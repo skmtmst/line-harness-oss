@@ -44,7 +44,7 @@ describe('宛先のタブ', () => {
   it('読み込み中は1枚だけ出す', () => {
     fixture.recipients.mockImplementation(() => new Promise(() => undefined))
     render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
-    expect(screen.getByText('宛先を読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('宛先を読み込んでいます')).toBeTruthy()
   })
 
   it('失敗は読み直せる', async () => {
@@ -54,7 +54,7 @@ describe('宛先のタブ', () => {
       data: { rows: [], summary: SUMMARY, aggregateOnly: false, aggregateReason: null, legacySuccessCount: null },
     })
     render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
-    await waitFor(() => expect(screen.getByText('宛先を表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('宛先を読み込めませんでした')).toBeTruthy())
     screen.getByRole('button', { name: 'もう一度読み込む' }).click()
     await waitFor(() => expect(screen.getByText('宛先の結果はまだありません')).toBeTruthy())
   })

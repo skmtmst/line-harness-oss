@@ -93,6 +93,19 @@ async function click(target: Element | undefined) {
 }
 
 describe('V8 会員（src/v8/nen-members）', () => {
+  it('ペット未登録でも絞り込めて、札を外すと全員へ戻る', async () => {
+    await render('members')
+    expect(byLabel('ペットの有無で絞り込む')).toBeUndefined()
+    await click(buttons().find(button => button.textContent?.startsWith('ペットあり')))
+    expect(fetchApi.mock.calls.some(([path]) => String(path).includes('pet=with'))).toBe(true)
+    await click(byLabel('ペットの有無で絞り込む'))
+    const unregistered = Array.from(document.querySelectorAll('[role="option"]')).find(option => option.textContent?.includes('未登録'))
+    await click(unregistered?.querySelector('button') ?? undefined)
+    expect(fetchApi.mock.calls.some(([path]) => String(path).includes('pet=without'))).toBe(true)
+    await click(buttons().find(button => button.textContent?.startsWith('ペット未登録')))
+    expect(String(fetchApi.mock.calls.at(-1)?.[0])).not.toContain('pet=')
+    expect(byLabel('ペットの有無で絞り込む')).toBeUndefined()
+  })
   beforeEach(() => {
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'

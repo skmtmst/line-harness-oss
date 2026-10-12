@@ -184,14 +184,16 @@ describe('題（label）とのつながり', () => {
   })
 })
 
-describe('v7 の見た目は変えない', () => {
-  it('data-theme が v8 でないときは今までどおりの textarea', async () => {
-    document.documentElement.removeAttribute('data-theme')
+describe('旧指定でも現在の差し込み表示', () => {
+  it('旧テーマ指定でも札を出し、保存値を保つ', async () => {
+    document.documentElement.setAttribute('data-theme', 'v7')
     await mount(<Harness initial="{{name}}さん" />)
     const element = box()
-    expect(element.tagName).toBe('TEXTAREA')
+    expect(element.tagName).toBe('DIV')
+    expect(chips()).toEqual(['{{name}}'])
     expect((element as HTMLTextAreaElement).value).toBe('{{name}}さん')
-    await act(async () => { fireEvent.change(element, { target: { value: '{{name}}' } }) })
+    element.textContent = '{{name}}'
+    await act(async () => { fireEvent.input(element) })
     expect(current()).toBe('{{name}}')
   })
 })
@@ -206,4 +208,29 @@ describe('閲覧用の差し込み', () => {
     expect(host.querySelector('script')).toBeNull()
     expect(host.querySelector('[contenteditable]')).toBeNull()
   })
+  it('解決した名前と情報の値を札にし、未解決名とHTMLは文字として保つ', () => {
+    act(() => root.render(<InsertText value="{{name}}さん {{field.pet}} {{unknown}}" resolvedValue="<b>利用者</b>さん ポチ {{unknown}}" />))
+    expect(host.textContent).toBe('<b>利用者</b>さん ポチ {{unknown}}')
+    expect(host.querySelector('[data-token="{{name}}"]')?.textContent).toBe('<b>利用者</b>')
+    expect(host.querySelector('[data-token="{{field.pet}}"]')?.textContent).toBe('ポチ')
+    expect(host.querySelector('b')).toBeNull()
+  })
+
+  it('解決できない名前を値の札にせず、本文を一致させられない場合も口が返した文字を保つ', () => {
+    act(() => root.render(<InsertText value="{{name}}さん" resolvedValue="{{name}}さん" />))
+    expect(host.textContent).toBe('{{name}}さん')
+    expect(host.querySelector('[data-token]')).toBeNull()
+    act(() => root.render(<InsertText value="{{name}}さん" resolvedValue="異なる本文" />))
+    expect(host.textContent).toBe('異なる本文')
+    expect(host.querySelector('[data-token]')).toBeNull()
+  })
+
+  it('隣り合う差し込みと空の値でも解決済み本文の文字を増減させない', () => {
+    act(() => root.render(<InsertText value="{{name}}{{field.pet}}の件" resolvedValue="利用者ポチの件" />))
+    expect(host.textContent).toBe('利用者ポチの件')
+    expect(host.querySelector('[data-token]')?.textContent).toBe('利用者ポチ')
+    act(() => root.render(<InsertText value="{{name}}さん" resolvedValue="さん" />))
+    expect(host.textContent).toBe('さん')
+  })
+
 })

@@ -9,7 +9,7 @@ const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
 const PUBLISH = read('app/auto-replies/edit/wizard-v8.tsx')
 const RUN_DETAIL = read('v8/friend-add-runs/detail.tsx')
 const PUBLISHED = read('app/webinars/published/page.tsx')
-const FRIEND_DETAIL = read('app/mileage/friends/detail/page.tsx')
+const FRIEND_DETAIL = read('v8/mileage/friend-detail.tsx')
 
 /*
  * #975 U098: 読み込みに失敗した・対象がない画面が「再読み込み」だけを
@@ -19,7 +19,7 @@ const FRIEND_DETAIL = read('app/mileage/friends/detail/page.tsx')
 describe('再読み込みだけにしない（#975 U098）', () => {
   it('公開する自動応答は、対象未指定・権限なし・失敗を分けて案内する', () => {
     expect(PUBLISH).toContain("loadState === 'not-found'")
-    // 戻り先は ★V7 TargetMissing の backHref、再読み込みは onRetry が持つ。
+    // 戻り先は 共通 TargetMissing の backHref、再読み込みは onRetry が持つ。
     expect(PUBLISH).toContain('backHref="/auto-replies"')
     expect(PUBLISH).toContain('onRetry={() => void load()}')
   })
@@ -48,7 +48,7 @@ describe('再読み込みだけにしない（#975 U098）', () => {
     expect(FRIEND_DETAIL).toContain('LINEアカウントを選択してください')
     expect(FRIEND_DETAIL).toContain('backHref="/friends"')
     expect(FRIEND_DETAIL).toContain('友だち一覧へ戻る')
-    // 再読み込みは ★V7 TargetMissing の error（文言は部品が持つ）。
+    // 再読み込みは 共通 TargetMissing の error（文言は部品が持つ）。
     expect(FRIEND_DETAIL).toContain('onRetry={() => void load()}')
     expect(FRIEND_DETAIL).toContain('友だちが選択中のLINEアカウントにいるか確認して')
   })

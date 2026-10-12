@@ -35,6 +35,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
+import { audienceText, NotificationStateBadge, notificationRowState, deliveryTimingSummary, missedNoticeSummary, completedNoticeSummary } from './notification-summary'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -46,8 +47,7 @@ import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/en
  * ★V8 ウェビナーの ④通知（Pencil E7iAYs）。
  * 通知とリマインド（送った数・6つの通知の入／切と時刻）→ 視聴後にすること（3つの場合・本文・取れないとき）。
  * 右は LINE での見え方（選んだ通知の本文）。
- * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は app/webinars/edit/notifications-v8.tsx と
- * components/webinars/webinar-notifications.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は BEHAVIOR.md。
  */
 
 const SETTINGS_KEYS = [
@@ -277,6 +277,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   const available = overview !== null
   const count = (value: number | undefined) => (available && typeof value === 'number' ? formatNumber(value) : emptyValue('unknown'))
+  const countWithUnit = (value: number | undefined) => (available && typeof value === 'number' ? `${count(value)}件` : count(value))
 
   const timeBox = (value: string, label: string, onChange: (next: string) => void) => (readOnly
     ? <ReadValue compact label={label}>{value}</ReadValue>
@@ -333,7 +334,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       hidePreviewWhenNarrow
       boardId="E7iAYs"
       title={chrome.title}
@@ -359,7 +360,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
         <div className={form.cardHeadRow}>
           <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : emptyValue('unknown')}`}</HelpTip>
+          <HelpTip label="送った数と通知の対象">{`予定 ${countWithUnit(overview?.pending)}・取消 ${countWithUnit(overview?.cancelled)}・合計 ${countWithUnit(overview?.total)}。通知の対象：${audienceText(overview?.audience)}`}<br /><NotificationStateBadge state={notificationRowState(settings ? SETTINGS_KEYS.filter(key => key.endsWith("Enabled")).some(key => Boolean(settings[key])) : undefined, loadState !== 'loading', loadState === 'error')} /><br />{deliveryTimingSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{missedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{completedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}</HelpTip>
         </div>
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}

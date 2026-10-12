@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { newBranchStep, updateBranchStep } from './branch-editor'
+import { newBranchStep, updateBranchStep } from '@/v8/automations/branch-editor'
 import type { CommonActionStep } from '@/lib/api'
 
 const refStep = (id: string, commonActionId: string): CommonActionStep => ({

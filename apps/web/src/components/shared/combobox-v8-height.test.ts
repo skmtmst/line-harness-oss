@@ -13,8 +13,8 @@ const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8
 
 describe('探して選ぶ欄の高さ', () => {
   it('V8 は 36（変数）。指で触る画面には効かせない', () => {
-    expect(css).toMatch(/@media not \(pointer: coarse\) \{\s*\[data-theme='v8'\] \.field \{\s*height: var\(--tpl-ux5-combobox-h\);/)
-    expect(globals).toMatch(/\[data-theme="v8"\] \{[^}]*--tpl-ux5-combobox-h: 36px;/)
+    expect(css).toMatch(/@media not \(pointer: coarse\) \{\s*:root \.field \{\s*height: var\(--tpl-ux5-combobox-h\);/)
+    expect(globals).toMatch(/:root \{[^}]*--tpl-ux5-combobox-h: 36px;/)
   })
 
   it('v7 の 40・指の 44 は残す', () => {

@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PhotoReviewDetail } from './photo-review-detail'
+import { PhotoReviewDetail } from '@/v8/nen-posts/detail'
 
 /*
  * #817: 写真の重複と報酬の決まりの版。主な状態を描画で確かめる。

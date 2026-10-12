@@ -17,7 +17,7 @@ import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
  * 見本が決めた見出し・数の帯・フォルダの列・表の列が出ることを
  * 実DOMで固定する。v7 では従来の一覧が出ることも固定する。
  */
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/inflow-links',
   useSearchParams: () => new URLSearchParams(),

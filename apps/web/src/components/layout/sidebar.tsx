@@ -11,15 +11,13 @@ import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
-import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
 import { brandInitial } from './brand-initial'
 import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
-import HqAccountMenu, { SidebarAccountMenu } from '@/components/hq/account-menu'
+import { SidebarAccountMenu } from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -77,14 +75,6 @@ export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
 
 /** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
 const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-
-/** 配布の受け口が無いあいだ、統括サイドバーから外す4画面。 */
-const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
-  '/hq/friend-attributes',
-  '/hq/templates',
-  '/hq/rich-menus',
-  '/hq/form-submissions',
-])
 
 // ─── メニュー定義 ───
 //
@@ -166,13 +156,12 @@ export default function Sidebar({
    * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
    * レイアウト効果の中で本当のテーマへ揃える。
    */
-  const isV8 = useAdminTheme() === 'v8'
+
   /*
    * V2 のタグモード（移行中だけの特別な形）で組を丸ごと隠すのは
    * V8 では真似しない（MIGRATION-RISKS §1-2）。V8 では組の見出しは常に出て、
    * 中身の開閉だけが変わる。
    */
-  const attrV2Mode = friendAttributesV2Mode && !isV8
 
   /*
    * ★V8（夕44-A）：メイン・配信・コンテンツ・予約は開いた形、それ以外は
@@ -233,7 +222,6 @@ export default function Sidebar({
   useEffect(() => {
     const toggle = () => {
       /* v7 では畳み機能を出さない。テーマが v7 のときは無視する。 */
-      if (document.documentElement.dataset.theme !== 'v8') return
       setCollapsed((current) => {
         const next = !current
         try {
@@ -414,13 +402,13 @@ export default function Sidebar({
          * ★V8 は4画面とも中身を出す（app/hq/hq-template-page.tsx と同じ条件）ので、
          * 左メニューにも出す（絵 `V8-B/JKjsE`・`LRc93` の6項目）。v7 は今までどおり。
          */
-        if (isHq && !isV8 && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
+
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
-        if (attrV2Mode && item.href === '/tags') return false
-        if (attrV2Mode && item.href === '/conversions') return false
-        if (attrV2Mode && item.href === '/analytics') return false
+
+
+
         if (item.href === '/staff' && staffReadRole !== 'owner' && staffReadRole !== 'admin') return false
         if (item.href === '/accounts' && staffReadRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
@@ -437,7 +425,6 @@ export default function Sidebar({
       }),
     }))
     .filter((section) => section.items.length > 0)
-    .filter((section) => !attrV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
     /*
      * 機能の見え方を読み込んでいる間は、最初の区分だけ出す（動きの点検 8・11 番）。
      * 以前は機能に縛られない「設定」だけが先に出て、読み込み後にその上へ区分が
@@ -703,19 +690,12 @@ export default function Sidebar({
 
       {isHq ? (
         <>
-          {/* v7 の札は残す。V8 では下のロゴの段に替わる。 */}
-          <div className={`px-3 pb-3 pt-4 ${styles.collapseHide} v7-only`}>
-            <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-              <p className="text-xs font-semibold text-accent-deep">musubo</p>
-              <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
-            </div>
-          </div>
           {/*
             ★V8 殻合わせ（絵 `V8-B/JKjsE`）：脇の頭は店の画面と同じ部品（会社の印＋会社名＋小さく musubo）。
             会社名と頭の1字（「株式会社」などを外す）は店の画面と同じ決め方にする（オーナー 2026-10-07）。
             統括の名前（統括名）は上の帯の切り替えの札に出す。v7 は上の札のまま。
           */}
-          <div className="v8-only"><SidebarIdentity /></div>
+          <div><SidebarIdentity /></div>
         </>
       ) : preview ? (
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
@@ -766,8 +746,8 @@ export default function Sidebar({
            * 畳めない。いまいる画面の組は常に開く。アイコンだけの帯では
            * 見出し自体が無いので、畳みは効かせず全部のアイコンを出す。
            */
-          const sectionLabel = section.label ?? (isHq && isV8 ? HQ_V8_SECTION_LABEL : null)
-          const collapsible = isV8 && Boolean(sectionLabel)
+          const sectionLabel = section.label ?? (isHq ? HQ_V8_SECTION_LABEL : null)
+          const collapsible = Boolean(sectionLabel)
           const sectionOpen =
             !collapsible || groupIsOpen(section) || section.items.some((item) => isActive(item))
           /*
@@ -778,7 +758,7 @@ export default function Sidebar({
           return (
           <div key={section.id} className={styles.section}>
             {sectionLabel && (
-              isV8 ? (
+              (
                 <button
                   type="button"
                   className={styles.sectionToggle}
@@ -796,10 +776,6 @@ export default function Sidebar({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
                   </svg>
                 </button>
-              ) : (
-                <div className={attrV2Mode ? 'flex h-[20px] items-center px-3' : styles.sectionHeading}>
-                  <p>{section.label}</p>
-                </div>
               )
             )}
             {(() => {
@@ -812,7 +788,7 @@ export default function Sidebar({
                   key={item.href}
                   href={item.href}
                   // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
-                  prefetch={isV8 ? false : undefined}
+                  prefetch={false}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
                   /*
@@ -821,21 +797,19 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-label` : ''} ${
+                  className={`${styles.item} ${''} ${
                     active
                       ? isDanger
                         ? `${styles.active} ${styles.danger}`
-                        : attrV2Mode
-                          ? `${styles.active} border-accent`
-                          : styles.active
+                        : styles.active
                       : isDanger
                         ? styles.danger
                         : ''
                   }`}
                 >
                   <span className="shrink-0">{(() => {
-                    const V8Icon = isV8 && !isHq ? V8_NAV_ICONS[item.id] : undefined
-                    return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon className={isV8 ? styles.v8NavIcon : undefined} d={isV8 && item.iconV8 ? item.iconV8 : item.icon} />
+                    const V8Icon = !isHq ? V8_NAV_ICONS[item.id] : undefined
+                    return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon className={styles.v8NavIcon} d={item.iconV8 ? item.iconV8 : item.icon} />
                   })()}</span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
@@ -875,7 +849,7 @@ export default function Sidebar({
         オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {isV8 && !isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+      {!isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"
@@ -893,7 +867,7 @@ export default function Sidebar({
         統括の設定の中（メンバー・統括の情報・請求・お問い合わせ）を開いているとき選ばれた形にする。
         v7 の統括は今までどおり左下のアカウントの行から行く。
       */}
-      {isV8 && isHq && !preview && (
+      {isHq && !preview && (
         <div className={styles.settingsEntry}>
           <Link
             href="/hq/settings"
@@ -914,7 +888,7 @@ export default function Sidebar({
         v7 の統括（/hq）には出さない。V8 の統括は店の画面と同じく出す（絵 `V8-B/JKjsE`）。
         V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview || (isHq && !isV8) ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
+      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
@@ -926,13 +900,13 @@ export default function Sidebar({
         正本は ★V6 36-1 `qAvlC`。中身は `components/hq/account-menu.tsx` が持つ。
         V8 の統括は店の画面と同じ形（名前・ログアウトは上の帯、メンバー・お問い合わせは「統括の設定」の中）。
       */}
-      {isHq && !isV8 ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}
+      {<div className={styles.footer} />}
       {/*
         ★V8 左下の自分とメニュー（オーナー 2026-10-07・絵 `zUg8S/T7XSI6/shBJJ`・`ZBjxY/Xn3xt`）。
         店・統括の両方で版の下に置く。上の帯の名前・ログアウト・［統括へ］はここへまとめた。
         畳んだ左メニューでは顔だけ。v7 は上の行のまま（統括の HqAccountMenu・店は上の帯）。
       */}
-      {isV8 && !preview ? <SidebarAccountMenu hq={isHq} collapsed={collapsed && !drawer} /> : null}
+      {!preview ? <SidebarAccountMenu hq={isHq} collapsed={collapsed && !drawer} /> : null}
     </>
   )
 

@@ -7,13 +7,15 @@
  *   理由は短く1行ずつ・取り下げで外れる2つ（登録中・LINE上に残る）は1行にまとめる・外す操作が右に出る
  */
 import React from 'react'
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 type ApiResult = { success: boolean; data?: unknown }
 
 const fixture = vi.hoisted(() => ({
   role: 'owner',
+  accountId: 'account-a',
+  deleteExternal: vi.fn(async (_id: string, _accountId: string) => ({ success: true })),
   deleteImpact: (() => Promise.resolve({ success: false })) as (id: string) => Promise<ApiResult>,
 }))
 
@@ -44,7 +46,7 @@ const items = [
 ]
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccount: { id: 'account-a', name: 'A社' } }),
+  useAccount: () => ({ selectedAccount: { id: fixture.accountId, name: 'A社' } }),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -75,7 +77,8 @@ vi.mock('@/lib/api', () => ({
           facets: { total: items.length, published: 1, targeting: 0, folderCounts: {} },
         },
       }),
-      external: () => Promise.resolve({ success: true, data: { currentDefault: null, lineMenus: [] } }),
+      external: () => Promise.resolve({ success: true, data: { currentDefault: null, lineMenus: [{ richMenuId: 'line-only', name: '外部メニュー', areasCount: 1, size: { width: 2500, height: 843 }, adminManaged: false }] } }),
+      deleteExternal: (id: string, accountId: string) => fixture.deleteExternal(id, accountId),
       tapStats: () => Promise.resolve({
         success: true,
         data: { from: '2026-09-01', to: '2026-10-01', total: 12, byGroup: [{ groupId: 'g-default', taps: 12 }], byArea: [] },
@@ -102,6 +105,10 @@ import RichMenusListV8 from './list'
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   fixture.role = 'owner'
+  fixture.accountId = 'account-a'
+  fixture.deleteExternal.mockReset().mockResolvedValue({ success: true })
+  window.history.replaceState({}, '', '/rich-menus')
+  window.dispatchEvent(new PopStateEvent('popstate'))
 })
 
 afterEach(() => {
@@ -110,6 +117,43 @@ afterEach(() => {
 })
 
 describe('V8 リッチメニュー一覧', () => {
+  async function openExternal(view: ReturnType<typeof render>) {
+    await view.findByText('通常メニュー')
+    fireEvent.click(view.getByRole('button', { name: /LINE上にあるメニュー/ }))
+    await view.findByRole('button', { name: 'LINE上の「外部メニュー」の操作' })
+    fireEvent.click(view.getByRole('button', { name: 'LINE上の「外部メニュー」の操作' }))
+    fireEvent.click(await view.findByText('LINEから削除する'))
+    return view.findByRole('alertdialog')
+  }
+
+  test('LINE側だけのメニューは確認後に同じ店のAPIで削除する', async () => {
+    const view = render(<RichMenusListV8 />)
+    const dialog = await openExternal(view)
+    expect(dialog.textContent).toContain('元に戻せません。')
+    expect(fixture.deleteExternal).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(fixture.deleteExternal).toHaveBeenCalledWith('line-only', 'account-a'))
+  })
+
+  test('店切替は外部メニューの削除確認を捨て、新しい店へ削除を送らない', async () => {
+    const view = render(<RichMenusListV8 />)
+    await openExternal(view)
+    fixture.accountId = 'account-b'
+    view.rerender(<RichMenusListV8 />)
+    await waitFor(() => expect(view.queryByRole('alertdialog')).toBeNull())
+    expect(fixture.deleteExternal).not.toHaveBeenCalled()
+  })
+
+  test('閲覧だけでは外部メニューの削除操作を出さない', async () => {
+    fixture.role = 'staff'
+    window.history.replaceState({}, '', '/rich-menus?showExternal=true')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    const view = render(<RichMenusListV8 />)
+    await view.findByText('選んだメニューの中身')
+    await act(async () => {})
+    expect(view.queryByRole('button', { name: 'LINE上の「外部メニュー」の操作' })).toBeNull()
+    expect(fixture.deleteExternal).not.toHaveBeenCalled()
+  })
   test('行に順番・状態の札・今月の回数が出る（集計の無い行は「—」）', async () => {
     const view = render(<RichMenusListV8 />)
     const first = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement

@@ -9,6 +9,7 @@
  *   R208: テキストのまま削除・上下移動ができ、本文を保って並べ替わる。
  *   R209: ボタンの編集欄は1つだけ（2通目を直すと全通に反映されていた）。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
@@ -99,12 +100,7 @@ function unmount() {
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = element instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 function titleInput(): HTMLInputElement | null {
@@ -112,7 +108,7 @@ function titleInput(): HTMLInputElement | null {
 }
 
 function textareas(): HTMLTextAreaElement[] {
-  return [...container.querySelectorAll<HTMLTextAreaElement>('textarea[placeholder="テキストを入力"]')]
+  return [...container.querySelectorAll<HTMLTextAreaElement>('[role="textbox"][placeholder="テキストを入力"]')]
 }
 
 function buttonByText(label: string): HTMLButtonElement | undefined {

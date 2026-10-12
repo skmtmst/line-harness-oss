@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 
-const consoleSource = readFileSync(new URL('./restaurant-console.tsx', import.meta.url), 'utf8')
+const consoleSource = readFileSync(new URL('../../v8/restaurant/organization/organization.tsx', import.meta.url), 'utf8')
+const copySource = readFileSync(new URL('../../components/shared/copy-text-button.tsx', import.meta.url), 'utf8')
 const apiSource = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta.url), 'utf8')
 
 describe('飲食店向け予約メール取り込みアドレス画面', () => {
@@ -16,13 +17,14 @@ describe('飲食店向け予約メール取り込みアドレス画面', () => {
       '予約メール取り込みアドレス',
       '未発行',
       'アドレスを発行',
-      'コピー済み',
       '旧アドレスは90日後に失効します',
       '取り込み用ドメインが未設定です',
     ]) {
       expect(consoleSource).toContain(label)
     }
-    expect(consoleSource).toContain('navigator.clipboard.writeText(item.address)')
+    expect(consoleSource).toContain('CopyTextButton value={item.address}')
+    expect(copySource).toContain('navigator.clipboard.writeText(text)')
+    expect(copySource).toContain('コピーしました')
     expect(consoleSource).not.toMatch(/console\.(?:log|warn|error)\([^\n]*address/)
   })
 })
@@ -41,7 +43,8 @@ describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', 
       '店舗を追加する',
       'LINE公式アカウント',
       '他店舗で使用中',
-      'LINE: {store.line_account_name || \'未設定\'}',
+      'LINE: ${s.line_account_name',
+      "emptyValue('unconfigured')",
       'アーカイブ',
     ]) {
       expect(consoleSource).toContain(label)

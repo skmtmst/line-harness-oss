@@ -30,6 +30,7 @@ let failScenarios: boolean
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
     const text = String(url)
+      if (text.includes('/api/tag-groups') || text.includes('/api/folders')) return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
     if (text.includes('/api/tags')) {
       if (failTags) throw new Error('network down')
       return { ok: true, status: 200, json: async () => ({ success: true, data: [
@@ -69,7 +70,7 @@ async function openOptions(buttonId: string) {
   expect(button).toBeTruthy()
   await act(async () => { button!.click() })
   if (buttonId === 'of-tag') {
-    const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')].map((el) => el.getAttribute('aria-label') ?? '')
+    const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')].map((el) => el.getAttribute('aria-label') ?? '')
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     return labels
   }
@@ -129,6 +130,7 @@ describe('R524 候補の取得失敗は空と区別して再試行を出す', ()
   it('正常な0件は失敗表示にならない', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
       const text = String(url)
+      if (text.includes('/api/tag-groups') || text.includes('/api/folders')) return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
       if (text.includes('/api/tags')) {
         return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
       }

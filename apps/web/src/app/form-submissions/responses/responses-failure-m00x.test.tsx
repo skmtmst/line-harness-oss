@@ -18,6 +18,7 @@ const net = vi.hoisted(() => ({
 }))
 
 const fetchApi = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -29,7 +30,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=form-1'),
 }))
@@ -38,7 +39,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 
 import FormResponsesPage from './page'
 
@@ -112,7 +113,11 @@ function findButton(text: string): HTMLButtonElement | undefined {
 }
 
 async function openDetail() {
-  const row = host.querySelector('tr.cursor-pointer')
+  await act(async () => {
+    ;([...host.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent?.includes('1件ずつ見る')) as HTMLElement).click()
+  })
+  await settle()
+  const row = host.querySelector('tbody tr')
   expect(row, '回答の行がある').toBeTruthy()
   await act(async () => {
     ;(row as HTMLElement).click()

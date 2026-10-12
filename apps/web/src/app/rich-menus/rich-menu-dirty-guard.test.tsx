@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options { "url": "http://localhost/rich-menus/" }
 import React, { act } from 'react'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
+import { pickDateTime } from '@/test-utils/rich-menu-editor'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -15,36 +18,22 @@ const richMenuPublish = vi.hoisted(() => vi.fn())
 const richMenuPreviewTargets = vi.hoisted(() => vi.fn())
 const richMenuDuplicate = vi.hoisted(() => vi.fn())
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
+vi.mock('next/navigation', async () => {
+  const router = {
     push: routerPush, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
-  }),
+  }
+  return { ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => router,
   useSearchParams: () => searchParams.value,
   usePathname: () => '/rich-menus/edit',
-}))
+  }
+})
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href, ...rest }, children),
 }))
-/*
- * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
- * ここで見たいのは選んだ日時の中身なので、素の <select> に置き換える。
- */
-vi.mock('@/components/shared/select', () => ({
-  default: ({ 'aria-label': label, value, onChange, options }: {
-    'aria-label'?: string
-    value: string
-    onChange: (value: string) => void
-    options: Array<{ value: string; label: string }>
-  }) => React.createElement(
-    'select',
-    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
-    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
-  ),
-}))
-
 const selectedAccount = vi.hoisted(() => ({ id: 'acc-1', name: 'テスト店' }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -55,7 +44,7 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -104,13 +93,18 @@ vi.mock('@/lib/api', () => ({
       get: richMenuGet,
       update: richMenuUpdate,
       tapStats: () => Promise.resolve({ success: true, data: { byArea: [] } }),
-      list: () => Promise.resolve({ success: true, data: [] }),
+      list: () => Promise.resolve({ success: true, data: [{ ...GROUP, id: 'restore-1', name: '戻すメニュー', status: 'published' }] }),
       listSchedules: () => Promise.resolve({ success: true, data: [] }),
       schedule: richMenuSchedule,
       publish: richMenuPublish,
       previewTargets: richMenuPreviewTargets,
       duplicate: richMenuDuplicate,
       audienceSummary: () => Promise.resolve({ success: true, data: { total: { value: 0, state: 'available', reason: null }, targeted: { value: 0, state: 'available', reason: null }, excluded: { value: 0, state: 'available', reason: null }, effective: { value: 0, state: 'available', reason: null } } }),
+      prepublishCheck: () => Promise.resolve({ success: true, data: { selfCheck: { ok: true }, deviceConfirmed: true, deviceConfirmedAt: null, pageCount: 1, maxPages: 20 } }),
+      validatePublish: () => Promise.resolve({ success: true, data: { checks: [{ key: 'self', ok: true }, { key: 'line', ok: true }] } }),
+      publishProgress: () => Promise.resolve({ success: true, data: { steps: [], message: null, run: { status: 'done' } } }),
+      publishRuns: () => Promise.resolve({ success: true, data: { runs: [] } }),
+      reconcile: () => Promise.resolve({ success: true, data: { diffs: [] } }),
       imageUrl: (key: string) => `/img/${key}`,
     },
     // N-152/N-156: 編集画面は操作者の役割を読んで staff には集計だけを出す。
@@ -118,8 +112,13 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import NewRichMenuPage from './new/page'
-import RichMenuEditPage from './edit/page'
+import NewRichMenuPage from './new/create-v8'
+import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
+
+function CurrentRichMenuEdit() {
+  window.history.replaceState(null, '', '/rich-menus/edit?' + searchParams.value.toString())
+  return <NewRichMenuPage editGroupId={searchParams.value.get('id') ?? undefined} />
+}
 
 async function flush() {
   await act(async () => { await Promise.resolve() })
@@ -135,49 +134,18 @@ async function type(input: Element, value: string) {
 }
 
 /** searchParams を差し替えて再描画し、画面内の工程移動を再現する。 */
-async function gotoStep(view: ReturnType<typeof render>, step: string | null) {
-  searchParams.value = new URLSearchParams(step ? `id=grp-1&step=${step}` : 'id=grp-1')
-  view.rerender(<RichMenuEditPage />)
-  await flush()
-}
-
-const WEEK = '日月火水木金土'
-
-/** 出しはじめ・出しおわりを日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm。 */
-async function pickDateTime(label: string, iso: string) {
-  const [date, time] = iso.split('T')
-  const [hour, minute] = time.split(':')
-  const [y, mo, d] = date.split('-').map(Number)
-  const week = WEEK[new Date(y, mo - 1, d).getDay()]
-  fireEvent.click(screen.getByLabelText(label))
-  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  fireEvent.click(picker.querySelector('button[aria-label="日付"]')!)
-  for (let i = 0; i < 24; i += 1) {
-    const grid = document.querySelector('[role="grid"]')
-    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
-    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
-    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
-    const nav = [...document.querySelectorAll('button')].find(
-      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
-    )!
-    fireEvent.click(nav)
-  }
-  fireEvent.click([...document.querySelectorAll('button')].find((b) =>
-    (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
-  )!)
-  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  fireEvent.change(reopened.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
-  fireEvent.change(reopened.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
-  fireEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
+async function gotoStep(_view: ReturnType<typeof render>, step: string | null) {
+  const labels: Record<string, string> = { shape: '形と画像', targeting: '誰に出すか', publish: '公開' }
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: `${labels[step ?? 'shape']}に戻る` }))
   await flush()
 }
 
 async function fillPublishSchedule() {
-  const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
-  // [0] いますぐ出す / [1] 日時を決めて出す / [2] 期間を決める
-  fireEvent.click(radios[1])
+  fireEvent.click(screen.getByRole('radio', { name: /日時を決めて公開する/ }))
   await flush()
-  await pickDateTime('出しはじめ', '2026-10-01T10:00')
+  await pickDateTime('公開を始める日時', '2026-10-01T10:00')
+  fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
+  await flush()
 }
 
 /** 試験ごとに空で始めるための localStorage 代替。 */
@@ -199,7 +167,7 @@ beforeEach(() => {
   searchParams.value = new URLSearchParams()
   routerPush.mockReset()
   richMenuGet.mockReset()
-  richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP }))
+  richMenuGet.mockImplementation((id: string) => Promise.resolve({ success: true, data: { ...GROUP, id } }))
   richMenuUpdate.mockReset()
   richMenuUpdate.mockImplementation(() => Promise.resolve({ success: true, data: GROUP }))
   richMenuSchedule.mockReset()
@@ -220,11 +188,13 @@ afterEach(() => {
 })
 
 describe('リッチメニュー新規作成の未保存ガード (N-162)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   test('未入力のまま一覧リンクを押しても確認は出ない', async () => {
     render(<NewRichMenuPage />)
     await flush()
 
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(routerPush).not.toHaveBeenCalled()
@@ -234,8 +204,8 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     render(<NewRichMenuPage />)
     await flush()
 
-    await type(screen.getByLabelText('メニュー名'), '季節メニュー')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    await type(screen.getByLabelText('メニュー名（友だちには見えません）'), '季節メニュー')
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
 
     // 確認窓が出て遷移は止まる
@@ -245,17 +215,17 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     // 「編集を続ける」で閉じる
     fireEvent.click(screen.getByText('編集を続ける'))
     await flush()
-    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
     // 入力は残る
-    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('季節メニュー')
+    expect((screen.getByLabelText('メニュー名（友だちには見えません）') as HTMLInputElement).value).toBe('季節メニュー')
   })
 
   test('確認で「保存せずに移る」を選ぶと遷移する', async () => {
     render(<NewRichMenuPage />)
     await flush()
 
-    await type(screen.getByLabelText('メニュー名'), '季節メニュー')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    await type(screen.getByLabelText('メニュー名（友だちには見えません）'), '季節メニュー')
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
@@ -266,7 +236,7 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     render(<NewRichMenuPage />)
     await flush()
 
-    await type(screen.getByLabelText('メニュー名'), '季節メニュー')
+    await type(screen.getByLabelText('メニュー名（友だちには見えません）'), '季節メニュー')
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
@@ -274,25 +244,27 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
 })
 
 describe('リッチメニュー編集の未保存ガード (N-162)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   test('読み込み直後は変更なしなので一覧リンクを押しても確認は出ない', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     await screen.findByDisplayValue('メインメニュー')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
 
   test('変更後に一覧リンクを押すと確認が出る', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
 
     expect(screen.getByText('保存していない変更があります')).toBeTruthy()
@@ -300,34 +272,34 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
   })
 
   test('保存し終わると警告は出なくなる', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
     // 保存（update→再読込で署名が更新される）
-    fireEvent.click(screen.getByText('下書きを保存する'))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await act(async () => { await Promise.resolve() })
     await flush()
 
     expect(richMenuUpdate).toHaveBeenCalled()
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
 
   test('step=targeting でも離脱確認が出る（どの段階でも窓は届く）', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     // 出し分けをONにしてdirty化（2つ目の audience radio が「条件に当てはまる友だちだけ」）
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="audience"]')
     fireEvent.click(radios[1])
     await flush()
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
 
     expect(screen.getByText('保存していない変更があります')).toBeTruthy()
@@ -335,8 +307,8 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
   })
 
   test('ステップ移動は同一画面の段階移動なので確認を出さない', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     const nameInput = await screen.findByDisplayValue('メインメニュー')
@@ -346,7 +318,11 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     fireEvent.click(stepButton!.closest('button')!)
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
-    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=grp-1&step=targeting')
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(screen.getByRole('radio', { name: /条件に当てはまる友だちだけ/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /形と画像/ }))
+    await flush()
+    expect(screen.getByDisplayValue('メインメニュー改')).toBeTruthy()
   })
 })
 
@@ -356,55 +332,60 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
  * 「いますぐ出す」へ黙って戻り、日時も消えていた。
  */
 describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   test('日時を決めて出す＋日時入力がSTEP1→STEP3の往復で消えない', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     await fillPublishSchedule()
 
     await gotoStep(view, null)
     await screen.findByDisplayValue('メインメニュー')
     await gotoStep(view, 'publish')
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
-    const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="timing"]')
     expect(radios[1].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('期間を決める＋出しおわり＋戻し先がSTEP往復で消えない', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
-    const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
-    fireEvent.click(radios[2])
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="timing"]')
+    fireEvent.click(radios[1])
+    fireEvent.click(screen.getByRole('checkbox', { name: '終わりを決める' }))
     await flush()
-    await pickDateTime('出しはじめ', '2026-10-01T10:00')
-    await pickDateTime('出しおわり', '2026-10-07T10:00')
+    await pickDateTime('公開を始める日時', '2026-10-01T10:00')
+    await pickDateTime('終わる日時', '2026-10-07T10:00')
+    await pickEntity('終わったらどうする', '戻すメニュー')
 
     await gotoStep(view, 'targeting')
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     await gotoStep(view, 'publish')
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[2].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
-    expect(screen.getByLabelText('出しおわり').textContent).toContain('2026年10月7日（水）10:00')
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
+    expect(screen.getByLabelText('終わる日時').textContent).toContain('2026年10月7日（水）10:00')
+    expect(screen.getByText('戻すメニュー')).toBeTruthy()
   })
 
   test('公開日時を入れたまま一覧へ離れると確認が出る（dirty署名に含まれる）', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     await fillPublishSchedule()
 
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.getByText('保存していない変更があります')).toBeTruthy()
     expect(routerPush).not.toHaveBeenCalled()
@@ -412,31 +393,31 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
 
   test('離脱確認を取消すと公開入力はそのまま残る', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     await fillPublishSchedule()
 
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     fireEvent.click(screen.getByText('編集を続ける'))
     await flush()
 
-    expect(screen.queryByText('保存していない変更があります')).toBeNull()
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('「保存せずに移る」を選ぶと公開入力は初期値へ戻る', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     await fillPublishSchedule()
 
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
@@ -444,42 +425,46 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
 
     // 捨てることを選んだので、開き直すと「いますぐ出す」・日時なしに戻る
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    view.rerender(<RichMenuEditPage />)
+    view.rerender(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[0].checked).toBe(true)
-    expect(screen.queryByLabelText('出しはじめ')).toBeNull()
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[0].checked).toBe(true)
+    expect(screen.queryByLabelText('公開を始める日時')).toBeNull()
   })
 
   test('下書き保存に失敗しても公開方法と日時は残る', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     await fillPublishSchedule()
 
     richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
-    fireEvent.click(screen.getByText('下書きを保存する'))
+    fireEvent.click(screen.getByRole('button', { name: '下書きのまま保存' }))
     await flush()
 
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('公開予約を保存できたら、その内容は未保存扱いにしない', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     await fillPublishSchedule()
-    fireEvent.click(screen.getByText('この内容で予約する'))
+    fireEvent.click(screen.getByRole('button', { name: '予約する' }))
     await flush()
     expect(richMenuSchedule).toHaveBeenCalled()
+    expect(richMenuSchedule).toHaveBeenCalledWith('grp-1', {
+      mode: 'scheduled', startsAt: '2026-10-01T01:00:00.000Z', endsAt: null, restoreGroupId: null,
+    }, expect.any(String))
 
     // 予約できた内容は保存済みなので、一覧への離脱で確認は出ない
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    await screen.findByRole('heading', { name: '公開予約を受け付けました' })
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
@@ -490,6 +475,8 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
  * 画面を離れてしまう。保存済みの条件と同じかどうかで表示を分ける。
  */
 describe('条件の保存状態の表示 (DEEP-27)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const GROUP_WITH_CONDITION = {
     ...GROUP,
     targetingEnabled: true,
@@ -502,13 +489,11 @@ describe('条件の保存状態の表示 (DEEP-27)', () => {
   test('保存済み条件は「保存済み」、直した条件は「未保存」と区別する', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     await screen.findByText('保存済み条件 1件')
 
-    fireEvent.click(screen.getByText('条件を編集'))
-    await flush()
     // スタブの条件組み立て: 押すと別の条件が1件入る
     fireEvent.click(screen.getByText('条件を足す(スタブ)'))
     await flush()
@@ -525,20 +510,22 @@ describe('条件の保存状態の表示 (DEEP-27)', () => {
  * 対象の説明を両工程で揃える（数え方そのものは変えない）。
  */
 describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const GROUP_EMPTY_CONDITION = {
     ...GROUP,
     targetingEnabled: true,
     targetingCondition: null,
   }
-  const EMPTY_WARNING = '条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。'
+  const EMPTY_WARNING = '条件が空のままだと、公開しても誰にも出ません。'
 
   test('条件ON・空条件ではSTEP2も「誰にも出しません」で0人と案内する', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
 
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
     // 「いま当てはまる人」「実際にこのメニューが出る人」は 0人 と出す
     expect(screen.getAllByText('0人')).toHaveLength(2)
@@ -546,12 +533,13 @@ describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
 
   test('同じ状態でSTEP1も同じ案内を出す', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     await screen.findByDisplayValue('メインメニュー')
-    expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '画面の説明' }))
+    expect(screen.getByText(/条件が空のままだと、公開しても誰にも出ません/)).toBeTruthy()
   })
 })
 
@@ -561,6 +549,8 @@ describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
  * STEP2 と同じく 0人＋誰にも出しません にそろえる。
  */
 describe('公開前チェックの人数（未保存条件）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const GROUP_WITH_CONDITION = {
     ...GROUP,
     targetingEnabled: true,
@@ -575,8 +565,6 @@ describe('公開前チェックの人数（未保存条件）', () => {
   }
 
   async function editConditionUnsaved() {
-    fireEvent.click(screen.getByText('条件を編集'))
-    await flush()
     // スタブの条件組み立て: 押すと別の条件が1件入る
     fireEvent.click(screen.getByText('条件を足す(スタブ)'))
     await flush()
@@ -595,9 +583,9 @@ describe('公開前チェックの人数（未保存条件）', () => {
   test('条件を未保存で直すと、人数APIへその未保存条件が渡る', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await editConditionUnsaved()
@@ -612,13 +600,13 @@ describe('公開前チェックの人数（未保存条件）', () => {
   test('未保存の条件では、STEP3の公開前チェックと右の欄にも注記が出る', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     await editConditionUnsaved()
 
     await gotoStep(view, 'publish')
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     // 公開前チェックの人数に「未保存の条件で計算」、右の欄に「（未保存の条件）」
     expect(screen.getByText(/未保存の条件で計算/)).toBeTruthy()
@@ -628,9 +616,9 @@ describe('公開前チェックの人数（未保存条件）', () => {
   test('保存済みの条件のままなら、注記は出ない', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     expect(screen.queryByText(/未保存の条件/)).toBeNull()
   })
@@ -639,12 +627,12 @@ describe('公開前チェックの人数（未保存条件）', () => {
     const GROUP_EMPTY_CONDITION = { ...GROUP, targetingEnabled: true, targetingCondition: null }
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     // 空条件は誰にも出ない。人数APIの全員カウントで誤魔化さない。
-    expect(screen.getByText(/誰にも出しません（0人）/)).toBeTruthy()
+    expect(screen.getByText(/誰の画面にも出ません（0人）/)).toBeTruthy()
     expect(screen.queryByText(/誰に出すかが決まっています/)).toBeNull()
     // 右の欄と「公開すると何が変わるか」も 0人 でそろえる
     expect(screen.getByText('0人')).toBeTruthy()
@@ -660,57 +648,66 @@ describe('公開前チェックの人数（未保存条件）', () => {
  * 保存成功・LINE登録・メニュー削除で消す。
  */
 describe('公開入力の下書き（localStorage）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const DRAFT_KEY = 'lh_rich_menu_publish_plan_grp-1'
 
   test('再読込すると公開方法と日時が復元される', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
     await fillPublishSchedule()
     expect(localStorage.getItem(DRAFT_KEY)).toBeTruthy()
 
     // ブラウザ再読込相当（アンマウントして開き直す）
     view.unmount()
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
+    const unload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unload)
+    expect(unload.defaultPrevented).toBe(true)
   })
 
   test('期間公開の入力（出しおわり・戻し先）も復元される', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
-    const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
-    fireEvent.click(radios[2])
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="timing"]')
+    fireEvent.click(radios[1])
+    fireEvent.click(screen.getByRole('checkbox', { name: '終わりを決める' }))
     await flush()
-    await pickDateTime('出しはじめ', '2026-10-01T10:00')
-    await pickDateTime('出しおわり', '2026-10-07T10:00')
+    await pickDateTime('公開を始める日時', '2026-10-01T10:00')
+    await pickDateTime('終わる日時', '2026-10-07T10:00')
+    await pickEntity('終わったらどうする', '戻すメニュー')
 
     view.unmount()
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[2].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
-    expect(screen.getByLabelText('出しおわり').textContent).toContain('2026年10月7日（水）10:00')
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
+    expect(screen.getByLabelText('終わる日時').textContent).toContain('2026年10月7日（水）10:00')
+    expect(screen.getByText('戻すメニュー')).toBeTruthy()
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!)).toMatchObject({ restoreGroupId: 'restore-1' })
   })
 
   test('「保存せずに移る」を選ぶと下書きも消える', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
     await fillPublishSchedule()
     expect(localStorage.getItem(DRAFT_KEY)).toBeTruthy()
 
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
@@ -720,13 +717,13 @@ describe('公開入力の下書き（localStorage）', () => {
 
   test('公開予約の保存に成功すると下書きは消える', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
     await fillPublishSchedule()
     expect(localStorage.getItem(DRAFT_KEY)).toBeTruthy()
 
-    fireEvent.click(screen.getByText('この内容で予約する'))
+    fireEvent.click(screen.getByRole('button', { name: '予約する' }))
     await flush()
 
     expect(richMenuSchedule).toHaveBeenCalled()
@@ -736,47 +733,50 @@ describe('公開入力の下書き（localStorage）', () => {
 
   test('LINE登録に成功すると下書きは消える', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
     await fillPublishSchedule()
 
     // 「いますぐ出す」へ戻しても日時は入力の中に残り、下書きも残る
-    fireEvent.click(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[0])
+    fireEvent.click(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[0])
     await flush()
     expect(localStorage.getItem(DRAFT_KEY)).toBeTruthy()
 
-    fireEvent.click(screen.getByText('この内容で公開する'))
+    fireEvent.click(screen.getByRole('button', { name: '公開する' }))
     await flush()
 
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '公開する' }))
+    await flush()
     expect(richMenuPublish).toHaveBeenCalled()
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
   })
 
   test('別メニューにはそのメニューの下書きだけが復元される', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
     await fillPublishSchedule()
 
     // 別メニュー（grp-2）の編集へ移る。grp-1 の下書きは出ない。
     searchParams.value = new URLSearchParams('id=grp-2&step=publish')
-    view.rerender(<RichMenuEditPage />)
+    view.rerender(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[0].checked).toBe(true)
-    expect(screen.queryByLabelText('出しはじめ')).toBeNull()
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[0].checked).toBe(true)
+    expect(screen.queryByLabelText('公開を始める日時')).toBeNull()
     // grp-1 の下書き自体は消えない
     expect(localStorage.getItem(DRAFT_KEY)).toBeTruthy()
 
     // grp-1 へ戻ると下書きが復元される
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    view.rerender(<RichMenuEditPage />)
+    view.rerender(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
-    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)
+    expect(screen.getByLabelText('公開を始める日時').textContent).toContain('2026年10月1日（木）10:00')
   })
 })
 
@@ -787,17 +787,19 @@ describe('公開入力の下書き（localStorage）', () => {
  * 読めた。
  */
 describe('R204 公開すると何が変わるか（設定に合わせた説明）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   async function renderPublish(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
   }
 
   test('全員の既定のときは「すべての友だちの画面に出る」と説明する', async () => {
     await renderPublish({ ...GROUP, isDefaultForAll: true })
-    expect(screen.getByText(/すべての友だちのトーク画面に出ます/)).toBeTruthy()
+    expect(screen.getByTitle(/すべての友だちのトーク画面に出ます/)).toBeTruthy()
     expect(screen.queryByText(/登録だけでは/)).toBeNull()
   })
 
@@ -807,22 +809,29 @@ describe('R204 公開すると何が変わるか（設定に合わせた説明�
       targetingEnabled: true,
       targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
     })
-    expect(screen.getByText(/順次切り替わります/)).toBeTruthy()
-    expect(screen.getByText(/すぐ全員に出るわけではありません/)).toBeTruthy()
+    expect(screen.getByTitle(/順次切り替わります/)).toBeTruthy()
+    expect(screen.getByTitle(/すぐ全員に出るわけではありません/)).toBeTruthy()
     expect(screen.queryByText(/すべての友だちのトーク画面に出ます/)).toBeNull()
   })
 
   test('対象設定なしなら「登録だけでは画面は変わらない」と説明する', async () => {
     await renderPublish(GROUP)
-    expect(screen.getByText(/LINEへの登録だけでは、友だちのトーク画面は変わりません/)).toBeTruthy()
-    expect(screen.getByText(/「表示先」で出す相手を決めてください/)).toBeTruthy()
+    expect(screen.getByTitle(/LINEへの登録だけでは、友だちのトーク画面は変わりません/)).toBeTruthy()
+    expect(screen.getByTitle(/「表示先」で出す相手を決めてください/)).toBeTruthy()
   })
 
   test('公開が終わると、設定に合った完了文が出る', async () => {
     await renderPublish(GROUP)
-    fireEvent.click(screen.getByText('この内容で公開する'))
+    fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '公開する' }))
+    await flush()
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '公開する' }))
     await flush()
     expect(richMenuPublish).toHaveBeenCalled()
+    expect(richMenuUpdate).toHaveBeenCalledWith('grp-1', expect.objectContaining({ isDefaultForAll: false, targetingEnabled: false }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '公開の確認' })).toBeNull())
     expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
     // 対象設定なしなのに「全員の画面が変わった」とは言わない
     expect(screen.queryByText(/既定メニューになりました/)).toBeNull()
@@ -834,19 +843,29 @@ describe('R204 公開すると何が変わるか（設定に合わせた説明�
  * 全設定共通の「出ません／友だちに表示を実行」は、全員既定・条件ありと矛盾する。
  */
 describe('R204 公開の確認窓（設定に合わせた説明）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   async function openPublishConfirm(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<CurrentRichMenuEdit />)
     await flush()
-    fireEvent.click(screen.getByText('LINE に登録する'))
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
+    fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
     await flush()
+    fireEvent.click(screen.getByRole('button', { name: '公開する' }))
+    await flush()
+    expect(richMenuPublish).not.toHaveBeenCalled()
   }
 
   test('全員の既定なら「個別指定を除く全友だち」と言う', async () => {
     await openPublishConfirm({ ...GROUP, isDefaultForAll: true })
-    expect(screen.getByText(/個別に指定した人を除く/)).toBeTruthy()
-    expect(screen.queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/個別に指定した人を除く/)).toBeTruthy()
+    expect(within(dialog).queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '公開の確認' })).toBeNull())
+    expect(richMenuPublish).not.toHaveBeenCalled()
   })
 
   test('条件ありなら「出来事で順次」と言う', async () => {
@@ -855,20 +874,23 @@ describe('R204 公開の確認窓（設定に合わせた説明）', () => {
       targetingEnabled: true,
       targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
     })
-    expect(screen.getByText(/順次出ます/)).toBeTruthy()
-    expect(screen.queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/順次出ます/)).toBeTruthy()
+    expect(within(dialog).queryByText(/友だちのトーク画面には出ません/)).toBeNull()
   })
 
   test('条件が空なら「今0人」と言い、直し方も添える', async () => {
     await openPublishConfirm({ ...GROUP, targetingEnabled: true, targetingCondition: null })
-    expect(screen.getByText(/今0人/)).toBeTruthy()
-    expect(screen.queryByText(/すべての友だちの既定メニューになります/)).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/今0人/)).toBeTruthy()
+    expect(within(dialog).queryByText(/すべての友だちの既定メニューになります/)).toBeNull()
   })
 
   test('登録のみなら「出ません／表示先で操作」と言う', async () => {
     await openPublishConfirm(GROUP)
-    expect(screen.getByText(/この操作だけでは、友だちのトーク画面には出ません/)).toBeTruthy()
-    expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/この操作だけでは、友だちのトーク画面には出ません/)).toBeTruthy()
+    expect(within(dialog).getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
   })
 })
 
@@ -878,17 +900,19 @@ describe('R204 公開の確認窓（設定に合わせた説明）', () => {
  * 条件あり（順次）・条件空（今0人）・登録のみ（登録だけ）と矛盾する。
  */
 describe('R204 「いますぐ出す」の注記（設定に合わせた説明）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   async function renderPublish(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
   }
 
   test('全員の既定なら「個別指定を除く全友だちにすぐ出る」と言う', async () => {
     await renderPublish({ ...GROUP, isDefaultForAll: true })
-    expect(screen.getByText('保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります')).toBeTruthy()
+    expect(screen.getByTitle('保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります')).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 
@@ -898,19 +922,19 @@ describe('R204 「いますぐ出す」の注記（設定に合わせた説明�
       targetingEnabled: true,
       targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
     })
-    expect(screen.getByText(/条件に当てはまる人の画面に出来事のタイミングで順次出ます/)).toBeTruthy()
+    expect(screen.getByTitle(/条件に当てはまる人の画面に出来事のタイミングで順次出ます/)).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 
   test('条件が空なら「今0人」と言う', async () => {
     await renderPublish({ ...GROUP, targetingEnabled: true, targetingCondition: null })
-    expect(screen.getByText(/いまの条件では誰にも出ません（今0人）/)).toBeTruthy()
+    expect(screen.getByTitle(/いまの条件では誰にも出ません（今0人）/)).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 
   test('登録のみなら「登録だけでは画面は変わらない」と言う', async () => {
     await renderPublish(GROUP)
-    expect(screen.getByText(/LINEへの登録だけで、友だちの画面は変わりません/)).toBeTruthy()
+    expect(screen.getByTitle(/LINEへの登録だけで、友だちの画面は変わりません/)).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 })
@@ -921,6 +945,8 @@ describe('R204 「いますぐ出す」の注記（設定に合わせた説明�
  * 期間を万能に安全とも言わない。新API・期間機能の追加はしない。
  */
 describe('R204 日時・期間の注記（自動表示を断定しない）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const SCHEDULED_NEW = '指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください'
   const PERIOD_NEW = '指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください'
   const SCHEDULED_OLD = 'その時刻になったら自動で出ます。それまでは今のメニューのままです'
@@ -929,15 +955,15 @@ describe('R204 日時・期間の注記（自動表示を断定しない）', ()
   async function renderPublish(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
   }
 
   async function expectReservationNotes(group: typeof GROUP) {
     await renderPublish(group)
-    expect(screen.getByText(SCHEDULED_NEW)).toBeTruthy()
-    expect(screen.getByText(PERIOD_NEW)).toBeTruthy()
+    expect(screen.getByTitle(SCHEDULED_NEW)).toBeTruthy()
+    expect(screen.getByTitle(PERIOD_NEW)).toBeTruthy()
     expect(screen.queryByText(SCHEDULED_OLD)).toBeNull()
     expect(screen.queryByText(PERIOD_OLD)).toBeNull()
   }
@@ -965,41 +991,52 @@ describe('R204 日時・期間の注記（自動表示を断定しない）', ()
  * 失敗時は窓を開いたまま理由を出す。
  */
 describe('複製の確認窓 (R232)', () => {
+  beforeEach(() => {
+    document.documentElement.dataset.theme = 'v8'
+    clearToastsForTest()
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: { ...GROUP, status: 'published' } }))
+  })
+  afterEach(() => { delete document.documentElement.dataset.theme; clearToastsForTest() })
   test('成功すると窓が閉じ、コピーの編集画面へ移る', async () => {
     searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    render(<><RichMenuDetailV8 groupId="grp-1" /><ToastHost /></>)
     await flush()
-    await screen.findByDisplayValue('メインメニュー')
+    await screen.findByRole('heading', { name: 'メインメニュー' })
 
-    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
     await flush()
-    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: '複製する' }))
+    await flush()
+    expect(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' }))
     await flush()
 
     expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
-    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=copy-1')
+    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=copy-1&step=shape')
     // 窓は閉じている。残ると「コピーをさらに複製する？」に見える。
-    expect(screen.queryByRole('button', { name: '下書きとして複製する' })).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /複製しますか/ })).toBeNull())
     expect(screen.getByText(/下書きを複製しました/)).toBeTruthy()
   })
 
   test('失敗したときは窓が開いたまま理由を出し、遷移しない', async () => {
     richMenuDuplicate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'copy failed' }))
     searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    render(<><RichMenuDetailV8 groupId="grp-1" /><ToastHost /></>)
     await flush()
-    await screen.findByDisplayValue('メインメニュー')
+    await screen.findByRole('heading', { name: 'メインメニュー' })
 
-    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
     await flush()
-    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '複製する' }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' }))
     await flush()
 
     expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
     expect(routerPush).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
-    expect(screen.getByText('copy failed')).toBeTruthy()
+    expect(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' })).toBeTruthy()
+    expect(screen.getByText('リッチメニューを複製できませんでした。もう一度お試しください。')).toBeTruthy()
+    expect(screen.queryByText('copy failed')).toBeNull()
   })
 })

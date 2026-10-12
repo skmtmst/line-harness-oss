@@ -15,7 +15,7 @@ afterEach(cleanup)
 describe('ReorderHandle', () => {
   it('上下キーで1つずつ動かす', () => {
     const onMove = vi.fn()
-    render(<ReorderHandle label="A" onMove={onMove} />)
+    render(<ReorderHandle label="A" onMove={onMove} onPointerDown={vi.fn()} />)
     const handle = screen.getByRole('button', { name: 'Aを並び替え。上下キーで移動' })
     fireEvent.keyDown(handle, { key: 'ArrowUp' })
     fireEvent.keyDown(handle, { key: 'ArrowDown' })
@@ -33,13 +33,13 @@ describe('ReorderHandle', () => {
     expect(slot.textContent).toBe('Aは並び替えできません。検索を外すと動かせます')
   })
 
-  it('旧 ReorderGrip（v7）は、動かせない時に薄いつまみを出す（見た目を変えない）', () => {
+  it('別名のReorderGripも、動かせない時はつまみを隠す', () => {
     const view = render(<ReorderGrip label="A" disabled onMove={() => {}} />)
     expect(screen.queryByRole('button')).toBeNull()
     const dim = view.container.querySelector('span.cursor-not-allowed')
-    expect(dim).toBeTruthy()
-    expect(dim?.querySelector('svg')).toBeTruthy()
-    expect(view.container.querySelector('[data-reorder-disabled]')).toBeNull()
+    expect(dim).toBeNull()
+    expect(view.container.textContent).toContain('Aは並び替えできません。')
+    expect(view.container.querySelector('[data-reorder-disabled]')).not.toBeNull()
   })
 
   it('DragHandle はマウスで動かせるときに名前とキー操作を保つ', () => {

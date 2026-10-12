@@ -17,7 +17,7 @@
 - 店とタグ：`GET /api/line-accounts`（タグ・友だちの数）、`GET /api/line-account-tags`。
 
 ## 作る（B-37・BBRDb：店の一斉配信と同じ5段＋送るアカウント。10-08 に p17Qku の1枚の形から置き換えた）
-- 店の一斉配信を作る画面と同じ5段（`?step=basic|audience|message|schedule|confirm`・履歴を積まない）、同じ部品（段の帯 BroadcastStepRail・選ぶカード・LINE の見え方・下の帯）、同じ CSS（`components/broadcasts/broadcast-form-v8.module.css`）。
+- 店の一斉配信を作る画面と同じ5段（`?step=basic|audience|message|schedule|confirm`・履歴を積まない）、同じ部品（段の帯 templates/Steps・選ぶカード・LINE の見え方・下の帯）、同じ CSS（`components/broadcasts/broadcast-form-v8.module.css`）。
 - ① 基本設定（lmWCZ・RqYwI）：配信方法（新しく作る／テンプレートを選択／過去の配信を複製）・配信名（必須・60字）・最近の配信2件（［複製する］）。
   - 「テンプレートを選択」：下に「テンプレートを選ぶ」一覧（名前で探す・丸の選び・種類・中身の要約・更新日）。選ぶと吹き出しがそのひな形になり、右の見え方も変わる。
   - 「過去の配信を複製」：下に「写す配信を選ぶ」一覧（送った日・人数・種類）。選ぶ・［複製する］・詳細の［複製して作る］（?copy=）はどれも、配信名に「（コピー）」を付け、中身（吹き出し）・フォルダ・社内メモだけを写す。宛先（送るアカウント・対象）と日時は写さない（オーナー 10-08）。

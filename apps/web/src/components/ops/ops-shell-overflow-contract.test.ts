@@ -4,7 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
-const SHELL = readFileSync(join(ROOT, 'ops-shell.tsx'), 'utf8')
+const SHELL = readFileSync(join(ROOT, '..', '..', 'v8', 'ops', 'shell.tsx'), 'utf8')
+const CSS = readFileSync(join(ROOT, '..', '..', 'v8', 'ops', 'shell.module.css'), 'utf8')
+const COMMON = readFileSync(join(ROOT, '..', 'app-shell.module.css'), 'utf8')
+const NAV = readFileSync(join(ROOT, '..', 'layout', 'sidebar.module.css'), 'utf8')
+const OVERLAY = readFileSync(join(ROOT, '..', 'shared', 'overlay-utils.ts'), 'utf8')
+const ACTIONS = readFileSync(join(ROOT, '..', 'shared', 'action-menu.tsx'), 'utf8')
 const HEADER = readFileSync(join(ROOT, 'ops-page-header.tsx'), 'utf8')
 
 /*
@@ -13,32 +18,35 @@ const HEADER = readFileSync(join(ROOT, 'ops-page-header.tsx'), 'utf8')
  * 出た。狭い画面はナビを開閉式にし、本文の余白は16pxに切り替える。
  */
 describe('U094 運営コンソールの外枠', () => {
-  it('1280px未満ではナビを常設せず、本文の上に開く操作を置く', () => {
-    expect(SHELL).toContain('xl:hidden')
+  it('1024px未満ではナビを常設せず、本文の上に開く操作を置く', () => {
+    expect(CSS).toContain('@media (min-width: 1024px)')
+    expect(CSS).toMatch(/\.mobileBar\s*\{\s*display:\s*none/)
     expect(SHELL).toContain('メニュー')
-    expect(SHELL).toContain('onClick={() => setNavOpen(true)}')
-    expect(SHELL).toContain('aria-expanded={navOpen}')
+    expect(SHELL).toContain('onClick={() => setDrawer(true)}')
+    expect(SHELL).toContain('aria-expanded={drawer}')
   })
 
-  it('開いたナビは画面の上に重なる開閉式で、1280px以上だけ常設に戻す', () => {
-    expect(SHELL).toContain('fixed inset-y-0 left-0 z-50')
-    expect(SHELL).toContain('xl:static')
-    expect(SHELL).toContain('xl:flex')
+  it('開いたナビは画面の上に重なる開閉式で、1024px以上だけ常設に戻す', () => {
+    expect(CSS).toMatch(/\.drawer\s*\{[^}]*position:\s*fixed/s)
+    expect(SHELL).toContain('className={nav.desktop}')
+    expect(NAV).toContain('display: flex')
     // 閉じている間は display:none で、幅もフォーカスも取らない。
-    expect(SHELL).toContain("open ? 'flex' : 'hidden'")
+    expect(SHELL).toContain('{drawer ? (')
   })
 
   it('開いたナビは暗幕・Escape・画面移動で閉じ、背面のスクロールを止める', () => {
-    expect(SHELL).toContain('fixed inset-0 z-40')
-    expect(SHELL).toContain('onClick={onClose}')
-    expect(SHELL).toContain("event.key === 'Escape'")
-    expect(SHELL).toContain('setNavOpen(false) }, [pathname]')
-    expect(SHELL).toContain("document.body.style.overflow = 'hidden'")
+    expect(CSS).toMatch(/\.scrim\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0/s)
+    expect(SHELL).toContain('onClick={() => setDrawer(false)}')
+    expect(SHELL).toContain('useOverlayFocus<HTMLElement>(drawer')
+    expect(OVERLAY).toContain("event.key === 'Escape'")
+    expect(SHELL).toContain('setDrawer(false) }, [pathname]')
+    expect(OVERLAY).toContain("document.body.style.overflow = 'hidden'")
   })
 
-  it('本文の左右の余白は狭い画面では16px、1280px以上で40pxに戻す', () => {
-    expect(SHELL).toContain('px-4 pb-8 pt-4 xl:px-10')
-    expect(SHELL).not.toContain('px-10 pb-8 pt-4')
+  it('本文の左右の余白は狭い画面では現在の共通外枠の余白へそろえる', () => {
+    expect(SHELL).toContain('className={shellStyles.content}')
+    expect(COMMON).toContain('@media (min-width: 1024px)')
+    expect(COMMON).toContain('padding: 24px 16px')
   })
 
   it('画面見出しは操作が入ると下へ折り返し、1文字ずつに割れない', () => {
@@ -53,25 +61,27 @@ describe('U094 運営コンソールの外枠', () => {
    * 画面に合わせ、縦に流れるのは本文の中だけにする。
    */
   it('外枠は画面の高さに収め、縦に流れるのは本文の中だけにする', () => {
-    expect(SHELL).toContain('flex h-svh flex-col overflow-hidden')
+    expect(SHELL).toContain('className={shellStyles.shell}')
     expect(SHELL).not.toContain('flex min-h-svh flex-col bg-canvas-sunken')
-    expect(SHELL).toContain('<div className="flex min-h-0 flex-1">')
-    expect(SHELL).toContain("navOpen ? 'overflow-hidden' : 'overflow-y-auto'")
+    expect(SHELL).toContain('className={shellStyles.workspace}')
+    expect(COMMON).toMatch(/\.main\s*\{[^}]*overflow:\s*auto/s)
     expect(SHELL).toContain('id="ops-main"')
   })
 
-  it('左下のアカウント情報は常に見え、流れるのはメニューの部分だけ', () => {
+  it('自分の操作と下の入口は常に見え、流れるのはメニューの部分だけ', () => {
     // サイドバー自体はスクロールさせない（中の nav だけが流れる）。
-    expect(SHELL).toContain('w-64 shrink-0 flex-col overflow-hidden')
-    expect(SHELL).toContain('<nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-3">')
+    expect(SHELL).toContain('className={nav.desktop}')
+    expect(SHELL).toContain('<nav className={nav.nav}')
+    expect(NAV).toMatch(/\.nav\s*\{[^}]*overflow-y:\s*auto/s)
     // 上の見出しと下のアカウントは縮まない。
-    expect(SHELL).toContain('flex shrink-0 items-center gap-3 px-4 py-4')
-    expect(SHELL).toContain('relative shrink-0 px-3 py-3')
+    expect(SHELL).toContain('className={nav.settingsEntry}')
+    expect(SHELL).toContain('identityActions={[')
   })
 
   it('利用者メニューは矢印キーで項目を移動できる', () => {
-    expect(SHELL).toContain("role=\"menu\"")
-    expect(SHELL).toContain("querySelectorAll<HTMLElement>('[role=\"menuitem\"]:not([disabled])')")
-    expect(SHELL).toContain("onKeyDown={(event: ReactKeyboardEvent<HTMLElement>)")
+    expect(ACTIONS).toContain('role="menu"')
+    expect(ACTIONS).toContain('querySelectorAll<HTMLElement>')
+    expect(SHELL).toContain("href: '/staff'")
+    expect(ACTIONS).toContain("['ArrowDown', 'ArrowUp', 'Home', 'End']")
   })
 })

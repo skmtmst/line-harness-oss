@@ -75,7 +75,7 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
     fireEvent.change(input, { target: { value: 'ズレ' } })
     fireEvent.blur(input)
     expect(onChange).not.toHaveBeenCalled()
-    expect(input.value).toBe('d7263d')
+    expect(input.value).toBe('D7263D')
   })
 
   it('すけ具合を下げると 8 桁で返す', () => {
@@ -148,12 +148,12 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
   it('承認した寸法を CSS が保つ', () => {
     expect(css).toMatch(/width:\s*288px/) // ピッカー本体
     expect(css).toMatch(/height:\s*168px/) // 彩度・明度の面
-    expect(css).toMatch(/border-radius:\s*var\(--radius-panel\)/)
+    expect(css).toMatch(/:root \.pop\s*\{[^}]*border-radius:\s*var\(--polish-radius-dialog\)/)
     expect(css).toMatch(/\.tabs\s*\{[^}]*height:\s*36px/)
     expect(css).toMatch(/\.bar\s*\{[^}]*height:\s*12px/)
     expect(css).toMatch(/\.cell\s*\{[^}]*height:\s*28px/)
     // V8 ではコントロールの枠色トークンを使う（直書きの #c9ced6 は使わない）。
-    expect(css).toMatch(/\[data-theme='v8'\][^{]*\{\s*border-color:\s*var\(--color-control-border\)/)
+    expect(css).toMatch(/:root[^{]*\{\s*border-color:\s*var\(--color-control-border\)/)
     expect(css).not.toMatch(/#c9ced6/i)
   })
 })

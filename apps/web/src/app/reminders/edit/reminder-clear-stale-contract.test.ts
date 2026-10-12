@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(join(HERE, 'issue469-reminder-screens.tsx'), 'utf8')
+const src = readFileSync(join(HERE, '../../../v8/reminders/edit.tsx'), 'utf8')
 
 describe('reminders/edit 古い失敗文を残さない', () => {
   it('読み直しの成功・再試行で古い失敗文を消す', () => {

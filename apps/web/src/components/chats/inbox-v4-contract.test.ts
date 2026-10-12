@@ -50,12 +50,13 @@ describe('受信箱V4で既存機能を失わない', () => {
   })
 
   it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
-    expect(TEMPLATE_PICKER).toContain('入力欄へ挿入')
-    expect(TEMPLATE_PICKER).toContain('TemplateFolderSelect')
-    expect(TEMPLATE_PICKER).toContain('送信内容のプレビュー')
+    const view = readFileSync(join(HERE, '../../v8/inbox-chat/template-picker-view.tsx'), 'utf8')
+    expect(view).toContain('入力欄に入れる')
+    expect(view).toContain('<FolderPanel')
+    expect(view).toContain('<EntityPickerDialog')
+    expect(TEMPLATE_PICKER).toContain('onPick(selected.messageContent)')
+    expect(TEMPLATE_PICKER).not.toContain('api.chats.send(')
     expect(PAGE).toContain('setMessageContent')
-    expect(TEMPLATE_PICKER).toContain('createPortal')
-    expect(TEMPLATE_PICKER).toContain('z-[100]')
   })
 })
 

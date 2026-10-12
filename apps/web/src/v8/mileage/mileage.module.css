@@ -23,33 +23,33 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   gap: var(--tpl-ml-col-gap);
   height: var(--tpl-ml-head-h);
   padding: var(--tpl-ml-head-pad);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-ml-col-gap);
   height: var(--tpl-ml-row-h);
   padding: var(--tpl-ml-row-pad);
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   height: auto;
   padding: 0;
   border: 0;
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > .num,
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > .num {
+:global(:root) .table .row[data-table-layout='columns'] > .num,
+:global(:root) .table .headRow[data-table-layout='columns'] > .num {
   padding-right: var(--tpl-ml-num-pad-end);
   text-align: right;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
+:global(:root) .table .row[data-table-layout='columns'] > td.colName {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -80,7 +80,7 @@
 .colTrend { width: var(--tpl-ml-col-trend); }
 .colReact { width: var(--tpl-ml-col-react); min-width: 0; }
 .colOpsMenu { width: var(--tpl-ml-col-ops-menu); }
-:global([data-theme='v8']) .tableScore .row[data-table-layout='columns'] { height: var(--tpl-ml-score-row-h); }
+:global(:root) .tableScore .row[data-table-layout='columns'] { height: var(--tpl-ml-score-row-h); }
 .colOpsWide { width: var(--tpl-ml-col-ops-wide); }
 /* 右寄せの数の列（絵：右に 8 の余白）。 */
 .num { text-align: right; }
@@ -726,11 +726,11 @@
   gap: var(--tpl-cell-gap-half);
   padding: var(--tpl-ml-card-pad);
 }
-:global([data-theme='v8']) .tableDetail .headRow[data-table-layout='columns'] {
+:global(:root) .tableDetail .headRow[data-table-layout='columns'] {
   height: var(--tpl-ml-detail-head-h);
   padding: var(--tpl-ml-detail-head-pad);
 }
-:global([data-theme='v8']) .tableDetail .row[data-table-layout='columns'] {
+:global(:root) .tableDetail .row[data-table-layout='columns'] {
   height: var(--tpl-ml-detail-row-h);
   padding: var(--tpl-ml-detail-row-pad);
 }

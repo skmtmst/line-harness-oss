@@ -39,7 +39,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-import VarsExportPanel from './export-panel'
+import VarsExportPanel from '@/v8/common-vars/export-panel'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -104,7 +104,7 @@ describe('共通情報CSVの監査付き出力パネル', () => {
       accountId: 'account-1', folderId: 'folder-9', ungrouped: undefined,
     })
     expect(text()).toContain('完了')
-    expect(text()).toContain('12件')
+    expect(text()).toContain('12 件')
     const link = host.querySelector('a[href$="/api/common-vars/exports/job-1/download"]')
     expect(link).not.toBeNull()
   })

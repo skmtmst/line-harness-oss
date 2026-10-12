@@ -239,7 +239,7 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     m.get.mockReturnValue(slow.promise)
     await mount(<FirstStep />)
     expect(screen.queryByRole('button', { name: '作って編集へ' })).toBeNull()
-    expect(screen.getByText('シナリオを読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('シナリオを読み込んでいます')).toBeTruthy()
     await act(async () => {
       slow.resolve(ok(scenario({ steps: [] })))
     })

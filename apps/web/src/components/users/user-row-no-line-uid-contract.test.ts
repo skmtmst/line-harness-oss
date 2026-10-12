@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const ROW = fs.readFileSync(path.join(__dirname, 'user-row.tsx'), 'utf8')
+const ROW = fs.readFileSync(path.join(__dirname, '../../app/users/users-v8.tsx'), 'utf8')
 
 /** 注釈を落とす。「なぜ消したか」を書いた文が、消したはずの字面に当たるのを避ける。 */
 function code(src: string): string {
@@ -15,14 +15,6 @@ function code(src: string): string {
 
 const CODE = code(ROW)
 
-/**
- * 設計 `friends-v6/r7eSi.png` はUIDの桁に
- * **「連携済み／未連携／要確認」という状態の言葉だけ**を置く。
- *
- * 実装は `U0000000000…` の頭10文字を描き、**全文を `title` に入れていた**。
- * 見えないだけで外に出ているのは同じなので、両方消す。
- * 言葉は同じファイルの `UID_STATUS` が既に持っていて、すぐ上の行で描いている。
- */
 describe('統合ユーザーの行は、LINEユーザーIDを画面に出さない', () => {
   it('IDを縮めて出す関数を持たない', () => {
     expect(CODE, 'shortenUid が残っている').not.toContain('shortenUid')
@@ -35,10 +27,10 @@ describe('統合ユーザーの行は、LINEユーザーIDを画面に出さな�
   })
 
   it('状態の言葉は残っている', () => {
-    expect(CODE).toContain('{uidStatus.label}')
-    expect(CODE).toContain("label: '要確認'")
-    expect(CODE).toContain("label: 'UIDで連携'")
-    expect(CODE).toContain("label: '未連携'")
+    expect(CODE).toContain('{UID_STATUS[row.identityKeyKind]}')
+    expect(CODE).toContain("url_token: '要確認'")
+    expect(CODE).toContain("uid: 'UIDで連携'")
+    expect(CODE).toContain("solo: '未連携'")
   })
 
   it('アカウントごとの行は、IDの代わりに状態の言葉を出す', () => {

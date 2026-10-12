@@ -9,12 +9,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=lifetime'),
 }))
 
-import LifetimeTab from './lifetime-tab'
+import LifetimeTab from '@/v8/nen-members/lifetime'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -53,28 +53,17 @@ describe('m18s ライフタイム表の列幅は見出しと合う', () => {
   it('行の列幅は見出しと合う（吸収列は特典の1列だけ）', async () => {
     await act(async () => {
       root.render(
-        <LifetimeTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
+        <LifetimeTab readonly={false} accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
       )
     })
     await settle(50)
-    const rows = Array.from(host.querySelectorAll('tbody tr')).filter(
-      (tr) => tr.querySelectorAll(':scope > td').length === 6,
-    )
-    expect(rows.length).toBeGreaterThan(0)
-    for (const tr of rows) {
-      const classes = Array.from(tr.querySelectorAll(':scope > td')).map((td) => td.className)
-      expect(classes[0]).toContain('w-52')
-      expect(classes[1]).toContain('w-56')
-      // 特典は幅指定なし（吸収列）＋隠すときは消す。
-      expect(classes[2].split(' ')).not.toContain('w-52')
-      expect(classes[2].split(' ')).not.toContain('w-56')
-      expect(classes[2].split(' ')).not.toContain('w-28')
-      expect(classes[2].split(' ')).not.toContain('w-44')
-      expect(classes[2].split(' ')).not.toContain('w-14')
-      expect(classes[2]).toContain('cq-hide-below-800')
-      expect(classes[3]).toContain('w-28')
-      expect(classes[4]).toContain('w-44')
-      expect(classes[5]).toContain('w-14')
+    const table = host.querySelector('[role="table"]')!
+    const heads = Array.from(table.querySelectorAll('[role="columnheader"]')).map(cell => cell.className)
+    expect(heads).toHaveLength(6)
+    const rows = Array.from(table.querySelectorAll('[role="row"]')).filter(row => row.querySelectorAll('[role="cell"]').length === 6)
+    expect(rows).toHaveLength(1)
+    for (const row of rows) {
+      expect(Array.from(row.querySelectorAll('[role="cell"]')).map(cell => cell.className)).toEqual(heads)
     }
   })
 })

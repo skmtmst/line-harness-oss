@@ -18,14 +18,14 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -37,6 +37,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: async () => ({ success: true, data: [] }) },
     },
     bookingApi: {
+      listMenus: async () => ({ menus: [] }),
+      listResources: async () => ({ data: { resources: [] } }),
+      listStaffMenusBulk: async () => ({ staff: [] }),
+
       createMenu: vi.fn(),
       getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
       listStaff: async () => ({ staff: [] }),
@@ -92,7 +96,7 @@ async function flush() {
 }
 
 async function typeMenuName(value: string) {
-  const box = host.querySelector('input#bm-name') as HTMLInputElement
+  const box = host.querySelector('input[aria-label="メニュー名"]') as HTMLInputElement
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
   await act(async () => {
     setter.call(box, value)
@@ -100,10 +104,10 @@ async function typeMenuName(value: string) {
   })
 }
 
-function cancelLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent === 'キャンセル')
+function cancelLink(): HTMLButtonElement {
+  const link = Array.from(host.querySelectorAll('button')).find((a) => a.textContent === 'キャンセル')
   if (!link) throw new Error('キャンセルのリンクが見つかりません')
-  return link as HTMLAnchorElement
+  return link as HTMLButtonElement
 }
 
 function bodyButton(label: string): HTMLButtonElement {
@@ -139,7 +143,7 @@ describe('booking/menus/new の未保存ガード', () => {
     await flush()
 
     expect(document.body.textContent).not.toContain('保存していない変更があります')
-    expect((host.querySelector('input#bm-name') as HTMLInputElement).value).toBe('カット')
+    expect((host.querySelector('input[aria-label="メニュー名"]') as HTMLInputElement).value).toBe('カット')
   })
 
   it('「保存せずに移る」を押すと予約設定へ進む', async () => {

@@ -339,3 +339,40 @@ export function impactCsv(impact: CommonVarChangeImpact): string {
     ]),
   ].map((row) => row.map(csvCell).join(',')).join('\r\n')
 }
+
+const KIND_LABELS: Record<string, string> = {
+  template: 'テンプレート',
+  broadcast: '一斉配信',
+  scenario: 'シナリオ配信',
+  reminder: 'リマインダ',
+  auto_reply: '自動応答',
+  form: '回答フォーム',
+  automation: 'オートメーション',
+  friend_add: '友だち追加時の配信',
+  common_action: '共通アクション',
+}
+
+export function impactBreakdown(impact: CommonVarChangeImpact): string {
+  const values = Object.entries(impact.byKind)
+    .filter(([, count]) => count > 0)
+    .map(([kind, count]) => `${KIND_LABELS[kind] ?? kind}${formatNumber(count)}`)
+  return values.length > 0 ? values.join('・') : '種類別の内訳はありません'
+}
+
+export function urgentImpactCount(impact: CommonVarChangeImpact): number | null {
+  const connected = impact as CommonVarChangeImpact & {
+    scheduledUsageCount?: number
+    publishedUsageCount?: number
+  }
+  if (typeof connected.scheduledUsageCount === 'number' && typeof connected.publishedUsageCount === 'number') {
+    return connected.scheduledUsageCount + connected.publishedUsageCount
+  }
+  const items = impact.items.filter((item) => item.changesOnSave)
+  if (items.some((item) => item.status === '使われています')) return null
+  // 状態の語彙は口（commonVarUsageStatus）とそろえる。口が返さない呼び名は使わない。
+  return items.filter((item) => /配信予約中|配信中/.test(item.status)).length
+}
+
+export function overLimitCount(impact: CommonVarChangeImpact): number {
+  return impact.items.filter((item) => item.exceedsCharacterLimit).length
+}

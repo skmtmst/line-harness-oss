@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest'
 const directory = dirname(fileURLToPath(import.meta.url))
 // ★V8 の登録は src/v8 に一から書いた（入口 new/page.tsx は @/v8 から読む）。新しい画面も一緒に読む。
 const setupSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8') + readFileSync(join(directory, '../../v8/account-new/register.tsx'), 'utf8')
-const accountsSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
-const wizardSource = readFileSync(join(directory, '../restaurant-test/stores/new/page.tsx'), 'utf8')
+const accountsSource = readFileSync(join(directory, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
+const wizardSource = readFileSync(join(directory, '../../v8/restaurant/store-new/store-new.tsx'), 'utf8')
 const orderingSource = readFileSync(join(directory, '../../components/accounts/account-ordering.tsx'), 'utf8')
 const switcherSource = readFileSync(join(directory, '../../components/accounts/account-switcher.tsx'), 'utf8')
 const editModalSource = readFileSync(join(directory, '../../components/accounts/account-edit-modal.tsx'), 'utf8')
@@ -22,9 +22,9 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       `/hq` は統括向けの店舗管理として、店舗ウィザードは飲食店向けの入口として残す。
     */
     expect(accountsSource).not.toContain("redirect('/hq')")
-    expect(accountsSource).toContain('ReadonlyDesignNode node="V7vn3"')
+    expect(accountsSource).toContain('boardId="V7vn3"')
     expect(setupSource).not.toContain("redirect('/restaurant-test/stores/new')")
-    expect(setupSource).toContain('data-design-node="b2NGxk"')
+    expect(setupSource).toContain('boardId={shownStep.node}')
   })
 
   it('新設計の4項目入力・自動接続と5つの正本ノードを使う', () => {
@@ -33,12 +33,12 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       'api.lineAccounts.connectCheck',
       'api.lineAccounts.connect',
       'api.lineAccounts.followerImportState',
-      'data-design-node="a8qMXX"',
-      'data-design-node="oeVQQ"',
+      'data-design-node="xj3zz"',
+      'data-design-node="GwKE2"',
       'data-design-node="JYfda"',
-      'data-design-node="K1zHyx"',
-      "'VPh1U'",
-      "'t3Mlu'",
+      'data-design-node="v2KMj"',
+      'data-design-node="TvXII"',
+      'designNode="qw80E"',
     ]) {
       expect(setupSource).toContain(value)
     }
@@ -52,12 +52,12 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       '利用規約への同意',
       '店舗の基本情報',
       'LINE公式アカウントを作る',
-      'Messaging APIを有効にして接続する',
+      'Messaging APIで接続',
       '接続の確認',
     ]) {
       expect(wizardSource).toContain(label)
     }
-    expect(wizardSource).toContain('ステップ {step} / 5')
+    expect(wizardSource).toContain('ステップ ${step} / 5')
     expect(wizardSource).toContain('type="password"')
   })
 

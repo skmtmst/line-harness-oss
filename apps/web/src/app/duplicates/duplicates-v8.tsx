@@ -7,7 +7,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { isForbidden } from '@/components/shared/api-error-message'
+import { isForbidden, loadFailureCopy } from '@/components/shared/api-error-message'
 import { FriendsManageNavV8 } from '@/app/friends/friends-nav-v8'
 import { formatNumber } from '@/lib/format'
 import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-duplicates-data'
@@ -188,8 +188,8 @@ export default function DuplicatesV8() {
                     <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
-                    <p className={styles.stateTitle}>重複の候補を読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => d.loadCandidates()} busyLabel="処理中…">
+                    <p className={styles.stateTitle}>{isForbidden(d.candidateFailure) ? loadFailureCopy(d.candidateFailure, '重複の候補').title : '重複の候補を読み込めませんでした'}</p>
+                    <Button type="button" variant="primary" onClick={() => void (d.data ? d.loadCandidates() : d.load())} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>

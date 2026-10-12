@@ -17,7 +17,7 @@ import InflowLinksPage from './page'
  * 実DOMで固定する。v7 では従来のタブが出ることも固定する。
  */
 let search = 'tab=ads'
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/inflow-links',
   useSearchParams: () => new URLSearchParams(search),

@@ -3,7 +3,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail', 'friend-detail-v8.module.css'), 'utf8')
+const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../v8/friend-detail/detail.module.css'), 'utf8')
+const TABS_CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../components/shared/tabs.module.css'), 'utf8')
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail', 'page.tsx'), 'utf8')
 
 /*
@@ -14,11 +15,12 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail'
 describe('友だち詳細のタブ帯は右列を押し広げない', () => {
   it('グリッドの右列（data-design="Right"）は min-w-0 を持つ', () => {
     // タブ帯とパネルの縦間隔は親の gap-4 にそろえる（m13h。min-w-0 の意図は変えない）。
-    expect(CSS).toContain('.content { min-width: 0;')
+    expect(CSS).toMatch(/\.overview\s*\{[^}]*min-width:\s*0/s)
   })
 
   it('V8のタブ帯は板の全幅で安全に折り返す', () => {
-    expect(CSS).toContain('flex-wrap: wrap')
+    expect(TABS_CSS).toContain('flex-wrap: wrap')
+    expect(TABS_CSS).toContain('overflow-x: auto')
     expect(PAGE).not.toContain('flex flex-wrap gap-1 border-b')
   })
 

@@ -7,7 +7,7 @@ export function useCardHeights() {
   const ref = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const card = ref.current
-    if (!card || document.documentElement.dataset.theme !== 'v8') return
+    if (!card) return
     const css = getComputedStyle(card)
     const border = ['Top', 'Right', 'Bottom', 'Left'].some(side => parseFloat(css.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0)
     const outline = css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0
@@ -28,7 +28,7 @@ export function useCardHeights() {
         view.cancelAnimationFrame(frame)
         frame = view.requestAnimationFrame(() => {
           const cards = [...parent.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-design-part="card"]'))
-          if (cards.length < 2 || document.documentElement.dataset.theme !== 'v8') return
+          if (cards.length < 2) return
           const layout = getComputedStyle(parent)
           const horizontal = layout.display.includes('grid') || layout.display.includes('flex') && layout.flexDirection === 'row'
           if (!horizontal) {

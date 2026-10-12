@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .root { display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); min-width: 0; }
 .heading, .title, .actions, .header, .controls, .insertRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); min-width: 0; }
@@ -63,5 +63,5 @@
 .previewAction { display: flex; align-items: center; justify-content: center; height: var(--tpl-msg-composer-preview-action-h); border-top: 1px solid var(--color-hairline); color: var(--color-accent-deep); font-size: var(--text-micro); font-weight: 700; }
 }
 
-html[data-theme='v8'] .number { background: var(--color-selection-border); color: var(--color-canvas); }
-html[data-theme='v8'] .audioIcon { background: var(--color-code-bg); color: var(--color-ink); }
+html:root .number { background: var(--color-selection-border); color: var(--color-canvas); }
+html:root .audioIcon { background: var(--color-code-bg); color: var(--color-ink); }

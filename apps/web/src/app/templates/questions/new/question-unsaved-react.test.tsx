@@ -10,11 +10,12 @@ const fixture = vi.hoisted(() => ({
   foldersList: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: fixture.routerPush }),
-  useSearchParams: () => new URLSearchParams(),
-}))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('next/navigation', async () => {
+  const navigation = (await import('@/test-utils/navigation-mock')).navigationMock()
+  navigation.useRouter().push = fixture.routerPush
+  return navigation
+})
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
 }))
@@ -47,7 +48,7 @@ describe('R136: 質問の書きかけがある間の離脱確認', () => {
     </>)
     const nameBox = await screen.findByPlaceholderText('例：継続の意思をうかがう')
     fireEvent.change(nameBox, { target: { value: '継続の意思' } })
-    fireEvent.change(screen.getByPlaceholderText('例：体調はいかがですか？'), { target: { value: '続けますか？' } })
+    fireEvent.change(screen.getByPlaceholderText('来月も定期便を続けますか？'), { target: { value: '続けますか？' } })
 
     fireEvent.click(screen.getByRole('link', { name: 'シナリオで使う' }))
     await screen.findByText('保存していない変更があります')
@@ -55,10 +56,10 @@ describe('R136: 質問の書きかけがある間の離脱確認', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
-    expect((screen.getByPlaceholderText('例：体調はいかがですか？') as HTMLInputElement).value).toBe('続けますか？')
+    expect((screen.getByPlaceholderText('来月も定期便を続けますか？') as HTMLInputElement).value).toBe('続けますか？')
   })
 
-  it('破棄を選んだときだけ一覧へ進む', async () => {
+  it('破棄を選んだときだけシナリオへ進む', async () => {
     render(<QuestionTemplatePage />)
     const nameBox = await screen.findByPlaceholderText('例：継続の意思をうかがう')
     fireEvent.change(nameBox, { target: { value: '継続の意思' } })

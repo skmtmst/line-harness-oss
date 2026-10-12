@@ -3,8 +3,7 @@
 対象：`app/accounts/page.tsx`（今の画面）から写して `accounts.tsx` を一から書いた。板 `V7vn3`。
 
 ## 入口
-- `app/accounts/page.tsx`：`data-theme="v8"` で、`?tab=migration` でないときだけこの画面を出す（`useSettingsTheme`）。
-  `?tab=migration`（UID の移行）は今までどおり今の画面が受ける。v7 側は触らない。
+- `app/accounts/page.tsx`：一覧はV8に固定。`?tab=migration`（UID の移行）だけ移行の入口へ渡す。
 
 ## 受け付ける URL と指定
 - `?tab=migration`：今の画面へ渡す（上）。ほかの指定は無い（今の画面と同じ）。

@@ -14,7 +14,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {}, prefetch: () => {} }),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => route.theme }))
 vi.mock('./layout/sidebar', () => ({ default: () => <aside data-test="sidebar" /> }))
 vi.mock('./layout/settings-inner-nav', () => ({
   default: () => <nav data-test="settings-nav" />,
@@ -45,11 +44,12 @@ describe('登録の画面枠', () => {
     expect(html).toContain('data-test="session"')
   })
 
-  it('v7 の /accounts/new は外枠の無い専用の全画面（左メニュー・上の帯を出さない）', () => {
+  it('旧テーマ指定でも /accounts/new は現在の外枠だけを出す', () => {
     const html = render('/accounts/new', 'v7')
-    expect(html).toContain('data-account-create-shell="true"')
-    expect(html).not.toContain('data-test="sidebar"')
-    expect(html).not.toContain('data-test="topbar"')
+    expect(html).not.toContain('data-account-create-shell')
+    expect(html).toContain('data-test="sidebar"')
+    expect(html).toContain('data-test="topbar"')
+    expect(html).not.toContain('data-test="settings-nav"')
   })
 
   it('★V8 の /accounts/new はほかの画面と同じ外枠（左メニュー・上の帯）で、設定の中のメニューは付けない', () => {

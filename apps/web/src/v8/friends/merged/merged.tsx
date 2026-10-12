@@ -2,11 +2,11 @@
 
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { useListItemHref } from '@/components/shared/list-navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Inbox, ChevronUp, Download, RotateCw } from 'lucide-react';
 
-import { api } from '@/lib/api';
+import { useUsersSummary } from '@/components/users/use-users-summary';
 import { formatDay, formatNumber, formatYmd } from '@/lib/format';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -23,7 +23,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view';
-import type { UserRowData } from '@/components/users/user-row';
+import type { UserRowData } from '@/components/users/users-types';
 import { FriendsSectionHead } from '../shared/head';
 import MergedPersonV8 from './person'
 import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users';
@@ -90,15 +90,8 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
-  // 「統合ユーザー」の数は重複検出の集計（uniquePeople）。今と同じ口。
-  const [uniquePeople, setUniquePeople] = useState<number | null>(null)
-  useEffect(() => {
-    let alive = true
-    api.duplicates.stats().then((res) => {
-      if (alive && res.success) setUniquePeople(res.data.uniquePeople)
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [])
+  const summary = useUsersSummary()
+  const uniquePeople = summary.stats?.uniquePeople ?? null
 
   const pageCount = Math.max(1, Math.ceil(u.total / u.pageSize))
   const linkedUidCount = u.rows.filter((row) => row.identityKeyKind === 'uid').length
@@ -106,8 +99,8 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
 
   const kpis = [
     { key: 'people', title: '統合ユーザー', value: uniquePeople, help: '重複を1人にまとめた数です。' },
-    { key: 'uid', title: 'UID連携済み', value: u.loading ? null : linkedUidCount, help: 'このページに出ている人のうち、LINE UIDを根拠にまとめている数です（このページでUID確認済み）。' },
-    { key: 'multi', title: '複数アカウントにいる', value: u.loading ? null : multiAccountCount, help: 'このページに出ている人のうち、2つ以上のLINEアカウントに登録がある数です。送信前に配信先の確認が必要です。' },
+    { key: 'uid', title: 'UID連携済み', value: u.loading || u.error ? null : linkedUidCount, help: 'このページに出ている人のうち、LINE UIDを根拠にまとめている数です（このページでUID確認済み）。' },
+    { key: 'multi', title: '複数アカウントにいる', value: u.loading || u.error ? null : multiAccountCount, help: 'このページに出ている人のうち、2つ以上のLINEアカウントに登録がある数です。送信前に配信先の確認が必要です。' },
   ]
 
   return (
@@ -151,8 +144,10 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               value={kpi.value}
               valueText={kpi.value == null ? emptyValue('unknown') : `${formatNumber(kpi.value)} 人`}
               unit="人"
-              detail={null}
-              help={kpi.help}
+              detail={kpi.key === 'people' ? summary.status === 'loading' ? '読み込んでいます' : summary.status === 'error' ? '読み込めませんでした' : null : null}
+              onRetry={kpi.key === 'people' && summary.status === 'error' ? () => void summary.load() : undefined}
+              retryLabel="再読み込み"
+              help={kpi.key === 'people' && summary.stats ? `${kpi.help} 紐付く友だち：${formatNumber(summary.stats.totalFollowing)}件（各アカウントの友だち登録）` : kpi.help}
             />
           ))}
         </KpiBand>

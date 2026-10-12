@@ -16,9 +16,9 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationAlert, OperationHealthSnapshot } from '@/lib/api'
-import EmergencyPage from './page'
+import { HealthPanelV8 as HealthPanel, OpenAlerts as OperationAlertsPanel } from '@/v8/settings/emergency/health'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/settings/emergency/health.tsx'), 'utf8')
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -46,7 +46,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-const { HealthPanel, OperationAlertsPanel } = EmergencyPage.__test
 
 function alert(overrides: Partial<OperationAlert> = {}): OperationAlert {
   return {
@@ -128,7 +127,7 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
   })
 
   it('実測された注意の異常では影響を可能性として案内する', () => {
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert()]}
       failed={false}
       busyId={null}
@@ -136,11 +135,11 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
       onRetry={vi.fn()}
     />)
 
-    expect(screen.getByText('外部システムへの通知が届いていない可能性があります。')).toBeTruthy()
+    expect(screen.getByTitle(/外部システムへの通知が届いていない可能性があります。/)).toBeTruthy()
   })
 
   it('友だち変化の異常でも減少を断定せず可能性として案内する', () => {
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert({ checkKey: 'friend_change', summary: '友だち数が大きく減少しています' })]}
       failed={false}
       busyId={null}
@@ -148,12 +147,12 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
       onRetry={vi.fn()}
     />)
 
-    expect(screen.getByText(/友だちが急に減っている可能性があります/)).toBeTruthy()
+    expect(screen.getByTitle(/友だちが急に減っている可能性があります/)).toBeTruthy()
     expect(screen.queryByText(/友だちが急に減っています/)).toBeNull()
   })
 
   it('確認できていない(unknown)異常では影響の有無も未確認と出す', () => {
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert({
         severity: 'unknown',
         summary: '友だち変化の比較記録が足りません',
@@ -166,20 +165,20 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
     />)
 
     // 記録不足なのに「減っている可能性」すら断定調で出さない
-    expect(screen.getByText('この項目はまだ確認できていないため、影響の有無も未確認です。')).toBeTruthy()
-    expect(screen.queryByText(/友だちが急に減っている可能性があります/)).toBeNull()
+    expect(screen.getByTitle(/この項目はまだ確認できていないため、影響の有無も未確認です。/)).toBeTruthy()
+    expect(screen.queryByTitle(/友だちが急に減っている可能性があります/)).toBeNull()
   })
 })
 
 describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜない', () => {
   it('古い実行の項目は「古い確認」の札にし、帯では確かめ直しへ誘導する', async () => {
     healthResponse.handler = () => Promise.resolve(staleSnapshot())
-    render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
     // 古い「正常」を現在の判定として出さない。板どおり「古い確認」の札。
     // 札の文字は点と文字が別の要素なので、textContent で探す。
     const stalePills = () => [...document.querySelectorAll('span')]
-      .filter((el) => el.textContent === '●古い確認')
+      .filter((el) => el.textContent === '古い確認')
     await waitFor(() => {
       expect(stalePills().length).toBeGreaterThan(0)
     })
@@ -198,13 +197,13 @@ describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜな�
     fresh.data.latestRun.results[0].observedAt = now
     fresh.data.lastCheckedAt = now
     healthResponse.handler = () => Promise.resolve(fresh)
-    render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
     await waitFor(() => {
       expect(screen.getAllByText('LINE のアカウントとつながっているか').length).toBeGreaterThan(0)
     })
     expect(screen.getAllByText(/正常/).length).toBeGreaterThan(0)
     expect(screen.queryByText(/古い結果です/)).toBeNull()
-    expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '●古い確認').length).toBe(0)
+    expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '古い確認').length).toBe(0)
   })
 })

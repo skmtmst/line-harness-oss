@@ -30,8 +30,8 @@ describe('タブの詰めた段（size="compact"）', () => {
   })
 
   it('詰めた段は v8 の文字の行だけを変数で詰め、選んだ下線を段の線に重ねる（既定の .tab は高さ auto のまま）', () => {
-    expect(tabsCss).toMatch(/\[data-theme='v8'\] \.list\[data-size='compact'\] \.tab \{[^}]*line-height: var\(--tpl-tabs-compact-lh\)/)
-    expect(tabsCss).toMatch(/\[data-theme='v8'\] \.list\[data-size='compact'\] \.current \{[^}]*margin-bottom: var\(--tpl-tabs-compact-line-overlap\)/)
+    expect(tabsCss).toMatch(/:root \.list\[data-size='compact'\] \.tab \{[^}]*line-height: var\(--tpl-tabs-compact-lh\)/)
+    expect(tabsCss).toMatch(/:root \.list\[data-size='compact'\] \.current \{[^}]*margin-bottom: var\(--tpl-tabs-compact-line-overlap\)/)
     expect(globals).toMatch(/--tpl-tabs-compact-lh: 18\.5px/)
   })
 })
@@ -45,7 +45,7 @@ describe('引き出しの幅（width="narrow"）', () => {
   })
 
   it('狭い幅は v8 だけ 480（既定の 660 は変えない）', () => {
-    expect(drawerCss).toMatch(/\[data-theme='v8'\] \.panel\[data-width='narrow'\] \{[^}]*width: min\(var\(--tpl-drawer-narrow-w\), 100%\)/)
+    expect(drawerCss).toMatch(/:root \.panel\[data-width='narrow'\] \{[^}]*width: min\(var\(--tpl-drawer-narrow-w\), 100%\)/)
     expect(drawerCss).toMatch(/\.panel \{[^}]*width: min\(660px, 100%\)/)
     expect(globals).toMatch(/--tpl-drawer-narrow-w: 480px/)
   })
@@ -60,7 +60,7 @@ describe('窓の下のボタンを中央に（footerAlign="center"）', () => {
   })
 
   it('中央寄せは v8 の印つきの窓だけ', () => {
-    expect(dialogCss).toMatch(/\[data-theme='v8'\] \.panel\[data-footer-align='center'\] \.actions \{ justify-content: center; \}/)
+    expect(dialogCss).toMatch(/:root \.panel\[data-footer-align='center'\] \.actions \{ justify-content: center; \}/)
   })
 })
 

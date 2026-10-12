@@ -10,6 +10,7 @@
  *   BC-03: 確認の段のプレビュー・配信後アクションに、決めていない
  *          固定の日時・人数・タグ名を出さない。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -111,14 +112,7 @@ async function renderStepped(initialStep: BroadcastStepKey, options: { openTempl
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
-  const proto = element instanceof HTMLSelectElement
-    ? HTMLSelectElement.prototype
-    : element instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 async function clickTab(label: string) {
@@ -140,7 +134,7 @@ describe('監査 #615：一斉配信の受け入れ', () => {
   it('BC-01: 書きかけの本文は、形式を行き来しても残る', async () => {
     await renderStepped('message')
 
-    const textarea = () => container.querySelector<HTMLTextAreaElement>('textarea[placeholder="テキストを入力"]')
+    const textarea = () => container.querySelector<HTMLTextAreaElement>('[role="textbox"][placeholder="テキストを入力"]')
     expect(textarea(), '本文の入力欄がない').not.toBeNull()
 
     await act(async () => { setNativeValue(textarea()!, 'おはようございます') })

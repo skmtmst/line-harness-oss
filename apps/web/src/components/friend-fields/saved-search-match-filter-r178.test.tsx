@@ -53,6 +53,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) =>
     React.createElement('a', { href, ...rest }, children),
@@ -62,7 +64,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { id: 'a1', name: '店舗A' } }),
 }))
 
-import SavedSearchList from './saved-search-list'
+import SavedSearchList from '@/v8/tags/searches-tab'
 
 let host: HTMLDivElement
 let root: Root
@@ -94,7 +96,7 @@ function rowNames(): string[] {
 describe('R178 該当人数の絞り込み', () => {
   it('「すべて」が0人・1人以上・未集計の全件を出す', async () => {
     await act(async () => {
-      root.render(<SavedSearchList accountId="a1" />)
+      root.render(<SavedSearchList accountId="a1" canEdit />)
     })
     await flush()
     await flush()

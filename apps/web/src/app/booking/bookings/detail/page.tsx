@@ -917,7 +917,7 @@ function BookingDetailInner() {
 
   return (
     <div className="flex flex-col gap-4" data-design-node="If9Mh">
-      <div className="v8-only"><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
+      <div><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {error && detail && (

@@ -34,65 +34,76 @@ function code(src: string): string {
 }
 
 describe('表の外側の余白の洗い出し', () => {
-  it('/accounts：外側は px-5、操作列は固定＋右寄せ', () => {
-    const body = code(read('app', 'accounts', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-5">アカウント</Th>')
-    expect(body).toContain('w-28 pr-5">操作')
-    expect(body).toContain('py-3 pr-4 pl-5')
-    expect(body).toContain('py-3 pr-5 pl-4 text-right')
+  it('/accounts：列はV8の板の幅で固定し、操作は1つのメニューにする', () => {
+    const body = code(read('v8', 'settings', 'accounts', 'accounts.tsx'))
+    const css = read('v8', 'settings', 'accounts', 'accounts.module.css')
+    expect(body).toContain('<Th className={styles.colName}>アカウント</Th>')
+    expect(body).toContain('<Th className={styles.colMenu}>')
+    expect(css).toContain('.colMenu { flex: 0 0 var(--tpl-sa-acc-menu-w); }')
   })
 
-  it('/affiliates：外側は px-5、操作列は中身の幅で固定', () => {
-    const body = code(read('app', 'affiliates', 'tabs.tsx'))
-    expect(body).toContain('<Th className="pl-5">アフィリエイター</Th>')
-    expect(body).toContain('w-44 pr-5">操作')
+  it('/affiliates：外側はV8の板の余白、操作列は中身の幅で固定', () => {
+    const body = code(read('v8', 'affiliates', 'affiliators.tsx'))
+    const css = read('v8', 'affiliates', 'affiliates.module.css')
+    expect(body).toContain('<Th className={styles.colName}>アフィリエイター</Th>')
+    expect(body).toContain('<Th className={styles.colOps}>操作</Th>')
+    expect(css).toContain('padding: var(--tpl-af-head-pad)')
+    expect(css).toContain('padding: var(--tpl-af-row-pad)')
+    expect(css).toContain('.colOps { width: var(--tpl-af-col-ops); }')
   })
 
   it('/common-actions：操作列は中身の幅で固定＋右寄せ', () => {
-    const body = code(read('app', 'common-actions', 'page.tsx'))
-    expect(body).toContain('<Th align="right" className="w-44">操作</Th>')
+    const body = code(read('v8', 'automations', 'common-actions.tsx'))
+    expect(body).toContain('<Th className={styles.colOps}>操作</Th>')
+    expect(read('v8', 'automations', 'common-actions.module.css')).toContain('.colOps')
   })
 
-  it('/ops/audit：IP は右へ寄せる', () => {
-    const body = code(read('app', 'ops', 'audit', 'page.tsx'))
-    expect(body).toContain('<Th className="w-36" align="right">IP</Th>')
-    expect(body).toContain('<Td align="right">')
+  it('/ops/audit：IPを理由の補足で確認し、右端の欄は残りの幅を使う', () => {
+    const body = code(read('v8', 'ops', 'audit.tsx'))
+    expect(body).toContain('className={parts.grow} role="cell" title={')
+    expect(body).toContain('IP ${row.ip')
+    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.grow\s*\{[^}]*min-width: 0;[^}]*flex: 1;/)
   })
 
-  it('/ops/members：名前・メールは幅を切らずに吸収する', () => {
-    const body = code(read('app', 'ops', 'members', 'page.tsx'))
-    expect(body).not.toContain('<Th className="w-72">名前</Th>')
-    expect(body).not.toContain('<Th className="w-52">メール</Th>')
+  it('/ops/members：名前は残りの幅を使い、名前とメールの全文を確認できる', () => {
+    const body = code(read('v8', 'ops', 'members.tsx'))
+    expect(body).toContain('className={parts.grow} role="cell" title={m.name}')
+    expect(body).toContain('styles.colMail}`} role="cell" title={m.email')
+    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.grow\s*\{[^}]*min-width: 0;[^}]*flex: 1;/)
   })
 
   it('/ops/dashboard：契約先で吸収し、使用率は右へ寄せる', () => {
-    const body = code(read('app', 'ops', 'dashboard', 'page.tsx'))
-    expect(body).toContain('<Th>上限に近い契約先</Th>')
-    expect(body).toContain('<Th className="w-28" align="right">使用率</Th>')
-    expect(body).toContain('<Td align="right">')
+    const body = code(read('v8', 'ops', 'dashboard.tsx'))
+    expect(body).toContain('className={parts.grow}>契約先</span>')
+    expect(body).toContain('parts.num} ${styles.colRate}')
+    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.num\s*\{[^}]*text-align: right;/)
   })
 
   it('/nen-campaigns：操作列はボタンがはみ出さない幅にする', () => {
-    const body = code(read('app', 'nen-campaigns', 'nen-overview.tsx'))
-    expect(body).toContain('<Th className="w-36 sticky right-0')
-    expect(body).toContain('<Th className="w-32 sticky right-0')
+    const body = code(read('v8', 'nen-campaigns', 'list.tsx'))
+    expect(body.match(/<Th className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(body.match(/<Td className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(read('v8', 'nen-campaigns', 'list.module.css')).toContain('width: var(--tpl-nc-menu-size)')
   })
 
   it('/rich-menus：外側は px-5、操作列はボタン幅で固定', () => {
-    const body = code(read('app', 'rich-menus', 'page.tsx'))
-    expect(body).toContain("width: '12rem'")
-    expect(body).toContain('<Th className="pl-5">メニュー</Th>')
-    expect(body).toContain('sticky right-0 pr-5">操作')
+    const body = code(read('v8', 'rich-menus', 'list.tsx'))
+    expect(body).toContain('className={styles.menuCell}')
+    const css = read('v8', 'rich-menus', 'list.module.css')
+    expect(css).toContain('.colMenu { width: var(--tpl-rml-col-menu); }')
+    expect(css).toContain('justify-content: flex-end')
   })
 
-  it('/ec-commerce：操作列は中身の幅で固定', () => {
-    const body = code(read('app', 'ec-commerce', 'page.tsx'))
-    expect(body).toContain('<Th align="right" className="w-44">操作</Th>')
+  it('/ec-commerce：操作は行メニューにまとめる', () => {
+    const body = code(read('v8', 'settings', 'ec-commerce', 'screen.tsx'))
+    expect(body).toContain('<Th><span className={styles.srOnly}>操作</span></Th>')
+    expect(body).toContain('<RowMenu')
   })
 
-  it('/ec-commerce/identity-candidates：操作列は2ボタン幅で固定', () => {
-    const body = code(read('app', 'ec-commerce', 'identity-candidates', 'page.tsx'))
-    expect(body).toContain('<Th align="right" className="w-56">操作</Th>')
+  it('/ec-commerce/identity-candidates：V8の比較表で操作の列を持つ', () => {
+    const body = code(read('v8', 'settings', 'ec-commerce', 'identity.tsx'))
+    expect(body).toContain('<Th>操作</Th>')
+    expect(body).toContain('<DataTable')
   })
 
   it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
@@ -102,33 +113,24 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
-    const body = code(read('app', 'duplicates', 'page.tsx'))
-    // 候補の表（20px）。文字だけのセルは span で包み、本当の余白で測らせる（m22b。見た目は同じ）。
-    expect(body).toContain('<Th className="pl-5">候補</Th>')
-    expect(body).toContain('<Th align="right" className="pr-5">操作</Th>')
-    expect(body).toContain('py-3 pr-3 pl-5')
-    expect(body).toContain('<span className="block truncate">{candidate.left.label}')
-    expect(body).toContain('whitespace-nowrap py-2 pr-5 pl-3 text-right')
-    // アカウント別の表（20px）。
-    expect(body).toContain('<Th className="pl-5">アカウント</Th>')
-    expect(body).toContain('pr-5">重複率')
-    expect(body).toContain('py-4 pr-4 pl-5')
-    expect(body).toContain('<span className="block truncate">{row.accountName}</span>')
-    expect(body).toContain('py-4 pr-5 pl-4 text-right tabular-nums')
-    // 行列の表（16px。列数が可変のため末尾列は要素指定）。
-    expect(body).toContain('<Th className="pl-4">行')
-    expect(body).toContain('truncate pr-4')
-    expect(body).toContain('[data-duplicates-matrix] tr > :last-child')
+    const body = code(read('app', 'duplicates', 'duplicates-v8.tsx'))
+    expect(body).toContain('<th>操作</th>')
+    expect(body).toContain('className={styles.linkAction}')
+    expect(read('app', 'friends', 'friends-v8.module.css')).toContain('.table td')
+    expect(read('app', 'friends', 'friends-v8.module.css')).toContain('.linkAction')
+    expect(body).toContain('candidate.left.label')
+    expect(body).toContain('candidate.right.label')
+
   })
 
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {
-    const body = code(read('components', 'friend-fields', 'tags-page-v4.tsx'))
+    const body = code(read('v8', 'tags', 'tags-tab.tsx'))
     // 共通 Th（余白 12px＝px-3 を持つ）へ寄せた後は幅だけ指定する。
     // 先頭列 w-11（44px）、操作列は編集＋…の2点分の128px（64pxでは枠付きボタンが切れる。m21o・m22b）。
-    expect(body).toContain('<Th style={{ width: 44 }}>')
-    expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
-    expect(body).toContain('>操作</Th>')
-    expect(body).toContain('cursor-grab')
+    expect(body).toContain('<Th className={styles.colName}>タグ</Th>')
+    expect(body).toContain('<Th className={styles.colMenu}>')
+    expect(body).toContain('<span className="sr-only">操作</span>')
+    expect(body).toContain('<ReorderHandle')
   })
 
   it('/friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {
@@ -138,7 +140,8 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/ops/members：自分自身の行にも「—」を置き、右端を空にしない', () => {
-    const body = code(read('app', 'ops', 'members', 'page.tsx'))
-    expect(body).toContain('<span className="text-ink-faint text-xs">—</span>')
+    const body = code(read('v8', 'ops', 'members.tsx'))
+    expect(body).toContain('self || readOnly ? (')
+    expect(body).toContain('<span className={styles.faint}>{emptyValue(\'unknown\')}</span>')
   })
 })

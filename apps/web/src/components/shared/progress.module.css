@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 処理の進み。Pencil ★V8 `tydx2`「進みの棒」。
@@ -65,23 +65,19 @@
   margin: 0;
 }
 
-.track {
-  height: 8px; /* height: 8 */
-  overflow: hidden;
-  border-radius: var(--radius-mini); /* cornerRadius: 4 */
-  background: var(--color-shell); /* fill: $shell */
+.track { /* height: 8 */
+  overflow: hidden; /* cornerRadius: 4 */ /* fill: $shell */
   position: relative;
 }
 
 /* ★V8（夕13）：進みの棒の溝は track の色（TOKENS-20261001）。 */
-[data-theme="v8"] .track {
+:root .track {
   background: var(--color-track);
 }
 
 .fill {
   position: absolute;
-  inset: 0;
-  border-radius: var(--radius-mini); /* cornerRadius: 4 */
+  inset: 0; /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   transform: scaleX(0);
   transform-origin: left center;
@@ -104,8 +100,7 @@
   top: 0;
   bottom: 0;
   left: 0;
-  width: 29%; /* width: 110（380 の帯のとき） */
-  border-radius: var(--radius-mini); /* cornerRadius: 4 */
+  width: 29%; /* width: 110（380 の帯のとき） */ /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   opacity: 0.6; /* opacity: 0.6 */
   animation: progress-slide var(--motion-slow) var(--motion-ease-in-out) infinite alternate;
@@ -154,8 +149,8 @@
   white-space: nowrap;
 }
 
-[data-theme='v8'] .track { height: 6px; border-radius: 3px; }
-[data-theme='v8'] .fill,
-[data-theme='v8'] .indeterminate { border-radius: 3px; }
+:root .track { height: 6px; border-radius: 3px; }
+:root .fill,
+:root .indeterminate { border-radius: 3px; }
 
 }

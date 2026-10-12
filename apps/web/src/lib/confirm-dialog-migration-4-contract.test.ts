@@ -14,16 +14,16 @@ function withoutComments(src: string): string {
 }
 
 const MIGRATED = [
-  'components/events/event-form.tsx',
-  'components/events/event-wizard.tsx',
+  'v8/events/edit-form.tsx',
+  'v8/events/create.tsx',
   'components/rich-menus/apply-to-tag-modal.tsx',
 ]
 
 describe('V6 確認窓への移行（4本目）', () => {
   it.each(MIGRATED)('%s は共通の確認窓を使い、ブラウザの確認・警告を残さない', (rel) => {
     const src = withoutComments(read(rel))
-    expect(src).toContain("from '@/components/shared/confirm-dialog'")
-    expect(src).toContain('<ConfirmDialog')
+    expect(src).toMatch(/from '@\/(?:components\/shared\/confirm-dialog|lib\/unsaved-leave-dialog)'/)
+    expect(src).toMatch(/<(?:ConfirmDialog|UnsavedLeaveDialog)\b/)
     expect(src).not.toMatch(
       /(?:(?:window|globalThis|self)\s*\.\s*confirm\s*\()|(?:(?:^|[^.\w])confirm\s*\()/,
     )
@@ -32,7 +32,7 @@ describe('V6 確認窓への移行（4本目）', () => {
 })
 
 describe('イベント編集の予約枠', () => {
-  const src = read('components/events/event-form.tsx')
+  const src = read('v8/events/edit-form.tsx')
 
   it('枠の削除は二度押しを止め、失敗を窓に出す', () => {
     expect(src).toContain('async function deleteSlot()')
@@ -62,34 +62,35 @@ describe('イベント編集の予約枠', () => {
 })
 
 describe('イベント作成の予約枠', () => {
-  const src = read('components/events/event-wizard.tsx')
+  const src = read('v8/events/edit-form.tsx')
+  const create = read('v8/events/create.tsx')
 
   it('まとめて追加は下見を出してから作る', () => {
-    expect(src).toContain('async function addBulk()')
+    expect(create).toContain('router.replace(`/events/edit?id=${encodeURIComponent(continuingId)}`)')
     // #1000: 下見の時点で操作IDと枠ごとの再送防止キーを確定する。
     expect(src).toContain('setBulkPreview({')
     expect(src).toContain('client_key')
-    expect(src).toContain('件の予約枠を追加しますか？')
+    expect(src).toContain('件の予約枠を作りますか？')
     expect(src).toContain('いまある枠は消えません')
     expect(src).toContain('busy={bulkBusy}')
     expect(src).toContain('error={bulkError}')
   })
 
   it('作る側は二度押しを止め、途中まで作られた可能性を書く', () => {
-    expect(src).toContain('async function createBulk()')
-    expect(src).toContain('if (!bulkPreview || bulkBusy) return')
+    expect(src).toContain('async function createBulkSlots()')
+    expect(src).toContain('if (!bulkPreview || !eventId || bulkBusy) return')
     expect(src).toContain('途中まで作られていることがあります')
-    expect(src).toContain('await refreshSlots()')
+    expect(src).toContain('await refresh()')
   })
 
   it('枠の削除は二度押しを止め、失敗を窓に出す', () => {
-    expect(src).toContain('async function removeSlot()')
-    expect(src).toContain('if (!removeTarget || removing) return')
+    expect(src).toContain('async function deleteSlot()')
+    expect(src).toContain('if (!deleteSlotTarget || !eventId || deletingSlot) return')
     expect(src).toContain('枠を削除できませんでした。')
-    expect(src).toContain('setRemoving(false)')
+    expect(src).toContain('setDeletingSlot(false)')
     expect(src).toContain('title="この予約枠を削除しますか？"')
-    expect(src).toContain('いま申込は入っていません')
-    expect(src).toContain('busy={removing}')
+    expect(src).toContain('いま予約は入っていません')
+    expect(src).toContain('busy={deletingSlot}')
   })
 })
 

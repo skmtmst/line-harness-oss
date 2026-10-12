@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const menu = read('../../../components/hq/account-menu.tsx')
+const menuCss = read('../../../components/hq/account-menu.module.css')
 const members = read('../../../v8/hq/members.tsx')
 const support = read('../../../v8/hq/support.tsx')
 const settings = read('../../../v8/hq/settings.tsx')
@@ -32,7 +33,7 @@ describe('統括の左下アカウントメニュー', () => {
   it('Esc で閉じて押した要素へフォーカスを戻し、外側の押下は器（MenuPortal）が閉じる', () => {
     expect(menu).toContain("event.key === 'Escape'")
     expect(menu).toContain('triggerRef.current?.focus()')
-    expect(menu).toContain('onClose={() => setOpen(false)}')
+    expect(menu).toContain('onClose={close}')
   })
 
   /*
@@ -42,9 +43,10 @@ describe('統括の左下アカウントメニュー', () => {
    */
   it('開いたメニューは最上層の器に出し、幅240で固定して行の右に説明を置かない', () => {
     expect(menu).toContain('<MenuPortal')
-    expect(menu).toContain('w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float')
-    expect(menu).toContain('flex h-10 items-center gap-2.5 px-3.5 text-label')
-    expect(menu).toContain('h-px bg-divider-soft')
+    expect(menu).toContain('className={styles.menu}')
+    expect(menuCss).toContain('width: 240px')
+    expect(menuCss).toContain('height: 40px')
+    expect(menu).toContain('className={styles.rule}')
     expect(menu).not.toContain('absolute bottom-full left-0')
     expect(menu).not.toContain('権限者・担当アカウント')
     expect(menu).not.toContain('プランと支払い')
@@ -57,7 +59,8 @@ describe('統括の左下アカウントメニュー', () => {
    */
   it('頭の課金の一言は役目の札のとなりに灰色の字で1行だけ出す', () => {
     expect(menu).toContain('const planNote = chip ?')
-    expect(menu).toContain('<span className="truncate text-nano text-ink-faint">{planNote}</span>')
+    expect(menu).toContain("const headNote = [roleLabel, planNote].filter(Boolean).join('・')")
+    expect(menu).toContain('className={styles.headNote}')
     expect(menu).not.toContain('{chip ? <PlanChip chip={chip} /> : null}')
     expect(menu).not.toContain('billingNote')
   })

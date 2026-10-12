@@ -1,8 +1,8 @@
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync as readRawSource } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 
 /**
@@ -21,7 +21,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('kind="empty"')
+    expect(PAGE).toContain('<EmptyList')
     expect(PAGE).toContain('成果地点を読み込めませんでした')
     expect(PAGE).toContain('onRetry=')
     expect(PAGE).toContain('onRetry={() => void load()}')
@@ -33,7 +33,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('formatNumber(point.metrics.netCount')
     expect(PAGE).toContain('formatNumber(point.metrics.netValue')
     expect(PAGE).toContain('point.usageCount === 0')
-    expect(PAGE).toContain('definitions.stateCounts.active')
+    expect(PAGE).toContain('stateCounts.active')
     expect(PAGE).not.toContain('利用先の取得は未接続')
   })
 
@@ -47,28 +47,28 @@ describe('V6 成果地点一覧の契約', () => {
   it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
     // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（SearchField は
     // 部品の中にある）。素の input 検索に戻さない。
-    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
+    expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
     expect(PAGE).toContain('<ListToolbar')
     expect(PAGE).toContain('search={{')
     // V8の独立した一覧はSearchFieldを使う。従来の一覧の入口だけ確認する。
     expect(readRawSource(new URL('./page.tsx', import.meta.url), 'utf8')).not.toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
-    expect(PAGE).toContain('const [sort, setSort] = useState<PointSort>')
-    expect(PAGE).toContain('CV数が多い順')
+    expect(PAGE).toContain('useListUrlValue<PointSort>')
+    expect(PAGE).toContain('件数が多い順')
     expect(PAGE).not.toContain('並び替えは準備中です')
   })
 
   it('ページ送りを共通Paginationにする', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(PAGE).toContain('<Pagination page={page} pageCount={pageCount} onPageChange={setPage} />')
-    expect(PAGE).toContain('shown.slice((page - 1) * pageSize, page * pageSize)')
+    expect(PAGE).toContain('<Pagination page={currentPage} pageCount={pageCount}')
+    expect(PAGE).toContain('shown.slice((currentPage - 1) * pageSize, currentPage * pageSize)')
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
   it('期間・V6レポート・CSVを実際の口へつなぐ', () => {
     expect(PAGE).toContain('api.conversions.definitionReport({')
     expect(PAGE).toContain('api.conversions.exportDefinitions({')
-    expect(PAGE).toContain('CSVで書き出す')
+    expect(PAGE).toContain('CSV で書き出す')
     expect(PAGE).not.toContain('書き出しはまだ繋がっていません。')
     expect(PAGE).not.toContain('CSVの書き出し口は未接続です。')
     expect(PAGE).not.toContain('準備中')
@@ -76,12 +76,12 @@ describe('V6 成果地点一覧の契約', () => {
 
 
   it('作成画面で重複を止め、入力中の条件だけを試算する', () => {
-    expect(NEW_PAGE).toContain('designNode="j8p3yj"')
+    expect(NEW_PAGE).toContain('boardId="j8p3yj"')
     expect(NEW_PAGE).toContain('const duplicateName = useMemo')
-    expect(NEW_PAGE).toContain('同じ意味の成果地点を2つ作らないでください')
+    expect(NEW_PAGE).toContain('分析の数字が二重になります')
     expect(NEW_PAGE).toContain('api.conversions.previewDefinition({')
-    expect(NEW_PAGE).toContain('入力中の条件だけで試算し、成果は追加しません。')
-    expect(NEW_PAGE).toContain('入力中の条件だけで試算し、成果は追加しません。')
+    expect(NEW_PAGE).toContain('入力中の条件だけで試算しています。')
+    expect(NEW_PAGE).toContain('試算では成果を追加しません。')
     expect(NEW_PAGE).not.toContain('保存前試算APIの接続後')
     expect(NEW_PAGE).not.toContain('準備中')
     expect(NEW_PAGE).not.toContain('Webhookで受け取った')
@@ -94,8 +94,8 @@ describe('V6 成果地点一覧の契約', () => {
     // 金額の出し方の選択肢は対応表(origin-labels)の valueModes から作る。
     // 注文の金額が無い起点では 'source' を出さないため、3択の直書きはしない。
     expect(NEW_PAGE).toContain('origin.valueModes')
-    expect(NEW_PAGE).toContain("source: '注文の金額をそのまま使う'")
-    expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '返品されたら取り消す'")
+    expect(NEW_PAGE).toContain("source: '注文の金額'")
+    expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '件数と金額を引く'")
     expect(NEW_PAGE).toContain('api.conversions.createDefinition({')
     // N-258: 送る利用先は実在するオブジェクトの実IDだけ。仮IDの固定一覧はない。
     expect(NEW_PAGE).toContain('usages: usageTargets')

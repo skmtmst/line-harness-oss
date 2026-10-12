@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isTemplateDetailData } from './template-detail-data'
+import { isTemplateDetailData } from '@/v8/template-detail/model'
 
 /*
  * D007/D008: 詳細口は success:true でも形の違う応答を返すことがある

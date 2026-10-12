@@ -11,7 +11,7 @@ import type { OpsSupportDetail } from '@/lib/api'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn() }))
 vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks } } }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/ops/knowledge', useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/knowledge', useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
 const article: OpsKnowledgeArticle = {
@@ -40,13 +40,13 @@ afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers() }
 async function flush() { await act(async () => { await vi.advanceTimersByTimeAsync(200) }) }
 const button = (label: string) => Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === label)!
 
-describe('V6 knowledge UI', () => {
+describe('V8 knowledge UI', () => {
   it('shows the actual source subject, JST evidence time and only quoted conditions', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, sourceSubject: '実際の問い合わせ件名', evidence: [
       { ...article.evidence[0], createdAt: '2026-09-19T00:40:00Z' }, article.evidence[1],
       { ...article.evidence[0], role: 'condition', quote: '対象フォームの回答後アクション' },
     ] }} onClose={() => {}} onSaved={() => {}} />))
-    expect(document.body.textContent).toContain('#MB-0312 実際の問い合わせ件名')
+    expect(document.querySelector('[title*="#MB-0312 実際の問い合わせ件名"]')).not.toBeNull()
     expect(document.querySelector('time')?.textContent).toBe('09:40')
     expect(document.body.textContent).toContain('適用条件：対象フォームの回答後アクション')
   })
@@ -97,16 +97,14 @@ describe('V6 knowledge UI', () => {
     expect(host.textContent).toContain('開く')
     expect(host.textContent).not.toContain('FAQ')
     expect(host.textContent).not.toContain('公開範囲')
-    expect(host.querySelector('button[aria-label$="記事の種類"]')).not.toBeNull()
-    await act(async () => host.querySelector('summary')!.click())
-    expect(host.querySelector('[data-design-node="aeKindFilter"]')).not.toBeNull()
-    expect(host.querySelectorAll('th')).toHaveLength(7)
+    expect(host.querySelector('button[aria-label="記事の種類"]')).not.toBeNull()
+    expect(host.querySelectorAll('[role="columnheader"]')).toHaveLength(7)
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
     // 板 `eSXxA`「記事を承認する前に」：2つ確かめてから保存して承認する。
     const closed = vi.fn()
     await act(async () => root.render(<KnowledgeEditor article={article} onClose={closed} onSaved={() => {}} />))
-    await act(async () => button('承認して有効にする').click())
+    await act(async () => button('保存して承認').click())
     const confirm = document.body.querySelector('[data-design-node="eSXxA"]')
     expect(confirm, '承認前の確認の窓が出ない').not.toBeNull()
     for (const row of ['記事を承認する前に', '本文と手順を読み', '下書きで保存', '保存して承認']) {
@@ -123,7 +121,7 @@ describe('V6 knowledge UI', () => {
   })
   it('does not enable approval for stale or uncertain evidence', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, sourceCurrent: false }} onClose={() => {}} onSaved={() => {}} />))
-    expect(button('承認して有効にする').disabled).toBe(true)
+    expect(button('保存して承認').disabled).toBe(true)
     expect(document.body.textContent).toContain('元のやり取りが更新されています')
   })
   it('labels an answer example and allows approval after the operator confirms its nonempty answer', async () => {
@@ -132,9 +130,9 @@ describe('V6 knowledge UI', () => {
       { ...article.evidence[1], role: 'answer' as const, authorKind: 'ops' as const, quote: '回答です' },
     ], reviewReason: 'お客様の成功確認はありません。回答内容を確認して承認してください。' }
     await act(async () => root.render(<KnowledgeEditor article={example} onClose={() => {}} onSaved={() => {}} />))
-    expect(document.body.textContent).toContain('回答例（お客様の確認なし）')
+    expect(document.querySelector('[title*="回答例（お客様の確認なし）"]')).not.toBeNull()
     expect(document.body.textContent).toContain('成功確認を示すものではありません')
-    await act(async () => button('承認して有効にする').click())
+    await act(async () => button('保存して承認').click())
     const confirm = document.body.querySelector('[data-design-node="eSXxA"]')
     expect(confirm, '承認前の確認の窓が出ない').not.toBeNull()
     expect(confirm?.textContent ?? '').toContain('本文と手順を読み')
@@ -149,7 +147,7 @@ describe('V6 knowledge UI', () => {
       onClose={() => {}}
       onSaved={() => {}}
     />))
-    await act(async () => button('承認して有効にする').click())
+    await act(async () => button('保存して承認').click())
     const confirm = document.body.querySelector('[data-design-node="eSXxA"]')
     expect(confirm, '承認前の確認の窓が出ない').not.toBeNull()
     expect(confirm?.textContent ?? '').toContain('元の問い合わせ #1045 が「解決」になっている')
@@ -162,15 +160,15 @@ describe('V6 knowledge UI', () => {
   it('keeps a question-only example blocked until an answer is written', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, articleKind: 'answer_example', answer: '', evidence: [], reviewState: 'needs_review' }} onClose={() => {}} onSaved={() => {}} />))
     expect(document.body.textContent).toContain('運営の回答がありません。答えを書いて承認できます')
-    expect(button('承認して有効にする').disabled).toBe(true)
+    expect(button('保存して承認').disabled).toBe(true)
     expect(mocks.review).not.toHaveBeenCalled()
   })
   it('recovers from a rejected save without issuing approval or trapping the dialog', async () => {
     mocks.update.mockRejectedValue(new TypeError('offline'))
     await act(async () => root.render(<KnowledgeEditor article={article} onClose={() => {}} onSaved={() => {}} />))
-    await act(async () => button('下書きを保存する').click())
+    await act(async () => button('下書きを保存').click())
     expect(mocks.review).not.toHaveBeenCalled()
-    expect(button('下書きを保存する').disabled).toBe(false)
+    expect(button('下書きを保存').disabled).toBe(false)
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('通信できませんでした')
   })
   it('warns that editing an approved article invalidates approval', async () => {
@@ -178,7 +176,7 @@ describe('V6 knowledge UI', () => {
     expect(document.querySelector('[data-design-node="ZAOc7"]')).not.toBeNull()
     expect(document.body.textContent).toContain('再承認するまで')
     expect(button('承認待ちで保存する')).toBeDefined()
-    expect(button('承認して有効にする')).toBeUndefined()
+    expect(button('保存して承認')).toBeUndefined()
   })
   it('shows fetch failures rather than a misleading empty list, and can retry', async () => {
     mocks.list.mockRejectedValueOnce(new TypeError('offline'))
@@ -210,8 +208,10 @@ describe('V8 ナレッジの集計範囲', () => {
       await act(async () => root.render(<OpsKnowledgePage />)); await flush()
       expect(host.querySelector('[data-design-node="h114s"]')).not.toBeNull()
       expect(host.textContent).toContain('104件中')
-      expect(host.textContent).toContain('承認待ち?1')
-      expect(host.textContent).toContain('使われた回数?7')
+      expect(host.querySelector('[aria-label="このページの記事の状況"]')?.textContent).toContain('承認待ち')
+      expect(host.querySelector('[aria-label="このページの記事の状況"]')?.textContent).toContain('1')
+      expect(host.querySelector('[aria-label="このページの記事の状況"]')?.textContent).toContain('使われた回数')
+      expect(host.querySelector('[aria-label="このページの記事の状況"]')?.textContent).toContain('7')
       expect(host.textContent).toContain('104件中 1〜1件')
       expect(mocks.review).not.toHaveBeenCalled()
     } finally { delete document.documentElement.dataset.theme }

@@ -24,7 +24,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn() }),
   usePathname: () => '/ec-commerce/identity-candidates',
   useSearchParams: () => new URLSearchParams(),
@@ -68,6 +68,7 @@ const OPERATIONS_OK = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'; window.history.replaceState({}, '', '/ec-commerce/identity-candidates'); window.dispatchEvent(new Event('popstate'))
   vi.clearAllMocks()
   mocks.overview.mockResolvedValue({ success: true, data: { total: 7, subscriptions: 3 } })
   mocks.operations.mockResolvedValue(OPERATIONS_OK)
@@ -101,13 +102,13 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => { cleanup() })
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
 describe('w1W8h 会員のつき合わせの絵合わせ', () => {
   test('数の帯は絵の順番・言葉・単位で出す', async () => {
     render(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('自動で結びついた')).toBeTruthy()
-    const band = screen.getByText('自動で結びついた').closest('[data-ro-kpis]')
+    const band = screen.getByText('自動で結びついた').closest('[data-shared-part="kpi-band"]')
     const text = band?.textContent ?? ''
     const order = ['自動で結びついた', '候補が見つかった', '結びついていない', '結びついていない注文の金額']
     let cursor = -1
@@ -117,7 +118,7 @@ describe('w1W8h 会員のつき合わせの絵合わせ', () => {
       cursor = index
     }
     /* linked=1128人・候補6人・候補なし18人・¥84,300。 */
-    expect(text).toContain('1,128人')
+    expect(text).toContain('1,128')
     expect(text).toContain('メールか電話番号が同じ')
     expect(text).toContain('人が決める（つき合わせ 24 のうち）')
     expect(text).toContain('候補なし')
@@ -128,7 +129,10 @@ describe('w1W8h 会員のつき合わせの絵合わせ', () => {
   test('並び順の初期値は確からしさが高い順', async () => {
     render(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('自動で結びついた')).toBeTruthy()
-    const trigger = screen.getByRole('button', { name: '候補の並び順' })
+    const trigger = screen.getByRole('button', { name: '並び' })
     expect(trigger.textContent ?? '').toContain('確からしさが高い順')
   })
 })
+
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))

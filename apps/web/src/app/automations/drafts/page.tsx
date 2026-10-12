@@ -3,24 +3,12 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { NewAutomationV8 } from '@/v8/automations/create/create'
 import AutomationDefinitionEntry from '@/v8/automations/definition-entry'
 
-/*
-  見本から作った下書きの編集面。
-
-  **「ルールを作る」（`Rv8Jv`）とは別の画面にした。** 見本を押すとサーバー側で
-  下書きができるので、白紙から作る画面とは出発点が違う。同じ画面に混ぜると、
-  設計の `Rv8Jv` の骨格に下書き側の節が混ざり、どちらの画面を見ているのか
-  読めなくなる（`design-structure.test.ts` が節の食い違いで落ちる）。
-
-  番号が付いていないときは、白紙の作成画面へ送らずに**理由を出す**。
-  黙って別の画面へ飛ばすと、下書きが消えたのか元から無いのかが分からない。
-*/
+/* 見本から作った下書き。未指定なら理由を出し、対象IDの変更では編集器を作り直す。 */
 function AutomationDraftPageInner() {
   usePageTitle('見本から作った下書き')
   /*
@@ -31,15 +19,8 @@ function AutomationDraftPageInner() {
   const params = useSearchParams()
   const draftId = params.get('id')
   const automationId = params.get('automationId')
-  const theme = useAdminTheme()
 
   if (!draftId && automationId) return <AutomationDefinitionEntry key={automationId} automationId={automationId} />
-
-  /*
-   * ★V8 切替（`J1VA8`）。v8 のときだけ src/v8 の画面（ルールを作るの「下書きを仕上げる」の顔）へ。
-   * v7 の見た目は1画素も変えない。
-   */
-  if (theme === 'v8' && draftId) return <NewAutomationV8 key={draftId} draftId={draftId} chrome="draft" />
 
   if (!draftId) {
     return (
@@ -53,7 +34,7 @@ function AutomationDraftPageInner() {
     )
   }
 
-  return <AutomationDraftEditor key={draftId} draftId={draftId} />
+  return <NewAutomationV8 key={draftId} draftId={draftId} chrome="draft" />
 }
 
 export default function AutomationDraftPage() {

@@ -6,8 +6,8 @@
  * - 頭：銀行用 CSV…・支払明細をまとめて出す
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { AffiliateShell } from '@/v8/affiliates/frame'
 
 const fixture = vi.hoisted(() => ({
   previewImpl: null as null | (() => Promise<unknown>),
@@ -45,7 +45,10 @@ const PREVIEW = {
   previewVersion: 'version-1',
 }
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       settlementPreview: () => fixture.previewImpl!(),
@@ -55,19 +58,17 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: PaymentTabV8 } = await import('./v8-payment-tab')
+const { default: PaymentTabV8 } = await import('@/v8/affiliates/payment')
 
 afterEach(() => {
   cleanup()
 })
 
-let headerNode: ReactNode = null
 
 function renderTab() {
   fixture.previewImpl = () => Promise.resolve({ success: true, data: PREVIEW })
-  headerNode = null
   const { container } = render(
-    <PaymentTabV8 accountId="acc-1" canEdit registerHeaderActions={(node) => { headerNode = node }} />,
+    <AffiliateShell.Provider value={{ tab: 'payment', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><PaymentTabV8 /></AffiliateShell.Provider>,
   )
   return container
 }
@@ -79,8 +80,8 @@ describe('aINnz 支払いタブの絵合わせ', () => {
       expect(screen.getByText('今回 払う額')).toBeTruthy()
     })
     expect(screen.getAllByText('¥70,400').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('2人・33件').length).toBeGreaterThan(0)
-    expect(screen.getByText('次の締め')).toBeTruthy()
+    expect(screen.getAllByText('2 人・33 件').length).toBeGreaterThan(0)
+    expect(screen.getByText('次の支払日')).toBeTruthy()
   })
 
   test('行に札と明細だけが出る', async () => {
@@ -89,7 +90,7 @@ describe('aINnz 支払いタブの絵合わせ', () => {
       expect(screen.getByText('確定できる')).toBeTruthy()
     })
     expect(screen.getByText('振込先待ち')).toBeTruthy()
-    expect(screen.getByText('未設定')).toBeTruthy()
+    expect(screen.getByText('未登録')).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '明細を見る' }).length).toBe(2)
     expect(screen.queryByRole('button', { name: 'この人を確定' })).toBeNull()
   })
@@ -97,12 +98,12 @@ describe('aINnz 支払いタブの絵合わせ', () => {
   test('頭に2つの書き出しボタンと脚注が出る', async () => {
     renderTab()
     await waitFor(() => {
-      expect(headerNode).not.toBeNull()
+      expect(screen.queryByRole('button', { name: /CSV/ })).not.toBeNull()
     })
-    const { container } = render(<>{headerNode}</>)
-    const head = within(container as HTMLElement)
+    const head = screen
     expect(head.getByRole('button', { name: '銀行用 CSV…' })).toBeTruthy()
     expect(head.getByRole('button', { name: '支払明細をまとめて出す' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '成果とアフィリエイトの説明' }))
     expect(screen.getByText(/口座番号は本人だけに表示します/)).toBeTruthy()
   })
 })

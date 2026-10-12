@@ -48,12 +48,10 @@ export function useOverlayFocus<T extends HTMLElement = HTMLDivElement>(
     if (activeOverlays.size === 0) originalOverflow = document.body.style.overflow
     activeOverlays.set(key, { depth, order })
     const isTop = () => {
-      if (document.documentElement?.dataset?.theme !== 'v8') return true
       const top = [...activeOverlays.entries()].sort((a, b) => b[1].depth - a[1].depth || b[1].order - a[1].order)[0]
       return top?.[0] === key
     }
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
     /*
@@ -102,8 +100,8 @@ export function useOverlayFocus<T extends HTMLElement = HTMLDivElement>(
       document.removeEventListener('keydown', onKeyDown)
       const restoreFocus = isTop()
       activeOverlays.delete(key)
-      if (document.documentElement?.dataset?.theme !== 'v8' || activeOverlays.size === 0) {
-        document.body.style.overflow = document.documentElement?.dataset?.theme === 'v8' ? originalOverflow : previousOverflow
+      if (activeOverlays.size === 0) {
+        document.body.style.overflow = originalOverflow
       }
       if (restoreFocus) previous?.focus()
     }
@@ -135,19 +133,16 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * 閉じる動きを付けてよいか。V8 の見た目で、動きを減らす設定でないときだけ。
- * v7・試験（v8 でない）・動きを減らす設定では即時に外す。
+ * 閉じる動きを付けてよいか。動きを減らす設定では即時に外す。
  */
 export function shouldAnimateLeave(): boolean {
   return typeof document !== 'undefined'
-    && document.documentElement?.dataset?.theme === 'v8'
     && !prefersReducedMotion()
 }
 
 /*
  * ★V8 仕上げ（M10）：窓・引き出しの「閉じるときは逆再生」。
- * V8 のときだけ閉じの印を残し（--motion-exit ぶん）、v7・試験
- * （v8 でない）は今までどおり即時に外す。開き直したら印を消す。
+ * 閉じの印を残す（--motion-exit ぶん）。開き直したら印を消す。
  *
  * 閉じの印は「描画の中」で立てる（2026-10-07 動きの点検 1 番）。
  * 以前は effect の中で立てていたので、閉じた最初の描画では
@@ -180,7 +175,7 @@ export type LeavingEntry<T> = { item: T; leaving: boolean }
  * `useV8Leave` と同じく、外れた描画のうちに消えかけへ移し、
  * --motion-exit ぶん残してから外す。1件ずつ自分の期限で外すので、
  * 続けて消えても先の1件が長く残らない。
- * 動きを減らす設定・v8 でないときは今までどおり即時に外す。
+ * 動きを減らす設定では即時に外す。
  */
 export function useV8LeaveList<T extends { id: number }>(items: readonly T[], ms?: number): LeavingEntry<T>[] {
   const [previous, setPrevious] = useState(items)

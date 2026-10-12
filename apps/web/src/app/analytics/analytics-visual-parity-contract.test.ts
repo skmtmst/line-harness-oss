@@ -1,15 +1,16 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('V6 機能20の画面比較で直した契約', () => {
   it('概要4画面に設計の判断材料を残す', () => {
     for (const text of [
-      '日ごとの増減（この{days}日）',
+      '日ごとの増減（この${days}日）',
       // 監査 R71: 集計はクリック時刻の時間帯。送った時刻ではないので名前を実態に合わせた。
       '押された時間帯ごとの回数',
-      '売上から広告費を引いた残り',
+      '売上 ${yen(revenue)} − 費用',
       '項目が多いほど良い、ではありません',
     ]) expect(PAGE).toContain(text)
 
@@ -20,7 +21,7 @@ describe('V6 機能20の画面比較で直した契約', () => {
       'item.conversions.rejected',
       'item.costPerFriend',
       'item.costPerConversion',
-    ]) expect(PAGE).toContain(`metric={${metric}}`)
+    ]) expect(PAGE).toContain(`metricText(${metric}`)
   })
 
   it('詳細4画面に説明・検索・書き出しを置く', () => {
@@ -47,7 +48,7 @@ describe('V6 機能20の画面比較で直した契約', () => {
   it('監査 R225: シナリオの送信通数は人数と分けて出す', () => {
     // 送信ログは「届いた人数」ではない。通数は対象の下に併記し、
     // 到達の列・合計には混ぜない。
-    expect(PAGE).toContain('送信 <MetricCell metric={item.sentMessages} />通')
+    expect(PAGE).toContain('送信 {metricText(item.sentMessages)} 通')
     expect(PAGE).toContain("'送信通数'")
     expect(PAGE).toContain('一斉配信で届いた人数です。シナリオは届いた人数が取れないため「—」です')
   })
@@ -57,24 +58,22 @@ describe('V6 機能20の画面比較で直した契約', () => {
     expect(PAGE).toContain('一覧から分析を選んでください')
   })
 
-  it('板 u5CuB8: クロス表の字は見本どおり（列見出し11・行と数12・700禁止）', () => {
-    // 見本 lint/V8-B/u5CuB8.html：列見出し 11px/600、行札 12px/600、数 12px/700。
-    // 700は管理画面の決まりで使わないので600に寄せる。
-    expect(PAGE).toContain('className="text-micro px-4 py-3 font-semibold whitespace-normal"')
-    expect(PAGE).toContain('className="text-ink text-caption px-4 py-3 font-semibold"')
-    expect(PAGE).toContain('text-caption w-full px-4 py-3 text-right font-semibold tabular-nums')
-    expect(PAGE).not.toContain('className="px-4 py-3 text-xs whitespace-normal"')
-    expect(PAGE).not.toContain('className="text-ink px-4 py-3 text-sm font-medium">{row.label}')
+  it('V8のクロス表は共通の文字寸法を使う', () => {
+    const css = readFileSync(new URL('../../v8/analytics/analytics.module.css', import.meta.url), 'utf8')
+    expect(PAGE).toContain('className={styles.gridHead}')
+    expect(PAGE).toContain('className={styles.gridCell}')
+    expect(css.match(/\.gridHead \{[^}]*\}/)?.[0]).toContain('font-size: var(--text-micro)')
+    expect(css.match(/\.gridCell \{[^}]*\}/)?.[0]).toContain('font-size: var(--text-caption)')
   })
 
-  it('板 DkRDE: ファネル作成ボタンの字は見本どおり（13・600）', () => {
-    // 見本 lint/V8-B/DkRDE.html：「ファネルを作る」は 13px/600。
-    expect(PAGE).toContain('text-label px-3 py-1.5 font-semibold h-auto whitespace-normal')
+  it('V8のファネル作成は共通ボタンを使う', () => {
+    expect(PAGE).toContain('<Button variant="secondary" onClick={() => setCreating(true)}>')
+    expect(PAGE).toContain('ファネルを作る')
   })
 
-  it('板 DkRDE: 段の行の字は見本どおり（12・段名500）', () => {
-    // 見本 lint/V8-B/DkRDE.html：段名 12px/500、補足 12px/400。
-    expect(PAGE).toContain('className="text-ink text-caption font-medium"')
-    expect(PAGE).toContain('className="text-ink-secondary text-caption tabular-nums"')
+  it('V8の段は共通グラフに人数と選択を渡す', () => {
+    expect(PAGE).toContain('<FunnelChart label="全体の流れ" disabled={!measurable}')
+    expect(PAGE).toContain('value:measurable?step.reached:null')
+    expect(PAGE).toContain('onSelect={key=>setPicked(Number(key))}')
   })
 })

@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .root { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-msg-composer-content-gap); min-width: 0; }
 .packs { display: flex; flex-wrap: wrap; gap: var(--tpl-steps-gap); }

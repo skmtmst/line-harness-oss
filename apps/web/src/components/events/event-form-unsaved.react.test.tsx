@@ -62,7 +62,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import EventForm from './event-form'
+import EventForm from '@/v8/events/edit-form'
 
 function serverRow(version: number): EventDetail {
   return {

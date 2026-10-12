@@ -7,13 +7,15 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
 
-import NenCampaignsV8 from './nen-campaigns-v8'
-import type { NenOverviewProps } from './nen-overview'
+import NenCampaignsV8 from '@/v8/nen-campaigns/list'
+import type { NenCampaignsListProps as NenOverviewProps } from '@/v8/nen-campaigns/list'
 
 const baseProps: NenOverviewProps = {
   tab: 'auto',
@@ -140,7 +142,7 @@ describe('NEN配信 V8', () => {
     const { container } = render(<NenCampaignsV8 {...baseProps} tab="auto" />)
     expect(container.querySelector('[data-design-node="MuhWR"]')).toBeTruthy()
     const heads = Array.from(container.querySelectorAll('th')).map((th) => th.textContent)
-    for (const head of ['配信', 'きっかけ', '対象', '9月送信', '注文', '状態', '操作']) {
+    for (const head of ['配信', 'きっかけ', '対象', '9月 送信', '注文', '状態', '操作']) {
       expect(heads).toContain(head)
     }
     expect(screen.getByText('口コミのお願い')).toBeTruthy()
@@ -151,7 +153,7 @@ describe('NEN配信 V8', () => {
     const { container } = render(<NenCampaignsV8 {...baseProps} tab="columns" />)
     expect(container.querySelector('[data-design-node="Jxmqh"]')).toBeTruthy()
     const heads = Array.from(container.querySelectorAll('th')).map((th) => th.textContent)
-    for (const head of ['コラム', '分類', '公開日', 'LINE配信', '閲覧']) {
+    for (const head of ['コラム', '分類', '公開日', 'LINE 配信', '閲覧']) {
       expect(heads).toContain(head)
     }
     expect(screen.getByText('秋の食事、量はどれくらい？')).toBeTruthy()
@@ -171,7 +173,7 @@ describe('NEN配信 V8', () => {
 it('選んだコラムの紹介文を入力でき、変更を保存側へ渡す',()=>{
  const change=vi.fn()
  render(<NenCampaignsV8 {...baseProps} tab="columns" selectedColumnId="c1" introDraft="元の紹介文" onIntroChange={change}/>)
- const input=screen.getByRole('textbox',{name:'LINEに出る紹介文'}) as HTMLTextAreaElement
+ const input=screen.getByRole('textbox',{name:'LINE に出る紹介文'}) as HTMLTextAreaElement
  expect(input.value).toBe('元の紹介文')
  fireEvent.change(input,{target:{value:'新しい紹介文'}})
  expect(change).toHaveBeenCalledWith('新しい紹介文')

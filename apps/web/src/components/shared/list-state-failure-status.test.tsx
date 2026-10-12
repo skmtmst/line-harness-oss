@@ -47,7 +47,7 @@ describe('失敗の1枚の403・429出し分け', () => {
     const html = renderToStaticMarkup(
       <ListState kind="error" error={new ApiError(500, 'API error: 500')} onRetry={vi.fn()} />,
     )
-    expect(html).toContain('表示できませんでした')
+    expect(html).toContain('読み込めませんでした')
     expect(html).toContain('もう一度読み込む')
   })
 
@@ -75,7 +75,7 @@ describe('失敗の1枚の403・429出し分け', () => {
         onRetry={vi.fn()}
       />,
     )
-    expect(html).toContain('表示できませんでした')
+    expect(html).toContain('読み込めませんでした')
     expect(html).toContain('<button')
   })
 

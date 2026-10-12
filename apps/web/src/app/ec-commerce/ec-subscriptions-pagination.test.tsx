@@ -17,10 +17,8 @@ const fixture = vi.hoisted(() => ({
   subscriptions: vi.fn(),
   overview: vi.fn(),
   identities: vi.fn(),
-  theme: "v7" as "v7" | "v8",
 }))
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => fixture.theme }))
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error { status = 0 },
@@ -36,14 +34,15 @@ vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/ec-commerce',
 }))
 
-const SubscriptionsPanel = (await import('./subscriptions-panel')).default
-const EcTabsView = (await import('./ec-tabs-view')).default
+const SubscriptionsPanel = (await import('@/v8/settings/ec-commerce/subscriptions')).default
+const { flushListUrlState } = await import('@/components/shared/list-url-state')
+const { EcTabsV8: EcTabsView } = await import('@/v8/settings/ec-commerce/screen')
 
 /** 契約900件のうち、要求された窓ぶんだけ返す。 */
 function page(offset: number, limit: number, total = 900) {
@@ -72,14 +71,17 @@ function page(offset: number, limit: number, total = 900) {
 beforeEach(() => {
   vi.clearAllMocks()
   /* 完全切り替え：V8 だけ。1ページ10件が既定。 */
-  fixture.theme = "v8"
+  flushListUrlState()
+  history.replaceState(null, '', '/ec-commerce')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  document.documentElement.dataset.theme = 'v8'
   fixture.subscriptions.mockImplementation(async (params: { offset?: number; limit?: number }) =>
     page(params.offset ?? 0, params.limit ?? 10))
   fixture.overview.mockResolvedValue({ success: true, data: { total: 12, subscriptions: 900 } })
   fixture.identities.mockResolvedValue({ success: true, data: { summary: { unmatched: 3 } } })
 })
 
-afterEach(() => { cleanup() })
+afterEach(() => { cleanup(); flushListUrlState(); delete document.documentElement.dataset.theme })
 
 describe('#731 定期便のページ送りとタブの件数', () => {
   test('総数はサーバが数えた数を出し、2ページ目は offset を送って取りに行く', async () => {
@@ -120,11 +122,9 @@ describe('#731 定期便のページ送りとタブの件数', () => {
 
   test('タブの件数は overview から取り、定期便の口を別に叩かない', async () => {
     render(<EcTabsView accountId="account-a" active="subscriptions" />)
-    await waitFor(() => { expect(screen.getByText('900')).toBeTruthy() })
-    console.log('AUDIT-WEB タブの件数 =', screen.getByText('900').textContent,
-      ' subscriptions を叩いた回数 =', fixture.subscriptions.mock.calls.length)
-    // パネルが出す総数と同じ数であること。
-    expect(screen.getByText('900')).toBeTruthy()
+    await screen.findByText('取り込みの記録 12')
+    expect(screen.getByText('会員のつき合わせ 3')).toBeTruthy()
+    expect(fixture.overview).toHaveBeenCalledWith('account-a')
     // 同じ数を2回取らない。
     expect(fixture.subscriptions).not.toHaveBeenCalled()
   })
@@ -138,19 +138,18 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     render(<SubscriptionsPanel accountId="account-a" />)
     const footer = await screen.findByText(/数えていません/)
     console.log('AUDIT-WEB 弾いた件数の知らせ =', footer.textContent)
-    expect(footer.textContent).toContain('2件は数えていません')
+    expect(footer.textContent).toContain('2 件は数えていません')
   })
 })
 
 
 describe('V8 定期便の表示件数', () => {
   test('10件で開き、50件へ変えた後の次ページはoffset50を使う', async () => {
-    fixture.theme = 'v8'
     render(<SubscriptionsPanel accountId="account-a" />)
     await screen.findByText(/1〜10件を表示/)
     expect(fixture.subscriptions.mock.calls[0][0]).toMatchObject({ limit: 10, offset: 0 })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '定期便の表示件数' })) })
-    await act(async () => { fireEvent.click(within(screen.getByRole('option', { name: '50件' })).getByRole('button')) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '表示件数' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('option', { name: '50件表示' })).getByRole('button')) })
     await screen.findByText(/1〜50件を表示/)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' })) })
     await screen.findByText(/51〜100件を表示/)
@@ -164,7 +163,7 @@ test('ROOT32: 表示条件で0件なら「条件に合う」の空と切り替�
     params.status ? page(0, 0, 0) : page(params.offset ?? 0, params.limit ?? 10))
   render(<SubscriptionsPanel accountId="acc-1" />)
   await waitFor(() => expect(screen.getByText('お客様0')).toBeTruthy())
-  const tab = screen.getAllByRole('tab').find((button) => button.textContent?.includes('休止中'))
+  const tab = screen.getAllByRole('button').find((button) => button.textContent?.includes('休止中'))
   expect(tab, '表示条件のタブがある').toBeTruthy()
   await act(async () => { fireEvent.click(tab!) })
   await waitFor(() => expect(screen.getByText('条件に合う定期便はありません')).toBeTruthy())

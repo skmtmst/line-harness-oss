@@ -15,23 +15,6 @@ import DateTimeField, {
   parseTime,
 } from './date-time-field'
 
-/*
- * 中の時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
- * 日時の判断なので、素の <select> に置き換える。
- */
-vi.mock('./select', () => ({
-  default: ({ 'aria-label': label, value, onChange, options }: {
-    'aria-label'?: string
-    value: string
-    onChange: (value: string) => void
-    options: Array<{ value: string; label: string }>
-  }) => React.createElement(
-    'select',
-    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
-    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
-  ),
-}))
-
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 function DateTimeHarness({ initial = '2026-10-01T10:00' }: { initial?: string }) {
@@ -54,7 +37,7 @@ function TimeHarness({ initial = '10:00' }: { initial?: string }) {
   )
 }
 
-describe('日時の選択（★V7）', () => {
+describe('日時の選択（V8）', () => {
   it('表示は「2026年10月1日（木）10:00」、値は YYYY-MM-DDTHH:mm のまま', () => {
     render(<DateTimeHarness />)
     expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain('2026年10月1日（木）10:00')
@@ -98,9 +81,12 @@ describe('日時の選択（★V7）', () => {
   it('時・分を変えると値が替わる。箱は開いたまま', () => {
     render(<DateTimeHarness />)
     fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
-    fireEvent.change(screen.getByLabelText('時'), { target: { value: '09' } })
+    const time = screen.getByRole('combobox', { name: '時刻' })
+    fireEvent.change(time, { target: { value: '0900' } })
+    fireEvent.keyDown(time, { key: 'Enter' })
     expect(screen.getByTestId('value').textContent).toBe('2026-10-01T09:00')
-    fireEvent.change(screen.getByLabelText('分'), { target: { value: '30' } })
+    fireEvent.change(time, { target: { value: '0930' } })
+    fireEvent.keyDown(time, { key: 'Enter' })
     expect(screen.getByTestId('value').textContent).toBe('2026-10-01T09:30')
     expect(screen.getByRole('dialog', { name: '日時を選ぶ' })).toBeTruthy()
   })
@@ -122,32 +108,34 @@ describe('日時の選択（★V7）', () => {
     const onChange = vi.fn()
     render(<DateTimeField defaultValue="2026-10-01T10:00" onChange={onChange} aria-label="送る日時" />)
     fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
-    fireEvent.change(screen.getByLabelText('時'), { target: { value: '18' } })
+    const time = screen.getByRole('combobox', { name: '時刻' })
+    fireEvent.change(time, { target: { value: '1800' } })
+    fireEvent.keyDown(time, { key: 'Enter' })
     expect(onChange).toHaveBeenCalledWith('2026-10-01T18:00')
     expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain('2026年10月1日（木）18:00')
   })
 })
 
-describe('時刻の選択（★V7）', () => {
+describe('時刻の選択（V8）', () => {
   it('表示は「10:00」、値は HH:mm のまま', () => {
     render(<TimeHarness />)
-    expect(screen.getByRole('button', { name: '始まる時刻' }).textContent).toContain('10:00')
+    expect((screen.getByRole('combobox', { name: '始まる時刻' }) as HTMLInputElement).value).toBe('10 : 00')
     expect(formatTimeLabel(parseTime('10:00')!)).toBe('10:00')
     expect(parseTime('')).toBeNull()
     expect(parseTime('24:00')).toBeNull()
     expect(parseTime('10:00:59')!.minutes).toBe(0)
   })
 
-  it('分を変えると値が替わる。×で空にできる', () => {
+  it('分を変えると値が替わる。消す口で空にできる', () => {
     render(<TimeHarness />)
-    fireEvent.click(screen.getByRole('button', { name: '始まる時刻' }))
+    fireEvent.click(screen.getByRole('button', { name: '時刻の一覧を開く' }))
     expect(screen.getByRole('dialog', { name: '時刻を選ぶ' })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('分'), { target: { value: '30' } })
+    fireEvent.click(screen.getByRole('listbox', { name: '分' }).querySelector('[role="option"][id$="-m-30"]')!)
     expect(screen.getByTestId('value').textContent).toBe('10:30')
-    fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '時刻を消す' }))
+    fireEvent.click(screen.getByRole('button', { name: '時刻の一覧を開く' }))
+    fireEvent.click(screen.getByRole('button', { name: '消す' }))
     expect(screen.getByTestId('value').textContent).toBe('')
-    expect(screen.getByRole('button', { name: '始まる時刻' }).textContent).toContain('時刻を選ぶ')
+    expect((screen.getByRole('combobox', { name: '始まる時刻' }) as HTMLInputElement).placeholder).toBe('-- : --')
   })
 })

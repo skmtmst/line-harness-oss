@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const SRC = readFileSync(join(__dirname, 'restaurant-console.tsx'), 'utf8')
+const SRC = readFileSync(join(__dirname, '../../v8/restaurant/organization/organization.tsx'), 'utf8')
 
 /*
  * R106: 飲食店向けの組織・権限で追加したユーザー設定は、実際の権限判定

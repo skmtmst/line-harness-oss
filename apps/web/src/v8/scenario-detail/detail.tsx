@@ -2259,6 +2259,7 @@ export default function ScenarioDetailV8({
       ? '全アカウント共通'
       : (accounts.find((a) => a.id === scenario.lineAccountId)?.name ?? '—（名前を読み込めません）')
   const startCompleteSummary = ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]
+  const startedAt = formatSavedAt(runs?.subscriptions?.[0]?.startedAt)
 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
@@ -2310,6 +2311,11 @@ export default function ScenarioDetailV8({
                 onOpenChange={(next) => setStepMenuId(next ? '__head__' : null)}
                 items={[
                   {
+                    id: 'audience',
+                    label: '対象を絞る',
+                    onSelect: () => setAudienceOpen(true),
+                  },
+                  {
                     id: 'duplicate',
                     /* 下の帯の「複製する」と同じ窓を開く。文言を変えるのは、撮影・試験が下の帯のボタンと取り違えないため。 */
                     label: 'このシナリオを複製',
@@ -2353,7 +2359,8 @@ export default function ScenarioDetailV8({
               <span className={styles.startedText}>
                 {`配信を始めました。予約中の ${formatNumber(stats?.activeNow ?? simulation?.audience.newStartPlanned ?? 0)} 人へ、条件を満たした人から順に送ります`}
               </span>
-              <Link href={`/scenarios/results?id=${id}`} className={styles.startedLink}>
+              <Link href={`/scenarios/results?id=${id}`} className={styles.startedLink}
+                title={startedAt ? `開始日時：${startedAt}` : '開始日時を読み込めませんでした。始めた記録を読み直してください。'}>
                 始めた記録を見る
               </Link>
             </div>
@@ -2878,6 +2885,7 @@ export default function ScenarioDetailV8({
               value={editForm.folderId}
               onChange={(value) => setEditForm({ ...editForm, folderId: value })}
               aria-label="置き場（フォルダ）"
+              disabled={folderState !== 'ready'}
               folders={folders.map(folderById)}
               // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
               onCreate={canEdit

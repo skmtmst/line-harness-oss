@@ -106,7 +106,7 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
 
   it('箱は高さ98・内側16・間8・角丸12（オン・オフ共通）', () => {
-    const blocks = [...css().matchAll(/\[data-theme='v8'\]\s*\.card\s*\{[^}]*\}/gs)].map((m) => m[0])
+    const blocks = [...css().matchAll(/:root\s*\.card\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(blocks.length, 'v8 の箱の指定がありません').toBeGreaterThan(0)
     // 値は複数の v8 ブロックに分かれる。どれかにあればよい（後勝ちで打ち消しなし）。
     for (const re of [/min-height:\s*98px/, /padding:\s*var\(--polish-space-card\)/, /gap:\s*var\(--polish-space-row\)/, /border-radius:\s*var\(--polish-radius-card\)/]) {
@@ -116,26 +116,26 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
 
   it('B-203の選択の枠と、題・説明の文字を保つ', () => {
     const c = css()
-    expect(c).toMatch(/html\[data-theme='v8'\]\s*\.checked[^{]*\{[^}]*outline:\s*var\(--choice-card-ring\) solid var\(--color-selection-border\)/s)
-    const titles = [...c.matchAll(/\[data-theme='v8'\]\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])
+    expect(c).toMatch(/html:root\s*\.checked[^{]*\{[^}]*outline:\s*var\(--choice-card-ring\) solid var\(--color-selection-border\)/s)
+    const titles = [...c.matchAll(/:root\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(titles.length, 'v8 の題の指定がありません').toBeGreaterThan(0)
     // 後の規則が折り返しだけを足しても、各文字の値の最後の宣言を確認する。
     for (const [property, value] of [['font-size', 'var(--polish-text-support)'], ['line-height', 'var(--text-lh)'], ['font-weight', 'var(--polish-weight-label)']]) {
       const declarations = [...titles.join('\n').matchAll(new RegExp(`${property}:\\s*([^;}]+)`, 'g'))]
       expect(declarations.at(-1)?.[1].trim()).toBe(value)
     }
-    const notes = [...c.matchAll(/\[data-theme='v8'\]\s*\.note\s*\{[^}]*\}/gs)].map((m) => m[0])
+    const notes = [...c.matchAll(/:root\s*\.note\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(notes.length, 'v8 の説明の指定がありません').toBeGreaterThan(0)
     const note = notes[notes.length - 1]
     expect(note).toMatch(/font-size:\s*var\(--polish-text-support\)/)
     expect(note).toMatch(/line-height:\s*var\(--text-lh\)/)
     // 印は選択中も文字の色を継ぐ（B-152⑤）。
-    expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked \.topIcon\s*\{[^}]*color:\s*inherit/s)
+    expect(c).toMatch(/:root\s*\.checked \.topIcon\s*\{[^}]*color:\s*inherit/s)
   })
 
   it('オフは白地＋1px の hairline 枠・丸の輪郭 control-border（r3xz1W）', () => {
     const c = css()
-    expect(c).toMatch(/\[data-theme='v8'\]\s*\.card\s*\{[^}]*outline:\s*1px solid var\(--color-hairline\)/s)
+    expect(c).toMatch(/:root\s*\.card\s*\{[^}]*outline:\s*1px solid var\(--color-hairline\)/s)
   })
 })
 
@@ -167,22 +167,22 @@ describe('選ぶカードの行型（BHEl9・変わり形）', () => {
     expect(row![0]).toMatch(/gap:\s*8px/)
     expect(row![0]).toMatch(/background:\s*transparent/)
     expect(row![0]).not.toMatch(/border:[^}]*solid/)
-    const rowRadio = css.match(/\[data-theme='v8'\]\s*\.row\s*\.radio\s*{[^}]*}/s)
+    const rowRadio = css.match(/:root\s*\.row\s*\.radio\s*{[^}]*}/s)
     expect(rowRadio, '行型の丸の指定がありません').toBeTruthy()
     expect(rowRadio![0]).toMatch(/width:\s*18px/)
     expect(rowRadio![0]).toMatch(/position:\s*static/)
     // 箱（fNPdg/r3xz1W）の既定は変えない。
-    expect(css).toMatch(/\[data-theme='v8'\]\s*\.card\s*{[^}]*min-height:\s*98px/s)
+    expect(css).toMatch(/:root\s*\.card\s*{[^}]*min-height:\s*98px/s)
   })
 })
 
 describe('V8 の丸（2026-10-06 オーナー：絵どおり丸を出す。バナーの小さい箱だけ丸なし）', () => {
   const css = () => readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
   it('普通の箱（card）の丸は消さない', () => {
-    expect(css()).not.toMatch(/\[data-theme='v8'\] \.card > \.radio[^{]*\{[^}]*opacity:\s*0/)
+    expect(css()).not.toMatch(/:root \.card > \.radio[^{]*\{[^}]*opacity:\s*0/)
   })
   it('小さい箱（compact）だけ丸を見えなくする（input は残す）', () => {
-    expect(css()).toMatch(/\[data-theme='v8'\] \.compact > \.radio[^{]*\{[^}]*opacity:\s*0/)
+    expect(css()).toMatch(/:root \.compact > \.radio[^{]*\{[^}]*opacity:\s*0/)
   })
 })
 
@@ -212,7 +212,7 @@ describe('ラジオカードの高さ 90 の口（★V8 E-3 ウォークイン�
   })
 
   it('高さ 90 は V8 の段の .short にだけあり、既定の箱の 98 は変えない', () => {
-    expect(css()).toMatch(/\[data-theme='v8'\] \.short \{[^}]*min-height:\s*90px[^}]*padding-bottom:\s*6px/)
-    expect(css()).toMatch(/\[data-theme='v8'\] \.card \{[^}]*min-height:\s*98px/)
+    expect(css()).toMatch(/:root \.short \{[^}]*min-height:\s*90px[^}]*padding-bottom:\s*6px/)
+    expect(css()).toMatch(/:root \.card \{[^}]*min-height:\s*98px/)
   })
 })

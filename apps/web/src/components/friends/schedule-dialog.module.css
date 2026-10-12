@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /* ★V8 予約して送るの小窓（板 MyJP7）。値は globals.css の --tpl-hb2-*。 */
 .body {

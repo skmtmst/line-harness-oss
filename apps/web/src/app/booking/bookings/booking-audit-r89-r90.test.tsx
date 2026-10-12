@@ -22,7 +22,7 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
@@ -34,12 +34,13 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   ApiError: class extends Error { constructor(public status: number) { super('API error') } },
   api: {
     staff: { me: fixture.staffMe },
   },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     listRequests: fixture.listRequests,
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
@@ -182,7 +183,7 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
      })
      render(<BookingsPage />)
      await screen.findAllByRole('button', { name: /今日/ })
-     expect(screen.getAllByText('読み込んでいます').length).toBeGreaterThan(0)
+     expect(screen.getAllByLabelText('読み込んでいます').length).toBeGreaterThan(0)
    })
    it('WEB296：期間の取得失敗から再試行したら、その期間を読み直す', async () => {
      let rangeCalls = 0

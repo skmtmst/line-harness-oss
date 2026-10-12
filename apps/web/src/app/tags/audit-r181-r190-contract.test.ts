@@ -16,7 +16,7 @@ const DEFAULT_INPUT = read('components/friend-fields/default-value-input.tsx')
 const SEARCH_EDIT = read('app/tags/searches/edit/page.tsx')
 const FRIENDS_PAGE = read('app/friends/page.tsx')
 const ADV_DIALOG = read('components/friends/advanced-search-dialog.tsx')
-const TAGS_PAGE = read('components/friend-fields/tags-page-v4.tsx')
+const TAGS_PAGE = read('v8/tags/tags-tab.tsx') + read('components/friend-fields/tags-page-v4.tsx')
 
 describe('R182 単一選択の既定値はIDのまま比べない', () => {
   it('編集画面は保存済み既定値を選択肢名へ戻して未保存を判定する', () => {
@@ -99,7 +99,7 @@ describe('R190 タグの操作名は保管に統一する', () => {
   it('一覧の確認窓は保管と書き、アーカイブに同じ確認を出さない', () => {
     expect(TAGS_PAGE).toContain('を保管しますか？')
     expect(TAGS_PAGE).toContain('このタグを保管する')
-    expect(TAGS_PAGE).toContain("tag.status === 'archived' ? undefined")
+    expect(TAGS_PAGE).toContain("if (tag.status === 'archived')")
     expect(TAGS_PAGE).not.toContain('このタグを削除する')
   })
 })

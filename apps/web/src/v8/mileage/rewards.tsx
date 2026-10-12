@@ -1,5 +1,6 @@
 'use client'
 
+import { createAccountTracker, createMileageRewardsFetchGuards, createSingleFlightLock } from './redemption-request-guard'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -12,6 +13,7 @@ import {
   api,
   fetchApi,
   type MileageRewardKind,
+  type MileageRewardReachMetric,
   type MileageRewardStatus,
   type MileageRewardSummary,
 } from '@/lib/api'
@@ -96,7 +98,7 @@ function benefitSub(reward: MileageRewardSummary): string | null {
   const version = reward.currentVersion
   if (!version) return null
   const parts: string[] = []
-  if (reward.availableCodeCount !== null) {
+  if (reward.availableCodeCount != null) {
     parts.push(`残り ${formatNumber(reward.availableCodeCount)}`)
   } else if (version.stockLimit !== null) {
     parts.push('残り数は取れていません')
@@ -145,6 +147,8 @@ export default function RewardsTab() {
   const router = useRouter()
   const [rewards, setRewards] = useState<MileageRewardSummary[]>([])
   const [reachMetrics, setReachMetrics] = useState<Array<{ rewardId: string; reachableFriendCount: number }>>([])
+  const [rankBenefits, setRankBenefits] = useState<MileageRewardReachMetric[]>([])
+  const [neverRedeemedFriendCount, setNeverRedeemedFriendCount] = useState<number | null>(null)
   const [redeemedMiles, setRedeemedMiles] = useState<number | null>(null)
   const [exchangedCount, setExchangedCount] = useState<number | null>(null)
   const [popularName, setPopularName] = useState<string | null>(null)
@@ -173,12 +177,25 @@ export default function RewardsTab() {
   const [preset, setPreset] = useState('default')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
-  const requestRef = useRef(0)
+  const [fetchGuards] = useState(createMileageRewardsFetchGuards)
+  const { overview: overviewGuard, redemptions: redemptionsGuard } = fetchGuards
+  const [accountTracker] = useState(createAccountTracker)
+  const [retryLock] = useState(createSingleFlightLock)
+  const redemptionsPageRef = useRef(1)
+  useEffect(() => { redemptionsPageRef.current = redemptionsPage }, [redemptionsPage])
+  useEffect(() => {
+    accountTracker.track(accountId)
+    retryLock.reset()
+    setRetryingId(null)
+    setRetryError('')
+    setRetryNotice('')
+    setRedemptionsPage(1)
+  }, [accountId, accountTracker, retryLock])
 
   const load = useCallback(async () => {
-    const request = ++requestRef.current
+    const requestId = overviewGuard.issue()
     if (!accountId) {
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       setRewards([])
       setStatus('ready')
       return
@@ -186,7 +203,7 @@ export default function RewardsTab() {
     setStatus('loading')
     try {
       const response = await api.mileage.rewards(accountId)
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.rewards)) throw new Error('malformed')
       const list = response.data.rewards
@@ -199,16 +216,18 @@ export default function RewardsTab() {
       setPopularName(redeemedCount ? (overviewSummary?.mostRedeemedRewardName ?? null) : null)
       setPopularCount(redeemedCount)
       setReachMetrics(Array.isArray(response.data.reachMetrics) ? response.data.reachMetrics : [])
+      setRankBenefits(Array.isArray(response.data.rankBenefits) ? response.data.rankBenefits : [])
+      setNeverRedeemedFriendCount(overviewSummary?.neverRedeemedFriendCount ?? null)
       setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       saveErrors.capture(reason)
       setRewards([]);
 
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId, saveErrors])
+  }, [accountId, saveErrors, overviewGuard])
 
   useEffect(() => {
     if (accountLoading) return
@@ -216,7 +235,9 @@ export default function RewardsTab() {
   }, [accountLoading, load])
 
   const loadFailed = useCallback(async (pageNumber: number) => {
+    const requestId = redemptionsGuard.issue()
     if (!accountId) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
       setFailed([])
       setRedemptionsVisible(false)
       setRedemptionsLoad('loading')
@@ -230,6 +251,7 @@ export default function RewardsTab() {
         `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`
         + `&limit=${REDEMPTIONS_PAGE_SIZE}&offset=${offset}`,
       )
+      if (!redemptionsGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.items)) throw new Error('malformed')
       setFailed(response.data.items.filter(
@@ -243,6 +265,7 @@ export default function RewardsTab() {
       setRedemptionsVisible(true)
       setRedemptionsLoad('ready')
     } catch (reason) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
       saveErrors.capture(reason)
       setFailed([])
       setRedemptionsVisible(true)
@@ -251,7 +274,7 @@ export default function RewardsTab() {
       const forbidden = reason instanceof ApiError && (reason.status === 403 || reason.code === 'forbidden')
       setRedemptionsLoad(forbidden ? 'forbidden' : 'error')
     }
-  }, [accountId, saveErrors])
+  }, [accountId, saveErrors, redemptionsGuard])
 
   useEffect(() => {
     void loadFailed(redemptionsPage)
@@ -267,14 +290,23 @@ export default function RewardsTab() {
 
   const retryRedemption = async (item: FailedRedemption) => {
     if (!accountId || retryingId) return
+    if (!retryLock.acquire(item.id)) return
+    const startedAccountId = accountId
+    const operation = accountTracker.track(startedAccountId)
     setRetryingId(item.id)
     setRetryError('')
     setRetryNotice('')
+    const reloadLists = async () => {
+      await loadFailed(redemptionsPageRef.current)
+      if (!accountTracker.isCurrent(operation)) return
+      await load()
+    }
     try {
       const response = await fetchApi<{ success: boolean; data?: { message?: string | null; redemption?: { status?: string } }; error?: string }>(
         `/api/mileage/redemptions/${encodeURIComponent(item.id)}/retry-fulfillment`,
-        { method: 'POST', body: JSON.stringify({ accountId }) },
+        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
       )
+      if (!accountTracker.isCurrent(operation)) return
       const redemptionStatus = response.data?.redemption?.status
       const serverMessage = typeof response.data?.message === 'string' && response.data.message.trim()
         ? response.data.message
@@ -286,16 +318,17 @@ export default function RewardsTab() {
       } else if (!response.success) {
         throw new Error(response.error)
       }
-      await loadFailed(redemptionsPage)
-      await load()
+      await reloadLists()
     } catch (saveFailure) {
+      if (!accountTracker.isCurrent(operation)) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。') }
-      await loadFailed(redemptionsPage)
+      await loadFailed(redemptionsPageRef.current)
     } finally {
-      setRetryingId(null)
+      retryLock.release(item.id)
+      if (accountTracker.isCurrent(operation)) setRetryingId(null)
     }
   }
 
@@ -519,7 +552,7 @@ export default function RewardsTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? rewards.length : null}
         unit="件"
-        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}
+        detail={<span title={neverRedeemedFriendCount == null ? '1回も使っていない人の数は未取得' : `1回も使っていない人 ${formatNumber(neverRedeemedFriendCount)} 人`}>{ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}</span>}
       />
       <KpiCard
         presentation="band"
@@ -536,7 +569,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : emptyValue('unknown')}
+        detail={ready ? (popularCount == null ? '交換の回数は未取得' : popularCount === 0 ? 'まだ交換されていません' : popularName ? `今月 ${formatMileageNumber(popularCount)}件` : '使い道の名前は未取得') : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -706,7 +739,7 @@ export default function RewardsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colName}>使い道</Th>
             <Th className={`${styles.colNeed} ${styles.num}`}>必要なマイル</Th>
-            <Th className={styles.colGives}>交換すると渡るもの</Th>
+            <Th className={styles.colGives} title={rankBenefits.length === 0 ? 'ランクの使い道はまだありません' : rankBenefits.map((rank) => `${rank.rewardName}・${formatNumber(rank.requiredMiles)} マイルから・今すぐ届く人 ${formatNumber(rank.reachableFriendCount)} 人・交換済み ${formatNumber(rank.redeemedFriendCount)} 人`).join('／')}>交換すると渡るもの</Th>
             <Th className={`${styles.colMonth} ${styles.num}`}>今月 交換された</Th>
             <Th className={styles.colStateWide}>状態</Th>
             <Th className={styles.colOpsWide}>操作</Th>
@@ -722,7 +755,7 @@ export default function RewardsTab() {
                 <Td className={styles.colName}>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
-                    <span className={styles.rowName} ><TruncatedText value={String(reward.name ?? '')} /></span>
+                    <span className={styles.rowName} title={reach ? `今すぐ届く人 ${formatNumber(reach.reachableFriendCount)} 人` : '届く人数は未取得'}><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
 
                 </Td>
@@ -881,6 +914,7 @@ export default function RewardsTab() {
       pagination={pager}
     >
       {body}
+      {!failedSection && retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
       {failedSection}
     </MileageFrame></SaveErrorScope>
   )

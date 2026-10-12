@@ -9,19 +9,20 @@ const fixture = vi.hoisted(() => ({
   validateDraft: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: fixture.routerPush }),
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: { id: 'account-1', name: 'LINE' }, loading: false }),
 }))
 vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
+    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
     reminders: {
       getDraft: fixture.getDraft,
       validateDraft: fixture.validateDraft,
@@ -31,7 +32,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import ReminderPublishFlow from './reminder-publish-flow'
+import ReminderPublishFlow from '../../test-utils/reminder-stages'
 
 const SETTINGS = {
   name: '予約前のお知らせ',
@@ -93,7 +94,7 @@ describe('R145: 対象と停止条件の書きかけがある間の離脱確認'
       <a href="/reminders">外の一覧へ</a>
       <ReminderPublishFlow reminderId="rem-1" stage="target" />
     </>)
-    const checkbox = await screen.findByRole('checkbox', { name: /基準日を過ぎて7日経過/ })
+    const checkbox = await screen.findByRole('checkbox', { name: /基準日を7日過ぎたら/ })
     expect((checkbox as HTMLInputElement).checked).toBe(true)
     fireEvent.click(checkbox)
     expect((checkbox as HTMLInputElement).checked).toBe(false)
@@ -105,7 +106,7 @@ describe('R145: 対象と停止条件の書きかけがある間の離脱確認'
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
     // 編集を続けたので、外した停止条件が保たれる。
-    expect((screen.getByRole('checkbox', { name: /基準日を過ぎて7日経過/ }) as HTMLInputElement).checked).toBe(false)
+    expect((screen.getByRole('checkbox', { name: /基準日を7日過ぎたら/ }) as HTMLInputElement).checked).toBe(false)
   })
 
   it('破棄を選んだときだけ一覧へ進む', async () => {
@@ -113,7 +114,7 @@ describe('R145: 対象と停止条件の書きかけがある間の離脱確認'
       <a href="/reminders">外の一覧へ</a>
       <ReminderPublishFlow reminderId="rem-1" stage="target" />
     </>)
-    const checkbox = await screen.findByRole('checkbox', { name: /基準日を過ぎて7日経過/ })
+    const checkbox = await screen.findByRole('checkbox', { name: /基準日を7日過ぎたら/ })
     fireEvent.click(checkbox)
 
     fireEvent.click(screen.getByRole('link', { name: '外の一覧へ' }))
@@ -125,7 +126,7 @@ describe('R145: 対象と停止条件の書きかけがある間の離脱確認'
 
   it('変えていなければ確認を出さない', async () => {
     render(<ReminderPublishFlow reminderId="rem-1" stage="target" />)
-    await screen.findByRole('checkbox', { name: /基準日を過ぎて7日経過/ })
+    await screen.findByRole('checkbox', { name: /基準日を7日過ぎたら/ })
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)

@@ -9,17 +9,20 @@ import { describe, expect, it, vi } from 'vitest'
 
 let currentQuery = 'id=draft-a'
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(currentQuery),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: vi.fn(),
 }))
 
 /* 編集器の中身ではなく、渡るID（表示対象＝保存先）だけを見る。 */
-vi.mock('@/components/automations/automation-draft-editor', () => ({
-  default: ({ draftId }: { draftId: string }) => <div data-draft-id={draftId}>editor:{draftId}</div>,
+vi.mock('@/v8/automations/create/create', () => ({
+  NewAutomationV8: ({ draftId, chrome }: { draftId: string; chrome: string }) => {
+    const [initialId] = React.useState(draftId)
+    return <div data-draft-id={draftId} data-initial-id={initialId} data-chrome={chrome}>editor:{draftId}</div>
+  },
 }))
 
 import AutomationDraftPage from './page'
@@ -50,6 +53,7 @@ describe('R531 対象IDが変わったら下書き編集も切り替わる', () 
     })
     expect(host.textContent).toContain('editor:draft-b')
     expect(host.textContent).not.toContain('editor:draft-a')
+    expect(host.querySelector('[data-initial-id="draft-b"][data-chrome="draft"]')).not.toBeNull()
 
     act(() => {
       root.unmount()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from '../../v8/rich-menus/targeting-order'
 
 const GROUPS = [
   { id: 'later-created', targetingPriority: 0, createdAt: '2026-08-02T00:00:00.000Z' },

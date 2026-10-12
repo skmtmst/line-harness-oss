@@ -18,7 +18,7 @@ function read(relativePath: string): string {
 describe('外部連携の表は1152幅で器に収まる', () => {
   it('固定幅の表＋1列目だけ自動幅', () => {
     const css = read('../../v8/webhooks/outgoing.module.css')
-    const view = read('outgoing-v8.tsx')
+    const view = read('../../v8/webhooks/outgoing.tsx')
     expect(view).toContain('data-table-layout="columns"')
     // 1列目の伸び縮みは共通の表の口（Th/Td の grow）が持つ。画面の CSS では書かない。
     const shared = read('../../components/shared/data-table.module.css')

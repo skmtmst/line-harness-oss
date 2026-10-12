@@ -35,6 +35,7 @@ import { VAR_TYPE_LABELS, commonVarValueError, isSecretLikeVarValue, COMMON_VAR_
 import { blockingErrors, checkedAtText, historicalText, isChangeItem, placeholderText, reflectionScopeText, reflectionTimingText, reviewWarnings, hiddenText, immediateItems, impactCsv, impactStateFromError, impactStateText, saveErrorText, scheduleErrorText, type ChangeImpactState } from './impact';
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import styles from './edit.module.css'
+import { characterCountText, impactBreakdown, urgentImpactCount, overLimitCount } from './impact'
 import { focusFieldById } from '@/lib/use-form-errors';
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls';
@@ -1011,7 +1012,7 @@ function EditCommonVarV8Inner() {
             return (
               <li key={entry.id} className={styles.historyItem}>
                 <span className={styles.historyDate}>{historyStamp(entry.createdAt)}</span>
-                <span className={previous ? styles.historyText : styles.historyTextQuiet}>{what}</span>
+                <span className={previous ? styles.historyText : styles.historyTextQuiet} title={entry.changeReason || undefined}>{what}</span>
               </li>
             )
           })}
@@ -1168,6 +1169,7 @@ function EditCommonVarV8Inner() {
                   <SaveErrorField names={["value","saved"]}><input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
+                    maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className={styles.fieldInput}
@@ -1195,7 +1197,7 @@ function EditCommonVarV8Inner() {
           <section className={styles.card} aria-labelledby="cv-edit-impact-heading">
             <div className={styles.cardHead}>
               <h2 id="cv-edit-impact-heading" className={styles.cardTitle}>変える前に影響を見る</h2>
-              <p className={styles.cardNote}>
+              <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact), ...('canSave' in impact ? [impactBreakdown(impact), `予約中・配信中：${urgentImpactCount(impact) ?? NOT_AVAILABLE}か所`, `文字数超過：${overLimitCount(impact)}か所`] : [])].filter(Boolean).join('\n') : undefined}>
                 {impactState === 'ready' && impact
                   ? `${formatNumber(impact.total)}か所。次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません`
                   : '次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません'}
@@ -1299,10 +1301,13 @@ function EditCommonVarV8Inner() {
           ) : deleteImpact ? (
             <>
               <p className={deleteImpact.blockingTotal > 0 ? styles.fieldError : styles.fieldHint}>
-                {deleteImpact.blockingTotal > 0
+                {deleteImpact.unavailableReferences?.length
+                  ? 'まだ数えられていない使用先があります。読み直してから確認してください。'
+                  : deleteImpact.blockingTotal > 0
                   ? `いま${deleteImpact.blockingTotal}か所で使われています。一覧の削除の窓から差し替えてください。`
                   : '使っている設定はありません。'}
               </p>
+              {deleteImpact.unavailableReferences?.map((reference) => <p key={reference.kind} className={styles.fieldHint}>{reference.kindLabel}：{reference.reason}</p>)}
               <Field label="消した理由" required><SaveErrorField names={["deleteReason","delete_reason"]}><input
                   value={deleteReason}
                   onChange={(event) => setDeleteReason(event.target.value)}
@@ -1471,7 +1476,7 @@ function ImpactRows({
   return (
     <>
       {rows.length === 0 ? (
-        <p className={styles.cardNote}>使われている場所がないため、確かめる文はありません。</p>
+        <p className={styles.cardNote}>{impact.total === 0 ? '使われている場所がないため、確かめる文はありません。' : 'すぐ変わる使用先の文はありません。'}</p>
       ) : (
         <div className={styles.impactList}>
           {visible.map((row, index) => (
@@ -1484,7 +1489,7 @@ function ImpactRows({
               </div>
               <div className={styles.impactPair}>
                 <p className={styles.impactBefore} title={row.currentPreview}>{`…${row.currentPreview}`}</p>
-                <p className={styles.impactAfter}>
+                <p className={styles.impactAfter} title={isChangeItem(row) ? characterCountText(row) : undefined} data-over-limit={isChangeItem(row) && row.exceedsCharacterLimit || undefined}>
                   {isChangeItem(row)
                     ? `…${row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`}`
                     : '値を変えると、ここに保存後の文が出ます。'}

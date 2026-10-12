@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', selectedAccount: null }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('./lib/edit-permission', () => ({ useBookingEdit: () => true }))
+vi.mock('@/lib/use-feature-access', () => ({ usePermissionAccess: () => true }))
 vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn(), notifySaved: vi.fn() }))
 vi.mock('./menu-version-history', () => ({ default: () => null }))
 vi.mock('@/lib/api', async (importOriginal) => {

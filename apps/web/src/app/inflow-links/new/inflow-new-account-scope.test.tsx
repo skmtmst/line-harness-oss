@@ -7,7 +7,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, waitFor } from '@testing-library/react'
+import { fireEvent, waitFor, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -25,6 +25,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      broadcastMessageAssets: { ...actual.api.broadcastMessageAssets, list: async () => ({ success: true, data: [] }) },
       tags: { ...actual.api.tags, list: api.tagsList },
       scenarios: { ...actual.api.scenarios, list: api.scenariosList },
       pools: { ...actual.api.pools, list: api.poolsList },
@@ -44,11 +45,11 @@ vi.mock('@/lib/qr-image', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href, ...rest }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -107,41 +108,14 @@ async function settle(milliseconds = 50) {
   })
 }
 
-/** 共通部品 Select はボタンの見た目で、候補は body 直下の [role="option"] に出る。 */
-function triggerById(id: string): HTMLElement {
-  const el = host.querySelector(`#${id}`)
-  if (!el) throw new Error(`見つかりません: #${id}`)
-  return el as HTMLElement
+async function addAction(kind: string, name: string) {
+  fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: kind }))
+  const dialog = await screen.findByRole('dialog', { name: kind + '対象を選ぶ' })
+  fireEvent.click(within(dialog).getByText(name))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
-
-/** 変える・決めるの開閉印を押して、候補の Select を出す。 */
-async function openPicker(ariaLabel: string) {
-  const button = host.querySelector(`button[aria-label="${ariaLabel}"]`)
-  if (!button) throw new Error(`見つかりません: ${ariaLabel}`)
-  await act(async () => {
-    fireEvent.click(button)
-  })
-  await settle(50)
-}
-
-async function chooseOption(triggerId: string, label: string) {
-  await act(async () => {
-    fireEvent.click(triggerById(triggerId))
-  })
-  await settle(50)
-  // 候補の一覧は MenuPortal で document.body 直下に出る（host の中にはない）。
-  const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) =>
-    el.textContent?.includes(label),
-  )
-  if (!option) throw new Error(`候補が見つかりません: ${label}`)
-  // 押すのは中のボタン（共通部品 Select の onChange はボタンの onClick）。
-  const target = option.querySelector('button') ?? option
-  await act(async () => {
-    fireEvent.click(target!)
-  })
-  await settle(50)
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
   fixture.accountId = 'account-1'
@@ -170,19 +144,18 @@ describe('R23横展開 流入リンク作成の候補は選択accountで絞る',
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
     await settle(100)
     // account-1 の候補を選ぶ（決める印で候補を開いてから選ぶ）
-    await openPicker('付けるタグを決める')
-    await chooseOption('ir-tag', '会員')
-    await openPicker('始めるシナリオを決める')
-    await chooseOption('ir-scenario', '案内A')
-    await openPicker('送るメッセージを決める')
-    await chooseOption('ir-intro', '挨拶A')
+    await addAction('タグを付ける', '会員')
+    await addAction('シナリオ配信を始める', '案内A')
+    await addAction('メッセージを送る', '挨拶A')
     expect(host.textContent).toContain('会員')
     // account-2 へ切り替えると候補が変わり、前の選択は外れる
     fixture.accountId = 'account-2'
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
     // 候補の取得・選択解除が描画へ反映されたことを待つ。固定時間に依存しない。
     await waitFor(() => {
-      expect(host.textContent).toContain('まだ決めていません')
+      expect(host.textContent).not.toContain('会員')
+      expect(host.textContent).not.toContain('案内A')
+      expect(host.textContent).not.toContain('挨拶A')
       expect(host.textContent).toContain('今のアカウントにないため外しました')
     })
   })

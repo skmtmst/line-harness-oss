@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../../v8/events/booking-records.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const WORKER = readFileSync(
   join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'),
@@ -38,7 +38,7 @@ describe('IDEA-07 イベント予約の通知予定', () => {
 
   it('予約枠のそばに通知の種類・日時・状態を出す', () => {
     const page = code(PAGE)
-    expect(page).toContain('b.reminders')
+    expect(page).toContain('booking.reminders')
     expect(page).toContain('data-booking-reminders')
     expect(page).toContain('REMINDER_KIND_LABELS[reminder.kind]')
     expect(page).toContain('REMINDER_STATUS_LABELS[reminder.status]')

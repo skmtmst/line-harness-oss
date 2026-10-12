@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,8 +33,8 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: fixture.tab }),
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -122,6 +123,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.tab = 'reactions'
   fixture.reactionsBody = null
@@ -155,8 +157,8 @@ describe('配信の反応タブの打切り注記', () => {
       { broadcast: true, scenario: false },
     )
     await render()
-    expect(text()).toContain('一斉配信は新しい方から先頭3件までを表示しています')
-    expect(text()).toContain('一覧にもCSVの書き出しにも入りません')
+    expect(text()).toContain('一斉配信は新しい方から先頭3 件までを表示しています')
+    expect(text()).toContain('一覧にも CSV にも入りません')
     // 打切っていない系統は注記に出さない。
     expect(text()).not.toContain('シナリオは新しい方から先頭')
   })
@@ -167,8 +169,8 @@ describe('配信の反応タブの打切り注記', () => {
       { broadcast: true, scenario: true },
     )
     await render()
-    expect(text()).toContain('一斉配信は新しい方から先頭1件')
-    expect(text()).toContain('シナリオは新しい方から先頭2件')
+    expect(text()).toContain('一斉配信は新しい方から先頭1 件')
+    expect(text()).toContain('シナリオは新しい方から先頭2 件')
   })
 
   it('上限未満なら打切り注記を出さない（CSV書出しは使える）', async () => {
@@ -181,7 +183,7 @@ describe('配信の反応タブの打切り注記', () => {
     expect(text()).not.toContain('CSVの書き出しにも入りません')
     // 一覧と同じ範囲を書き出すCSVボタンは常に出す。
     expect(
-      Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('CSV で書き出す')),
+      Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('CSVで書き出す')),
     ).toBe(true)
   })
 })

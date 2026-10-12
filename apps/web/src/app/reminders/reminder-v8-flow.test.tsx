@@ -55,7 +55,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: pushMock,
     replace: replaceMock,
@@ -132,7 +132,7 @@ vi.mock('@/components/shared/date-time-field', () => ({
 import RemindersPage from './page'
 import NewReminderPage from './new/page'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
-import { ReminderRegistrantsPanel } from './detail/registrants-panel'
+import { RegistrantsTab } from '@/v8/reminders/detail'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
@@ -274,9 +274,10 @@ describe('V8 リマインダの通し：登録者を足す', () => {
       createdAt: '2026-10-03T00:00:00.000Z',
       updatedAt: '2026-10-03T00:00:00.000Z',
     }]
-    renderNode(<ReminderRegistrantsPanel reminderId="rm-1" />)
+    renderNode(<RegistrantsTab canManage reminderId="rm-1" />)
     await flush()
     await screen.findByText('試す友だち')
-    await screen.findByText(/登録 1件/)
+    await screen.findByText('1 人')
+    expect(screen.getByRole('table', { name: '登録者' })).toBeTruthy()
   })
 })

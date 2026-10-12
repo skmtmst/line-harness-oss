@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const source = readFileSync(join(here, 'restaurant-console.tsx'), 'utf8')
+const source = readFileSync(join(here, '../../v8/restaurant/booking-kit/shell.tsx'), 'utf8')
 
 function errorTags() {
   const tags = [...source.matchAll(/<ListState\b[\s\S]*?\/>/g)].map(([t]) => t)

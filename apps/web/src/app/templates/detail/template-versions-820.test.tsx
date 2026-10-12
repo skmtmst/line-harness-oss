@@ -6,7 +6,7 @@ import type { StaffMember } from '@line-crm/shared'
  * 空・読み込み中・失敗・正常を描画で確かめる。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const templateGet = vi.hoisted(() => vi.fn())
@@ -40,15 +40,17 @@ vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
     templates: {
+      list: async () => ({ success: true, data: [] }),
       get: templateGet,
       delete: vi.fn(() => Promise.resolve({ success: true, data: null })),
       versions: templateVersions,
       revert: templateRevert,
     },
+    folders: { list: async () => ({ success: true, data: [] }) },
   },
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: () => {}, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
@@ -63,6 +65,7 @@ vi.mock('next/link', () => ({
 }))
 
 import TemplateDetailPage from './page'
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }) }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -105,88 +108,77 @@ async function renderDetail() {
   render(<TemplateDetailPage />)
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  await screen.findByText('使われている場所')
+  await screen.findByRole('heading', { name: '使っている所' })
 }
 
 describe('使われている場所', () => {
   test('一斉配信の行に版と状態が出る', async () => {
     stubAll()
     await renderDetail()
-    expect(screen.getByText('秋の会員向け案内')).toBeTruthy()
-    expect(screen.getByText('予約済み')).toBeTruthy()
-    expect(screen.getByText('8月の案内')).toBeTruthy()
-    expect(screen.getByText('送信済み')).toBeTruthy()
-    expect(screen.getAllByText('第3版').length).toBeGreaterThan(0)
-    expect(screen.getByText('第2版')).toBeTruthy()
-    // 補足は見出し横の？に入れる（2-1b）。本文に注の文を置かない。
-    expect(screen.getByRole('button', { name: '使われている場所の説明' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '版の履歴の説明' })).toBeTruthy()
+    const usage = within(screen.getByRole('region', { name: '使っている所' }))
+    expect(usage.getByText('秋の会員向け案内')).toBeTruthy()
+    expect(usage.getByText('予約中')).toBeTruthy()
+    expect(usage.getByText('8月の案内')).toBeTruthy()
+    expect(usage.getByText('送信済み')).toBeTruthy()
+    expect(usage.getAllByText('版3で固定（変わらない）').length).toBeGreaterThan(0)
+    expect(usage.getByText('版2で固定（変わらない）')).toBeTruthy()
+    expect(usage.getByText(/版を決めた/)).toBeTruthy()
+    expect(screen.getByText('戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。')).toBeTruthy()
   })
-
   test('予約済みの配信があると削除の理由が出る', async () => {
     stubAll()
     await renderDetail()
-    expect(screen.getByText(/予約済み・送信中の配信1件で使われているため削除できません/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+    const dialog = await screen.findByRole('dialog', { name: '「案内」はまだ消せません' })
+    expect(within(dialog).getByText(/先に別のテンプレートへ差し替えてください/)).toBeTruthy()
+    expect(within(dialog).getByText('秋の会員向け案内')).toBeTruthy()
+    expect((await import('@/lib/api')).api.templates.delete).not.toHaveBeenCalled()
   })
-
-  test('使っている版が無い行は「—」', async () => {
-    stubAll({
-      ...USED_BY,
-      autoReplies: [
-        { id: 'ar-9', keyword: '営業時間', matchType: 'exact', lineAccountId: 'account-a', templateVersion: null },
-      ],
-      scenarioSteps: [],
-      broadcasts: [],
-    })
+  test('使っている版が無い行は最新の版と分かり、未取得の数は0にしない', async () => {
+    stubAll({ ...USED_BY, autoReplies: [{ id: 'ar-9', keyword: '営業時間', matchType: 'exact', lineAccountId: 'account-a', templateVersion: null }], scenarioSteps: [], broadcasts: [] })
     await renderDetail()
     expect(screen.getByText('営業時間')).toBeTruthy()
+    expect(within(screen.getByRole('region', { name: '使っている所' })).getByText('いまの版')).toBeTruthy()
     expect(screen.getAllByText('—').length).toBeGreaterThan(0)
   })
 })
-
 describe('版の履歴', () => {
-  test('欄を開くと版が並び、選んで比べられる', async () => {
+  test('欄に版が並び、選んで比べられる', async () => {
     stubAll()
     await renderDetail()
-    fireEvent.click(screen.getByText('版の履歴を見る'))
-    await screen.findByText('いま使っている')
-    expect(screen.getByText('使用中')).toBeTruthy()
-    expect(screen.getByText('過去')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /第2版/ }))
-    fireEvent.click(screen.getByText('第2版と比べる'))
-    expect(screen.getByText(/比べる（いま使っている/)).toBeTruthy()
-    // 消えた行に－、足した行に＋
-    expect(screen.getByText('－')).toBeTruthy()
-    expect(screen.getByText('＋')).toBeTruthy()
+    const history = within(screen.getByRole('region', { name: '版の履歴' }))
+    await history.findByText('いま使っている版')
+    expect(history.getByText('前の版')).toBeTruthy()
+    fireEvent.click(history.getByRole('button', { name: '比べる' }))
+    expect(history.getByText('比べる（版2 → いま使っている版3）')).toBeTruthy()
+    expect(history.getByText('－ 前の本文')).toBeTruthy()
+    expect(history.getByText('＋ いまの本文')).toBeTruthy()
   })
-
   test('版が無いときは無い旨だけ出す', async () => {
     stubAll(USED_BY, [])
     await renderDetail()
-    fireEvent.click(screen.getByText('版の履歴を見る'))
-    await screen.findByText('版はまだありません。')
+    expect(await within(screen.getByRole('region', { name: '版の履歴' })).findByText('版はまだありません。')).toBeTruthy()
   })
-
-  test('読み込めなかったときは赤を使わず、もう一度読める', async () => {
+  test('読み込めなかったときは失敗を示し、もう一度読める', async () => {
     stubAll()
     templateVersions.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'ng' }))
     await renderDetail()
-    fireEvent.click(screen.getByText('版の履歴を見る'))
-    await screen.findByText('版の履歴を読み込めませんでした。もう一度お試しください。')
-    fireEvent.click(screen.getByText('もう一度読み込む'))
-    await screen.findByText('いま使っている')
+    const history = within(screen.getByRole('region', { name: '版の履歴' }))
+    await history.findByText('版の履歴を読み込めませんでした。もう一度お試しください。')
+    fireEvent.click(history.getByRole('button', { name: 'もう一度読み込む' }))
+    await history.findByText('いま使っている版')
+    expect(templateVersions).toHaveBeenCalledTimes(2)
   })
-
   test('この版に戻すの確認から口を叩く', async () => {
     stubAll()
     await renderDetail()
-    fireEvent.click(screen.getByText('版の履歴を見る'))
-    await screen.findByText('いま使っている')
-    fireEvent.click(screen.getByRole('button', { name: /第2版/ }))
-    fireEvent.click(screen.getByText('第2版に戻す'))
-    await screen.findByText('第2版に戻しますか？')
-    fireEvent.click(screen.getByText('この版に戻す'))
-    await act(async () => { await Promise.resolve() })
-    expect(templateRevert).toHaveBeenCalledWith('tpl-1', { versionNumber: 2, expectedVersion: 3 })
+    const history = within(screen.getByRole('region', { name: '版の履歴' }))
+    await history.findByText('いま使っている版')
+    fireEvent.click(history.getByRole('button', { name: 'この版に戻す' }))
+    const dialog = await screen.findByRole('dialog', { name: '版2の内容で下書きを作り直しますか？' })
+    expect(templateRevert).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'この版に戻す' }))
+    await vi.waitFor(() => expect(templateRevert).toHaveBeenCalledWith('tpl-1', { versionNumber: 2, expectedVersion: 3 }))
   })
 })

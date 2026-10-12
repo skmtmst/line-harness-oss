@@ -601,6 +601,13 @@ export default function RichMenusListV8() {
     void loadImpact(beginImpactRequest(selectedAccount.id, group.id))
   }
 
+  function handleDeleteExternal(menu: LineMenu) {
+    if (!selectedAccount?.id || !canEdit) return
+    setDeleteError(null)
+    beginImpactRequest(selectedAccount.id, `external:${menu.richMenuId}`)
+    setDeleteTarget({ kind: 'external', menu })
+  }
+
   function closeDelete() {
     if (deleteBusy) return
     impactRequestGenerationRef.current += 1
@@ -1386,6 +1393,7 @@ export default function RichMenusListV8() {
               onBack={() => setShowExternal(false)}
               onReload={() => void reload()}
               onImport={handleImport}
+              onDelete={canEdit ? handleDeleteExternal : undefined}
             />
           </div>
         ) : null}

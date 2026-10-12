@@ -3,7 +3,6 @@ import { cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 const mocks=vi.hoisted(()=>({templates:vi.fn(),reminders:vi.fn(),events:vi.fn()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a'})}))
-vi.mock('@/lib/use-admin-theme',()=>({useAdminTheme:()=> 'v8'}))
 vi.mock('@/lib/api',()=>({api:{
   tags:{list:async()=>({success:true,data:[]})},friendFields:{list:async()=>({success:true,data:[]})},supportMarks:{list:async()=>({success:true,data:[]})},scenarios:{list:async()=>({success:true,data:[]})},commonVars:{list:async()=>({success:true,data:[]})},notifications:{operatorRules:{list:async()=>({success:true,data:{items:[]}})}},templates:{list:mocks.templates},reminders:{list:mocks.reminders}},eventsApi:{listEvents:mocks.events}}))
 import {useActionOptions} from './inline-action-list'

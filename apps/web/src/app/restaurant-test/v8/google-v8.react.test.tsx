@@ -7,17 +7,17 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), connection: vi.fn(), list
 const search = vi.hoisted(() => ({ tab: null as string | null, view: null as string | null }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', setSelectedAccountId: vi.fn(), accounts: [] }) }))
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
-  usePathname: () => '/restaurant-test/google',
-  useSearchParams: () => ({ get: (key: string) => (key === 'tab' ? search.tab : key === 'view' ? search.view : null) }),
+vi.mock('next/navigation',async()=>({... (await import('@/test-utils/navigation-mock')).navigationMock(),
+ usePathname:()=>'/restaurant-test/google',
+ useSearchParams:()=>new URLSearchParams({...search.tab?{tab:search.tab}:{},...search.view?{view:search.view,id:'r1'}:{}}),
 }))
+vi.mock('@/components/shell/page-chrome',async()=> (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: fixture.snapshot } }))
 vi.mock('@/lib/restaurant-google-api', () => ({
   restaurantGoogleApi: { connection: fixture.connection, listReviews: fixture.listReviews, syncReviews: fixture.syncReviews },
 }))
 
-import GoogleV8 from './google'
+import GoogleV8 from '@/v8/restaurant/google/google'
 
 const store = { id: 'store-1', organization_id: 'org-1', name: '渋谷店', code: 'SHIBUYA', area: null, capacity: 26, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'connected', line_account_id: 'account-1', line_account_name: '渋谷' }
 const connectionData = {
@@ -64,7 +64,8 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     expect(board.textContent).toContain('佐藤 S.')
     expect(board.textContent).toContain('下書きを作る')
     expect(board.textContent).toContain('返信を見る')
-    expect(board.textContent).toContain('返信文は手で書くか')
+    fireEvent.click(screen.getByRole('button',{name:'一覧の操作の説明'}))
+    expect(screen.getByText(/^返信文は手で書くか/)).toBeTruthy()
   })
 
   it('状態で絞ると一覧の口へ条件が届く', async () => {
@@ -72,7 +73,7 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     await screen.findByPlaceholderText('口コミを探す')
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'all' })))
     fireEvent.click(screen.getByRole('button', { name: '状態で絞り込み' }))
-    const option = await screen.findByRole('option', { name: '状態：未返信' })
+    const option = await screen.findByRole('option', { name: '未返信' })
     fireEvent.click(option.querySelector('button')!)
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'unreplied' })))
   })
@@ -90,6 +91,6 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     await screen.findByText('佐藤 S.')
     const board = document.querySelector('[data-design-node="j0Wcg"]')!
     expect(board.textContent).not.toContain('2023年')
-    expect(board.textContent).toContain('9月20日')
+    expect(board.textContent).toContain('9/20')
   })
 })

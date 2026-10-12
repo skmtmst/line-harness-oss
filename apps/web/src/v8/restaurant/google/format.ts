@@ -1,6 +1,5 @@
 /*
- * ★V8 Googleビジネスの表示の道具（今の画面 app/restaurant-test/google/google-format.ts から写した）。
- * src/v8 からは @/app を読めないので、使う分だけ写す。日時は店舗の時刻（日本時間）で出す。
+ * ★V8 Googleビジネスの共通の表示の道具。日時は店舗の時刻（日本時間）で出す。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'

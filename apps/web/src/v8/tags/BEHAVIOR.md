@@ -5,7 +5,7 @@
 - 行の詳細パネル：タグは `?tag=<id>`、対応マークは `?mark=<id>`
 
 ## 対応マーク（marks-tab.tsx・絵 vKDj5）
-今の V8 タブ（app/tags/marks-v8.tsx）と同じ動き。見た目だけ絵に合わせた。
+現役の V8 タブ（src/v8/tags/marks-tab.tsx）と同じ動き。見た目だけ絵に合わせた。
 - 読む：`GET /api/support-marks?accountId=`（一覧）、`GET /api/list-stats`（数の帯の人数）。アカウントを切り替えたあとに届いた古い応答は捨てる
 - 数の帯：マークの数（使っている数）・未対応・対応中・過去7日の変更。集計が取れないときは「—」と理由
 - 絞り込み：名前で探す・使っている／いない。表示件数 10・20・50。2ページ以上のときだけページ送り
@@ -16,7 +16,7 @@
 - 閲覧のみ：「マークを作る」・つまみ・編集・保管を出さない（「…」は「詳しく見る」だけ）。名前の直しは押せない
 
 ## 保存した検索（searches-tab.tsx・絵 IWnYX）
-今の V8 タブ（app/tags/searches-v8.tsx）と同じ動きに、絵の下の段にある「複製して保存」を足した。
+現役の V8 タブ（src/v8/tags/searches-tab.tsx）と同じ動きに、絵の下の段にある「複製して保存」を足した。
 - 読む：`GET /api/saved-searches?lineAccountId=&limit=50`（一覧と数の帯）。条件の名前（タグ・マーク・シナリオ・項目）は別に読み、一覧を待たせない
 - 絞り込み：条件名で探す・使っている所（あり／なし）・該当人数（1人以上／0人／未集計）。未集計は 0 人に数えない
 - 行：条件名と条件の要約（「かつ」「または」）・該当・共有・使っている所（1件は名前、複数は種類ごとの数）・更新（人・日）・「友だち一覧へ」（`/friends?savedSearch=<id>`）・「…」
@@ -25,7 +25,7 @@
 - 閲覧のみ：作る口はそのまま（友だち一覧へ行くだけ）、「…」は友だち一覧へだけ。名前の直しは押せない
 
 ## 友だち情報欄（fields-tab.tsx・絵 q5gbcM）
-今の V8 タブ（app/tags/fields-tab-v8.tsx）と同じ動き。見た目だけ絵に合わせた。
+現役の V8 タブ（src/v8/tags/fields-tab.tsx）と同じ動き。見た目だけ絵に合わせた。
 - 読む：`GET /api/friend-fields?withUsage=1`（一覧）、`GET /api/friend-fields/stats`（数の帯）、`GET /api/folders?kind=friend_field`（フォルダ）。古い応答は捨てる
 - 左のフォルダの列：すべて・作ったフォルダ・未分類（件数は一覧から数える）。追加・直す・並べ替え・削除（中の項目は未分類に残る）。1152 では道具の段のフォルダ選びに畳む
 - 表：名前の前にフォルダの色の丸（表にフォルダ列は置かない）、差し込み名 `{{field.<key>}}`、種類（選ぶ種類は「1つ選ぶ」「いくつも選ぶ」）、入っている人、回答フォームの数、出す場所
@@ -43,7 +43,7 @@
 - 右の欄の「できあがるタグ」は共通 TagPill のふつうサイズ。名前・所属フォルダを変えると見本にも反映（2026-10-08 オーナー採用）
 
 ## 友だち情報欄を作る・編集（field-new.tsx・field-edit.tsx・field-editor.tsx・絵 w9zY5）
-今の入口（app/tags/new-field-page-v8.tsx・edit-field-page-v8.tsx）と同じ動き。中身の部品を src/v8 の FieldEditor にした。
+今の入口（src/v8/tags/field-new.tsx・src/v8/tags/field-edit.tsx）と同じ動き。中身の部品を src/v8 の FieldEditor にした。
 - 受け付ける URL：`/tags/fields/new`（`?back=<戻り先>`）・`/tags/fields/edit?id=<項目>`
 - 作る：`POST /api/friend-fields`（同じ作成のやり直しは同じ要求キー＝二重に作らない）。既存の項目を読めないあいだは保存しない（R514）
 - 編集：`PATCH /api/friend-fields/:id`（読んだ版を送る）。409 は最新を読み直して「保存済み」か「ほかの人の変更」かを出し、入力は残す（R517）。共通項目は押せない
@@ -54,7 +54,7 @@
 - 絵に無い説明（タグ・情報欄・マークの違い、作ったあと変えられないもの）は板の頭の「？」へ
 
 ## 対応マークを作る・編集（mark-editor.tsx・絵 ulq9Y）
-今の部品（app/tags/mark-editor-v8.tsx）と同じ動き。
+今の部品（src/v8/tags/mark-editor.tsx）と同じ動き。
 - 受け付ける URL：`/tags/marks/new`・`/tags/marks/edit?id=<マーク>`
 - 読む：`GET /api/support-marks`（一覧から自分を探す）。編集では `GET /api/support-marks/:id/automation-rules`（権限・未接続 404・失敗を分ける）
 - 保存：作る `POST /api/support-marks`（同じやり直しは同じ要求キー）、編集 `PATCH`（読んだ版。409 は最新を出して入力を残す）。403 のあとは押させない
@@ -65,7 +65,7 @@
 - 案内の帯は絵（止めると…）と違い、今の動き（保管すると置き換わる）に合わせた文にした
 
 ## 友だち情報欄の移行＝種類を変える（field-migrate.tsx・絵 GobMd）
-今の画面（app/tags/field-migrate-v8.tsx）と同じ動き（移行先の作成 R519・事前確認・実行・結果の見守り R547/R548・アカウント切替）。
+今の画面（src/v8/tags/field-migrate.tsx）と同じ動き（移行先の作成 R519・事前確認・実行・結果の見守り R547/R548・アカウント切替）。
 - 受け付ける URL：`/tags/fields/migrate?id=<移行元>`
 - 足したもの：見本の表。移行後の種類だけで `POST /api/friend-fields/:id/migration-preview`（`targetType` だけ）を読み、「今の値 → 移したあと・人数」にまとめる。移行先が無いのでサーバーは何も書き込まない（確認番号も出ない）
 - 移行先の決め方は「新しい項目を作る／今ある項目へ移す」の2択（今の大きいカードを小さい選択に）

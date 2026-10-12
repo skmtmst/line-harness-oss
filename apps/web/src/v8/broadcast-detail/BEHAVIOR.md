@@ -1,8 +1,8 @@
 # 一斉配信の詳細・予約したあと（V8）の動き
 
-入口：`app/broadcasts/detail/page.tsx`（V8 のときだけ `src/v8/broadcast-detail/detail.tsx`）・
-`app/broadcasts/reserved/page.tsx`（V8 のときだけ `src/v8/broadcast-detail/reserved.tsx`）。
-v7 の画面・今までの V8 の部品（`app/broadcasts/detail-v8.tsx`・`reserved-v8.tsx`）は消していない（切り替えの日にまとめて消す）。
+入口：`app/broadcasts/detail/page.tsx`（`src/v8/broadcast-detail/detail.tsx` に固定）・
+`app/broadcasts/reserved/page.tsx`（`src/v8/broadcast-detail/reserved.tsx` に固定）。
+旧詳細・予約完了・携帯見本の写しは2026-10-11に削除。動作試験は現役の部品へ移した。
 
 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
 ほかの人が更新した `Q28Gb`・予約したあと `cdZBf`（`CRtK8`）・予約を取り消す（確かめ）`BeNtj`。

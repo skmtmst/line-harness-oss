@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { api, type CommonActionResources } from '@/lib/api'
-import ActionList, { type ActionChoice } from '@/components/shared/action-list'
+import ActionList, { ActionAddButton, type ActionChoice } from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
 import { ACTION_TYPES, ACTION_DEFINITIONS, type LinkedAction, type TagEditorActionLabel } from './tag-editor-v4'
 import { newStepId } from '@/components/automations/common-action-editor'
 
@@ -58,7 +59,9 @@ export default function LinkedActionList({ value, onChange, accountId, allowedTy
           {action.definition.type === 'send_message' && !params.templateId || action.definition.type === 'notify_staff' ? <TextArea aria-label="送る本文" value={String(params.content ?? params.message ?? '')} onChange={event => patch({ [action.definition!.type === 'notify_staff' ? 'message' : 'content']: event.target.value })} /> : null}
           {action.definition.type === 'grant_mileage' ? <TextField type="number" min={1} aria-label="付けるマイル" value={String(params.amount ?? '')} onChange={event => patch({ amount: Number(event.target.value) })} /> : null}
           <TextField type="number" min={0} aria-label="実行までの分数" value={String(params.delayMinutes ?? 0)} onChange={event => patch({ delayMinutes: Number(event.target.value) })} />
+          <HelpTip label="実行するタイミングの説明">0分はすぐに実行します。時間をあけて実行すると、その時間が経ってから実行されます。{params.cancelIfTagRemoved === false ? '待機中にタグが外れた場合も実行されます。' : '待機中にタグが外れた場合は実行されません。'}</HelpTip>
           <Select aria-label="失敗したとき" value={action.definition.onFailure ?? 'stop'} options={[{ value: 'stop', label: 'ここで止める' }, { value: 'continue', label: '次へ進む' }]} onChange={onFailure => update({ ...action, definition: { ...action.definition!, onFailure: onFailure as 'stop' | 'continue' } })} />
+          <ActionAddButton label="この行の前に行うことを足す" choices={choices} onAdd={next => { const index = value.findIndex(item => item.id === action.id); if (index >= 0) onChange([...value.slice(0, index), next, ...value.slice(index)]) }} />
         </>
       }} />
   </>

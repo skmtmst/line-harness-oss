@@ -1,11 +1,12 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
 describe('V6 外部連携の一覧状態', () => {
   it('受信と送信を別々に読込・成功・失敗へ分ける', () => {
@@ -23,27 +24,26 @@ describe('V6 外部連携の一覧状態', () => {
   })
 
   it('アカウント切替前の遅い応答で現在の一覧を上書きしない', () => {
-    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(PAGE).toContain('loadGenerationRef.current !== requestGeneration')
-    expect(PAGE).toContain('selectedAccountIdRef.current !== requestAccountId')
+    expect(PAGE).toContain('const generation = ++generationRef.current')
+    expect(PAGE).toContain('generationRef.current !== generation')
+    expect(PAGE).toContain('accountRef.current !== accountId')
   })
 
   it('失敗を空状態や古い一覧として表示しない', () => {
-    const outgoingStart = OVERVIEWS.indexOf('export function OutgoingOverview')
-    const incomingStart = OVERVIEWS.indexOf('export function IncomingOverview')
-    const outgoing = OVERVIEWS.slice(outgoingStart, incomingStart)
-    const incoming = OVERVIEWS.slice(incomingStart)
-    expect(outgoing.indexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(outgoing.indexOf('items.length === 0 && !showCreate')).toBeGreaterThan(outgoing.indexOf("status === 'error'"))
-    expect(incoming.indexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(incoming.indexOf('!selected && !showCreate')).toBeGreaterThan(incoming.indexOf("status === 'error'"))
-    expect(OVERVIEWS.match(/登録内容は消えていません。/g)).toHaveLength(2)
+    const outgoing = readUiSource(join(HERE, '../../v8/webhooks/outgoing.tsx'), 'utf8')
+    const incoming = readUiSource(join(HERE, '../../v8/webhooks/incoming.tsx'), 'utf8')
+    expect(outgoing.indexOf("outgoingStatus === 'error'")).toBeGreaterThan(-1)
+    expect(outgoing.indexOf('visible.length === 0')).toBeGreaterThan(outgoing.indexOf("outgoingStatus === 'error'"))
+    expect(incoming).toContain("incomingStatus === 'error'")
+    expect(incoming).toContain("incomingStatus === 'ready' && !selected")
+    expect(outgoing).toContain('登録内容は消えていません。')
+    expect(incoming).toContain('受け取り口を読み込めませんでした')
     expect(PAGE).toContain("setIncoming([])\n      setIncomingStatus('error')")
     expect(PAGE).toContain("setOutgoing([])\n      setOutgoingStatus('error')")
   })
 
   it('失敗時に再読み込みできる', () => {
-    expect(PAGE.match(/onReload=\{\(\) => void load\(\)\}/g)).toHaveLength(2)
+    expect(PAGE).toContain('onRetry={() => void reload()}')
     // ★V7 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
     expect(OVERVIEWS.match(/onRetry=\{[^}]*\}/g)).toHaveLength(3)
     expect(OVERVIEWS).not.toContain('onClick={onReload}')

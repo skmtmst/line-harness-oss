@@ -40,9 +40,9 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
   })
 
   it('CSS：共通の頭の余白の後ろで、印のあるときだけ変数で上書きする', () => {
-    const base = css.indexOf("[data-theme='v8'] .headerRow { width: 100%; padding: 20px 24px 8px;")
-    const pad = css.indexOf("[data-theme='v8'] .panel[data-design-header-padding] > .headerRow { padding: var(--dialog-design-header-padding); }")
-    const height = css.indexOf("[data-theme='v8'] .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height);")
+    const base = css.indexOf(":root .headerRow { width: 100%; padding: 20px 24px 8px;")
+    const pad = css.indexOf(":root .panel[data-design-header-padding] > .headerRow { padding: var(--dialog-design-header-padding); }")
+    const height = css.indexOf(":root .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height);")
     expect(base).toBeGreaterThan(-1)
     expect(pad).toBeGreaterThan(base)
     expect(height).toBeGreaterThan(base)

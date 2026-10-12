@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,7 +26,7 @@ const net = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => fixture.params,
   usePathname: () => '/webinars/edit',
   useRouter: () => ({ push: vi.fn() }),
@@ -32,9 +34,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-a', liffId: 'liff' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
-vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
 vi.mock('@/components/shared/select', () => ({
   default: ({ value, onChange, options, size: _size, ...props }: {
     value: string
@@ -142,6 +143,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
   net.calls.length = 0
   installFetch()
@@ -167,16 +169,17 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    await act(async () => { (host.querySelector('button[aria-label="分類の根拠"]') as HTMLButtonElement).click() })
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     // 分類の根拠（完了閾値 540秒=9:00 はサーバー応答の rule から）。
-    expect(host.textContent).toContain('分類の根拠')
-    expect(host.textContent).toContain('9:00')
+    await act(async () => { (host.querySelector('button[aria-label="一覧の操作の説明"]') as HTMLButtonElement).click() })
+    expect(document.body.textContent).toContain('視聴完了＝動画の9割')
+    expect(document.body.textContent).toContain('9:00')
     // 未参加・途中離脱・完了・録画/ライブの区別。
-    expect(host.textContent).toContain('未参加')
-    expect(host.textContent).toContain('途中離脱 40%')
-    expect(host.textContent).toContain('視聴完了 95%')
-    expect(host.textContent).toContain('ライブ1')
-    expect(host.textContent).toContain('録画1')
+    expect(host.textContent).toContain('見ていない')
+    expect(host.textContent).toContain('途中で離れた')
+    expect(host.textContent).toContain('95%')
+    expect([...host.querySelectorAll('[title]')].some((node) => node.getAttribute('title')?.includes('ライブ1'))).toBe(true)
+    expect([...host.querySelectorAll('[title]')].some((node) => node.getAttribute('title')?.includes('録画1'))).toBe(true)
     // 「未視聴」という断定表示はしない。
     expect(host.textContent).not.toContain('未視聴')
   })
@@ -185,13 +188,13 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const select = host.querySelector('select[aria-label="参加者の分類で絞り込む"]') as HTMLSelectElement | null
+    const select = host.querySelector('select[aria-label="よく使う絞り込み"]') as HTMLSelectElement | null
     expect(select).not.toBeNull()
     const labels = Array.from(select!.querySelectorAll('option')).map((option) => option.textContent)
     expect(labels).toEqual([
-      'すべての申込・参加者',
-      '未参加（申込のみ・入場記録なし）',
-      '途中離脱（入場したが未完了）',
+      'よく使う絞り込み',
+      '見ていない（申込のみ）',
+      '途中で離れた',
       '視聴完了',
       '計測外',
     ])

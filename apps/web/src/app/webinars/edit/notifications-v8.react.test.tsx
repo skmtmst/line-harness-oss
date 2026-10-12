@@ -31,7 +31,11 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import NotificationsV8 from './notifications-v8'
+import NotificationsV8 from '@/test-utils/webinar-notifications'
+import { fireEvent } from '@testing-library/react'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [] }) }))
 import type { WebinarEditor } from '@/lib/api'
 
 const SETTINGS = {
@@ -59,9 +63,7 @@ function render(): HTMLElement {
     root.render(
       <NotificationsV8
         webinarId="webinar-1"
-        webinarTitle="NEN活用スタートセミナー"
         editor={EDITOR}
-        onOpenActions={() => undefined}
       />,
     )
   })
@@ -90,21 +92,21 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     const host = render()
     await act(async () => undefined)
     expect(host.querySelector('[data-design-node="E7iAYs"]')).not.toBeNull()
-    for (const label of ['通知とリマインド', '視聴後にすること', 'LINEでの見え方']) {
+    for (const label of ['通知とリマインド', '視聴後にすること', '申込のお礼']) {
       expect(host.textContent).toContain(label)
     }
     expect(host.textContent).toContain('412')
     expect(host.textContent).toContain('申込のお礼')
-    expect(host.textContent).toContain('視聴完了')
+    expect(host.textContent).toContain('見終わった人へのお礼')
   })
 
   it('入り切りの入力を残し、下書き保存したときだけ保存する', async () => {
     const host = render()
     await act(async () => undefined)
-    const toggle = host.querySelector('button[role="switch"][aria-label="申込のお礼"]')
+    const toggle = host.querySelector('input[type="checkbox"][aria-label="申込のお礼"]')
     expect(toggle).not.toBeNull()
     await act(async () => {
-      toggle!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      fireEvent.click(toggle!)
     })
     expect(apiMocks.saveNotifications).not.toHaveBeenCalled()
     await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!.click() })
@@ -116,12 +118,12 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     apiMocks.saveNotifications.mockRejectedValueOnce(new Error('network'))
     const host = render()
     await act(async () => undefined)
-    const toggle = host.querySelector('button[role="switch"][aria-label="申込のお礼"]') as HTMLButtonElement
-    await act(async () => { toggle.click() })
+    const toggle = host.querySelector('input[type="checkbox"][aria-label="申込のお礼"]') as HTMLInputElement
+    await act(async () => { fireEvent.click(toggle) })
     const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!
     await act(async () => { save.click() })
     expect(host.textContent).toContain('入力を残しました')
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(toggle.checked).toBe(false)
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
     await act(async () => { save.click() })
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(2)

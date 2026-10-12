@@ -14,11 +14,11 @@ import { ApiError } from '@/lib/api'
 const m = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
 
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { feeding: m.get, saveFeeding: m.save } }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }))
 
-import FeedingTab from './feeding-tab'
+import FeedingTab from '@/v8/nen-pets/feeding'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -33,15 +33,18 @@ const flush = () => act(async () => { await Promise.resolve(); await Promise.res
 afterEach(cleanup)
 beforeEach(() => {
   vi.clearAllMocks()
+  m.get.mockReset()
+  m.save.mockReset()
 })
 
 describe('M036 主食のカロリーの保存・読み込み失敗', () => {
   it('保存の403は権限の案内になり、生文は出ない', async () => {
     m.get.mockResolvedValueOnce({ success: true, data: data() })
     m.save.mockRejectedValueOnce(new ApiError(403, 'API error: 403'))
-    render(<FeedingTab accountId="A" />)
+    render(<FeedingTab canEdit accountId="A" />)
     await flush()
-    fireEvent.change(screen.getByLabelText('商品名 1'), { target: { value: 'A編集中' } })
+    fireEvent.click(screen.getByRole('button', { name: /^[AB]フード$/ }))
+    fireEvent.change(screen.getByLabelText('商品名'), { target: { value: 'A編集中' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await flush()
 
@@ -52,7 +55,7 @@ describe('M036 主食のカロリーの保存・読み込み失敗', () => {
 
   it('読み込みの429は待ち案内になり、再試行の口は残る', async () => {
     m.get.mockRejectedValueOnce(new ApiError(429, 'API error: 429'))
-    render(<FeedingTab accountId="A" />)
+    render(<FeedingTab canEdit accountId="A" />)
     await flush()
 
     expect(document.body.textContent).toMatch(/混み合っています|待って/)

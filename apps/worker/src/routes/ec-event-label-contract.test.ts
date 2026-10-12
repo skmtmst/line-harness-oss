@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKER = readFileSync(join(HERE, 'ec-commerce.ts'), 'utf8');
-const WEB = readFileSync(join(HERE, '../../../web/src/app/ec-commerce/page.tsx'), 'utf8');
-const CONNECTOR = readFileSync(join(HERE, '../../../web/src/app/ec-commerce/connector-panel.tsx'), 'utf8');
+const WEB = readFileSync(join(HERE, '../../../web/src/v8/settings/ec-commerce/screen.tsx'), 'utf8');
+const CONNECTOR = readFileSync(join(HERE, '../../../web/src/v8/settings/ec-commerce/connector.tsx'), 'utf8');
 
 describe('EC event label drift guard (#600)', () => {
   it('WebとWorkerが共有契約から表示名を読む', () => {

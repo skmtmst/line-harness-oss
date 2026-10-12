@@ -51,7 +51,7 @@ describe('④ 表の行の登場と退場', () => {
   })
 
   it('登場の動きは消える行に当てない・済みの tbody に当てない・動きを減らす設定では当てない', () => {
-    const block = globals.match(/@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme="v8"\] tbody[\s\S]*?\n\}/)
+    const block = globals.match(/@media \(prefers-reduced-motion: no-preference\) \{\s*:root tbody[\s\S]*?\n\}/)
     expect(block, '行の登場の規定が no-preference の中に無い').not.toBeNull()
     const trRules = rules(globals).filter((r) => /tbody[^,{]*>\s*tr/.test(r.selector) && /animation(-delay)?:/.test(r.body))
     expect(trRules.length).toBeGreaterThan(0)

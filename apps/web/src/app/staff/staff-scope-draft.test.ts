@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { BROADCAST_EDIT_OPERATION_KEYS } from '@line-crm/shared'
-import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
+import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from '@/v8/settings/staff/staff-scope-draft'
 
 describe('R497 保存済みを3択へ写す', () => {
   it('受信箱だけの個別設定は受信箱だけ変えられるで写す（受付の当てはめはしない）', () => {

@@ -149,11 +149,11 @@ vi.mock('@/lib/api', () => ({
     getAvailabilityRules: vi.fn(async () => ({ rules: [] })),
     getGoogleCalendar: vi.fn(async () => ({ connected: false })),
     listRequests: vi.fn(async () => ({ items: [], total: 0 })),
-    listResources: vi.fn(async () => ({ resources: [] })),
+    listResources: vi.fn(async () => ({ success: true, data: { resources: [] } })),
   },
 }))
 
-import BookingSettingsV8 from './menus/settings-v8'
+import BookingSettingsV8 from '@/v8/booking-menus/settings'
 import BookingDetailPage from './bookings/detail/page'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
@@ -209,7 +209,7 @@ describe('V8 予約の通し：受付枠を作る', () => {
     await flush()
 
     // 月曜を開ける（09:00–18:00が入る）と書きかけになり保存帯が出る。
-    fireEvent.click(await screen.findByRole('switch', { name: '月曜日を開ける' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: '月曜日を開ける' }))
     const saveButton = await screen.findByRole('button', { name: '受付枠を作る' })
     fireEvent.click(saveButton)
     await waitFor(() => expect(saveSettings).toHaveBeenCalledTimes(1))

@@ -40,6 +40,7 @@ import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
+import { formJumpsInto } from '@/components/forms/form-definition-operations'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -64,6 +65,7 @@ type Props = {
   onRenamePage: (index: number, name: string) => boolean
   onDuplicatePage: (index: number) => void
   onRemovePage: (index: number) => void
+  canUndoPageRemoval?: boolean
   onSelectBlock: (id: string | null) => void
   onAddBlock: (block: FormBlock) => void
   onPatchBlock: (id: string, patch: Partial<FormBlock>) => void
@@ -77,6 +79,11 @@ export function ContentTab(props: Props) {
   const [renaming, setRenaming] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
   const section = layout.sections[page]
+
+  const askRemoveSection = (index: number) => {
+    if (props.readOnly || layout.sections.length <= 1 || !section) return
+    setRemoving(true)
+  }
 
   return (
     <>
@@ -95,7 +102,7 @@ export function ContentTab(props: Props) {
             destructiveItem={layout.sections.length > 1 ? {
               id: 'remove',
               label: 'このページを消す',
-              onSelect: () => setRemoving(true),
+              onSelect: () => askRemoveSection(page),
             } : undefined}
           />}
         </div>
@@ -155,14 +162,17 @@ export function ContentTab(props: Props) {
       <Dialog
         open={!props.readOnly && removing}
         title="このページを消す"
-        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0} 個を消します。この操作は元に戻せません。`}
+        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0} 個を消します。${props.canUndoPageRemoval ? '保存する前なら「元に戻す」で戻せます。' : 'この操作は元に戻せません。'}`}
         confirmLabel="消す"
         onConfirm={() => {
           setRemoving(false)
           props.onRemovePage(page)
         }}
         onCancel={() => setRemoving(false)}
-      />
+      >
+        <p>集まった回答は消えません。</p>
+        <p>このページへの分岐{section ? formJumpsInto(layout, section.id) : 0}件は「次へ進む」に戻します。</p>
+      </Dialog>
     </>
   )
 }

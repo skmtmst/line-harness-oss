@@ -18,11 +18,10 @@ const fixture = vi.hoisted(() => ({
   listMenus: null as null | (() => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push?.(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [] }),
 }))
@@ -81,6 +80,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: async () => ({ success: true, data: [] }) },
     },
     bookingApi: {
+
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: async () => ({ staff: [] }),
       getSettings: async () => ({ success: true, data: { bookingWindowDays: 30 } }),

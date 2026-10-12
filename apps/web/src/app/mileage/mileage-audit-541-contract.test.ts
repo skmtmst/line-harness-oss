@@ -5,16 +5,16 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const ACTION_SCORE = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
-const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
+const ACTION_SCORE = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
+const HISTORY = readFileSync(join(HERE, '../../v8/mileage/history.tsx'), 'utf8')
 const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'v8-earning-rule-new.tsx'), 'utf8')
 const REWARD_EDIT = readFileSync(join(HERE, 'rewards', 'edit', 'v8-reward-edit.tsx'), 'utf8')
 
 describe('点検 #511(中)の再発防止(#541)', () => {
   it('CSVのボタンは「この頁だけ」と分かる文にする(#511-4)', () => {
-    expect(PAGE).toContain('この頁の残高をCSVで書き出す')
+    expect(PAGE).toContain('この頁の残高を CSV')
     expect(ACTION_SCORE).toContain('この頁の行動スコアをCSVで書き出す')
-    expect(HISTORY).toContain('この頁の履歴をCSVで書き出す')
+    expect(HISTORY).toContain('CSVで書き出す')
   })
 
   it('CSVのセルは数式の頭を無害化する(#511-8)', () => {

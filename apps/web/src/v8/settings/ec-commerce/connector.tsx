@@ -319,7 +319,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
 
       <div className={styles.foot}>
         {/* つながる先：止めると止まるもの（ECの出来事がきっかけ）の数は title で見せる。 */}
-        <p className={styles.links}>
+        <p className={styles.links} title={`「ECの出来事がきっかけ」とあるものは、このつなぎ先を止めると止まります。コンバージョンと分析はアカウント全体の記録数です。タグ ${impactWords(impact?.friendFields)}（ECの出来事がきっかけ）・分析 ${impactWords(impact?.analytics)}（アカウント全体）。止めたあとも、保存済みの設定と届いたデータは残ります。失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。`}>
           つながる先：
           <Link href="/nen-campaigns" title={`ECの出来事がきっかけ ${impactWords(impact?.nenCampaigns)}`}>→ NEN配信</Link>
           <Link href="/mileage" title={`ECの出来事がきっかけ ${impactWords(impact?.mileageRules)}`}>→ マイル</Link>

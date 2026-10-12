@@ -541,6 +541,10 @@ function SettlementEditor({
   const save = async () => {
     if (saving) return
     setError(null)
+    if (rewardMode === 'rate' && (!rate.trim() || !Number.isFinite(Number(rate)) || Number(rate) < 0 || Number(rate) > 100)) {
+      saveErrors.apply({ rate: '報酬率は0から100の間で入力してください' })
+      return
+    }
     const errors: typeof fieldErrors = {}
     if (email.trim() && emailRef.current?.validity.typeMismatch) errors.email = 'メールアドレスを確認してください'
     if (holdDays.trim() && (!Number.isInteger(Number(holdDays)) || Number(holdDays) < 0 || Number(holdDays) > 365)) errors.hold = '保留期間は0日から365日の整数で入力してください'

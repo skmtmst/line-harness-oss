@@ -96,6 +96,22 @@ const buttonByLabel = (label: string) =>
   [...document.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === label) as HTMLButtonElement | undefined
 
 describe('V8 ウェビナー一覧', () => {
+  it('未取得の視聴数は横線にし、理由を実際の補足へ一度だけ出す', async () => {
+    const originalFetch = globalThis.fetch
+    const reason = '視聴区間の記録をまだ集計できないため'
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input)).pathname.endsWith('/overview')) return Promise.resolve(json({ data: { state: 'partial', registrationMode: 'people', metrics: { viewers: { value: null, state: 'unavailable', reason }, viewRate: { value: null, state: 'unavailable', reason } } } }))
+      return originalFetch(input, init)
+    })
+    await render()
+    const help = buttonByLabel('視聴の説明')!
+    expect(help.closest('[data-kpi-presentation]')?.textContent).toContain('—')
+    await act(async () => help.click())
+    const note = host.querySelector('[role="note"]')!
+    expect(note.textContent?.match(/視聴区間の記録をまだ集計できないため/g)).toHaveLength(1)
+    expect(note.textContent).not.toContain('視聴人数:')
+  })
+
   it('行の「…」から「アーカイブする」を選ぶと、対象を言う確かめの窓（VXZ6T）が開く', async () => {
     await render()
     const more = buttonByLabel('ウェビナー「旧機能説明会」の操作')

@@ -1,20 +1,17 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import Link from '@/components/shared/list-navigation'
+import { useId, useEffect, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { PageHeading } from '@/components/templates/page-frame'
-import styles from './create-page.module.css'
-import { AutoFormLeaveGuard } from './form-leave-guard'
+import { CreatePage as CreateTemplate } from '@/components/templates/create-page'
+import FormSectionView from './form-section'
+import Card, { CardHeader } from './card'
 import Button from '@/components/shared/button'
 import { notifySaved } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
-import StickyBar from '@/components/shared/sticky-bar'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { describeSaveFailure } from '@/lib/api'
 import { SaveErrorScope, useSaveFormErrors } from './save-form-errors'
 import type { FormErrors } from '@/lib/use-form-errors'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*
  * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
@@ -39,20 +36,6 @@ export function createPageReturnHref(parentHref: string, id: string | void): str
   url.searchParams.set('highlight', String(id))
   return `${url.pathname}${url.search}${url.hash}`
 }
-
-/**
- * 作成画面の寸法の版。
- *
- * V6の設計は、作成画面のカードを r10・余白18・行間12、節の見出しを16/700 と
- * 描き、保存はカードの中ではなく下部追従バーに置いている。既存の作成画面は
- * V5の寸法（r12・余白24・見出し14/600・カード内ボタン）で並んでいる。
- *
- * 既定を変えると作成画面が全部いっぺんに動く。1画面ずつ設計と突き合わせて
- * 移すため、`variant="v6"` を渡した画面だけV6の寸法にする。
- */
-export type CreatePageVariant = 'default' | 'v6'
-
-const VariantContext = createContext<CreatePageVariant>('default')
 
 /**
  * 作成画面の骨組み。
@@ -85,7 +68,7 @@ export interface CreatePageProps {
    */
   describeError?: (error: unknown) => string
   /**
-   * 欄ごとの検査（★V7 sTJsh §6）。渡すと保存時に全欄を検査し、落ちた欄は
+   * 欄ごとの検査。渡すと保存時に全欄を検査し、落ちた欄は
    * 欄の下に理由・上にまとめを出して1つ目へフォーカスを移す。
    * 欄は離れた時点でも1回だけ検査される（`useFormErrors` 参照）。
    */
@@ -97,14 +80,6 @@ export interface CreatePageProps {
   aside?: ReactNode
   /** 保存ボタンの文言。設計は画面ごとに「メニューを追加」などと書き分けている */
   saveLabel?: string
-  /** 共通トップバーだけに画面名を置くV6画面では、本文の重複見出しを出さない。 */
-  showHeader?: boolean
-  /** Pencilの実ノードと、作成フロー全体を結び付ける。 */
-  designNode?: string
-  /** 寸法の版。既定はV5。V6へ移した画面だけ 'v6' を渡す。 */
-  variant?: CreatePageVariant
-  /** 下部追従バーの左に出す状態。V6のときだけ使う。 */
-  statusLabel?: ReactNode
   children: ReactNode
 }
 
@@ -120,16 +95,11 @@ export default function CreatePage({
   fields,
   aside,
   saveLabel,
-  showHeader = true,
-  designNode,
-  variant = 'default',
-  statusLabel,
   children,
 }: CreatePageProps) {
   const saveErrors = useSaveFormErrors()
 
   const router = useRouter()
-  const theme = useAdminTheme()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -167,7 +137,7 @@ export default function CreatePage({
     const validationError = validate?.()
     /*
      * 欄ごとの検査がある画面では、保存時に全欄をもう一度見て、落ちた欄は
-     * 欄の下に理由・上にまとめを出す（★V7 sTJsh §6）。直し方が分かる文なので
+     * 欄の下に理由・上にまとめを出す。直し方が分かる文なので
      * 「保存できませんでした」だけの帯にはしない。画面全体の条件
      * （アカウント未選択など）とは両方出す。
      */
@@ -203,119 +173,33 @@ export default function CreatePage({
     }
   }
 
-  const v6 = variant === 'v6'
-
-  // V6は共通ボタンで組む。V5の並びは既存の作成画面がそのまま使っているので、
-  // 触らずに残す。
-  const actions = v6 ? (
-    <>
-      <Button href={parent[1]}>キャンセル</Button>
-      {onReset && (
-        <Button onClick={() => run(true)} disabled={saving} busy={saving}>
-          保存して続けて作る
+  return <SaveErrorScope errors={saveErrors}>
+    <CreateTemplate
+      title={title}
+      help={help}
+      busy={saving}
+      preview={aside}
+      hidePreviewWhenNarrow
+      footerActions={<>
+        <Button href={parent[1]}>キャンセル</Button>
+        {onReset ? <Button onClick={() => run(true)} disabled={saving} busy={saving}>保存して続けて作る</Button> : null}
+        <Button variant="primary" onClick={() => run(false)} disabled={saving} busy={saving}>
+          {saveLabel ?? "保存する"}
         </Button>
-      )}
-      <Button variant="primary" onClick={() => run(false)} disabled={saving} busy={saving} busyLabel="保存中...">
-        {(saveLabel ?? '保存する')}
-      </Button>
-    </>
-  ) : (
-    <>
-      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving} busy={saving}>
-        {saveLabel ?? '保存する'}
-      </Button>
-      {onReset && (
-        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving} busy={saving}>
-          保存して続けて作る
-        </Button>
-      )}
-      <Link
-        href={parent[1]}
-        className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"
-      >
-        キャンセル
-      </Link>
-    </>
-  )
-
-  /*
-   * v7 は頭の上に「親 / 今の題」の行を置く。★V8 は描かない（オーナー 2026-10-08）：
-   * 戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ。
-   */
-  const crumb = theme === 'v8' ? null : (
-    <nav data-design="Crumb" className={`${styles.crumb} text-ink-faint mb-2 text-xs`}>
-      <Link href={parent[1]} className="hover:underline">
-        {parent[0]}
-      </Link>
-      <span className="mx-1.5">/</span>
-      <span>{title}</span>
-    </nav>
-  )
-
-  return (
-    <SaveErrorScope errors={saveErrors}><VariantContext.Provider value={variant}>
-    <div data-design-node={designNode} data-create-variant={variant}>
-      <AutoFormLeaveGuard busy={saving} />
-      {showHeader ? (
-        <div data-design="Head" className={styles.head}>
-          {crumb}
-          <PageHeading title={title} help={help} />
-        </div>
-      ) : crumb}
-
-      <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
-        <div
-          data-design="Left"
-          className={`bg-canvas content-card border ${
-            v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
-          } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
-        >
-          {/* 保存時に落ちた欄のまとめ（★V7 sTJsh §6）。欄の上の方に出す。 */}
-          {fields ? (
-            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} />
-          ) : null}
-          {children}
-
-          {error && <p className="text-danger text-sm">{error}</p>}
-          {notice && <p className="text-success text-sm">{notice}</p>}
-
-          {/* V6は保存を下部追従バーへ出す。カードの中とバーの両方に置くと、
-              どちらを押せばよいか分からなくなる。 */}
-          {v6 ? null : <div className="flex flex-wrap gap-2">{actions}</div>}
-        </div>
-
-        {aside && (
-          <div
-            data-design="Right"
-            className={`w-full shrink-0 space-y-4 ${v6 ? 'xl:w-[390px]' : 'xl:w-80'}`}
-          >
-            {aside}
-          </div>
-        )}
-      </div>
-
-      {v6 && (
-        <div className="mt-4">
-          <StickyBar
-            status={statusLabel ?? (saving ? '保存しています' : 'まだ保存していません')}
-            actions={actions}
-          />
-        </div>
-      )}
-    </div>
-    </VariantContext.Provider></SaveErrorScope>
-  )
+      </>}
+    >
+      {fields ? <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} /> : null}
+      {children}
+      {error ? <p className="text-danger text-sm" role="alert">{error}</p> : null}
+      {notice ? <p className="text-success text-sm" role="status">{notice}</p> : null}
+    </CreateTemplate>
+  </SaveErrorScope>
 }
 
 /**
- * 番号つきの節。
- *
- * 設計の作成画面は、入力を「① お客様に見える情報」「② 予約の受け方」の
- * ように区切っている。上から順に埋めれば終わる、と分かるための番号なので、
- * 見出しだけ並べるのとは意味が違う。
+ * 設定フォームの節。段の順は呼び出し側が保持し、見た目は共通部品へ渡す。
  */
 export function FormSection({
-  step,
   label,
   note,
   help,
@@ -326,40 +210,16 @@ export function FormSection({
   note?: string
   /**
    * 節の言葉の意味・仕様。見出しのすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。警告・直し方は note のまま残す。
+   * 警告・直し方は note のまま残す。
    */
   help?: ReactNode
   children: ReactNode
 }) {
-  const v6 = useContext(VariantContext) === 'v6'
-  const hasHelp = help !== undefined && help !== null
-  return (
-    <section
-      className={`border-hairline border-b last:border-b-0 last:pb-0 ${v6 ? 'pb-3' : 'pb-5'}`}
-    >
-      <div className="mb-3 flex items-start gap-2">
-        <span
-          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-pill font-semibold ${
-            v6 ? 'h-6 w-6 text-label' : 'h-5 w-5 text-xs'
-          }`}
-        >
-          {step}
-        </span>
-        <div>
-          <h2 className={v6 ? 'text-ink text-lead font-bold' : 'text-ink text-sm font-semibold'}>
-            {label}
-            {hasHelp ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
-          </h2>
-          {note && (
-            <p className={v6 ? 'text-ink-faint text-micro mt-0.5 font-medium' : 'text-ink-faint mt-0.5 text-xs'}>
-              {note}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className={v6 ? 'space-y-3' : 'space-y-4'}>{children}</div>
-    </section>
-  )
+  const id = useId()
+  return <FormSectionView id={id} title={label} description={note}
+    action={help ? <HelpTip label={label}>{help}</HelpTip> : undefined}>
+    {children}
+  </FormSectionView>
 }
 
 /** 右の列に置く囲み。「予約画面での見え方」「気をつけること」に使う。 */
@@ -372,46 +232,10 @@ export function AsideCard({
   note?: string
   children: ReactNode
 }) {
-  return (
-    <section className="bg-canvas rounded-card content-card border p-4">
-      <h2 className="text-ink text-sm font-semibold">{title}</h2>
-      {note && <p className="text-ink-faint mt-0.5 text-xs">{note}</p>}
-      <div className="mt-3">{children}</div>
-    </section>
-  )
-}
-
-/**
- * 択一の選択肢を、説明つきの札で出す。
- *
- * 設計の作成画面は「先着順で自動確定 / 承認制」のように、選択肢そのものより
- * 「それを選ぶと何が起きるか」を並べて選ばせる。プルダウンにすると説明が
- * 消えるので、選ぶ前に読める形で置く。
- */
-export function ChoiceCard({
-  selected,
-  title,
-  note,
-  onClick,
-}: {
-  selected: boolean
-  title: string
-  note: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`${styles.choice} rounded-card border p-3 text-left transition-colors ${
-        selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-      }`}
-    >
-      <div className="text-ink text-sm font-semibold">{title}</div>
-      <div className="text-ink-faint text-xs">{note}</div>
-    </button>
-  )
+  return <Card spacing="normal">
+    <CardHeader title={title} meta={note} />
+    {children}
+  </Card>
 }
 
 // Field と inputClass は form-controls.tsx に移した。入力欄だけ使いたい画面が

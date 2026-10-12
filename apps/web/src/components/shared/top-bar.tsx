@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import type { MenuPortalRect } from './menu-portal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
+import ActionMenu, { type ActionMenuItem } from './action-menu'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './top-bar.module.css'
 
@@ -102,6 +103,8 @@ export interface TopBarProps {
    * ★V8 の管理画面は左下の自分のメニューへ移したので `false` を渡す（オーナー 2026-10-07）。
    */
   showIdentity?: boolean
+  /** 運営の自分の操作。省いたときの名前と配置は変えない。 */
+  identityActions?: ActionMenuItem[]
   className?: string
 }
 
@@ -134,9 +137,12 @@ export default function TopBar({
   titleHref,
   hqReturn = null,
   showIdentity = true,
+  identityActions,
   className,
 }: TopBarProps) {
   const [switchOpen, setSwitchOpen] = useState(false)
+  const [identityOpen, setIdentityOpen] = useState(false)
+  const identityRef = useRef<HTMLButtonElement>(null)
   const switchRef = useRef<HTMLButtonElement>(null)
   const rootRef = useRef<HTMLElement>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
@@ -151,9 +157,6 @@ export default function TopBar({
     return { top: bar.top, bottom: bar.bottom, left: right, right, width: 0 }
   }, [])
   const classes = [styles.root, className].filter(Boolean).join(' ')
-  const handleAccountChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    onAccountChange(event.target.value)
-  }
   const current = accounts.find((account) => account.id === selectedAccountId)
 
   /*
@@ -165,7 +168,6 @@ export default function TopBar({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return
-      if (document.documentElement.dataset.theme !== 'v8') return
       if (e.key === '\\') {
         e.preventDefault()
         window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT))
@@ -184,7 +186,7 @@ export default function TopBar({
         現在位置はここでも h1 を持つ（v7 の h1 は v8 で隠れるため）。
       */}
       {v8Chrome ? (
-        <div className={`${styles.v8Left} v8-only`}>
+        <div className={`${styles.v8Left}`}>
           <button
             type="button"
             className={styles.iconButton}
@@ -198,7 +200,7 @@ export default function TopBar({
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：手前はホーム。格子印＋
               「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
-              v8-only の帯にだけ出すので v7 は変わらない。
+              の帯にだけ出すので v7 は変わらない。
             */}
             <Link href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
@@ -237,12 +239,12 @@ export default function TopBar({
         </div>
       ) : null}
 
-      <div className={`${styles.titleGroup} ${v8Chrome ? 'v7-only' : ''}`}>
+      {!v8Chrome ? <div className={styles.titleGroup}>
         <h1 className={styles.title} title={title}>{title}</h1>
         {manualHref
           ? <Link href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
           : null}
-      </div>
+      </div> : null}
 
       <div className={styles.actions}>
         {showAccountSwitcher ? <>
@@ -267,8 +269,7 @@ export default function TopBar({
             <span className={styles.accountMark} aria-hidden="true">
               {hq ? (
                 <>
-                  <span className="v7-only">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
-                  <span className="v8-only">{hq.mark}</span>
+                  <span >{hq.mark}</span>
                 </>
               ) : (current?.mark ?? current?.label.slice(0, 1) ?? '')}
             </span>
@@ -280,14 +281,13 @@ export default function TopBar({
               <span className={styles.pillText}>
                 {/*
                   札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
-                  v8-only の行なので v7 の札は変わらない。
+                  の行なので v7 の札は変わらない。
                 */}
-                <span className={`${styles.pillRole} v8-only`}>{hq ? '統括' : 'LINEアカウント'}</span>
+                <span className={`${styles.pillRole}`}>{hq ? '統括' : 'LINEアカウント'}</span>
                 {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
                 {hq ? (
                   <>
-                    <span className={`${styles.accountName} v7-only`}>{current?.label ?? '店舗を選択'}</span>
-                    <span className={`${styles.accountName} v8-only`} title={hq.name}>{hq.name}</span>
+                    <span className={`${styles.accountName}`} title={hq.name}>{hq.name}</span>
                   </>
                 ) : (
                   <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
@@ -297,22 +297,7 @@ export default function TopBar({
               <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
             )}
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
-            <select
-              className={`${styles.accountSelect} v7-only`}
-              value={selectedAccountId}
-              onChange={handleAccountChange}
-              aria-label="LINEアカウント"
-            >
-              {/*
-                未選択を表す option。これが無いと value="" のとき、札の表示は空なのに
-                ブラウザは先頭の店舗を選んだと読み上げて食い違う（NEXT-07）。
-                「未選択へ戻る」は操作として意味を持たないので選べない形にする。
-              */}
-              <option value="" disabled>店舗を選択</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.label}</option>
-              ))}
-            </select>
+
             {/*
               ★V8：開くと自前の一覧（統括に戻る・店の一覧）。v7 はブラウザの選ぶ欄のまま。
               札の上に透明のボタンを敷き、押すと一覧を出す。
@@ -321,7 +306,7 @@ export default function TopBar({
             <button
               ref={switchRef}
               type="button"
-              className={`${styles.accountSelect} v8-only`}
+              className={`${styles.accountSelect}`}
               aria-label="アカウントを切り替える"
               aria-haspopup="menu"
               aria-expanded={switchOpen}
@@ -348,7 +333,7 @@ export default function TopBar({
               <button
                 ref={bellRef}
                 type="button"
-                className={`${styles.iconButton} v8-only`}
+                className={`${styles.iconButton}`}
                 aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
                 aria-haspopup="dialog"
                 aria-expanded={bellOpen}
@@ -363,7 +348,7 @@ export default function TopBar({
           ) : (
             <Link
               href="/notifications"
-              className={`${styles.iconButton} v8-only`}
+              className={`${styles.iconButton}`}
               aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
             >
               <BellIcon />
@@ -380,11 +365,14 @@ export default function TopBar({
         */}
         <div className={styles.identity}>
           {/* ★V8: 自分（36px の顔）。名まえの頭1文字を丸いタイルで出す。 */}
-          <span className={`${styles.avatar} v8-only`} aria-hidden="true">
+          <span className={`${styles.avatar}`} aria-hidden="true">
             {userName.trim().slice(0, 1)}
           </span>
           <span className={styles.identityText}>
-            <span className={styles.user} title={userName}>{userName}</span>
+            {identityActions?.length ? <>
+              <button type="button" ref={identityRef} className={styles.user} title={userName} aria-label="自分のメニュー" aria-haspopup="menu" aria-expanded={identityOpen} onClick={() => setIdentityOpen((open) => !open)}>{userName}</button>
+              <ActionMenu open={identityOpen} items={identityActions} anchorRef={identityRef} onClose={() => setIdentityOpen(false)} ariaLabel="自分の操作" />
+            </> : <span className={styles.user} title={userName}>{userName}</span>}
             {onRoleClick
               ? <button type="button" className={styles.roleButton} onClick={onRoleClick}>{roleLabel}</button>
               : <span className={styles.role}>{roleLabel}</span>}
@@ -392,7 +380,6 @@ export default function TopBar({
         </div>
 
         {/* v7 の区切り線は残す（V8 では消す決まり）。 */}
-        <span className={`${styles.separator} v7-only`} aria-hidden="true" />
 
         <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
           <LogOutIcon /><span aria-hidden="true">ログアウト</span>

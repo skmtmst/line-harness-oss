@@ -7,9 +7,9 @@ const editPage = readFileSync(resolve(root, 'src/app/tags/searches/edit/page.tsx
 const friendsPage = readFileSync(resolve(root, 'src/app/friends/page.tsx'), 'utf8')
   + readFileSync(resolve(root, 'src/components/friends/saved-search-dialog.tsx'), 'utf8')
 const advanced = readFileSync(resolve(root, 'src/components/friends/advanced-search-dialog.tsx'), 'utf8')
-const list = readFileSync(resolve(root, 'src/components/friend-fields/saved-search-list.tsx'), 'utf8')
+const list = readFileSync(resolve(root, 'src/v8/tags/searches-tab.tsx'), 'utf8') + readFileSync(resolve(root, 'src/components/friend-fields/saved-search-list.tsx'), 'utf8')
 
-describe('V6 保存した検索の画面契約', () => {
+describe('V8 保存した検索の画面契約', () => {
   it('XBkiQを既存の保存APIへ接続する', () => {
     expect(editPage).toContain('api.savedSearches.update')
     expect(editPage).toContain('api.savedSearches.create')
@@ -34,8 +34,9 @@ describe('V6 保存した検索の画面契約', () => {
       #1014 ATTR-24: 省略した名前のヒントは「条件を確認・編集」の固定文
       ではなく、名前そのもの（title）と「名前 を編集」の読み上げに分ける。
     */
-    expect(list).toContain('title={search.name}')
-    expect(list).toContain('aria-label={`${search.name} を編集`}')
+    expect(list).toContain('<TruncatedText value={String(search.name')
+    expect(readFileSync(resolve(root, 'src/components/shared/truncated-text.tsx'), 'utf8')).toContain('role="tooltip"')
+    expect(list).toContain('label={`保存した検索「${search.name}」の操作`}')
     expect(list).not.toContain('title="条件を確認・編集"')
   })
 
@@ -63,7 +64,7 @@ describe('V6 保存した検索の画面契約', () => {
     expect(list).toContain("setLoadError('')")
     expect(list).toContain('setItems([])')
     expect(list).toContain('kind="error"')
-    expect(list).toContain('onRetry={() => void load()}')
+    expect(list).toContain('onClick={() => load()}')
     expect(list.indexOf('loadError ?')).toBeLessThan(list.indexOf('items.length === 0'))
   })
 })

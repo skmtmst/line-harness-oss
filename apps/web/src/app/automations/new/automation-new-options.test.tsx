@@ -16,12 +16,13 @@ import {
  * - N3: シナリオ開始を選んで保存すると、scenarioId付きで送る
  */
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 // 権限フックは happy-dom の localStorage を読むため、固定で通す。
 vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => true }))
@@ -72,7 +73,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api } from '@/lib/api'
-import NewAutomationPage from './page'
+import { NewAutomationV8 as NewAutomationPage } from '@/v8/automations/create/create'
 
 const mockList = api.automations.list as unknown as ReturnType<typeof vi.fn>
 const mockResources = api.automations.draftResources as unknown as ReturnType<typeof vi.fn>
@@ -94,6 +95,7 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   mockList.mockReset()
   mockResources.mockReset()
   mockCreate.mockReset()
@@ -129,6 +131,7 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
@@ -146,15 +149,6 @@ async function mountPage(): Promise<HTMLDivElement> {
   return container
 }
 
-/** ネイティブselectへ値を入れる。 */
-async function chooseOption(select: HTMLSelectElement, value: string): Promise<void> {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set
-    setter?.call(select, value)
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
-}
-
 async function typeText(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -164,7 +158,7 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
 }
 
 async function clickButton(el: HTMLElement, text: string): Promise<void> {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text)
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   await act(async () => { (button as HTMLButtonElement).click() })
 }
@@ -175,33 +169,32 @@ describe('新規作成の選択可能一覧(#734)', () => {
     // 共有へ無い値を足す・共有から値が消える逆変異はここで赤になる。
     // #975 U061: 初回は代表3件だけを出すため、「すべて見る」を開いてから拾う。
     const el = await mountPage()
-    await clickButton(el, `ほかのきっかけもすべて見る（あと${AUTOMATION_DRAFT_TRIGGER_OPTIONS.length - 3}件）`)
-    // きっかけは押しボタン群(ラベル+説明の2段)。説明spanを持つボタンを拾う。
-    const labels = Array.from(el.querySelectorAll('span.line-clamp-2')).map(
-      (note) => note.parentElement?.querySelector('span')?.textContent ?? '',
-    )
-    expect(labels).toEqual(AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => option.label))
+    await clickButton(el, `ほかのきっかけもすべて見る（あと${AUTOMATION_DRAFT_TRIGGER_OPTIONS.length - 3} 件）`)
+    const radios = Array.from(el.querySelectorAll<HTMLInputElement>('input[name="v8-trigger"]'))
+    expect(radios.map(input => input.value)).toEqual(AUTOMATION_DRAFT_TRIGGER_OPTIONS.map(option => option.value))
+    for (const option of AUTOMATION_DRAFT_TRIGGER_OPTIONS) expect(radios.find(input => input.value === option.value)?.parentElement?.textContent).toContain(option.label)
   })
 
-  it('N2: することの選択肢が共有の全件と一致する', async () => {
+  it('N2: することの選択肢が共有の正本の編集可能な処理と一致する', async () => {
     const el = await mountPage()
-    const actionSelect = Array.from(el.querySelectorAll('select')).find((select) =>
-      Array.from(select.querySelectorAll('option')).some((option) => option.textContent === 'メッセージを送る'),
-    ) as HTMLSelectElement
-    const values = Array.from(actionSelect.querySelectorAll('option')).map((option) => option.textContent)
-    expect(values).toEqual(AUTOMATION_DRAFT_ACTION_OPTIONS.map((option) => option.label))
+    await clickButton(el, '行うことを足す')
+    const values = Array.from(document.querySelectorAll('[role="menuitem"]')).map(option => option.textContent)
+    // 既存の通知の保存は仕上げの実描画試験で保持する。新規の選び口では本文に化ける旧不具合へ戻さない。
+    expect(values).toEqual(AUTOMATION_DRAFT_ACTION_OPTIONS.filter(option => option.value !== 'notify_staff').map(option => option.label))
   })
 
   it('N3: シナリオ開始を選んで保存するとscenarioId付きで送る', async () => {
     const el = await mountPage()
-    const name = el.querySelector('#au-name') as HTMLInputElement
+    const name = el.querySelector('#v8-rule-name') as HTMLInputElement
     await typeText(name, '確認用ルール')
-    const actionSelect = Array.from(el.querySelectorAll('select')).find((select) =>
-      Array.from(select.querySelectorAll('option')).some((option) => option.textContent === 'メッセージを送る'),
-    ) as HTMLSelectElement
-    await chooseOption(actionSelect, 'start_scenario')
-    const scenarioSelect = el.querySelector('[aria-label="自動化で始めるシナリオ"]') as HTMLSelectElement
-    await chooseOption(scenarioSelect, 'scenario-1')
+    await act(async () => { el.querySelector<HTMLButtonElement>('[aria-label="1つ目の行うことのその他操作"]')!.click() })
+    await clickButton(document.body, '削除する')
+    await clickButton(document.body, '削除する')
+    await clickButton(el, '行うことを足す')
+    await clickButton(document.body, 'シナリオを始める')
+    const candidate = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]')).find(input => input.value === 'scenario-1')!
+    await act(async () => { candidate.click() })
+    await clickButton(document.body, '選ぶ')
     // #975 U073: 動かし始める前に確認ダイアログを挟む。
     await clickButton(el, 'つくって動かす')
     await act(async () => { await drainMicrotasks() })

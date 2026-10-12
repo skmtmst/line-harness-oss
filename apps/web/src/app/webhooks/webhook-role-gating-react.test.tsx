@@ -15,7 +15,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(query),
 }))
@@ -100,7 +100,7 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
       root.render(<WebhooksPage />)
     })
     await settle()
-    expect(host.textContent).toContain('＋ 送り先を作る')
+    expect(host.textContent).toContain('最初の送り先を作る')
     expect(host.textContent).not.toContain('送り先の作成は統括だけができます')
   })
 
@@ -110,8 +110,8 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
       root.render(<WebhooksPage />)
     })
     await settle()
-    expect(host.textContent).not.toContain('＋ 送り先を作る')
-    expect(host.textContent).toContain('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+    expect(host.textContent).not.toContain('最初の送り先を作る')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
   })
 
   it('管理者には受け取り口の作成を出さず、統括への依頼を案内する', async () => {
@@ -121,8 +121,8 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
       root.render(<WebhooksPage />)
     })
     await settle()
-    expect(host.textContent).not.toContain('＋ 受け取り口を作る')
-    expect(host.textContent).toContain('受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。')
+    expect(host.textContent).not.toContain('受け取り口を作る')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
   })
 
   it('受け取り口のURLはAPIの住所で組み立てる', async () => {
@@ -134,7 +134,9 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     await settle()
     const base = process.env.NEXT_PUBLIC_API_URL ?? ''
     expect(base).not.toBe('')
-    expect(host.textContent).toContain(`${base}/api/webhooks/incoming/iwh-1/receive`)
+    await act(async () => { (host.querySelector('button[aria-label^="受け取り口"]') as HTMLButtonElement).click() })
+    await settle()
+    expect(host.querySelector('[data-truncated-text][aria-label]')?.getAttribute('aria-label')).toBe(`${base}/api/webhooks/incoming/iwh-1/receive`)
   })
 
   it('統括には見本から作るを出す（受け取る・送るの両方）', async () => {
@@ -158,8 +160,8 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
 
   it('管理者には見本から作るを出さず、統括への依頼だけ出す', async () => {
     for (const [tabQuery, guidance] of [
-      ['', '送り先の作成は統括だけができます。必要なときは統括に頼んでください。'],
-      ['tab=incoming', '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。'],
+      ['', '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'],
+      ['tab=incoming', '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'],
     ] as const) {
       query = tabQuery
       staffRole = 'admin'
@@ -187,7 +189,7 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     })
     await settle()
     expect(host.textContent).toContain('この見本で作る')
-    expect(host.textContent).toContain('送り先を作る')
+    expect(host.querySelector('a[href^="/webhooks/new?event="]')).not.toBeNull()
   })
 
   it('管理者には見本タブの作成を出さず、統括への依頼だけ出す', async () => {
@@ -199,7 +201,7 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     await settle()
     expect(host.textContent).not.toContain('この見本で作る')
     expect(host.textContent).not.toContain('送り先を作る')
-    expect(host.textContent).toContain('受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。')
-    expect(host.textContent).toContain('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
   })
 })

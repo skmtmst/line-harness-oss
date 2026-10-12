@@ -7,7 +7,9 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import FriendAddDoneV8 from './done-v8'
+import FriendAddDoneV8 from '@/v8/friend-add-publish/done'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 /*
  * ★V8 友だち追加時の配信の有効化の完了（板 `e0FD1J`）の契約。

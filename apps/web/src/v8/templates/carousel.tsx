@@ -57,7 +57,7 @@ import InlineSettings from '@/components/shared/inline-settings'
  * 「カード N の中身」（画像・タイトル・本文・ボタン最大3つ）と案内の帯、絵に無い「押せる回数」は下に。
  * 右の列に「気をつけること」と「届き方」。下の帯はキャンセル・下書きを保存・保存して公開。
  * 読み込み・保存（作成だけ済んだあとのやり直しは作り直さない）・公開（使用先があれば確認の窓 cuR8I）・離れる確認は
- * 今の V8（app/templates/carousel/carousel-v8.tsx）と同じ。組み立てと保存は carousel-core の写し。
+ * 現役の組み立てと保存の正本は carousel-core。
  * ボタンの「動きを実行する」の中身は今の部品（InlineActionList）を窓で開いて決める。
  * ボタンの「押したら」（絵 JkLOF・2026-10-08）：URLを開く／テキストを送る／回答フォームを開く／予約ページを開く／予約履歴を開く／
  * 動きを実行する（店だけ）。回答フォーム・予約・予約履歴はそのアカウントの LIFF の URL を保存の時点で作る（LIFF の無いアカウントでは出さない）。
@@ -616,7 +616,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS} 枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={15} aria-hidden="true" />このカードを複製</Button>
                   <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>
                 </div>
-                <p className={own.info}><TriangleAlert className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
+                <p className={own.info} title="画像は横1024 × 縦678pxを推奨。本文はタイトルか画像があると60文字、両方なければ120文字までです。"><TriangleAlert className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
               </section>
             ) : null}
 

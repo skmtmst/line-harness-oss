@@ -4,12 +4,9 @@ import { hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { Window } from 'happy-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { adminThemeDefault, adminThemeLocked } from './admin-theme-default'
-import { ADMIN_THEME_CHANGED_EVENT } from './events'
 
 // テーマの関数と実際のページ入口は差し替えない。V7が選ばれたらその場で失敗する。
 vi.mock('@/v8/webinars/list', () => ({ default: () => <p data-screen="v8">ウェビナー</p> }))
-vi.mock('@/app/webinars/list-v8', () => ({ default: () => { throw new Error('旧画面が選ばれた') } }))
 vi.mock('next/font/google', () => ({ Inter: () => ({ variable: 'inter' }), Noto_Sans_JP: () => ({ variable: 'noto' }) }))
 vi.mock('@/components/app-shell', () => ({ default: ({ children }: { children: ReactNode }) => children }))
 vi.mock('@/components/client-error-reporter', () => ({ default: () => null }))
@@ -40,8 +37,6 @@ describe.each(['production', 'development'])('%sの画面はV8固定', (environm
     // 古い値の読み取り・更新通知がV7の入口を開かないことも確認する。
     document.documentElement.dataset.theme = 'v7'
     const storageRead = vi.spyOn(storage, 'getItem')
-    expect(adminThemeDefault()).toBe('v8')
-    expect(adminThemeLocked()).toBe(true)
     const page = renderToString(<WebinarsPage />)
     const layout = renderToString(<RootLayout><WebinarsPage /></RootLayout>)
     expect(page).toContain('data-screen="v8"')
@@ -58,7 +53,7 @@ describe.each(['production', 'development'])('%sの画面はV8固定', (environm
         root = hydrateRoot(container, <WebinarsPage />, { onRecoverableError: (error) => errors.push(error) })
       })
       await act(async () => {
-        window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
+        window.dispatchEvent(new Event('lh:admin-theme-changed'))
       })
       expect(errors).toEqual([])
       expect(container.querySelector('[data-screen="v8"]')).not.toBeNull()

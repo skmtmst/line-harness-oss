@@ -5,14 +5,17 @@
  * 内訳に再試行・配布URLは Worker の `/r/` で作ることを確かめる。
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 
 vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://worker.example.com')
 
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       list: async () => ({
@@ -55,7 +58,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const tabs = await import('./tabs')
+const tabs = await import('@/test-utils/affiliate-tabs')
 const { AffiliatorsTab } = tabs
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -76,19 +79,20 @@ describe('点検の器でも白画面にしない', () => {
   })
 
   test('内訳を開いても落ちず、動線は再試行になる', async () => {
-    render(<AffiliatorsTab accountId={null} />)
+    render(<AffiliatorsTab accountId="acc-1" />)
     await screen.findByText('候補A')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '候補Aの成果を見る' }))
+      fireEvent.click(within(screen.getByRole('row', { name: /候補A/ })).getByRole('button', { name: '成果を見る' }))
     })
     // 内訳のリンク表が出る（配布URLは Worker の /r/ で作られる）。
     await waitFor(() =>
-      expect(screen.queryByText('https://worker.example.com/r/CODE_A')).not.toBeNull(),
+      expect(screen.queryByTitle('https://worker.example.com/r/CODE_A')).not.toBeNull(),
     )
     // 動線は配列でないため失敗扱い＝再試行が出る。白画面ではない。
+    fireEvent.click(screen.getByRole('tab', { name: '友だち' }))
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /もう一度読み込む/ })).not.toBeNull(),
     )
-    expect(screen.queryByText('候補A')).not.toBeNull()
+    expect(screen.queryAllByText('候補A').length).toBeGreaterThan(0)
   })
 })

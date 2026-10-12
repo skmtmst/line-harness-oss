@@ -37,6 +37,7 @@ import {
 } from './dialogs'
 import {
   archiveBlockedReason,
+  capacityDetails,
   credentialLine,
   friendsLine,
   shortDateTime,
@@ -296,7 +297,7 @@ export default function AccountDetailV8() {
             <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-credentials">
               <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-inner-pad)" gap="var(--tpl-acd-card-gap)" className={styles.inner}>
                 <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
-                <Pair label="友だち数">{friendsLine(account)}</Pair>
+                <Pair label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Pair>
                 <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
                 <Pair label="国・地域">{account.country ?? emptyValue('unconfigured')}</Pair>
                 <Pair label="役割メモ">{account.role ?? emptyValue('unconfigured')}</Pair>

@@ -16,10 +16,10 @@ const calls = vi.hoisted(() => ({
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, api: { lineAccounts: calls, hqNotices: notices } }
+  return { ...actual, api: { lineAccounts: calls, hqNotices: notices, lineAccountTags: { list: async () => ({success:true,data:[]}) }, staff: { list: async () => ({success:true,data:[]}) } } }
 })
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
 
 const passedSteps = [
   'チャネルIDとシークレットでアクセストークンを発行',
@@ -42,9 +42,9 @@ const checked = {
   },
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.localStorage?.clear(); delete document.documentElement.dataset.theme })
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.clearAllMocks(); document.documentElement.dataset.theme='v8'
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
   calls.list.mockResolvedValue({ success: true, data: [] })
@@ -57,18 +57,19 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 async function enterSaveStep() {
   render(<NewLineAccountPage />)
   next()
-  fill('channel-id', '123456789')
-  fill('channel-secret', 'synthetic-secret')
-  fill('login-channel-id', '2007123456')
-  fill('login-channel-secret', 'synthetic-login-secret')
+  fill('v8-channel-id', '123456789')
+  fill('v8-channel-secret', 'synthetic-secret')
+  fill('v8-login-channel-id', '2007123456')
+  fill('v8-login-channel-secret', 'synthetic-login-secret')
   next()
   next()
   fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-  await screen.findByText('5段すべて通りました。保存できます。')
+  await screen.findByRole('dialog', { name: '接続を確かめた結果' })
+  fireEvent.click(screen.getByRole('checkbox', { name: /応答メッセージ.*オフ/ }))
 }
 
 async function save() {
-  fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
+  fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
 }
 
 describe('R523 保存の応答消失と重複（本物のReact）', () => {
