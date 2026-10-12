@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .timestamp {
   display: inline-flex;
   flex-wrap: wrap;
@@ -6,3 +8,4 @@
   max-width: 100%;
 }
 .timestamp > span { white-space: nowrap; }
+}
