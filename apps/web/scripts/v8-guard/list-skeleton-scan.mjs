@@ -42,6 +42,14 @@ export function scanListSkeleton() {
     for (const cell of root.querySelectorAll('[data-kpi-strip]:not([data-kpi-density="compact"]) > [data-design-version]')) {
       if (visible(cell) && !near(cell.getBoundingClientRect().height, 116)) fail('B-178 数の帯116', cell)
     }
+    for (const detail of root.querySelectorAll('[data-kpi-strip] [data-kpi-detail]')) {
+      const note = detail.querySelector('[role="note"]')
+      if (!note || !visible(note) || !note.textContent.trim()) continue
+      if (note.scrollWidth > note.clientWidth + 1 || note.scrollHeight > note.clientHeight + 1) fail('U6 数の補足の切れ', note)
+      for (const action of detail.querySelectorAll('a,button')) {
+        if (visible(action) && action.getBoundingClientRect().top < note.getBoundingClientRect().bottom - 1) fail('U6 数の行き先が同じ行', action)
+      }
+    }
     for (const toolbar of root.querySelectorAll('[data-list-toolbar]')) {
       if (!visible(toolbar)) {
         if (getComputedStyle(toolbar).display !== 'contents' && toolbar.dataset.toolbarLayout

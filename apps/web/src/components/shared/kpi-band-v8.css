@@ -78,17 +78,17 @@
   height: var(--tpl-band-compact-number-lh);
 }
 
-/* 補足の省略表示。空の段の有無は下のB-220で帯全体から決める。 */
-:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* U6/V3：補足は全文を折り返し、行き先は次の行。高さは帯の格子でそろう。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: column; align-items: flex-start; }
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child {
+  display: block; flex: none; width: 100%; white-space: normal;
+  overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: normal;
+}
 
 /* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
 :root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
   min-height: var(--tpl-list-band-h); box-sizing: border-box;
   padding: var(--tpl-list-band-pad); gap: var(--tpl-list-gap);
-}
-/* 長い説明は1行で省略する。KpiCardのtitleから全文を確かめられる。 */
-:root [data-list-skeleton] [data-kpi-strip]:not([data-kpi-density='compact']) [data-kpi-detail] > span {
-  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* B-220：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
