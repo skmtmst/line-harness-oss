@@ -64,7 +64,7 @@ describe('未利用の部品のトークン照合', () => {
 
 describe('固定HTMLとV8の選択状態の照合', () => {
   it('選ぶカードの通常1pxと選択2pxを別々に照合する', () => {
-    const css = '.card{outline:1px solid gray}[data-theme="v8"] .checked{outline:2px solid green}.checked:hover{outline:5px solid red}'
+    const css = '.card{outline:1px solid gray}:root .checked{outline:2px solid green}.checked:hover{outline:5px solid red}'
     const idle = v8EffectiveBody(css, 'card')
     const selected = v8EffectiveBody(css, ['card', 'checked'])
     expect(idle).toContain('outline:1px solid gray')
@@ -72,22 +72,22 @@ describe('固定HTMLとV8の選択状態の照合', () => {
     expect(selected).toContain('outline:2px solid green')
     expect(selected).not.toContain('5px')
   })
-  it('html上のV8指定を読み、親のある別状態と別テーマは読み込まない', () => {
-    const css = '.selected{color:black}html[data-theme="v8"] .selected{color:green}.parent html[data-theme="v8"] .selected{color:red}html[data-theme="v7"] .selected{color:blue}html .selected{color:purple}html[data-theme="v8"].selected{color:orange}'
-    const body = frozenSelectorBody(css, '[data-theme="v8"] .selected')
+  it('html:rootの指定を読み、親のある別状態と暗色状態は読み込まない', () => {
+    const css = '.selected{color:black}html:root .selected{color:green}.parent html:root .selected{color:red}html[data-mode="dark"] .selected{color:blue}html .selected{color:purple}html:root.selected{color:orange}'
+    const body = frozenSelectorBody(css, ':root .selected')
     expect(body).toContain('color:green')
     expect(body).not.toMatch(/red|blue|purple|orange/)
   })
 
-  it('合成した状態のV8指定をCSSの順番で読み、通常状態には混ぜない', () => {
-    const css = '.card{outline:1px solid gray}html[data-theme="v8"] .card.checked{outline:2px solid green}.checked:hover{outline:9px solid red}'
+  it('合成した状態の:root指定をCSSの順番で読み、通常状態には混ぜない', () => {
+    const css = '.card{outline:1px solid gray}html:root .card.checked{outline:2px solid green}.checked:hover{outline:9px solid red}'
     expect(v8EffectiveBody(css, ['card', 'checked'])).toContain('outline:2px solid green')
     expect(v8EffectiveBody(css, 'card')).not.toContain('2px solid green')
     expect(v8EffectiveBody(css, ['card', 'checked'])).not.toContain('red')
   })
 
   it('選択中の合成クラスを読み、hover・未選択・別テーマの色を混ぜない', () => {
-    const css = '.card{background:white}:root .checked{background:#e8f5ec}.checked:hover{background:black}[data-theme="v7"] .checked{background:blue}.parent .checked{background:red}'
+    const css = '.card{background:white}:root .checked{background:#e8f5ec}.checked:hover{background:black}[data-mode="dark"] .checked{background:blue}.parent .checked{background:red}'
     const body = frozenSelectorBody(css, '.card.checked')
     expect(body).toContain('background:#e8f5ec')
     expect(body).not.toMatch(/black|blue|red/)

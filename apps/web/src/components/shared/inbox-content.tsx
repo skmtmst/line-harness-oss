@@ -2,8 +2,8 @@ import type { HTMLAttributes, ImgHTMLAttributes, Ref } from 'react'
 import styles from './inbox-content.module.css'
 
 /** 会話の媒体・補助面。取得、再読込、保存、開閉は呼び出す画面が持つ。 */
-export function InboxMedia({ kind, ...props }: ImgHTMLAttributes<HTMLImageElement> & { kind: 'sticker' | 'image' | 'preview' }) {
-  return <img {...props} className={styles.media} data-kind={kind} />
+export function InboxMedia({ kind, alt, ...props }: ImgHTMLAttributes<HTMLImageElement> & { kind: 'sticker' | 'image' | 'preview'; alt: string }) {
+  return <img {...props} alt={alt} className={styles.media} data-kind={kind} />
 }
 export function InboxFlexContent(props: HTMLAttributes<HTMLDivElement>) {
   return <div {...props} className={styles.flexMedia} />

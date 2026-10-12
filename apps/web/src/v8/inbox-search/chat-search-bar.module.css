@@ -75,15 +75,3 @@
   width: var(--tpl-inbox-search-btn-icon);
   height: var(--tpl-inbox-search-btn-icon);
 }
-
-/*
- * 当たった吹き出し：いま見ている当たりは太い枠、ほかは薄い枠（大きさは変えない＝窓分けの高さが動かない）。
- * 吹き出しは受信箱の画面が描くので、会話の欄（hitScope）の中の data-search-hit の印で当てる。
- */
-:global([data-inbox-search-scope]) :global([data-search-hit='current']) {
-  box-shadow: var(--tpl-inbox-search-hit-current);
-}
-
-:global([data-inbox-search-scope]) :global([data-search-hit='other']) {
-  box-shadow: var(--tpl-inbox-search-hit-other);
-}

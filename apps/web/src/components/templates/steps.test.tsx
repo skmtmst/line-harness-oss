@@ -92,8 +92,8 @@ describe('手順（型の共通部品 Steps）', () => {
     vi.restoreAllMocks()
   })
 
-  it('見た目：丸24・数11・名13・線24×1.5・間8・丸と名8。折り返さず、狭いときは今の段以外の名を隠す', () => {
-    expect(globals).toMatch(/--tpl-steps-dot:\s*24px/)
+  it('見た目：丸22・数11・名13・線24×1.5・間8・丸と名8。折り返さず、狭いときは今の段以外の名を隠す', () => {
+    expect(globals).toMatch(/--tpl-steps-dot:\s*22px/)
     expect(globals).toMatch(/--tpl-steps-text-size:\s*var\(--polish-text-body\);/)
     expect(globals).toMatch(/--tpl-steps-num-size:\s*11px/)
     expect(globals).toMatch(/--tpl-steps-line-w:\s*24px/)

@@ -116,6 +116,9 @@
 :global(:root) .inboxList { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 :global(:root) .conversation { position: relative; min-height: 0; overflow: hidden; }
 :global(:root) .inboxMessages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
+/* 枠の強調で会話の高さを変えず、検索の移動位置を保つ。 */
+.inboxMessages :global([data-search-hit='current']) { box-shadow: var(--tpl-inbox-search-hit-current); }
+.inboxMessages :global([data-search-hit='other']) { box-shadow: var(--tpl-inbox-search-hit-other); }
 :global(:root) .inboxComposer { position: relative; z-index: 10; flex: none; padding: var(--tpl-inbox-composer-pad); border-top: 1px solid var(--color-hairline); background: var(--color-canvas); }
 :global(:root) .inboxSummaryPane { padding: var(--polish-space-section); width: var(--tpl-inbox-summary-width); max-width: 100%; flex: none; height: 100%; overflow: hidden; background: var(--color-canvas); border-left: 1px solid var(--color-hairline); }
 :global(:root) .inboxSummaryPane:not([data-wide]) { position: fixed; inset: 0 0 0 auto; z-index: 70; box-shadow: var(--shadow-overlay); }
