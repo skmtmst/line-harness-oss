@@ -1,4 +1,8 @@
-/** Measure the actual band, including expanded chips and the readable search minimum. */
+/** Measure the actual band, including expanded chips and the readable search minimum.
+ * @param {HTMLElement} toolbar
+ * @param {HTMLElement | null} [expandedItem]
+ * @param {number} [expandedWidth]
+ */
 export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0) {
   const flatten = element => getComputedStyle(element).display === 'contents'
     ? [...element.children].flatMap(flatten) : [element]
