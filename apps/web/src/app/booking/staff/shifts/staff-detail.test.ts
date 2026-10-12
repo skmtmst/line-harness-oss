@@ -65,12 +65,17 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).toContain("kind: 'break'")
   })
 
-  it('休憩は版付きで保存し、重なったら最新へ描き直す', () => {
+  it('休憩は版付きで保存し、409では入力を保持して本人が最新を読む', () => {
     expect(DETAIL).toContain('breaksVersion,')
     expect(DETAIL).toContain('breakDatesVersion,')
     expect(DETAIL).toContain('error.status === 409')
     expect(DETAIL).toContain('ほかの変更と重なりました')
-    expect(DETAIL).toContain('asBreakConflict(error.data)')
+    expect(DETAIL).toContain('breakSaveConflict.mark()')
+    expect(DETAIL).toContain('dateSaveConflict.mark()')
+    expect(DETAIL).toContain('入力はそのまま残しています')
+    expect(DETAIL).toContain('breakSaveConflict.reloadLatest()')
+    expect(DETAIL).toContain('dateSaveConflict.reloadLatest()')
+    expect(DETAIL).not.toContain('asBreakConflict(error.data)')
   })
 
   it('この日だけの休憩は日付ごとに持てる', () => {
