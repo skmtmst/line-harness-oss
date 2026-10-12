@@ -34,9 +34,9 @@ import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/compon
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu from '@/components/shared/context-menu'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -680,8 +680,8 @@ export default function WebhooksOutgoingV8() {
                       </FolderDotName>
 
                     </Td>
-                    <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
-                    <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
+                    <Td className={styles.colWhen}><TruncatedText value={when} /></Td>
+                    <Td className={styles.colPayload}><TruncatedText value={payload} /></Td>
                     <Td align="right" className={styles.colCount}>
                       <span className={styles.num}>{formatNumber(item.deliverySummary.total)} 回</span>
                       <span className={styles.numSub}>
@@ -696,32 +696,23 @@ export default function WebhooksOutgoingV8() {
                         ? <span className={styles.sub}>最終 {shortDateTime(completedAt)}</span>
                         : item.isActive && !toggling ? <span className={styles.sub}>まだ送っていません</span> : null}
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
                         {item.deliverySummary.canRetry && canManage
-                          ? <Button href="/webhooks?tab=interactions">やり直す</Button>
-                          : <Button href="/webhooks?tab=interactions">中身を見る</Button>}
+                          ? <Button size="compact" href="/webhooks?tab=interactions">やり直す</Button>
+                          : <Button size="compact" href="/webhooks?tab=interactions">中身を見る</Button>}
                         {showMenu ? (
-                          <>
-                            <Button
-                              aria-haspopup="menu"
-                              aria-expanded={menuId === item.id}
-                              aria-label={`「${item.name}」の設定`}
-                              onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                            >
-                              設定
-                            </Button>
-                            <ActionMenu
-                              open={menuId === item.id}
-                              onClose={() => setMenuId(null)}
-                              ariaLabel={`「${item.name}」の設定`}
-                              items={menuItems}
-                              note={canManage ? undefined : MANAGE_REASON}
-                            />
-                          </>
+                          <RowMenu
+                            label={`「${item.name}」の設定`}
+                            title="設定"
+                            open={menuId === item.id}
+                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                            items={menuItems}
+                            note={canManage ? undefined : MANAGE_REASON}
+                          />
                         ) : null}
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
