@@ -3,9 +3,24 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CreatePage, DetailColumns, ListPage, SettingsPage } from './index'
 import { useState } from 'react'
+import { PageFrame } from './page-frame'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('一覧の高さは本文で決まり、単独の板と明示した画面高さを保つ', () => {
+    const { container, rerender } = render(<ListPage title="一覧">少ない行</ListPage>)
+    const frame = () => container.querySelector('[data-page-template]')!
+    expect(frame().getAttribute('data-frame-height')).toBe('content')
+    rerender(<ListPage title="一覧">{Array.from({ length: 20 }, (_, i) => <p key={i}>行{i}</p>)}</ListPage>)
+    expect(frame().getAttribute('data-frame-height')).toBe('content')
+    expect(container.querySelectorAll('p')).toHaveLength(20)
+    rerender(<ListPage title="一覧" heightMode="viewport">本文</ListPage>)
+    expect(frame().getAttribute('data-frame-height')).toBe('viewport')
+    rerender(<ListPage title="一覧" standalone>小窓</ListPage>)
+    expect(frame().hasAttribute('data-frame-height')).toBe(false)
+    rerender(<PageFrame kind="create">入力</PageFrame>)
+    expect(frame().hasAttribute('data-frame-height')).toBe(false)
+  })
   it('畳んだ詳細欄を開閉でき、検索欄の入力を保持する', () => {
     function Example() {
       const [expanded, setExpanded] = useState(false)
