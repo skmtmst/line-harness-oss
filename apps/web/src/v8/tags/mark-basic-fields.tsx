@@ -1,5 +1,6 @@
 'use client'
 import Card from '@/components/shared/card'
+import { markNameRequirement } from './mark-requirement'
 import type { Ref } from 'react'
 import { TextField } from '@/components/shared/text-field'
 import { DuplicateNameNote } from '@/components/friend-fields/attribute-kind-guide'
@@ -20,8 +21,8 @@ export default function MarkBasicFields({ name, color, onName, onColor, nameDupl
   return (
             <Card variant="form" gap="normal" aria-labelledby="mark-basic">
               <div className={styles.cardHead}><h2 className={styles.cardTitle} id="mark-basic">基本</h2></div>
-              <Field label="マーク名"><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} className={styles.input} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
-{error ? <p role="alert" className={styles.fieldError}>{error}</p> : null}
+              <Field label="マーク名" requirement={markNameRequirement} error={error}><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} className={styles.input} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
+
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" /></Field>
               <div className={styles.colorField} role="group" aria-labelledby="mark-color">
                 <span className={styles.labelStrong} id="mark-color">色</span>

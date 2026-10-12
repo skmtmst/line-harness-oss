@@ -285,8 +285,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
    * 別の面なら その面を選んでから移る。面の一覧には直す欄の数の赤い丸。
    */
   const fields = useFormErrors()
-  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'リッチメッセージ名を入力してください'))
-  fields.define('image', '画像', () => (hqHost ? (uploaded ? null : '画像を選んでください') : imageUrl.trim() ? null : '画像を設定してください'))
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'リッチメッセージ名を入力してください'), { required: true })
+  fields.define('image', '画像', () => (hqHost ? (uploaded ? null : '画像を選んでください') : imageUrl.trim() ? null : '画像を設定してください'), { required: true })
   shapeDef.areas.forEach((area) => {
     fields.define(`area-${area.label}`, `面 ${area.label} の押したら`, () => {
       const draft = areas[area.label]
@@ -481,7 +481,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
           <div className={styles.pair}>
-            <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
+            <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError></Field></div>
             <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-rich-folder"><SaveErrorField names={["folder","host.folder"]}><FolderSelect
                 id="te-rich-folder"

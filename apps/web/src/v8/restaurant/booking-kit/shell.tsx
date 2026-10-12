@@ -112,12 +112,13 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, children }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
   /** 説明の行。店舗によって変わるとき（休業日・貸切の「然-NEN 本店 ・ 総数 26席」）は ctx から作る関数を渡す。 */
   description: string | ((ctx: RestaurantV8Context | null) => string)
+  explanation?: ReactNode
   query?: ReservationQuery
   /**
    * 板の頭の右に置く物（予約台帳の見方の切り替え・主ボタンなど）。店舗を選ぶ欄は2つ目の引数で渡すので、
@@ -240,12 +241,12 @@ export default function RestaurantShell({ boardId, title, description, query, he
         inset="none"
         title={title}
         subtitle={typeof description === 'function' ? description(ctx) : ctx?.store?.name}
-        help={typeof description === 'function' ? '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}
+        help={<>{typeof description === 'function' ? '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}{explanation ? <p>{explanation}</p> : null}</>}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <PageHeading inset={headingInset} title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
+          <PageHeading inset={headingInset} title={title} help={typeof description === 'function' ? description(ctx) : description} explanation={explanation} />
 
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}

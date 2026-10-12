@@ -4,7 +4,7 @@ import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「サクサク感」。
  * A: 候補の読み込み中は目に見える「読み込み中…」を置かず、骨組みの入れ物が読み込み中と伝える。
- * B: 保存ボタンは押した直後にボタンの中だけ「保存中…」へ変わり（busy）、画面を止めない。
+ * B: 保存ボタンは押した直後にボタンの中だけ「保存しています…」へ変わり（busy）、画面を止めない。
  */
 import React from 'react'
 import { act } from 'react'
@@ -134,7 +134,7 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     expect(options.map((o) => o.textContent)).toEqual(['付けるタグ：予約中', '付けるタグ：常連さん'])
   })
 
-  test('保存を押すとボタンの内側だけ「保存中…」になり成功したら一覧へ戻る', async () => {
+  test('保存を押すとボタンの内側だけ「保存しています…」になり成功したら一覧へ戻る', async () => {
     const gate = deferred<unknown>()
     fixture.createMenu = vi.fn(() => gate.promise)
     render(<NewBookingMenuPage />)
@@ -145,7 +145,7 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
 
     // ボタンの内側だけ保存中に変わり、画面は止めない（入力欄は触れるまま）。
-    const savingButton = await screen.findByRole('button', { name: '保存中…' })
+    const savingButton = await screen.findByRole('button', { name: '保存しています…' })
     expect(savingButton.getAttribute('aria-busy')).toBe('true')
     expect(screen.getByPlaceholderText("例：トリミング（小型犬）")).toBeTruthy()
 

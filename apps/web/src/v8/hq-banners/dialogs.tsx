@@ -1,4 +1,6 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+const projectNameRequirement = requiredText('プロジェクト名を入力してください')
 
 import { Archive, Plus, Upload } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
@@ -56,7 +58,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
 
   const submit = () => {
     const trimmed = name.trim()
-    if (!trimmed) return setLocalError('プロジェクト名を入力してください')
+    if (projectNameRequirement.check(name)) return setLocalError(projectNameRequirement.check(name)!)
     if (trimmed.length > 100) return setLocalError('プロジェクト名は100文字以内で入力してください')
     setLocalError('')
     onSubmit({ name: trimmed, description: description.trim() })
@@ -76,14 +78,14 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
           <>
             <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
             {/* W7Z57: 名前が空のまま作らせない。 */}
-            <Button variant="primary" onClick={submit} disabled={busy || name.trim() === ''} busy={busy} busyLabel="保存しています…">
+            <Button variant="primary" onClick={submit} disabled={busy || Boolean(projectNameRequirement.check(name))} busy={busy} busyLabel="保存しています…">
               {project ? '変更を保存' : <><Plus aria-hidden="true" className={styles.icon} />作って開く</>}
             </Button>
         </>
       )}
     >
         <form className={styles.form} onSubmit={(event) => { event.preventDefault(); submit() }}>
-          <div className={styles.field}><Field label="プロジェクト名" htmlFor={`${uid}-name`}><SaveErrorField names={["name"]}><TextField
+          <div className={styles.field}><Field label="プロジェクト名" htmlFor={`${uid}-name`} requirement={projectNameRequirement} error={localError || undefined}><SaveErrorField names={["name"]}><TextField
               id={`${uid}-name`}
               value={name}
               maxLength={100}

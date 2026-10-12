@@ -386,7 +386,7 @@ export default function FeatureSettingsScreen() {
     <SbSettingsScreen
       boardId="ywFJT"
       title={TITLE}
-      help={DESCRIPTION}
+      explanation={<>{DESCRIPTION}<div>公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。</div></>}
       saveActions={ready && canManage ? (
         <>
           <Button
@@ -425,7 +425,7 @@ export default function FeatureSettingsScreen() {
       {!canManage && (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}
-      <Notice tone="info">公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。</Notice>
+
 
       {!selectedAccountId ? (
         <p className={styles.stateBox}>先に上部でLINEアカウントを選んでください。</p>

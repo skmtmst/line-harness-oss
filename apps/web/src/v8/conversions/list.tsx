@@ -806,7 +806,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   })
 
   const rowMenuItems = (point: ConversionDefinitionListItem): ActionMenuItem[] => [
-    { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+    { id: 'detail', label: "成果地点の詳細を見る", onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
       { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(point) },
@@ -881,33 +881,16 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div>
-      <Notice tone="info">成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。</Notice>
-    </div>
+    null
   )
   const searchBox = (
     <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="成果地点の名前で探す" aria-label="成果地点の名前で探す" />
   )
   /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {notice}
-      <ListToolbarRow>
-        {createInRow}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
-      </ListToolbarRow>
-      <ListToolbarRow>
-        <div className={styles.narrowChips}>{filterChips}</div>
-        <span className={styles.spacer} aria-hidden="true" />
-        <ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>
-        {perPageBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
   const wideToolbar = (
-    <div className={styles.wideTools}>
-      {notice}
+    <div className={`${styles.wideTools} ${role !== null && !canEdit ? styles.viewerTools : ''}`}>
+
       <ListToolbar
         search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 160, value: query, onChange: setQuery }}
         filters={filterChips}
@@ -933,7 +916,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
             disabled: ingestBusy !== '', onSelect: () => void toggleIngest(panelPoint),
           }] : []),
-          { id: 'events', label: '中身を見る', onSelect: () => setDetailTarget(panelPoint) },
+          { id: 'events', label: "成果地点の詳細を見る", onSelect: () => setDetailTarget(panelPoint) },
           { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
         ]} />
       </div>
@@ -991,6 +974,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
             : '利用先と影響を読み込めませんでした。'}
       </p>
+      <p>止めると、使っている配信・流入リンク・アフィリエイトでも、この成果地点では数えなくなります。</p>
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
           variant="row"
@@ -1196,9 +1180,9 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
-      help={canEdit
+      explanation={<>{canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}<div>成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。</div></>}
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
@@ -1276,8 +1260,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           unfiledCount={folderState.unfiledCount}
           error={folderState.error}
         />}
-      collapsedFolders={narrow ? undefined : <>{createInRow}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={<>{createInRow}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={pager}
       overlays={<>
         {folderMove.overlays}

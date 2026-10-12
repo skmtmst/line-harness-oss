@@ -295,7 +295,7 @@ export default function EventsListV8() {
   })
 
   const rowMenuItems = (e: EventListItem): ActionMenuItem[] => [
-    { id: 'detail', label: '中身を見る', onSelect: () => router.push(`/events/edit?id=${e.id}`) },
+    { id: 'detail', label: "イベントの設定を見る", onSelect: () => router.push(`/events/edit?id=${e.id}`) },
     { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
     { id: 'change', label: '日時・定員を変える', onSelect: () => router.push(`/events/change-review?id=${e.id}`) },
     { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
@@ -377,9 +377,7 @@ export default function EventsListV8() {
   const savedValue = filter === 'full' ? 'full' : sort === 'name' ? 'sort-name' : ''
   const toolbar = (
     <>
-      <div className={styles.noticeRow}>
-        <Notice tone="info">定員に達すると、お客さまの画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。</Notice>
-      </div>
+
       <ListToolbar
         search={{
           placeholder: 'イベント名で探す',
@@ -666,9 +664,10 @@ export default function EventsListV8() {
       headingSize="regular"
       title="イベント予約"
       layout="event-list"
-      help={<>
+      explanation={<>
         教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。
         {dataReady && kpi.nearest_low_starts_at ? <p>申し込みが少ないのは{jstDay(kpi.nearest_low_starts_at)}の回。あと{daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')}日です。</p> : null}
+        <div>定員に達すると、お客さまの画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。</div>
       </>}
       folderWidth={200}
 

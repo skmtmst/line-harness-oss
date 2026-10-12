@@ -177,7 +177,7 @@ export default function HealthV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="健康日記"
-      help="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
+      explanation={<>{"お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"}<div>{"「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。"}</div></>}
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
           <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
@@ -295,9 +295,7 @@ function HealthListV8({
 
   return (
     <>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。" />
-      </div>
+
 
       <ListToolbarRow data-design="ListControls">
         <ListToolbarSearchSlot>

@@ -428,7 +428,7 @@ export default function AutomationRunsV8() {
 
   /* 行の「…」：中身を見る・もう一度やる（やり直せる失敗のとき）・ルールを開く・トークを開く。 */
   const rowMenuItems = (run: AutomationRunRow): ActionMenuItem[] => [
-    { id: 'open', label: '中身を見る', onSelect: () => setSelectedRun(run) },
+    { id: 'open', label: "実行の記録を見る", onSelect: () => setSelectedRun(run) },
     ...(canOperate && run.canRetry
       ? [{ id: 'retry', label: 'もう一度やる', disabled: retryingId !== null, onSelect: () => void retryRun(run) }]
       : []),
@@ -472,9 +472,6 @@ export default function AutomationRunsV8() {
   )
   const toolbar = (
     <>
-      <div className={styles.noticeRow}>
-        <Notice tone="info">「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。</Notice>
-      </div>
       {canExport && data && data.pagination.total > 5000 ? (
         <div className={styles.noticeRow}><Notice tone="warn">CSVは5,000件までしか出ません。期間や絞り込みで分けて出してください。</Notice></div>
       ) : null}
@@ -589,7 +586,7 @@ export default function AutomationRunsV8() {
 
   return (
     <ListPage
-      help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
+      explanation={<>{<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}<div>「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。</div></>}
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"

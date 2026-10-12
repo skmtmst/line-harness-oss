@@ -1098,36 +1098,12 @@ export default function ScenariosListV8() {
    * 1152 の板（wjfLe）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {noteBand}
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で探す"
-            value={nameQuery}
-            onChange={(value) => setNameQuery(clampSearchQuery(value))}
-            onClear={() => setNameQuery('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {savedBox}
-      </ListToolbarRow>
-      {filteredCount}
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <>
       {/* 案内の帯は表の上の主列に置く（板 axFrW）。toolbar 枠の先頭で一行を取る。 */}
-      <div className={styles.noteRow}>{noteBand}</div>
+      <div className={styles.noteRow}></div>
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
@@ -1324,8 +1300,8 @@ export default function ScenariosListV8() {
         <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
         {folderPanel}
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={<>{createButton(false)}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={listPager}
     >
       {actionError ? (

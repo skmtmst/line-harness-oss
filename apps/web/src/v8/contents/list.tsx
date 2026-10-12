@@ -1160,7 +1160,7 @@ export default function MediaLibraryListV8() {
       toolbarRowGap="card"
       headingSize="regular"
       title="登録メディア一覧"
-      help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
+      explanation={<>{"配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"}<div>使っているメディアは消せません。いらなくなったら「アーカイブ」にすると一覧と新規選択から外れます（使っている場所や過去の配信はそのまま動きます）。</div></>}
       tabs={!canManageMedia ? (
         <div className={styles.roBand}><ReadOnlyNotice role="note">{`閲覧のみで見ています。${managementPermissionReason}。`}</ReadOnlyNotice></div>
       ) : undefined}
@@ -1221,7 +1221,7 @@ export default function MediaLibraryListV8() {
       toolbar={(
         <>
           <div className={styles.noticeRow}>
-            <Notice tone="info">使っているメディアは消せません。いらなくなったら「アーカイブ」にすると一覧と新規選択から外れます（使っている場所や過去の配信はそのまま動きます）。</Notice>
+
             {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
             {!error && selectedAccountId ? <FileScanStoppedBanner accountId={selectedAccountId} /> : null}
             {/* 容量は数の帯に出す。案内は 80% を超えたとき・満杯・読めなかったときだけ（いつも出すと道具の段を押し下げる）。 */}

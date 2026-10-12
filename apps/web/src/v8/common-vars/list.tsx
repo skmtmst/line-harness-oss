@@ -52,11 +52,11 @@ import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-
 import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
 import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
-import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
+import { reasonRequirement, typedKeyRequirement, blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
+import { Field, RequiredBadge } from '@/components/shared/form-controls';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
@@ -411,7 +411,7 @@ function CommonVarsListInner() {
   const applyStatus = async () => {
     if (!statusTarget || !selectedAccountId || statusBusy) return
     const reason = statusReason.trim()
-    if (!reason) {
+    if (reasonRequirement.check(reason)) {
       setStatusError(statusAction === 'stop' ? '止める理由を入力してください' : '再開する理由を入力してください')
       return
     }
@@ -596,7 +596,7 @@ function CommonVarsListInner() {
 
   const confirmReplacement = async () => {
     if (!deleteTarget || !selectedAccountId || !replacementImpact?.canReplace || deleteBusy) return
-    if (!deleteReason.trim()) {
+    if (reasonRequirement.check(deleteReason)) {
       setDeleteError('消した理由を入力してください。')
       return
     }
@@ -684,7 +684,7 @@ function CommonVarsListInner() {
   /** 「消さずに止める」を選んだとき。理由を止める理由として使う。 */
   const confirmStopInstead = async () => {
     if (!deleteTarget || !selectedAccountId || deleteBusy) return
-    if (!deleteReason.trim()) {
+    if (reasonRequirement.check(deleteReason)) {
       setDeleteError('止める理由を入力してください。')
       return
     }
@@ -842,7 +842,7 @@ function CommonVarsListInner() {
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
-    if (!batchReason.trim()) {
+    if (reasonRequirement.check(batchReason)) {
       setDeleteBatchError('消した理由を入力してください。')
       return
     }
@@ -1014,69 +1014,7 @@ function CommonVarsListInner() {
    * 1152 の板（`XIzkJ`）：1段目「作る・フォルダ・探す … 件数」、2段目「札」。
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>
-          <SaveErrorField names={["folderFilter","folderId","activeId","folder_filter"]}><Select
-            aria-label="フォルダ"
-            value={folderFilter}
-            onChange={(value) => setFolderFilter(value)}
-            options={folderOptions}
-          /></SaveErrorField>
-        </div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            aria-label="共通情報を検索"
-            placeholder="名前・差し込み名・中身"
-            value={query}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </ListToolbarSearchSlot>
-        {canWrite ? (
-          <>
-            <IconButton
-              title="フォルダの操作"
-              aria-label="フォルダの操作"
-              aria-haspopup="menu"
-              aria-expanded={folderMenuOpen}
-              onClick={(event) => {
-                folderMenuAnchorRef.current = event.currentTarget
-                setFolderMenuOpen((open) => !open)
-              }}
-            >
-              <FolderCog size={15} aria-hidden="true" />
-            </IconButton>
-            <ActionMenu
-              open={folderMenuOpen}
-              onClose={() => setFolderMenuOpen(false)}
-              anchorRef={folderMenuAnchorRef}
-              ariaLabel="フォルダの操作"
-              items={[
-                { id: 'add', label: 'フォルダを追加する', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startAdd() } },
-                ...(selectedUserFolder ? [
-                  { id: 'rename', label: 'フォルダ名を変える', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startEdit(selectedUserFolder) } },
-                  {
-                    id: 'delete',
-                    label: 'フォルダを削除する',
-                    tone: 'danger' as const,
-                    dividerBefore: true,
-                    onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startDelete(selectedUserFolder) },
-                  },
-                ] : []),
-              ]}
-            />
-          </>
-        ) : null}
-        <span className={styles.spacer} aria-hidden="true" />
-        {orderBox}
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>{filterChips}</ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1390,7 +1328,7 @@ function CommonVarsListInner() {
             ) : null}
             <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
-              </span></>}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
+              </span></>} requirement={reasonRequirement} error={statusError && reasonRequirement.check(statusReason)}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
@@ -1431,14 +1369,15 @@ function CommonVarsListInner() {
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              <SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+              <span>{reasonRequirement.required ? <RequiredBadge /> : null}<SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                aria-required={reasonRequirement.required}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
                 placeholder="理由（必須・記録に残ります）"
                 aria-label="消した理由・止める理由（記録に残ります）"
                 title="消した理由・止める理由（記録に残ります）"
                 className={styles.footerReason}
-              /></SaveErrorField>
+              /></SaveErrorField></span>
             ) : <span aria-hidden="true" />}
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
@@ -1629,7 +1568,7 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                <Field label="消した理由（記録に残ります）"><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                <Field label="消した理由（記録に残ります）" requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
@@ -1638,7 +1577,7 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                  <Field label="削除する場合は、差し込みキーを入力してください"><SaveErrorField names={["typedKey","typed_key"]}><input
+                  <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
@@ -1681,7 +1620,7 @@ function CommonVarsListInner() {
           setDeleteTargets([])
         }}
       >
-        <Field label="消した理由" required><SaveErrorField names={["batchReason","batch_reason"]}><input
+        <Field label="消した理由" requirement={reasonRequirement}><SaveErrorField names={["batchReason","batch_reason"]}><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
@@ -1842,11 +1781,11 @@ function CommonVarsListInner() {
         </KpiBand>
       }
       /* 1281〜1339 の幅は板が狭いのに 1152 用の道具の段にならない。そこだけ型が作る・フォルダを出す。 */
-      folderNav={narrow ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
         {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}
-        {narrow ? narrowToolbar : wideToolbar}
+        {wideToolbar}
       </>}
       pagination={listPager}
       overlays={overlays}

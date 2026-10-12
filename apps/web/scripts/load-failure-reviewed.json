@@ -418,5 +418,26 @@
     "disposition": "local-parser",
     "count": 3,
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/booking-menus/tabs/rules-tab.tsx",
+    "fingerprint": "4bd275c577deb09e",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "B-246：失敗は保存の知らせへ表示。空配列は完了した工程の記録で、取得データを空にしていない。"
+  },
+  {
+    "filename": "src/v8/events/create.tsx",
+    "fingerprint": "47b07634760657e8",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "B-246：空配列は保存済み・残りの工程の記録。入力・作成済みの枠を保ち、版を読み直して残りを保存する。失敗はSaveFeedbackと欄の理由で表示。"
+  },
+  {
+    "filename": "src/v8/mileage/reward-edit.tsx",
+    "fingerprint": "ece61e18739dc61f",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "B-246：失敗は保存の知らせへ表示。空配列は完了した工程の記録で、取得データを空にしていない。"
   }
 ]

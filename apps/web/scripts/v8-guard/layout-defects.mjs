@@ -15,11 +15,12 @@ import scanOwnerRules from './owner-rules-browser.mjs'
 import scanPanelBlank from './panel-blank-browser.mjs'
 import scanBlankGap from './blank-gap-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
+import scanB244Rules from './b244-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
 export const keyOf = f => JSON.stringify([f.kind, f.target, f.other || '', f.text])
-const KINDS = ['control-overlap', 'control-blocked', 'liffshadow','liffradio','canvasbottom','kpiblank','kpialign','cardspill','cardbottom','segempty','segselected','segstyle','choice-radio','choice-color','pageredge','rowmenu','bandtouch','customer-edit','insertoutside','insertlegacy','internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname']
+const KINDS = ['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'control-overlap', 'control-blocked', 'liffshadow','liffradio','canvasbottom','kpiblank','kpialign','cardspill','cardbottom','segempty','segselected','segstyle','choice-radio','choice-color','pageredge','rowmenu','bandtouch','customer-edit','insertoutside','insertlegacy','internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname']
 export function validateAllowances(allowances) {
   if (!Array.isArray(allowances)) throw new Error('許可リストは配列です')
   const keys = new Set()
@@ -74,7 +75,7 @@ export function assessAgainstBase(findings, baseFindings, route, width, allowanc
   })
   // 固定の許可の上限を変えない。同じ項目の件数を二重に足すこともない。
   const fixedKeys = new Set(allowances.filter(a => a.route === route && a.width === width).map(keyOf))
-  const baseline = record(baseFindings, route, width, '統合先で同じ検出器が確認した既存箇所')
+  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
     .filter(a => !fixedKeys.has(keyOf(a)))
   const baseKeys = new Set(baseline.map(keyOf))
   const result = assess(findings, route, width, [...allowances, ...baseline])
@@ -108,7 +109,7 @@ export async function measurePage(page) {
       extra.push({kind:'blank-kpi',target:b.sel.replace(/__[\w-]+/g,''),text:'数の帯の全マスが高い',measure:{minExcess:Math.min(...b.cardH.map((h,i)=>h-b.contentH[i]-16)),maxExcess:Math.max(...b.cardH.map((h,i)=>h-b.contentH[i]-16))}})
   }
   for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
-  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap)]
+  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanB244Rules)]
   return await page.evaluate(identifyStableTargets, findings)
 }
 async function measureRoute(browser, baseUrl, route, width) {

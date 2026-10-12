@@ -4,7 +4,7 @@ import type { StaffMember } from '@line-crm/shared'
 /*
  * 担当スタッフ一覧の「サクサク感」（V8 のときだけ）。
  * A: 読み込み中は目に見える「読み込み中」の文字を置かず、表の形の骨組みで待つ。
- * B: 編集窓の保存ボタンは押した直後に内側だけ「保存中…」へ変わる。
+ * B: 編集窓の保存ボタンは押した直後に内側だけ「保存しています…」へ変わる。
  * v7 は従来の見た目のまま（この試験では触らない）。
  */
 import React from 'react'
@@ -104,7 +104,7 @@ describe('担当一覧（V8）の読み込みと保存ボタン', () => {
     fireEvent.change(screen.getByPlaceholderText('顧客に表示される名前'), { target: { value: '佐藤' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
 
-    expect(await screen.findByRole('button', { name: '保存中…' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '保存しています…' })).toBeTruthy()
 
     await act(async () => { gate.resolve({ ok: true }) })
     await waitFor(() => { expect(fixture.createStaff).toHaveBeenCalled() })

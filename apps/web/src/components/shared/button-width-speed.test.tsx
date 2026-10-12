@@ -40,7 +40,7 @@ describe('保存中・完了のボタン幅', () => {
     expect(button.style.width).toBe('121px')
     rerender(<Button busy done={false}>機能設定を保存</Button>)
     expect(button.disabled).toBe(true)
-    expect(button.textContent).toBe('保存中…')
+    expect(button.textContent).toBe('保存しています…')
     expect(button.style.minWidth).toBe('100px')
   })
 })

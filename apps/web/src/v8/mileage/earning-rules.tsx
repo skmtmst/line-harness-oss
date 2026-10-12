@@ -696,9 +696,7 @@ export default function EarningRulesTab() {
 
   const notices = (
     <>
-      <div className={styles.fullRow}>
-        <Notice tone="info">決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。</Notice>
-      </div>
+
       {actionError ? <div className={styles.fullRow}><Notice tone="danger" message={actionError} /></div> : null}
       {menuNotice ? <div className={styles.fullRow}><Notice tone="success" message={menuNotice} /></div> : null}
       {orderDirty && !readonly ? (
@@ -911,7 +909,7 @@ export default function EarningRulesTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
+      explanation={<>{"行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"}<div>決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。</div></>}
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す

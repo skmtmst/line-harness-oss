@@ -156,7 +156,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     href: _href,
     type = 'button',
     busy,
-    busyLabel = '保存中…',
+    busyLabel = '保存しています…',
     done,
     doneLabel = '保存しました',
     widthReserve = 'states',

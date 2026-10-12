@@ -522,3 +522,7 @@ shared-button-importer v8/settings/customer-look/screen.tsx
 shared-button-importer components/shared/selection-button.tsx
 
 shared-button-importer components/shared/inbox-composer.tsx
+# B-244〜B-247: 新しい共通の知らせの持ち主
+shared-button-importer components/shared/aggregation-status.tsx
+shared-button-importer components/shared/friend-filter-band.tsx
+shared-button-importer components/shared/save-feedback.tsx
