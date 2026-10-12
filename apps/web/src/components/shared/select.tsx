@@ -50,7 +50,7 @@ export interface SelectProps {
   name?: string
   onChange: (value: string) => void
   options: SelectOption[]
-  size?: 'standard' | 'page-size' | 'full'
+  size?: 'standard' | 'page-size' | 'full' | 'content'
   value: string
   /**
    * 箱の幅（px）。渡すと size の幅を上書きする
@@ -335,8 +335,8 @@ export default function Select({
           </span>
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
-        <span className={styles.value} title={selected?.label ?? undefined}>
-          {label ? `${label}：${selected?.label ?? ''}` : selected?.label ?? ''}
+        <span className={styles.value} data-select-value title={selected?.label ?? undefined}>
+          {label ? `${label}：${selected ? heads.labelOf(selected) : ''}` : selected?.label ?? ''}
         </span>
         {showChevron && !iconOnly && (open ? (
           <ChevronUp className={styles.chevron} aria-hidden="true" />

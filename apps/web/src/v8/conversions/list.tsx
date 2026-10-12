@@ -856,9 +856,9 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     </div>
   )
   const sortBox = (
-    <div className={styles.sortBox}>
+    <>
       <SortSelect value={sort} onChange={(value) => setSort(value as PointSort)} options={SORT_OPTIONS} label="並び：" />
-    </div>
+    </>
   )
   const savedBox = (
     <div className={styles.savedBox}>

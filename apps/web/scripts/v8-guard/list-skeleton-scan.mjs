@@ -52,6 +52,11 @@ export function scanListSkeleton() {
         const available = input.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
         if (context.measureText(input.placeholder).width > available + 1) fail('B-191 探す欄の見本文字切れ', input)
       }
+      for (const value of toolbar.querySelectorAll('[data-select-value]')) {
+        if (!visible(value)) continue
+        const range = document.createRange(); range.selectNodeContents(value)
+        if (range.getBoundingClientRect().width > value.clientWidth + 1) fail('B-191 選ぶ欄の文字切れ', value)
+      }
       for (const tool of toolbar.querySelectorAll('input, button, [role="combobox"]')) {
         if (visible(tool) && !tool.closest('[role="menu"], [role="dialog"], details[open]') && (tool.getBoundingClientRect().right > toolbar.getBoundingClientRect().right + 1 || tool.getBoundingClientRect().left < toolbar.getBoundingClientRect().left - 1)) fail('B-178 道具のはみ出し', tool)
       }

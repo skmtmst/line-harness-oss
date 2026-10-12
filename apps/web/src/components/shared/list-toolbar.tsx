@@ -1,11 +1,12 @@
 'use client'
 import type React from 'react'
 
-import { Fragment, Children, isValidElement, cloneElement, useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
+import { Children, isValidElement, cloneElement, useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
 import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import styles from './list-toolbar.module.css'
+import { toolbarContentFit } from './list-toolbar-fit.mjs'
 
 export type ListToolbarSearch = {
   placeholder: string
@@ -70,7 +71,7 @@ export default function ListToolbar({
 }) {
   return (
     <div className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
-      <div className={styles.row1} data-toolbar-tools>
+      <div className={styles.row1} data-toolbar-tools data-toolbar-row>
         {search ? <div className={styles.search} data-toolbar-search><SearchField
           placeholder={search.placeholder}
           aria-label={search.label ?? search.placeholder}
@@ -83,7 +84,7 @@ export default function ListToolbar({
         {actions}
       </div>
       {filters || trailing || sort ? (
-        <div className={styles.row2}>
+        <div className={styles.row2} data-toolbar-row>
           {filters ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}</div> : null}
           {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{trailing}</div> : null}
         </div>
@@ -99,7 +100,7 @@ export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAt
 }
 
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {
-  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools>{compactFilterGroups(children)}</Tag>
+  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools data-toolbar-row>{compactFilterGroups(children)}</Tag>
 }
 
 export function ListToolbarSearchSlot({ children, width }: { children: ReactNode; width?: number }) {
@@ -114,31 +115,22 @@ export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanEl
 export function ListToolbarOptional({ children, label = 'ほかの絞り込み', compact = false }: { children: ReactNode; label?: string; compact?: boolean }) {
   const ref = useRef<HTMLDetailsElement>(null)
   const expandedWidthRef = useRef(0)
-  const [collapsed, setCollapsed] = useState(compact)
+  const [collapsed, setCollapsed] = useState(false)
   useLayoutEffect(() => {
-    const item = ref.current, toolbar = item?.closest<HTMLElement>('[data-list-toolbar]')
-    if (!item || !toolbar || !window.ResizeObserver || compact) return
+    const item = ref.current
+    const owner = item?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
+    const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') ? item?.closest<HTMLElement>('[data-toolbar-row]') ?? owner : owner
+    if (!item || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       const content = item.querySelector<HTMLElement>('[data-toolbar-optional-content]')!
       if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = content.getBoundingClientRect().width
-      const tools = [...toolbar.querySelectorAll<HTMLElement>('[data-toolbar-tools]')].flatMap((group) => [...group.children] as HTMLElement[])
-      const gap = parseFloat(getComputedStyle(toolbar).columnGap) || 0
-      const required = tools.reduce((total, tool) => {
-        let width = tool === item ? expandedWidthRef.current : tool.getBoundingClientRect().width
-        // 札が畳まれた瞬間の幅で補助操作を戻すと、両方が交互に開閉する。
-        // 補助操作を先に畳み、札は残った幅で判断する。
-        const groups = tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll<HTMLElement>('[data-filter-width]')]
-        for (const group of groups) width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
-        return total + width
-      }, 0) + gap * Math.max(0, tools.length - 1)
-      const css = getComputedStyle(toolbar)
-      const available = toolbar.clientWidth - parseFloat(css.paddingLeft || '0') - parseFloat(css.paddingRight || '0')
-      setCollapsed(required > available)
+      setCollapsed(!toolbarContentFit(toolbar, item, expandedWidthRef.current).fits)
     }
     const observer = new ResizeObserver(measure)
     observer.observe(toolbar)
     for (const group of toolbar.querySelectorAll('[data-toolbar-tools]')) for (const tool of group.children) observer.observe(tool)
     measure()
+    void document.fonts?.ready.then(measure)
     return () => observer.disconnect()
   }, [children, compact])
   return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
@@ -152,7 +144,7 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
 export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
 /** 並びの名前と選ぶ操作はこの欄にそろえる。 */
 export function ListToolbarSort(props: ListToolbarSortProps) {
-  return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
+  return <span data-list-sort><Select {...props} size="content" width={undefined} label="並び" aria-label="並び" /></span>
 }
 
 /** B-191/192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
@@ -160,8 +152,16 @@ function compactFilterGroups(node: ReactNode): ReactNode {
   const children = Children.toArray(node)
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
     return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
-  return children.map(child => isValidElement<{ children?: ReactNode }>(child) && child.props.children && (typeof child.type === 'string' || child.type === Fragment)
-    ? cloneElement(child, {}, compactFilterGroups(child.props.children)) : child)
+  return children.map(child => {
+    if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
+      return cloneElement(child, { size: 'content', width: undefined })
+    if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
+      const nested = compactFilterGroups(child.props.children)
+      // Field wrappers receive one control, not a one-element children array.
+      return cloneElement(child, {}, Array.isArray(nested) && nested.length === 1 ? nested[0] : nested)
+    }
+    return child
+  })
 }
 export function ResponsiveFilterChips({ children, label = '状態' }: { children: ReactNode; label?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -171,30 +171,16 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
     const choices = ref.current
     const toolbar = choices?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
     if (!choices || !toolbar || !window.ResizeObserver || toolbar.dataset.toolbarLayout?.includes('stacked')) return
-    const flatten = (element: HTMLElement): HTMLElement[] => getComputedStyle(element).display === 'contents'
-      ? [...element.children].flatMap(child => flatten(child as HTMLElement)) : [element]
     const measure = () => {
-      if (document.documentElement.dataset.theme !== 'v8') return
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
       choices.dataset.filterWidth = String(unfoldedWidth.current)
-      const tools = [...toolbar.children].flatMap(child => flatten(child as HTMLElement)).filter(tool =>
-        getComputedStyle(tool).display !== 'none' && getComputedStyle(tool).flexGrow === '0'
-        && !tool.matches('[data-shared-part="notice"], :has(> [data-shared-part="notice"])'))
-      const required = tools.reduce((sum, tool) => {
-        let width = tool.getBoundingClientRect().width
-        for (const group of tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll<HTMLElement>('[data-filter-width]')]) {
-          width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
-        }
-        return sum + width
-      }, 0)
-      const css = getComputedStyle(toolbar)
-      const available = toolbar.clientWidth - parseFloat(css.paddingLeft || '0') - parseFloat(css.paddingRight || '0')
-      setCollapsed(required + (parseFloat(css.columnGap) || 0) * Math.max(0, tools.length - 1) > available + 1)
+      setCollapsed(!toolbarContentFit(toolbar).fits)
     }
     const observer = new ResizeObserver(measure)
     observer.observe(toolbar); observer.observe(choices)
     measure()
+    void document.fonts?.ready.then(measure)
     return () => observer.disconnect()
   }, [children])
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
@@ -204,7 +190,7 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
   const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : allIndex >= 0 ? String(allIndex) : 'all'
   return <span ref={ref} className={styles.filterChoices} data-filter-collapsed={collapsed || undefined}>
     <span className={styles.filterWide} data-filter-chips>{children}</span>
-    <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={current}
+    <span className={styles.filterNarrow}><Select size="content" label={label} aria-label={label} value={current}
       options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
       onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span>
   </span>

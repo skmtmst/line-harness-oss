@@ -5,6 +5,7 @@ import { chromium } from '@playwright/test'
 import { fitListSearchPlaceholder } from '../../src/components/shared/search-field-size.mjs'
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
+import { toolbarContentFit } from '../../src/components/shared/list-toolbar-fit.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
@@ -55,5 +56,20 @@ test('list columns give spare width to the name and remeasure changed data', asy
       const ops = await page.locator('tbody td').nth(2).evaluate(el => ({ available: el.clientWidth, required: el.scrollWidth }))
       assert.ok(ops.available >= ops.required, 'primary action and menu both keep their hit areas')
     }
+  } finally { await browser.close() }
+})
+
+test('content-sized list selects stay readable; real band width decides chip collapse', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('select')}\n*{box-sizing:border-box} .band{display:flex;gap:8px;width:800px} .row{display:contents} .search{flex:0 1 240px;min-width:180px;--list-search-content-min:180px} .chips{width:400px;flex:none} .count{width:100px;flex:none}</style><section data-list-skeleton><div class="band" data-list-toolbar><div class="row"><div class="search" data-toolbar-search>検索</div><span class="chips" data-filter-width="400">状態</span><div class="content root"><button class="trigger"><span class="value" data-select-value>並び：件数が多い順</span><svg class="chevron"></svg></button></div><div class="count">件数</div></div></div></section></html>`)
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具のはみ出し'))
+    assert.equal((await page.locator('.band').evaluate(toolbarContentFit)).fits, false)
+    await page.locator('.band').evaluate(el => { el.style.width = '1000px' })
+    assert.equal((await page.locator('.band').evaluate(toolbarContentFit)).fits, true)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
+    await page.locator('.root').evaluate(el => { el.className = 'standard root'; el.style.width = '100px' })
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
   } finally { await browser.close() }
 })
