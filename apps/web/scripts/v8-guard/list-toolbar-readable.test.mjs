@@ -329,6 +329,7 @@ test('F10: stacked callers share two narrow rows; a separate leading row fails a
     assert.equal((await page.evaluate(scanFixPatterns)).counts.F10,0)
     const heights = await page.locator('[data-toolbar-leading]').evaluate(el=>[...el.children].map(c=>c.getBoundingClientRect().y))
     assert.equal(heights[0],heights[1])
+    assert.equal(await page.locator('summary').evaluate(el=>getComputedStyle(el).fontSize),'13px')
     await page.locator('summary').click()
     await page.locator('input[type="date"]').fill('2026-10-12')
     assert.equal(await page.locator('input[type="date"]').inputValue(),'2026-10-12')

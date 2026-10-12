@@ -279,7 +279,7 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
 .optional[data-collapsed] > summary {
   display: inline-flex; align-items: center; height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap);
   border: 1px solid var(--color-hairline); border-radius: var(--radius-control); cursor: pointer;
-  gap: var(--tpl-toolbar-gap); font: inherit; font-weight: 500; white-space: nowrap; box-shadow: var(--control-shadow);
+  gap: var(--tpl-toolbar-gap); font: inherit; font-size: var(--polish-text-body); line-height: var(--tpl-chip-label-lh); font-weight: 500; white-space: nowrap; box-shadow: var(--control-shadow);
 }
 .optional > summary::-webkit-details-marker { display: none; }
 .optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
