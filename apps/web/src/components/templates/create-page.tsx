@@ -51,7 +51,7 @@ export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightM
   return <PageFrame kind="create" boardId={boardId} standalone={standalone} heightMode={heightMode} hasFooter>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
-    {readOnly ? <ReadOnlyNotice /> : null}
+    {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
     {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher>{preview}</PreviewLauncher>}</div> : null}
