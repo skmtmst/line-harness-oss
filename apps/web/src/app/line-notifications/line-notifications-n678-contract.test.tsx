@@ -126,7 +126,7 @@ vi.mock('@/lib/api', () => {
 })
 
 import { ApiError, type EcNotificationSetting, type LineNotificationDefinition } from '@/lib/api'
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 
 import LineNotificationsPage from './page'
 

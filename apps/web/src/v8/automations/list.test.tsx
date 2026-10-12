@@ -132,7 +132,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
   it('旧一覧の削減時間は現在の説明へ残し、未取得を0時間にしない', async () => {
     vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: null })
     await render(<AutomationListV8 />)
-    await act(async () => { host.querySelector<HTMLButtonElement>('button[data-screen-explanation-toggle]')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="オートメーションの説明"]')!.click() })
     expect(host.textContent).toContain('削減時間はまだ数えられていません')
     expect(host.textContent).not.toContain('およそ0時間')
     account.id = 'account-b'

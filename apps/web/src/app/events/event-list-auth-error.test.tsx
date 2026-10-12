@@ -245,8 +245,8 @@ describe('R601 イベント一覧の権限不足と通信失敗の言い分け',
     const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
     listEvents.mockResolvedValue({ ...payload, summary: { ...payload.summary, low_applications: 1, nearest_low_starts_at: start } })
     await renderPage()
-    const note = document.querySelector<HTMLElement>('[data-screen-explanation]')!
-    expect(note.hidden).toBe(false)
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="イベント予約の説明"]')!.click() })
+    const note = document.querySelector<HTMLElement>('[role="note"][id]')!
     expect(note.textContent).toContain('申し込みが少ないのは')
     expect(note.textContent).toContain('あと2日です')
   })
