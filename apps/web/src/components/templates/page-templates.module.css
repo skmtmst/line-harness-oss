@@ -399,7 +399,7 @@
 /* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
-:global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); }
+:global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
 :global(:root) [data-list-skeleton] .paginationRow,
 :global(:root) [data-list-skeleton] .pagination { justify-content: space-between; }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }

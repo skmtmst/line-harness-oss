@@ -12,6 +12,18 @@ import './list-row-height.test.mjs'
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
 const table = body => `<div role="table" data-shared-part="list-table" style="width:600px">${body}</div>`
+test('B-245：共通の説明ボタンは青で出し、印だけの手書きや頭の外の青は検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const control = (label, classes = 'page-explanation_toggle__test') => `<button type="button" class="${classes}" data-shared-part="page-explanation-toggle" aria-controls="explanation" aria-expanded="false" style="color:#2563eb;background:transparent;border:0">${label}</button>`
+    await page.setContent(shell(`<header data-template-region="heading">${control('この画面の説明')}${control('手書きの青', 'screen_blue')}</header>${control('頭の外の青')}<a style="color:#2563eb">普通の青いリンク</a>`))
+    const blue = (await page.evaluate(scan)).filter(f => f.kind === 'blue').map(f => f.text)
+    assert.deepEqual(blue.sort(), ['手書きの青', '普通の青いリンク', '頭の外の青'].sort())
+    await page.locator('.page-explanation_toggle__test').first().evaluate(el => { el.removeAttribute('aria-controls') })
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'blue' && f.text === 'この画面の説明'), '開閉する共通部品の条件を崩すと検出する')
+  } finally { await browser.close() }
+})
 const cases = {
   align: table([0,20,0].map(x=>row(`<button data-row-menu style="margin-left:${x}px">…</button>`)).join('')),
   missing: table([true,false,true].map(show=>row(`<b>名前</b>${show?'<button data-row-menu>…</button>':''}`)).join('')),

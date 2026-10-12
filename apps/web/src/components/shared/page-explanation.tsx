@@ -45,7 +45,7 @@ function useExplanation() {
 export function PageExplanationToggle() {
   const { open, toggle, bodyId, toggleId } = useExplanation()
   const Chevron = open ? ChevronUp : ChevronDown
-  return <button type="button" id={toggleId} className={styles.toggle} aria-expanded={open} aria-controls={bodyId} onClick={toggle}>
+  return <button type="button" id={toggleId} className={styles.toggle} data-shared-part="page-explanation-toggle" aria-expanded={open} aria-controls={bodyId} onClick={toggle}>
     この画面の説明<Chevron size={16} aria-hidden="true" />
   </button>
 }
