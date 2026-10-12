@@ -311,7 +311,7 @@ export default function HqBroadcastList() {
     )
   } else {
     content = (
-      <DataTable className={styles.table} data-design="hq-broadcasts">
+      <DataTable columnSizing="content" className={styles.table} data-design="hq-broadcasts">
         <thead>
           <TableHeadRow>
             <Th className={styles.colTitle}>タイトル・内容</Th>

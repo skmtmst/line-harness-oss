@@ -592,3 +592,17 @@ html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:no
 html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:not(:has([colspan])) > td {
   height: var(--polish-table-row); min-height: var(--polish-table-row);
 }
+
+/* Content-sized list columns keep their existing padding and truncation budget. */
+html:root .frame[data-column-sizing='content'] .table.table tr > :is(th, td)[data-content-name-column] {
+  width: auto; min-width: 0;
+}
+html:root .frame[data-column-sizing='content'] .table.table tr > :is(th, td)[data-content-support-column] {
+  width: var(--list-content-column-width);
+}
+html:root .frame[data-column-sizing='content'] .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-name-column] {
+  flex: 1 1 0;
+}
+html:root .frame[data-column-sizing='content'] .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-support-column] {
+  flex: 0 0 var(--list-content-column-width); min-width: 0;
+}

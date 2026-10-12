@@ -649,7 +649,7 @@ export default function InflowListV8({
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-il-col-gap)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--polish-text-body)', numberInset: 'var(--tpl-il-num-pad-end)', collapseScope: 'page' }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-il-col-gap)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--polish-text-body)', numberInset: 'var(--tpl-il-num-pad-end)', collapseScope: 'page' }}>
             <thead>
               <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colCheck}>
