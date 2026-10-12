@@ -129,6 +129,7 @@ import { richMenuGroups } from './routes/rich-menu-groups.js';
 import { lineProxy } from './routes/line-proxy.js';
 import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
+import { instagram } from './routes/instagram.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
@@ -313,6 +314,16 @@ export type Env = {
     ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
     ADMIN_COOKIE_SAMESITE?: string; // Optional override: 'Strict' | 'Lax' | 'None'
     ADMIN_ALLOW_CROSS_SITE?: string; // 'true' opts into SameSite=None cross-site cookies
+    META_APP_ID?: string;
+    META_APP_SECRET?: string;
+    // Instagram API with Instagram Login (no Facebook Page). Separate credentials
+    // from META_APP_*: App Dashboard > Instagram > API setup with Instagram login.
+    INSTAGRAM_APP_ID?: string;
+    INSTAGRAM_APP_SECRET?: string;
+    META_REDIRECT_URI?: string;
+    META_GRAPH_API_VERSION?: string;
+    META_TOKEN_ENCRYPTION_KEY?: string;
+    META_WEBHOOK_VERIFY_TOKEN?: string;
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
     IG_HARNESS_URL?: string;  // Optional: IG Harness API URL for cross-platform linking
     IG_HARNESS_LINK_SECRET?: string;  // Shared secret for IG Harness link-line webhook
@@ -546,6 +557,8 @@ app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
 app.route('/', instagramEngagement);
+// Instagram連携（Instagram直接ログイン）。設定→SNS連携のつなぎと同時投稿で使う。
+app.route('/', instagram);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
 app.route('/', lineProxy);
 // EC-CUBEの取引イベント。管理者認証ではなく署名・時刻・重複IDで検証する。
@@ -1868,6 +1881,16 @@ async function runSixHourlyHeavyJobs(
         if (totalRetentionActions(result) > 0) {
           console.log(JSON.stringify({ event: 'google_business_content_retention', ...result }));
         }
+      },
+    },
+    {
+      // Instagram連携: つなぎ途中の一時データの掃除。認可の途中で使う状態キーは
+      // 期限切れを消し、受信メッセージの控えは90日で消す。Googleビジネスと同じく
+      // 機能スイッチでゲートしない（offにした店舗の古いコピーを残さないため）。
+      name: 'instagram transient data retention',
+      run: async () => {
+        const { purgeInstagramTransientData } = await import('./services/instagram.js');
+        await purgeInstagramTransientData(env.DB, new Date(event.scheduledTime));
       },
     },
   ];

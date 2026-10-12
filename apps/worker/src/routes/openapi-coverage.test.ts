@@ -116,8 +116,11 @@ function formatKeys(keys: string[]): string {
  * 追加は原則禁止。新 route は openapi.ts へ記載する。
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
-/** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 772;
+/**
+ * 未記載負債はこの件数より増やせない。
+ * 772 → 784：Instagram連携（Instagram直接ログイン）の12件を足した分だけ上げた。
+ */
+const ALLOWLIST_MAX = 784;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -1153,6 +1156,21 @@ const ALLOWLIST = new Set<string>([
   'POST /api/media/{id}/replace-usages',
   'POST /api/media/{id}/replacement-preview',
   'POST /api/media/{id}/versions',
+
+  // Instagram連携（Instagram直接ログイン）の管理画面用APIと、Meta側から呼ばれる
+  // 折り返し・webhook（OpenAPI未記載・順次記載）（12件）
+  'DELETE /api/instagram/connection',
+  'GET /api/instagram/connection',
+  'GET /api/instagram/messages',
+  'GET /api/instagram/oauth/callback',
+  'GET /api/instagram/posts',
+  'GET /api/instagram/profile',
+  'GET /api/instagram/webhook',
+  'POST /api/instagram/messages/{id}/reply',
+  'POST /api/instagram/oauth/start',
+  'POST /api/instagram/refresh',
+  'POST /api/instagram/sync',
+  'POST /api/instagram/webhook',
 
   // core：ログインユーザーと権限管理（OpenAPI未記載・順次記載）（12件）
   'DELETE /api/staff/{id}',
