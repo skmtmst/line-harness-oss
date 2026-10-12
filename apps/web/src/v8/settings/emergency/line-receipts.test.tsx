@@ -9,7 +9,7 @@ vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/l
 } } }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
 import { HealthPanelV8 } from './health'
-import { ApiError } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 const props = { accountId: 'a', manualRunRequest: 0, onSeverity: vi.fn(), canManage: true }
 const receipt = (extra = {}) => ({ webhookEventId: 'safe', lineAccountId: 'a', eventType: 'message', status: 'failed', receivedAt: '2026-10-12T00:09:00+09:00', canRetry: true, recoveryStatus: null, recoveryReason: null, ...extra })
 beforeEach(() => {
@@ -80,4 +80,14 @@ it('APIの内部エラーは日本語で案内し、失敗後の古い操作は�
   await screen.findByText(/LINE受信の失敗を読み込めませんでした/)
   expect(document.body.textContent).not.toContain('API error: 500')
   expect(screen.queryByRole('button', { name: 'やり直す' })).toBeNull()
+})
+
+it('shows the unavailable MFA key notice in operation status without inventing a successful check', async () => {
+  const notice = '二段階認証の鍵が未設定のため、必須にできません'
+  vi.mocked(api.operations.health).mockResolvedValueOnce({ success: true, data: {
+    overallStatus: 'unknown', latestRun: null, lastCheckedAt: null, nextCheckAt: null, serverNow: '2026-10-12T00:00:00Z', loginSecurity: { configured: false, notice },
+  } })
+  render(<HealthPanelV8 {...props} />)
+  await screen.findByText(notice)
+  expect(screen.queryByText('すべて正常')).toBeNull()
 })

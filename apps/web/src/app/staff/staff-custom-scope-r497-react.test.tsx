@@ -229,3 +229,6 @@ describe('R497 個別設定の表示と保存', () => {
     expect(screen.getByText(/いまの設定と同じ内容です/)).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

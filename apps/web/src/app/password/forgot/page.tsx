@@ -66,7 +66,7 @@ export default function PasswordForgotPage() {
           <Mail className="h-7 w-7 text-accent-deep" />
         </span>
         <p className="text-caption text-ink-secondary">届かないときは、迷惑メールフォルダと、入れたメールアドレスを確かめてください。</p>
-        <Button href="/login" className="w-full">
+        <Button fullWidth href="/login" className="w-full">
           ログインへ戻る
         </Button>
       </AuthCard>
@@ -98,7 +98,7 @@ export default function PasswordForgotPage() {
           />
         </AuthField>
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
-        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">再設定メールを送る
+        <Button fullWidth type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">再設定メールを送る
         </Button>
       </form>
       <p className="text-caption text-ink-faint">

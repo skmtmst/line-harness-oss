@@ -1,4 +1,5 @@
 'use client'
+import SelfMfa from './self-mfa'
 import MfaPolicy from './mfa-policy'
 import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
 import TotpQr from '@/components/shared/totp-qr'
@@ -1143,6 +1144,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         <SettingsInnerNav inline />
         <div className={styles.main}>
           {administrator ? <MfaPolicy /> : null}
+          <SelfMfa />
           {tab === 'audit' ? (
             <>
               {tabAction ? <div className={styles.toolbar}><span className={styles.spacer} />{tabAction}</div> : null}

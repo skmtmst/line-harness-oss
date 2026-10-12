@@ -31,6 +31,7 @@ type CommonProps = {
    * 高さ28・左右10・角丸8・字12は `delivery-row` と同じで、印13角・印と字の間5が違う。
    */
   size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
+  fullWidth?: boolean
   align?: 'start'
   /**
    * 字の色だけを絵に合わせる指定。渡したボタンだけに効き、既定のボタンと他の画面は変えない。
@@ -130,10 +131,10 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
+      <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}
         {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
@@ -151,6 +152,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     variant: _variant,
     size: _size,
     align,
+    fullWidth,
     textTone: _textTone,
     presentation,
     href: _href,
@@ -195,6 +197,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   useLayoutEffect(() => {
     const el = elementRef.current
     if (!el || !stateful) return
+    if (fullWidth) { el.style.width = ''; el.style.minWidth = ''; return }
     if (busyNow || done === true) {
       if (idleWidthRef.current > 0) el.style.minWidth = `${idleWidthRef.current}px`
       return
@@ -254,7 +257,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     <button
       type={type}
       className={classes}
-      data-align={align}
+      data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined}
       data-presentation={presentation}
       ref={setRefs}
       disabled={disabled || busyNow}

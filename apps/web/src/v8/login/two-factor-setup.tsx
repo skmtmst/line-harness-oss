@@ -11,8 +11,8 @@ import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/app/login/two-factor/two-factor-error'
 
+import { Steps } from '@/components/templates/steps'
 import { AuthPage, AuthForm } from '@/components/templates/auth-page'
-import { Field } from '@/components/shared/form-controls'
 import TotpQr from '@/components/shared/totp-qr'
 import RecoveryCodes from './recovery-codes'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -154,15 +154,14 @@ export default function TwoFactorSetupPage() {
   }
 
   if (recoveryCodes.length) return <RecoveryCodes codes={recoveryCodes} onContinue={() => { setRecoveryCodes([]); window.location.assign(destination) }} />
-  return <SaveErrorScope errors={saveErrors}><AuthPage title="二段階認証を設定" help="認証アプリでQRコードを読み取り、表示された6桁の数字を入れてください。">
+  return <SaveErrorScope errors={saveErrors}><AuthPage titleAlign="start" steps={<Steps label="ログインの手順" steps={[{ label: 'ログイン', state: 'done' }, { label: '二段階認証の設定', state: 'current' }]} />} title="二段階認証を設定">
     {error ? <Notice tone="danger" message={error} /> : null}
     {loading ? <ListState kind="loading" title="QRコードを用意しています…" /> : setup ? (
       <AuthForm onSubmit={event => void submit(event)}>
         <TotpQr qr={qr} manualKey={setup.manualKey} />
-        <Field label="認証アプリの6桁の数字" htmlFor="totp-setup-code">
-          <SaveErrorField names={["code", "typedCode"]}><OtpInput id="totp-setup-code" value={typedCode} onChange={setCode} onComplete={entered => void submit(undefined, entered)} label="認証アプリの6桁の数字" invalid={Boolean(error)} busy={busy} /></SaveErrorField>
-        </Field>
-        <Button type="submit" variant="primary" disabled={busy} busy={busy} busyLabel="確認しています…">確認して登録を完了する</Button>
+          <SaveErrorField names={["code", "typedCode"]}><OtpInput id="totp-setup-code" value={typedCode} onChange={setCode} onComplete={entered => void submit(undefined, entered)} visualLabel="認証アプリの6桁の数字" label="認証アプリの6桁の数字" invalid={Boolean(error)} busy={busy} /></SaveErrorField>
+        <Button type="submit" variant="primary" fullWidth disabled={busy} busy={busy} busyLabel="確認しています…">登録してログイン</Button>
+        <Link href="/login" onClick={clearTwoFactorChallenge}>ログインへ戻る</Link>
       </AuthForm>
     ) : expired || !challenge ? (
       <Link href="/login" onClick={clearTwoFactorChallenge}>ログインへ戻る</Link>

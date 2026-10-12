@@ -49,6 +49,10 @@ async function preparePage(page: Page, posted: PostedCommonVar[], accounts: Post
       }) })
       return
     }
+    if (url.pathname === '/api/staff/me') {
+      await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: { id: 'staff-1', name: 'テスト担当', role: 'owner', accessLevel: 'full', isActive: true, permissionKeys: [], permissionViewKeys: [] } }) })
+      return
+    }
     if (url.pathname === '/api/line-accounts') {
       await route.fulfill({ status: 200, headers, body: JSON.stringify({
         success: true,
@@ -104,7 +108,7 @@ test('社内メモと通常値を登録内容へ含める', async ({ page }) => 
 
   await page.getByLabel('共通情報名（友だちには見えません）').fill('shop hours')
   await page.getByRole('textbox', { name: '中身', exact: true }).fill('平日 10:00〜18:00')
-  await page.getByLabel('社内メモ 任意').fill('祝日の前日に更新する')
+  await page.getByLabel('社内メモ', { exact: true }).fill('祝日の前日に更新する')
   await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   await expect.poll(() => posted.length).toBe(1)
@@ -146,7 +150,7 @@ test('警告表示中にアカウントを切り替えると、前アカウン�
   // account-1 で秘密値らしい内容を入力し、送信前警告を出す。
   await page.getByLabel('共通情報名（友だちには見えません）').fill('account-1 の下書き')
   await page.getByRole('textbox', { name: '中身', exact: true }).fill('通常値')
-  await page.getByLabel('社内メモ 任意').fill('password: hunter2')
+  await page.getByLabel('社内メモ', { exact: true }).fill('password: hunter2')
   await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
@@ -163,7 +167,7 @@ test('警告表示中にアカウントを切り替えると、前アカウン�
   // 切替後は前アカウント向けの警告・入力を引き継がない。
   await expect(warning).toBeHidden()
   await expect(page.getByLabel('共通情報名（友だちには見えません）')).toHaveValue('')
-  await expect(page.getByLabel('社内メモ 任意')).toHaveValue('')
+  await expect(page.getByLabel('社内メモ', { exact: true })).toHaveValue('')
   await expect(page.getByText('LINEアカウントが切り替わったため、入力をやり直してください')).toBeVisible()
 
   // account-2 用に改めて入力し、account-2 として正しく登録できる。
@@ -187,9 +191,9 @@ test('日本語の秘密値ラベルを社内メモに書くと、送信前に�
 
   await page.getByLabel('共通情報名（友だちには見えません）').fill('日本語ラベル確認')
   // 日本語名からは差し込み名を自動生成できないため、明示的に入れる。
-  await page.getByLabel('差し込み名（あとから変えられません）').fill('ja_label_check')
+  await page.getByRole('textbox', { name: '差し込み名（あとから変えられません）', exact: true }).fill('ja_label_check')
   await page.getByRole('textbox', { name: '中身', exact: true }).fill('通常値')
-  await page.getByLabel('社内メモ 任意').fill('パスワード: hunter2')
+  await page.getByLabel('社内メモ', { exact: true }).fill('パスワード: hunter2')
   await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
@@ -197,7 +201,7 @@ test('日本語の秘密値ラベルを社内メモに書くと、送信前に�
   await expect(warning).toContainText('社内メモ')
   expect(posted).toHaveLength(0)
   await warning.getByRole('button', { name: '入力に戻って修正する' }).click()
-  await expect(page.getByLabel('社内メモ 任意')).toBeFocused()
+  await expect(page.getByLabel('社内メモ', { exact: true })).toBeFocused()
 })
 
 test('保存した社内メモは、編集画面を開き直すと再表示される', async ({ page }) => {
@@ -206,9 +210,9 @@ test('保存した社内メモは、編集画面を開き直すと再表示さ�
 
   await page.getByLabel('共通情報名（友だちには見えません）').fill('再表示確認用')
   // 日本語名からは差し込み名を自動生成できないため、明示的に入れる。
-  await page.getByLabel('差し込み名（あとから変えられません）').fill('redisplay_check')
+  await page.getByRole('textbox', { name: '差し込み名（あとから変えられません）', exact: true }).fill('redisplay_check')
   await page.getByRole('textbox', { name: '中身', exact: true }).fill('平日 10:00〜18:00')
-  await page.getByLabel('社内メモ 任意').fill('更新は毎月1日に確認する')
+  await page.getByLabel('社内メモ', { exact: true }).fill('更新は毎月1日に確認する')
   await page.getByRole('button', { name: '保存して公開', exact: true }).click()
   await expect.poll(() => posted.length).toBe(1)
   const created = posted[0]

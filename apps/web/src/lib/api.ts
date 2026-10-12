@@ -959,6 +959,7 @@ export type LineWebhookRecoveryEvent = {
 };
 
 export type OperationHealthSnapshot = {
+  loginSecurity?: { configured: boolean; notice: string | null }
   latestRun: {
     id: string
     lineAccountId: string | null
@@ -6375,6 +6376,8 @@ export type OpsSupportDetail = {
 /** 大事な操作の直前再確認（V）が対象にする操作の名前。Workerの STEP_UP_PURPOSES と一致させる。 */
 export type StepUpPurpose =
   | 'auth.mfa.policy'
+  | 'auth.mfa.recovery'
+  | 'auth.mfa.reenroll'
   | 'operations.control'
   | 'affiliate.payout.export'
   | 'photo.original.download'

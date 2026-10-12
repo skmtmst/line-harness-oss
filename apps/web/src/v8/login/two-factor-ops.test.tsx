@@ -57,7 +57,7 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
 
   it('管理画面の2段目もV8で出し、LINEでのログイン方法を保つ', async () => {
     await open('/login/two-factor#lh_2fa=challenge-1', 'v8')
-    expect(host.textContent).toContain('6桁の確認')
+    expect(host.textContent).toContain('二段階認証')
     expect(host.textContent).toContain('LINEログイン')
   })
 

@@ -3082,6 +3082,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
   }
 
+  if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
+  if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。

@@ -236,3 +236,6 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     expect(resendButtons()).toHaveLength(0)
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

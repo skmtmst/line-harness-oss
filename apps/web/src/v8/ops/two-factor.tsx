@@ -2,6 +2,9 @@
 import { Check, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import OpsShell from '@/components/ops/ops-shell'
+import { OpsHead } from '@/v8/ops/shell'
+import SelfMfa from '@/v8/settings/staff/self-mfa'
 import MfaPolicy from '@/v8/settings/staff/mfa-policy'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -10,6 +13,7 @@ import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
+import { rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -19,7 +23,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
-type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
+type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null; stepUpMethod?: string }
 
 /**
  * 運営コンソールの 2要素認証の設定 V8（絵 `qod6X`）。
@@ -32,7 +36,7 @@ export default function OpsTwoFactorV8() {
   const saveErrors = useSaveFormErrors()
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
   const [session, setSession] = useState<Session | null>(null)
-  const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
+  const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied' | 'security'>('loading')
   const [uri, setUri] = useState('')
   const [manualKey, setManualKey] = useState('')
   const [qr, setQr] = useState('')
@@ -58,6 +62,10 @@ export default function OpsTwoFactorV8() {
       if (cancelledRef.current) return
       if (!body.data.platformAdmin && body.data.platformAdminState !== 'awaiting_totp') { setState('denied'); return }
       setSession(body.data)
+      if (body.data.platformAdmin && body.data.stepUpMethod === 'totp') {
+        rememberSessionSnapshot({ impersonation: null, unfamiliarAt: null, stepUpMethod: 'totp' })
+        setState('security'); return
+      }
       // QR の準備の失敗はログイン切れではない。ログイン中のまま理由と取り直しを出す。
       let setup: Awaited<ReturnType<typeof api.staff.beginTwoFactorSetup>> | null = null
       try {
@@ -121,6 +129,8 @@ export default function OpsTwoFactorV8() {
     setState('done')
   }
 
+  if (state === 'security') return <OpsShell><OpsHead title="二段階認証" /><MfaPolicy loginPath="/ops/login" /><SelfMfa loginPath="/ops/login" /></OpsShell>
+
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="qod6X">
       <div className={styles.brand}>
@@ -139,17 +149,17 @@ export default function OpsTwoFactorV8() {
         ) : state === 'denied' ? (
           <>
             <ListState permissionScope="hq" kind="forbidden" title="この画面は運営メンバーだけが開けます" description="招待メールのリンクから進んでください。" />
-            <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button>
+            <Button fullWidth href="/ops/login" className={styles.wide}>運営のログインへ</Button>
           </>
         ) : state === 'done' && recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => void logoutAndGoToLogin('/ops/login')} /> : state === 'done' ? (
           <>
             <NoteBar tone="info">2要素認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
-            <Button variant="primary" onClick={() => void logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
+            <Button fullWidth variant="primary" onClick={() => void logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
           </>
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
             {error ? <Notice tone="danger" message={error} /> : null}
-            {error && !uri ? <Button onClick={() => load()} className={styles.wide} busyLabel="処理中…">もう一度読み込む</Button> : null}
+            {error && !uri ? <Button fullWidth onClick={() => load()} className={styles.wide} busyLabel="処理中…">もう一度読み込む</Button> : null}
             <div className={styles.qrRow}>
               <div className={styles.qr}>
                 {qr ? (
@@ -173,7 +183,7 @@ export default function OpsTwoFactorV8() {
               <span id="ops-totp-label" className={styles.label}>認証コード（6桁）</span>
               <OtpInput id="ops-totp-code" value={typedCode} onChange={setCode} onComplete={(entered) => void submit(undefined, entered)} labelledBy="ops-totp-label" invalid={Boolean(error)} busy={busy} />
             </div>
-            <Button type="submit" variant="primary" disabled={busy || !uri || !codeComplete} className={styles.wide} busy={busy} busyLabel="確認しています…">
+            <Button fullWidth type="submit" variant="primary" disabled={busy || !uri || !codeComplete} className={styles.wide} busy={busy} busyLabel="確認しています…">
               <Check aria-hidden="true" />登録する
             </Button>
             <p className={styles.note}>登録すると安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください。</p>
