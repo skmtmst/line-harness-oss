@@ -13,6 +13,7 @@ import type { SelectOption } from './select'
 import selectStyles from './select.module.css'
 
 export type EntitySelectOption = SelectOption & {
+  color?: string | null
   hint?: string
   locked?: boolean
   folderId?: string | null
@@ -79,7 +80,7 @@ export default function EntitySelect(props: EntitySelectProps) {
   const errorId = `${useId()}-error`
   const { folders: loadedFolders, failed, load } = useEntityFolders(kind ?? 'staff', account?.selectedAccountId)
   const heads = splitOptionHeads(options, props.label)
-  const items = options.map((option) => ({ id: option.value, name: heads.labelOf(option), disabled: option.disabled, locked: option.locked,
+  const items = options.map((option) => ({ id: option.value, name: heads.labelOf(option), color: option.color, disabled: option.disabled, locked: option.locked,
     folderId: option.folderId, content: option.content, meta: option.description ?? option.hint }))
   const localFolders: EntityPickerFolder[] = [...new Map(options.filter((option) => option.folderId && option.folderName)
     .map((option) => [option.folderId!, { id: option.folderId!, name: option.folderName!, color: option.folderColor }])).values()]

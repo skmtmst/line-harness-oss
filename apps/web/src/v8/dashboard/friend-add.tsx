@@ -93,7 +93,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
             aria-label="発行中の追加URL"
             disabled={routes === null}
             options={[
-              { value: '__base_url__', label: '基本の追加URL' },
+              { value: '__base_url__', label: '基本の追加URL', color: 'var(--tpl-picker-selected-dot)' },
               ...(routes ?? []).map((entry) => ({ ...entityOptionMetadata(entry), value: entry.id, label: entry.name })),
             ]}
           /></SaveErrorField>

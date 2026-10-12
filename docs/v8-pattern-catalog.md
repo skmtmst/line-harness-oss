@@ -355,6 +355,7 @@
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
 
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
+- 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
 - **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
 - **持ち主（Pen）**：**未定**
   - 注：Pen の欄の部品 ID が無い（決まりの板 MqqcW・aXUuh は見本。板では「選んだもの（B-163 窓で選ぶ）」の名前）

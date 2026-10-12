@@ -46,8 +46,8 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
-  background: var(--color-status-info-soft);
-  color: var(--color-action);
+  background: var(--color-avatar-blue-bg);
+  color: var(--color-avatar-blue-ink);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.5;

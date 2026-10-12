@@ -2798,6 +2798,9 @@ select:not([multiple]):not(.appearance-none) {
   --font-sans: var(--font-noto-sans-jp), "Noto Sans JP", var(--font-inter), Inter, sans-serif;
   --color-avatar-purple-bg: #f3ecfb;
   --color-avatar-purple-ink: #6b3fa0;
+  --color-avatar-blue-bg: #e9f1ff;
+  --color-avatar-blue-ink: #0b63ce;
+  --tpl-picker-selected-dot: #3b82f6;
 }
 
 /* 触り心地 5 回目：左メニューの組の開閉（組の見出しと項目の間）・「?」の印の字の書体。 */
