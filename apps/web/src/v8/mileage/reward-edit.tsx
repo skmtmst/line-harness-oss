@@ -567,8 +567,8 @@ function RewardEditorAccess() {
   const canManage = canManageRole(useStaffRole())
   usePageTitle('使い道を作る')
   usePageCrumbs([{ label: 'マイル', href: '/mileage?tab=rewards' }])
-  if (!canManage) return <CreatePage boardId="L2Bzp" title="使い道を作る" readOnly dirty={false} children={null}
-    footerActions={<Button href="/mileage?tab=rewards">一覧へ戻る</Button>} />
+  if (!canManage) return <CreatePage boardId="L2Bzp" title="使い道を作る" readOnly dirty={false}
+    footerActions={<Button href="/mileage?tab=rewards">一覧へ戻る</Button>}>{null}</CreatePage>
   return <RewardEditorInner />
 }
 

@@ -80,8 +80,8 @@ export default function EarningRuleCreateV8() {
   const canManage = canManageRole(useStaffRole())
   usePageTitle('たまる決めごとを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: LIST_HREF }])
-  if (!canManage) return <CreatePage boardId="ctLwT" title="たまる決めごとを作る" readOnly dirty={false} children={null}
-    footerActions={<Button href={LIST_HREF}>一覧へ戻る</Button>} />
+  if (!canManage) return <CreatePage boardId="ctLwT" title="たまる決めごとを作る" readOnly dirty={false}
+    footerActions={<Button href={LIST_HREF}>一覧へ戻る</Button>}>{null}</CreatePage>
   return <EarningRuleCreateBody />
 }
 
