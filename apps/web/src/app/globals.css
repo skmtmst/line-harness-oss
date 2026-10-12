@@ -1170,7 +1170,7 @@
   /* 回答フォームの一覧（I3L41O・GrnO4・JV2oR・GVizd）。 */
   --tpl-fm-note-lh: 17px; --tpl-fm-text-button-gap: 6px; --tpl-fm-band-gap: 10px; --tpl-fm-band-pad: 10px 14px; --tpl-fm-band-lh: 20px;
   --tpl-fm-search-w: 200px; --tpl-fm-sort-w: 160px; --tpl-fm-narrow-row-gap: 8px; --tpl-fm-folder-w: 150px;
-  --tpl-fm-col-dest: 136px; --tpl-fm-col-status: 96px; --tpl-fm-col-answers: 126px; --tpl-fm-col-url: 100px; --tpl-fm-col-menu: 60px;
+  --tpl-fm-col-dest: 136px; --tpl-fm-col-status: 96px; --tpl-fm-col-answers: 126px; --tpl-fm-col-url: calc(var(--copy-feedback-min-w) + 2 * var(--tpl-row-pad-side)); --tpl-fm-col-menu: 60px;
   --tpl-fm-name-gap: 8px; --tpl-fm-cell-lh: 17px; --tpl-fm-dot: 6px; --tpl-fm-pill-gap: 5px; --tpl-fm-badge-pad: 2px 8px; --tpl-fm-badge-lh: 18px;
   --tpl-fm-answer-lh: 19px; --tpl-fm-answer-gap: 2px; --tpl-fm-answer-sub-lh: 16px; --tpl-fm-url-gap: 6px; --tpl-fm-control-h: 36px; --tpl-fm-url-pad: 0 14px; --tpl-fm-url-lh: 20px;
   --tpl-fm-skeleton-bar: 12px; --tpl-fm-pager-pad: 10px 20px; --tpl-fm-pager-lh: 21px; --tpl-fm-state-pad: 28px 24px; --tpl-fm-state-icon: 32px;
@@ -3067,6 +3067,8 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --choice-dot: 8px;
   --choice-card-ring: 2px;
   --space-8: 8px;
+  /* コピー成功の7文字・印・間隔。表の操作列も同じ予約幅を読む。 */
+  --copy-feedback-min-w: calc(7 * var(--text-caption) + var(--polish-icon-control) + var(--space-8) + var(--tpl-slot-gap));
   --space-16: 16px;
   --tpl-list-inset: 24px;
   --tpl-list-name-min: 12em;

@@ -6,6 +6,7 @@ import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/compo
 import { ListToolbarSort } from '@/components/shared/list-toolbar';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useTenantWideAccess } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react';
@@ -94,6 +95,7 @@ export default function HqBroadcastList() {
   const saveErrors = useSaveFormErrors()
 
   const router = useRouter()
+  const narrow = useNarrowViewport()
   usePageTitle('一括配信')
   const role = useStaffRole()
   const canManage = useTenantWideAccess()
@@ -316,7 +318,7 @@ export default function HqBroadcastList() {
             <Th className={styles.colStatus}>状態</Th>
             <Th className={styles.colAudience}>配信条件</Th>
             <Th className={styles.colDate}>配信日時</Th>
-            <Th className={styles.colResultWide}>結果</Th>
+            {!narrow && <Th className={styles.colResultWide}>結果</Th>}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -349,14 +351,14 @@ export default function HqBroadcastList() {
                   <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
                   {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
                 </Td>
-                <Td>
+                {!narrow && <Td>
                   {sent ? (
                     <>
                       <span className={styles.resultMain}>{`${formatNumber(reached)} 人に届いた`}</span>
                       {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : rateLine(live, reached) ? <span className={styles.cellSub}>{rateLine(live, reached)}</span> : null}
                     </>
                   ) : <span className={styles.cellMain}>{emptyValue('unknown')}</span>}
-                </Td>
+                </Td>}
                 <Td className={styles.colMenu}>
                   <div className={styles.menuBox}>
                     <RowActions subjectName={run.title} menuItems={[
