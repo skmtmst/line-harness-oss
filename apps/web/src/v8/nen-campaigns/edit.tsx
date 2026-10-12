@@ -549,7 +549,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-after">
-        <CardHeader size="stacked" titleId="nen-edit-after" title="押されたあとにすること" meta="{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}" />
+        <CardHeader size="stacked" titleId="nen-edit-after" title="押されたあとにすること" meta={`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`} />
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
