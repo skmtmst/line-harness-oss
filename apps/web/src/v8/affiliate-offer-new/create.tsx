@@ -34,7 +34,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
  * 型（CreatePage）に4つの段（どんな案件か・何を成果として数えるか・いくら払うか・成果を認めたときにすること）と、
  * 右の列（アフィリエイターの画面での見え方・気をつけること）、下の帯を渡す。
  * 聞く項目・保存の口・送る形・入力の断り方は今の画面（app/affiliate-offers/new-offer-v8.tsx）から写した。
- * 成果地点を案件につなぐ口がまだ無い（F-23）ので、成果地点の欄は押せない形で置く（BEHAVIOR.md）。
+ * 成果地点を案件につなぐ口がまだ無い（F-23）ので、保存できない理由と既存の設定への行き先を出す（BEHAVIOR.md）。
  */
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'

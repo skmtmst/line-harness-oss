@@ -1,21 +1,7 @@
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import Button from './button'
+import type { CSSProperties, ReactNode } from 'react'
 import styles from './sticky-bar.module.css'
 
-/** 下の帯の左端。確認窓を開く副操作と、押せない場合の理由を同じ形で出す。 */
-export function StickyBarAction({ label, icon: Icon, disabledReason, disabled, ...props }: {
-  label: string
-  icon: LucideIcon
-  disabledReason?: string | null
-} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'style'>) {
-  return <div className={styles.leadAction}>
-    <Button {...props} type="button" variant="secondary" disabled={disabled || Boolean(disabledReason)} aria-description={disabledReason ?? undefined}>
-      <Icon size={15} aria-hidden="true" />{label}
-    </Button>
-    {disabledReason ? <span className={styles.leadReason} role="note">{disabledReason}</span> : null}
-  </div>
-}
+export { default as StickyBarAction } from './sticky-bar-action'
 
 /**
  * 下部追従バー。作成・編集画面の最下段。Pencil V5 の `Ai3fq`。
