@@ -176,7 +176,7 @@
 html:root .rowButton, html:root .quickAction { width: var(--row-action-width, max-content); min-width: max-content; justify-content: center; }
 
 /* つまみと行操作の見た目はセルの色や素のbuttonの規則に左右されない。 */
-html:root :is(.inlineGrip, .grip)[data-reorder-handle] { color: var(--color-ink-faint); }
+html:root :is(.inlineGrip, .grip)[data-reorder-handle] { color: var(--color-ink-secondary); }
 html:root .action[data-row-menu] {
   position: relative;
   isolation: isolate;

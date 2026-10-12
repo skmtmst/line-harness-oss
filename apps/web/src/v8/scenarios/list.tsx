@@ -930,9 +930,7 @@ export default function ScenariosListV8() {
                         label={s.name}
                         disabledReason={reorderDisabledReason}
                         onMove={(direction) => keyboardMove(s.id, direction)}
-                      >
-                        <span aria-hidden>⠿</span>
-                      </ReorderHandle>}
+                      />}
                     </Td>
                     <NameCell name={
                         <div className={styles.nameRow}>
