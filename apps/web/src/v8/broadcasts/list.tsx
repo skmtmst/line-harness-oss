@@ -925,7 +925,7 @@ export default function BroadcastListV8() {
 
   /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
-    <ListToolbarFrame layout="stacked">
+    <ListToolbarFrame>
       <ListToolbarRow>
         {searchBox}
         {dateBox}

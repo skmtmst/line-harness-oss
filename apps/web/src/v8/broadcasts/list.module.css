@@ -57,9 +57,7 @@
 .statusSelect :global(*) { max-width: 100%; }
 .statusSelect :global(button) { width: 100%; }
 
-.pageSizeBox { width: var(--tpl-bc-page-size-w); }
-.pageSizeBox :global(*) { max-width: 100%; }
-.pageSizeBox :global(button) { width: 100%; }
+.pageSizeBox { display: inline-flex; width: max-content; flex-shrink: 0; }
 
 .savedBox { position: relative; flex-shrink: 0; }
 

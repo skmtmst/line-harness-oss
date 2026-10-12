@@ -380,6 +380,7 @@ type FieldBase = {
   state?: ReactNode
   placeholder?: string
   valuePrefix?: string
+  compact?: boolean
   disabled?: boolean
   readOnly?: boolean
   invalid?: boolean
@@ -425,7 +426,7 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
   color?: string | null
@@ -438,6 +439,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   selection?: ReactNode
   ariaLabel?: string
   valuePrefix?: string
+  compact?: boolean
 }) {
   const field = useFieldContext()
   const empty = !name
@@ -451,7 +453,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
       {empty ? <span className={styles.fieldPlaceholder}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
-        <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size="sm" name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
+        <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size={compact ? 'sm' : 'md'} name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
@@ -484,7 +486,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const close = () => setOpen(false)
   return <>
     <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
-      ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix}
+      ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} compact={props.compact}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null

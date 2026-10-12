@@ -482,7 +482,7 @@ export default function MediaSlot({
       <>
         <FileUp aria-hidden="true" className={styles.icon} />
         <span className={styles.title}>{readOnly ? `${noun}はありません` : title}</span>
-        {readOnly ? null : drag === 'reject' ? (
+        {readOnly || controlsBelow && compact ? null : drag === 'reject' ? (
           <span className={styles.reason}>{formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`}</span>
         ) : error ? (
           <>
@@ -573,7 +573,8 @@ export default function MediaSlot({
         {extraHelp ? <HelpTip label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
         {picker}
       </div>
-      {controlsBelow && drag === 'idle' ? <>{links}{!readOnly && limit ? <span className={styles.desc}>{limit}</span> : null}</> : null}
+      {controlsBelow && !readOnly && (error || drag === 'reject') ? <span className={styles.reason} role="alert">{error ?? (formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)}</span> : null}
+      {controlsBelow && drag === 'idle' ? <>{!filled && canFile && !readOnly ? <span className={styles.desc}>ドラッグ＆ドロップ またはクリック</span> : null}{links}{!readOnly && limit ? <span className={styles.desc}>{limit}</span> : null}</> : null}
       {urlEntry && urlOpen && !readOnly ? (
         <TextField
           id={urlEntry.id}

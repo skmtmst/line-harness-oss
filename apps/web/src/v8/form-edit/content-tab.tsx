@@ -457,6 +457,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
       <span className={styles.saveSelect}>
         <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
+          compact
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)

@@ -59,6 +59,8 @@ type CommonProps = {
   defaultOpen?: boolean
   size?: 'standard' | 'page-size' | 'full'
   width?: number
+  /** 選択した名前が長い小さな設定欄だけ、札を小さい口で出す。 */
+  compact?: boolean
   /** 呼び出し元の印は欄に入れず、窓を開く操作の意味を共通にする。 */
   icon?: ReactNode
   /** 移行前のSelectと同じ呼び出し口。 */
@@ -89,7 +91,7 @@ export default function EntitySelect(props: EntitySelectProps) {
   const hasFolderInfo = items.some((item) => item.folderId !== undefined)
   const noun = props.noun ?? (kind ? ENTITY_KINDS[kind].noun : props.label ?? label.replace(/で絞り込む.*$|を変える$|を選ぶ$/, ''))
   const common = {
-    label, ariaLabel: label, noun, items, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
+    compact: props.compact, label, ariaLabel: label, noun, items, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,

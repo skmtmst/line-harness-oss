@@ -1569,6 +1569,7 @@ export default function FormsListV8() {
       skeleton
         boardId={narrow ? 'GrnO4' : 'I3L41O'}
         headingSize="regular"
+        bottomSpacing="compact"
         title="回答フォーム"
         help="LINEの中で開くアンケート・申し込みフォームです。答えは友だち情報に保存できます。"
         /* 絵に無い機能（管理者確認）は見出しの右に小さく残す。 */
