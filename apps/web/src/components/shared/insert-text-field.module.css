@@ -117,6 +117,6 @@
 }
 
 @layer components {
-.editorMessage { box-sizing: border-box; width: 100%; height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h); padding: var(--tpl-nc-body-pad); border: 0; outline: 0; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-body-lh); resize: vertical; }
+.editorMessage { box-sizing: border-box; width: 100%; height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h); padding: var(--tpl-nc-body-pad); border: 0; outline: revert; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-body-lh); resize: vertical; }
 .editorCode { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
 }

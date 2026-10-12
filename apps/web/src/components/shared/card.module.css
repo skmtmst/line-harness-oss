@@ -228,4 +228,4 @@ html:root .records > [data-card-footer] { padding-inline: var(--polish-space-sec
 html:root .headerStacked { padding: 0; }
 
 /* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
-html:root .card[data-card-surface='muted'] { border: 0; outline: 0; box-shadow: none; background: var(--color-surface-pearl); }
+html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
