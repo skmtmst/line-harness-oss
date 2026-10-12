@@ -1,3 +1,4 @@
+import { csvRecordCount } from '../middleware/output-audit.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -217,6 +218,7 @@ commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonV
       await task;
     }
     const fresh = await getCommonVarExportJob(c.env.DB, job.id);
+    c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 201);
   } catch (error) {
     console.error(JSON.stringify({ event: 'common_var_export_create_failed', error: String(error) }));
@@ -263,6 +265,7 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireDeliveryAcc
   }
   auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: job.id },
     { result: 'success', lineAccountId: job.line_account_id });
+  c.set('outputAudit', { count: csvRecordCount(fresh.csv_text), accountId: job.line_account_id, targetId: job.id });
   return new Response(`\uFEFF${fresh.csv_text}`, {
     headers: {
       'content-type': 'text/csv; charset=utf-8',

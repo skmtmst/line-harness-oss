@@ -465,6 +465,7 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
       return '自動';
     };
     const headings = ['お知らせ', 'きっかけ', '受け取る人', '通知方法', '状態', '試行回数', '実行区分', '受付日時', 'LINE API受付日時', '理由'];
+    c.set('outputAudit', { count: rows.results?.length ?? 0, accountId: lineAccountId });
     const lines = [headings, ...(rows.results ?? []).map((row) => [
       row.rule_name, row.source_event_type, row.recipient_name, row.channel,
       row.status, row.attempts, modeLabel(row.execution_mode),

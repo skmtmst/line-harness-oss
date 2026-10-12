@@ -1,3 +1,4 @@
+import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../services/booking-confirmed-effects.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -145,6 +146,7 @@ import {
 } from '../services/booking-channels.js';
 
 const booking = new Hono<Env>();
+booking.use('/api/booking/admin/bookings.csv', outputAuditMiddleware);
 booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
 
 booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
@@ -7176,6 +7178,7 @@ booking.get('/api/booking/admin/bookings.csv', async (c) => {
   const all = rows.results ?? [];
   const truncated = all.length > BOOKING_CSV_EXPORT_LIMIT;
   const exportRows = truncated ? all.slice(0, BOOKING_CSV_EXPORT_LIMIT) : all;
+  c.set('outputAudit', { count: exportRows.length, accountId });
 
   const status = csvNoteValue(c.req.query('status') || 'requested');
   const filterNote = [
@@ -7215,6 +7218,7 @@ booking.get('/api/booking/admin/bookings.csv', async (c) => {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="booking-ledger-${date}.csv"`,
+      'Cache-Control': 'private, no-store',
     },
   });
 });
