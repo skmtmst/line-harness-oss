@@ -70,6 +70,17 @@ export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: 
   };
 }
 
+/**
+ * inputJsonBoundary が読んで検査し終えた本文。
+ * この口を通ったルートが本文を使うときは、自分で読み直さずこれを使う。
+ * 読み直すと clone() で分けた同じ本文を二度読むことになり、
+ * 中身は正しいのに読み取りの失敗で 400 になる余地が残る。
+ * この口を通らない（本文が無い・JSON以外・除外パス）場合は undefined。
+ */
+export function validatedInputBody(c: Context): Record<string, unknown> | undefined {
+  return c.get('validatedInputBody') as Record<string, unknown> | undefined;
+}
+
 /** 宣言値でも実バイト数でも止める。超過時は残りを読まず、本文を保持しない。 */
 export async function readBoundedText(request: Request, maxBytes: number): Promise<string | null> {
   const declared = Number(request.headers.get('content-length'));
