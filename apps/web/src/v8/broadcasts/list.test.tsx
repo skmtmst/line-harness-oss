@@ -314,7 +314,7 @@ it('2ページ目を含む全配信を検索し、検索結果を20件ずつ表�
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '見つからない' } })
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
-  expect(host.textContent).toContain('0件中 0〜0件')
+  expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('0件')
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '' } })
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
