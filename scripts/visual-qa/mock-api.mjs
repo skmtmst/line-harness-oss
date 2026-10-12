@@ -3735,7 +3735,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (method === 'GET' && pathname === '/api/tenants/me/company-contact') return { success: true, data: {
-    legalCompanyName: 'Shed Products株式会社', postalCode: '1500001', address: '東京都渋谷区神宮前1-2-3',
+    legalCompanyName: 'Shed Products株式会社', postalCode: '150-0001', address: '東京都渋谷区神宮前1-2-3',
     building: null, phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
   } }
   if (method === 'GET' && pathname === '/api/postal-code/search') return { success: true, data: {
