@@ -128,6 +128,10 @@
 .customerLookSplit { display:flex; flex:1; min-width:0; }
 .customerLookMain { flex:1; min-width:0; padding:var(--customer-look-pane-padding); }
 .customerLookPreview { width:var(--customer-look-preview-width); flex-shrink:0; padding:var(--customer-look-pane-padding); border-left:1px solid var(--color-hairline); }
+/* 入力とカードの見本。寸法は既存の設定・カードの共通値から使う。 */
+.customerLookSplit[data-preview-layout='cards'] { align-items:flex-start; gap:var(--polish-space-card); }
+.customerLookSplit[data-preview-layout='cards'] > .customerLookMain { padding:0; }
+.customerLookSplit[data-preview-layout='cards'] > .customerLookPreview { width:var(--tpl-st2-pc-side-w); padding:0; border-left:0; }
 @container v8-page (max-width:1099px) { .customerLookPreview { display:none; } }
 :global([data-theme='v8']) .period { padding: var(--polish-space-field) var(--polish-space-section); display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-field); }
 :global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--polish-space-field); }
