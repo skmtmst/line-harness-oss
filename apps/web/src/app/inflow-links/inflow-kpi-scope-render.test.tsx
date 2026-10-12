@@ -8,6 +8,8 @@
  * 動きが未設定は6行（種にシナリオもタグも付けていない）。
  */
 import React, { act } from 'react'
+import { waitFor } from '@testing-library/react'
+import { flushListUrlState, readListUrlParam } from '@/components/shared/list-url-state'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -145,9 +147,10 @@ function stubFetch() {
 let host: HTMLDivElement
 let root: Root
 
-async function settle(milliseconds = 320) {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, milliseconds))
+async function waitForRoutes(name = '春キャンペーン') {
+  await waitFor(() => {
+    expect(host.textContent).toContain(name)
+    expect(kpiCards()).toHaveLength(4)
   })
 }
 
@@ -180,7 +183,11 @@ async function setSearch(value: string) {
     setter.call(input, value)
     input!.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  await settle()
+  // 検索の300ms遅延と描画が終わった状態を待つ。時間が過ぎただけでは成功にしない。
+  await waitFor(() => {
+    expect(readListUrlParam('q')).toBe(value)
+    expect(host.textContent).toContain(value ? '条件に合うものがありません' : '春キャンペーン')
+  })
 }
 
 async function clickButton(scope: ParentNode, text: string) {
@@ -190,11 +197,12 @@ async function clickButton(scope: ParentNode, text: string) {
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
-  await settle()
 }
 
 describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 Worker の省略形）', () => {
   beforeEach(() => {
+    // 前の描画のURL書き込みを終えてから、新しい試験のURLへ戻す。
+    flushListUrlState()
     window.history.replaceState(null, '', '/inflow-links')
     accountState.id = 'acc-1'
     summaryMode = 'full-real'
@@ -208,6 +216,8 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     act(() => {
       root.unmount()
     })
+    // URLの保存はrAFの後。混雑するとunmount後にもpendingが残るので確定する。
+    flushListUrlState()
     host.remove()
     vi.unstubAllGlobals()
   })
@@ -216,7 +226,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
 
     // 全体: 経路6件・友だち17人・動きが未設定6件・広告とつないだ0件。
     const cards = kpiCards()
@@ -264,7 +274,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
 
     expect(kpiText()).toContain('17人')
 
@@ -278,10 +288,13 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
 
     expect(kpiText()).toContain('17人')
 
+    // CIの遅い描画を再現する。検索は反映するが、URLの保存用のコマはまだ来ない。
+    // 次のアカウント試験がこの検索語を拾わないことも続けて確かめる。
+    vi.stubGlobal('requestAnimationFrame', () => 1)
     await setSearch('そんざいしないさーち')
     expect(host.textContent).toContain('条件に合うものがありません')
     expect(kpiText()).toContain('17人')
@@ -291,14 +304,14 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
     expect(kpiText()).toContain('17人')
 
     accountState.id = 'acc-2'
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes('B春')
 
     const cards = kpiCards()
     expect(cards[0]).toContain('2件')
@@ -313,7 +326,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
 
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
@@ -337,7 +350,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
 
     // 一覧は読めているので経路は6件。動きが未設定も行だけ見れば数えられる。
     // 友だち追加は集計が要るので「—」。
@@ -355,7 +368,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
-    await settle()
+    await waitForRoutes()
 
     const cards = kpiCards()
     expect(cards).toHaveLength(4)
