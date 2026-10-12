@@ -613,7 +613,7 @@ export default function BroadcastListV8() {
       icon: CalendarClock,
       value: kpiPending ? null : (listKpis?.scheduled ?? null),
       unit: '件',
-      detail: '今日 —（未取得）',
+      detail: <span title="今日の予約件数は取得していません">今日 {emptyValue('unknown')}</span>,
     },
     narrow
       ? {

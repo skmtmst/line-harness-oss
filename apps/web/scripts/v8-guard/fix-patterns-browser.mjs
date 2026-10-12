@@ -66,8 +66,10 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     for (const el of all('button,a[role="button"],[data-page-title]')) {
       if (/^(直す|編集|編集をする)$/.test(el.textContent.trim()) || /（任意）/.test(el.textContent) && el.matches('[data-page-title]')) add('F3', el, 'noncanonical action or optional title')
     }
-    for (const el of all('[data-unknown-value],td:not([data-list-name-cell]) [data-design-node="xRvDB"],td:not([data-list-name-cell])')) {
-      if ((el.hasAttribute('data-unknown-value') || /^(?:種類を確認.*|確認できません|不明|未取得|[（(]未取得[）)])$/.test(el.textContent.trim())) && !['—', '未設定', 'なし'].includes(el.textContent.trim())) add('F7', el, 'unknown value is not one of the three canonical values')
+    for (const el of all('[data-unknown-value],td:not([data-list-name-cell]) [data-design-node="xRvDB"],td:not([data-list-name-cell]),[data-kpi-detail] [role="note"]')) {
+      if (el.matches('td') && el.querySelector('[data-unknown-value]')) continue
+      if ((el.hasAttribute('data-unknown-value') || /^(?:種類を確認.*|確認できません|不明|未取得|[（(]未取得[）)])$/.test(el.textContent.trim())
+        || /—\s*[（(]未取得[）)]/.test(el.textContent)) && !['—', '未設定', 'なし'].includes(el.textContent.trim())) add('F7', el, 'unknown value is not one of the three canonical values')
     }
     for (const el of all('[data-list-sort]')) {
       const value = el.querySelector('[data-select-value]')

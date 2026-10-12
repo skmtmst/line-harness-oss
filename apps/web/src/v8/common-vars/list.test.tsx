@@ -142,6 +142,27 @@ function buttonByText(text: string): HTMLElement {
 }
 
 describe('V8 共通情報の一覧（src/v8）の動き', () => {
+  it('未入力と取得できない数を分け、実値の0を残す', async () => {
+    // 使用先の列が出る1440相当。狭い板ではこの列を詳細へ畳む。
+    const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+      matches:false, media:query, onchange:null,
+      addEventListener:vi.fn(), removeEventListener:vi.fn(),
+      addListener:vi.fn(), removeListener:vi.fn(), dispatchEvent:vi.fn(()=>true),
+    }))
+    try {
+      listVars.mockResolvedValue({success:true,data:[{...company,usageCount:undefined},contact,{...notice,value:'0'}]})
+      act(() => { root.render(<CommonVarsListV8 />) })
+      await flush()
+      const rows = [...host.querySelectorAll('tbody tr')]
+      const companyRow = rows.find(row=>row.textContent?.includes('会社名'))!
+      expect(companyRow.querySelector('[title="使われている場所を取得できていません"]')?.textContent).toBe('—')
+      expect(rows.find(row=>row.textContent?.includes('問い合わせ先'))?.textContent).toContain('未設定')
+      const zeroRow = rows.find(row=>row.textContent?.includes('臨時のお知らせ'))!
+      expect([...zeroRow.querySelectorAll('td')].some(cell=>cell.textContent==='0')).toBe(true)
+      expect(zeroRow.textContent).toContain('なし')
+      expect(host.textContent).not.toContain('—（未取得）')
+    } finally { media.mockRestore() }
+  })
   it('行が出て、数の帯と空のままの帯が出る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()

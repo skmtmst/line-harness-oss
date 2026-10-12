@@ -4,6 +4,19 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('F7 counts unknown annotations in a cell and KPI note while retaining known values', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><table><tbody><tr><td>—（未取得）</td><td>0</td><td>未設定</td><td>なし</td></tr></tbody></table><div data-kpi-detail><span role="note">今日 —（未取得）</span></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F7,2)
+    await page.locator('td').first().evaluate(el=>el.textContent='—')
+    await page.locator('[role="note"]').evaluate(el=>el.textContent='今日 —')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F7,0)
+    assert.equal(await page.locator('td').nth(1).innerText(),'0')
+  } finally { await browser.close() }
+})
+
 test('F5 checks rendered toolbar control ownership without board exceptions', async () => {
   const owners = sharedControlOwners()
   assert.ok(owners.includes('button'))

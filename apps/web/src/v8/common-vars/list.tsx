@@ -57,7 +57,7 @@ import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field, RequiredBadge } from '@/components/shared/form-controls';
-import { emptyValue } from '@/components/shared/empty-value';
+import { displayValue, emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -1173,8 +1173,8 @@ function CommonVarsListInner() {
                         </div>
                       } folder={folderDotOf(item)}
                     />
-                    <Td className={styles.valueCell} title={valueText || '（空）'}>
-                      {valueText || <span className={styles.valueEmpty}>（空）</span>}
+                    <Td className={styles.valueCell} title={displayValue(valueText, 'unconfigured')}>
+                      {valueText || <span className={styles.valueEmpty}>{emptyValue('unconfigured')}</span>}
                     </Td>
                     <Td>
                       <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
@@ -1182,7 +1182,7 @@ function CommonVarsListInner() {
                     {!narrow && (
                       <Td>
                         {item.usageCount === undefined ? (
-                          <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
+                          <span className={styles.usageNone} title="使われている場所を取得できていません">{emptyValue('unknown')}</span>
                         ) : item.usageCount === 0 ? (
                           <span className={styles.usageNone}>{emptyValue('none')}</span>
                         ) : (
