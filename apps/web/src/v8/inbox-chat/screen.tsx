@@ -918,7 +918,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })}`,
       ))
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
-      if (res.success) {
+      if (res.success && res.data && Array.isArray(res.data.items)) {
         setEmailError('')
         if (append) {
           const rows = res.data.items
@@ -2602,8 +2602,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setShowMemoEditor(false)
       }
     } catch (memoSaveError) {
-      saveErrors.capture(memoSaveError)
       if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
+        saveErrors.capture(memoSaveError)
         setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした')
       }
     } finally {

@@ -83,8 +83,8 @@ describe('受信箱V4の画面契約', () => {
     // 覆う窓のままだと、直前のやり取りを見ながら書けない。
     expect(PAGE).toContain('handleSaveMemo')
     expect(PAGE).toContain('aria-labelledby="chat-internal-memo-title"')
-    expect(EMAIL_THREAD).toContain('createPortal(')
-    expect(EMAIL_THREAD).toContain('aria-labelledby="email-internal-memo-title"')
+    expect(EMAIL_THREAD).toContain('<Dialog open={showMemoEditor}')
+    expect(EMAIL_THREAD).toContain('title="内部メモ"')
     expect(EMAIL_THREAD).toContain('/notes`')
     expect(EMAIL_THREAD).toContain('担当者だけに表示され、相手には送信されません。')
     expect(EMAIL_THREAD).not.toContain('>閉じる</button>')

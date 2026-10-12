@@ -105,7 +105,7 @@ describe('受信箱 保存した検索の完了判定', () => {
   })
 
   it('削除は名前の隣へ常設せず、その他操作へ畳む', () => {
-    expect(PAGE).toContain("import { MoreAction } from '@/components/shared/row-actions'")
+    expect(PAGE).toContain("import { RowMenu } from '@/components/shared/row-actions'")
     expect(PAGE).toContain('label={`${view.name}の操作`}')
     expect(PAGE).toContain('保存した検索を削除')
   })

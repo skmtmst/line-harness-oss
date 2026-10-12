@@ -161,7 +161,9 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
     expect(panel).not.toContain('hidden xl:block')
     // 狭い幅では fixed のドロワー（背景の暗幕付き）として出す。
     expect(panel).toContain('wide={wideInfoPanel}')
-    expect(PAGE).toContain("wideInfoPanel ? 'hidden' : ''")
+    expect(PAGE).toContain('<InboxInfoBackdrop wide={wideInfoPanel}')
+    const backdrop = readFileSync(join(HERE, '../shared/inbox-content.tsx'), 'utf8')
+    expect(backdrop).toContain('return wide ? null : <div')
     // 広い幅では従来どおり列として並ぶ。
     expect(panel).toContain('wide={wideInfoPanel}')
   })
