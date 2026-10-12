@@ -15,7 +15,7 @@ test('B-191: list placeholders remain readable at both widths; fixed-width regre
     for (const width of [1440, 1152]) {
       await page.setViewportSize({ width, height: 900 })
       for (const placeholder of ['ルール名・言葉で探す', '成果地点の名前で探す', '名前・本文・差し込みで探す']) {
-        await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('search-field')}\n*{box-sizing:border-box} .toolbar{width:800px}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><div class="row1"><div class="searchSlot" data-toolbar-search style="--list-search-width:160px"><div class="search"><svg style="width:16px;height:16px;flex:none"></svg><input type="search" class="input" placeholder="${placeholder}"></div></div></div></div></section></html>`)
+        await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('search-field').replaceAll('.searchIcon', '.controlIcon').replaceAll('.search', '.controlSearch').replaceAll('.input', '.controlInput')}\n*{box-sizing:border-box} .toolbar{width:800px}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><div class="row1"><div class="search" data-toolbar-search style="--list-search-width:160px"><div class="controlSearch"><svg style="width:16px;height:16px;flex:none"></svg><input type="search" class="controlInput" placeholder="${placeholder}"></div></div></div></div></section></html>`)
         await page.evaluate(() => document.fonts.ready)
         assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-191 探す欄の見本文字切れ'))
         await page.locator('input').evaluate(fitListSearchPlaceholder)

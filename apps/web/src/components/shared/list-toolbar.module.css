@@ -220,7 +220,7 @@ html:root :global([data-template-region='toolbar']):has(> div > :is([data-design
 }
 
 /* B-191: reserve the measured placeholder, then wrap the other list tools. */
-html:root :is(.toolbar, .slots) [data-toolbar-search] {
+html:root :is(.toolbar, .slots) :is(.search, .searchSlot)[data-toolbar-search] {
   min-width: min(var(--list-search-content-min, var(--tpl-list-search-min)), 100%);
   flex-basis: max(var(--list-search-width, var(--tpl-list-search-w)), var(--list-search-content-min, 0px));
 }
