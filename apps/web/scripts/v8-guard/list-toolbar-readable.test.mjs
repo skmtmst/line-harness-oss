@@ -270,3 +270,51 @@ test('V2: a collapsed folder reserves its readable selected width instead of a f
     assert.equal(await fit(), false, 'the former narrow wrapper must be exposed')
   } finally { await browser.close() }
 })
+
+test('F6: KPI necessary height follows painted lines with fixed spacing, forced height and padding fail', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const markup = note => `<html><style>${read('../../src/app/globals.css')}\n${css('kpi-card')}\n${read('../../src/components/shared/kpi-band-v8.css')}\n*{box-sizing:border-box}p{margin:0}</style><section data-list-skeleton style="width:700px"><div data-kpi-strip data-kpi-presentation="band"><div class="card" data-design-version="v8" data-kpi-presentation="band"><div class="head"><p class="label">件数</p></div><div class="valueRow"><p class="value"><span class="number" data-kpi-number>2</span></p></div><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note">${note}</span></p></div></div></section></html>`
+    const rule = 'B-178 数の帯の共通余白と必要高'
+    for (const [note, expected] of [['補足',116], ['補足<br>二行目',134], ['補足<br>二行目<br>三行目',152]]) {
+      await page.setContent(markup(note))
+      assert.equal(await page.locator('.card').evaluate(el => el.getBoundingClientRect().height), expected)
+      assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes(rule))
+      await page.locator('.card').evaluate(el => el.style.height='220px')
+      assert.ok((await page.evaluate(scanListSkeleton)).failures.includes(rule))
+      await page.locator('.card').evaluate(el => { el.style.height=''; el.style.paddingTop='24px' })
+      assert.ok((await page.evaluate(scanListSkeleton)).failures.includes(rule))
+      await page.locator('.card').evaluate(el => { el.style.paddingTop=''; el.querySelector('[data-kpi-detail]').style.minHeight='80px' })
+      assert.ok((await page.evaluate(scanListSkeleton)).failures.includes(rule))
+    }
+  } finally { await browser.close() }
+})
+
+test('F6: all list pagers own one layer of padding, including lists without skeleton markers', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const templateCss = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
+    for (const skeleton of [false,true]) {
+      await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${templateCss}\n*{box-sizing:border-box}button{height:32px}</style><div class="listBody" ${skeleton?'data-list-skeleton':''}><div class="pagination"><div class="pagination"><div class="paginationRow"><span>1件中 1〜1件</span><nav><button>1</button></nav></div></div></div></div></html>`)
+      assert.equal(await page.locator('.pagination').first().evaluate(el => el.getBoundingClientRect().height), 56)
+      assert.equal(await page.locator('.pagination .pagination').evaluate(el => getComputedStyle(el).padding), '0px')
+      await page.locator('.pagination .pagination').evaluate(el => el.style.padding='12px 24px')
+      assert.equal(await page.locator('.pagination').first().evaluate(el => el.getBoundingClientRect().height), 80)
+    }
+  } finally { await browser.close() }
+})
+
+test('F1/F6: stacked state badges keep their text and the 60px row with common spacing', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('data-table')}\n${css('status-badge')}\n*{box-sizing:border-box}table{width:700px}tr{height:60px}</style><section data-list-skeleton><table><tbody><tr class="row" data-shared-part="list-row"><td class="bodyCell">名前</td><td class="bodyCell statusCell"><div class="statusStack"><span class="badge success">公開中</span><span class="badge danger compact">後処理の未完 2</span></div></td></tr></tbody></table></section></html>`)
+    assert.equal(await page.locator('tr').evaluate(el => Math.round(el.getBoundingClientRect().height)), 60)
+    assert.equal(await page.locator('.statusStack').evaluate(el => getComputedStyle(el).gap), '4px')
+    assert.equal(await page.locator('.badge').nth(1).innerText(), '後処理の未完 2')
+    await page.locator('.statusCell').evaluate(el => el.style.paddingBlock='12px')
+    assert.ok(await page.locator('tr').evaluate(el => el.getBoundingClientRect().height) > 60)
+  } finally { await browser.close() }
+})

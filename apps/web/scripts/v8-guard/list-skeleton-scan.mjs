@@ -39,8 +39,38 @@ export function scanListSkeleton() {
       const rowHeight = contentLines > 1 ? 60 : 52
       if (visible(row) && !row.querySelector('[colspan]') && !near(row.getBoundingClientRect().height, rowHeight)) fail(`B-178 行${rowHeight}`, row)
     }
-    for (const cell of root.querySelectorAll('[data-kpi-strip]:not([data-kpi-density="compact"]) > [data-design-version]')) {
-      if (visible(cell) && !near(cell.getBoundingClientRect().height, 116)) fail('B-178 数の帯116', cell)
+    // Keep canonical spacing fixed. U6 requires readable notes and a separate
+    // action line; derive necessary height from painted lines, never from a
+    // caller's height/min-height or a relaxed upper bound.
+    const paintedLines = el => {
+      if (!el || !visible(el)) return 0
+      const centers = [], walker = document.createTreeWalker(el, 4)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim() || !visible(node.parentElement) || node.parentElement.closest('svg,[hidden],.sr-only')) continue
+        const range = document.createRange(); range.selectNodeContents(node)
+        for (const rect of range.getClientRects()) if (rect.width > 0 && rect.height > 0) {
+          const center = rect.top + rect.height / 2
+          if (!centers.some(value => Math.abs(value - center) < 7)) centers.push(center)
+        }
+      }
+      return centers.length
+    }
+    for (const band of root.querySelectorAll('[data-kpi-strip]:not([data-kpi-density="compact"])')) {
+      const cells = [...band.querySelectorAll(':scope > [data-design-version]')].filter(visible)
+      if (!cells.length) continue
+      const hasDetail = cells.some(cell => cell.querySelector('[data-kpi-detail-present]'))
+      const expected = hasDetail ? Math.max(116, ...cells.map(cell => {
+        const detail = cell.querySelector('[data-kpi-detail]')
+        const detailLines = detail ? [...detail.children].filter(visible).reduce((sum, child) => sum + paintedLines(child), 0) : 0
+        return 32 + 24 + 26 + 16 + Math.max(1, detailLines) * 18
+      })) : 90
+      for (const cell of cells) {
+        const css = getComputedStyle(cell)
+        if (!near(cell.getBoundingClientRect().height, expected)
+          || !near(parseFloat(css.paddingTop), 16) || !near(parseFloat(css.paddingBottom), 16)
+          || !near(parseFloat(css.paddingLeft), 24) || !near(parseFloat(css.paddingRight), 24)
+          || !near(parseFloat(css.rowGap), 8)) fail('B-178 数の帯の共通余白と必要高', cell)
+      }
     }
     for (const detail of root.querySelectorAll('[data-kpi-strip] [data-kpi-detail]')) {
       const note = detail.querySelector('[role="note"]')
