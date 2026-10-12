@@ -11,9 +11,9 @@ describe('フォルダ行の「…」の場所（I3L41O）', () => {
     expect(PANEL).toContain('aria-hidden="true"')
   })
 
-  it('場所取りは v8 だけで出す（v7 の見た目は変えない）', () => {
-    expect(CSS).toContain('.menuSlot { display: none; }')
-    expect(CSS).toContain("[data-theme='v8'] .menuSlot")
+  it('今の行は共通の規定で操作の場所を取る', () => {
+    expect(CSS).not.toContain('.menuSlot { display: none; }')
+    expect(CSS).toMatch(/:root \.menuSlot\s*\{[^}]*width:/s)
   })
 
   it('選んでいない行の「…」は場所を取らない（重ねて出す）', () => {

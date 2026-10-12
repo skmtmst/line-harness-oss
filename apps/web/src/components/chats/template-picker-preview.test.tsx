@@ -9,7 +9,7 @@
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   renderPreviewCalls: [] as unknown[],
@@ -70,8 +70,10 @@ describe('テンプレート選択のプレビュー解決(N-026)', () => {
     expect(call[0]).toBe('fr-1')
     expect(call[1].content).toContain('{{name}}')
     await waitFor(() => {
-      expect(screen.getByText('利用者1さん、ポチの件です {{pet_name}}')).toBeTruthy()
+      expect(screen.getByText((_, element) => element?.tagName === 'SPAN' && element.textContent === '利用者1さん、ポチの件です {{pet_name}}')).toBeTruthy()
     })
+    expect(document.querySelector('[data-token="{{name}}"]')?.textContent).toBe('利用者1')
+    expect(document.querySelector('[data-token="{{field.pet_name}}"]')?.textContent).toBe('ポチ')
     // 解決しきれない差し込みは警告として出る。
     expect(screen.getByRole('alert').textContent).toContain('{{pet_name}}')
   })
@@ -110,4 +112,26 @@ describe('テンプレート選択のプレビュー解決(N-026)', () => {
     expect(fixture.renderPreviewCalls).toHaveLength(0)
     expect(screen.queryByRole('alert')).toBeNull()
   })
+  test('解決済み本文を表示しても入力欄へ渡す値は元の差し込み文字列', async () => {
+    const onPick = vi.fn()
+    render(<TemplatePicker open onClose={() => {}} onPick={onPick} chatId="fr-1" />)
+    await waitFor(() => expect(document.querySelector('[data-token="{{name}}"]')?.textContent).toBe('利用者1'))
+    fireEvent.click(screen.getByRole('button', { name: '入力欄に入れる' }))
+    expect(onPick).toHaveBeenCalledWith('{{name}}さん、{{field.pet_name}}の件です {{pet_name}}')
+  })
+
+  test('別の会話へ切り替えたら前の相手の値を表示せず、遅れた応答も採用しない', async () => {
+    const deferred: Array<{ id: string; resolve: (value: unknown) => void }> = []
+    const preview = vi.spyOn((await import('@/lib/api')).api.chats, 'renderPreview').mockImplementation((id: string) => new Promise(resolve => deferred.push({ id, resolve })) as never)
+    const view = render(<TemplatePicker open onClose={() => {}} onPick={() => {}} chatId="fr-old" />)
+    await waitFor(() => expect(deferred.some(call => call.id === 'fr-old')).toBe(true))
+    view.rerender(<TemplatePicker open onClose={() => {}} onPick={() => {}} chatId="fr-new" />)
+    await waitFor(() => expect(deferred.some(call => call.id === 'fr-new')).toBe(true))
+    await act(async () => deferred.find(call => call.id === 'fr-new')!.resolve({ success: true, data: { content: '新しい方さん、ポチの件です {{pet_name}}', unresolved: ['pet_name'] } }))
+    await act(async () => deferred.filter(call => call.id === 'fr-old').forEach(call => call.resolve({ success: true, data: { content: '前の方さん、ポチの件です {{pet_name}}', unresolved: ['pet_name'] } })))
+    expect(document.querySelector('[data-token="{{name}}"]')?.textContent).toBe('新しい方')
+    expect(screen.queryByText('前の方')).toBeNull()
+    preview.mockRestore()
+  })
+
 })

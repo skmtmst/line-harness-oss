@@ -1,4 +1,6 @@
+import { writeFormDestinationsOnce } from './form-destination-workflow.js';
 import { applyTapExtras } from './tap-extras.js';
+import { runScenarioOp } from './scenario-actions.js';
 import { researchGateProblem, runResearchAnswerAction, validateResearchActionScope } from './research-forms.js';
 import type { Env } from '../index.js';
 /**
@@ -35,17 +37,15 @@ import {
   countChoiceUsage,
   countFormSubmissionsByFriend,
   enrollFriendInReminder,
-  enrollFriendInScenario,
   getFriendFieldById,
   getFixedFriendField,
   getMessageTemplateById,
   getTemplateById,
   jstNow,
-  removeTagFromFriend,
   setFriendFieldValue,
   validateFriendFieldValue,
 } from '@line-crm/db';
-import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
 import { buildMessage } from './line-message.js';
 
 /** 回答1件。キーは入力ブロックの name。 */
@@ -128,6 +128,7 @@ export interface FormCapacitySlot {
   /** `form_capacity_claims.slot_key`。全体は固定値、選択肢は `choice:ブロック名:ラベル`。 */
   key: string;
   limit: number;
+  choice?: { fieldName: string; label: string; isOther: boolean; labels: string[] };
   /** 確保できなかったときに利用者へ見せる文言。 */
   message: string;
 }
@@ -171,6 +172,7 @@ export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): 
       slots.push({
         key: `choice:${block.name}:${choice.label}`,
         limit: choice.capacity!.limit!,
+        choice: { fieldName: block.name, label: choice.label, isOther: !!choice.isOther, labels: (block.choices ?? []).map(c => c.label) },
         message: `「${choice.label}」は定員に達しました`,
       });
     }
@@ -315,14 +317,13 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     const value = answers[block.name];
     if (value === undefined) continue;
 
-    await runEffectStep(input, failedEffects, destinationWrites, `destinations:${block.id}`, () => writeDestinations(
-      db,
-      block,
-      value,
-      friendId,
-      destinationWrites,
-      input.formId,
-    ));
+    await runEffectStep(input, failedEffects, destinationWrites, `destinations:${block.id}`, () => {
+      if ((!block.destinations && !fixedFieldForBlock(block)) || isFormAnswerEmpty(value)) return Promise.resolve();
+      return writeFormDestinationsOnce({
+      db, friendId, sourceKey: input.idempotencyPrefix, blockId: block.id, stats: destinationWrites,
+      write: (ownedDb, stats) => writeDestinations(ownedDb, block, value, friendId, stats, input.formId),
+      });
+    });
 
     if (hasChoices(block)) {
       await runEffectStep(input, failedEffects, destinationWrites, `choices:${block.id}`, () =>
@@ -746,7 +747,7 @@ export async function runFormAction(
     case 'tag':
       for (const tagId of action.tagIds ?? []) {
         if (action.op === 'remove') {
-          await removeTagFromFriend(db, friendId, tagId);
+          await detachTagAndFireSideEffects(db, friendId, tagId, input.idempotencyPrefix ? `${input.idempotencyPrefix}:${pushSuffix ?? actionIndex}:remove:${tagId}` : undefined);
         } else {
           await attachTagAndFireSideEffects(
             db,
@@ -797,7 +798,7 @@ export async function runFormAction(
           .run();
         return;
       }
-      await enrollFriendInScenario(db, friendId, action.scenarioId);
+      await runScenarioOp(db, friendId, '', { op: 'start', scenarioId: action.scenarioId }, input.idempotencyPrefix ? `${input.idempotencyPrefix}:${pushSuffix ?? actionIndex}` : undefined);
       return;
 
     case 'reminder': {

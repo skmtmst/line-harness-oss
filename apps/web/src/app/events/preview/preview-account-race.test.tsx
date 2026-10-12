@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ account: 'acc-a', pending: new Map<string, (v: unknown) => void>() }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'ev-1' : null) }),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))

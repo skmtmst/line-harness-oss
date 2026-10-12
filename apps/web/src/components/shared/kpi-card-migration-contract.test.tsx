@@ -10,7 +10,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 
 describe('KpiCardへの一本化契約', () => {
-  it('数のカードはKpiCardだけを使い、V6の見せ方にする', () => {
+  it('数のカードは現在のV8へ固定し、数の整形と行き先を保つ', () => {
     const html = renderToStaticMarkup(
       <KpiCard
         title="成果"
@@ -21,17 +21,17 @@ describe('KpiCardへの一本化契約', () => {
       />,
     )
 
-    expect(html).toContain('data-design-version="v6"')
+    expect(html).toContain('data-design-version="v8"')
     expect(html.replace(/<[^>]*>/g, '')).toContain('1,234件')
     expect(html).toContain('href="/conversions"')
   })
 
-  it('配信告知をbroadcast variantとして明示する', () => {
+  it('配信告知も現在のV8のカードで数と単位を表示する', () => {
     const html = renderToStaticMarkup(
-      <KpiCard title="今週の配信" value={3} unit="通" detail="過去7日" variant="broadcast" />,
+      <KpiCard title="今週の配信" value={3} unit="通" detail="過去7日" />,
     )
 
-    expect(html).toContain('data-design-version="broadcast"')
+    expect(html).toContain('data-design-version="v8"')
     expect(html.replace(/<[^>]*>/g, '')).toContain('3通')
   })
 
@@ -39,7 +39,7 @@ describe('KpiCardへの一本化契約', () => {
     const files = [
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
-      'components/users/summary-bar.tsx',
+      'v8/friends/merged/merged.tsx',
     ]
 
     for (const file of files) {
@@ -55,7 +55,7 @@ describe('KpiCardへの一本化契約', () => {
     const files = [
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
-      'components/users/summary-bar.tsx',
+      'v8/friends/merged/merged.tsx',
     ]
 
     for (const file of files) {

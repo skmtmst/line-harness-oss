@@ -1,22 +1,18 @@
 'use client'
-
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import PageHeader from '@/components/shared/page-header'
-import ListState from '@/components/shared/list-state'
-import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError } from '@/lib/api'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
-import LifetimeTab from './lifetime-tab'
-import MembersTab from './members-tab'
 import MembersPageV8 from '@/v8/nen-members/members'
-import RankSettingsTab from './rank-settings-tab'
+
+
 
 export type MemberTab = 'members' | 'ranks' | 'lifetime'
+
 export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
+
 
 /**
  * 然-NEN- 会員。★V6 37-1（`IqL2Z`）会員一覧／37-1-A（`p7xHl`）ランク設定／37-1-B（`Vt65m`）ライフタイム。
@@ -35,9 +31,10 @@ export default function NenMembersPage() {
   )
 }
 
+
 function MembersInner() {
   usePageTitle('会員')
-  const theme = useAdminTheme()
+
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
@@ -105,12 +102,7 @@ function MembersInner() {
   // 選択中アカウントの設定だけを下のタブへ渡す。別アカウントのものは渡さない。
   const settings = snapshot && snapshot.accountId === selectedAccountId ? snapshot.data : null
 
-  /*
-   * ★V8-B：data-theme="v8" のときだけ新しい会員画面（AOWoJ・fb9NJ・zQ5vY）
-   * へ切り替える。v7 の見た目はそのまま。
-   */
-  if (theme === 'v8') {
-    return (
+  return (
       <MembersPageV8
         accountId={selectedAccountId}
         tab={tab}
@@ -121,40 +113,4 @@ function MembersInner() {
         onChangeTab={changeTab}
       />
     )
-  }
-
-  return (
-    <div data-design-node="IqL2Z" className="flex flex-col gap-4">
-      <PageHeader breadcrumb={[{ label: '専用機能' }, { label: '会員' }]} title="会員" help="" />
-      <div data-design="Tabs" data-design-node="AG3tX">
-        {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
-        <ScrollableTabs
-          items={[
-            { label: '会員一覧', count: settings?.kpis?.members, current: tab === 'members', onClick: () => changeTab('members') },
-            { label: 'ランク設定', current: tab === 'ranks', onClick: () => changeTab('ranks') },
-            { label: 'ライフタイム', current: tab === 'lifetime', onClick: () => changeTab('lifetime') },
-            { label: 'ECとの照合', href: '/ec-commerce/identity-candidates' },
-          ]}
-        />
-      </div>
-
-      {/*
-        アカウント未選択で真っ白にしない。一覧系と同じく「選んでください」の
-        案内を出す（`/nen-members` やマイル明細と同じ形）。
-      */}
-      {!selectedAccountId ? (
-        <ListState
-          kind="empty"
-          title="LINEアカウントを選んでください"
-          description="上のバーから、会員を見るLINEアカウントを選びます。"
-        />
-      ) : tab === 'ranks' ? (
-        <RankSettingsTab accountId={selectedAccountId} status={status} settings={settings} onSaved={handleSaved} onRetry={() => void load()} />
-      ) : tab === 'lifetime' ? (
-        <LifetimeTab accountId={selectedAccountId} status={status} settings={settings} onSaved={handleSaved} onRetry={() => void load()} />
-      ) : (
-        <MembersTab accountId={selectedAccountId} settingsStatus={status} settings={settings} />
-      )}
-    </div>
-  )
 }

@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 
-const consoleSource = readFileSync(new URL('./restaurant-console.tsx', import.meta.url), 'utf8')
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const ledgerSource = ['reservations', 'list', 'dialogs'].map(name => read('../../v8/restaurant/reservations/' + name + '.tsx')).join('\n') + read('../../v8/restaurant-reservations/detail-dialog.tsx')
+const dashboardSource = read('../../v8/restaurant/dashboard/stores.tsx')
+const approvalSource = read('../../v8/restaurant/approvals/approvals.tsx')
 const apiSource = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta.url), 'utf8')
 
 describe('飲食店向け予約台帳（R103・R107）', () => {
@@ -29,23 +32,23 @@ describe('飲食店向け予約台帳（R103・R107）', () => {
       '予約台帳のページ送り',
       '条件に合う予約はありません',
     ]) {
-      expect(consoleSource).toContain(label)
+      expect(ledgerSource).toContain(label)
     }
-    expect(consoleSource).toContain('from: todayStartIso')
+    expect(ledgerSource).toContain('from: today.from')
   })
 
   test('予約行に変更・取消・復活があり取消は確認して在庫を戻す', () => {
     for (const label of [
-      'の予約を変更',
+      '変更する',
       '終了日時',
       'この予約を取り消しますか？',
-      '時間帯の在庫は人数分だけ戻ります',
+      'その時間帯の卓は空きに戻ります',
       '復活',
       '予約を有効に戻しました',
     ]) {
-      expect(consoleSource).toContain(label)
+      expect(ledgerSource).toContain(label)
     }
-    expect(consoleSource).toContain("update(cancelId, { status: 'cancelled' }")
+    expect(ledgerSource).toContain("restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled', expectedVersion:")
   })
 })
 
@@ -55,16 +58,16 @@ describe('飲食店向けダッシュボード（R104）', () => {
       '今日以降の有効予約',
       'コース単価×人数の合計です',
       '固定の客単価では計算しません',
-      '予約数の説明',
-      '売上予測の説明',
+      'title="予約数"',
+      'title="売上予測"',
     ]) {
-      expect(consoleSource).toContain(label)
+      expect(dashboardSource).toContain(label)
     }
-    expect(consoleSource).not.toContain('guestCount * 8800')
+    expect(dashboardSource).not.toContain('guestCount * 8800')
   })
 
   test('店舗のLINE異常も要確認に数える', () => {
-    expect(consoleSource).toContain("line_status === 'error'")
+    expect(dashboardSource).toContain("line_status === 'error'")
   })
 })
 
@@ -77,7 +80,7 @@ describe('飲食店向け承認（R105）', () => {
       '改定の前後が記録されていません',
       'payload_json',
     ]) {
-      expect(consoleSource).toContain(label)
+      expect(approvalSource).toContain(label)
     }
     expect(apiSource).toContain('payload_json')
   })

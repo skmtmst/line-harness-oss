@@ -3,33 +3,25 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const HERE = dirname(fileURLToPath(import.meta.url))
+const PAGE = readFileSync(join(HERE, 'users-v8.tsx'), 'utf8')
+const CSS = readFileSync(join(HERE, '../friends/friends-v8.module.css'), 'utf8')
 
-/*
- * U018/U041: 統合ユーザー（/users と /friends?tab=merged で同じ画面）。
- * 390pxでは検索・絞り込みが操作と同じ帯に入って潰れ、7列の表は見出しが
- * 衝突していた。共通部品は変えず、画面側の印＋scoped styleで縦へ逃がす。
- */
-describe('U018 統合ユーザーの検索・絞り込みを縦へ逃がす', () => {
-  it('検索・絞り込みを操作行とは別の専用行にする', () => {
-    expect(PAGE).toContain('data-users-actions="true"')
-    expect(PAGE).toContain('data-users-filters')
-    expect(PAGE).toContain('[data-users-filters] > div { flex-wrap: wrap; }')
-    expect(PAGE).toContain('[data-users-filters] [data-design-node="phlR1"] { flex: 1 1 100%; }')
+describe('統合ユーザーの現役の配置', () => {
+  it('主要操作と検索・絞り込みを別の行に置く', () => {
+    expect(PAGE).toContain('className={styles.headAction}')
+    expect(PAGE).toContain('className={styles.toolbar}')
+    expect(PAGE).toContain('className={styles.searchWrap}')
+    expect(PAGE).toContain('aria-label="統合ユーザーを検索"')
   })
 
-  it('作成・CSV・再計算の操作は残す', () => {
-    expect(PAGE).toContain('＋ 統合ユーザーを作る')
-    expect(PAGE).toContain('CSVで書き出す')
-    expect(PAGE).toContain('再計算')
-    expect(PAGE).toContain('UsersFilters')
+  it('作成・CSV・再計算と条件の操作を残す', () => {
+    for (const text of ['統合ユーザーを作る', 'CSVで書き出す', '再計算', 'u.setQ', 'u.setUid', 'u.setAccount', 'u.setOnlyDups']) expect(PAGE).toContain(text)
   })
-})
 
-describe('U041 統合ユーザー表の見出しの衝突', () => {
-  it('表は枠の内側で横へ動かせる', () => {
-    expect(PAGE).toContain('data-scroll-table')
-    expect(PAGE).toContain('[data-scroll-table] > div { overflow-x: auto; }')
-    expect(PAGE).toContain('[data-scroll-table] table { min-width: 860px; }')
+  it('表は現役の幅と見出しの折り返しの決まりを使う', () => {
+    expect(PAGE).toContain('className={styles.tableWrap}')
+    expect(CSS).toMatch(/\.table\s*\{[\s\S]*?width: 100%/)
+    expect(CSS).toMatch(/\.table th\s*\{[\s\S]*?white-space: nowrap/)
   })
 })

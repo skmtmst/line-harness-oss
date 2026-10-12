@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /*
@@ -22,6 +22,13 @@ describe('V8 の画面（src/v8）の決まり', () => {
       [...readFileSync(f, 'utf8').matchAll(/from\s+['"]([^'"]+)['"]/g)]
         .map((m) => m[1])
         .filter((s) => s.startsWith('@/app/') || /(^|\/)\.\.\/(\.\.\/)*app\//.test(s))
+        .filter((s) => {
+          // 現役V8のCSSと、描画を持たない型/純関数は旧画面ではない。
+          if (s.endsWith('.module.css')) return false
+          const base = s.startsWith('@/') ? join(ROOT, '..', s.slice(2)) : resolve(dirname(f), s)
+          const pure = [base, `${base}.ts`].find(p => p.endsWith('.ts') && existsSync(p))
+          return !pure || /from\s+['"](?:react|next\/)|createElement\s*\(/.test(readFileSync(pure, 'utf8'))
+        })
         .map((s) => `${relative(ROOT, f)} → ${s}`),
     )
     expect(bad).toEqual([])

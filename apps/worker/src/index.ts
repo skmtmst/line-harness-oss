@@ -67,7 +67,7 @@ import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
-import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
@@ -517,6 +517,7 @@ app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
+app.use('*', authenticatedRateLimitMiddleware);
 app.use('*', timingMark('auth'));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
@@ -1477,6 +1478,7 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'line webhook recovery',run:async()=>{const {processDueLineWebhookRetries}=await import('./services/line-webhook-recovery.js');await processDueLineWebhookRetries(env);}},
     {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
     {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
     {
@@ -1751,7 +1753,6 @@ async function runFrequentHeavyJobs(
       },
     },
     { name: 'visit stamps', run: () => processVisitStampQueue(env) },
-    { name: 'restaurant events', run: () => processRestaurantEvents(env) },
     { name: 'restaurant followup jobs', run: async () => { await processScenarioSourceJobs(env); } },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
@@ -2096,6 +2097,10 @@ async function scheduled(
   // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
+  if (lane === 'restaurantMinute') {
+    await runIsolatedScheduledJobs([{ name: 'restaurant events', run: () => processRestaurantEvents(env) }]);
+    return;
+  }
   if (lane === 'frequentHeavy') {
     await runFrequentHeavyJobs(event, env);
     return;

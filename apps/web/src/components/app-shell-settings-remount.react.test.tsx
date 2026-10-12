@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PageChromeProvider, useSettingsNavInline } from './shell/page-chrome'
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/staff', useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('./shell/app-top-bar', () => ({ default: () => null }))
 vi.mock('./layout/settings-inner-nav', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./layout/settings-inner-nav')>()

@@ -201,7 +201,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
                 aria-label="目標日"
                 className="min-w-0 flex-1"
               /></SaveErrorField>
-              <Button variant="secondary" className="text-ink-secondary v7:h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
+              <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
               </Button>
             </div>
@@ -209,7 +209,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
-                <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
+                <Button variant="secondary" className="text-ink-secondary px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
                   {n}日後
                 </Button>
               ))}

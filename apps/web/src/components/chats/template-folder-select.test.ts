@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
-const SELECT = readFileSync(join(HERE, 'template-folder-select.tsx'), 'utf8')
+const VIEW = readFileSync(join(HERE, '../../v8/inbox-chat/template-picker-view.tsx'), 'utf8')
+const PANEL = readFileSync(join(HERE, '../shared/folder-panel.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 // PERF-12: フォルダの親子展開はサーバー側へ移った。画面は folder_id を
 // そのまま渡し、直下の子を含める判断は Worker が行う。
@@ -14,13 +15,13 @@ const WORKER_TEMPLATES = readFileSync(
   'utf8',
 )
 
-describe('受信箱V6のテンプレートフォルダ', () => {
-  it('標準selectではなく、開状態を確認できるリストを使う', () => {
-    expect(PICKER).toContain('TemplateFolderSelect')
-    expect(SELECT).toContain('aria-haspopup="listbox"')
-    expect(SELECT).toContain('aria-expanded={open}')
-    expect(SELECT).toContain('role="listbox"')
-    expect(SELECT).not.toContain('<select')
+describe('受信箱のテンプレートフォルダ', () => {
+  it('V8のフォルダ列で選択状態を確認できる', () => {
+    expect(VIEW).toContain('<FolderPanel')
+    expect(VIEW).toContain('activeId={side.active}')
+    expect(VIEW).toContain('onSelect={(key) => props.onPickSide(')
+    expect(PANEL).toContain('aria-pressed=')
+    expect(VIEW).not.toContain('<select')
   })
 
   it('既存APIのfolderIdを落とさず、親を選ぶと子のテンプレートも出す', () => {
@@ -38,10 +39,11 @@ describe('受信箱V6のテンプレートフォルダ', () => {
     expect(PICKER).toContain("countOf('')")
     // 未分類だけを返す絞り込みは Worker 側。
     expect(WORKER_TEMPLATES).toContain("folderParam === '__none__'")
-    expect(PICKER).toContain("visibleTemplatesStatus === 'ready' ? `${total}件` : '—'")
-    expect(PICKER).toContain('テンプレートを読み込めませんでした。もう一度開き直してください。')
-    expect(SELECT).toContain("disabled={status !== 'ready'}")
-    expect(SELECT).toContain("option.count ?? '—'")
+    expect(PICKER).toContain('allCount: folderOptions[0]?.count ?? null')
+    expect(PICKER).toContain("status: visibleFoldersStatus === 'error' ? 'error'")
+    expect(VIEW).toContain('テンプレートを読み込めませんでした。もう一度開き直してください。')
+    expect(PANEL).toContain('row.count === null ? null :')
+
   })
 
   it('開くたびに前のLINEアカウントの内容を消してから読み直す', () => {

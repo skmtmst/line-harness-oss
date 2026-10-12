@@ -12,6 +12,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
@@ -26,6 +27,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { EVENT_NAME_MAX_LENGTH, EVENT_DESCRIPTION_MAX_LENGTH, resolveEventMultiAccountIds } from '@/components/events/event-draft-shared'
 
 /*
  * ★V8 イベント予約「イベントを作る」（Pencil `d4adD4`）。
@@ -54,6 +56,11 @@ const WAITLIST_OPTIONS = [
   { value: '0', label: '締め切る（キャンセル待ちを受けない）' },
   { value: '1', label: 'キャンセル待ちを受ける（空いたら順番に案内）' },
 ]
+
+function timeMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number)
+  return hour * 60 + minute
+}
 
 type QuestionDraft = { label: string; required: boolean }
 
@@ -109,7 +116,8 @@ function EventsCreateV8Inner() {
     delete next[id]
     return next
   })
-  const createdIdRef = useRef<string | null>(null)
+  const createdRef = useRef<{ accountId: string; event: EventDetail } | null>(null)
+  const [publishOpen, setPublishOpen] = useState(false)
 
   const update = <K extends keyof EventDetail>(key: K, value: EventDetail[K]) => setDraft((current) => ({ ...current, [key]: value }))
 
@@ -118,14 +126,16 @@ function EventsCreateV8Inner() {
   const dirty = snapshot !== initialRef.current
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  async function save(publish: boolean) {
-    if (saving || !canEdit) return
+  function validateInput() {
+    if (saving || !canEdit) return false
     if (!selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
-      return
+      return false
     }
     const errors: Record<string, string> = {}
     if (!draft.name.trim()) errors['ev-new-name'] = 'イベント名を入れてください'
+    else if (draft.name.length > EVENT_NAME_MAX_LENGTH) errors['ev-new-name'] = 'イベント名は255字以内で入力してください'
+    if ((draft.description ?? '').length > EVENT_DESCRIPTION_MAX_LENGTH) errors['ev-new-desc'] = '詳細は20000字以内で入力してください'
     if (draft.venue_url) {
       try {
         const url = new URL(draft.venue_url)
@@ -139,15 +149,22 @@ function EventsCreateV8Inner() {
     if (!startTime) errors['ev-new-start'] = '開始の時刻を入れてください'
     if (!endTime) errors['ev-new-end'] = '終わりの時刻を入れてください'
     else if (startTime && endTime <= startTime) errors['ev-new-end'] = '終了は開始より後にしてください'
+    else if (startTime && (timeMinutes(endTime) - timeMinutes(startTime)) < 15) errors['ev-new-end'] = '開催時間は15分以上で入力してください'
     const cap = Number(capacity)
     if (!Number.isInteger(cap) || cap < 1) errors['ev-new-cap'] = '定員は1以上の数で入れてください'
     setError(null)
     focusTarget.current = Object.keys(errors)[0] ?? null
     setFieldErrors(errors)
-    if (focusTarget.current) return
+    return !focusTarget.current
+  }
+
+  async function save(publish: boolean) {
+    if (!validateInput() || !selectedAccountId) return
     setSaving(true)
     setError(null)
-    let eventId = createdIdRef.current
+    let saved = createdRef.current?.accountId === selectedAccountId ? createdRef.current.event : null
+    let eventId = saved?.id ?? null
+    let stage: 'event' | 'slots' = 'event'
     try {
       const qs: EventQuestion[] = questions.map((question, index) => ({
         id: `q${index + 1}`, label: question.label, type: 'text', required: question.required, options: null,
@@ -155,17 +172,21 @@ function EventsCreateV8Inner() {
       const payload: Partial<EventDetail> = {
         ...draft,
         name: draft.name.trim(),
-        is_published: publish ? 1 : 0,
+        is_published: publish || saved?.is_published === 1 ? 1 : 0,
         questions: qs,
-        account_ids: (draft.target_type ?? 'single') === 'multi-account-dedup' ? [selectedAccountId] : null,
+        account_ids: resolveEventMultiAccountIds(draft, selectedAccountId),
       }
       delete payload.id
       delete payload.version
       if (!eventId) {
         const created = await eventsApi.createEvent(selectedAccountId, payload)
         eventId = created.id
-        createdIdRef.current = eventId
+        saved = created
+      } else {
+        saved = await eventsApi.updateEvent(selectedAccountId, eventId, payload, saved!.version ?? 1)
       }
+      createdRef.current = { accountId: selectedAccountId, event: saved! }
+      stage = 'slots'
       const startsAt = jstToUtcIso(date, startTime)
       const endsAt = jstToUtcIso(date, endTime)
       // 再送しても枠を二重に作らない（今の作りと同じ固定キー）。
@@ -173,6 +194,7 @@ function EventsCreateV8Inner() {
         { starts_at: startsAt, ends_at: endsAt, capacity: Number(capacity), client_key: `first-slot:${eventId}` },
       ])
       initialRef.current = snapshot
+      setPublishOpen(false)
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
@@ -183,8 +205,9 @@ function EventsCreateV8Inner() {
         : cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。'
       { if (!fieldFailure)
       setError(eventId
-        ? `イベントは下書きで作りましたが、最初の予約枠を作れませんでした。もう一度押すと続きから作ります。（${reason}）`
+        ? `イベントは${saved?.is_published === 1 ? '公開済みですが' : '下書きで作りましたが'}、${stage === 'slots' ? '最初の予約枠を作れませんでした' : '変更を保存できませんでした'}。もう一度押すと続きから作ります。（${reason}）`
         : reason) }
+      setPublishOpen(false)
       setSaving(false)
     }
   }
@@ -247,23 +270,29 @@ function EventsCreateV8Inner() {
       footerActions={(
         <>
           <Button href="/events">キャンセル</Button>
-          <Button disabled={saving} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving} busy={saving} onClick={() => void save(true)}><Globe size={15} aria-hidden="true" />公開する</Button>
+          <Button disabled={saving || !selectedAccountId} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
+          <Button variant="primary" disabled={saving || !selectedAccountId} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={15} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {!selectedAccountId ? <Notice tone="info">上のバーでLINE公式アカウントを選んでください</Notice> : null}
 
       <section className={styles.card} aria-labelledby="ev-new-body">
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>
         <div className={styles.field}><Field label="イベント名" htmlFor="ev-new-name" required><SaveErrorField names={["name","draft.name"]}><TextField
             id="ev-new-name"
             value={draft.name}
-            maxLength={255}
+            maxLength={EVENT_NAME_MAX_LENGTH}
             placeholder="秋のしつけ教室（第1回）"
             aria-invalid={Boolean(fieldErrors['ev-new-name']) || undefined}
             aria-describedby={fieldErrors['ev-new-name'] ? 'ev-new-name-error' : undefined}
             required
+            onBlur={() => {
+              const error = !draft.name.trim() ? 'イベント名を入れてください' : draft.name.length > EVENT_NAME_MAX_LENGTH ? 'イベント名は255字以内で入力してください' : null
+              if (error) setFieldErrors((current) => ({ ...current, 'ev-new-name': error }))
+              else clearFieldError('ev-new-name')
+            }}
             onChange={(event) => {
               update('name', event.target.value)
               clearFieldError('ev-new-name')
@@ -273,7 +302,7 @@ function EventsCreateV8Inner() {
         <div className={styles.field}><Field label="説明" htmlFor="ev-new-desc"><SaveErrorField names={["description","draft.description"]}><TextField
             id="ev-new-desc"
             value={draft.description ?? ''}
-            maxLength={20000}
+            maxLength={EVENT_DESCRIPTION_MAX_LENGTH}
             placeholder="開催趣旨・注意事項・持ち物など"
             onChange={(event) => update('description', event.target.value || null)}
           /></SaveErrorField></Field></div>
@@ -480,6 +509,7 @@ function EventsCreateV8Inner() {
       </section>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog open={publishOpen} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} onConfirm={() => save(true)} onCancel={() => setPublishOpen(false)} />
     </CreatePage></SaveErrorScope>
   )
 }

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
@@ -484,12 +485,12 @@ function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; val
       values.push(input.lineAccountId, input.lineAccountId);
     }
   } else if (input.includeTenantWide && input.allowedLineAccountIds.length > 0) {
-    conditions.push(`(ae.line_account_id IS NULL OR ae.line_account_id IN (${input.allowedLineAccountIds.map(() => '?').join(', ')}))`);
-    values.push(...input.allowedLineAccountIds);
+    conditions.push(`(ae.line_account_id IS NULL OR ae.line_account_id IN (${sqlIdSet(input.allowedLineAccountIds).sql}))`);
+    values.push(...(input.allowedLineAccountIds.length ? sqlIdSet(input.allowedLineAccountIds).binds : []));
   } else if (input.includeTenantWide) {
     conditions.push('ae.line_account_id IS NULL');
   } else if (input.allowedLineAccountIds.length > 0) {
-    const placeholders = input.allowedLineAccountIds.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(input.allowedLineAccountIds).sql;
     conditions.push(`(ae.line_account_id IN (${placeholders}) OR (
       ae.line_account_id IS NULL AND ae.actor_principal_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM staff_account_scopes audit_scope
@@ -497,7 +498,7 @@ function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; val
            AND audit_scope.line_account_id IN (${placeholders})
       )
     ))`);
-    values.push(...input.allowedLineAccountIds, ...input.allowedLineAccountIds);
+    values.push(...(input.allowedLineAccountIds.length ? sqlIdSet(input.allowedLineAccountIds).binds : []), ...(input.allowedLineAccountIds.length ? sqlIdSet(input.allowedLineAccountIds).binds : []));
   } else {
     conditions.push('1 = 0');
   }

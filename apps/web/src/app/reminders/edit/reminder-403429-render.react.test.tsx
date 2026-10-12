@@ -15,8 +15,8 @@ const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -25,31 +25,25 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
 }))
-vi.mock('@/lib/api', () => {
-  class MockApiError extends Error {
-    status: number
-    constructor(status: number, message: string) {
-      super(message)
-      this.name = 'ApiError'
-      this.status = status
-    }
-  }
-  return {
-    ApiError: MockApiError,
-    api: {
-      reminders: {
-        getDraft: fixture.getDraft,
-        saveDraft: fixture.saveDraft,
-        validateDraft: fixture.validateDraft,
-      },
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api,
+    reminders: { ...actual.api.reminders,
+      previewDraft: vi.fn(async () => ({ success: true, data: null })),
+      validateDraft: vi.fn(async () => ({ success: true, data: { valid: true, checks: [], audience: { matched: 5, excluded: 1 } } })),
+      ...fixture,
     },
-  }
+    folders: { ...actual.api.folders, list: vi.fn(async () => ({ success: true, data: [], unfiledCount: 0 })) },
+    friendFields: { ...actual.api.friendFields, list: vi.fn(async () => ({ success: true, data: [] })) },
+  } }
 })
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+
 const { ApiError: TestApiError } = await import('@/lib/api') as unknown as {
   ApiError: new (status: number, message: string) => Error & { status: number }
 }
 
-import { Issue469ReminderStepEditor } from './issue469-reminder-screens'
+import ReminderEditV8 from '@/v8/reminders/edit'
 
 const DRAFT_SETTINGS = {
   name: '予約前のお知らせ',
@@ -92,6 +86,7 @@ function draftResponse() {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.getDraft.mockReset()
   fixture.saveDraft.mockReset()
   fixture.validateDraft.mockReset()
@@ -102,8 +97,8 @@ afterEach(cleanup)
 describe('D015 リマインダ編集の取得失敗（実描画）', () => {
   it('403は権限の理由を出し、再読み込みを出し、保存もできない', async () => {
     fixture.getDraft.mockRejectedValue(new TestApiError(403, 'API error: 403'))
-    render(<Issue469ReminderStepEditor reminderId="r-1" />)
-    const alert = await screen.findByRole('alert')
+    render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    const alert = (await screen.findByText(/リマインダを見る権限がありません|混み合っています/)).closest('[data-list-state="error"]') as HTMLElement
     expect(within(alert).getByText('リマインダを見る権限がありません')).not.toBeNull()
     expect(within(alert).getByText(/オーナーか管理者に頼んでください/)).not.toBeNull()
     // 権限の案内を保ち、権限変更後に読み直せる。保存の口はない。
@@ -113,8 +108,8 @@ describe('D015 リマインダ編集の取得失敗（実描画）', () => {
 
   it('429は混雑の待ち理由を出し、再試行を残す', async () => {
     fixture.getDraft.mockRejectedValue(new TestApiError(429, 'API error: 429'))
-    render(<Issue469ReminderStepEditor reminderId="r-1" />)
-    const alert = await screen.findByRole('alert')
+    render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    const alert = (await screen.findByText(/リマインダを見る権限がありません|混み合っています/)).closest('[data-list-state="error"]') as HTMLElement
     expect(within(alert).getByText('混み合っています')).not.toBeNull()
     expect(within(alert).getByText(/少し待ってから、もう一度読み込んでください/)).not.toBeNull()
     expect(within(alert).getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
@@ -123,8 +118,8 @@ describe('D015 リマインダ編集の取得失敗（実描画）', () => {
   it('429から読み直すと直り、古い失敗文は消える', async () => {
     fixture.getDraft.mockRejectedValueOnce(new TestApiError(429, 'API error: 429'))
     fixture.getDraft.mockResolvedValue(draftResponse())
-    render(<Issue469ReminderStepEditor reminderId="r-1" />)
-    const alert = await screen.findByRole('alert')
+    render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    const alert = (await screen.findByText(/リマインダを見る権限がありません|混み合っています/)).closest('[data-list-state="error"]') as HTMLElement
     expect(within(alert).getByText('混み合っています')).not.toBeNull()
     fireEvent.click(within(alert).getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => {

@@ -61,6 +61,9 @@ export default function PetsListV8({
       const res = await nenPetsApi.pets(accountId, { ...query, page, pageSize })
       if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
+      if (!res.data?.kpis || !Number.isFinite(res.data.kpis.total) || !Array.isArray(res.data.items)) {
+        throw new Error('ペット一覧の内容を確認できませんでした。')
+      }
       setData(res.data)
       onKpis(res.data.kpis)
       setStatus('ready')
@@ -232,8 +235,8 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
           <span className={styles.sub} title={feed.sub}>{feed.sub}</span>
         </span>
       </Td>
-      <Td className={styles.colNeutered}><span className={styles.cell}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
-      <Td className={styles.colActivity}><span className={styles.cell}>{pet.activityLabel}</span></Td>
+      <Td className={styles.colNeutered}><span className={styles.cell} title={NEUTERED_LABEL[pet.neutered]}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
+      <Td className={styles.colActivity}><span className={styles.cell} title={pet.activityLabel}>{pet.activityLabel}</span></Td>
       <Td className={styles.colProduct}><span className={styles.cell} title={pet.productName ?? '（未設定）'}>{pet.productName ?? '（未設定）'}</span></Td>
       <Td className={styles.colUpdated}>
         {pet.weightStale && updated !== '—' ? <Pill tone="warn" title="体重が90日更新されていません">{updated}</Pill> : <span className={styles.cell}>{updated}</span>}

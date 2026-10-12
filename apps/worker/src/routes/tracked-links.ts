@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { extrasFromTrackedLink } from '../services/tap-extras.js';
 import { recordTrackedClick, processTrackedClick } from '../services/tracked-click-steps.js';
@@ -27,7 +28,7 @@ const trackedLinks = new Hono<Env>();
 async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const where = scope.allowedAccountIds.length
-    ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    ? `(line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
       ? 'line_account_id IS NULL'
       : '1 = 0';

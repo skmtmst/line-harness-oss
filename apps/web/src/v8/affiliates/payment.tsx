@@ -106,12 +106,13 @@ export default function PaymentTab() {
     try {
       const [settlement, summaries, current] = await Promise.all([
         api.affiliates.settlementPreview(accountId, period),
-        api.affiliates.paymentSummaries(accountId).catch(() => null),
-        api.affiliates.settlementCurrent(accountId, period).catch(() => null),
+        api.affiliates.paymentSummaries(accountId),
+        api.affiliates.settlementCurrent(accountId, period),
       ])
       if (seq !== loadSeq.current) return
+      if(!summaries.success || !Array.isArray(summaries.data) || !current.success)throw new Error('payment data unavailable')
       if (!settlement.success || !Array.isArray(settlement.data.affiliates)) throw new Error('payment data malformed')
-      setItems(summaries?.success && Array.isArray(summaries.data) ? summaries.data : [])
+      setItems(summaries.data)
       setPreview(settlement.data)
       const found = current?.success && current.data && typeof current.data === 'object' && 'settlementId' in current.data ? current.data : null
       setResumed(found)

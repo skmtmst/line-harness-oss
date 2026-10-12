@@ -192,7 +192,8 @@ describe('POST /webhook — 並行followの単一化 (#622)', () => {
     lineClientMocks.replyMessage.mockImplementation(
       async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
     );
-    await Promise.all([postFollow('webhook-a'), postFollow('webhook-b')]);
+    const occurredAt=Date.now();
+    await Promise.all([postFollow('webhook-a',db,{},occurredAt), postFollow('webhook-b',db,{},occurredAt)]);
 
     const sends = lineClientMocks.replyMessage.mock.calls.length
       + lineClientMocks.pushMessage.mock.calls.length;
@@ -821,7 +822,8 @@ describe('POST /webhook — 流入リンクの案内も同じ送信権の下 (#6
     lineClientMocks.replyMessage.mockImplementation(
       async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
     );
-    await Promise.all([postFollow('webhook-a'), postFollow('webhook-b')]);
+    const occurredAt=Date.now();
+    await Promise.all([postFollow('webhook-a',db,{},occurredAt), postFollow('webhook-b',db,{},occurredAt)]);
 
     // シナリオ1通（reply）＋ 流入リンクの案内1通（push）。負けた側は0通。
     expect(lineClientMocks.replyMessage.mock.calls.length).toBe(1);

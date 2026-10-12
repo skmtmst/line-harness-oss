@@ -13,8 +13,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
  * 足すときも同じ形にし、欄ごとの手書き検査を増やさない。
  */
 const WIRED = [
-  'app/webhooks/new/page.tsx',
-  'app/staff/new/page.tsx',
+  'v8/settings/staff/create.tsx',
 ]
 
 describe('blur検証の配線（★V7 sTJsh §6）', () => {
@@ -29,4 +28,14 @@ describe('blur検証の配線（★V7 sTJsh §6）', () => {
       expect(source).toContain('fields.define(')
     })
   }
+})
+
+// 現役V8は欄を離れた時の検査と、送信時のまとめ/最初の誤りへの移動を持つ。
+it('Webhook作成のV8は欄を離れた時と送信時の検査を保つ', () => {
+  const source = readFileSync(join(SRC, 'v8/webhooks/create.tsx'), 'utf8')
+  for (const key of ['name', 'url', 'secret']) expect(source).toContain(`onBlur={() => blurField('${key}')}`)
+  expect(source).toContain('setFieldErrors(errors)')
+  expect(source).toContain('Object.keys(errors)[0]')
+  expect(source).toContain('.focus()')
+  expect(source).toContain('Object.keys(errors).length > 0')
 })

@@ -1,9 +1,9 @@
 # 会員（専用機能）の動き（BEHAVIOR.md）
 
-対象：`app/nen/members/members-v8.tsx`（今までの V8 の会員）。このファイルの動きを写して、`members.tsx`（外枠）・`list.tsx`（会員一覧）・`ranks.tsx`（ランク設定）・`lifetime.tsx`（ライフタイム）を一から書いた。見た目は型（ListPage）と部品で組み直した。板は 会員一覧 `AOWoJ`・ランク設定 `fb9NJ`・ランクを消す（確認）`dEv6G`・ランク設定の競合 `e5yBLx`・ライフタイム `zQ5vY`。
+対象：`members.tsx`（外枠）・`list.tsx`（会員一覧）・`ranks.tsx`（ランク設定）・`lifetime.tsx`（ライフタイム）。旧タブと読まれない写しは除去済み。型（ListPage）と部品で組む。板は 会員一覧 `AOWoJ`・ランク設定 `fb9NJ`・ランクを消す（確認）`dEv6G`・ランク設定の競合 `e5yBLx`・ライフタイム `zQ5vY`。
 
 ## 入口
-- `app/nen/members/page.tsx`：V8 のときだけ `@/v8/nen-members/members` を出す。設定の読み込み（アカウントごとの世代・切り替えの瞬間に読み込み中へ戻す）と保存結果の受け取りは今までどおり page.tsx が持つ。v7 の画面（members-tab・rank-settings-tab・lifetime-tab）と `members-v8.tsx` は切り替えの日まで残す。
+- `app/nen/members/page.tsx`：`@/v8/nen-members/members` に固定。設定の読み込み（対象ごとの世代・切替の瞬間の読み込み状態）と保存結果の受け取りは page.tsx が持つ。設定タブは対象の切替で下書きを破棄して知らせ、切替前の保存・削除・同期の応答を採用しない。A→B→Aでも古いAの応答を捨てる。
 
 ## 受け付ける URL と指定（今までと同じ名前・同じ意味）
 - `?tab=ranks`：ランク設定。`?tab=lifetime`：ライフタイム。無い・ほかの値は会員一覧。

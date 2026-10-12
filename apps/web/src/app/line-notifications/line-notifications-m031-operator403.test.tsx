@@ -42,8 +42,8 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => 'customer',
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({ default: () => null }))
-vi.mock('./operator-notification-rules', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()

@@ -32,7 +32,10 @@ function cumulativeRows() {
   ]
 }
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       list: () => fixture.listImpl!(),
@@ -53,7 +56,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { AffiliatorsTab } = await import('./tabs')
+const { AffiliatorsTab } = await import('@/test-utils/affiliate-tabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -67,9 +70,9 @@ function funnelText() {
 
 /** 流れの段の箱（見出し＋値）の全文。見出しの親の箱を読む。 */
 function monthlyCell(label: string) {
-  const heads = Array.from(funnelSection().querySelectorAll('p'))
+  const heads = Array.from(funnelSection().querySelectorAll('label'))
   const head = heads.find((p) => p.textContent === label)
-  return head?.parentElement?.textContent ?? ''
+  return head?.parentElement?.parentElement?.textContent ?? ''
 }
 
 beforeEach(() => {
@@ -106,7 +109,8 @@ afterEach(() => {
 
 describe('R290 今月の流れは今月の範囲で数える', () => {
   test('累計80ではなく今月5クリックを出す。日付つきで取得する', async () => {
-    render(<AffiliatorsTab accountId={null} />)
+    render(<AffiliatorsTab accountId="acc-1" />)
+    fireEvent.click(screen.getByRole('button', { name: '今月の流れを確認' }))
     await waitFor(() => expect(funnelText()).toContain('5件'))
 
     // 今月の取得は日付つき。
@@ -133,12 +137,13 @@ describe('R293 失敗しても0件と出さない', () => {
   test('一覧も集計も失敗したら—になり、再試行の成功で数値が戻る', async () => {
     fixture.listImpl = async () => ({ success: false, error: '落ちた' })
     fixture.monthlyImpl = async () => ({ success: false, error: '落ちた' })
-    render(<AffiliatorsTab accountId={null} />)
+    render(<AffiliatorsTab accountId="acc-1" />)
+    fireEvent.click(screen.getByRole('button', { name: '今月の流れを確認' }))
 
-    // 流れの段に0件は出ない（流れと一覧の両方に再試行が出る）。
+    // 詳細窓の失敗を読み直せる。背景の一覧は窓の間は操作しない。
     await waitFor(() => expect(
       screen.getAllByRole('button', { name: 'もう一度読み込む' }).length,
-    ).toBeGreaterThanOrEqual(2))
+    ).toBeGreaterThanOrEqual(1))
     // 取れていない3段は—。承認は本当に0件（空の応答）なので0のまま。
     expect(monthlyCell('クリック')).toBe('クリック—')
     expect(monthlyCell('友だち追加')).toBe('友だち追加—')

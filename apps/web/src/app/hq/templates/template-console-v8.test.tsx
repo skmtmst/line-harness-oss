@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import TemplateConsole from './template-console'
+import TemplateConsole from '@/test-utils/hq-template-console'
 import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
 /**
@@ -13,7 +13,6 @@ import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templ
 
 const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','deleteImage','context','list','accounts','get','create','update','remove','duplicate','folderList','folderCreate','folderUpdate','folderRemove','preflight','distribute','result'].map(key => [key, vi.fn()])))
 vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), TEMPLATE_TYPES: ['tag','template','rich_menu','form'], hqTemplatesApi: { listStats: async () => ({ thisMonthSentCount: 0, outdatedTemplateCount: 0 }), listByKind: () => calls.list('template'), kindCounts: async () => ({}), versions: async () => [], receivedVersions: async () => [], messageReferences: async () => [], ...calls, folders: { list:calls.folderList, create:calls.folderCreate, update:calls.folderUpdate, remove:calls.folderRemove } } }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('./template-definition-editor', () => {
   const freshDefinition = (type: TemplateType): TemplateDefinition => type === 'tag'
     ? { schemaVersion: 1, tag: { name: '', folderId: null }, folders: [] }

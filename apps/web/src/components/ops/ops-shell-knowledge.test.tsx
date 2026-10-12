@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
+import { fireEvent, waitFor } from '@testing-library/react'
 import OpsShell from './ops-shell'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -46,11 +47,23 @@ it.each(['/ops/knowledge', '/ops/support'])('%s でもメニューを開き、Es
     expect(open.getAttribute('aria-expanded')).toBe('false')
     await act(async () => open.click())
     expect(open.getAttribute('aria-expanded')).toBe('true')
-    expect(host.querySelector('aside')?.className).toMatch(/^flex /)
+    expect(host.querySelector('aside[aria-label="運営メニュー（開いた形）"]')).not.toBeNull()
     expect(document.body.style.overflow).toBe('hidden')
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
     expect(open.getAttribute('aria-expanded')).toBe('false')
-    expect(host.querySelector('aside')?.className).toMatch(/^hidden /)
+    expect(host.querySelector('aside[aria-label="運営メニュー（開いた形）"]')).toBeNull()
     expect(document.body.style.overflow).toBe('')
+    const self = host.querySelector('button[aria-label="自分のメニュー"]') as HTMLButtonElement
+    await act(async () => self.click())
+    await waitFor(() => expect(document.querySelector('[role="menuitem"][href="/staff"]')).not.toBeNull())
+    const profile = document.querySelector('[role="menuitem"][href="/staff"]') as HTMLAnchorElement
+    expect(profile.textContent).toBe('プロフィールを編集')
+    profile.focus()
+    fireEvent.keyDown(profile, { key: 'ArrowDown' })
+    expect(document.activeElement?.getAttribute('href')).toBe('/ops/members')
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(document.activeElement?.getAttribute('href')).toBe('/ops/two-factor')
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    await waitFor(() => expect(self.getAttribute('aria-expanded')).toBe('false'))
   } finally { act(() => root.unmount()); host.remove() }
 })

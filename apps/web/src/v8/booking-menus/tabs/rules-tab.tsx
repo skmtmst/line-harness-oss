@@ -130,6 +130,14 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   const [cutoffEmpty, setCutoffEmpty] = useState(false)
   const [cancelEmpty, setCancelEmpty] = useState(false)
   const inFlightRef = useRef(false)
+  const saveGenerationRef = useRef(0)
+  useEffect(() => {
+    setSaving(false)
+    inFlightRef.current = false
+    return () => { saveGenerationRef.current += 1 }
+  }, [accountId])
+  const savedStaff = useRef(new Map<string, boolean>())
+  useEffect(() => { savedStaff.current.clear() }, [accountId])
 
   const initialNoAssign = useMemo(
     () => staff.some((person) => person.is_active && person.is_designation_optional),
@@ -171,7 +179,9 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   }
 
   async function submit() {
-    if (!draft || inFlightRef.current) return
+    if (!draft || inFlightRef.current || !canEdit) return
+    const generation = saveGenerationRef.current
+    const alive = () => saveGenerationRef.current === generation
     const emptyLabels = [
       cutoffEmpty ? '受付の締め切り' : null,
       cancelEmpty ? 'キャンセルの期限' : null,
@@ -183,6 +193,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
+    let settingsSaved = false
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: draft.version,
@@ -198,14 +209,21 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         reminderDayBeforeTime: draft.reminderDayBeforeTime || null,
         reminderHoursBefore: draft.reminderHoursBefore,
       })
+      if (!alive()) return
       if (!response.success) throw new Error('booking_settings_save_failed')
+      setDraft(response.data)
+      settingsSaved = true
       /* 「指名なし」の切替は全スタッフの is_designation_optional を揃える。 */
       if (noAssign !== null && noAssign !== initialNoAssign) {
-        const targets = staff.filter((person) => person.is_active && Boolean(person.is_designation_optional) !== noAssign)
+        const targets = staff.filter((person) => person.is_active && (savedStaff.current.get(person.id) ?? Boolean(person.is_designation_optional)) !== noAssign)
         for (const person of targets) {
+          if (!alive()) return
           await bookingApi.updateStaff(accountId, person.id, { is_designation_optional: noAssign ? 1 : 0 })
+          if (!alive()) return
+          savedStaff.current.set(person.id, noAssign)
         }
       }
+      if (!alive()) return
       setDraft(response.data)
       setCutoffEmpty(false)
       setCancelEmpty(false)
@@ -213,13 +231,16 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       onSaved(response.data)
       if (noAssign !== null && noAssign !== initialNoAssign) onReload()
     } catch (cause) {
+      if (!alive()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
-      setSaveError(bookingRulesErrorMessage(cause, '保存')) }
+      setSaveError(settingsSaved ? `ルールは保存しました。担当の更新を完了できませんでした。もう一度保存すると、残った担当だけ更新します。${bookingRulesErrorMessage(cause, '保存')}` : bookingRulesErrorMessage(cause, '保存')) }
     } finally {
-      inFlightRef.current = false
-      setSaving(false)
+      if (alive()) {
+        inFlightRef.current = false
+        setSaving(false)
+      }
     }
   }
 
@@ -277,14 +298,20 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               /></SaveErrorField>
               <SaveErrorField names={["cutoffMinutesBefore","draft.cutoffMinutesBefore","cutoff_minutes_before","draft.cutoff_minutes_before"]}><Select size="full"
                 aria-label="受付の締め切り"
-                value={String(draft.cutoffMinutesBefore)}
-                onChange={(value) => set('cutoffMinutesBefore', Number(value))}
+                value={cutoffEmpty ? '' : String(draft.cutoffMinutesBefore)}
+                onChange={(value) => {
+                  setCutoffEmpty(value === '')
+                  if (value !== '') set('cutoffMinutesBefore', Number(value))
+                }}
                 options={cutoffOptions}
               /></SaveErrorField>
               <SaveErrorField names={["cancelDeadlineMinutesBefore","draft.cancelDeadlineMinutesBefore","cancel_deadline_minutes_before","draft.cancel_deadline_minutes_before"]}><Select size="full"
                 aria-label="キャンセルの期限"
-                value={String(draft.cancelDeadlineMinutesBefore)}
-                onChange={(value) => set('cancelDeadlineMinutesBefore', Number(value))}
+                value={cancelEmpty ? '' : String(draft.cancelDeadlineMinutesBefore)}
+                onChange={(value) => {
+                  setCancelEmpty(value === '')
+                  if (value !== '') set('cancelDeadlineMinutesBefore', Number(value))
+                }}
                 options={cancelOptions}
               /></SaveErrorField>
             </> : <>

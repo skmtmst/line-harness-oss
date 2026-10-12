@@ -12,13 +12,13 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=ranks'),
 }))
 
-import RankSettingsTab from './rank-settings-tab'
-import LifetimeTab from './lifetime-tab'
+import RankSettingsTab from '@/v8/nen-members/ranks'
+import LifetimeTab from '@/v8/nen-members/lifetime'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -44,14 +44,11 @@ async function settle(milliseconds: number) {
 
 /** 区画の表の中に結合セルが無く、追加ボタンが表の外・区画の中にある。 */
 function expectAddOutsideTable(label: string) {
-  const section = host.querySelector('section[data-design="Table"]')
-  expect(section).toBeTruthy()
-  const table = section!.querySelector('table')
-  expect(table).toBeTruthy()
-  expect(section!.querySelector('td[colspan]')).toBeNull()
-  const add = Array.from(section!.querySelectorAll('button')).find((b) => b.textContent?.includes(label))
+  const add = Array.from(host.querySelectorAll('button')).find(button => button.textContent?.includes(label))
   expect(add).toBeTruthy()
-  expect(table!.contains(add!)).toBe(false)
+  expect(add!.closest('[role="table"], [role="row"], table')).toBeNull()
+  expect(host.querySelector('td[colspan]')).toBeNull()
+  expect(add!.closest('[data-design-part="card"]')).toBeTruthy()
 }
 
 describe('m18s 追加は表の外に置き表の中に結合を作らない', () => {
@@ -71,20 +68,20 @@ describe('m18s 追加は表の外に置き表の中に結合を作らない', ()
   it('ランク表：「ランクを追加」は表の外にある', async () => {
     await act(async () => {
       root.render(
-        <RankSettingsTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
+        <RankSettingsTab readonly={false} onTopBand={vi.fn()} accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
       )
     })
     await settle(50)
-    expectAddOutsideTable('ランクを追加する')
+    expectAddOutsideTable('ランクを足す')
   })
 
   it('lifetime表：「節目を追加」は表の外にある', async () => {
     await act(async () => {
       root.render(
-        <LifetimeTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
+        <LifetimeTab readonly={false} accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
       )
     })
     await settle(50)
-    expectAddOutsideTable('節目を追加する')
+    expectAddOutsideTable('節目を足す')
   })
 })

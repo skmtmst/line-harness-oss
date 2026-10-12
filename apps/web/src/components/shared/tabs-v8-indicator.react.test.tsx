@@ -17,13 +17,14 @@ const ITEMS = [
 
 /*
  * ★V8 仕上げ（M10）：選ばれている下線が滑って移る。
- * v7 は今までどおり枠線の下線だけで、動く印は出さない。
+ * 古いDOMの値が残っていても同じ下線を使う。
  */
 describe('V8 タブの下線', () => {
-  it('v7は動く印を出さない', () => {
+  it('古いDOMの値で現役の下線を止めない', () => {
+    document.documentElement.dataset.theme = 'v7'
     const { container } = render(<Tabs items={ITEMS} />)
-    expect(screen.getByRole('tablist').getAttribute('data-sliding')).toBeNull()
-    expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
+    expect(screen.getByRole('tablist').getAttribute('data-sliding')).toBe('true')
+    expect(container.querySelector('[aria-hidden="true"]')).toBeTruthy()
   })
 
   it('v8は今のタブの下に動く印を出す', () => {

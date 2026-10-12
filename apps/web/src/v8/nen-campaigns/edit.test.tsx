@@ -179,6 +179,23 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 })
 
 describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
+  it('入力した画像・分類・題名・概要を見本に出し、文字だけへ戻すと画像を外す（送信しない）', async () => {
+    await act(async () => { root.render(<ColumnNew />) })
+    await flush()
+    for (const [label, value] of [['題名', '季節のコラム'], ['分類', '秋のごはん'], ['概要', '食事の短い紹介'], ['記事の URL', 'https://example.test/article']]) {
+      await act(async () => { fireEvent.change(host.querySelector(`input[aria-label="${label}"]`)!, { target: { value } }) })
+    }
+    await act(async () => { fireEvent.click(button('URL で入れる')!) })
+    await act(async () => { fireEvent.change(host.querySelector('input[aria-label="画像の URL"]')!, { target: { value: 'https://example.test/article.jpg' } }) })
+    const preview = host.querySelector('[data-template-region="preview"]')!
+    for (const text of ['季節のコラム', '秋のごはん', '食事の短い紹介', 'コラムを読む']) expect(preview.textContent).toContain(text)
+    expect(preview.querySelector('img[src="https://example.test/article.jpg"]')).not.toBeNull()
+    await act(async () => { fireEvent.click(host.querySelector('input[type="radio"][value="text"]')!) })
+    expect(preview.querySelector('img[src="https://example.test/article.jpg"]')).toBeNull()
+    expect((host.querySelector('input[aria-label="画像の URL"]') as HTMLInputElement).value).toBe('')
+    expect(calls.createColumn).not.toHaveBeenCalled()
+  })
+
   it('配信対象はタグを1つの欄で選び、保存に乗る', async () => {
     await act(async () => { root.render(<ColumnNew />) })
     await flush()

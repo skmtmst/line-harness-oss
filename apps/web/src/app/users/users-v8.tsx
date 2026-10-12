@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -13,7 +13,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import MergedPersonDetailViewV8 from '@/components/merged-person/merged-person-detail-v8'
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
 import { FriendsManageNavV8 } from '@/app/friends/friends-nav-v8'
-import { api } from '@/lib/api'
+import { useUsersSummary } from '@/components/users/use-users-summary'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
@@ -55,15 +55,8 @@ export default function UsersV8() {
     : [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }])
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // 数の帯の「統合ユーザー」は重複検出の集計（uniquePeople）を使う（v7 と同じ API）。
-  const [uniquePeople, setUniquePeople] = useState<number | null>(null)
-  useEffect(() => {
-    let alive = true
-    api.duplicates.stats().then((res) => {
-      if (alive && res.success) setUniquePeople(res.data.uniquePeople)
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [])
+  const summary = useUsersSummary()
+  const uniquePeople = summary.stats?.uniquePeople ?? null
 
   const pageCount = Math.max(1, Math.ceil(u.total / USERS_PAGE_SIZE))
   const linkedUidCount = u.rows.filter((row) => row.identityKeyKind === 'uid').length
@@ -119,7 +112,9 @@ export default function UsersV8() {
             {uniquePeople !== null ? formatNumber(uniquePeople) : emptyValue('unknown')}
             <span className={styles.kpiUnit}>人</span>
           </p>
-          <p className={styles.kpiDetail}>重複を1人にまとめた数</p>
+          <p className={styles.kpiDetail} title={summary.stats ? `紐付く友だち：${formatNumber(summary.stats.totalFollowing)}件（各アカウントの友だち登録）` : undefined}>
+            {summary.status === 'loading' ? '読み込んでいます' : summary.status === 'error' ? <>読み込めませんでした <button type="button" className={styles.linkAction} onClick={() => void summary.load()}>再読み込み</button></> : '重複を1人にまとめた数'}
+          </p>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>

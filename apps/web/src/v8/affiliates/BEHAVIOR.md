@@ -8,11 +8,9 @@
 成果承認 `OylSV`・まとめて操作 `hadfk`・支払い `aINnz`・期間を締める `usDpO`・レポート `Eo56k`・
 アフィリエイターを作る `RaMf3`（`Gqve5` は同時編集API未接続のため未再現）・状態の見本帳 `rRk0C`（見本帳なので画面としては測らない）。
 
-写し元（古い V8 の器。消していない）：`app/affiliates/affiliates-v8.tsx`・`v8-*-tab.tsx`・`v8-drawer.tsx`・
-`new-affiliate-v8.tsx`・`action-dialogs.tsx`・`bulk-op-wizard.tsx`・`attribution-view.tsx`・`offer-terms.tsx`・
-`tabs.tsx`（OfferFormModal・型・配布URL・承認の全件読み）・`payment-tab.tsx`（締めの窓・本人確認の窓）。
-src/v8 は `@/app` を import できないので、必要なものを `display.ts`・`dialogs.tsx`・`offer-form.tsx`・
-`offer-terms.tsx`・`attribution-view.tsx`・`bulk-op.tsx`・`payment-dialogs.tsx` に写した。
+2026-10-11：未使用の旧画面と窓は削除済み。動作試験は現役のV8を直接描く。
+共通の口は `display.ts`・`dialogs.tsx`・`offer-form.tsx`・`offer-terms.tsx`・
+`attribution-view.tsx`・`bulk-op.tsx`・`payment-dialogs.tsx` に置く。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/affiliates`：アフィリエイター。`?tab=offers|approvals|payment|report` で各タブ。知らない値はアフィリエイター。
@@ -38,6 +36,7 @@ src/v8 は `@/app` を import できないので、必要なものを `display.t
 - 行：名前（押すと引き出し）・紹介コード・報酬の決め方・計測中/停止中。右端は「成果を見る」と「…」（紹介リンクをコピー・編集・紹介を止める）。
 - 左のチェックで選ぶと一括バー →「まとめて紹介を止める」（確かめの窓のあと、1人ずつ `archive(pause)`）。
 - 作るボタンは `/affiliates/new` へ（今の窓で作る形から、作る画面へ移した）。
+- 旧だけにあった今月のクリック・友だち追加・成果・承認・確定報酬・保留報酬は「今月の流れを確認」の共通窓へ残す。未取得は「—」、失敗は再試行できる。採用済みの絵での入口は司令塔確認事項（`docs/v7-removal-1011.md`）。
 
 ## 詳細の引き出し（drawer.tsx・tnTn9）
 - 上のタブ：概要（今月の成果・今月の報酬・支払いを確定していない報酬・発行ずみの紹介リンク・認めるのを待っている成果・成果の付け方）・
@@ -59,6 +58,7 @@ src/v8 は `@/app` を import できないので、必要なものを `display.t
 - 行の右端は「認める」と「…」（認める・認めない（却下）・付帯動作をやり直す・詳細と成果の付け方を見る）。
   1件の却下は確かめの窓を通す（今はボタン一押しで却下していた）。
 - 「保留期間」の数は、アフィリエイターの保留日数のうちいちばん長いもの（無ければ「—」）。
+- 共通のアカウント選択に従い、一覧・件数・まとめて判断の対象をそのアカウントへ絞る。URLで渡された紹介者の絞り込みも操作で外せる。
 - 動きが変わるところ：数の帯「今月 認めた」の下の金額は報酬の合計（今までは成果額の合計）。
 
 ## 支払い（payment.tsx・payment-dialogs.tsx）

@@ -40,6 +40,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { formatMileageDate } from './display'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
@@ -449,10 +450,10 @@ export default function BalancesTab() {
         <thead>
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colName}>友だち</Th>
-            <Th className={styles.colRank}>ランク</Th>
-            <Th className={`${styles.colBalance} ${styles.num}`}>いまの残高</Th>
+            <Th className={styles.colRank} title={summary ? summary.rankCounts.length > 0 ? summary.rankCounts.map(rank => `${rank.rankName} ${formatMileageNumber(rank.friendCount)}名`).join('・') : '公開中のランクなし' : 'ランク別の人数は未取得'}>ランク</Th>
+            <Th className={`${styles.colBalance} ${styles.num}`} title="並び順：残高が多い順">いまの残高</Th>
             <Th className={`${styles.colChange} ${styles.num}`}>今月の増減</Th>
-            <Th className={`${styles.colBalance} ${styles.num}`}>消える予定</Th>
+            <Th className={`${styles.colBalance} ${styles.num}`} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
             <Th className={styles.colLast}>最終行動</Th>
             <Th className={styles.colOpsBalance}>操作</Th>
           </TableHeadRow>
@@ -482,7 +483,7 @@ export default function BalancesTab() {
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
                 </Td>
                 <Td className={`${styles.colChange} ${styles.num}`}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
-                <Td className={`${styles.colBalance} ${styles.num}`}><span className={styles.cellMain}>{expiringText(member)}</span></Td>
+                <Td className={`${styles.colBalance} ${styles.num}`}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
                 <Td className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
                 <Td className={styles.colOpsBalance}>
                   <span className={styles.rowActions}>

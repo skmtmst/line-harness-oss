@@ -12,7 +12,6 @@ import { isAreaActionConfigured } from './action-drafts'
 import type { Area } from './canvas-editor'
 import { HQ_RICH_MENU_INTENTS } from '@/lib/hq-rich-menu-create'
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 afterEach(cleanup)
 
 const BASE: Area = { id: 'a', boundsX: 0, boundsY: 0, boundsWidth: 10, boundsHeight: 10, actionType: 'message', actionData: { text: '' }, intent: 'text' }

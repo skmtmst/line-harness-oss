@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST_PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const PUBLISH_HISTORY = readFileSync(join(HERE, 'edit', 'publish-history.tsx'), 'utf8')
-const TEST_APPLY = readFileSync(join(HERE, 'edit', 'test-apply-section.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
+const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.tsx'), 'utf8')
+const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const CREATE_FORM = readFileSync(
-  join(HERE, '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),
+  join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
 )
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
@@ -18,7 +18,7 @@ const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 /** #898 / N-163: ボタン名でも見つかる検索 */
 describe('一覧の検索はボタン名にも当たる', () => {
   it('案内文が「メニュー名・ボタン名」になっている', () => {
-    expect(LIST_PAGE).toContain('メニュー名・ボタン名で検索')
+    expect(LIST_PAGE).toContain('メニュー名・ボタン名で探す')
   })
 })
 
@@ -26,32 +26,35 @@ describe('一覧の検索はボタン名にも当たる', () => {
 describe('作成画面の登録メディア選択', () => {
   it('メディア選択ダイアログを今のアカウントで開き、選択がフォームへ戻る', () => {
     expect(NEW_PAGE).toContain("import MediaPickerDialog from '@/app/contents/media-picker-dialog'")
-    expect(NEW_PAGE).toContain('accountId={selectedAccount?.id ?? null}')
-    expect(NEW_PAGE).toContain('onSelect={(item) => {')
-    expect(NEW_PAGE).toContain('setSelectedMedia(item)')
+    expect(NEW_PAGE).toContain('accountId={accountId}')
+    expect(NEW_PAGE).toContain('onSelect={handlePickedMedia}')
+    expect(NEW_PAGE).toContain('setPendingImageAt(imagePickTarget, { file: null, url: null, dims: null, media: item })')
     // キャンセルは入力を捨てない（onClose は閉じるだけ）
     expect(NEW_PAGE).toContain('onClose={() => setMediaPickerOpen(false)}')
     // 選んだ画像のプレビューがフォーム内に残る
-    expect(NEW_PAGE).toContain('api.media.contentUrl(selectedMedia.id, selectedAccount.id)')
+    expect(NEW_PAGE).toContain('api.media.contentUrl(image.media.id, accountId)')
     // 作成APIへ imageMediaId を渡す
-    expect(NEW_PAGE).toContain('imageMediaId: selectedMedia?.id')
+    expect(NEW_PAGE).toContain('imageMediaId: pendingImages[0]?.media?.id')
   })
 
   it('アカウントを切り替えたら前のアカウントの選択を持ち込まない', () => {
-    expect(NEW_PAGE).toContain('setSelectedMedia(null)')
-    expect(NEW_PAGE).toContain('[selectedAccount?.id]')
+    expect(NEW_PAGE).toContain('pendingMediaAccountRef.current === accountId')
+    expect(NEW_PAGE).toMatch(/setPendingImages\(\(previous\) => \{[\s\S]*?return \[\]/)
+    expect(NEW_PAGE).toContain('[accountId, host]')
   })
 
   it('選んだメディアも未保存の入力として数える', () => {
-    expect(NEW_PAGE).toContain('selectedMedia !== null')
+    expect(NEW_PAGE).toContain('images: pendingImages.map((image) =>')
+    expect(NEW_PAGE).toContain('image.media?.id')
   })
 })
 
 /** #900 / N-151: 履歴・失敗だけの再試行・照合 */
 describe('公開履歴・再試行・照合', () => {
   it('編集画面に履歴セクションがあり owner/admin のみ出す', () => {
-    expect(EDIT_PAGE).toContain("import { PublishHistorySection } from './publish-history'")
-    expect(EDIT_PAGE).toContain('canOperate ? <PublishHistorySection')
+    expect(PUBLISH_HISTORY).toContain("const canInspectOperations = role === 'owner' || role === 'admin'")
+    expect(PUBLISH_HISTORY).toContain('canInspectOperations ? <section')
+    expect(PUBLISH_HISTORY).toContain('aria-label="公開の履歴とLINEとの照合"')
   })
 
   it('失敗したrunだけに再試行ボタンを出し、照合は dryRun → 明示修復の順', () => {
@@ -74,18 +77,18 @@ describe('本人LINEへのテスト適用', () => {
 
 /** #902 / N-154: 下書き複製 */
 describe('一覧と編集からの複製', () => {
-  it('一覧の各行に複製があり、確認ダイアログ経由で作成→編集へ進む', () => {
-    expect(LIST_PAGE).toContain('setDuplicateTarget')
+  it('行の複製は二重実行を防ぎ、再取得した一覧に結果を示す', () => {
+    expect(LIST_PAGE).toContain('duplicateLock.current = true')
     expect(LIST_PAGE).toContain('api.richMenuGroups.duplicate')
     expect(LIST_PAGE).toContain('confirmDuplicate')
     // 確認なしの即実行ではない
     expect(LIST_PAGE).toContain('複製')
-    expect(LIST_PAGE).toContain('router.push(`/rich-menus/edit?id=${res.data.id}`)')
+    expect(LIST_PAGE).toContain('duplicateFeedback.mark(duplicateTarget.id, res.data.id)')
   })
 
   it('編集画面にも複製がある', () => {
-    expect(EDIT_PAGE).toContain("confirmKind === 'duplicate'")
-    expect(EDIT_PAGE).toContain('api.richMenuGroups.duplicate')
+    expect(PUBLISH_HISTORY).toContain('open={duplicateOpen}')
+    expect(PUBLISH_HISTORY).toContain('api.richMenuGroups.duplicate')
   })
 })
 
@@ -94,7 +97,7 @@ describe('staffへの影響人数は合計のみ', () => {
   it('編集画面は staff を読み取り専用にし、集計だけを読む', () => {
     expect(EDIT_PAGE).toContain('audienceSummary')
     expect(EDIT_PAGE).toContain('aggregateOnly')
-    expect(EDIT_PAGE).toContain('readOnly={aggregateOnly}')
+    expect(EDIT_PAGE).toContain('disabled={aggregateOnly}')
   })
 })
 
@@ -109,10 +112,10 @@ describe('作成時の既定ページ・出し分け・切替', () => {
   })
 
   it('作成APIへ全部送り、切替の行き先は targetPageIndex に直す', () => {
-    expect(NEW_PAGE).toContain('defaultPageIndex: value.defaultPageIndex')
+    expect(NEW_PAGE).toContain('defaultPageIndex: 0')
     expect(NEW_PAGE).toContain('isDefaultForAll:')
-    expect(NEW_PAGE).toContain('targetingEnabled: value.targetingEnabled')
-    expect(NEW_PAGE).toContain('targetingPriority: value.targetingPriority')
+    expect(NEW_PAGE).toContain("targetingEnabled: audience === 'targeted'")
+    expect(NEW_PAGE).toContain('targetingPriority,')
     expect(NEW_PAGE).toContain('targetPageIndex')
     // 切替ボタンを新規作成で選べる
     expect(NEW_PAGE).toContain('NEW_MENU_INTENTS_WITH_SWITCH')

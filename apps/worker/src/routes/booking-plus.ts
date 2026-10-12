@@ -1,3 +1,4 @@
+import { scheduledJstIso } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -25,9 +26,7 @@ function accountIdOf(c: { req: { query: (name: string) => string | undefined } }
 }
 
 function validISODate(value: unknown): string | null {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : `${value}T00:00:00.000Z`;
+  return typeof value === 'string' ? scheduledJstIso(value, '00:00') : null;
 }
 
 // GET /api/booking/admin/sales-summary — 予約からの売上

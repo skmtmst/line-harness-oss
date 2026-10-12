@@ -1,114 +1,26 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-
-const source = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const overviews = readFileSync(new URL('./webhook-overviews.tsx', import.meta.url), 'utf8')
-
-describe('N-381 見本タブは外部連携の中で開く', () => {
-  test('別機能の通知画面を埋め込まない', () => {
-    expect(source).not.toContain('NotificationsPage')
-    expect(source).not.toContain('@/app/notifications')
-  })
-
-  test('見本タブは外部連携の見本パネルを開く', () => {
-    expect(source).toContain('WebhookSamples')
-    expect(source).toContain("{tab === 'notify' && <WebhookSamples />}")
-  })
-
-  test('受け取る見本は種類を選んだ状態の作成へつなげる', () => {
-    expect(source).toContain('tab=incoming&source=')
-    // 見本に無い値は無視し、空のままにする。
-    expect(source).toContain("searchParams.get('source')")
-    expect(source).toContain('SOURCE_PRESETS.some')
-  })
-
-  test('送る見本は送り先の作成へつなげる', () => {
-    expect(source).toContain('OUTGOING_SAMPLES')
-    // R150: 見本は作られる出来事の種類IDを持ち、作成画面へ ?event= で渡す。
-    // イベント指定なしのリンクは「すべて送る」の初期値を選んだことに
-    // なるので、見本からの導線では使わない。
-    expect(source).toContain('href={`/webhooks/new?event=${sample.event}`}')
-  })
-
-  test('送る見本の出来事は実際に購読できる種別コード', () => {
-    // KNOWN_OUTGOING_EVENT_TYPES（packages/db/src/webhooks.ts）と一致する
-    // ものだけ。作られない出来事を見せると「全イベント送信」の誤設定を生む。
-    for (const event of ['friend_add', 'form_submitted', 'booking_created', 'ec.order.confirmed']) {
-      expect(source).toContain(`event: '${event}'`)
-    }
-  })
+const read = (name: string) => readFileSync(new URL(`../../v8/webhooks/${name}.tsx`, import.meta.url), 'utf8')
+const pages = [read('incoming'), read('outgoing')]
+const samples = read('samples')
+const host = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+describe('現役V8の見本の入口', () => {
+  test('別機能の通知画面を埋め込まない', () => { expect(host).not.toContain('NotificationsPage'); expect(host).not.toContain('@/app/notifications') })
+  test('見本タブは現在の見本を開く', () => { expect(host).toContain("@/v8/webhooks/samples"); expect(host).toContain('return <SamplesV8Page />') })
+  test('受け取る見本の種類を作成へ渡し、見本以外は選択しない', () => { expect(samples).toContain('tab=incoming&source='); expect(pages[0]).toContain('SOURCE_PRESETS.some(') })
+  test('送る見本は種類を選んだ状態の専用作成へつなげる', () => { expect(samples).toContain('/webhooks/new?event=${sample.event}') })
+  test('送る見本は実際に購読できる種類を渡す', () => { for (const event of ['friend_add', 'form_submitted', 'booking_created', 'ec.order.confirmed']) expect(samples).toContain(`event: '${event}'`) })
 })
-
-describe('N-382 開始/停止の二重押しで意図と逆にならない', () => {
-  /*
-    #707 で、二重押し防止の印(ref)と送信中の見え方(state)を必ず一緒に動かすため、
-    印の付け外しを `beginToggle` / `endToggle` の1か所へ寄せた。ref が正本である
-    ことは変えていない（stateを正本にすると、次の描画まで古い値が見えるので
-    素早い二重押しを2回とも通す）。ここでは受信・送信の両方がその1か所を
-    通っていることを見る。
-  */
-  test('送信中の行の再押下は送らずに戻る（受信・送信の2つ）', () => {
-    expect(source.match(/if \(togglingIdsRef\.current\.has\(key\)\) \{/g)).toHaveLength(2)
-    /* 案内を出したあと必ず return する（落とすと素通りして二重に送る）。 */
-    expect(source.match(/setToggleBusyNotices\(\(current\) => \(\{ \.\.\.current, \[key\][^\n]*\n {6}return\n {4}\}/g)).toHaveLength(2)
-    expect(source.match(/^ {4}beginToggle\(key\)$/gm)).toHaveLength(2)
-    expect(source).toContain('togglingIdsRef.current.add(key)')
-  })
-
-  test('応答の成否にかかわらず送信中の印を外す（受信・送信の2つ）', () => {
-    expect(source.match(/^ {6}endToggle\(key\)$/gm)).toHaveLength(2)
-    expect(source).toContain('togglingIdsRef.current.delete(key)')
-    expect(source).toContain('finally')
-  })
-
-  test('成功時だけ一覧を読み直してサーバ状態へ寄せる', () => {
-    expect(source).toContain('if (selectedAccountIdRef.current === requestAccountId) await load()')
-  })
-
-  test('失敗時は状態を変えず次に何をすべきか出す', () => {
-    expect(source).toContain('状態は変わっていません')
-    expect(source).toContain('もう一度お試しください')
-  })
-
-  test('行ごとに印を持つので他の行の操作は止めない', () => {
-    expect(source).toContain('useRef<Set<string>>(new Set())')
-    expect(source).toContain('setToggleFailures((current) => ({')
-    expect(source).toContain('data-webhook-toggle-error={key}')
-  })
+describe('切替の二度押しと失敗', () => {
+  test('同じ行の再押下を送信前に止める', () => { for (const src of pages) expect(src).toMatch(/if \(togglingRef.current.has\(item.id\)\) \{[\s\S]*?return\s*\}/) })
+  test('応答に関係なく処理中の印を外す', () => { for (const src of pages) { expect(src).toMatch(/finally[\s\S]*?togglingRef.current.delete\(item.id\)/); expect(src).toContain('setTogglingIds((current) => current.filter') } })
+  test('成功時だけ読み直す', () => { for (const src of pages) { expect(src).toContain('if (!isCurrent()) return'); expect(src).toMatch(/if \(!res.success\)[\s\S]*?return[\s\S]*?await reload\(\)/) } })
+  test('失敗時は元へ戻し、再試行を案内する', () => { for (const src of pages) { expect(src).toContain('状態は変わっていません'); expect(src).toContain('もう一度お試しください'); expect(src).toContain("actionLabel: 'もう一度'") } })
+  test('行ごとの印で他の行を止めない', () => { for (const src of pages) { expect(src).toContain('togglingRef.current.add(item.id)'); expect(src).toContain('togglingRef.current.has(item.id)'); expect(src).toContain('setOptimisticActive(') } })
 })
-
-describe('#707 送信中が見え、二重押し防止の当て先が残る', () => {
-  test('2回目の押下を黙って落とさず、待っている旨を返す（受信・送信の2つ）', () => {
-    expect(source.match(/setToggleBusyNotices\(\(current\) => \(\{ \.\.\.current, \[key\]/g)).toHaveLength(2)
-    expect(source).toContain('data-webhook-toggle-busy={key}')
-    expect(source).toContain('返事が来るまでお待ちください')
-  })
-
-  test('送信中の行を一覧へ渡す（受信・送信の2つ）', () => {
-    expect(source.match(/togglingIds=\{togglingIdsOf\('(incoming|outgoing)'\)\}/g)).toHaveLength(2)
-  })
-
-  /*
-    **押せなくして解決しない。**送信中に `止める` を `disabled` にすると、
-    二重押しがそもそも起こせず、二重押し防止を外しても
-    `webhook-runtime.spec.ts` の試験2が緑のままになる（#705 の実測）。
-    幅を固定するのは、吹き出しが `right-full` で左へ伸びるため、文言が伸びると
-    ボタンの箱が動き、`dblclick` の2発目が外れかねないから。
-  */
-  test('外向きは送信中でも押せる状態を保ち、箱の幅を固定する', () => {
-    expect(overviews).toContain('data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}')
-    expect(overviews).toContain('aria-busy={toggling || undefined}')
-    expect(overviews).not.toContain('disabled={toggling')
-    expect(overviews.match(/className="min-w-36"/g)).toHaveLength(2)
-  })
-
-  /*
-    内向きも同じ「黙って落とす」作りだったので見え方を揃える。ただし内向きの
-    `止める` は詳細の窓の中にあり、`webhook-runtime.spec.ts` に当て先が無い。
-    **内向きの見張りはこの文字列の契約だけで、実ブラウザの当て先は無い。**
-  */
-  test('内向きも送信中だと分かる（実ブラウザの当て先は無い）', () => {
-    expect(overviews).toContain('data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}')
-    expect(overviews).toContain("(selected.isActive ? '止めています…' : '動かしています…')")
-  })
+describe('処理中の表示と再押下の説明', () => {
+  test('再押下には待っている理由を示す', () => { for (const src of pages) expect(src).toContain('返事が来るまでお待ちください。') })
+  test('処理中の印を対象行に結び付ける', () => { for (const src of pages) { expect(src).toContain('togglingIds.includes('); expect(src).toContain('setTogglingIds((current) => [...current, item.id])') } })
+  test('送り先の処理中でも同じ切替操作を呼べてガードを検査できる', () => { expect(pages[1]).toContain('void handleToggle(item, item.isActive)'); expect(pages[1]).toContain("toggling ? '切り替え中'") })
+  test('受け取り口も処理中の状態を表示する', () => { expect(pages[0]).toContain('togglingIds.includes(selected.id)'); expect(pages[0]).toContain('切り替え中') })
 })

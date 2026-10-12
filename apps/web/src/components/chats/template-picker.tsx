@@ -1,17 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import TemplateFolderSelect, {
-  type TemplateFolderOption,
-  type TemplateFolderStatus,
+import type {
+  TemplateFolderOption,
+  TemplateFolderStatus,
 } from './template-folder-select'
-import Button from '@/components/shared/button'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import TemplatePickerView, { type TemplatePickerSideKey } from '@/v8/inbox-chat/template-picker-view'
 
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -32,7 +28,7 @@ function usageScore(template: UsageAwareTemplate): number {
 }
 
 /**
- * テンプレートを選ぶ（設計 V2 2-1-1）。
+ * テンプレートを選ぶ（★V8）。
  *
  * 受信箱の入力欄から開く。選ぶと本文が入力欄に入り、送る前に直せる。
  * 設計の「コピーして編集」はテンプレート管理側の操作なので、ここには置かない。
@@ -72,7 +68,7 @@ export default function TemplatePicker({
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
-  const [category, setCategory] = useState<'all' | 'frequent' | 'reservation' | 'ec'>('all')
+  const [category, setCategory] = useState<'all' | 'frequent'>('all')
   // パック呼出しの下書き。選んだ順が送る順になる（あいさつ→案内→締め）。
   // 本文ごと持つのは、絞り込みを変えて一覧から外れても選んだものが
   // 消えないようにするため。
@@ -84,6 +80,7 @@ export default function TemplatePicker({
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(selectedAccountId)
   const [resolvedPreview, setResolvedPreview] = useState<{
     forId: string
+    chatId: string
     content: string
     unresolved: string[]
   } | null>(null)
@@ -105,9 +102,6 @@ export default function TemplatePicker({
    * Tab は窓の中で回し、Escape で閉じ、閉じたら起点（テンプレートを
    * 開いたボタン）へフォーカスを戻す。未挿入で閉じても下書きは変えない。
    */
-  // ★V8 は共通の窓（Dialog）が開閉とフォーカスを受け持つので、ここの約束は v7 の窓だけに掛ける。
-  const isV8 = useAdminTheme() === 'v8'
-  const dialogRef = useOverlayFocus(open && !isV8, onClose)
   const searchInputRef = useRef<HTMLInputElement>(null)
   /*
    * 初期フォーカスは検索欄へ。useOverlayFocus は先頭の閉じるボタンへ
@@ -320,7 +314,7 @@ export default function TemplatePicker({
       if (cancelled) return
       setResolvedPreview(
         res.success
-          ? { forId: templateId, content: res.data.content, unresolved: res.data.unresolved }
+          ? { forId: templateId, chatId, content: res.data.content, unresolved: res.data.unresolved }
           : null,
       )
     }).catch(() => {
@@ -335,7 +329,7 @@ export default function TemplatePicker({
 
   const selected = selectedTemplate
   const previewContent =
-    resolvedPreview && selected && resolvedPreview.forId === selected.id
+    resolvedPreview && selected && resolvedPreview.forId === selected.id && resolvedPreview.chatId === chatId
       ? resolvedPreview.content
       : null
 
@@ -358,315 +352,61 @@ export default function TemplatePicker({
     onClose()
   }
 
-  if (isV8) {
-    /*
-     * ★V8（M0393 段2「4. テンプレートを選ぶ」）：左はテンプレートの画面と同じフォルダの列。
-     * 「予約」「EC」の文字で拾う絞り込みはフォルダに統一したので出さない（絵の注）。
-     */
-    const sideActive: TemplatePickerSideKey = category === 'frequent'
-      ? 'frequent'
-      : folderId === '__none__'
-        ? 'none'
-        : folderId
-          ? `folder:${folderId}`
-          : 'all'
-    const countReady = folderCounts !== null
-    const colorOf = new Map(scopedFolders.map((folder) => [folder.id, folder.color]))
-    return (
-      <TemplatePickerView
-        onClose={onClose}
-        search={search}
-        onSearch={setSearch}
-        searchInputRef={searchInputRef}
-        side={{
-          active: sideActive,
-          allCount: folderOptions[0]?.count ?? null,
-          noneCount: countReady ? folderCounts?.[''] ?? 0 : null,
-          folders: folderOptions
-            .filter((option) => option.value && option.value !== '__none__')
-            .map((option) => ({ id: option.value, name: option.label, color: colorOf.get(option.value) ?? null, count: option.count, depth: option.depth })),
-          status: visibleFoldersStatus === 'error' ? 'error' : visibleFoldersStatus === 'ready' ? 'ready' : 'loading',
-        }}
-        onPickSide={(key) => {
-          if (key === 'frequent') { setCategory('frequent'); setFolderId(''); return }
-          setCategory('all')
-          setFolderId(key === 'all' ? '' : key === 'none' ? '__none__' : key.slice('folder:'.length))
-        }}
-        status={visibleTemplatesStatus}
-        emptyText={search.trim() || folderId || category !== 'all' ? '見つかりませんでした。' : '文字のテンプレートがまだありません。'}
-        frequentNote={category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage}
-        templates={shown.map((template) => ({ id: template.id, name: template.name, content: template.messageContent }))}
-        selectedId={selected?.id ?? null}
-        onSelect={(id) => {
-          setSelectedId(id)
-          if (!packMode) return
-          const template = shown.find((item) => item.id === id)
-          if (template) togglePackItem(template)
-        }}
-        canPack={Boolean(onPickPack)}
-        packMode={packMode}
-        onPackMode={(next) => { setPackMode(next); setPackItems([]) }}
-        packItems={packItems}
-        remaining={visibleTemplatesStatus === 'ready' && category !== 'frequent' ? Math.max(0, total - templates.length) : 0}
-        loadingMore={loadingMore}
-        onLoadMore={loadMore}
-        unresolved={previewContent !== null && resolvedPreview?.unresolved.length ? resolvedPreview.unresolved : null}
-        onConfirm={confirmPick}
-        confirmDisabled={packMode && onPickPack ? packItems.length === 0 : !selected}
-      />
-    )
-  }
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="テンプレートを選択"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
-          <div>
-            <h2 className="text-lg font-bold text-ink">テンプレートを選択</h2>
-            <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-              選択した内容を入力欄へ入れます。この操作だけでは送信されません。
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="閉じる"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-lg leading-none text-ink-faint hover:bg-shell hover:text-ink"
-          >
-            ✕
-          </button>
-        </header>
-
-        <div className="grid gap-3 border-b border-hairline px-6 py-4 md:grid-cols-[1fr_240px]">
-          <div className="relative">
-            <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="テンプレート名・本文で検索"
-              aria-label="テンプレート名・本文で検索"
-              className="w-full rounded-control border border-hairline py-2.5 pr-3 pl-9 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
-            />
-          </div>
-          <TemplateFolderSelect
-            value={folderId}
-            onChange={setFolderId}
-            options={folderOptions}
-            status={visibleFoldersStatus}
-          />
-        </div>
-
-        {/*
-          * 狭い画面では左の一覧と右のプレビューを縦に積み、この領域ごと
-          * スクロールする。プレビューを md 以上だけにすると、狭い画面では
-          * 挿入前に全文を確かめる場所がなくなる（IDEA-11）。
-          */}
-        <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[350px_1fr] md:overflow-visible">
-          {/*
-            INBOX-34: 狭い画面でも一覧は自分の領域で最後までスクロールする。
-            md 未満では高さを画面の45%に留め、下のプレビューと操作へ
-            続けて届くようにする。md 以上はグリッドの残り高を使う。
-          */}
-          <div className="max-h-[45dvh] min-h-0 overflow-y-auto border-b border-hairline bg-canvas-sunken p-3 md:max-h-none md:border-b-0 md:border-r">
-            <div className="mb-2 flex flex-wrap items-center gap-1.5">
-              {[
-                { key: 'all' as const, label: 'すべて' },
-                { key: 'frequent' as const, label: 'よく使う' },
-                { key: 'reservation' as const, label: '予約' },
-                { key: 'ec' as const, label: 'EC' },
-              ].map((item) => (
-                <Button variant="secondary" className={(`rounded-mini border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-faint hover:bg-shell'}`) + ' h-auto whitespace-normal'} key={item.key} type="button" onClick={() => setCategory(item.key)} aria-pressed={category === item.key}>
-                  {item.label}
-                </Button>
-              ))}
-              {onPickPack ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPackMode((prev) => !prev)
-                    setPackItems([])
-                  }}
-                  aria-pressed={packMode}
-                  className={`rounded-mini border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-shell-gray bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
-                >
-                  まとめて選ぶ
-                </button>
-              ) : null}
-              <span className="ml-auto text-micro text-ink-faint">
-                {visibleTemplatesStatus === 'ready' ? `${total}件` : '—'}
-              </span>
-            </div>
-            {/*
-              INBOX-15: 「よく使う」は送信数・使用箇所の多い順。実績がまだ
-              1件も無いときは、推測ではなく実績が無いことを先に断る。
-            */}
-            {category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage ? (
-              <p className="mb-2 text-micro leading-relaxed text-ink-faint">
-                まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。
-              </p>
-            ) : null}
-            {visibleTemplatesStatus === 'loading' ? (
-              <p className="px-4 py-10 text-center text-sm text-ink-faint">テンプレートを読み込んでいます。</p>
-            ) : visibleTemplatesStatus === 'error' ? (
-              <p className="px-4 py-10 text-center text-sm text-danger">テンプレートを読み込めませんでした。もう一度開き直してください。</p>
-            ) : shown.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-ink-faint">
-                {/*
-                  PERF-12: 絞り込み中の0件は「見つからない」、無条件の0件は
-                  「まだ無い」。届いた分だけを絞った見かけ上の0と区別する。
-                */}
-                {search.trim() || folderId || category !== 'all' ? '見つかりませんでした。' : '文字のテンプレートがまだありません。'}
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {shown.map((template) => {
-                  const packIndex = packItems.findIndex((item) => item.id === template.id)
-                  const inPack = packIndex >= 0
-                  return (
-                  <li key={template.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedId(template.id)
-                        if (!packMode) return
-                        setPackItems((prev) =>
-                          inPack
-                            ? prev.filter((item) => item.id !== template.id)
-                            : prev.length >= 5
-                              ? prev
-                              : [...prev, { id: template.id, name: template.name, content: template.messageContent }],
-                        )
-                      }}
-                      aria-pressed={packMode ? inPack : selected?.id === template.id}
-                      className={`w-full rounded-control border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-shell-gray bg-canvas hover:bg-canvas-sunken'}`}
-                    >
-                      <p className="truncate text-sm font-semibold text-ink" title={template.name}>
-                        {inPack ? `${packIndex + 1}. ` : ''}{template.name}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-faint">{template.messageContent}</p>
-                    </button>
-                  </li>
-                  )
-                })}
-              </ul>
-            )}
-            {/*
-              PERF-12: 届いていない区画があれば下へ足す。「よく使う」は
-              上位5件だけ見せる決まりなので続きは出さない。
-            */}
-            {visibleTemplatesStatus === 'ready' && category !== 'frequent' && templates.length < total ? (
-              <div className="mt-2 flex justify-center">
-                <Button variant="secondary" className="rounded-pill px-3 py-1.5 text-xs text-action hover:bg-shell disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={loadMore} disabled={loadingMore}>
-                  {loadingMore ? '読み込み中...' : `さらに表示（残り${total - templates.length}件）`}
-                </Button>
-              </div>
-            ) : null}
-          </div>
-
-          <section className="min-h-0 bg-canvas p-6 md:overflow-y-auto" aria-label="テンプレートのプレビュー">
-            {packMode && packItems.length > 0 ? (
-              <div className="mb-4 rounded-control border border-hairline bg-canvas-sunken p-3">
-                <p className="text-xs font-semibold text-ink-secondary">まとめて送る順番（{packItems.length}/5通）</p>
-                <ol className="mt-2 space-y-1">
-                  {packItems.map((item, index) => (
-                    <li key={item.id} className="flex items-center gap-2 text-xs text-ink-secondary">
-                      <span className="w-4 shrink-0 text-right font-semibold text-ink-secondary">{index + 1}.</span>
-                      <span className="min-w-0 flex-1 truncate" title={item.name}>{item.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setPackItems((prev) => prev.filter((p) => p.id !== item.id))}
-                        aria-label={`${item.name}をまとめ送りから外す`}
-                        className="shrink-0 rounded-mini px-1.5 py-0.5 text-ink-faint hover:bg-shell-gray hover:text-ink-secondary"
-                      >
-                        外す
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-                {packItems.length >= 5 ? (
-                  <p className="mt-2 text-caption text-warning">1回に送れるのは5通までです。</p>
-                ) : null}
-              </div>
-            ) : null}
-            {selected ? (
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-base font-bold text-ink">{selected.name}</h3>
-                  {category === 'frequent' && <span className="rounded-control border border-status-warn bg-status-warn-soft px-2.5 py-1.5 text-xs font-semibold text-status-warn-deep">☆ よく使う</span>}
-                </div>
-                <p className="mt-5 text-xs font-semibold text-ink-faint">送信内容のプレビュー</p>
-                <div className="mt-3 min-h-[250px] rounded-card bg-line-talk p-5 shadow-card">
-                  <div className="flex justify-center"><span className="rounded-pill bg-canvas/85 px-3 py-1 text-micro text-ink-faint">今日</span></div>
-                  <div className="mt-4 max-w-[78%] rounded-card rounded-tl-mini bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-ink-secondary shadow-card">{previewContent ?? selected.messageContent}</div>
-                </div>
-                {previewContent !== null && resolvedPreview?.unresolved.length ? (
-                  <p className="mt-3 text-xs leading-6 text-danger" role="alert">
-                    解決できない差し込みがあります: {resolvedPreview.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
-                  </p>
-                ) : null}
-                <div className="mt-3 rounded-control bg-canvas-sunken px-4 py-3 text-xs leading-6 text-ink-faint">
-                  この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
-                  種類：テキスト
-                </div>
-              </div>
-            ) : (
-              <p className="mt-10 text-center text-sm text-ink-faint">左からテンプレートを選択してください。</p>
-            )}
-          </section>
-        </div>
-
-        {/*
-          INBOX-18: 説明文は操作より上の独立した行へ。操作は専用の行にして
-          折り返さない（以前は同じ flex 行で、説明に押されてボタンの
-          文字が1文字ずつ縦に割れていた）。
-          INBOX-13: 狭い画面では一覧とプレビューが縦に積まれるため、
-          現在の選択名を操作の直上に固定して出す。押す直前に
-          何を挿入するかが画面に残る。
-        */}
-        <footer className="border-t border-hairline bg-canvas px-6 py-4">
-          {selected ? (
-            <p className="mb-1 truncate text-xs font-semibold text-ink-secondary md:hidden" title={selected.name}>
-              選択中: {selected.name}
-            </p>
-          ) : (
-            <p className="mb-1 text-xs text-ink-faint md:hidden">テンプレートが選択されていません</p>
-          )}
-          <p className="text-xs text-ink-faint">
-            {packMode
-              ? '選んだ順にまとめて送ります。送る前に確認画面が出ます。'
-              : '入力後に文章を編集してから送信できます。'}
-          </p>
-          <div className="mt-3 flex flex-wrap justify-end gap-2">
-            <Button variant="secondary" className="v7:min-h-11 whitespace-nowrap px-4 py-2 text-ink-faint h-auto" onClick={onClose}>
-              キャンセル
-            </Button>
-            <Button variant="primary" className="v7:min-h-11 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" disabled={packMode && onPickPack ? packItems.length === 0 : !selected} onClick={() => {
-                if (packMode && onPickPack) {
-                  if (packItems.length === 0) return
-                  onPickPack(packItems.map((item) => item.content))
-                } else {
-                  if (!selected) return
-                  onPick(selected.messageContent)
-                }
-                onClose()
-              }}>
-              {packMode && onPickPack ? `まとめて送る（${packItems.length}通）` : '入力欄へ挿入'}
-            </Button>
-          </div>
-        </footer>
-      </div>
-    </div>,
-    document.body,
+  /*
+   * ★V8（M0393 段2「4. テンプレートを選ぶ」）：左はテンプレートの画面と同じフォルダの列。
+   * 「予約」「EC」の文字で拾う絞り込みはフォルダに統一したので出さない（絵の注）。
+   */
+  const sideActive: TemplatePickerSideKey = category === 'frequent'
+    ? 'frequent'
+    : folderId === '__none__'
+      ? 'none'
+      : folderId
+        ? `folder:${folderId}`
+        : 'all'
+  const countReady = folderCounts !== null
+  const colorOf = new Map(scopedFolders.map((folder) => [folder.id, folder.color]))
+  return (
+    <TemplatePickerView
+      onClose={onClose}
+      search={search}
+      onSearch={setSearch}
+      searchInputRef={searchInputRef}
+      side={{
+        active: sideActive,
+        allCount: folderOptions[0]?.count ?? null,
+        noneCount: countReady ? folderCounts?.[''] ?? 0 : null,
+        folders: folderOptions
+          .filter((option) => option.value && option.value !== '__none__')
+          .map((option) => ({ id: option.value, name: option.label, color: colorOf.get(option.value) ?? null, count: option.count, depth: option.depth })),
+        status: visibleFoldersStatus === 'error' ? 'error' : visibleFoldersStatus === 'ready' ? 'ready' : 'loading',
+      }}
+      onPickSide={(key) => {
+        if (key === 'frequent') { setCategory('frequent'); setFolderId(''); return }
+        setCategory('all')
+        setFolderId(key === 'all' ? '' : key === 'none' ? '__none__' : key.slice('folder:'.length))
+      }}
+      status={visibleTemplatesStatus}
+      emptyText={search.trim() || folderId || category !== 'all' ? '見つかりませんでした。' : '文字のテンプレートがまだありません。'}
+      frequentNote={category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage}
+      templates={shown.map((template) => ({ id: template.id, name: template.name, content: template.messageContent }))}
+      selectedId={selected?.id ?? null}
+      onSelect={(id) => {
+        setSelectedId(id)
+        if (!packMode) return
+        const template = shown.find((item) => item.id === id)
+        if (template) togglePackItem(template)
+      }}
+      canPack={Boolean(onPickPack)}
+      packMode={packMode}
+      onPackMode={(next) => { setPackMode(next); setPackItems([]) }}
+      packItems={packItems}
+      remaining={visibleTemplatesStatus === 'ready' && category !== 'frequent' ? Math.max(0, total - templates.length) : 0}
+      loadingMore={loadingMore}
+      onLoadMore={loadMore}
+      resolvedPreview={previewContent === null || !selected ? null : { id: selected.id, content: previewContent }}
+      unresolved={previewContent !== null && resolvedPreview?.unresolved.length ? resolvedPreview.unresolved : null}
+      onConfirm={confirmPick}
+      confirmDisabled={packMode && onPickPack ? packItems.length === 0 : !selected}
+    />
   )
 }

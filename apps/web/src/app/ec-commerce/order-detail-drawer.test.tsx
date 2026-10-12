@@ -19,7 +19,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }))
 
@@ -38,8 +38,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { ApiError, api, type EcOrderDetail } from '@/lib/api'
-import OrderDetailDrawer from './order-detail-drawer'
-import { EVENT_STATUS_TEXT, FAILURE_KIND_TEXT, eventStoppedStage } from './ec-failure'
+import OrderDetailDrawer from '@/v8/settings/ec-commerce/order-drawer'
+import { EVENT_STATUS_TEXT, FAILURE_KIND_TEXT, eventStoppedStage } from '@/v8/settings/ec-commerce/ec-failure'
 
 const mockOrderDetail = api.ecCommerce.orderDetail as unknown as ReturnType<typeof vi.fn>
 
@@ -115,6 +115,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  document.documentElement.dataset.theme = 'v8'
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -124,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   container.remove()
+  delete document.documentElement.dataset.theme
   document.body.innerHTML = ''
 })
 
@@ -237,7 +239,7 @@ describe('注文の状況パネル', () => {
     render()
     await settle()
     const text = document.body.textContent ?? ''
-    expect(text).toContain('成果：初回購入')
+    expect(text).toContain('成果「初回購入」')
     expect(text).toContain('紹介者：紹介者A')
     expect(text).toContain('報酬：¥400')
     expect(text).toContain('支払い確定：締めに入った')
@@ -311,7 +313,7 @@ describe('V8 注文の引き出し', () => {
     const close = vi.fn()
     try {
       render({ onClose: close }); await settle()
-      expect(document.querySelector('[data-design-node="nAesv"] [role="dialog"]')).not.toBeNull()
+      expect(document.querySelector('[data-design-part="drawer"][data-width="order"][role="dialog"]')).not.toBeNull()
       expect(mockOrderDetail).toHaveBeenCalledWith('order-1', 'account-1')
       expect(document.querySelector('footer a[href="https://ec.example/admin/order/9001"]')).not.toBeNull()
       await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })

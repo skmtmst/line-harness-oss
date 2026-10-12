@@ -175,12 +175,12 @@ describe('V8-1085-KEYBOARD-01: ⌘\\ は1回だけ畳む', () => {
     expect(isCollapsed()).toBe(true)
   })
 
-  it('v7では ⌘\\ もボタンも畳まない(見た目を変えない)', async () => {
+  it('旧テーマ指定でも ⌘\\ とボタンはそれぞれ1回だけ畳みを切り替える', async () => {
     document.documentElement.dataset.theme = 'v7'
     renderShell()
     keydown(window, { key: '\\', metaKey: true })
-    expect(collapsedValue()).toBe('0')
-    expect(isCollapsed()).toBe(false)
+    expect(collapsedValue()).toBe('1')
+    expect(isCollapsed()).toBe(true)
     const button = document.querySelector('button[aria-label="メニューを畳む・広げる"]') as HTMLButtonElement
     await act(async () => { button.click() })
     expect(collapsedValue()).toBe('0')

@@ -10,7 +10,6 @@ import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
-import { logOutgoingMessage } from './event-bus.js';
 import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
@@ -1271,16 +1270,6 @@ export async function processNenDeliveries(
       await pushViaHarnessProxy(
         options.proxyBaseUrl, accessToken, friend.line_user_id, messages, idempotencyKey, options.proxyDispatch,
       );
-      for (const message of messages) {
-        await logOutgoingMessage(db, {
-          friendId: friend.id,
-          messageType: message.type,
-          content: message.type === 'text' ? message.text : JSON.stringify(message),
-          deliveryType: 'push',
-          source: `nen_${job.campaign_key}`,
-          lineAccountId: account.id,
-        });
-      }
       await db.prepare(
         `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
       ).bind(jstNow(), jstNow(), job.id).run();

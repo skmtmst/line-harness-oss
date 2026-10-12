@@ -9,7 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenMemberListData, NenRankSettingsData } from '@/lib/nen-ranks-api'
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=members'),
 }))
@@ -19,7 +19,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 const membersMock = vi.hoisted(() => ({ list: vi.fn() }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { members: membersMock.list } }))
 
-import MembersTab from './members-tab'
+import MembersTab from '@/v8/nen-members/list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -85,25 +85,19 @@ describe('m18s 会員一覧表の列幅は見出しと合う', () => {
 
   it('行の列幅は見出しと合う（吸収列はペットの1列だけ）', async () => {
     await act(async () => {
-      root.render(<MembersTab accountId="acc-1" settingsStatus="ready" settings={SETTINGS} />)
+      root.render(<MembersTab accountId="acc-1" settings={SETTINGS} />)
     })
     await settle(100)
-    const rows = Array.from(host.querySelectorAll('tbody tr')).filter(
-      (tr) => tr.querySelectorAll(':scope > td').length === 9,
+    const rows = Array.from(host.querySelectorAll('[role="row"]')).filter(
+      (tr) => tr.querySelectorAll(':scope > [role="cell"]').length === 9,
     )
     expect(rows.length).toBe(1)
-    const classes = Array.from(rows[0].querySelectorAll(':scope > td')).map((td) => td.className)
-    expect(classes[0]).toContain('w-72')
-    expect(classes[1]).toContain('w-28')
-    expect(classes[2]).toContain('w-32')
-    expect(classes[3]).toContain('w-32')
-    expect(classes[4]).toContain('w-28')
-    // ペットは幅指定なし（吸収列）。
-    for (const w of ['w-72', 'w-28', 'w-32', 'w-24', 'w-16']) {
-      expect(classes[5].split(' ')).not.toContain(w)
-    }
-    expect(classes[6]).toContain('w-28')
-    expect(classes[7]).toContain('w-24')
-    expect(classes[8]).toContain('w-16')
+    const classes = Array.from(rows[0].querySelectorAll(':scope > [role="cell"]')).map((td) => td.className)
+    expect(rows[0].className).toContain('mRow')
+    expect(host.querySelector('[role="row"]')?.className).toContain('mRow')
+    expect(classes[5]).toContain('cellText')
+    expect(classes[6]).toContain('mWide')
+    expect(classes[7]).toContain('mWide')
+    expect(classes[8]).toContain('mOps')
   })
 })

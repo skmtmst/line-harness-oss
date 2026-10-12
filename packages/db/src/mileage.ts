@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type { MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { matchesCondition, parseCondition, type SegmentCondition } from './segment-conditions.js';
@@ -1102,7 +1103,7 @@ export async function getMileageConnectedAccountsForFriend(
   allowedAccountIds: string[],
 ): Promise<MileageConnectedAccount[]> {
   if (allowedAccountIds.length === 0) return [];
-  const placeholders = allowedAccountIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(allowedAccountIds).sql;
   const rows = await db
     .prepare(
       `WITH identity AS (
@@ -1118,7 +1119,7 @@ export async function getMileageConnectedAccountsForFriend(
           AND (f.id = ? OR (identity.user_id IS NOT NULL AND f.user_id = identity.user_id))
         ORDER BY COALESCE(la.display_order, 0) ASC, account_name ASC, f.id ASC`,
     )
-    .bind(friendId, ...allowedAccountIds, friendId)
+    .bind(friendId, ...(allowedAccountIds.length ? sqlIdSet(allowedAccountIds).binds : []), friendId)
     .all<{ account_id: string; account_name: string; friend_id: string }>();
   return rows.results.map((row) => ({
     accountId: row.account_id,
@@ -2697,7 +2698,7 @@ export async function getMileageAdminOverview(
   const visibleAccountIds = accountId
     ? [...new Set([accountId, ...(options.visibleAccountIds ?? [])])]
     : [];
-  const visiblePlaceholders = visibleAccountIds.map(() => '?').join(',');
+  const visiblePlaceholders = sqlIdSet(visibleAccountIds).sql;
   const walletScopeSql = accountId
     ? `AND (
          bf.line_account_id IN (${visiblePlaceholders})
@@ -2796,7 +2797,7 @@ export async function getMileageAdminOverview(
   const scopeBinds = [
     accountId,
     accountId,
-    ...(accountId ? [...visibleAccountIds, ...visibleAccountIds, ...visibleAccountIds] : []),
+    ...(accountId ? [...sqlIdSet(visibleAccountIds).binds, ...sqlIdSet(visibleAccountIds).binds, ...sqlIdSet(visibleAccountIds).binds] : []),
   ];
 
   const rows = await db
@@ -2883,7 +2884,7 @@ export async function getMileageAdminOverview(
           AND q.attempts < 5
           ${activityScopeSql}`,
     )
-    .bind(...scopeBinds, ...(accountId ? visibleAccountIds : []))
+    .bind(...scopeBinds, ...(accountId ? sqlIdSet(visibleAccountIds).binds : []))
     .first<{ queued_events: number }>();
 
   return {
@@ -2960,7 +2961,7 @@ export async function getMileageAdminHistory(
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
   const offset = Math.max(0, options.offset ?? 0);
   const visibleAccountIds = [...new Set([accountId, ...(options.visibleAccountIds ?? [])])];
-  const visiblePlaceholders = visibleAccountIds.map(() => '?').join(',');
+  const visiblePlaceholders = sqlIdSet(visibleAccountIds).sql;
 
   const ctes = `WITH selected_profiles AS (
     SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS identity_key,
@@ -3003,7 +3004,7 @@ export async function getMileageAdminHistory(
          )
        )
   )`;
-  const scopeBinds = [accountId, ...visibleAccountIds, ...visibleAccountIds];
+  const scopeBinds = [accountId, ...sqlIdSet(visibleAccountIds).binds, ...sqlIdSet(visibleAccountIds).binds];
   const searchColumn = options.friendId ? "lr.reason" : "sp.display_name";
   const where = [`(? = '' OR ${searchColumn} LIKE '%' || ? || '%')`];
   const filters: unknown[] = [search, search];

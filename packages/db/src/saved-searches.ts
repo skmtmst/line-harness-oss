@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { isSavedSearchOpAllowed } from '@line-crm/shared';
 import type {
@@ -490,7 +491,7 @@ export async function getSavedSearchReferences(
 ): Promise<SavedSearchReference[]> {
   const ids = [...new Set(savedSearchIds.filter(Boolean))];
   if (ids.length === 0) return [];
-  const placeholders = ids.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(ids).sql;
   const result = await db
     .prepare(
       `SELECT saved_search_id, line_account_id, reference_kind, reference_id,
@@ -499,7 +500,7 @@ export async function getSavedSearchReferences(
         WHERE line_account_id = ? AND saved_search_id IN (${placeholders})
         ORDER BY reference_kind ASC, reference_name ASC, reference_id ASC`,
     )
-    .bind(lineAccountId, ...ids)
+    .bind(lineAccountId, ...(ids.length ? sqlIdSet(ids).binds : []))
     .all<SavedSearchReference>();
   return result.results;
 }
@@ -555,7 +556,7 @@ export async function getSavedSearchUsageCounts(
 ): Promise<Map<string, number>> {
   const ids = [...new Set(savedSearchIds.filter(Boolean))];
   if (ids.length === 0) return new Map();
-  const placeholders = ids.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(ids).sql;
   const result = await db.prepare(
     `SELECT saved_search_id, COUNT(*) AS call_count_this_month
        FROM saved_search_usage_events
@@ -563,7 +564,7 @@ export async function getSavedSearchUsageCounts(
         AND saved_search_id IN (${placeholders})
         AND substr(used_at, 1, 7) = ?
       GROUP BY saved_search_id`,
-  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchUsageCount>();
+  ).bind(lineAccountId, ...(ids.length ? sqlIdSet(ids).binds : []), savedSearchMonth(now)).all<SavedSearchUsageCount>();
   return new Map(result.results.map((row) => [
     row.saved_search_id,
     Number(row.call_count_this_month),
@@ -579,7 +580,7 @@ export async function getSavedSearchReferenceUsageCounts(
 ): Promise<Map<string, number>> {
   const ids = [...new Set(savedSearchIds.filter(Boolean))];
   if (ids.length === 0) return new Map();
-  const placeholders = ids.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(ids).sql;
   const result = await db.prepare(
     `SELECT saved_search_id, reference_kind, reference_id,
             COUNT(*) AS call_count_this_month
@@ -588,7 +589,7 @@ export async function getSavedSearchReferenceUsageCounts(
         AND saved_search_id IN (${placeholders})
         AND substr(used_at, 1, 7) = ?
       GROUP BY saved_search_id, reference_kind, reference_id`,
-  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchReferenceUsageCount>();
+  ).bind(lineAccountId, ...(ids.length ? sqlIdSet(ids).binds : []), savedSearchMonth(now)).all<SavedSearchReferenceUsageCount>();
   return new Map(result.results.map((row) => [
     `${row.saved_search_id}:${row.reference_kind}:${row.reference_id ?? ''}`,
     Number(row.call_count_this_month),

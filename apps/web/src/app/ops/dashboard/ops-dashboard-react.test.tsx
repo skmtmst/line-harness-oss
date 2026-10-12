@@ -9,7 +9,7 @@ import { formatBytes, formatYen, formatYenShort, niceCeiling } from '@/component
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
-/** ★V6 37-2 運営ダッシュボード。API の形どおりに数値カード・グラフ・要対応・使用量が出ること。 */
+/** 現役V8でAPIの数・要対応・使用量と詳細情報、同期・再取得を守る。 */
 
 const payload = {
   period: 'month', periodLabel: '今月', pricing: 'stripe_actual', lastSyncedAt: '2026-09-25T03:00:00.000+09:00',
@@ -33,6 +33,17 @@ let host: HTMLDivElement
 let root: Root
 let urls: string[]
 let requests: Array<{ url: string; init?: RequestInit }>
+
+/** V8は未登録者の概要も先に読む。各APIにその口の応答を返す。 */
+function stubDashboardFetch(handler: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const response = await handler(input, init)
+    if (!response.ok || !String(input).includes('line-unregistered')) return response
+    return new Response(JSON.stringify({ success: true, data: { registered: 21, total: 24, people: [] } }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    })
+  }))
+}
 
 beforeEach(() => {
   urls = []
@@ -93,33 +104,33 @@ describe('画面', () => {
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
     const text = host.textContent ?? ''
-    expect(text).toContain('今月のようす')
+    const details = Array.from(host.querySelectorAll('[title]')).map(item => item.getAttribute('title')).join(' ')
+    expect(text).toContain('契約先の売上・使用量・お問い合わせ')
     expect(text).toContain('¥398,000')
-    expect(text).toContain('前月比 ＋¥59,600')
-    expect(text).toContain('返金 ¥0')
+    expect(details).toContain('前月比 ＋¥59,600')
+    expect(details).toContain('返金 ¥0')
     expect(text).toContain('¥412,300')
-    expect(text).toContain('12件（ライト4・スタンダード6・プロ2）・定価で補い 1件')
-    expect(text).toContain('解約率 0.0%')
+    expect(details).toContain('12件（ライト4・スタンダード6・プロ2）・定価で補い 1件')
+    expect(details).toContain('解約率 0.0%')
     expect(text).toContain('月ごとの売上')
-    expect(host.querySelectorAll('svg rect').length).toBeGreaterThanOrEqual(6)
+    expect(host.querySelector('[aria-label="月ごとの売上"]')?.textContent).toContain('9月')
     // m22d: プラン別の行は割合だけにする。件数は「契約中の月額合計」の
     // カードに集約する（同じ「1件」「2件」が4回出るため）。
-    expect(text).toContain('27%')
+    expect(details).toContain('27%')
     expect(text).not.toContain('4件 ・ 27%')
-    expect(text).toContain('トライアルは契約前です')
+    expect(text).toContain('トライアルは入れない')
     expect(text).toContain('決済が失敗している契約先')
     expect(text).toContain('LINEのトークン期限が近い店舗')
-    expect(text).toContain('1時間24分')
-    expect(text).toContain('契約者専用LINEの登録　21人 / 24人')
-    expect(text).toContain('未登録の3人へ案内')
-    expect(text).toContain('4,820 / 5,000')
-    expect(text).toContain('1.8GB / 5.0GB')
+    expect(details).toContain('1時間24分')
+    expect(details).toContain('契約者専用LINEの登録 21人 / 24人')
+    expect(text).toContain('未登録の3 人を見る')
+    expect(details).toContain('4,820 / 5,000')
+    expect(details).toContain('1.8GB / 5.0GB')
     expect(text).toContain('96%')
     expect(text).toContain('Stripe の入金実績（最終同期 9月25日（金）03:00）')
     expect(text.toLowerCase()).not.toContain(['m', 'r', 'r'].join(''))
-    expect(host.querySelector('[data-design-node="Xvofy"]')).not.toBeNull()
-    expect(host.querySelector('[data-design-node="s7wSj"]')).not.toBeNull()
-    expect(host.querySelector('[data-design-node="fyib5"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="CyW0E"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="Xvofy"]')).toBeNull()
   })
 
   it('書き込み権限がある運営マスターには Stripe 同期ボタンを出す', async () => {
@@ -127,17 +138,17 @@ describe('画面', () => {
     await flush()
     const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期'))
     expect(button).toBeTruthy()
-    expect(button?.getAttribute('data-design-node')).toBe('Fo4yb')
+    expect(button?.disabled).toBe(false)
   })
 
   it('閲覧のみの運営メンバーには Stripe 同期ボタンを出さない', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    stubDashboardFetch(async (input: RequestInfo | URL) => {
       const url = String(input)
       const body = url.endsWith('/api/ops/me')
         ? { success: true, data: { id: 'staff-2', name: '閲覧担当', email: null, readOnly: true, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }
         : { success: true, data: payload }
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    }))
+    })
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
     expect(Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('Stripe と同期'))).toBe(false)
@@ -146,7 +157,7 @@ describe('画面', () => {
   it('同期中はボタンを無効にし、12か月同期の完了後に結果を出してダッシュボードを読み直す', async () => {
     let finishSync: ((response: Response) => void) | undefined
     const deferredSync = new Promise<Response>((resolve) => { finishSync = resolve })
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    stubDashboardFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       requests.push({ url, init })
       if (url.endsWith('/api/ops/me')) {
@@ -154,7 +165,7 @@ describe('画面', () => {
       }
       if (url.endsWith('/api/ops/billing/sync')) return deferredSync
       return new Response(JSON.stringify({ success: true, data: payload }), { status: 200 })
-    }))
+    })
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
     const dashboardCallsBefore = requests.filter((item) => item.url.includes('/api/ops/dashboard') && !item.url.includes('line-unregistered')).length
@@ -173,7 +184,7 @@ describe('画面', () => {
   })
 
   it('同期に失敗したら理由を alert で出す', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    stubDashboardFetch(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/api/ops/me')) {
         return new Response(JSON.stringify({ success: true, data: { id: 'staff-1', name: '運営', email: null, readOnly: false, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }), { status: 200 })
@@ -182,7 +193,7 @@ describe('画面', () => {
         return new Response(JSON.stringify({ success: false, error: 'Stripe の接続設定がまだありません' }), { status: 503 })
       }
       return new Response(JSON.stringify({ success: true, data: payload }), { status: 200 })
-    }))
+    })
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
     const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
@@ -193,13 +204,13 @@ describe('画面', () => {
   })
 
   it('Stripe未設定時は定価の注記を同じ場所に出す', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    stubDashboardFetch(async () => new Response(JSON.stringify({
       success: true,
       data: { ...payload, pricing: 'list_price', lastSyncedAt: null },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
-    expect(host.querySelector('[data-design-node="xaUOz"]')?.textContent).toBe('定価で数えています')
+    expect(host.querySelector('[aria-label="月ごとの売上"]')?.textContent).toContain('定価で数えています')
   })
 
   it('期間を先月に切り替えると period 付きで読み直す。未登録の人の一覧は名前と契約先を出す', async () => {
@@ -209,8 +220,8 @@ describe('画面', () => {
     await act(async () => { prev!.click() })
     await flush()
     expect(urls.some((u) => u.includes('/api/ops/dashboard?period=prev_month'))).toBe(true)
-    expect(host.textContent).toContain('先月のようす')
-    const guide = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('人へ案内'))
+    expect(prev?.getAttribute('aria-pressed')).toBe('true')
+    const guide = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('人を見る'))
     await act(async () => { guide!.click() })
     await flush()
     expect(document.body.textContent).toContain('木下 花')
@@ -219,18 +230,18 @@ describe('画面', () => {
 
   it('#1058: 読み込みに失敗したらエラーと再読み込みを1枚だけ出し、各セクションは読み込み中のままにしない', async () => {
     let fail = true
-    vi.stubGlobal('fetch', vi.fn(async () => (
+    stubDashboardFetch(async () => (
       fail
         ? new Response(JSON.stringify({ error: 'server' }), { status: 500 })
         : new Response(JSON.stringify({ success: true, data: payload }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    )))
+    ))
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
     // エラー表示は1枚だけ。読み込み中や空の案内は残らない。
     expect(host.querySelectorAll('[data-list-state="error"]')).toHaveLength(1)
     expect(host.querySelectorAll('[data-list-state="loading"]')).toHaveLength(0)
     expect(host.querySelectorAll('[data-list-state="empty"]')).toHaveLength(0)
-    expect(host.textContent).toContain('ダッシュボードを表示できませんでした')
+    expect(host.textContent).toContain('ダッシュボードを読み込めませんでした')
     // 再読み込みで復帰する。
     fail = false
     const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
@@ -255,11 +266,11 @@ describe('画面', () => {
     }))
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
-    const guide = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('人へ案内'))
+    const guide = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('人を見る'))
     await act(async () => { guide!.click() })
     await flush()
     // ダイアログは「読み込んでいます」のままにせず、エラーと再読み込みを出す。
-    expect(document.body.textContent).toContain('未登録の人を表示できませんでした')
+    expect(document.body.textContent).toContain('未登録の人を読み込めませんでした')
     const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     fail = false

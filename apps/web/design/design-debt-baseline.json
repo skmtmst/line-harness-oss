@@ -2,16 +2,9 @@
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
-  "app/accounts/page.tsx": {
-    "arbitrary-value": 1
-  },
   "app/accounts/uid-migration-v8.tsx": {
     "unresolved-classname": 1,
     "direct-th": 8
-  },
-  "app/affiliates/tabs.tsx": {
-    "arbitrary-value": 9,
-    "direct-th": 20
   },
   "app/affiliates/v8-affiliates-tab.tsx": {
     "direct-th": 7
@@ -89,50 +82,20 @@
   "app/contents/vars/page.tsx": {
     "arbitrary-value": 3
   },
-  "app/conversions/conversion-points-v8.tsx": {
-    "unresolved-classname": 2
-  },
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
   },
   "app/duplicates/duplicates-v8.tsx": {
     "direct-th": 12
   },
-  "app/ec-commerce/order-detail-drawer.tsx": {
-    "unresolved-classname": 2
-  },
   "app/ec-commerce/page.tsx": {
-    "unresolved-classname": 1
-  },
-  "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 1
   },
   "app/emergency/control-v8.tsx": {
     "direct-th": 6
   },
-  "app/emergency/page.tsx": {
-    "unresolved-classname": 1,
-    "arbitrary-value": 3
-  },
-  "app/events/bookings/page.tsx": {
-    "direct-th": 6
-  },
-  "app/events/events-list-v8.tsx": {
-    "arbitrary-value": 7,
-    "direct-th": 6
-  },
-  "app/events/page.tsx": {
-    "direct-primary-button": 1
-  },
-  "app/form-submissions/edit/page.tsx": {
-    "arbitrary-value": 1
-  },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
-  },
-  "app/friend-add-settings/runs/runs-v8.tsx": {
-    "direct-th": 7,
-    "unresolved-classname": 1
   },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 3,
@@ -159,25 +122,6 @@
   "app/hq/templates/template-definition-editor.tsx": {
     "unresolved-classname": 2
   },
-  "app/inflow-links/_components/create-genre-modal.tsx": {
-    "arbitrary-value": 1
-  },
-  "app/inflow-links/ad-integration-v8.tsx": {
-    "unresolved-classname": 1
-  },
-  "app/inflow-links/ad-integration.tsx": {
-    "arbitrary-value": 2
-  },
-  "app/inflow-links/detail/page.tsx": {
-    "direct-secondary-button": 1
-  },
-  "app/inflow-links/new/page.tsx": {
-    "direct-th": 4,
-    "unresolved-classname": 4
-  },
-  "app/inflow-links/page.tsx": {
-    "arbitrary-value": 8
-  },
   "app/layout.tsx": {
     "unresolved-classname": 1
   },
@@ -191,29 +135,8 @@
   "app/login/two-factor/setup/page.tsx": {
     "arbitrary-value": 1
   },
-  "app/mileage/friends/detail/v8-friend-detail.tsx": {
-    "direct-th": 7,
-    "unresolved-classname": 1
-  },
   "app/mileage/page.tsx": {
     "arbitrary-value": 7
-  },
-  "app/mileage/v8-balances-tab.tsx": {
-    "direct-th": 7
-  },
-  "app/mileage/v8-earning-rules-tab.tsx": {
-    "direct-th": 7
-  },
-  "app/mileage/v8-history-tab.tsx": {
-    "direct-th": 6
-  },
-  "app/mileage/v8-rewards-tab.tsx": {
-    "direct-th": 12,
-    "unresolved-classname": 1
-  },
-  "app/mileage/v8-score-tab.tsx": {
-    "direct-th": 10,
-    "unresolved-classname": 1
   },
   "app/nen/pets/pets-v8.tsx": {
     "direct-th": 3
@@ -263,13 +186,6 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 1
   },
-  "app/rich-menus/external-import.tsx": {
-    "arbitrary-value": 5,
-    "direct-secondary-button": 1
-  },
-  "app/rich-menus/page.tsx": {
-    "arbitrary-value": 5
-  },
   "app/scenarios/detail/detail-v8.tsx": {
     "arbitrary-value": 2
   },
@@ -288,13 +204,6 @@
   "app/settings/settings-nav-v8.tsx": {
     "unresolved-classname": 1
   },
-  "app/staff/new/page.tsx": {
-    "direct-secondary-button": 1,
-    "arbitrary-value": 1
-  },
-  "app/staff/page.tsx": {
-    "arbitrary-value": 6
-  },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
   },
@@ -307,18 +216,11 @@
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7
   },
-  "app/templates/detail/detail-v8.tsx": {
-    "direct-th": 5
-  },
   "app/templates/detail/page.tsx": {
     "direct-secondary-button": 1
   },
   "app/templates/edit/page.tsx": {
     "unresolved-classname": 1
-  },
-  "app/templates/list-v8.tsx": {
-    "unresolved-classname": 9,
-    "direct-th": 8
   },
   "app/templates/page.tsx": {
     "unresolved-classname": 2,
@@ -330,22 +232,13 @@
   "app/webhooks/apitokens-v8.tsx": {
     "direct-th": 6
   },
-  "app/webhooks/edit/page.tsx": {
-    "unresolved-classname": 4
-  },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
   },
   "app/webhooks/outgoing-v8.tsx": {
     "direct-th": 6
   },
-  "app/webinars/edit/page.tsx": {
-    "arbitrary-value": 2
-  },
   "app/webinars/edit/participants-shared.tsx": {
-    "unresolved-classname": 2
-  },
-  "app/webinars/list-v8.tsx": {
     "unresolved-classname": 2
   },
   "app/webinars/published/page.tsx": {
@@ -396,13 +289,6 @@
   "components/dashboard/shipment-panel.tsx": {
     "arbitrary-value": 2
   },
-  "components/events/event-form.tsx": {
-    "arbitrary-value": 1,
-    "direct-secondary-button": 2
-  },
-  "components/events/event-wizard.tsx": {
-    "unresolved-classname": 8
-  },
   "components/forms/action-editor.tsx": {
     "arbitrary-value": 2
   },
@@ -449,9 +335,6 @@
   "components/friends/single-friend-actions.tsx": {
     "unresolved-classname": 2
   },
-  "components/inflow-links/site-script.tsx": {
-    "arbitrary-value": 1
-  },
   "components/layout/page-header-h2.tsx": {
     "unresolved-classname": 1
   },
@@ -464,9 +347,6 @@
   },
   "components/merged-person/merged-person-detail-v8.tsx": {
     "direct-th": 8
-  },
-  "components/reminders/reminder-v6-ui.tsx": {
-    "unresolved-classname": 3
   },
   "components/rich-menus/area-properties.tsx": {
     "unresolved-classname": 12
@@ -643,9 +523,6 @@
   "components/ui/sort-select.tsx": {
     "unresolved-classname": 1
   },
-  "components/users/users-table.tsx": {
-    "arbitrary-value": 5
-  },
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 1
@@ -664,5 +541,12 @@
   },
   "v8/booking-menus/tabs/shared.tsx": {
     "unresolved-classname": 1
+  },
+  "v8/settings/staff/create.tsx": {
+    "direct-secondary-button": 1,
+    "arbitrary-value": 1
+  },
+  "v8/webhooks/edit.tsx": {
+    "unresolved-classname": 4
   }
 }

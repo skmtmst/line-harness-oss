@@ -345,6 +345,15 @@ describe('テスト送信の失敗と回復 (N-070)', () => {
     expect(line.pushMessageWithRequestId).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['unknown','in_progress'])('SEND-S02仲間: %sの古い試し送りはLINEへ進まない', async status => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    expect((await testSend(REMINDER_A, KEY_OWNER)).status).toBe(200);
+    sqlite.raw.prepare("UPDATE outbound_send_requests SET status=?,response_id=NULL,created_at='2020-01-01T00:00:00Z',lease_token='lost',failure_code='DELIVERY_UNKNOWN',last_failed_at='2020-01-01T00:00:00Z'").run(status);
+    const recovered = await testSend(REMINDER_A, KEY_OWNER);
+    expect(recovered.status).toBeGreaterThanOrEqual(400);
+    expect(line.pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+  });
+
   test('アカウント範囲外の下書きへは送信できない', async () => {
     setTestRecipients(sqlite.raw, ACC_B, [FRIEND_B]);
     // 編集権限があっても担当外アカウントは隠す。

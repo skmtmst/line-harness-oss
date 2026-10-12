@@ -30,7 +30,6 @@ import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { canEditFeature } from '@/lib/staff-capability'
 import { X } from 'lucide-react'
 import { formatRelative, formatNumber } from '@/lib/format'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -200,7 +199,7 @@ function ExpandableText({ value, className = '', empty = '未登録' }: {
    * ★V8：空の「未登録」はほかの値と同じ大きさ（13px）・普通の太さで、薄い色にする。
    * 大きさを付けないと親の 16px を継いで、値より大きく見えていた（オーナー指摘）。
    */
-  if (!value) return <span className="text-ink-faint v8:text-label v8:font-normal">{empty}</span>
+  if (!value) return <span className="text-ink-faint text-label font-normal">{empty}</span>
   return (
     <button
       type="button"
@@ -270,7 +269,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalTags(undefined)
     setTagToRemove(null)
   }, [friendId, chatId, accountId])
-  const isV8 = useAdminTheme() === 'v8'
+
   const [showSettings, setShowSettings] = useState(false)
   const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -356,17 +355,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     }
   }, [])
 
-  useEffect(() => {
-    if (!prefsLoaded || isV8) return
-    try {
-      localStorage.setItem('chat.friendInfoSections.v4', JSON.stringify({ order: sectionOrder, hidden: hiddenSections }))
-    } catch {
-      // 保存できないブラウザでは、この表示中だけ設定を保つ。
-    }
-  }, [hiddenSections, prefsLoaded, sectionOrder, isV8])
-
   const sectionStyle = (key: DetailSectionKey) => ({ order: sectionOrder.indexOf(key) })
-  const sectionVisibility = (key: DetailSectionKey) => !isV8 && hiddenSections.includes(key) ? 'hidden' : ''
+  const sectionVisibility = (key: DetailSectionKey) => ''
 
   const moveGroup = (groupKey: string, delta: -1 | 1) => {
     setSectionOrder((current) => {
@@ -605,7 +595,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       request: () => api.chats.update(chatId, { status: next }),
       revert: () => setLocalStatus(previous),
       reapply: () => setLocalStatus(next),
-      successMessage: isV8 ? `対応状況を「${STATUS_WORD[next]}」にしました` : '',
+      successMessage: `対応状況を「${STATUS_WORD[next]}」にしました`,
       failureMessage: '対応状況を変えられませんでした。',
       retry: () => saveChatStatus(next),
       undoRequest: previous ? async () => {
@@ -615,7 +605,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       } : undefined,
       onSuccess: changed,
     })
-  }, [chatId, effectiveStatus, changed, isV8, beginChange])
+  }, [chatId, effectiveStatus, changed, beginChange])
 
   const saveAssignee = useCallback((nextOperatorId: string | null) => {
     if (!chatId) return
@@ -629,7 +619,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       request: () => api.chats.update(chatId, { operatorId: nextOperatorId }),
       revert: () => setLocalOperatorId(previous),
       reapply: () => setLocalOperatorId(nextOperatorId),
-      successMessage: !isV8 ? '' : nextOperatorId ? `担当を${nameOf(nextOperatorId)}にしました` : '担当を外しました',
+      successMessage: nextOperatorId ? `担当を${nameOf(nextOperatorId)}にしました` : '担当を外しました',
       failureMessage: '担当を変えられませんでした。',
       retry: () => saveAssignee(nextOperatorId),
       undoRequest: async () => {
@@ -639,7 +629,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       },
       onSuccess: changed,
     })
-  }, [chatId, effectiveOperatorId, operators, changed, isV8, beginChange])
+  }, [chatId, effectiveOperatorId, operators, changed, beginChange])
 
   /*
    * メモは書くのをやめて1秒で自動保存。最後に直した日時（版）で比べる：
@@ -702,12 +692,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
           changed(res)
         },
         onFailure: () => setMemoSaving(false),
-        successMessageOf: () => !isV8 ? '' : overwritten !== undefined
+        successMessageOf: () => overwritten !== undefined
           ? 'ほかの人が先にメモを直していました。あとから直したこの内容で保存しました'
           : 'メモを保存しました',
       })
     }, 1000)
-  }, [chatId, effectiveNotes, changed, isV8, beginChange])
+  }, [chatId, effectiveNotes, changed, beginChange])
   useEffect(() => () => {
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
   }, [])
@@ -743,7 +733,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       request: () => api.friends.addTag(friendId, tagId),
       revert: drop,
       reapply: () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag]),
-      successMessage: isV8 ? `タグ「${tag.name}」を付けました` : '',
+      successMessage: `タグ「${tag.name}」を付けました`,
       failureMessage: `タグ「${tag.name}」を付けられませんでした。`,
       retry: () => addTagById(tagId, target),
       undoRequest: () => api.friends.removeTag(friendId, tagId),
@@ -753,7 +743,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       },
       onFailure: () => setTagSaving(false),
     })
-  }, [friendId, effectiveTags, tagOptions, isV8])
+  }, [friendId, effectiveTags, tagOptions])
   const removeTagById = useCallback((tagId: string) => {
     if (!friendId) return
     const tag = (effectiveTags ?? []).find((t) => t.id === tagId)
@@ -765,12 +755,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       request: () => api.friends.removeTag(friendId, tagId),
       revert: putBack,
       reapply: () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId)),
-      successMessage: isV8 ? `タグ「${tag.name}」を外しました` : '',
+      successMessage: `タグ「${tag.name}」を外しました`,
       failureMessage: `タグ「${tag.name}」を外せませんでした。`,
       retry: () => removeTagById(tagId),
       undoRequest: () => api.friends.addTag(friendId, tagId),
     })
-  }, [friendId, effectiveTags, isV8])
+  }, [friendId, effectiveTags])
 
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
   const createAndAddTag = async (query: string) => {
@@ -850,10 +840,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       const key = event.key.toLowerCase()
       if (key === 't' && canEditFriend) {
         event.preventDefault()
-        if (isV8) {
+        {
           setTagPickerOpen(true)
           requestAnimationFrame(() => document.getElementById('inbox-panel-tag')?.focus())
-        } else tagSearchRef.current?.focus()
+        }
       } else if (key === 'm' && canEditChat) {
         event.preventDefault()
         memoAreaRef.current?.focus()
@@ -864,7 +854,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [isV8, canEditFriend, canEditChat])
+  }, [canEditFriend, canEditChat])
 
   /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
@@ -886,7 +876,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   if (!friendId) return null
 
   const settingsButton = (
-    <Button variant="secondary" className={isV8 ? 'shrink-0 items-center justify-center whitespace-nowrap' : 'mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint'} type="button" ref={settingsButtonRef} onClick={() => {
+    <Button variant="secondary" className={'shrink-0 items-center justify-center whitespace-nowrap'} type="button" ref={settingsButtonRef} onClick={() => {
         if (!showSettings) updateSettingsPanelPos()
         setShowSettings(!showSettings)
       }} aria-expanded={showSettings}>
@@ -959,7 +949,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {/* ①対応状況（3つのボタン・1タップ）。押した瞬間に変えて裏で保存。 */}
               <div>
                 <span className="text-micro text-ink-faint">対応状況（Sキー）</span>
-                {canEditChat && isV8 ? (
+                {canEditChat ? (
                   /* ★V8 B-26：共通の選ぶ欄（会話の頭と同じ色の点）。選んだ瞬間に変えて裏で保存・知らせに元に戻す。保留も選べる。 */
                   <div ref={statusButtonRef} className={v8.editField}>
                     <Select
@@ -995,9 +985,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   </div>
                 ) : chatStatus?.status && statusLabels[chatStatus.status] ? (
                   <div className="mt-1.5">
-                    {isV8 ? <StatusPill tone={SUPPORT_STATUS_TONES[chatStatus.status]}>{statusLabels[chatStatus.status].label}</StatusPill> : (<span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
-                      {statusLabels[chatStatus.status].label}
-                    </span>)}
+                    {<StatusPill tone={SUPPORT_STATUS_TONES[chatStatus.status]}>{statusLabels[chatStatus.status].label}</StatusPill>}
                   </div>
                 ) : (
                   <p className="text-xs text-ink-faint mt-1.5">未設定</p>
@@ -1006,7 +994,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {/* ②担当（選ぶ）。 */}
               <div>
                 <label htmlFor="inbox-panel-assignee" className="text-micro text-ink-faint">担当者</label>
-                {canEditChat && operators && isV8 ? (
+                {canEditChat && operators ? (
                   /* ★V8 B-26：共通の選ぶ欄（選んだ行は ✓ だけ）。 */
                   <div className={v8.editField}>
                     <EntitySelect
@@ -1018,18 +1006,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ ...entityOptionMetadata(op), value: op.id, label: op.name }))]}
                     />
                   </div>
-                ) : canEditChat && operators ? (
-                  <select
-                    id="inbox-panel-assignee"
-                    value={effectiveOperatorId ?? ''}
-                    onChange={(event) => saveAssignee(event.target.value || null)}
-                    className="border-hairline rounded-control text-ink mt-1.5 w-full border bg-canvas px-2 py-2 text-xs outline-none"
-                  >
-                    <option value="">未割り当て</option>
-                    {operators.map((op) => (
-                      <option key={op.id} value={op.id}>{op.name}</option>
-                    ))}
-                  </select>
                 ) : (
                   <p className="text-xs text-ink-secondary mt-1.5">{operatorName || <span className="text-ink-faint">未割り当て</span>}</p>
                 )}
@@ -1037,7 +1013,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {/* ④メモ（書くのをやめて1秒で自動保存）。 */}
               <div data-customer-memo>
                 <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ（Mキー）{memoSaving ? '・保存中…' : ''}</label>
-                {canEditChat && isV8 ? (
+                {canEditChat ? (
                   /* ★V8 B-26：共通の複数行の入力欄。書くのをやめて1秒で保存し、知らせに元に戻す。 */
                   <div className={v8.editField}>
                     <TextArea
@@ -1124,44 +1100,23 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
   )
   const renderTags = (friend: FriendDetail) => (
-<div data-customer-section="tags" style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${isV8 ? v8.tagsSection : ''}`}>
+<div data-customer-section="tags" style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${v8.tagsSection}`}>
               <div className="mb-1.5 flex items-center justify-between">
                 <h4 className="text-ink text-xs font-bold">タグ（Tキー）</h4>
-                {isV8 && canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen((value) => !value)}>＋ 追加</Button> : <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
+                {canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen((value) => !value)}>＋ 追加</Button> : <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
                 </a>}
               </div>
               <div className="flex flex-wrap gap-1">
-                <TagOverflow maxVisible={isV8 ? 2 : undefined}>{(effectiveTags ?? []).map((tag) => isV8 ? (
+                <TagOverflow maxVisible={2}>{(effectiveTags ?? []).map((tag) => (
                   <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
                     onRemove={canEditFriend && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
-                ) : (
-                  <span
-                    key={tag.id}
-                    className="inline-flex max-w-full items-center gap-1 rounded-mini px-2 py-0.5 text-nano font-medium"
-                    style={{
-                      backgroundColor: `${tag.color}20`,
-                      color: tagTextColor(tag.color),
-                    }}
-                  >
-                    <ExpandableText value={tag.name} className="max-w-full text-inherit" />
-                    {canEditFriend ? (
-                      <button
-                        type="button"
-                        aria-label={`${tag.name}を外す`}
-                        onClick={() => removeTagById(tag.id)}
-                        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-pill hover:bg-canvas-sunken"
-                      >
-                        <X aria-hidden="true" size={12} />
-                      </button>
-                    ) : null}
-                  </span>
                 ))}</TagOverflow>
               </div>
               {(effectiveTags ?? []).length === 0 ? (
                 <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
               ) : null}
-              {canEditFriend && isV8 ? (
+              {canEditFriend ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
                 <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
                   <EntitySelect clearable size="full" kind="tag"
@@ -1289,34 +1244,31 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
             {accountId && friendId ? (
               /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
-              <div className="border-hairline border-b px-5 py-3 v8:empty:hidden">
+              <div className="border-hairline border-b px-5 py-3 empty:hidden">
                 <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
               </div>
             ) : null}
 
-            {isV8 ? <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} ${v8.profileSection}`}>
+            {<div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} ${v8.profileSection}`}>
               <h4>プロフィール</h4>
               <p>{friend.displayName}・{formatAddedDate(friend.createdAt)}</p>
-            </div> : null}
+            </div>}
             {/*
               名前（設計 `友だち詳細` の「名前」）。
               LINEの表示名と、こちらで付けた本名は別物。取り違えると
               別人に送ってしまうので、両方を並べて出す。
             */}
-            <div data-customer-section="names" style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4 ${isV8 ? v8.basicSection : ''}`}>
+            <div data-customer-section="names" style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4 ${v8.basicSection}`}>
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">本名</span>
-                <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
+                <ExpandableText value={friend.realName} className="text-label text-ink-secondary" />
               </div>
-              {(!isV8 || (friend.systemDisplayName && friend.systemDisplayName !== friend.displayName)) ? <div className="flex justify-between items-center gap-2">
+              {((friend.systemDisplayName && friend.systemDisplayName !== friend.displayName)) ? <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
-                <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
+                <ExpandableText value={friend.systemDisplayName} className="text-label text-ink-secondary" />
               </div> : null}
-              {!isV8 ? <div className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-micro text-ink-faint">登録日</span>
-                <span className="truncate text-xs text-ink-secondary v8:text-label">{formatDate(friend.createdAt)}</span>
-              </div> : null}
+              {null}
             </div>
 
             {/* Harness Mileage — canonical user identity across LINE accounts */}
@@ -1457,9 +1409,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
 
             {/* ⑥購入（EC の直近3件と合計）。数は実データ。無いときは「—」。★V8 は顧客情報の枠の最後に置き、見出しをほかの節とそろえる。 */}
-            <div data-customer-section="purchase" className="p-4" style={isV8 ? { order: DETAIL_SECTIONS.length } : undefined}>
+            <div data-customer-section="purchase" className="p-4" style={{ order: DETAIL_SECTIONS.length }}>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className={isV8 ? 'text-ink text-xs font-bold' : 'text-micro font-semibold text-ink-faint'}>購入</h4>
+                <h4 className={'text-ink text-xs font-bold'}>購入</h4>
                 <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
                 </a>
@@ -1570,15 +1522,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         顔・名前から始まり、「表示項目」は「友だち詳細」の横に並べる（オーナー指摘）。
         v7 は今までどおり頭の段に置く。
       */}
-      <div className={isV8 ? 'contents' : 'relative flex min-h-[66px] items-center border-b border-hairline bg-canvas px-4'}>
-        {isV8 ? null : (
-        <div className="flex w-full items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-bold text-ink">顧客情報</h3>
-          </div>
-          {settingsButton}
-        </div>
-        )}
+      <div className={'contents'}>
+        {null}
         {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
             data-inbox-v6="detail-sections-panel"
@@ -1668,7 +1613,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       </div>
 
       <ConfirmDialog
-        open={isV8 && tagToRemove !== null && tagToRemove.friendId === friendId}
+        open={tagToRemove !== null && tagToRemove.friendId === friendId}
         title={`『${tagToRemove?.name ?? ''}』を外しますか？`}
         description="この友だちからタグを外します。タグそのものは消えません。"
         confirmLabel="外す"
@@ -1704,9 +1649,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </Button>
           </div>
         ) : friend ? (
-          <div className={isV8 ? v8.body : 'flex flex-col divide-y divide-hairline'}>
+          <div className={v8.body}>
             {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
-            {isV8 ? (
+            {(
               <>
                 {/*
                   ★V8（M0393 XqSvX「その人の要点」）：大きい丸の顔 → 名前 → 友だち追加日 →
@@ -1741,41 +1686,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   })}
                 />
               </>
-            ) : (
-            <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>
-              <Avatar name={friend.displayName} src={friend.pictureUrl} size={56} />
-              <ExpandableText
-                value={friend.displayName}
-                empty="名前なし"
-                className="text-ink mt-2 max-w-full text-sm font-bold"
-              />
-              <p className="text-ink-faint mt-0.5 text-micro">LINE表示名</p>
-              <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
-                {chatStatus?.status && statusLabels[chatStatus.status] ? (
-                  <span className={`inline-flex items-center rounded-pill px-2 py-1 text-micro font-semibold ${statusLabels[chatStatus.status].className}`}>
-                    {statusLabels[chatStatus.status].label}
-                  </span>
-                ) : (
-                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-micro font-semibold">未設定</span>
-                )}
-                <span
-                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-pill px-2 py-1 text-micro font-semibold"
-                  title={operatorName ?? undefined}
-                >
-                  {operatorName || '未割り当て'}
-                </span>
-              </div>
-              {!friend.isFollowing && (
-                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded-mini px-1.5 py-0.5 text-nano font-medium">
-                  ブロック済
-                </span>
-              )}
-              <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
-                友だち詳細
-              </Button>
-            </div>
             )}
-            {isV8 ? null : renderDetailSections(friend)}
+            {null}
             {/*
               編集導線は将来追加予定 (現在の /friends は ?id= をハンドルしないため、
               リンク先が機能しない → Codex review で指摘済 → 代わりに削除。

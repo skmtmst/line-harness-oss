@@ -142,7 +142,7 @@ export default function PetsV8({
       {!accountId ? (
         <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、ペットを見るLINEアカウントを選びます。" />
       ) : tab === 'feeding' ? (
-        <FeedingV8 key={accountId} accountId={accountId} canEdit={canEdit} />
+        <FeedingV8 accountId={accountId} canEdit={canEdit} />
       ) : (
         <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} />
       )}

@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const LIST = fs.readFileSync(path.join(__dirname, 'field-list.tsx'), 'utf8')
+const LIST = fs.readFileSync(path.join(__dirname, '../../v8/tags/fields-tab.tsx'), 'utf8')
 
 /** 注釈を落とす。直した理由を書いた文が、自分の見張りに当たらないように。 */
 function code(src: string): string {
@@ -27,12 +27,12 @@ const CODE = code(LIST)
  */
 describe('友だち情報欄の帯', () => {
   it('値が無いとき、数のかわりに undefined を出さない', () => {
-    expect(CODE, 'summary があるかだけで数を語っている').not.toContain('summary ? `使用中 ${summary.inUse}件` : ')
-    expect(CODE).toContain("typeof summary?.inUse === 'number' ? `使用中 ${summary.inUse}件` : '使用中の数は取得できません'")
+    expect(CODE, 'summary があるかだけで数を語っている').not.toContain('summary ? `使っている ${summary.inUse} 件` : ')
+    expect(CODE).toContain("typeof summary?.inUse === 'number' ? `使っている ${summary.inUse} 件` : '使っている数は未集計'")
   })
 
   it('取れていないことを、0件と言い分ける', () => {
-    expect(CODE).toContain('使用中の数は取得できません')
+    expect(CODE).toContain('使っている数は未集計')
     expect(CODE, '取れないのを0と書かない').not.toContain('summary?.inUse ?? 0')
   })
 })

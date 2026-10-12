@@ -1,15 +1,16 @@
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { impactCsv } from './impact-review'
+import { impactCsv } from '@/v8/common-vars-edit/impact'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const EXPORT_PANEL = readFileSync(join(HERE, 'export-panel.tsx'), 'utf8')
-const IMPACT_REVIEW = readFileSync(join(HERE, 'impact-review.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const EXPORT_PANEL = readUiSource(join(HERE, '../../../v8/common-vars/export-panel.tsx'), 'utf8')
+const IMPACT_REVIEW = readUiSource(join(HERE, '../../../v8/common-vars-edit/edit.tsx'), 'utf8')
 const WORKER_EXPORT = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'common-var-exports.ts'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK_API = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
@@ -60,7 +61,7 @@ describe('#544 N2 一覧の件数上限と絞り込み誘導', () => {
 
 describe('#544 N4 編集画面の値欄に入力上限を付ける', () => {
   it('値欄は200文字までで、数値種別は登録画面と同じ扱いにする', () => {
-    // 日付・日時種別は★V7の選択部品（文字数制限の概念がない）で、文章・数値種別だけが入力欄のまま。
+    // 日付・日時種別はV8の選択部品（文字数制限の概念がない）で、文章・数値種別だけが入力欄のまま。
     expect(EDIT_PAGE).toContain('<DateField id="cv-value"')
     expect(EDIT_PAGE).toContain('<DateTimeField id="cv-value"')
     expect(EDIT_PAGE).toMatch(/maxLength=\{item\.type === 'number' \? undefined : 200\}/)

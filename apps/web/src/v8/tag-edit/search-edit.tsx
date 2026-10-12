@@ -41,7 +41,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 型は「作る」（CreatePage）：頭（戻る・条件名・人数と共有と使っている所）→ 左に「名前と共有」「条件」
  * 「友だち一覧での見せ方」、右に「当てはまる人」「使っている所」、下の帯（削除は左端・中央にキャンセル／複製して保存する／保存する）。
  * 動き（読み込み・切り替え時の捨て方・人数の数え直し・保存前の検査・複製・削除・未保存の確認）は
- * 今の画面（app/tags/search-editor-v8）と同じ。条件の部品と検査はそこから写した。
+ * 今の画面（src/v8/tag-edit/search-edit）と同じ。条件の部品と検査はそこから写した。
  */
 
 /*
@@ -612,7 +612,8 @@ export default function SavedSearchEditV8() {
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
       // R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。
       if (cancelled || generation !== loadGenerationRef.current) return
-      if (tagResult.success) setTags(tagResult.data)
+      if(!searches.success || !tagResult.success)throw new Error('references unavailable')
+      setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
       setScenarios(scenarioResult?.success ? scenarioResult.data : [])
       setFields(fieldResult?.success ? fieldResult.data : [])
@@ -625,8 +626,8 @@ export default function SavedSearchEditV8() {
         forms: formResult?.success !== true,
         operators: operatorResult?.success !== true,
       })
-      setSavedCount(searches.success ? searches.summary.total : null)
-      setSiblingSearches(searches.success ? searches.items.map((item) => ({ id: item.id, name: item.name })) : [])
+      setSavedCount(searches.summary.total)
+      setSiblingSearches(searches.items.map((item) => ({ id: item.id, name: item.name })))
       const found = detail.success ? detail.data : null
       if (!found) {
         setError('保存した検索が見つかりません')

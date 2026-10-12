@@ -14,7 +14,10 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, selectedAccount: null, loading: false }),
 }))
 
-import AdIntegration from './ad-integration'
+import AdIntegration from '@/v8/inflow-links/ads'
+import AdConnections from '@/v8/inflow-links/ad-connections'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...await importOriginal(), useStaffRole: () => 'owner' }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -67,6 +70,7 @@ async function settle() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/inflow-links')
   fixture.accountId = 'account-a'
   requestedUrls.length = 0
   handler = async () => ({ success: true, data: [] })
@@ -74,7 +78,7 @@ beforeEach(() => {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? new URL(raw).pathname + new URL(raw).search : raw
     requestedUrls.push(path)
-    return new Response(JSON.stringify(await handler(path)), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify(path.startsWith('/api/staff/me') ? { success: true, data: { role: 'owner' } } : await handler(path)), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -102,7 +106,7 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       }
     }
 
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
 
     expect(host.textContent).toContain('￥1,000')
@@ -117,12 +121,12 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     const pending = deferred<unknown>()
     handler = async (path) => path.startsWith('/api/ad-platforms/logs') ? logs() : pending.promise
 
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
-    expect(host.textContent).toContain('広告との接続状況を読み込んでいます')
+    await act(async () => { root.render(<AdIntegration />) })
+    expect(host.querySelector('[aria-busy="true"][aria-label="広告連携を読み込んでいます"]')).toBeTruthy()
 
     pending.resolve({ success: false, error: { code: 'unavailable', message: 'failed' } })
     await settle()
-    expect(host.textContent).toContain('広告との接続状況を表示できませんでした')
+    expect(host.textContent).toContain('広告との接続状況を読み込めませんでした')
     expect(host.textContent).not.toContain('今月の広告費')
   })
 
@@ -134,9 +138,9 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       return { success: true, data: [platform('google', 2000, 'USD', 'account-b')] }
     }
 
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     fixture.accountId = 'account-b'
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     expect(host.textContent).toContain('$2,000.00')
 
@@ -156,18 +160,18 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       return selectedPlatforms.promise
     }
 
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     expect(host.textContent).toContain('LINEアカウントを選択してください')
     expect(requestedUrls).toHaveLength(0)
 
     fixture.accountId = 'account-b'
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     expect(requestedUrls.some((url) => url.includes('lineAccountId=account-b'))).toBe(true)
 
     fixture.accountId = null
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     const callsAfterClearing = requestedUrls.length
     selectedPlatforms.resolve({ success: true, data: [platform('google', 2000, 'USD', 'account-b')] })
@@ -190,10 +194,10 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       ] } }
       return { success: true, data: [] }
     }
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     expect(host.textContent).toContain('友だち1人あたり¥1,500')
-    expect(host.textContent).toContain('経路がある円の費用')
+    expect(host.textContent).toContain('友だち追加 10 人')
   })
 
   it('R278: 30日の送信数はAPIの集計を使い、設定値や表示中の行で変わらない', async () => {
@@ -216,13 +220,12 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
       return { success: true, data: [trap] }
     }
-    await act(async () => { root.render(<AdIntegration view="history" />) })
+    await act(async () => { root.render(<AdConnections />) })
     await settle()
-    const metricValue = (label: string) =>
-      Array.from(host.querySelectorAll('p')).find((p) => p.textContent === label)?.nextElementSibling?.textContent ?? ''
-    expect(metricValue('送った件数')).toBe('8')
-    expect(metricValue('待っている')).toBe('1')
-    expect(metricValue('断られた')).toBe('1')
+    const metricValue = (label: string) => [...host.querySelectorAll('[data-shared-part="kpi-band"] > *')].find(card => card.textContent?.startsWith(label))?.textContent ?? ''
+    expect(metricValue('送った件数')).toContain('8件')
+    expect(metricValue('待っている')).toContain('1件')
+    expect(metricValue('断られた')).toContain('1件')
   })
 
   it('R276: 広告費の空欄・空白は送信せず、明示的な0円だけ送る', async () => {
@@ -231,11 +234,11 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
       return { success: true, data: [] }
     }
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
     await act(async () => { button('費用を手で入れる').click() })
-    fireEvent.change(document.querySelector('#ad-cost-label')!, { target: { value: 'チラシ' } })
+    fireEvent.change(document.querySelector('#ad-cost-name')!, { target: { value: 'チラシ' } })
     await act(async () => { fireEvent.click(document.querySelector('#ad-cost-day')!) })
     await act(async () => { fireEvent.click(document.querySelector('[role="grid"] button[data-today]')!) })
     await act(async () => { button('記録する').click(); await Promise.resolve() })
@@ -264,11 +267,12 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       }
       return { success: true, data: [] }
     }
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
 
     expect(host.textContent).toContain('手で入れた費用')
+    await act(async () => { (host.querySelector('button[aria-controls="ads-entry-actions"]') as HTMLButtonElement).click() })
     await act(async () => { button('取り消す').click() })
     // 窓の確定ボタンは一覧の同名ボタンと分ける（窓は最後に描かれる）。
     const confirmButton = Array.from(document.querySelectorAll('button'))
@@ -278,7 +282,7 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     expect(document.body.textContent).toContain('取り消す理由を入れてください')
     expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST' && String(init?.body ?? '').includes('reason'))).toBe(false)
 
-    fireEvent.change(document.querySelector('#ad-cost-cancel-reason')!, { target: { value: '金額を間違えた' } })
+    fireEvent.change(document.querySelector('#ad-cancel-reason')!, { target: { value: '金額を間違えた' } })
     await act(async () => { confirmButton.click(); await Promise.resolve() })
     const cancelCall = vi.mocked(fetch).mock.calls.find(([input, init]) =>
       init?.method === 'POST' && String(input).includes('/api/ad-costs/e-1/cancel'))
@@ -301,11 +305,11 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       }
       return { success: true, data: [] }
     }
-    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await act(async () => { root.render(<AdIntegration />) })
     await settle()
     expect(host.textContent).toContain('取り消し済み')
     expect(host.textContent).toContain('日付を間違えた')
-    expect(Array.from(document.querySelectorAll('button')).some((item) => item.textContent?.trim() === '取り消す')).toBe(false)
+    expect(Array.from(host.querySelectorAll('button')).filter(item => item.textContent?.trim() === '取り消す').every(item => item.disabled)).toBe(true)
   })
 })
 
@@ -313,9 +317,27 @@ it('V8の成果1件あたりはAPIの確定件数と計算値を使う', async (
  document.documentElement.dataset.theme='v8';
  try {
   handler=async(path)=> path.startsWith('/api/ad-platforms/logs') ? logs() : path.startsWith('/api/ad-costs') ? {success:true,data:{rows:[],platforms:[],conversionCost:{from:'2026-09-01',to:'2026-09-30',confirmedConversionCount:2,costPerConversionMinor:600,currency:'JPY'}}} : {success:true,data:[]};
-  await act(async()=>{root.render(<AdIntegration view="metrics"/>)});await settle();await settle();
+  await act(async()=>{root.render(<AdIntegration/>)});await settle();await settle();
   expect(host.textContent).toContain('¥600');
-  expect(host.textContent).toContain('同じ期間の確定成果 2件');
+  expect(host.textContent).toContain('成果 2 件');
   expect(host.textContent).not.toContain('認めた成果の件数は未接続');
- } finally {document.documentElement.dataset.theme='v7';}
+ } finally {delete document.documentElement.dataset.theme;}
 });
+
+it('現在の費用記録がある媒体では以前の設定金額を重ねず、集計も現在の記録だけ', async () => {
+  const old = platform('meta', 999, 'JPY')
+  handler = async path => path.startsWith('/api/ad-platforms')
+    ? { success: true, data: [old] }
+    : path.startsWith('/api/ad-costs')
+      ? { success: true, data: { platforms: [], rows: [{
+          sourceLabel: '取り込み済み', adPlatformId: old.id, entryRouteId: null, source: 'import',
+          totals: [{ currency: 'JPY', amountMinor: 200 }], friendAdds: null, costPerFriendMinor: null, lastImportedAt: null,
+        }] } }
+      : { success: true, data: [] }
+  await act(async () => { root.render(<AdIntegration />) })
+  await settle()
+  expect(host.querySelector('[data-shared-part="kpi-band"] > *')?.textContent).toContain('¥200')
+  expect(host.textContent).toContain('取り込み済み')
+  expect(host.textContent).not.toContain('999')
+  expect(host.textContent).not.toContain('以前の設定')
+})

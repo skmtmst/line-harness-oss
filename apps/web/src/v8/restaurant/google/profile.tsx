@@ -23,7 +23,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * ★V8 Googleビジネス プロフィール（`JUTGz`）。
  * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
  * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
- * ?tab=profile&view=hours|confirm|history|edit へ移り、入口の page.tsx が今の画面で出す。
+ * ?tab=profile&view=hours|confirm|history|edit へ移り、共通の V8 部品で出す。
  */
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
@@ -174,7 +174,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-google-updates-title">
         <SectionHeader size="small" title={<span id="gb-google-updates-title">Google側の変更を確認</span>} note={updates && updates.fields.length > 0 ? <StatusBadge tone="warning">{`確認が必要 ${updates.fields.length} 件`}</StatusBadge> : <StatusBadge tone="neutral">{updates ? '確認が必要な変更はありません' : '未確認'}</StatusBadge>} />
-        <p className={styles.warnNote}>Google やお客さまの提案で、店舗情報が変わることがあります。違いがあれば、ここで確かめて採るか戻すかを選びます。</p>
+        <p className={styles.warnNote} title="この画面で比較できるのは、店舗名・住所・電話番号・ウェブサイト・通常の営業時間・特別営業時間・店舗紹介文です。">Google やお客さまの提案で、店舗情報が変わることがあります。違いがあれば、ここで確かめて採るか戻すかを選びます。</p>
         {showDiff && updates ? (
           <dl className={styles.diffList}>
             {updates.fields.map((f) => {

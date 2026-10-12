@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 
 /**
  * テンプレート一覧（設計 `W7LBc` 11-1）の、状態と押し口。
@@ -15,9 +15,9 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 describe('テンプレート一覧の状態と押し口', () => {
   it('画面が名乗っているNodeを面に付ける', () => {
     // 撮影で「どの設計と比べる面か」が分からないと、比較が始められない。
-    expect(PAGE).toContain('data-design-node="W7LBc"')
-    expect(PAGE).toContain('data-design-node="W7LBc kcmGB"')
-    expect(PAGE).toContain('data-design-node="W7LBc FuBeQ"')
+    expect(PAGE).toContain("boardId={narrow ? 'L7zA7C' : 'v19Ivv'}")
+    expect(PAGE).toContain('data-design-node="susGP"')
+    expect(PAGE).toContain('<EmptyList')
   })
 
   it('読込中・権限不足・取得失敗・初回空・0件を言い分ける', () => {
@@ -25,8 +25,8 @@ describe('テンプレート一覧の状態と押し口', () => {
     expect(PAGE).toContain('const view = listView({')
     expect(PAGE).toContain("view === 'forbidden'")
     expect(PAGE).toContain("view === 'error'")
-    expect(PAGE).toContain('まだテンプレートがありません')
-    expect(PAGE).toContain('条件に合うテンプレートはありません')
+    expect(PAGE).toContain('title={`まだ${sectionWord}がありません`}')
+    expect(PAGE).toContain('filtered={filterActive}')
     // 4つを1つにまとめていた文。戻したら落とす。
     expect(PAGE).not.toContain('該当するテンプレートがありません')
   })
@@ -34,8 +34,8 @@ describe('テンプレート一覧の状態と押し口', () => {
   it('取得失敗は読み直せる形で出す', () => {
     // ★V7 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
     // ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
-    expect(PAGE).toContain('onRetry={() => void load()}')
-    expect(PAGE).toContain('title={failure?.title}')
+    expect(PAGE).toContain('onClick={() => load()}')
+    expect(PAGE).toContain("failure?.title ?? '見る権限がありません'")
   })
 
   it('一覧の読み込み失敗を、操作の失敗と同じ帯に混ぜない', () => {
@@ -48,14 +48,15 @@ describe('テンプレート一覧の状態と押し口', () => {
 
   it('読み込めていないあいだ、作成を押せる形で置かない', () => {
     expect(PAGE).toContain('disabled={createBlocked !== null}')
-    expect(PAGE).toContain('id="tpl-create-blocked"')
-    expect(PAGE).toContain('{createBlocked}')
+    expect(PAGE).toContain('title={createBlocked ?? undefined}')
+    expect(PAGE).toContain('createBlockedReason({ loading, failure })')
   })
 
   it('実送信数は今月分を表示し、未取得を0にしない', () => {
-    expect(PAGE).toContain('今月 {formatCount(t.monthlySendCount)}通')
-    expect(PAGE).toContain('title={`累計 ${formatCount(t.totalSendCount)}通`}')
-    expect(PAGE).toContain('送信数を確認できません')
-    expect(PAGE).not.toContain('t.monthlySendCount ?? 0')
+    expect(PAGE).toContain('今月送った数')
+    expect(PAGE).toContain('`累計 ${formatNumber(t.totalSendCount)} 通`')
+    expect(PAGE).toContain("typeof t.monthlySendCount !== 'number'")
+    const count = PAGE.slice(PAGE.indexOf('function sendCountText'), PAGE.indexOf('function publishStateOf'))
+    expect(count).not.toContain('t.monthlySendCount ?? 0')
   })
 })

@@ -1,6 +1,6 @@
 'use client'
 import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
-import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
+import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -37,7 +37,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
  * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
- * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
+ * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（src/v8/tag-edit/edit）と同じ。
  */
 
 export interface TagEditHost {
@@ -277,7 +277,7 @@ export function TagEditForm({
               <div className={styles.cardTitles}>
                 <div className={styles.titleRow}>
                   <h2 className={styles.cardTitle}>タグ連動（このタグが付いたときの動き）</h2>
-                  <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。</HelpTip>
+                  <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip>
                   <span className={styles.titleSpacer} />
                   <span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>
                   {readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}

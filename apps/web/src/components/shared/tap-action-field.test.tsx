@@ -5,7 +5,6 @@ import { Zap } from 'lucide-react'
 import TapActionField from './tap-action-field'
 import { emptyTapAction, type TapActionValue } from '@/lib/tap-actions'
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 afterEach(cleanup)
 
 function openKinds() {

@@ -12,7 +12,7 @@ const st = vi.hoisted(() => ({
   role: 'admin',
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (url: string) => { st.pushed.push(url) } }),
   useSearchParams: () => new URLSearchParams(''),
 }))

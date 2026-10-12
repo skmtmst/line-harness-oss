@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -141,8 +142,8 @@ const baseForm = {
 };
 
 function env() {
-  const run = vi.fn(async () => ({ success: true }));
-  const bind = vi.fn((..._args: unknown[]) => ({ run }));
+  const run = vi.fn(async () => ({ success: true,meta:{changes:1} }));
+  const bind = vi.fn((..._args: unknown[]) => ({ run,all:async()=>({results:[]}) }));
   const prepare = vi.fn((_sql: string) => ({ bind }));
   return {
     bindings: {
@@ -154,6 +155,16 @@ function env() {
     prepare,
     bind,
   };
+}
+
+const metadataFixtures:SqliteD1[]=[];
+afterEach(()=>{for(const f of metadataFixtures.splice(0))f.raw.close()});
+function metadataEnv(metadata:string){
+ const f=createTestD1();metadataFixtures.push(f);
+ f.raw.prepare('INSERT INTO friends(id,line_user_id,metadata) VALUES(?,?,?)').run('friend-real','U-real',metadata);
+ f.raw.prepare('INSERT INTO friends(id,line_user_id,metadata) VALUES(?,?,?)').run('victim-friend','U-victim',JSON.stringify({untouched:true}));
+ const result=env();result.bindings.DB=f.db;
+ return {...result,readMetadata:(id:string)=>JSON.parse((f.raw.prepare('SELECT metadata FROM friends WHERE id=?').get(id) as {metadata:string}).metadata)};
 }
 
 function app(asAdmin = false, role: 'owner' | 'staff' = 'owner') {
@@ -843,7 +854,7 @@ describe('LIFF identity enforcement', () => {
       id: 'friend-real',
       metadata: JSON.stringify({ existing: true }),
     });
-    const { bindings, bind } = env();
+    const { bindings, readMetadata } = metadataEnv(JSON.stringify({existing:true}));
 
     const res = await app().request('/api/forms/form-1/partial', {
       method: 'POST',
@@ -860,11 +871,8 @@ describe('LIFF identity enforcement', () => {
       'line-real',
       'account-a',
     );
-    expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ existing: true, x_username: 'alice' }),
-      '2026-08-04T12:00:00+09:00',
-      'friend-real',
-    );
+    expect(readMetadata('friend-real')).toEqual({ existing: true, x_username: 'alice' });
+    expect(readMetadata('victim-friend')).toEqual({untouched:true});
   });
 
   test('drops partial keys that are not part of the form definition', async () => {
@@ -873,7 +881,7 @@ describe('LIFF identity enforcement', () => {
       id: 'friend-real',
       metadata: JSON.stringify({ existing: true }),
     });
-    const { bindings, bind } = env();
+    const { bindings, readMetadata } = metadataEnv(JSON.stringify({existing:true}));
 
     const res = await app().request('/api/forms/form-1/partial', {
       method: 'POST',
@@ -884,11 +892,8 @@ describe('LIFF identity enforcement', () => {
     }, bindings);
 
     expect(res.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ existing: true, x_username: 'alice' }),
-      '2026-08-04T12:00:00+09:00',
-      'friend-real',
-    );
+    expect(readMetadata('friend-real')).toEqual({ existing: true, x_username: 'alice' });
+    expect(readMetadata('victim-friend')).toEqual({untouched:true});
   });
 
   test('rejects oversized partial writes instead of growing the row', async () => {
@@ -917,7 +922,7 @@ describe('LIFF identity enforcement', () => {
       id: 'friend-real',
       metadata: 'not-json{{{',
     });
-    const { bindings, bind } = env();
+    const { bindings, readMetadata } = metadataEnv('broken-json');
 
     const res = await app().request('/api/forms/form-1/partial', {
       method: 'POST',
@@ -928,11 +933,8 @@ describe('LIFF identity enforcement', () => {
     }, bindings);
 
     expect(res.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ x_username: 'bob' }),
-      '2026-08-04T12:00:00+09:00',
-      'friend-real',
-    );
+    expect(readMetadata('friend-real')).toEqual({ x_username: 'bob' });
+    expect(readMetadata('victim-friend')).toEqual({untouched:true});
   });
 
   test('rejects submit without a valid LINE ID token even when a friendId is supplied', async () => {

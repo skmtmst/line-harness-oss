@@ -4,7 +4,6 @@ import TagOverflow from '@/components/shared/tag-overflow'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TagPill from '@/components/shared/tag-pill'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
 import {
@@ -948,7 +947,7 @@ function TagPicker({
   exclude: string[]
   onChange: (include: string[], exclude: string[]) => void
 }) {
-  const isV8 = useAdminTheme() === 'v8'
+
   const [pick, setPick] = useState('')
   const [mode, setMode] = useState<'include' | 'exclude'>('include')
   const label = (id: string) => tags.find((t) => t.id === id)?.name ?? id
@@ -997,43 +996,15 @@ function TagPicker({
         </button>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        <TagOverflow>{include.map((id) => isV8 ? (
+        <TagOverflow>{include.map((id) => (
           <TagPill key={id} name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
             onRemove={() => onChange(include.filter((value) => value !== id), exclude)} />
-        ) : (
-          <span
-            key={id}
-            className="bg-accent-soft text-accent-deep rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs"
-          >
-            {label(id)}
-            <button
-              type="button"
-              onClick={() => onChange(include.filter((v) => v !== id), exclude)}
-              aria-label={`${label(id)} を外す`}
-            >
-              ✕
-            </button>
-          </span>
         ))}</TagOverflow>
-        <TagOverflow>{exclude.map((id) => isV8 ? (
+        <TagOverflow>{exclude.map((id) => (
           <span key={id} className="inline-flex items-center gap-1.5">
             <TagPill name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
               onRemove={() => onChange(include, exclude.filter((value) => value !== id))} />
             <span>以外</span>
-          </span>
-        ) : (
-          <span
-            key={id}
-            className="bg-warning-bg text-warning rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs"
-          >
-            {label(id)} 以外
-            <button
-              type="button"
-              onClick={() => onChange(include, exclude.filter((v) => v !== id))}
-              aria-label={`${label(id)} 以外 を外す`}
-            >
-              ✕
-            </button>
           </span>
         ))}</TagOverflow>
       </div>

@@ -109,9 +109,9 @@ test('v8 では gW0F2 の受け取る画面（受け取り口の列・設定カ�
   expect(board?.textContent).toContain('届いたつもりで試す')
 })
 
-test('v7 では従来の受け取るタブが出て gW0F2 は出ない', async () => {
+test('旧テーマ属性でも現役の受け取るタブが出て gW0F2 が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="gW0F2"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="gW0F2"]')).not.toBeNull()
 })
 
 test('v8 の動かす切替は押した瞬間に札が変わり、失敗したら戻る', async () => {

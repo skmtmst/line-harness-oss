@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
 
 // apiクライアントは起動時にAPI URLを要求する。実通信はfetch差替で止める。
 vi.hoisted(() => {
@@ -20,6 +21,8 @@ import EventsListPage from './page'
  */
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }))
@@ -62,14 +65,14 @@ async function eventually(check: () => void, timeout = 1500) {
   }
 }
 async function typeQuery(value: string) {
-  const input = host.querySelector<HTMLInputElement>('input[aria-label="イベント名で検索"]')!
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  const input = host.querySelector<HTMLInputElement>('input[aria-label="イベント名で探す"]')!
   await act(async () => {
-    setter.call(input, value)
-    input.dispatchEvent(new Event('input', { bubbles: true }))
+    fireEvent.change(input, { target: { value } })
   })
 }
 beforeEach(() => {
+  history.replaceState({}, '', '/events')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   calls = []; handler = base
   fixture.accountId = 'account-a'
   const values = new Map<string, string>()
@@ -107,7 +110,7 @@ test('2000文字の検索語は上限へ切り詰めてサーバーへ届き、0
       && url.searchParams.get('q') === CLAMPED_QUERY)).toBe(true)
   })
   await eventually(() => {
-    expect(host.textContent).toContain('条件に合うイベントはありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
   })
   expect(host.textContent).not.toContain('読み込み中')
 })
@@ -157,7 +160,7 @@ test('一覧口が落ちても失敗表示＋再読み込みが出て、無限�
   fail = false
   await act(async () => { retry!.click() })
   await eventually(() => {
-    expect(host.textContent).toContain('条件に合うイベントはありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(calls.filter((url) => url.pathname === '/api/events/admin/events'
       && url.searchParams.get('q') === CLAMPED_QUERY).length).toBeGreaterThanOrEqual(2)
   })

@@ -87,7 +87,7 @@ describe('F7: 作成時の競合自動確認', () => {
     expect(body.data.activationBlocked ?? false).toBe(false);
   });
 
-  it('競合があれば有効化せず停止中で作り理由を残す', async () => {
+  it('競合があれば下書きで作り理由を残す', async () => {
     const first = await post(baseRule({ isActive: true }));
     expect(first.status).toBe(201);
     expect(((await first.json()) as CreatedBody).data.isActive).toBe(true);
@@ -103,11 +103,13 @@ describe('F7: 作成時の競合自動確認', () => {
     expect(body.data.conflicts?.length ?? 0).toBeGreaterThan(0);
     expect(body.data.conflictDetected).toBe(true);
 
-    // DB上も停止中。
-    const row = testDb.raw.prepare(`SELECT is_active FROM auto_replies WHERE id = ?`).get(
+    // NORMAL3-01 公開版を作らず、編集できる下書き版を持つ。
+    const row = testDb.raw.prepare(`SELECT is_active, lifecycle_status, current_draft_version_id, current_published_version_id FROM auto_replies WHERE id = ?`).get(
       body.data.id,
     ) as { is_active: number };
     expect(row.is_active).toBe(0);
+    expect(row).toMatchObject({ lifecycle_status: 'draft', current_published_version_id: null });
+    expect((row as unknown as { current_draft_version_id: string }).current_draft_version_id).toBeTruthy();
   });
 
   it('停止指定の作成は競合があっても入力メモを壊さない', async () => {

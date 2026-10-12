@@ -4,16 +4,16 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // 画面が使う正本は page＋core（組み立て・保存を出した共有モジュール）の両方。
-const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
-  + fs.readFileSync(path.join(__dirname, 'edit/edit-core.tsx'), 'utf8')
-const CAROUSEL = fs.readFileSync(path.join(__dirname, 'carousel/page.tsx'), 'utf8')
-  + fs.readFileSync(path.join(__dirname, 'carousel/carousel-core.ts'), 'utf8')
+const EDIT = fs.readFileSync(path.join(__dirname, '../../v8/template-edit/message.tsx'), 'utf8')
+  + fs.readFileSync(path.join(__dirname, '../../v8/template-edit/core.ts'), 'utf8')
+const CAROUSEL = fs.readFileSync(path.join(__dirname, '../../v8/templates/carousel.tsx'), 'utf8')
+  + fs.readFileSync(path.join(__dirname, '../../v8/templates/carousel-core.ts'), 'utf8')
 const QUESTION_NEW = fs.readFileSync(
-  path.join(__dirname, 'questions/new/page.tsx'),
+  path.join(__dirname, '../../v8/templates/question-new.tsx'),
   'utf8',
 )
 const ASSET_EDITOR = fs.readFileSync(
-  path.join(__dirname, 'template-asset-editor.tsx'),
+  path.join(__dirname, '../../v8/template-edit/asset.tsx'),
   'utf8',
 )
 
@@ -33,13 +33,13 @@ describe('点検・中: テンプレートの画面契約', () => {
        * 完全一致で見張ると、理由を足しただけで落ちる。**「読み込めて
        * いないときに保存を止めている」ことだけを見る。**
        */
-      expect(page).toContain('disabled={saving || loadFailed')
+      expect(page).toMatch(/disabled=\{(?:saving|busy) \|\| loadFailed|disabled=\{busy \|\| Boolean\(blocked\)/)
     }
   })
 
   it('中5: 3つの作成・更新画面は置き場を選んでfolderIdを送る', () => {
     for (const page of [EDIT, CAROUSEL, QUESTION_NEW]) {
-      expect(page).toContain('置き場')
+      expect(page).toMatch(/置き場|フォルダ/)
       expect(page).toContain('folderId')
       expect(page).toContain("api.folders.list('template',")
     }
@@ -51,7 +51,7 @@ describe('点検・中: テンプレートの画面契約', () => {
     // 成功は共通 Notice のうまくいった帯（一覧へ戻る操作つき）で出す（★V7 共通部品その2 §1）。
     expect(ASSET_EDITOR).toContain('保存しました')
     expect(ASSET_EDITOR).toContain('setSaved(true)')
-    expect(ASSET_EDITOR).toContain('disabled={saving || saved}')
-    expect(ASSET_EDITOR).toContain('<Notice tone="success"')
+    expect(ASSET_EDITOR).toContain('disabled={busy || Boolean(blocked)}')
+    expect(ASSET_EDITOR).toContain("notifySaved('下書きを保存しました')")
   })
 })

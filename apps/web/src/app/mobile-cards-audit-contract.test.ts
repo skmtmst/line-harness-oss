@@ -12,10 +12,11 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-const TEMPLATES = read('templates/page.tsx')
-const TEMPLATES_CSS = read('templates/templates-v6.module.css')
-const CONVERSIONS = read('conversions/page.tsx')
-const HEALTH_TAB = read('nen/health/health-tab.tsx')
+const TEMPLATES = read('../v8/templates/list.tsx')
+const TEMPLATES_CSS = read('../v8/templates/list.module.css')
+const CONVERSIONS = read('../v8/conversions/list.tsx')
+const HEALTH_TAB = read('../v8/nen-health/health.tsx')
+const HEALTH_CSS = read('../v8/nen-health/health.module.css')
 const SHARED_CARD = read('../components/shared/mobile-table-cards.tsx')
 const SIDEBAR_CSS = read('../components/layout/sidebar.module.css')
 
@@ -40,46 +41,44 @@ describe('1: 共通の表に「スマホではカード」の形がある', () =
 })
 
 describe('2: テンプレート・成果地点の一覧はこの形になる', () => {
-  it('テンプレート一覧は表（768px以上）とカード（767px以下）を出し分ける', () => {
-    expect(TEMPLATES).toContain('MobileTableCards')
-    expect(TEMPLATES).toContain("import MobileTableCards from '@/components/shared/mobile-table-cards'")
-    expect(TEMPLATES).toContain('hidden md:block')
+  it('テンプレート一覧は狭いV8の板でも名前と操作を残す', () => {
+    expect(TEMPLATES).toContain('useNarrowViewport()')
+    expect(TEMPLATES).toContain('<DataTable>')
+    expect(TEMPLATES).toContain('{!narrow && <Th className={styles.headCell}>使っている所</Th>}')
     // 名前欄の max-w-0 を残したCSS畳み込みは名前が消える原因。戻したら赤くなる。
     expect(TEMPLATES).not.toContain('data-template-list')
     expect(TEMPLATES_CSS).not.toContain('[data-template-list]')
   })
 
-  it('テンプレートのカードは名前・種別・要点・主な数字・編集・「…」を持つ', () => {
-    expect(TEMPLATES).toContain('summary: `${latestContentOf(t).slice(0, 60)}')
-    expect(TEMPLATES).toContain('件で使用')
-    expect(TEMPLATES).toContain('onSelect: () => setDrawerId(t.id)')
+  it('テンプレートの表と詳細パネルは名前・種別・本文・使用数・編集・操作を持つ', () => {
+    expect(TEMPLATES).toContain('latestContentOf(activeTemplate).slice(0, 120)')
+    expect(TEMPLATES).toContain('activeTemplate.usageCount}か所')
+    expect(TEMPLATES).toContain('onOpen={() => setActiveId(activeId === t.id ? null : t.id)}')
   })
 
-  it('成果地点の一覧は表（768px以上）とカード（767px以下）を出し分ける', () => {
-    expect(CONVERSIONS).toContain('MobileTableCards')
-    expect(CONVERSIONS).toContain('hidden md:block')
-    expect(CONVERSIONS).toContain('この30日 ${formatNumber(point.metrics.netCount)}件')
-    expect(CONVERSIONS).toContain('使う場所を足す')
+  it('成果地点の現役一覧は共通の表と省略した全文を使う', () => {
+    expect(CONVERSIONS).toContain('<DataTable className={styles.table}>')
+    expect(CONVERSIONS).toContain('title={point.name}')
+    expect(CONVERSIONS).toContain('title={usageLabel(point)}')
+    expect(CONVERSIONS).toContain('<ListPage')
   })
 })
 
 describe('3: 健康日記は390pxではみ出さない', () => {
-  it('8列の表は768px以上だけ出し、767px以下は絞ったカードにする', () => {
-    expect(HEALTH_TAB).toContain('MobileTableCards')
-    expect(HEALTH_TAB).toContain('hidden md:block')
+  it('V8の狭い板では補足の列を見出しと行の両方で畳む', () => {
+    expect(HEALTH_CSS).toContain('@container v8-page (max-width: 1099px)')
+    expect(HEALTH_CSS).toMatch(/> th.colStool,[\s\S]*?> td.colStool \{\s*display: none/)
   })
 
-  it('カードは日付・ペット・状態・主な記録に絞る', () => {
-    expect(HEALTH_TAB).toContain('最終記録 ${row.lastLoggedLabel}')
-    expect(HEALTH_TAB).toContain('30日 ${row.count30d}件')
+  it('V8の一覧は日付・ペット・変化・主な記録を保持する', () => {
+    expect(HEALTH_TAB).toContain('row.lastLoggedLabel')
+    expect(HEALTH_TAB).toContain('row.count30d')
     expect(HEALTH_TAB).toContain('30日のまとめ')
   })
 
-  it('カード側に横はみ出しの種（固定の最小幅・横スクロール容器）を持ち込まない', () => {
-    const start = HEALTH_TAB.indexOf('<MobileTableCards')
-    const cardBlock = HEALTH_TAB.slice(start, HEALTH_TAB.indexOf('/>', start))
-    expect(cardBlock).not.toContain('min-w-')
-    expect(cardBlock).not.toContain('overflow-x-auto')
+  it('V8の名前と補足は省略表示し、全文も読める', () => {
+    expect(HEALTH_CSS).toMatch(/\.cell \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis/)
+    expect(HEALTH_TAB).toContain('title={row.pet.callName || name}')
   })
 })
 
@@ -87,9 +86,10 @@ describe('4: テンプレート詳細の×は固定の上の帯に隠れない',
   it('詳細面の重なり順は固定のモバイル帯より上（共通の最上層の器にそろえる）', () => {
     const headerZ = zIndexOf(SIDEBAR_CSS, '.mobileHeader')
     expect(headerZ).toBe(50)
-    expect(TEMPLATES).toContain('zIndex: 80')
+    expect(TEMPLATES).toContain('<DetailPanel')
+    expect(read('../components/shared/detail-panel.module.css')).toContain('z-index: var(--tpl-detail-panel-z, 70)')
     expect(TEMPLATES).not.toContain('bg-black/30 z-30')
     expect(TEMPLATES).not.toContain('border-hairline z-40 overflow-y-auto')
-    expect(80).toBeGreaterThan(headerZ)
+    expect(70).toBeGreaterThan(headerZ)
   })
 })

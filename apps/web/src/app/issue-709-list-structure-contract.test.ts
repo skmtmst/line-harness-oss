@@ -10,8 +10,7 @@
  * 4. フォームの「フォルダを追加」は押せない理由を hover 限定の title
  *    ではなく常時表示の注記で伝える。
  * 5. 予約メニューにドラッグできない「⠿」の飾りを戻さない。
- * 6. 残件: 28の並び替えは操作列の「…」の中の上へ・下へで行い、注意書きに導線を書く。
- *    専用APIが無いため既存updateMenu（版つきPUT）でsort_orderを交換する。
+ * 6. 予約メニューは共通のつまみ・行操作で並べ替え、版つきの一括APIで保存する。
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
@@ -27,17 +26,17 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
    * 「すべて」の行へ移し、母集団の正しさ（フォルダ数ではない）はそちらで守る。
    */
   it('テンプレートはテンプレート総件数（フォルダ数ではない）', () => {
-    const src = read('templates/page.tsx')
+    const src = read('../v8/templates/list.tsx')
     // ★V7 `x63W5x`：取れていない間は「—」。読めたときはテンプレート総件数。
-    expect(src).toContain("{ id: 'all', label: 'すべて'")
-    expect(src).toContain('? templates.length : null')
+    expect(src).toContain("id: 'all', label: 'すべて'")
+    expect(src).toContain('? tabItems.length : null')
     expect(src).not.toContain('`${templates.length} 件`')
     expect(src).not.toContain('total={`${folders.length} 件`}')
   })
 
   it('リッチメニューはグループ総件数（フォルダ数+1ではない）', () => {
     const src = read('rich-menus/page.tsx')
-    expect(src).toContain("{ id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal }")
+    expect(src).toContain('allCount={groupFacets?.total ?? groupTotal}')
     expect(src).not.toContain('total={`${groupFacets?.total ?? groupTotal} 件`}')
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
@@ -53,7 +52,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
      * 出どころは絞り込み前の総数（overallTotal ?? total）のまま変えない。
      */
     expect(src).not.toContain('total={`${total} 件`}')
-    expect(src).toContain("{ id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null }")
+    expect(src).toContain("id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null }")
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
 
@@ -82,9 +81,10 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収める', () => {
   it('リッチメニュー一覧は最小幅を実効幅内に収める', () => {
     const src = read('rich-menus/page.tsx')
-    const minWidth = src.match(/min-w-\[(\d+)px\]/)
-    expect(minWidth, 'min-w が付いている').toBeTruthy()
-    expect(Number(minWidth![1])).toBeLessThanOrEqual(780)
+    expect(src).toContain('<DataTable')
+    const css = read('../v8/rich-menus/list.module.css')
+    expect(css).not.toMatch(/min-width:\s*\d+px/)
+    expect(css).toContain('.colMenu { width: var(--tpl-rml-col-menu); }')
   })
 
   it('フォーム一覧は最小幅を実効幅内に収める', () => {
@@ -108,9 +108,10 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
 describe('Issue #709: リッチメニューの状態表示は共有StatusBadgeに一本化', () => {
   it('共有StatusBadgeをimportし、ローカル札実装を持たない', () => {
     const src = read('rich-menus/page.tsx')
-    expect(src).toContain("import StatusBadge from '@/components/shared/status-badge'")
+    expect(src).toContain('styles.pillScheduled')
     // 平文の公開予定表示は札へ集約したので、行内の直接表示は残さない。
-    expect(src).toContain('MenuStatusBadge group={g}')
+    expect(src).toContain("g.status === 'published' ? styles.pillLive : styles.pillDraft")
+    expect(src).toContain('`${shortDay(g.publishingAt)} 公開`')
     expect(src).not.toMatch(/function StatusBadge\(/)
   })
 })
@@ -139,27 +140,32 @@ describe('Issue #709: 予約メニューに押せないドラッグ飾りを戻�
   })
 })
 
-describe('Issue #709残件: 28予約メニューは操作列の↑↓で並び替えできる', () => {
-  it('行操作に上へ/下へボタンがある（掴めない飾りの代わり）', () => {
-    const src = read('booking/menus/page.tsx')
-    // ★V7 行の操作の決まり：4つ並べると1440pxで器からはみ出すため、
-    // 上へ・下へは操作列の「…」の中へ集める。並び替え自体は残す。
-    expect(src).toContain("id: 'move-up'")
-    expect(src).toContain("label: '上へ'")
-    expect(src).toContain("id: 'move-down'")
-    expect(src).toContain("label: '下へ'")
-    expect(src).toContain('moveMenu')
+describe('Issue #709残件: V8予約メニューの並べ替えを維持する', () => {
+  it('共通の行操作から上へ・下へ動かせる', () => {
+    const src = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    expect(src).toContain('useReorder({')
+    expect(src).toContain('reorder.menuItems(menu.id')
+    expect(src).toContain('<RowMenu')
+    expect(src).toContain('onReorder: ({ id, ids }) => persistOrder(id, ids)')
   })
 
-  it('注意書きに↑↓の導線を書く', () => {
-    const src = read('booking/menus/page.tsx')
-    expect(src).toContain('操作列の「…」から変えられます')
+  it('つまみも実操作へつなぎ、閲覧のみ・検索中・保存中は動かせない', () => {
+    const src = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    expect(src).toContain('<ReorderHandle')
+    expect(src).toContain('reorder.handleProps(menu.id)')
+    expect(src).toContain('reorder.rowProps(menu.id)')
+    expect(src).toContain('disabledReason: reorderDisabledReason')
+    expect(src).toContain('閲覧のみのため並び替えできません')
+    expect(src).toContain('検索を外すと動かせます')
+    expect(src).toContain('並び替えを保存しています')
   })
 
-  it('並び替えは既存updateMenu（版つきPUT）でsort_orderを交換し、新規APIを作らない', () => {
-    const src = read('booking/menus/page.tsx')
-    expect(src).toContain('bookingApi.updateMenu')
-    expect(src).toContain('sort_order: other.sort_order')
-    expect(src).not.toContain('menus/order')
+  it('既存の一括APIへ版と順位を送り、途中までの順位交換を防ぐ', () => {
+    const src = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    expect(src).toContain('bookingApi.reorderMenus(accountId')
+    expect(src).toContain('expectedVersion: menu.version')
+    expect(src).toContain('sortOrder')
+    expect(src).toContain('setOrderOverride(null)')
+    expect(src).toContain('onReload()')
   })
 })

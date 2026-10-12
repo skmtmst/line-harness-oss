@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest'
 import { summarize } from '../../../scripts/build-release-log.mjs'
 import type { OperationHistoryEntry } from '@/lib/api'
-import { collectRecentUpdates, RECENT_UPDATES_LIMIT, releaseEntryCount, type UpdateRelease } from './update-history'
+import { collectRecentUpdates, RECENT_UPDATES_LIMIT, releaseEntryCount, type UpdateRelease } from '@/lib/operation-updates'
 
 function entries(count: number, prefix: string, day: (i: number) => string) {
   return Array.from({ length: count }, (_, i) => ({

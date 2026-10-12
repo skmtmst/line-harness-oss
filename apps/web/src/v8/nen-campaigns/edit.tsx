@@ -10,6 +10,8 @@ import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
+import Dialog from '@/components/shared/dialog'
+import NumberInput from '@/components/shared/number-field'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
@@ -40,8 +42,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 /*
  * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
  *
- * 取得・保存・版つき競合・テスト送信の決めごとは今の画面
- * （app/nen-campaigns/edit/campaign-editor-v8.tsx）と同じ。違いは置き場と見せ方だけ——
+ * 取得・保存・版つき競合・テスト送信の決めごとを保持する現役の編集。
  * ・節は 配信フロー・いつ送りますか・送るもの・押されたあとにすること。
  * ・きっかけからの日数・送る時刻・つなぐ回答フォーム・付けるマイルは、どれも「選ぶ欄」で選ぶ。
  * ・差し込みの道具・残りの字数は、欄の横の小さな押し口から開く／足りないときだけ出す。
@@ -120,10 +121,15 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [testTarget, setTestTarget] = useState('')
   const [testing, setTesting] = useState(false)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [customMileageOpen, setCustomMileageOpen] = useState(false)
+  const [customMileage, setCustomMileage] = useState('')
+  const [customMileageError, setCustomMileageError] = useState('')
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
+
+  useEffect(() => { setCustomMileageOpen(false) }, [campaignKey, selectedAccountId, canEdit])
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -231,7 +237,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       return
     }
     const form = forms.find((candidate) => candidate.id === formId)
-    if (!form) return
+    if (!form || !form.isActive) return
     const next: NenCampaignAfterAction = { kind: 'open_form', formId: form.id, formName: form.name, buttonLabel: '感想を書く（30秒）' }
     setDraft((previous) => ({
       ...previous,
@@ -242,6 +248,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   }
 
   const chooseMileage = (value: string) => {
+    if (value === 'custom') {
+      setCustomMileage(mileageAction?.kind === 'award_mileage' ? String(mileageAction.amount) : '')
+      setCustomMileageError('')
+      setCustomMileageOpen(true)
+      return
+    }
     const others = actions.filter((action) => action.kind !== 'award_mileage')
     if (!value) { setActions(others); return }
     setActions([...others, { kind: 'award_mileage', amount: Number(value), trigger: 'form_submitted' }])
@@ -425,7 +437,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       footerActions={canEdit ? (
         <>
           <Button href="/nen-campaigns">キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
         </>
       ) : <></>} dirty={false}
     >
@@ -560,8 +572,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
                 id="nen-edit-form"
                 kind="form"
                 label="回答フォームを開かせる（任意）"
-                options={forms.filter((form) => form.isActive || form.id === formAction?.formId)}
-                meta={(row) => (row.isActive === false ? '公開されていません' : undefined)}
+                options={forms.map((form) => ({ ...form, disabled: !form.isActive }))}
+                meta={(row) => (row.isActive === false ? '公開されていないため選べません' : undefined)}
                 placeholder="（開かせない）"
                 clearable
                 invalid={Boolean(formIssueMessage)}
@@ -570,7 +582,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
               /></SaveErrorField>
               {formIssueMessage ? <Notice tone="danger" >{formIssueMessage}</Notice> : null}
             </>}
-            {formIssueBanner && !formIssueMessage ? <p className={styles.muted}>{formIssueBanner}</p> : null}
+            {formIssueBanner ? <p className={styles.muted}>{formIssueBanner}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答後にマイルを付ける</span>
@@ -584,6 +596,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
               options={[
                 { value: '', label: '付けない' },
                 ...withCurrent(MILEAGE_CHOICES, mileageAction?.kind === 'award_mileage' ? mileageAction.amount : MILEAGE_CHOICES[0]).map((amount) => ({ value: String(amount), label: `${formatNumber(amount)} マイル` })),
+                { value: 'custom', label: 'ほかの数を入れる' },
               ]}
             /></SaveErrorField>}
           </div>
@@ -591,6 +604,17 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ タグ</p>
       </Card>
       <Drawer open={previewOpen} title="配信のプレビュー" width="narrow" onClose={() => setPreviewOpen(false)}>{preview}</Drawer>
+      <Dialog open={customMileageOpen} title="回答後に付けるマイル" confirmLabel="この数にする" onCancel={() => setCustomMileageOpen(false)} error={customMileageError || undefined} onConfirm={() => {
+        const amount = Number(customMileage)
+        if (!Number.isInteger(amount) || amount < 1 || amount > 1_000_000) {
+          setCustomMileageError('付けるマイルは1〜1,000,000の整数で入力してください')
+          return
+        }
+        chooseMileage(String(amount))
+        setCustomMileageOpen(false)
+      }}>
+        <Field label="回答後に付けるマイル"><NumberInput unit="マイル" aria-label="回答後に付けるマイル" min={1} max={1_000_000} step={1} value={customMileage} onChange={(event) => { setCustomMileage(event.target.value); setCustomMileageError('') }} /></Field>
+      </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>
   )

@@ -3,15 +3,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ChevronDown, Pipette } from 'lucide-react'
 import styles from './color-well.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { isImeComposing } from './ime'
+import Notice from './notice'
 
-/** よく使う色の見本（8×3）。Pencil ★BG-2 `d6PU4a` の色グリッドと同じ並び。 */
-const DEFAULT_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#16a34a', '#06c755',
-  '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-  '#ec4899', '#f43f5e', '#64748b', '#1d1d1f', '#ffffff', '#9ca3af', '#d1d5db', '#f5f5f7',
-]
 
 /*
  * ピッカー本体の幅（`color-well.module.css` の `.pop` と同じ）と、画面の端に
@@ -130,7 +124,10 @@ export default function ColorWell({
   onSaveColor,
   block = false,
   fallback = '#ffffff',
+  retainInvalidInput = false,
 }: {
+  /** 書きかけを消さず、誤ったコードは直してから確定してもらう。 */
+  retainInvalidInput?: boolean
   /** 今の色（`#rrggbb`／半透明なら `#rrggbbaa`）。指定なしは null。 */
   value: string | null
   onChange: (color: string | null) => void
@@ -151,13 +148,14 @@ export default function ColorWell({
   /** 指定なしのときにピッカーを開く色（★BG-B の役割ごとの見本の色）。 */
   fallback?: string
 }) {
-  const theme = useAdminTheme()
-  const palette = colors ?? (theme === 'v8' ? V8_COLORS : DEFAULT_COLORS)
+
+  const palette = colors ?? (V8_COLORS)
   const [open, setOpen] = useState(false)
   const initial = parseValue(value ?? fallback)
   const [hsv, setHsv] = useState<Hsv>(initial.hsv)
   const [alpha, setAlpha] = useState(initial.alpha)
   const [hexText, setHexText] = useState((value ?? fallback).replace(/^#/, '').slice(0, 6))
+  const [hexError, setHexError] = useState(false)
   const emitted = useRef<string | null>(value ?? null)
   const rootRef = useRef<HTMLSpanElement | null>(null)
   const [alignEnd, setAlignEnd] = useState(false)
@@ -213,10 +211,12 @@ export default function ColorWell({
   const applyHex = (input: string) => {
     const hex = normalizeHex(input)
     if (!hex) {
+      if (retainInvalidInput) { setHexError(true); return }
       setHexText(value ? value.slice(1, 7) : '')
       return
     }
     const rgb = hexToRgb(hex)
+    setHexError(false)
     if (!rgb) return
     const nextHsv = rgbToHsv(rgb.r, rgb.g, rgb.b)
     const nextAlpha = HEX8.test(hex) ? Math.round((Number.parseInt(hex.slice(7, 9), 16) / 255) * 100) : alpha
@@ -450,9 +450,10 @@ export default function ColorWell({
               {/* v8 は正本どおり大文字で見せる。入力中の文字は hexText のまま持つ。 */}
               <input
                 className={styles.hexInput}
-                value={theme === 'v8' ? hexText.toUpperCase() : hexText}
+                value={hexText.toUpperCase()}
                 aria-label="色を十六進で入力"
-                onChange={(event) => setHexText(event.target.value.replace(/^#/, ''))}
+                aria-invalid={hexError || undefined}
+                onChange={(event) => { setHexText(event.target.value.replace(/^#/, '')); setHexError(false) }}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' || isImeComposing(event)) return
                   event.preventDefault()
@@ -479,7 +480,7 @@ export default function ColorWell({
               </label>
             ) : null}
             {/* v8 は正本どおりスポイトを必ず置き、対応していないブラウザでは押せない形で出す。 */}
-            {hasDropper || theme === 'v8' ? (
+            {(
               <button
                 type="button"
                 className={styles.dropper}
@@ -490,7 +491,7 @@ export default function ColorWell({
               >
                 <Pipette size={15} aria-hidden="true" />
               </button>
-            ) : null}
+            )}
           </div>
 
           <span className={styles.rule} aria-hidden="true" />
@@ -498,6 +499,7 @@ export default function ColorWell({
           {/* よく使う色 */}
           <div className={styles.group}>
             <span className={styles.headingText}>よく使う色</span>
+            {hexError ? <Notice tone="danger">6桁の16進数で色を入力してください。</Notice> : null}
             <div className={styles.grid} role="listbox" aria-label="よく使う色">
               {palette.map((color) => (
                 <button

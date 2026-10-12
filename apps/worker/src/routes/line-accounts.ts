@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
@@ -281,13 +282,13 @@ lineAccounts.get('/api/line-accounts/summary', async (c) => {
     if (visibleActiveIds.length === 0) {
       return c.json({ success: true, data: { uniqueFriendCount: 0 } });
     }
-    const placeholders = visibleActiveIds.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(visibleActiveIds).sql;
     const row = await db.prepare(
       `SELECT COUNT(DISTINCT (${IDENTITY_KEY_SQL})) AS count
        FROM friends
        WHERE friends.is_following = 1
          AND friends.line_account_id IN (${placeholders})`,
-    ).bind(...visibleActiveIds).first<{ count: number }>();
+    ).bind(...sqlIdSet(visibleActiveIds).binds).first<{ count: number }>();
     return c.json({ success: true, data: { uniqueFriendCount: row?.count ?? 0 } });
   } catch (err) {
     console.error('GET /api/line-accounts/summary error:', err);

@@ -71,6 +71,7 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     expect(body).toContain('有効 2・招待中 1')
     expect(body).toContain('監査ログに記録')
     expect(body).not.toContain('未設定 1人')
+    expect(host.querySelector('[title="2要素認証 設定済み 2人 / 3人・未設定 1人"]')).not.toBeNull()
     // 招待の行
     expect(body).toContain('招待メールを送る')
     expect(body).not.toContain('運営メンバーを招待')

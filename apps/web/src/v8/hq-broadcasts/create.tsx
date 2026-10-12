@@ -252,11 +252,11 @@ export default function HqBroadcastCreate() {
   const replaceActive = (next: Bubble) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...next, id: item.id } : item)))
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   /* 統括で使える共有の素材（どの店にも属さないクーポン・リッチメッセージ）。 */
+  const [assetsError,setAssetsError]=useState(false)
   const [assets, setAssets] = useState<BroadcastMessageAsset[] | null>(null)
   const assetId = String(active.content.assetId ?? '')
   const setAssetId = (next: string) => { const found = (assets ?? []).find((a) => a.id === next); setContent(found ? assetContent(found) : {}) }
   /* 統括のカルーセルのひな形（③ のカルーセル）と、［テンプレートから選ぶ］の窓。 */
-  const [carousels, setCarousels] = useState<HqTemplateListItem[] | null>(null)
   const [carouselError, setCarouselError] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerKind, setPickerKind] = useState<string | undefined>()
@@ -382,26 +382,24 @@ export default function HqBroadcastCreate() {
 
   const needsAssets = bubbles.some((item) => item.kind === 'rich' || item.kind === 'coupon')
   useEffect(() => {
-    if (!needsAssets || assets) return
+    if (!needsAssets || assets || assetsError) return
     let current = true
     void api.broadcastMessageAssets.list()
-      .then((res) => { if (current) setAssets(res.success ? res.data.filter((a) => a.lineAccountId === null && (a.kind === 'coupon' || a.kind === 'rich_message')) : []) })
-      .catch(() => { if (current) setAssets([]) })
+      .then((res) => { if(!res.success)throw new Error(res.error);if (current) setAssets(res.data.filter((a) => a.lineAccountId === null && (a.kind === 'coupon' || a.kind === 'rich_message'))) })
+      .catch(() => { if (current) setAssetsError(true) })
     return () => { current = false }
-  }, [needsAssets, assets])
-
-  const needsCarousels = bubbles.some((item) => item.kind === 'carousel')
-  useEffect(() => {
-    if (!needsCarousels || carousels) return
-    let current = true
-    void hqTemplatesApi.listByKind('carousel').then((list) => { if (current) setCarousels(list) }).catch(() => { if (current) setCarousels([]) })
-    return () => { current = false }
-  }, [needsCarousels, carousels])
+  }, [needsAssets, assets,assetsError])
 
   const chosen = useMemo(() => (stores ?? []).filter((s) => accountIds.includes(s.id)), [stores, accountIds])
+  const candidatesRequest = useRef(0)
+  const candidatesScope = useRef('')
+  candidatesScope.current = chosen.map((s) => s.id).join(',')
 
   /* 配信対象の候補：選んだアカウントごとにタグ・シナリオ・保存した条件を読み、同じ名前でまとめる。 */
   const loadTags = useCallback(async () => {
+    const request = ++candidatesRequest.current
+    const scope = chosen.map((s) => s.id).join(',')
+    const current = () => request === candidatesRequest.current && scope === candidatesScope.current
     if (chosen.length === 0) { setTagOptions([]); setScenarioOptions([]); setSavedOptions([]); setTagStatus('ready'); return }
     setTagStatus('loading')
     const group = (lists: string[][]) => {
@@ -412,15 +410,17 @@ export default function HqBroadcastCreate() {
     try {
       const [tagLists, scenarioLists, savedLists] = await Promise.all([
         Promise.all(chosen.map((s) => api.tags.list({ accountId: s.id }))),
-        Promise.all(chosen.map((s) => api.scenarios.list({ accountId: s.id }).catch(() => null))),
-        Promise.all(chosen.map((s) => api.segmentPresets.list(s.id).catch(() => null))),
+        Promise.all(chosen.map((s) => api.scenarios.list({ accountId: s.id }))),
+        Promise.all(chosen.map((s) => api.segmentPresets.list(s.id))),
       ])
-      if (tagLists.some((res) => !res.success)) throw new Error('tags')
-      setTagOptions(group(tagLists.map((res) => (res.success ? res.data.map((t) => t.name) : []))))
-      setScenarioOptions(group(scenarioLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
-      setSavedOptions(group(savedLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
+      if (!current()) return
+      if ([...tagLists, ...scenarioLists, ...savedLists].some((res) => !res.success)) throw new Error('candidates')
+      setTagOptions(group(tagLists.map((res) => {if(!res.success)throw new Error(res.error);return res.data.map((t) => t.name)})))
+      setScenarioOptions(group(scenarioLists.map((res) => {if(!res.success)throw new Error(res.error);return res.data.map((t) => t.name)})))
+      setSavedOptions(group(savedLists.map((res) => {if(!res.success)throw new Error(res.error);return res.data.map((t) => t.name)})))
       setTagStatus('ready')
     } catch (saveFailure) {
+      if (!current()) return
       saveErrors.capture(saveFailure)
       setTagStatus('error')
     }
@@ -490,6 +490,7 @@ export default function HqBroadcastCreate() {
   const fields = useFormErrors()
   fields.define('title', '配信名', () => !title.trim() ? '配信名を入れてください' : title.trim().length > TITLE_MAX ? `配信名は${TITLE_MAX}文字までです` : null, { reveal: () => changeStep('basic') })
   fields.define('accountIds', '送るアカウント', () => chosen.length ? null : '送るアカウントを選んでください', { reveal: () => changeStep('audience') })
+  fields.define('candidates', '配信対象の候補', () => chosen.length && tagStatus !== 'ready' ? '配信対象の候補を読み直してください' : null, { reveal: () => changeStep('audience') })
   fields.define('tagName', '送る相手のタグ', () => audience === 'tag' && !tagName ? '送る相手のタグを選んでください' : null, { reveal: () => changeStep('audience') })
   fields.define('target', '配信対象', () => audience === 'advanced' && !pruneCondition(condition) && !savedName ? '詳細条件を入力するか、保存した条件を選んでください' : null, { reveal: () => changeStep('audience') })
   fields.define('scheduledAt', '送る日時', () => when === 'later' && !scheduledAt ? '送る日時を選んでください' : scheduledAt && Date.parse(scheduledAt) <= Date.now() ? '予約日時は今より後にしてください' : null, { reveal: () => changeStep('schedule') })
@@ -762,7 +763,6 @@ export default function HqBroadcastCreate() {
       const definition = hostDefinition(freshDefinition('template') as MessageTemplateDefinition, made.content)
       await hqTemplatesApi.create({ type: 'template', name, definition }, crypto.randomUUID())
       setSaveTplOpen(false)
-      setCarousels(null)
       notifySaved(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught, fields)
@@ -1009,7 +1009,7 @@ export default function HqBroadcastCreate() {
                   onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
                   onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
                   onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
-                  extraFields={(index, item) => item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><EntitySelect aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                  extraFields={(index, item) => assetsError && item.type === 'coupon'?<ListState kind="error" title="クーポンを読み込めませんでした" onRetry={()=>setAssetsError(false)}/>:item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><EntitySelect aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
                 />
               </section>
             ) : null}
@@ -1178,7 +1178,7 @@ export default function HqBroadcastCreate() {
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
             <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
-              <Button variant="primary" disabled={composerBusy} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
+              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
                 {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
               </Button>
             ) : (

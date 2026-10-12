@@ -939,7 +939,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
 
 type RegistrantFilter = 'all' | 'active' | 'cancelled'
 
-function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canManage: boolean }) {
+export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canManage: boolean }) {
   const saveErrors = useSaveFormErrors()
 
   const { selectedAccountId } = useAccount()

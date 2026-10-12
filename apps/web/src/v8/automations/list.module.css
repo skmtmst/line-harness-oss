@@ -35,20 +35,20 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   gap: var(--tpl-am-col-gap);
   height: var(--tpl-am-head-h);
   padding: var(--tpl-am-head-pad);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-am-col-gap);
   height: var(--tpl-am-row-h);
   padding: var(--tpl-am-row-pad);
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -59,22 +59,22 @@
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colRuns,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colRuns {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colRuns,
+:global(:root) .table .row[data-table-layout='columns'] > td.colRuns {
   align-items: flex-end;
   padding-right: var(--tpl-am-num-pad-end);
   text-align: right;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
+:global(:root) .table .row[data-table-layout='columns'] > td.colName {
   flex: 1 1 0;
   min-width: 0;
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps {
+:global(:root) .table .row[data-table-layout='columns'] > td.colOps {
   overflow: visible;
 }
 /* 1152 の板（En14p）：名前が2行になるので行は 55.5。 */
-:global([data-theme='v8']) .narrowTable .table .row[data-table-layout='columns'] {
+:global(:root) .narrowTable .table .row[data-table-layout='columns'] {
   height: var(--tpl-am-narrow-row-h);
 }
 .colTrigger { width: var(--tpl-am-col-trigger); flex-shrink: 0; }

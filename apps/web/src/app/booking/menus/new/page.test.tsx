@@ -15,9 +15,10 @@ import type { StaffMember } from '@line-crm/shared'
  *   - 保存が tag_not_found で落ちても入力が消えず、選び直せること
  */
 import React from 'react'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 type DeferredTags = {
   promise: Promise<unknown>
@@ -51,7 +52,7 @@ function switchAccount(id: string | null): void {
   act(() => { accountSetters.forEach((setId) => setId(id)) })
 }
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -76,7 +77,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: useControllableAccount() }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -117,6 +118,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: (...args: unknown[]) => fixture.mileageRules!(...(args as [])) },
     },
     bookingApi: {
+      listMenus: async () => ({ menus: [] }),
+      listResources: async () => ({ data: { resources: [] } }),
+      listStaffMenusBulk: async () => ({ staff: [] }),
+
       createMenu: (...args: unknown[]) => fixture.createMenu!(...args),
       getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
       listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
@@ -147,7 +152,7 @@ function deferredTags(): DeferredTags {
 
 /** メニュー名の入力欄。 */
 function nameInput(): HTMLInputElement {
-  return screen.getByPlaceholderText("例: トリミング（小型犬）") as HTMLInputElement
+  return screen.getByPlaceholderText("例：トリミング（小型犬）") as HTMLInputElement
 }
 
 /** 選べる中身。プルダウンの option をそのまま読む。 */
@@ -169,158 +174,91 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+async function openTags() {
+  fireEvent.click(await screen.findByRole('button', { name: '予約後に付けるタグ' }))
+  return (await screen.findAllByRole('dialog')).at(-1)!
+}
+async function tagLabels() {
+  const dialog = await openTags()
+  const labels = within(dialog).queryAllByRole('radio').map(item => item.getAttribute('aria-label'))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  return labels
+}
+async function chooseTag(name: string) { await pickEntity('予約後に付けるタグ', name) }
+function chosenTag() { return screen.getByRole('button', { name: '予約後に付けるタグ' }).closest('[data-entity-picker-field]')!.textContent }
+async function publish() {
+  fireEvent.change(nameInput(), { target: { value: 'トリミング' } })
+  fireEvent.click(await screen.findByRole('button', { name: '担当A' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+}
 describe('新規作成画面: 予約後に付けるタグ', () => {
-  async function renderNew() {
-    render(<NewBookingMenuPage />)
-    // 取得が終わるまでは読み込み中の文言を出し、プルダウンは出さない。
-    return screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as Promise<HTMLSelectElement>
-  }
-
+  async function renderNew() { render(<NewBookingMenuPage />); await screen.findByRole('button', { name: '予約後に付けるタグ' }) }
   test('タグ取得が遅れて返る間も入力は消えず、返った後に候補が出る', async () => {
-    const deferred = deferredTags()
-    fixture.tagsList = () => deferred.promise
-
+    const deferred = deferredTags(); fixture.tagsList = () => deferred.promise
     render(<NewBookingMenuPage />)
-
-    // まだ返っていない: 読み込み中を出し、選ばせない。
-    expect(screen.getByText('タグを読み込んでいます…')).toBeTruthy()
-    expect(screen.queryByLabelText('予約後に付けるタグ')).toBeNull()
-
-    // 取得を待っている間にメニュー名を入れる。
+    expect(screen.getByText('タグを読み込んでいます').className).toContain('sr-only')
+    expect(screen.queryByRole('button', { name: '予約後に付けるタグ' })).toBeNull()
     fireEvent.change(nameInput(), { target: { value: 'トリミング' } })
-
-    await act(async () => {
-      deferred.resolve({ success: true, data: TAGS })
-      await deferred.promise
-    })
-
-    // 遅れて返った後も、待っている間の入力はそのまま残る。
+    await act(async () => { deferred.resolve({ success: true, data: TAGS }); await deferred.promise })
     expect(nameInput().value).toBe('トリミング')
-    const select = await screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
-    expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
+    expect(await tagLabels()).toEqual(['予約中', '常連さん'])
   })
-
-  test('取得に失敗しても保存はできる文言を出し、プルダウンは出さない', async () => {
+  test('取得に失敗しても保存はできる文言を出し、選ぶ口は出さない', async () => {
     fixture.tagsList = async () => { throw new Error('network down') }
     render(<NewBookingMenuPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('タグを読み込めませんでした。タグなしで保存できます。')).toBeTruthy()
-    })
-    expect(screen.queryByLabelText('予約後に付けるタグ')).toBeNull()
+    expect(await screen.findByText('タグを読み込めませんでした。タグなしで保存できます。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '予約後に付けるタグ' })).toBeNull()
+    await publish(); await waitFor(() => expect(fixture.createMenu).toHaveBeenCalled())
+    expect(fixture.createMenu).toHaveBeenCalledWith('account-a', expect.objectContaining({ auto_tag_id: null }), expect.any(String))
   })
-
   test('候補は対象アカウントの有効タグだけ。整理済みも別アカウントも出さない', async () => {
-    const select = await renderNew()
-    const labels = optionLabels(select)
-    expect(labels).toContain('予約中')
-    expect(labels).not.toContain('旧キャンペーン')
-    expect(labels).not.toContain('B店のタグ')
+    await renderNew(); expect(await tagLabels()).toEqual(['予約中', '常連さん'])
   })
-
   test('検索で絞り込み、選び、解除できる', async () => {
-    const select = await renderNew()
-
-    fireEvent.change(screen.getByLabelText('タグを検索'), { target: { value: '常連' } })
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
-    expect(optionLabels(select)).toEqual(['— なし —', '常連さん'])
-
-    fireEvent.change(select, { target: { value: 'tag-active-2' } })
-    expect(select.value).toBe('tag-active-2')
-
-    // 検索を消しても選択は残る。
-    fireEvent.click(screen.getByLabelText('検索語を消す'))
-    expect(select.value).toBe('tag-active-2')
-    expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
-
-    // 「なし」へ戻せる。
-    fireEvent.change(select, { target: { value: '' } })
-    expect(select.value).toBe('')
+    await renderNew()
+    const dialog = await openTags()
+    fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '常連' } })
+    // 本線の300ms検索後の状態待機を、V8の選択窓へ移して残す。
+    await waitFor(() => expect(within(dialog).queryAllByRole('radio').map(item => item.getAttribute('aria-label'))).toEqual(['常連さん']))
+    fireEvent.click(within(dialog).getByRole('radio', { name: '常連さん' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+    await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0))
+    expect(chosenTag()).toContain('常連さん')
+    expect(await tagLabels()).toEqual(['予約中', '常連さん'])
+    expect(chosenTag()).toContain('常連さん')
+    fireEvent.click(screen.getByRole('button', { name: '予約後に付けるタグを外す' }))
+    expect(chosenTag()).toContain('付けるタグ：なし')
   })
-
-  test('検索に合うタグが無いときは、選択を残したまま合わないことを出す', async () => {
-    const select = await renderNew()
-    fireEvent.change(select, { target: { value: 'tag-active' } })
-    fireEvent.change(screen.getByLabelText('タグを検索'), { target: { value: 'ありえない語' } })
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
-
-    expect(screen.getByText('「ありえない語」に合うタグがありません。')).toBeTruthy()
-    // 選んだタグは隠れても外れない。
-    expect(select.value).toBe('tag-active')
-  })
-
-  test('アカウントを切り替えると前の選択が残らず、候補も切替先のものになる', async () => {
-    const select = await renderNew()
-    fireEvent.change(select, { target: { value: 'tag-active' } })
-    expect(select.value).toBe('tag-active')
-
-    switchAccount('account-b')
-
-    const afterSwitch = await screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
-    expect(afterSwitch.value).toBe('')
-    expect(optionLabels(afterSwitch)).toEqual(['— なし —', 'B店のタグ', 'B店だけの分類'])
-
-    /*
-     * プルダウンの見た目だけでは足りない。候補から外れた値は DOM の側でも
-     * 空へ倒れて見えるので、「選択が消えた」のか「候補外の値を抱えたままか」の
-     * 区別がつかない。実際に保存まで通して、前アカウントの ID が request へ
-     * 載らない(=画面の状態としても消えている)ことを確かめる。
-     */
-    fireEvent.change(nameInput(), { target: { value: 'B店のメニュー' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
-    })
-
-    await waitFor(() => { expect(fixture.createMenu).toHaveBeenCalled() })
-    expect(fixture.createMenu).toHaveBeenCalledWith(
-      'account-b',
-      expect.objectContaining({ auto_tag_id: null }),
-      // R535: 作成試行の一意キーも一緒に送る。
-      expect.any(String),
-    )
-  })
-
-  test('保存 request に選んだ auto_tag_id が載る', async () => {
-    const select = await renderNew()
-    fireEvent.change(nameInput(), { target: { value: 'トリミング' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
-    fireEvent.change(select, { target: { value: 'tag-active' } })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
-    })
-
-    await waitFor(() => { expect(fixture.createMenu).toHaveBeenCalled() })
-    expect(fixture.createMenu).toHaveBeenCalledWith(
-      'account-a',
-      expect.objectContaining({ auto_tag_id: 'tag-active' }),
-      // R535: 作成試行の一意キーも一緒に送る。
-      expect.any(String),
-    )
-  })
-
-  test('保存が tag_not_found で落ちても入力は残り、選び直せる', async () => {
-    fixture.createMenu = vi.fn(async () => {
-      throw new ApiError(400, 'tag not found', 'tag_not_found')
-    })
-    const select = await renderNew()
-    fireEvent.change(nameInput(), { target: { value: 'トリミング' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
-    fireEvent.change(select, { target: { value: 'tag-active' } })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
-    })
-
+  test('検索に合うタグが無いときも選択を残す', async () => {
+    await renderNew(); await chooseTag('予約中')
+    const dialog = await openTags()
+    fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: 'ありえない語' } })
     await waitFor(() => {
-      expect(screen.getByText('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')).toBeTruthy()
+      expect(within(dialog).queryAllByRole('radio')).toHaveLength(0)
+      expect(within(dialog).getByText(/見つかりません|ありません/)).toBeTruthy()
     })
-    // 入力は消えない。選び直してもう一度出せる。
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    expect(chosenTag()).toContain('予約中')
+  })
+  test('アカウントを替えると前の選択を残さず、候補も切替先のものになる', async () => {
+    await renderNew(); await chooseTag('予約中'); switchAccount('account-b')
+    await screen.findByRole('button', { name: '予約後に付けるタグ' })
+    expect(chosenTag()).toContain('付けるタグ：なし')
+    expect(await tagLabels()).toEqual(['B店のタグ', 'B店だけの分類'])
+    await publish(); await waitFor(() => expect(fixture.createMenu).toHaveBeenCalled())
+    expect(fixture.createMenu).toHaveBeenCalledWith('account-b', expect.objectContaining({ auto_tag_id: null }), expect.any(String))
+  })
+  test('保存 request に選んだ auto_tag_id が載る', async () => {
+    await renderNew(); await chooseTag('予約中'); await publish()
+    await waitFor(() => expect(fixture.createMenu).toHaveBeenCalled())
+    expect(fixture.createMenu).toHaveBeenCalledWith('account-a', expect.objectContaining({ auto_tag_id: 'tag-active' }), expect.any(String))
+  })
+  test('保存が tag_not_found で落ちても入力は残り、選び直せる', async () => {
+    fixture.createMenu = vi.fn(async () => { throw new ApiError(400, 'tag not found', 'tag_not_found') })
+    await renderNew(); await chooseTag('予約中'); await publish()
+    expect(await screen.findByText('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')).toBeTruthy()
     expect(nameInput().value).toBe('トリミング')
-    const again = screen.getByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
-    fireEvent.change(again, { target: { value: 'tag-active-2' } })
-    expect(again.value).toBe('tag-active-2')
+    await chooseTag('常連さん'); expect(chosenTag()).toContain('常連さん')
   })
 })
 
@@ -328,7 +266,7 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
   async function renderNew() {
     render(<NewBookingMenuPage />)
     // タグ欄が出れば画面の読み込みは終わっている。
-    await screen.findByRole('combobox', {name:'予約後に付けるタグ'})
+    await screen.findByRole('button', {name:'予約後に付けるタグ'})
   }
 
   function settingsLink(): HTMLAnchorElement {
@@ -351,15 +289,13 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
 
   test('付与ルールが無いときは「未設定」と出し、取得失敗と区別する', async () => {
     await renderNew()
-    await waitFor(() => expect(screen.getByText('未設定')).toBeTruthy())
-    expect(screen.getByText('予約イベントのマイル付与ルールは未設定です。')).toBeTruthy()
+    await waitFor(() => expect((screen.getByLabelText('予約したときのマイル（お店全体の設定）') as HTMLInputElement).value).toBe('未設定'))
   })
 
   test('取得に失敗したときは「未取得」と出し、未設定と区別する', async () => {
     fixture.mileageRules = async () => { throw new Error('network down') }
     await renderNew()
-    await waitFor(() => expect(screen.getByText('未取得')).toBeTruthy())
-    expect(screen.getByText('「予約した」のマイル設定を取得できませんでした。')).toBeTruthy()
+    await waitFor(() => expect((screen.getByLabelText('予約したときのマイル（お店全体の設定）') as HTMLInputElement).value).toBe('未取得'))
   })
 
   test('有効な予約イベントのルールがあるときは付ける量を出す', async () => {
@@ -368,9 +304,18 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
       data: [{ eventType: 'booking_created', isActive: true, amount: 50 }],
     })
     await renderNew()
-    await waitFor(() => expect(screen.getByText('マイルを 50 付ける')).toBeTruthy())
+    await waitFor(() => expect((screen.getByLabelText('予約したときのマイル（お店全体の設定）') as HTMLInputElement).value).toBe('50'))
   })
 })
 
-// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
-vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
+// 同じ保存口で、価格の意味と店舗ルールの継承を確かめる。
+test.each([['', 'inquiry', 0], ['0', 'free', 0], ['8400', 'fixed', 8400]])('金額 %s は %s として送り、上書きしない店舗ルールはnullで送る', async (amount, mode, price) => {
+  render(<NewBookingMenuPage />)
+  fireEvent.change(screen.getByLabelText('金額（円）'), { target: { value: amount } })
+  await publish()
+  await waitFor(() => expect(fixture.createMenu).toHaveBeenCalled())
+  expect(fixture.createMenu).toHaveBeenCalledWith('account-a', expect.objectContaining({
+    price_mode: mode, base_price: price,
+    booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null,
+  }), expect.any(String))
+})

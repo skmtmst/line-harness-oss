@@ -10,7 +10,7 @@ import {
   jstMonthKey,
 } from './offer-kpi'
 
-const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
+const TABS = readFileSync(new URL('../../v8/affiliates/offers.tsx', import.meta.url), 'utf8')
 
 /**
  * **ファイル全体を `toContain` で見ない。** 別の関数に同じ字が
@@ -25,12 +25,12 @@ function sliceBetween(source: string, start: string, end: string): string {
   return source.slice(from, to)
 }
 
-const OFFERS_TAB = sliceBetween(TABS, 'export function OffersTab() {', '\nexport function SettlementEditor')
+const OFFERS_TAB = TABS
 // KPI帯と前後の間隔は親の gap-4 にそろえる（m13h。帯の中身の意図は変えない）。
 const KPI_BAND = sliceBetween(
   OFFERS_TAB,
-  '<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">',
-  '</div>\n\n      <div',
+  '<KpiBand>',
+  '</KpiBand>',
 )
 
 function approval(over: Partial<ConversionApprovalItem> & { eventId: string }): ConversionApprovalItem {
@@ -141,28 +141,28 @@ describe('取れた0と、取れていないものを混ぜない', () => {
 
 })
 
-describe('V6 案件一覧（GH8VL）のKPIの帯', () => {
-  it('設計どおり、案件数・最多成果・平均報酬・動き未設定を並べる', () => {
-    for (const title of ['紹介できる案件', 'いちばん成果が出た案件', '平均報酬額', '動きが未設定の案件']) {
+describe('現役V8の案件一覧のKPIの帯', () => {
+  it('採用済みのV8の案件数・今月の成果・平均報酬・マイルを出す', () => {
+    for (const title of ['案件', '今月の成果', '平均報酬', 'マイルあり']) {
       expect(KPI_BAND).toContain(`title="${title}"`)
     }
     expect(OFFERS_TAB).toContain('offerStats')
-    expect(OFFERS_TAB).toContain('introducerIds')
+    expect(OFFERS_TAB).toContain('approvalState')
   })
 
-  it('m22d: 「1件あたり」は単位の意味なので見出しの「？」へ移す。件数の重なりを増やさない', () => {
+  it('平均報酬は承認済みの成果で数え、未取得を0円にしない', () => {
     // 見出しに「1件」を出さない（「停止・終了 1件」「動きが未設定 1件」と重なるため）。
     expect(KPI_BAND).not.toContain('title="1件あたりの平均報酬"')
-    expect(KPI_BAND).toContain('help="成果1件あたりの平均です"')
+    expect(KPI_BAND).toContain("approvalState === 'ready' && !approvalsTruncated && averageReward != null")
   })
 
-  it('公開中の案件は読み込んだ行から数えるので、状態を付けない', () => {
-    expect(KPI_BAND).toContain('title="紹介できる案件" value={openCount} unit="件"')
+  it('案件数は読込が済んだときだけ出し、未取得は数にしない', () => {
+    expect(KPI_BAND).toContain('value={ready ? offers.length : null}')
   })
 
   it('承認の取得が落ちたら error にする。黙って0のままにしない', () => {
-    expect(OFFERS_TAB).toContain("setConfirmedState('error')")
-    expect(OFFERS_TAB).toContain("setConfirmedState('ready')")
+    expect(OFFERS_TAB).toContain("setApprovalState('error')")
+    expect(OFFERS_TAB).toContain("setApprovalState('ready')")
     expect(OFFERS_TAB).not.toContain("new Date().toISOString().slice(0, 7)")
   })
 })

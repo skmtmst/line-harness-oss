@@ -160,7 +160,7 @@ const baseExecutionCtx = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([]);
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{id:'account-main',channel_secret:'env-default-secret',channel_access_token:'account-token',is_active:1} as never]);
 });
 
 describe('POST /webhook — V6 friend-add ledger', () => {
@@ -234,7 +234,7 @@ describe('POST /webhook — V6分析イベント', () => {
     await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
 
     expect(updateFriendFollowStatus).toHaveBeenCalledWith(
-      baseEnv.DB, 'U-1', false, 'account-main',
+      baseEnv.DB, 'U-1', false, 'account-main', '2026-08-24T12:00:00.000+09:00',
     );
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(baseEnv.DB, {
       lineAccountId: 'account-main',
@@ -485,6 +485,7 @@ describe('POST /webhook — postback events', () => {
 
     const stmt = {
       bind: vi.fn(),
+      first: vi.fn().mockResolvedValue(null),
       run: vi.fn().mockResolvedValue({}),
       all: vi.fn().mockResolvedValue({ results: [] }), // no auto_reply match
     };
@@ -544,8 +545,8 @@ describe('POST /webhook — postback events', () => {
         eventData: { text: 'tag:premium', matched: false },
         replyToken: 'reply-token-postback',
       },
-      'env-default-token',
-      null,
+      'account-token',
+      'account-main',
       expect.objectContaining({sourceEventId:expect.any(String)}),
     );
     expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
@@ -571,6 +572,7 @@ describe('POST /webhook — postback events', () => {
 
     const stmt = {
       bind: vi.fn(),
+      first: vi.fn().mockResolvedValue(null),
       run: vi.fn().mockResolvedValue({}),
       all: vi.fn().mockResolvedValue({
         results: [
@@ -642,8 +644,8 @@ describe('POST /webhook — postback events', () => {
         eventData: { text: 'tag:premium', matched: true },
         replyToken: 'reply-token-postback',
       },
-      'env-default-token',
-      null,
+      'account-token',
+      'account-main',
       expect.objectContaining({sourceEventId:expect.any(String)}),
     );
   });
@@ -749,6 +751,7 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(upsertFriend).toHaveBeenCalledWith(db, {
       lineUserId: 'U-existing',
       lineAccountId: 'account-main',
+      followOccurredAt: '2026-08-24T12:00:00.000+09:00',
       displayName: 'Existing Friend',
       pictureUrl: 'https://example.com/profile.jpg',
       statusMessage: 'hello',
@@ -910,3 +913,11 @@ vi.mock('../services/line-webhook-events.js',async()=>{
  return {...actual,processLineWebhookEvents:(input:any)=>unitLineEvents(input,ledger as any)};
 });
 vi.mock('../services/workflow-line-client.js',()=>({workflowLineClient:(client:any)=>client}));
+
+test('SEC-04 env署名が正しくても受信店が不明なら友だちを変更しない',async()=>{
+ vi.mocked(verifySignature).mockResolvedValue(true);
+ vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([]);
+ const pending:Promise<unknown>[]=[];
+ const res=await setupApp().request('/webhook',{method:'POST',headers:{'X-Line-Signature':'s'.repeat(44),'Content-Type':'application/json'},body:JSON.stringify({destination:'unknown',events:[{type:'unfollow',timestamp:Date.now(),source:{type:'user',userId:'U-other'}}]})},baseEnv,{...baseExecutionCtx,waitUntil:(p:Promise<unknown>)=>pending.push(p)});
+ await Promise.all(pending);expect(res.status).toBe(200);expect(getFriendByLineUserIdForAccount).not.toHaveBeenCalled();expect(updateFriendFollowStatus).not.toHaveBeenCalled();
+});

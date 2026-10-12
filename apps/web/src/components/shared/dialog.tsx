@@ -10,7 +10,7 @@ import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 import { useFormInputDirty } from './form-input-dirty'
-import { useOverlayDiscard } from './overlay-discard'
+import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
 import { dialogWidth } from './destination-policy'
 
@@ -105,6 +105,8 @@ export type DialogProps = {
   designNode?: string
   /** ConfirmDialog の構造。重要操作でも説明を赤帯へ入れない。 */
   confirmation?: boolean
+  /** 見た目を変えず、重要操作の読み上げの役割を保つ。 */
+  role?: 'dialog' | 'alertdialog'
   /** 本文を持たない短い確認窓。 */
   compact?: boolean
   /**
@@ -163,6 +165,7 @@ export default function Dialog({
   modal = true,
   designNode,
   confirmation = false,
+  role: suppliedRole,
   compact = false,
   primaryAction = 'confirm',
   footerAlign,
@@ -257,9 +260,9 @@ export default function Dialog({
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
       onChangeCapture={formInput.onChangeCapture}
       onInputCapture={formInput.onChangeCapture}
-      onClickCapture={formInput.onClickCapture}
+      onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
-      role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
+      role={suppliedRole ?? (tone === 'destructive' ? 'alertdialog' : 'dialog')}
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
@@ -308,12 +311,7 @@ export default function Dialog({
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
-      <div className={styles.footer} onClickCapture={(event) => {
-        const button = (event.target as Element).closest?.('button')
-        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
-          event.preventDefault(); event.stopPropagation(); discard.requestClose()
-        }
-      }}>
+      <div className={styles.footer}>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま

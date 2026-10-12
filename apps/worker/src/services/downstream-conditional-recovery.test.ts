@@ -1,0 +1,52 @@
+import { afterEach,beforeEach,expect,test,vi } from 'vitest';
+import { emptyLayout } from '@line-crm/shared';
+import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { runResearchAnswerAction } from './research-forms.js';
+import { processFriendFieldReminders } from './friend-field-reminders.js';
+import { runEventBookingAction } from './event-booking-action.js';
+import { applyFormLayoutEffects } from './form-layout-effects.js';
+vi.mock('./event-bus.js',()=>({fireEvent:vi.fn()}));
+let f:SqliteD1;
+beforeEach(()=>{
+  vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external access forbidden');}));
+  f=createTestD1({foreignKeys:true});f.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES ('a','ch','fixture','fake','fake','00000000-0000-4000-8000-000000000001');
+    INSERT INTO friends(id,line_user_id,line_account_id) VALUES ('f','Uf','a');
+    INSERT INTO friend_fields(id,name,field_key,type) VALUES ('date','fixture','next_date','date');
+    INSERT INTO friend_field_values(friend_id,field_id,value) VALUES ('f','date','2099-01-01');`);
+});
+afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
+test('D-02 既存の定期補完は、研究回答で消えた日付の登録を拾って取り消す',async()=>{
+  f.raw.exec(`INSERT INTO reminders(id,name,line_account_id,trigger_type,trigger_field_id,repeat_yearly) VALUES ('r','fixture','a','friend_field','date',0);
+    INSERT INTO reminder_steps(id,reminder_id,offset_minutes,message_type,message_content) VALUES ('s','r',-1440,'text','fake');`);
+  await processFriendFieldReminders(f.db,new Date('2026-10-11T00:00:00Z'));
+  expect(f.raw.prepare('SELECT status FROM friend_reminders').all()).toEqual([{status:'active'}]);
+  await runResearchAnswerAction(f.db,{kind:'research_action',actionType:'friend_field',config:{fieldId:'date',op:'clear'},onFailure:'stop'},'f','answer:clear');
+  expect(f.raw.prepare('SELECT COUNT(*) n FROM friend_field_values').get()).toEqual({n:0});
+  // clear自体は取消経路を通らないが、値なしの既存登録も次の走査対象に含まれる。
+  expect((await processFriendFieldReminders(f.db,new Date('2026-10-11T00:01:00Z'))).scanned).toBe(1);
+  expect(f.raw.prepare('SELECT status,cancel_reason FROM friend_reminders').all()).toEqual([{status:'cancelled',cancel_reason:'friend_field_baseline_removed_or_invalid'}]);
+  expect(fetch).not.toHaveBeenCalled();
+});
+test('D-07 予約更新に失敗した取消工程を、同じ回答キーで再開すると既存の回復処理で収束する',async()=>{
+  f.raw.exec(`INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status,max_bookings_per_friend,requires_approval,reminder_day_before_enabled,reminder_hours_before) VALUES ('e','a','fixture',1,'published',NULL,0,1,1);
+    INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES ('slot','e','2099-01-01T09:00:00Z','2099-01-01T10:00:00Z',10);
+    INSERT INTO reminders(id,name,line_account_id,trigger_type,trigger_event_id,lifecycle_status) VALUES ('r','fixture','a','event','e','published');
+    INSERT INTO reminder_steps(id,reminder_id,offset_minutes,message_type,message_content) VALUES ('s','r',-1440,'text','fake');`);
+  await runEventBookingAction(f.db,{eventId:'e'},'f','register');
+  expect(f.raw.prepare('SELECT status FROM friend_reminders').all()).toEqual([{status:'active'}]);
+  f.raw.exec(`CREATE TRIGGER booking_outage BEFORE UPDATE OF status ON event_bookings WHEN NEW.status='cancelled' BEGIN SELECT RAISE(ABORT,'booking outage'); END;`);
+  const layout=emptyLayout();layout.options.afterActions=[{kind:'research_action',actionType:'event_booking',config:{eventId:'e',op:'cancel'},onFailure:'stop'}];
+  const input={db:f.db,formId:'form',friendId:'f',layout,answers:{},idempotencyPrefix:'cancel-answer'};
+  const complete=vi.fn();
+  expect((await applyFormLayoutEffects({...input,onEffectComplete:complete})).failedEffects).toEqual(['afterAction:0']);
+  expect(complete).not.toHaveBeenCalled();
+  expect(f.raw.prepare('SELECT status FROM friend_reminders').all()).toEqual([{status:'cancelled'}]);
+  expect(f.raw.prepare('SELECT status FROM event_bookings').all()).toEqual([{status:'confirmed'}]);
+  f.raw.exec('DROP TRIGGER booking_outage');
+  expect((await applyFormLayoutEffects(input)).failedEffects).toEqual([]);
+  expect(f.raw.prepare('SELECT status FROM event_bookings').all()).toEqual([{status:'cancelled'}]);
+  expect(f.raw.prepare('SELECT status FROM event_booking_reminders').all()).toEqual([{status:'cancelled'},{status:'cancelled'}]);
+  await applyFormLayoutEffects(input);
+  expect(f.raw.prepare('SELECT COUNT(*) n FROM event_waitlist_promotion_jobs').get()).toEqual({n:1});
+  expect(fetch).not.toHaveBeenCalled();
+});

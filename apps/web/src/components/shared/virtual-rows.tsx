@@ -1,14 +1,13 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*
  * 見えている行だけ描く窓（M10・V8のみ）。
  *
  * 2,000行の一覧が全部描画で遅いため、窓の内側だけDOMに置き、
  * 上下に見えない分の高さの詰め物を入れてスクロール位置を保つ。
- * 行の高さは固定（今のまま変えない）。v7・行数が少ないときは
+ * 行の高さは固定（今のまま変えない）。行数が少ないときは
  * 今までどおり全部描く（聞き口も付けない）。
  *
  * 崩さないもの：
@@ -70,19 +69,15 @@ export function VirtualRows({
   /** 1行の包み（詰め物と行の両方に付く目印用）。 */
   itemClassName?: string
 }) {
-  const theme = useAdminTheme()
   const ref = useRef<HTMLDivElement>(null)
   const [range, setRange] = useState<VirtualRange | null>(null)
 
-  const enabled = theme === 'v8' && count > threshold
-  // 初回は両テーマとも先頭分だけ（描画の不一致なし・最初の絵が速い）。
+  const enabled = count > threshold
+  // 初回は先頭分だけ（描画の不一致なし・最初の絵が速い）。
   const initiallyWindowed = count > threshold
 
   useEffect(() => {
-    // テーマの状態は初回v7で来るため、地の値は直接読む。
-    // v7 は効果で全部へ（settled は今までどおり）。V8 は窓を同期で求める。
-    const v8 = document.documentElement.dataset?.theme === 'v8'
-    if (!v8 || count <= threshold) {
+    if (count <= threshold) {
       setRange((previous) => {
         if (previous && previous.start === 0 && previous.end === count) return previous
         return { start: 0, end: count }
@@ -121,7 +116,7 @@ export function VirtualRows({
       window.removeEventListener('scroll', schedule, { capture: true })
       window.removeEventListener('resize', schedule)
     }
-  }, [theme, count, rowHeight, overscan, threshold])
+  }, [count, rowHeight, overscan, threshold])
 
   // 少ない行：全部描く。多い行の初回は先頭分だけ描く。
   const start = range === null ? 0 : range.start
@@ -132,7 +127,7 @@ export function VirtualRows({
     return out
   }, [start, end, renderRow])
 
-  // 窓が全部なら包みも詰め物も付けない（v7・少ない行は今までどおり）。
+  // 窓が全部なら包みも詰め物も付けない（少ない行は今までどおり）。
   const full = range !== null && range.start === 0 && range.end === count
   if (!enabled && (range === null || full)) {
     return <>{rows}</>

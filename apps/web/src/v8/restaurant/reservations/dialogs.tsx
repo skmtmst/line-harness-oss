@@ -1,6 +1,6 @@
 'use client'
 
-import { jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
+import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
 
 
 import { useEffect, useState } from 'react'
@@ -92,8 +92,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     customerName: draft.customerName,
     customerPhone: draft.customerPhone || null,
     guestCount: Number(draft.guestCount),
-    startsAt: new Date(draft.startsAt).toISOString(),
-    endsAt: new Date(draft.endsAt).toISOString(),
+    startsAt: datetimeLocalJstToUtcIso(draft.startsAt),
+    endsAt: datetimeLocalJstToUtcIso(draft.endsAt),
     tableId: draft.tableId || null,
     courseId: draft.courseId || null,
     allergyNote: draft.allergyNote || null,
@@ -237,7 +237,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
           })
           return
         }
-        onSubmit({ provider: draft.provider, externalId: draft.externalId, customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: new Date(draft.startsAt).toISOString() })
+        onSubmit({ provider: draft.provider, externalId: draft.externalId, customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: datetimeLocalJstToUtcIso(draft.startsAt) })
       }}
       actions={(
         <>

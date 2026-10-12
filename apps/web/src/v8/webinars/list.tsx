@@ -13,7 +13,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react';
+import { Archive, Bookmark, Download, FilePen, Inbox, Plus, Radio, Video } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
 import { ListPage, ListPagePagination } from '@/components/templates';
@@ -48,7 +48,7 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { runUndoable } from '@/lib/undoable';
 import { formatDateTime, formatNumber } from '@/lib/format';
-import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from '@/lib/api';
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview } from '@/lib/api';
 import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -56,6 +56,7 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { kpiCells } from './overview'
 
 /*
  * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
@@ -66,8 +67,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 「…」と右クリックは同じ操作（参加者・分析・コメント演出・アーカイブ）。
  * 行を押すと右に詳細が出る（↑↓で次の行へ・名前はその場で直せる）。
  *
- * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ。
+ * データの口・保存の口・権限・失敗の扱いは BEHAVIOR.md に記録。
  */
 
 type SortKey = 'updated' | 'created' | 'name'
@@ -75,8 +75,6 @@ type SavedFilter = '' | 'active' | 'draft' | 'archived'
 
 const UNFILED = '__unfiled__'
 const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
-/** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
-const SEARCH_DEBOUNCE_MS = 300
 
 function scheduleSummary(w: Webinar): string {
   if (w.schedule.length === 0) return '未設定'
@@ -114,40 +112,6 @@ function periodSummary(webinar: WebinarListItem): string {
 
 function peopleText(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
-}
-
-function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
-  return metric && metric.state === 'available' && metric.value !== null ? metric.value : null
-}
-
-/*
- * 数の帯の4つ。口にある数だけ（無い数は「—」。0 にしない）。
- * 補足の行も口にある数だけで書く（先月比・フォーム送信は口に無い）。
- */
-function kpiCells(overview: WebinarOverview | null) {
-  const m = overview?.metrics
-  const active = metricValue(m?.activeWebinars)
-  const bookings = metricValue(m?.registrationBookings)
-  const rate = metricValue(m?.viewRate)
-  const people = metricValue(m?.ctaUniquePeople)
-  return [
-    {
-      key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? emptyValue('unknown') : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
-    },
-    {
-      key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? emptyValue('unknown') : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
-    },
-    {
-      key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
-      detail: rate === null ? emptyValue('unknown') : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
-    },
-    {
-      key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
-    },
-  ]
 }
 
 /** 行の「…」と右クリックの中身。2箇所で別々に書くとずれるので1つにする。 */
@@ -400,6 +364,7 @@ function WebinarList() {
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
   const [foldersReady, setFoldersReady] = useState(false)
+  const [foldersLoadError,setFoldersLoadError]=useState(false)
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [folderFormOpen, setFolderFormOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
@@ -522,16 +487,18 @@ function WebinarList() {
     const generation = ++folderGeneration.current
     setFolders([])
     setFoldersReady(false)
+    setFoldersLoadError(false)
     if (!selectedAccountId) return
     try {
       const response = await webinarApi.folders(selectedAccountId)
       if (folderGeneration.current !== generation) return
-      setFolders(response.success ? response.data : [])
+      if(!response.success)throw new Error(response.error)
+      setFolders(response.data)
       setFoldersReady(response.success && Array.isArray(response.data))
     } catch (saveFailure) {
       saveErrors.capture(saveFailure);
 
-      if (folderGeneration.current === generation) setFolders([])
+      if (folderGeneration.current === generation) setFoldersLoadError(true)
     }
   }, [selectedAccountId, saveErrors])
 
@@ -541,8 +508,8 @@ function WebinarList() {
   useEffect(() => { setQuery((current) => (current.trim() === view.q ? current : view.q)) }, [view.q])
   useEffect(() => {
     if (query.trim() === view.q) return
-    const timer = setTimeout(() => setView({ q: query.trim(), page: '1' }), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    // 共通SearchFieldが300ms束ねた値を受ける。ここで二重に待たせない。
+    setView({ q: query.trim(), page: '1' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
   useEffect(() => { void refreshOverview() }, [refreshOverview])
@@ -1028,7 +995,7 @@ function WebinarList() {
           ))}
         </KpiBand>
       </>}
-      folders={<>
+      folders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>
         <FolderPanel
           createAction={createButton}
           activeId={selectedFolder}
@@ -1041,7 +1008,7 @@ function WebinarList() {
           <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
+      collapsedFolders={narrow ? undefined : foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{narrow ? narrowToolbar : wideToolbar}</>}
       pagination={pager}
       overlays={<>

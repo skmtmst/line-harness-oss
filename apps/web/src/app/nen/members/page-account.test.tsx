@@ -23,16 +23,16 @@ type RankTabProps = {
 }
 const captured = vi.hoisted(() => ({ rank: null as RankTabProps | null }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams('tab=ranks') }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams('tab=ranks') }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error { status?: number } }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('@/components/shared/page-header', () => ({ default: () => null }))
 vi.mock('@/components/layout/scrollable-tabs', () => ({ default: () => null }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { settings: m.settings } }))
-vi.mock('./rank-settings-tab', () => ({ default: (props: RankTabProps) => { captured.rank = props; return null } }))
-vi.mock('./lifetime-tab', () => ({ default: () => null }))
-vi.mock('./members-tab', () => ({ default: () => null }))
+vi.mock('@/v8/nen-members/ranks', () => ({ default: (props: RankTabProps) => { captured.rank = props; return null } }))
+vi.mock('@/v8/nen-members/lifetime', () => ({ default: () => null }))
+vi.mock('@/v8/nen-members/list', () => ({ default: () => null }))
 
 import Page from './page'
 

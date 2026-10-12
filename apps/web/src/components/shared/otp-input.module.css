@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 認証コード入力（6マス）。Pencil ★V8 `RfHCo`「OTP入力」・`cMbie`「OTP入力/できた」。
@@ -17,19 +17,11 @@
 }
 
 .slot {
-  width: 48px; /* width: 48 */
-  height: 56px; /* height: 56 */
+  width: 48px; /* width: 48 */ /* height: 56 */
   flex: 0 0 auto;
-  padding: 0;
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
-  background: var(--color-canvas); /* fill: $canvas */
-  color: var(--color-ink); /* fill: $ink */
-  font-family: inherit;
-  font-size: 22px; /* fontSize: 22 */
-  font-weight: 600; /* fontWeight: 600 */
+  padding: 0; /* stroke: $hairline */ /* cornerRadius: $radius-sm */ /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */ /* fontSize: 22 */ /* fontWeight: 600 */
   text-align: center;
-  caret-color: var(--color-accent);
 }
 
 /*
@@ -44,10 +36,8 @@
 }
 
 /* 誤り（違うコード）`Q10xgy`。読み上げと同じ aria-invalid を根拠に見た目を変える。 */
-.slot[aria-invalid='true'] {
-  border-color: var(--color-status-danger); /* stroke: $status-danger */
-  box-shadow: 0 0 0 1px var(--color-status-danger); /* strokeWidth: 2 */
-  background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
+.slot[aria-invalid='true'] { /* stroke: $status-danger */
+  box-shadow: 0 0 0 1px var(--color-status-danger); /* strokeWidth: 2 */ /* fill: $status-danger-soft */
 }
 
 /* 無効（確認中）`BYrQG`。 */
@@ -73,7 +63,7 @@
  * 緑の輪郭、全部そろって確認できたら緑の輪郭が順に描かれる、
  * まちがえると横に揺れる（MOTION.md「OTP」）。
  */
-[data-theme='v8'] .slot {
+:root .slot {
   border-color: var(--color-control-border);
   border-radius: var(--radius-card);
   background: var(--color-canvas-sunken);
@@ -81,17 +71,17 @@
 }
 
 /* 誤り（違うコード）の赤い枠は v8 でも変えない。 */
-[data-theme='v8'] .slot[aria-invalid='true'] {
+:root .slot[aria-invalid='true'] {
   border-color: var(--color-status-danger);
 }
 
-[data-theme='v8'] .slot:focus,
-[data-theme='v8'] .slot:focus-visible {
+:root .slot:focus,
+:root .slot:focus-visible {
   outline-color: var(--color-accent-deep);
 }
 
 /* 確認できた：左から順に緑の輪郭が描かれる。 */
-[data-theme='v8'] .group[data-state='success'] .slot {
+:root .group[data-state='success'] .slot {
   border-color: var(--color-accent-deep);
   background: var(--color-canvas);
   box-shadow: 0 0 0 1px var(--color-accent-deep);
@@ -105,15 +95,15 @@
  * ずらし幅は物差しの値から作る（素の ms は置かない・
  * motion-tokens-contract）。0/40/80/120/160/200ms。
  */
-[data-theme='v8'] .group[data-state='success'] .slot:nth-child(2) { transition-delay: calc(var(--motion-instant) * 0.5); }
-[data-theme='v8'] .group[data-state='success'] .slot:nth-child(3) { transition-delay: var(--motion-instant); }
-[data-theme='v8'] .group[data-state='success'] .slot:nth-child(4) { transition-delay: var(--motion-fast); }
-[data-theme='v8'] .group[data-state='success'] .slot:nth-child(5) { transition-delay: calc(var(--motion-instant) * 2); }
-[data-theme='v8'] .group[data-state='success'] .slot:nth-child(n + 6) { transition-delay: var(--motion-base); }
+:root .group[data-state='success'] .slot:nth-child(2) { transition-delay: calc(var(--motion-instant) * 0.5); }
+:root .group[data-state='success'] .slot:nth-child(3) { transition-delay: var(--motion-instant); }
+:root .group[data-state='success'] .slot:nth-child(4) { transition-delay: var(--motion-fast); }
+:root .group[data-state='success'] .slot:nth-child(5) { transition-delay: calc(var(--motion-instant) * 2); }
+:root .group[data-state='success'] .slot:nth-child(n + 6) { transition-delay: var(--motion-base); }
 
 /* まちがえた：横に揺れる（300ms）。動きを減らす設定では揺らさない（赤い枠と文で伝わる）。 */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme='v8'] .group[data-state='error'] .slot {
+  :root .group[data-state='error'] .slot {
     animation: otp-v8-shake var(--motion-slow) var(--motion-ease-out);
   }
 }
@@ -141,26 +131,26 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
-[data-theme='v8'] .slot:focus { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
-[data-theme='v8'] .group[data-state='success'] .slot { outline: 1.5px solid var(--color-success); outline-offset: -0.75px; background: var(--color-shell); box-shadow: none; }
-[data-theme='v8'] .slot[aria-invalid='true'] { outline-color: var(--color-status-danger); background: var(--color-status-danger-soft); }
+:root .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
+:root .slot:focus { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+:root .group[data-state='success'] .slot { outline: 1.5px solid var(--color-success); outline-offset: -0.75px; background: var(--color-shell); box-shadow: none; }
+:root .slot[aria-invalid='true'] { outline-color: var(--color-status-danger); background: var(--color-status-danger-soft); }
 
 .field { display: contents; }
-[data-theme='v8'] .field:has(.label) { display: inline-flex; flex-direction: column; gap: 6px; }
-[data-theme='v8'] .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
-[data-theme='v8'] .field:has(.label) { align-items: flex-start; }
-[data-theme='v8'] .slot { gap: 0; }
+:root .field:has(.label) { display: inline-flex; flex-direction: column; gap: 6px; }
+:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
+:root .field:has(.label) { align-items: flex-start; }
+:root .slot { gap: 0; }
 
 /* 空の入力マスの目印は正本の2×24px。入力・選択は本物のinputが受ける。 */
-[data-theme='v8'] .slot[value='']:focus {
+:root .slot[value='']:focus {
   caret-color: transparent;
   background-image: linear-gradient(var(--color-ink), var(--color-ink));
   background-size: 2px 24px;
   background-position: center;
   background-repeat: no-repeat;
 }
-[data-theme='v8'] .slot { font-variant-numeric: normal; }
+:root .slot { font-variant-numeric: normal; }
 
 /*
  * 確かめている間の輪と、通ったときの ✓。6マスの並びを動かさないよう、まとまりの右の外に置く。

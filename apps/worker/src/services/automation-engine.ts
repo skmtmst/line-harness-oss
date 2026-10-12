@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 /**
  * V6オートメーションの実行状態機械。
  *
@@ -969,8 +970,8 @@ export async function retryAutomationRun(
        FROM automation_runs r
        JOIN automation_versions v
          ON v.id = r.automation_version_id AND v.automation_id = r.automation_id
-      WHERE r.id = ? AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})`,
-  ).bind(input.runId, ...input.allowedAccountIds).first<{
+      WHERE r.id = ? AND r.line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})`,
+  ).bind(input.runId, ...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : [])).first<{
     id: string;
     status: RunStatus;
     current_step: number;
@@ -1045,8 +1046,8 @@ export async function cancelAutomationRun(
   }
   const run = await db.prepare(
     `SELECT id, status FROM automation_runs
-      WHERE id = ? AND line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})`,
-  ).bind(input.runId, ...input.allowedAccountIds).first<{ id: string; status: RunStatus }>();
+      WHERE id = ? AND line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})`,
+  ).bind(input.runId, ...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : [])).first<{ id: string; status: RunStatus }>();
   if (!run) throw new AutomationRunCancelError('not_found', '実行記録が見つかりません');
   if (run.status === 'cancelled') {
     return { runId: run.id, status: 'cancelled', alreadyCancelled: true, cancelledStepCount: 0 };

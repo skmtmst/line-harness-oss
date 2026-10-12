@@ -76,7 +76,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('./media-direct-upload', () => ({
+vi.mock('@/v8/contents/media-direct-upload', () => ({
   extractMediaMetadata: () => Promise.resolve({ width: 200, height: 100 }),
   fileMatchesMediaKind: () => true,
   mediaAcceptForKind: () => 'image/png',
@@ -84,7 +84,7 @@ vi.mock('./media-direct-upload', () => ({
   validateMediaFile: () => null,
 }))
 
-const { default: MediaDetailDialog } = await import('./media-detail-dialog')
+const { default: MediaDetailDialog } = await import('@/v8/contents/media-detail-dialog')
 
 const ITEM: MediaItem = {
   id: 'media-a',

@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 友だちの顔。Pencil ★V8「顔/小・中・大」（`MFTlt`・`pDKi6`・`zjEbn`）。
@@ -15,7 +15,6 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: var(--radius-pill);
   font-weight: 600;
   line-height: 1;
   user-select: none;
@@ -37,11 +36,6 @@
   pointer-events: none;
 }
 
-.s24 { width: 24px; height: 24px; font-size: 10px; }
-.s32 { width: 32px; height: 32px; font-size: 13px; }
-.s40 { width: 40px; height: 40px; font-size: 16px; }
-.s56 { width: 56px; height: 56px; font-size: 22px; }
-
 .t0 { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .t1 { background: var(--color-status-info-soft); color: var(--color-action); }
 .t2 { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
@@ -50,13 +44,10 @@
 .t5 { background: var(--color-shell); color: var(--color-ink-secondary); }
 
 /* 28 / 34 / 52 are the V8 small / medium / large face sizes. */
-.s28 { width: 28px; height: 28px; font-size: 11px; }
-.s34 { width: 34px; height: 34px; font-size: 14px; }
-.s52 { width: 52px; height: 52px; font-size: 21px; }
-[data-theme='v8'] .avatar { gap: 0; border-radius: var(--polish-radius-pill); font-family: var(--font-noto-sans-jp), system-ui, sans-serif; }
-[data-theme='v8'] .s28, [data-theme='v8'] .s24 { width: 28px; height: 28px; font-size: 11px; line-height: 17px; }
-[data-theme='v8'] .s34, [data-theme='v8'] .s32, [data-theme='v8'] .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
-[data-theme='v8'] .s52, [data-theme='v8'] .s56 { width: 52px; height: 52px; font-size: 21px; line-height: 32px; }
-[data-theme='v8'] .avatar[data-avatar='initials'] { background: #f3ecfb; color: #6b3fa0; }
+:root .avatar { gap: 0; border-radius: var(--polish-radius-pill); font-family: var(--font-noto-sans-jp), system-ui, sans-serif; }
+:root .s28, :root .s24 { width: 28px; height: 28px; font-size: 11px; line-height: 17px; }
+:root .s34, :root .s32, :root .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
+:root .s52, :root .s56 { width: 52px; height: 52px; font-size: 21px; line-height: 32px; }
+:root .avatar[data-avatar='initials'] { background: #f3ecfb; color: #6b3fa0; }
 
 }

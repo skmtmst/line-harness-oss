@@ -584,7 +584,7 @@ function ConversionCreate() {
           </div>
         ) : null}
         <div className={styles.field}>
-          <span className={styles.pickLabel}>できごと</span>
+          <span className={styles.pickLabel} title={origin.target}>できごと</span>
           <div className={styles.selectBox}>
             <SaveErrorField names={["eventType","sourceType","event_type"]}><Select
               size="full"
@@ -755,7 +755,7 @@ function ConversionCreate() {
             </Field>
             <div className={styles.field}>
               <span className={styles.label}>集計対象アカウント</span>
-              <p className={styles.fixedBox}>{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
+              <p id="cv-account" className={styles.fixedBox} title="画面上部で選んでいるLINEアカウントに固定されます">{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
             </div>
           </div>
         </Disclosure>

@@ -5,10 +5,10 @@
 
 /* ---------- 外枠 ---------- */
 /* タブの段は絵の高さ（28.5）。共通のタブは下に余白が多く、数の帯が下がる。下線もこの高さの下端に置く。 */
-:global([data-theme='v8']) nav.tabs {
+:global(:root) nav.tabs {
   height: var(--tpl-mb-tabs-h);
 }
-:global([data-theme='v8']) nav.tabs > span {
+:global(:root) nav.tabs > span {
   height: 100%;
 }
 .band {

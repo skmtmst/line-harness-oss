@@ -61,6 +61,17 @@ export function record(findings, route, width, reason) {
 }
 export function assessAgainstBase(findings, baseFindings, route, width, allowances = []) {
   validateAllowances(allowances)
+  // 非表示の旧テーマを消すとnth-of-typeだけが変わる。両方の実画面で
+  // workspaceが一つである証拠がある場合だけ、同じ経路へ一対一で結ぶ。
+  const available = [...baseFindings]
+  const restoreTarget = ({ measuredTarget, ...f }) => measuredTarget ? { ...f, target: measuredTarget } : f
+  findings = findings.map(f => {
+    if (!f.targetIdentity) return f
+    const index = available.findIndex(base => base.targetIdentity === f.targetIdentity && base.kind === f.kind && base.text === f.text && (base.other || '') === (f.other || ''))
+    if (index < 0) return f
+    const [base] = available.splice(index, 1)
+    return { ...f, target: base.target, measuredTarget: f.target }
+  })
   // 固定の許可の上限を変えない。同じ項目の件数を二重に足すこともない。
   const fixedKeys = new Set(allowances.filter(a => a.route === route && a.width === width).map(keyOf))
   const baseline = record(baseFindings, route, width, '統合先で同じ検出器が確認した既存箇所')
@@ -68,11 +79,20 @@ export function assessAgainstBase(findings, baseFindings, route, width, allowanc
   const baseKeys = new Set(baseline.map(keyOf))
   const result = assess(findings, route, width, [...allowances, ...baseline])
   return {
-    failures: result.failures,
-    allowed: result.allowed.filter(f => !baseKeys.has(keyOf(f))),
-    existing: result.allowed.filter(f => baseKeys.has(keyOf(f))),
+    failures: result.failures.map(restoreTarget),
+    allowed: result.allowed.filter(f => !baseKeys.has(keyOf(f))).map(restoreTarget),
+    existing: result.allowed.filter(f => baseKeys.has(keyOf(f))).map(restoreTarget),
     baseFindings,
   }
+}
+/** 番号を無視してよいのは、DOMで一つと確認した外枠だけ。子の番号は保つ。 */
+export function identifyStableTargets(findings) {
+  findings = findings.map(({ targetIdentity, ...f }) => f)
+  const workspaces = [...document.querySelectorAll('[class]')].filter(el => [...el.classList].some(name => name === 'app-shell_workspace' || name.startsWith('app-shell_workspace__')))
+  if (workspaces.length !== 1) return findings
+  return findings.map(f => /div\.app-shell_workspace:nth-of-type\(\d+\)/.test(f.target)
+    ? { ...f, targetIdentity: f.target.replace(/div\.app-shell_workspace:nth-of-type\(\d+\)/, 'div.app-shell_workspace:unique') }
+    : f)
 }
 export async function measurePage(page) {
   const panels = await page.evaluate(scanPanelBlank)
@@ -88,7 +108,8 @@ export async function measurePage(page) {
       extra.push({kind:'blank-kpi',target:b.sel.replace(/__[\w-]+/g,''),text:'数の帯の全マスが高い',measure:{minExcess:Math.min(...b.cardH.map((h,i)=>h-b.contentH[i]-16)),maxExcess:Math.max(...b.cardH.map((h,i)=>h-b.contentH[i]-16))}})
   }
   for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
-  return [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap)]
+  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap)]
+  return await page.evaluate(identifyStableTargets, findings)
 }
 async function measureRoute(browser, baseUrl, route, width) {
   let page

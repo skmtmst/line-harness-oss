@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 
 const MSG_UNIT_YEN = 3;
@@ -136,7 +137,7 @@ const PAIRWISE_RAW_SQL = `
 function accountFilterClause(column: string, accountIds: string[] | undefined): string {
   if (accountIds === undefined) return '';
   if (accountIds.length === 0) return 'AND 1 = 0';
-  return `AND ${column} IN (${accountIds.map(() => '?').join(',')})`;
+  return `AND ${column} IN (${sqlIdSet(accountIds).sql})`;
 }
 
 /** 1配信の本文が複数通でも、本人の1友だち分は正規の送信として残す。 */
@@ -159,7 +160,7 @@ export async function countOverlappingDeliveries(
         FROM delivered GROUP BY user_id, broadcast_id
       )
       SELECT COALESCE(SUM(extra), 0) AS count FROM overlaps
-    `).bind(...(accountIds ?? [])).first<{ count: number }>();
+    `).bind(...(accountIds?.length ? sqlIdSet(accountIds).binds : [])).first<{ count: number }>();
     return typeof row?.count === 'number' ? row.count : null;
   } catch {
     // 実績未接続・未取得を0通と見せない。本文や個人情報は記録しない。
@@ -185,7 +186,7 @@ export async function computeDuplicatesStats(
     const clause = accountFilterClause(column, accountIds);
     return {
       sql: sql.split(FRIEND_SCOPE_WHERE).join(`${FRIEND_SCOPE_WHERE} ${clause}`),
-      binds: Array.from({ length: sites }, () => accountIds ?? []).flat(),
+      binds: Array.from({ length: sites }, () => accountIds?.length ? sqlIdSet(accountIds).binds : []).flat(),
     };
   };
   const totalsQuery = scopedWithBinds(TOTALS_SQL, 'line_accounts.id');

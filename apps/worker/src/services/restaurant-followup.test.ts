@@ -1,3 +1,4 @@
+import { reservationInstant } from '@line-crm/shared';
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { setRestaurantAttendance } from './restaurant-attendance.js';
@@ -12,9 +13,11 @@ let t:SqliteD1,env:Env['Bindings'];
 const sender=vi.fn(async()=>{});
 const store='s',scenario='restaurant-followup:s';
 function iso(offset:number){return new Date(Date.now()+offset*60000).toISOString();}
-function reservation(id='r',starts=iso(3000),source='phone') {
+function reservation(id='r',starts=iso(3000),source='phone',occurredAt?:string) {
  t.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status)
- VALUES(?,'s',?,'友だち','UID',2,?,?,'confirmed')`).run(id,source,starts,new Date(Date.parse(starts)+120*60000).toISOString());
+ VALUES(?,'s',?,'友だち','UID',2,?,?,'confirmed')`).run(id,source,starts,new Date(Date.parse(reservationInstant(starts))+120*60000).toISOString());
+ // SQLiteのstrftime('now')はJavaScriptの偽時計と別。固定時刻の試験ではイベントも同じ時刻で作る。
+ if(occurredAt !== undefined) t.raw.prepare('UPDATE rt_reservation_events SET occurred_at=? WHERE reservation_id=?').run(occurredAt,id);
  return t.raw.prepare('SELECT * FROM rt_reservation_events WHERE reservation_id=? ORDER BY reservation_version DESC LIMIT 1').get(id) as RestaurantEvent;
 }
 async function activate() {
@@ -25,7 +28,8 @@ async function activate() {
  return approval!.id;
 }
 beforeEach(()=>{
- t=createTestD1();sender.mockClear();
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-11T09:00:00Z'));
+ t=createTestD1({now:()=>new Date()});sender.mockClear();
  t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','店','token','secret');
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち');
  INSERT INTO rt_organizations(id,account_id,name) VALUES('o','a','組織');
@@ -175,7 +179,7 @@ describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
  });
  it('来店確認カードは予約版を持ち、行きますは予約を改版しない',async()=>{
   await activate();await scheduleRestaurantFollowup(t.db,reservation());
-  t.raw.exec("UPDATE scenario_source_jobs SET scheduled_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+  t.raw.prepare('UPDATE scenario_source_jobs SET scheduled_at=?').run(iso(0));
   await processScenarioSourceJobs(env,sender);
   const c=t.raw.prepare('SELECT * FROM rt_reservation_confirmations').get() as {request_id:string;reservation_version:number};expect(c.reservation_version).toBe(1);
   const rendered=JSON.stringify(sender.mock.calls);expect(rendered).toContain('rc:'+c.request_id+':going');expect(rendered).not.toContain('{{var.restaurant_');
@@ -193,21 +197,28 @@ describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
   expect(await respondToRestaurantConfirmation(t.db,input)).toMatchObject({ok:false,error:'version_conflict'});
   expect(t.raw.prepare('SELECT response FROM rt_reservation_confirmations').get()).toEqual({response:null});
  });
- it('旧SQLiteのUTC時刻を端末の時間帯でずらさない',async()=>{
-  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-11T15:09:00Z'));await activate();
-  const e=reservation('r','2026-10-12 15:09:00');await scheduleRestaurantFollowup(t.db,e);
+ const boundaries=[
+  {jst:'00:09',now:'2026-10-11T15:09:00Z',next:'2026-10-13 00:09'},
+  {jst:'08:59',now:'2026-10-11T23:59:00Z',next:'2026-10-13 08:59'},
+  {jst:'09:00',now:'2026-10-12T00:00:00Z',next:'2026-10-13 09:00'},
+  {jst:'23:59',now:'2026-10-12T14:59:00Z',next:'2026-10-13 23:59'},
+ ];
+ it.each(boundaries)('旧SQLiteのUTC時刻を端末の時間帯でずらさない（$jst JST）',async({now,next})=>{
+  vi.setSystemTime(new Date(now));await activate();
+  const starts=iso(1440).replace('T',' ').slice(0,19);
+  const e=reservation('r',starts,'phone',new Date(now).toISOString());await scheduleRestaurantFollowup(t.db,e);
   const due=t.raw.prepare("SELECT scheduled_at FROM scenario_source_jobs j JOIN scenario_versions v ON v.id=j.scenario_version_id JOIN json_each(v.steps_snapshot) st ON json_extract(st.value,'$.version_step_id')=j.step_id WHERE json_extract(st.value,'$.live_step_id') LIKE '%:reservation_24h'").get() as {scheduled_at:string};
-  expect(due.scheduled_at).toBe('2026-10-11T15:09:00.000Z');
+  expect(due.scheduled_at).toBe(new Date(now).toISOString());
   expect(await processScenarioSourceJobs(env,sender)).toBe(2);
-  expect(JSON.stringify(sender.mock.calls)).toContain('2026-10-13 00:09');
+  expect(JSON.stringify(sender.mock.calls)).toContain(next);
  });
- it('00:09 JSTでも予約時刻の24時間前・本文の今日を日本時間で扱う',async()=>{
-  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-11T15:09:00Z'));await activate();
+ it.each(boundaries)('$jst JSTでも予約時刻の24時間前・本文の今日を日本時間で扱う',async({now})=>{
+  vi.setSystemTime(new Date(now));await activate();
   t.raw.exec("UPDATE scenario_steps SET message_content='{{date}}・{{var.reservation_datetime}}' WHERE scenario_id='restaurant-followup:s' AND step_order=0");await activate();
-  const starts=iso(1440);await scheduleRestaurantFollowup(t.db,reservation('r',starts));
+  const starts=iso(1440);await scheduleRestaurantFollowup(t.db,reservation('r',starts,'phone',new Date().toISOString()));
   const before=t.raw.prepare("SELECT j.scheduled_at FROM scenario_source_jobs j JOIN scenario_versions v ON v.id=j.scenario_version_id JOIN json_each(v.steps_snapshot) st ON json_extract(st.value,'$.version_step_id')=j.step_id WHERE json_extract(st.value,'$.live_step_id') LIKE '%:reservation_24h'").get() as {scheduled_at:string};
   expect(Date.parse(starts)-Date.parse(before.scheduled_at)).toBe(24*60*60000);
-  expect(before.scheduled_at).toBe('2026-10-11T15:09:00.000Z');
+  expect(before.scheduled_at).toBe(new Date(now).toISOString());
   expect(await processScenarioSourceJobs(env,sender)).toBe(2);
   expect(JSON.stringify(sender.mock.calls)).toContain('10月12日(月)');
  });

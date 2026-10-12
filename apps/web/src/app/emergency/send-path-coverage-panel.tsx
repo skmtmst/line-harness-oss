@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { api, type OperationSendPath, type OperationSendPathsResponse } from '@/lib/api'
 import { formatOperationDate } from '@/lib/operation-status'
 import Notice from '@/components/shared/notice'
-import { CAPABILITY_LABEL } from './restore-drift'
+import { CAPABILITY_LABEL } from '@/lib/operation-restore'
 
 export const SEND_PATH_KIND_LABEL: Record<OperationSendPath['kind'], string> = {
   manual: '手の操作',

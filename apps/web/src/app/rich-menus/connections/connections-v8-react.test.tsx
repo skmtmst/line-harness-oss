@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * 切替のつながり V8（板 wxIQ7）。
- * V8 では見出し・板ID・右の「いまの状態」を出す。v7 はそのまま。
+ * V8 の見出し・板ID・右の「いまの状態」を出し、旧設定でも旧画面へ戻さない。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -64,9 +64,10 @@ describe('切替のつながりV8（wxIQ7）', () => {
     expect(host.textContent).toContain('タブB ⇄ タブA')
   })
 
-  it('v7はDIUbOのまま', async () => {
+  it('旧設定が残っていても現役V8へ固定する', async () => {
+    document.documentElement.dataset.theme = 'v7'
     await render()
-    expect(host.querySelector('[data-design-node="DIUbO"]')).not.toBeNull()
-    expect(host.querySelector('[data-design-node="wxIQ7"]')).toBeNull()
+    expect(host.querySelector('[data-design-node="DIUbO"]')).toBeNull()
+    expect(host.querySelector('[data-design-node="wxIQ7"]')).not.toBeNull()
   })
 })

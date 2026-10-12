@@ -2,6 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import styles from './folder-panel.module.css'
 import FolderPanel, { CollapsedFolderActions, type FolderPanelRow } from './folder-panel'
 
 let host: HTMLDivElement
@@ -26,7 +27,7 @@ async function render(row: FolderPanelRow, activeId = '', onSelect = vi.fn()) {
     root.render(<FolderPanel rows={[row]} activeId={activeId} onSelect={onSelect} />)
   })
   const button = host.querySelector('nav button') as HTMLButtonElement
-  const icon = button.querySelector('.v8-only svg') as SVGElement
+  const icon = button.querySelector('.' + styles.folderIcon + ' svg') as SVGElement
   if ((row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')) === 'folder') return { button, icon, onSelect }
   expect(icon).not.toBeNull()
   return { button, icon, onSelect }
@@ -42,7 +43,7 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(icon.classList.contains('lucide-inbox')).toBe(true)
     expect(icon.getAttribute('fill')).toBe('none')
     expect(icon.style.color).toBe('var(--color-ink)')
-    expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
+    expect(button.querySelector('.' + styles.folderIcon + ' [data-caller-icon]')).toBeNull()
     expect(button.textContent).toBe('全部を見る12')
     await act(async () => button.click())
     expect(onSelect).toHaveBeenCalledWith('all')
@@ -55,7 +56,7 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(icon.classList.contains('lucide-folder-open')).toBe(true)
     expect(icon.getAttribute('fill')).toBe('none')
     expect(icon.style.color).toBe('var(--color-ink-secondary)')
-    expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
+    expect(button.querySelector('.' + styles.folderIcon + ' [data-caller-icon]')).toBeNull()
   })
 
   it.each([
@@ -73,13 +74,15 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     const dot = button.querySelector('[data-folder-dot]') as HTMLElement
     expect(dot.style.backgroundColor).toBe('rebeccapurple')
     expect(dot.getAttribute('aria-label')).toBe(`フォルダ：${label}`)
-    expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
+    expect(button.querySelector('.' + styles.folderIcon + ' [data-caller-icon]')).toBeNull()
   })
 
-  it('v7 の色の丸を引き継ぐ', async () => {
+  it('旧テーマ指定でもすべての印は現役の中立の色に固定する', async () => {
     document.documentElement.dataset.theme = 'v7'
-    const { button } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
-    expect((button.querySelector('.v7-only') as HTMLElement).style.backgroundColor).toBe('red')
+    const { button, icon } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
+    expect(icon.classList.contains('lucide-inbox')).toBe(true)
+    expect(icon.style.color).toBe('var(--color-ink)')
+    expect(button.querySelector('.v7-only')).toBeNull()
   })
 })
 
@@ -143,7 +146,7 @@ describe('選ぶだけのフォルダ列', () => {
       createAction={<button onClick={mutate}>作る</button>} reserveCreateSpace>
       <button onClick={mutate}>追加操作</button>
     </FolderPanel>))
-    expect(host.querySelector('[aria-hidden="true"].v8-only')).not.toBeNull()
+    expect(host.querySelector('[aria-hidden="true"].' + styles.createPlaceholder)).not.toBeNull()
     const buttons = host.querySelectorAll('button')
     expect(buttons).toHaveLength(1)
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true')

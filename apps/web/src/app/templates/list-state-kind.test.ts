@@ -6,7 +6,7 @@ import {
   failureOfResponse,
   listView,
   type TemplatesFailure,
-} from './list-state-kind'
+} from '@/v8/templates/words'
 
 describe('テンプレート一覧の状態の言い分け', () => {
   it('権限不足を取得失敗に混ぜない', () => {

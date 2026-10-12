@@ -1,4 +1,4 @@
-import { normalizeStoreInterpolations } from '@line-crm/shared';
+import { normalizeStoreInterpolations, isBroadcastAssetKind } from '@line-crm/shared';
 import {
   getFriendFieldMap,
   getCommonVarMap,
@@ -173,7 +173,10 @@ export function contentNeedsFriendFields(content: string): boolean {
 }
 
 // 判別は送信側が指定する種別を使う。JSONらしいplain textを推測で変換しない。
-const STRUCTURED_MESSAGE_TYPES = new Set(['flex', 'carousel', 'location', 'image', 'video', 'audio', 'sticker']);
+const STRUCTURED_MESSAGE_TYPES = new Set(['flex', 'carousel', 'location', 'image', 'video', 'audio', 'sticker', 'imagemap']);
+function isStructuredMessageType(messageType: string): boolean {
+  return STRUCTURED_MESSAGE_TYPES.has(messageType) || isBroadcastAssetKind(messageType);
+}
 
 function mapStringValues(value: unknown, visit: (text: string) => string): unknown {
   if (typeof value === 'string') return visit(value);
@@ -185,7 +188,7 @@ function mapStringValues(value: unknown, visit: (text: string) => string): unkno
 }
 
 function commonVarContentValues(content: string, messageType: string | undefined): string {
-  if (!STRUCTURED_MESSAGE_TYPES.has(messageType ?? 'text')) return content;
+  if (!isStructuredMessageType(messageType ?? 'text')) return content;
   const values: string[] = [];
   mapStringValues(JSON.parse(content), (text) => { values.push(text); return text; });
   return values.join('\n');
@@ -201,7 +204,7 @@ export function substituteCommonVars(
     /\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,
     (_match, key: string) => vars[key],
   );
-  if (!STRUCTURED_MESSAGE_TYPES.has(messageType)) return substitute(content);
+  if (!isStructuredMessageType(messageType)) return substitute(content);
   return JSON.stringify(mapStringValues(JSON.parse(content), substitute));
 }
 

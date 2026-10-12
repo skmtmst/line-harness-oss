@@ -12,7 +12,13 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { IncomingOverview } from './webhook-overviews'
+import IncomingOverview from '@/v8/webhooks/incoming'
+
+let staffRole: 'owner' | 'viewer' = 'owner'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => staffRole }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', accounts: [] }) }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -103,6 +109,12 @@ function installFetch() {
         headers: { 'Content-Type': 'application/json' },
       })
     }
+    if (/\/api\/webhooks\/incoming\?/.test(raw)) {
+      return new Response(JSON.stringify({ success: true, data: [{
+        id: 'iwh-1', name: '受け取り口 1', sourceType: 'form', hasSecret: true,
+        isActive: true, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+      }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
     return new Response(JSON.stringify({ success: true, data: [] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -111,30 +123,8 @@ function installFetch() {
 }
 
 function renderOverview(canResolveUnmatched = true) {
-  root.render(
-    <IncomingOverview
-      items={[{
-        id: 'iwh-1',
-        name: '受け取り口 1',
-        sourceType: 'form',
-        hasSecret: true,
-        isActive: true,
-        createdAt: '2026-09-01T00:00:00.000Z',
-        updatedAt: '2026-09-01T00:00:00.000Z',
-      }]}
-      status="ready"
-      showCreate={false}
-      lineAccountId="acc-1"
-      endpointUrl={(id) => `https://api.test/api/webhooks/incoming/${id}/receive`}
-      onReload={() => {}}
-      onToggle={() => {}}
-      togglingIds={[]}
-      onRotate={() => {}}
-      onDelete={() => {}}
-      canManage
-      canResolveUnmatched={canResolveUnmatched}
-    />,
-  )
+  staffRole = canResolveUnmatched ? 'owner' : 'viewer'
+  root.render(<IncomingOverview />)
 }
 
 async function settle() {
@@ -253,7 +243,7 @@ describe('R400 何もしない設定でも保留と取得失敗を見せる', ()
     await settle()
     // 保留欄ごと消えると、読込障害自体に気付けない。
     expect(host.textContent).toContain('人が見つからなかった届物')
-    expect(host.textContent).toContain('未確認 1件')
+    expect(host.textContent).toContain('1 件。')
     expect(host.textContent).toMatch(/表示できませんでした/)
     expect([...host.querySelectorAll('button')].some((el) => el.textContent === '届物だけ読み直す')).toBe(true)
   })
@@ -283,7 +273,7 @@ describe('R401 50件超えは次の一覧へ辿り着く', () => {
       renderOverview()
     })
     await settle()
-    expect(host.textContent).toContain('未確認 51件')
+    expect(host.textContent).toContain('51 件。')
     // 次の届物へ辿り着く導線が要る。
     expect(host.textContent).toMatch(/ほか1件|さらに表示/)
     expect(host.textContent).not.toContain('いま確認が必要な届物はありません')

@@ -236,6 +236,6 @@
 }
 
 /* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
-.viewerBand { }
 
 .fieldNote, .fieldNoteNoticePlacement { margin: 0; }
+.viewerBand { }

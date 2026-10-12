@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -78,6 +79,6 @@ describe('ログインユーザーの確認窓', () => {
     expect(unlink).toContain('招待メールからLINE認証をやり直せば、また繋がります。')
     const twoFactor = dialogWith(PAGE, 'open={disablingTarget !== null}')
     expect(twoFactor).toContain('LINEログインだけでログインできるようになります。')
-    expect(twoFactor).toContain('あとから「未設定」を押せば、設定し直せます。')
+    expect(twoFactor).toContain('あとから「2段階の確認を設定する」で、設定し直せます。')
   })
 })

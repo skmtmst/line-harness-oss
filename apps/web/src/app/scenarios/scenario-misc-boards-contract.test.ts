@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 /* 一覧の入口は src/v8/scenarios/list.tsx（2026-10-06〜。古い list-v8.tsx・list-v8.module.css はもう描かれない）。 */
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'scenarios', 'list.tsx'), 'utf8')
 const DETAIL = readFileSync(join(HERE, 'detail', 'detail-v8.tsx'), 'utf8')
-const FIRST_CSS = readFileSync(join(HERE, 'first-step-v8.module.css'), 'utf8')
+const FIRST_CSS = readFileSync(join(HERE, '../../v8/scenario-first-step/first-step.module.css'), 'utf8')
 
 /*
  * V8 シナリオ配信の細かい板（X0QrW0・kz2B6・wjfLe・U5rxyH）。
@@ -36,6 +36,6 @@ describe('シナリオ配信の細かい板', () => {
   })
 
   it('作る②の1152（U5rxyH）は狭い板で右の欄を下へ畳む', () => {
-    expect(FIRST_CSS).toContain('@media (max-width: 1352px)')
+    expect(FIRST_CSS).toContain('@container v8-page (max-width: 1099px)')
   })
 })

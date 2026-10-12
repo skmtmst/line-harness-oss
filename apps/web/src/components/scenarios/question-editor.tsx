@@ -663,7 +663,7 @@ export default function QuestionEditor({
 
         {choiceOnly === undefined ? <>
 
-        <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+        <Button variant="secondary" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
             onChange({
               ...value,
               choices: [...value.choices, { key: newChoiceKey(), label: '', behavior: 'none' }],

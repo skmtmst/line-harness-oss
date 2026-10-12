@@ -10,24 +10,24 @@ import { describe, expect, it } from 'vitest'
  * - detail-v8.tsx … `PMLkX`（有効）/ `nMSiE`（始めた直後）/ `ARuZ4`（停止中）、
  *   小窓 `F1LK4e`（開始の確認）・`OPGU2`（停止の確認）・`Al4Ek`（複製）
  * - results-v8.tsx … `X4STXS`（配信結果）
- * - page.tsx 2 つ … data-theme="v8" のときだけ V8 を描く
+ * - page.tsx 2 つ … 現役 V8 に固定
  *
  * 動きの契約（API・確認キー・購読操作）はここに固定する。
  * 板の文言の一字一句は固定しない（V8 の直しで文言が変わるたびに
  * 試験を書き換えることになるため）。
  */
 
-const V8_DETAIL = fs.readFileSync(path.join(__dirname, 'detail-v8.tsx'), 'utf8')
+const V8_DETAIL = fs.readFileSync(path.join(__dirname, '../../../v8/scenario-detail/detail.tsx'), 'utf8')
 const V8_DETAIL_PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const V8_DETAIL_CSS = fs.readFileSync(path.join(__dirname, 'detail-v8.module.css'), 'utf8')
-const RESULTS_CURRENT = fs.readFileSync(new URL('../../scenarios/results/results-v8.tsx', import.meta.url), 'utf8')
+const V8_DETAIL_CSS = fs.readFileSync(path.join(__dirname, '../../../v8/scenario-detail/detail.module.css'), 'utf8')
+const RESULTS_CURRENT = fs.readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 const V8_RESULTS = fs.readFileSync(
-  path.join(__dirname, '..', 'results', 'results-v8.tsx'),
+  path.join(__dirname, '../../../v8/scenarios/results.tsx'),
   'utf8',
 )
 const V8_RESULTS_PAGE = fs.readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 const V8_RESULTS_CSS = fs.readFileSync(
-  path.join(__dirname, '..', 'results', 'results-v8.module.css'),
+  path.join(__dirname, '../../../v8/scenarios/results.module.css'),
   'utf8',
 )
 
@@ -40,8 +40,8 @@ describe('★V8 シナリオ編集（PMLkX / nMSiE / ARuZ4）の契約', () => {
   })
 
   it('数の帯と「最後の1通の後」の行を持つ', () => {
-    for (const label of ['予約中', '届いた', '送れなかった', '終わった']) {
-      expect(V8_DETAIL).toContain(`<p className={styles.kpiLabel}>${label}</p>`)
+    for (const label of ['購読中', '読み終えた', '始まる見込み（試算）', '離脱が多い所']) {
+      expect(V8_DETAIL).toContain(`title="${label}"`)
     }
     // ON_COMPLETE_LABEL の実設定から読む（固定文を置かない）。
     expect(V8_DETAIL).toContain('ON_COMPLETE_LABEL[')
@@ -89,7 +89,7 @@ describe('★V8 シナリオ編集（PMLkX / nMSiE / ARuZ4）の契約', () => {
   })
 
   it('閲覧のみの人は直す操作が押せない', () => {
-    expect(V8_DETAIL).toContain('canManageRole(staffRole)')
+    expect(V8_DETAIL).toContain("useFeatureAccess('scenarios')")
     expect(V8_DETAIL).toContain('readonlyReason')
   })
 })
@@ -97,14 +97,16 @@ describe('★V8 シナリオ編集（PMLkX / nMSiE / ARuZ4）の契約', () => {
 describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
 
   it('板の印（X4STXS）と数の帯を持つ', () => {
-    for (const label of ['届いた', '送れなかった', '進んでいる途中', '全部終わった']) {
-      expect(V8_RESULTS).toContain(`<p className={styles.kpiLabel}>${label}</p>`)
+    for (const label of ['始まった', '読み終えた', '途中', '離れた']) {
+      expect(V8_RESULTS).toContain(`title="${label}"`)
     }
   })
 
   it('送れずに止まった・いま送っているの帯を持つ', () => {
-    expect(V8_RESULTS).toContain('bandWarn')
-    expect(V8_RESULTS).toContain('bandInfo')
+    expect(V8_RESULTS).toContain('failedTotal')
+    expect(V8_RESULTS).toContain('送れずに止まった人が')
+    expect(V8_RESULTS).toContain('deliveringCount')
+    expect(V8_RESULTS).toContain('いま送っています')
   })
 
   it('購読操作（止める・再開・失敗を再送・移す）は既存の口を使う', () => {
@@ -124,9 +126,9 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
 })
 
 describe('★V8 シナリオの CSS モジュールの契約', () => {
-  it('新しい CSS Module は layer 宣言から始める', () => {
-    expect(V8_DETAIL_CSS.startsWith('@layer properties, theme, base, components, utilities;')).toBe(true)
-    expect(V8_RESULTS_CSS.startsWith('@layer properties, theme, base, components, utilities;')).toBe(true)
+  it('現役CSSは画面の寸法を共通のトークンから読む', () => {
+    expect(V8_DETAIL_CSS).toContain('var(--tpl-sd-')
+    expect(V8_RESULTS_CSS).toContain('var(--tpl-sc2-')
   })
 
   it('v7 に効かせる指定を持たない（data-theme セレクタの直書きは無い）', () => {
@@ -135,12 +137,12 @@ describe('★V8 シナリオの CSS モジュールの契約', () => {
      * [data-theme] を条件にする必要は無い。付いていたら v7 の
      * 見た目へ漏れ出す危険があるので契約で止める。
      */
-    expect(V8_DETAIL_CSS).not.toContain('[data-theme')
+    expect(V8_DETAIL_CSS.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('[data-theme')
     expect(V8_RESULTS_CSS).not.toContain('[data-theme')
   })
   it('通ごとの結果と友だちごとの記録を持つ', () => {
-    expect(RESULTS_CURRENT).toContain('通ごとの結果')
-    expect(RESULTS_CURRENT).toContain('友だちごとの記録')
+    expect(RESULTS_CURRENT).toContain('通ごとの反応')
+    expect(RESULTS_CURRENT).toContain('参加中の友だち')
     expect(RESULTS_CURRENT).toContain('予定を見る')
     expect(RESULTS_CURRENT).toContain('さらに読み込む')
   })

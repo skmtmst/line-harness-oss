@@ -15,7 +15,7 @@ const block = (selector: RegExp) => css.match(selector)?.[1] ?? ''
  * 動きを減らす設定では動かさない。
  */
 describe('知らせの消える動き', () => {
-  const leaving = block(/\[data-theme='v8'\] \.toast\[data-closing\] \{([^}]*)\}/)
+  const leaving = block(/:root \.toast\[data-closing\] \{([^}]*)\}/)
   const keyframes = css.match(/@keyframes toast-v8-leave \{([\s\S]*?)\n\}/)?.[1] ?? ''
 
   it('消えかけの印で、変数の長さ・イージングの消える動きを当てる', () => {

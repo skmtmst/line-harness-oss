@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
 /**
@@ -140,7 +141,7 @@ export async function getFormsWithStats(
            EXISTS (
              SELECT 1 FROM form_accounts visible
              WHERE visible.form_id = f.id
-               AND visible.line_account_id IN (${accountIds.map(() => '?').join(', ')})
+               AND visible.line_account_id IN (${sqlIdSet(accountIds).sql})
            )
            ${scope.includeUnassigned
              ? `OR NOT EXISTS (SELECT 1 FROM form_accounts pending WHERE pending.form_id = f.id)`
@@ -205,7 +206,7 @@ export async function getFormsWithStats(
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .bind(monthPrefix, monthPrefix, staleBefore, ...accountIds, ...folderBinds)
+    .bind(monthPrefix, monthPrefix, staleBefore, ...(accountIds.length ? sqlIdSet(accountIds).binds : []), ...folderBinds)
     .all<Form & {
       last_submitted_at: string | null;
       account_scope_review_required: number;
@@ -1106,7 +1107,7 @@ export async function insertFormSubmissionRecord(
   const now = jstNow();
   const fileIds = [...new Set(input.fileIds ?? [])];
   if (fileIds.length) {
-    const placeholders = fileIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(fileIds).sql;
     // D1 batch is a transaction: two concurrent answers cannot claim one upload.
     const results = await db.batch([
       db.prepare(`INSERT INTO form_submissions (id, form_id, friend_id, form_version_id, is_test, data, destination_write_status, created_at)
@@ -1115,10 +1116,15 @@ export async function insertFormSubmissionRecord(
           WHERE f.id IN (${placeholders}) AND f.friend_id = ? AND f.form_id = ? AND f.submission_id IS NULL
             AND f.deleted_at IS NULL AND (f.expires_at IS NULL OR julianday(f.expires_at) > julianday(?)) AND s.status = 'clean') = ?`)
         .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now,
-          ...fileIds, input.friendId ?? null, input.formId, now, fileIds.length),
+          ...sqlIdSet(fileIds).binds, input.friendId ?? null, input.formId, now, fileIds.length),
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
-        .bind(id, ...fileIds, id),
+        .bind(id, ...(fileIds.length ? sqlIdSet(fileIds).binds : []), id),
+      // Only a conclusively absent answer releases capacity. This transaction also
+      // excludes a concurrent successful save; transport failures keep the reservation.
+      db.prepare(`DELETE FROM form_capacity_claims WHERE form_id = ? AND submission_id = ?
+        AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
+        .bind(input.formId, id, id),
     ]);
     if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
     return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;
@@ -1196,6 +1202,7 @@ export async function claimFormCapacitySlot(
   slotKey: string,
   submissionId: string,
   limit: number,
+  choice?: { fieldName: string; label: string; isOther: boolean; labels: string[] },
 ): Promise<boolean> {
   const result = await db
     .prepare(
@@ -1204,11 +1211,25 @@ export async function claimFormCapacitySlot(
         WHERE EXISTS (
           SELECT 1 FROM form_capacity_claims
            WHERE form_id = ? AND slot_key = ? AND submission_id = ?
-        ) OR (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?
+        ) OR (SELECT COUNT(*) FROM (
+          SELECT submission_id AS id FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?
+          UNION SELECT s.id FROM form_submissions s
+           WHERE s.form_id = ? AND s.is_test = 0 AND (
+             ? = '__total__' OR EXISTS (
+               SELECT 1 FROM json_each(CASE WHEN json_valid(s.data) THEN s.data ELSE '{}' END) field,
+                 json_each(CASE WHEN field.type='array' THEN field.value ELSE json_array(field.value) END) answer
+               WHERE field.key = ? AND (answer.value = ? OR
+                 (? = 1 AND answer.type='text' AND answer.value <> ''
+                   AND answer.value NOT IN (SELECT value FROM json_each(?))))
+             )
+           )
+        )) < ?
        ON CONFLICT(form_id, slot_key, submission_id)
        DO UPDATE SET created_at = form_capacity_claims.created_at`,
     )
-    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, submissionId, formId, slotKey, limit)
+    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, submissionId, formId, slotKey,
+      formId, slotKey, choice?.fieldName ?? '', choice?.label ?? '', choice?.isOther ? 1 : 0,
+      JSON.stringify(choice?.labels ?? []), limit)
     .run();
   if ((result.meta?.changes ?? 0) > 0) return true;
   const owned = await db.prepare(`SELECT 1 AS owned FROM form_capacity_claims
@@ -1373,7 +1394,7 @@ export async function getFormSubmissionAnalytics(
 
   let dateAnsweredUniqueFriends = 0;
   if (normalizedDateFields.length > 0) {
-    const placeholders = normalizedDateFields.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(normalizedDateFields.map(field => field.key)).sql;
     const row = await db.prepare(
       `SELECT COUNT(DISTINCT fs.friend_id) AS unique_friends
          FROM form_submissions fs
@@ -1385,7 +1406,7 @@ export async function getFormSubmissionAnalytics(
           AND answer.key IN (${placeholders})
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
-    ).bind(formId, lineAccountId, ...normalizedDateFields.map((field) => field.key))
+    ).bind(formId, lineAccountId, ...sqlIdSet(normalizedDateFields.map(field => field.key)).binds)
       .first<{ unique_friends: number }>();
     dateAnsweredUniqueFriends = Number(row?.unique_friends ?? 0);
   }

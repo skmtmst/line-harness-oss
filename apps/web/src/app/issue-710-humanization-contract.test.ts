@@ -8,7 +8,7 @@
  * 3. メディア容量は「2048.0 MB」のような4桁MBを出さず、1024MB超はGBへ
  *    切り替える1関数に統一する。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -17,11 +17,12 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('Issue #710: 分の期限は人間化した読み替えを添える', () => {
-  it('受付締切・キャンセル期限の入力へ読み替え関数をつなぐ', () => {
+  it('受付締切・キャンセル期限の候補を分値から読みやすい時間へ変換する', () => {
     const src = read('booking/menus/page.tsx')
-    expect(src).toContain('humanize={minutesBeforeLabel}')
-    // RuleNumberField が読み替え行を描く
-    expect(src).toContain('＝{hint}')
+    expect(src).toContain('options={cutoffOptions}')
+    expect(src).toContain('options={cancelOptions}')
+    expect(src).toContain('label: beforeLabel(minutes)')
+    expect(src).toContain('時間前まで')
   })
 
   it('読み替え関数が正しい単位へ変換する', async () => {
@@ -30,6 +31,10 @@ describe('Issue #710: 分の期限は人間化した読み替えを添える', (
     expect(minutesBeforeLabel(90)).toBe('1時間30分前')
     expect(minutesBeforeLabel(2880)).toBe('2日前')
     expect(minutesBeforeLabel(30)).toBeNull()
+    const { beforeLabel } = await import('../v8/booking-menus/lib/rule-choices')
+    expect(beforeLabel(1440)).toBe('24 時間前まで')
+    expect(beforeLabel(30)).toBe('30 分前まで')
+    expect(beforeLabel(0)).toBe('直前まで')
   })
 })
 
@@ -55,7 +60,7 @@ describe('Issue #710: 残りの分・時間の入力にも読み替えを添え�
   it('仮押さえの保持時間・当日のお知らせへ読み替え関数をつなぐ', () => {
     const src = read('booking/menus/page.tsx')
     expect(src).toContain('humanize={formatMinutesLengthHint}')
-    expect(src).toContain('humanize={formatHoursBeforeHint}')
+    expect(src).toContain('humanize={(value) => formatHoursBeforeHint(value) || null}')
   })
 
   it('読み替え関数が正しい単位へ変換する', async () => {
@@ -76,7 +81,7 @@ describe('Issue #710: 容量は1024MB超でGBへ切り替える1関数に統一'
 
   it('一覧・登録ダイアログの独自MB整形を廃止した', () => {
     const page = read('contents/page.tsx')
-    const upload = read('contents/media-upload-dialog.tsx')
+    const upload = read('../v8/contents/media-upload-dialog.tsx')
     expect(page).not.toContain('function formatStorage')
     expect(upload).not.toContain('(entry.file.size / 1024 / 1024).toFixed(1)')
     expect(upload).toContain('formatMediaSize(entry.file.size)')

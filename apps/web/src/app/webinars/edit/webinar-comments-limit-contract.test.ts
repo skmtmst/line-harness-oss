@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '../../../components/webinars/webinar-limits'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'comments-v8.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/comments.tsx'), 'utf8')
 
-describe('V6 ウェビナーさくらコメントの件数上限の契約', () => {
+describe('V8 ウェビナーさくらコメントの件数上限の契約', () => {
   it('上限は200件でサーバーと画面が同じ値を見る', () => {
     expect(WEBINAR_SAKURA_COMMENTS_MAX).toBe(200)
   })
@@ -19,6 +19,6 @@ describe('V6 ウェビナーさくらコメントの件数上限の契約', () =
   })
 
   it('一括インポートの案内に上限を書く', () => {
-    expect(PAGE).toContain('{WEBINAR_SAKURA_COMMENTS_MAX}件まで')
+    expect(PAGE).toContain('{WEBINAR_SAKURA_COMMENTS_MAX} 件まで')
   })
 })

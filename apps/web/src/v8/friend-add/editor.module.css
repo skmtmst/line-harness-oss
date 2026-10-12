@@ -90,13 +90,13 @@
   line-height: var(--tpl-chip-label-lh);
 }
 /* 選ぶ行は共通のチェックのカード。絵の行（余白10/12・角10・名前13/600）に合わせて寸法だけ当てる。 */
-:global([data-theme='v8']) label.routeCard {
+:global(:root) label.routeCard {
   align-items: center;
   min-height: 0;
   padding: var(--tpl-fa-ed-route-pad);
   border-radius: var(--radius-control);
 }
-:global([data-theme='v8']) label.routeCard > span:last-child > span:first-child {
+:global(:root) label.routeCard > span:last-child > span:first-child {
   font-size: var(--text-label);
   font-weight: 600;
   line-height: var(--tpl-row-name-lh);

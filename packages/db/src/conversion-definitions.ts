@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment, FolderAssignmentError } from './folder-assignment.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
@@ -237,8 +238,8 @@ function accountWhere(
   }
   if (scope.allowedAccountIds.length > 0) {
     return {
-      sql: `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ` OR ${column} IS NULL` : ''})`,
-      values: [...scope.allowedAccountIds],
+      sql: `(${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.includeUnassigned ? ` OR ${column} IS NULL` : ''})`,
+      values: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [],
     };
   }
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', values: [] };

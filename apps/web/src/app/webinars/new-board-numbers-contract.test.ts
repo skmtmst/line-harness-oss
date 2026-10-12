@@ -7,15 +7,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const CSS = readFileSync(resolve(__dirname, "new/new-v8.module.css"), "utf-8");
+const FIELD_CSS = readFileSync(resolve(__dirname, "../../components/shared/text-field.module.css"), "utf-8");
+const CSS = readFileSync(resolve(__dirname, "../../v8/webinar-edit/form.module.css"), "utf-8");
 
 describe("webinar 作成の板の数字", () => {
-  it("段カードは余白20（四方）", () => {
-    expect(CSS).toMatch(/\.card \{[^}]*padding: 20px;/s);
+  it("段カードは採用した共通の余白を使う", () => {
+    expect(CSS).toMatch(/\.card \{[^}]*padding: var\(--tpl-wc-an-card-pad\);/s);
   });
 
-  it("入力の枠は h36・丸み10", () => {
-    expect(CSS).toMatch(/\.input \{[^}]*height: 36px/s);
-    expect(CSS).toMatch(/\.input \{[^}]*border-radius: var\(--radius-control, 10px\)/s);
+  it("入力の枠は共通の高さ36と角を使う", () => {
+    expect(FIELD_CSS).toMatch(/\.single \{[^}]*height: 36px/s);
+    expect(FIELD_CSS).toContain("border-radius: var(--radius-control)");
   });
 });

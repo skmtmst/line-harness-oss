@@ -1,3 +1,5 @@
+import { idChunks, sqlIdSet } from '@line-crm/db/id-queries';
+import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../services/form-documents.js';
@@ -81,11 +83,11 @@ async function adminAccountScope(c: Context<Env>, alias = '') {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const column = `${alias}line_account_id`;
   const where = scope.allowedAccountIds.length
-    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    ? `(${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
     : scope.canSeeUnassigned
       ? `${column} IS NULL`
       : '1 = 0';
-  return { scope, where };
+  return { scope, where, binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [] };
 }
 
 /**
@@ -452,9 +454,9 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       conditions.push('f.line_account_id = ?');
       binds.push(lineAccountId);
     } else {
-      const { scope, where } = await adminAccountScope(c, 'f.');
+      const { binds: scopeBinds, where } = await adminAccountScope(c, 'f.');
       conditions.push(where);
-      binds.push(...scope.allowedAccountIds);
+      binds.push(...scopeBinds);
     }
     if (savedSearchId) {
       if (!lineAccountId) {
@@ -742,13 +744,17 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     // row per friend; SQLite supports window functions on D1.
     if (includeChatStatus && items.length > 0) {
       const ids = items.map((f) => f.id);
-      const placeholders = ids.map(() => '?').join(',');
 
       type IncomingRow = { friend_id: string; content: string; message_type: string; created_at: string };
       type OutgoingRow = { friend_id: string; max_at: string };
       type ScenarioRow = { friend_id: string; scenario_name: string; status: string };
 
-      const [incomingRes, outgoingRes, scenarioRes] = await Promise.all([
+      const incomingRes: { results: IncomingRow[] } = { results: [] };
+      const outgoingRes: { results: OutgoingRow[] } = { results: [] };
+      const scenarioRes: { results: ScenarioRow[] } = { results: [] };
+      for (const chunk of idChunks(ids)) {
+      const placeholders = chunk.map(() => '?').join(',');
+      const [incoming, outgoing, scenario] = await Promise.all([
         db
           .prepare(
             `SELECT friend_id, content, message_type, created_at FROM (
@@ -758,7 +764,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
                WHERE direction = 'incoming' AND friend_id IN (${placeholders})
              ) WHERE rn = 1`,
           )
-          .bind(...ids)
+          .bind(...chunk)
           .all<IncomingRow>(),
         db
           .prepare(
@@ -773,7 +779,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
                AND friend_id IN (${placeholders})
              GROUP BY friend_id`,
           )
-          .bind(...ids)
+          .bind(...chunk)
           .all<OutgoingRow>(),
         db
           .prepare(
@@ -786,9 +792,13 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
              JOIN scenarios s ON s.id = fs.scenario_id
              WHERE fs.rn = 1`,
           )
-          .bind(...ids)
+          .bind(...chunk)
           .all<ScenarioRow>(),
       ]);
+      incomingRes.results.push(...incoming.results);
+      outgoingRes.results.push(...outgoing.results);
+      scenarioRes.results.push(...scenario.results);
+      }
 
       const incomingByFriend = new Map(incomingRes.results.map((r) => [r.friend_id, r]));
       const outgoingByFriend = new Map(outgoingRes.results.map((r) => [r.friend_id, r.max_at]));
@@ -908,9 +918,9 @@ friends.get('/api/friends/count', async (c) => {
         .bind(lineAccountId).first<{ count: number }>();
       count = row?.count ?? 0;
     } else {
-      const { scope, where } = await adminAccountScope(c);
+      const { binds: scopeBinds, where } = await adminAccountScope(c);
       const row = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND ${where}`)
-        .bind(...scope.allowedAccountIds).first<{ count: number }>();
+        .bind(...scopeBinds).first<{ count: number }>();
       count = row?.count ?? 0;
     }
     return c.json({ success: true, data: { count } });
@@ -929,7 +939,7 @@ friends.get('/api/friends/ref-stats', async (c) => {
     }
     const accountScope = lineAccountId ? null : await adminAccountScope(c);
     const where = lineAccountId ? 'line_account_id = ?' : accountScope!.where;
-    const binds = lineAccountId ? [lineAccountId] : accountScope!.scope.allowedAccountIds;
+    const binds = lineAccountId ? [lineAccountId] : accountScope!.binds;
     const stmt = c.env.DB.prepare(
       `SELECT ref_code, COUNT(*) as count FROM friends WHERE ${where} AND ref_code IS NOT NULL GROUP BY ref_code ORDER BY count DESC`,
     );
@@ -1469,11 +1479,8 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
     // 指定なしは従来どおり無条件更新（既存互換）。
     const expectedUpdatedAt = c.req.query('expectedUpdatedAt')?.trim() || null;
     if (expectedUpdatedAt) {
-      const applied = await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ? AND updated_at = ?')
-        .bind(JSON.stringify(merged), now, friendId, expectedUpdatedAt)
-        .run();
-      if ((applied.meta?.changes ?? 0) === 0) {
+      const applied = await patchFriendMetadata(db, friendId, body, { deleteNull: true, expectedUpdatedAt });
+      if (!applied) {
         const current = await getFriendById(db, friendId);
         if (!current) {
           return c.json({ success: false, error: 'Friend not found' }, 404);
@@ -1486,10 +1493,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
         }, 409);
       }
     } else {
-      await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-        .bind(JSON.stringify(merged), now, friendId)
-        .run();
+      await patchFriendMetadata(db, friendId, body, { deleteNull: true });
     }
 
     const updated = await getFriendById(db, friendId);

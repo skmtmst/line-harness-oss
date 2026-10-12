@@ -298,6 +298,13 @@ export async function claimDueScheduledChatSends(
     Date.parse(input.now) + leaseMs,
   ).toISOString();
 
+  // 旧版の中断行にも、24時間後に同じキーで再送する権利はない。
+  await db.prepare(`UPDATE scheduled_chat_sends SET status='failed',failed_at=?,
+    last_error_code='LINE_RETRY_KEY_EXPIRED',last_error='届いたか分からないため確認が必要です',
+    lease_token=NULL,lease_expires_at=NULL,updated_at=?
+    WHERE status='sending' AND lease_expires_at < ? AND julianday(?) - julianday(updated_at) >= 1`)
+    .bind(input.now,input.now,input.now,input.now).run();
+
   // 前のclaimが返ってこなかった分を回収する。
   await db
     .prepare(

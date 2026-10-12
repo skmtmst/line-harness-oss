@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow } from './utils.js';
 // アクション自動化 (IF-THEN ルール) クエリヘルパー
 
@@ -96,11 +97,11 @@ export interface AutomationExecutionRunsQuery {
 function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters: boolean) {
   if (input.allowedAccountIds.length === 0) return { sql: '1 = 0', binds: [] as unknown[] };
   const clauses = [
-    `r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(', ')})`,
+    `r.line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})`,
     'datetime(r.created_at) >= datetime(?)',
     'datetime(r.created_at) < datetime(?)',
   ];
-  const binds: unknown[] = [...input.allowedAccountIds, input.from, input.to];
+  const binds: unknown[] = [...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : []), input.from, input.to];
   // テスト実行は一覧・集計・CSVすべてで既定除外。切替時だけ含める。
   if (!input.includeTest) clauses.push('r.is_test = 0');
   if (includeFilters && input.status?.length) {
@@ -223,9 +224,9 @@ export async function getAutomationExecutionRun(
        LEFT JOIN line_accounts la ON la.id = r.line_account_id
        LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
       WHERE r.id = ?
-        AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})
+        AND r.line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})
       GROUP BY r.id`,
-  ).bind(input.runId, ...input.allowedAccountIds).first<AutomationExecutionRunRow>();
+  ).bind(input.runId, ...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : [])).first<AutomationExecutionRunRow>();
 }
 
 export interface AutomationExecutionRunStepRow {

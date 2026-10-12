@@ -5,7 +5,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
-import WebinarEditConflictBand, { extractEditConflict } from './webinar-edit-conflict-band'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { isConflict } from '@/v8/webinar-edit/cta'
 
 const latestEditor = { version: 3 } as never
 
@@ -13,17 +14,17 @@ function conflictError(): ApiError {
   return new ApiError(409, 'ほかの人が先に変えました', 'VERSION_CONFLICT', { latest: latestEditor }, null, null)
 }
 
-describe('extractEditConflict', () => {
-  it('409 の同時編集だけ最新を取り出す', () => {
-    expect(extractEditConflict(conflictError())).toEqual({ latest: latestEditor })
+describe('isConflict', () => {
+  it('409 の同時編集だけを見分ける', () => {
+    expect(isConflict(conflictError())).toBe(true)
   })
 
-  it('ふつうの失敗・版でない最新は帯を出さない', () => {
-    expect(extractEditConflict(new Error('落ちた'))).toBeNull()
-    expect(extractEditConflict(new ApiError(500, '失敗', undefined, null, null, null))).toBeNull()
+  it('ふつうの失敗を競合と混ぜず、返事にある不正な最新を信頼せず読む', () => {
+    expect(isConflict(new Error('落ちた'))).toBe(false)
+    expect(isConflict(new ApiError(500, '失敗', undefined, null, null, null))).toBe(false)
     expect(
-      extractEditConflict(new ApiError(409, '競合', 'VERSION_CONFLICT', { latest: { version: 'x' } }, null, null)),
-    ).toEqual({ latest: null })
+      isConflict(new ApiError(409, '競合', 'VERSION_CONFLICT', { latest: { version: 'x' } }, null, null)),
+    ).toBe(true)
   })
 })
 
@@ -31,15 +32,14 @@ describe('WebinarEditConflictBand', () => {
   it('帯に文と最新を読み込む口を出す', () => {
     const onReload = vi.fn()
     render(
-      <WebinarEditConflictBand
-        message="ほかの人が先に保存しました"
-        reloading={false}
+      <SaveConflictBand
+        title="ほかの人が先に保存しました"
+        compareBusy={false}
         onReload={onReload}
-        onClose={() => {}}
       />,
     )
     expect(screen.getByText('ほかの人が先に保存しました')).toBeTruthy()
-    const button = screen.getByRole('button', { name: '最新を読み込む' })
+    const button = screen.getByRole('button', { name: '最新を読み込んで続ける' })
     button.click()
     expect(onReload).toHaveBeenCalledTimes(1)
   })

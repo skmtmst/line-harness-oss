@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,10 +13,10 @@ import { describe, expect, it } from 'vitest'
  * への戻し・ blanket の「通信を確かめて」の復活で落ちる。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
+const NEW_PAGE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const HELPER = readFileSync(
   join(HERE, '..', '..', 'components', 'shared', 'api-error-message.ts'),
   'utf8',
@@ -24,36 +25,36 @@ const HELPER = readFileSync(
 describe('R32 作成の操作は権限に合わせる', () => {
   it('作成の可否は入り直した本人の役割で決め、手元の保存値で決めない', () => {
     for (const [name, body] of [['page.tsx', PAGE], ['new/page.tsx', NEW_PAGE], ['edit/page.tsx', EDIT_PAGE]]) {
-      expect(body, `${name} が役割を確認していない`).toContain('api.staff.me()')
+      expect(body, `${name} が役割を確認していない`).toMatch(/useStaffRole|api\.staff\.me\(\)/)
       expect(body, `${name} が手元の保存値で判定している`).not.toContain("localStorage.getItem('lh_staff_role')")
     }
   })
 
   it('統括でなければ作成ボタンを出さず、統括への依頼を案内する', () => {
-    expect(PAGE).toContain('受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。')
-    expect(PAGE).toContain('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
-    expect(PAGE).toContain('canCreate')
-    expect(NEW_PAGE).toContain('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+    expect(PAGE).toContain('<ViewerBand />')
+    expect(PAGE).toContain('<ViewerBand />')
+    expect(PAGE).toContain("const canManage = staffRole === 'owner'")
+    expect(NEW_PAGE).toContain("staffRole !== 'owner'")
     expect(EDIT_PAGE).toContain('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
   })
 
   it('見本から作る・見本タブの作成も統括だけに出す（戻したら赤）', () => {
     // 一覧の「見本から作る」は作成の入口なので、無条件表示に戻すと落ちる。
     expect(PAGE).toContain('見本から作る')
-    expect(PAGE).toMatch(/\{canCreate \? \(\s*<Button variant="secondary" href="\/webhooks\?tab=notify">見本から作る/)
+    expect(PAGE).toContain('actions={canManage ? <Button href="/webhooks?tab=notify">')
     // 見本タブの中の作成も同じく統括だけ。役割の確認なしに戻すと落ちる。
-    expect(PAGE).toContain('canCreateSamples')
-    expect(PAGE).toContain('api.staff.me()')
+    expect(PAGE).toContain('canManage')
+    expect(readFileSync(new URL('../../lib/staff-role.ts', import.meta.url), 'utf8')).toContain('api.staff.me()')
     expect(PAGE).toContain('この見本で作る')
     expect(PAGE).toContain('送り先を作る')
   })
 
   it('一覧の変更操作（開始・停止・合言葉・削除・直す）も統括だけに出す', () => {
-    expect(PAGE).toContain('canManage={canCreate}')
-    expect(OVERVIEWS).toContain('canManage: boolean')
+    expect(PAGE).toContain('canManage ?')
+    expect(OVERVIEWS).toContain("const canManage = staffRole === 'owner'")
     // 試し送信は管理者も使えるので残す。
     expect(OVERVIEWS).toContain('届いたつもりで試す')
-    expect(OVERVIEWS).toContain('1回 試してみる')
+    expect(OVERVIEWS).toContain('試しに送る')
   })
 })
 
@@ -75,7 +76,7 @@ describe('R32 失敗の文は原因どおりに', () => {
 
   it('入力の直しは欄の下に出す', () => {
     expect(PAGE).toContain('createFieldError')
-    expect(PAGE).toContain('mapIncomingCreateFieldError')
+    expect(PAGE).toContain("setCreateFieldError({ name: '名前を入力してください' })")
     expect(PAGE).toContain('role="alert"')
   })
 })
