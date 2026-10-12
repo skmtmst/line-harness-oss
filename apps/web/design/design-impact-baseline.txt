@@ -528,3 +528,4 @@ shared-button-importer components/shared/inbox-composer.tsx
 shared-button-importer components/shared/aggregation-status.tsx
 shared-button-importer components/shared/friend-filter-band.tsx
 shared-button-importer components/shared/save-feedback.tsx
+shared-button-importer components/shared/inbox-list.tsx

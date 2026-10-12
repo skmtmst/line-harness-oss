@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './activity-item.module.css'
 
@@ -46,4 +47,9 @@ export default function ActivityItem({
 
 export function ActivityMarker({ icon: Icon }: { icon: LucideIcon }) {
   return <span className={styles.marker} aria-hidden="true"><Icon size={12} /></span>
+}
+
+/** 履歴の小さな時刻。カードの中でも同じ文字と行の値を使う。 */
+export function ActivityTime({ children, lineHeight }: { children: ReactNode; lineHeight?: string }) {
+  return <span className={styles.microTime} style={lineHeight ? { '--activity-time-line-height': lineHeight } as CSSProperties : undefined}>{children}</span>
 }

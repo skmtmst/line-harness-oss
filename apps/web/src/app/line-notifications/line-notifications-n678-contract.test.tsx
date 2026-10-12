@@ -1214,8 +1214,12 @@ describe('#678 実DOMへマウントした画面全体', () => {
     const number = document.querySelector('[data-kpi-number]')
     const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.textContent)
     expect(number).toBeTruthy()
-    expect(numbers).toContain('7通')
-    expect(numbers).toContain('2通')
+    expect(numbers).toContain('7')
+    expect(numbers).toContain('2')
+    for (const value of ['2', '7']) {
+      const number = [...document.querySelectorAll('[data-kpi-number]')].find(node => node.textContent === value)!
+      expect(number.nextElementSibling?.textContent).toBe('通')
+    }
     expect(numbers).not.toContain('5')
     expect(numbers).not.toContain('9')
     expect(screen.queryByText('5通')).toBeNull()

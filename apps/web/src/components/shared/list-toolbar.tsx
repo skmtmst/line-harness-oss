@@ -178,7 +178,6 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
     const flatten = (element: HTMLElement): HTMLElement[] => getComputedStyle(element).display === 'contents'
       ? [...element.children].flatMap(child => flatten(child as HTMLElement)) : [element]
     const measure = () => {
-      if (document.documentElement.dataset.theme !== 'v8') return
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
       choices.dataset.filterWidth = String(unfoldedWidth.current)

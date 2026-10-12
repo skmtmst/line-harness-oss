@@ -59,7 +59,7 @@ describe('V8 質問テンプレートの共通の値', () => {
   })
 
   it('入力欄は共通Fieldと採用済みのV8の寸法を使う', () => {
-    expect(page).toContain('<Field label="質問文（160文字まで）">')
+    expect(page).toContain(`<Field label="質問文（160文字まで）" requirement={fields.requirement('text')}`)
     expect(css).toContain('height: var(--tpl-cn-control-h)')
     expect(css).toContain('font-size: var(--text-body)')
     expect(page).not.toContain('px-3 py-2 text-sm')

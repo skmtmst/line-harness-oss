@@ -311,9 +311,9 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
     await click('過去30日')
-    expect(host.textContent).toContain('まだ集計がありません。下の「定義の操作と集計の詳細」から「この30日を再集計」を押してください')
+    expect(host.textContent).toContain('まだ集計していません')
     await click('過去7日')
-    expect(host.textContent, host.textContent ?? '').toContain('まだ集計がありません。下の「定義の操作と集計の詳細」から「この7日を再集計」を押してください')
+    expect(host.textContent, host.textContent ?? '').toContain('まだ集計していません')
     await click('この7日を再集計')
 
     fixture.accountId = 'account-b'

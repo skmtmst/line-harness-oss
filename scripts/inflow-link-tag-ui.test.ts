@@ -36,11 +36,14 @@ describe('inflow link tag auto-assignment UI wiring', () => {
 
   test('desktop referral table stays compact without breaking identifiers mid-word', () => {
     expect(page).toContain('className={styles.tableWrap}');
-    for (const cell of ['nameLink', 'cellMain', 'cellSub']) {
+    for (const cell of ['cellMain', 'cellSub']) {
       const rule = listStyles.match(new RegExp(`\\.${cell}[^{}]*\\{([^}]+)\\}`))?.[1];
       expect(rule, cell).toContain('text-overflow: ellipsis');
       expect(rule, cell).toContain('white-space: nowrap');
     }
+    const truncateStyles = readFileSync(new URL('../apps/web/src/components/shared/truncated-text.module.css', import.meta.url), 'utf8')
+    expect(truncateStyles).toContain('text-overflow: ellipsis')
+    expect(truncateStyles).toContain('white-space: nowrap')
     expect(page).not.toContain('title={r.refCode}')
     expect(page).toContain("label: 'URLをコピー'");
     expect(page).toContain('<CopyTextButton role="menuitem" value={referralUrl(row.refCode)}');

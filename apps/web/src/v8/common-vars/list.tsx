@@ -928,13 +928,19 @@ function CommonVarsListInner() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
-  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED })
+  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED }).map(row => ({ ...row,
+    leadingActions: canWrite && selectedUserFolder?.id === row.id ? [
+      { id: 'edit-folder', label: 'フォルダ名を変える', onSelect: () => folderControlRef.current?.startEdit(selectedUserFolder) },
+      { id: 'delete-folder', label: 'フォルダを削除する', tone: 'danger' as const, onSelect: () => folderControlRef.current?.startDelete(selectedUserFolder) },
+    ] : [],
+  }))
   const folderOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
     { value: UNGROUPED, label: '未分類' },
   ]
-  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+
 
   /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
   const createButton = (full: boolean) => canWrite ? (

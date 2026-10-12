@@ -6,7 +6,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { PageTitle } from '@/components/templates/page-frame'
 import FilterChip from '@/components/shared/filter-chip'
 import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread'
-import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls } from '@/components/shared/inbox-list'
+import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list'
 
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
@@ -3293,27 +3293,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 })()}
 
                 {hasMoreChats && (
-                  <Button variant="text" busy={loadingMore} busyLabel="読み込み中..."
+                  <InboxHistoryButton context="list" busy={loadingMore}
                     onClick={() => { void loadMoreChats() }}
-                    disabled={loadingMore}
-                    className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b border-hairline"
                   >
                     さらに読み込む
-                  </Button>
+                  </InboxHistoryButton>
                 )}
                 {/*
                   メールの続き。メールは上限200件で切れていた分を offset で遡る。
                   LINEの「さらに読み込む」とは別物なので文言を分ける。
                 */}
                 {hasMoreEmails && (
-                  <Button variant="text" busy={loadingMoreEmails} busyLabel="読み込み中..."
+                  <InboxHistoryButton context="list" busy={loadingMoreEmails}
                     onClick={() => { void loadEmails(emailItems.length, true) }}
-                    disabled={loadingMoreEmails}
-                    className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b"
-                    style={{ borderBottomColor: 'var(--color-hairline)' }}
                   >
                     メールの続きを読み込む
-                  </Button>
+                  </InboxHistoryButton>
                 )}
             </>
           </div>
@@ -3416,14 +3411,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 */}
                 {messagesHasMore && (chatDetail.messages?.length ?? 0) > 0 && (
                   <div className="flex justify-center pb-1">
-                    <Button variant="text" busy={loadingOlderMessages} busyLabel="読み込み中..."
-                      type="button"
+                    <InboxHistoryButton context="thread" busy={loadingOlderMessages}
                       onClick={() => { void loadOlderMessages() }}
-                      disabled={loadingOlderMessages}
-                      className="bg-canvas/90 rounded-pill px-3 py-1 text-xs font-semibold text-action shadow-card disabled:opacity-50"
                     >
                       前のメッセージ
-                    </Button>
+                    </InboxHistoryButton>
                   </div>
                 )}
                 {(!chatDetail.messages || chatDetail.messages.length === 0) ? (

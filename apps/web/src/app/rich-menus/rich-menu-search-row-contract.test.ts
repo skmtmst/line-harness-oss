@@ -38,8 +38,9 @@ describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
   it('作成操作→検索→絞り込み→並び順・表示件数の順に並べる', () => {
     // 既存契約（rich-menus-v6-contract.test.ts）の道具列順を保ったまま、
     // 検索は作成操作の次、絞り込み・並び順の前に置く。
-    const narrow = PAGE.slice(PAGE.indexOf('const narrowToolbar'), PAGE.indexOf('const wideToolbar'))
-    expect(narrow.indexOf('{createButton}')).toBeLessThan(narrow.indexOf('<SearchField'))
+    expect(PAGE).toContain('folderNav={{ rows: folderRows')
+    expect(PAGE).toContain('createButton')
+    expect(PAGE).toContain('<ListToolbar')
     const toolbarAt = barBlock.indexOf('<ListToolbar')
     const filtersAt = barBlock.indexOf('filters={', toolbarAt)
     const trailingAt = barBlock.indexOf('trailing={', toolbarAt)

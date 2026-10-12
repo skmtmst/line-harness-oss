@@ -210,6 +210,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
     setSaving(true)
     setSaveError(null)
     let settingsSaved = false
+    const completedSteps: string[] = []
+    const remainingSteps = ['予約のルール']
     try {
       const payload = {
         timeZone: draft.timeZone.trim(),
@@ -234,6 +236,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       completedRules.current = { accountId, payload: payloadKey, settings: response.data }
       setDraft(response.data)
       settingsSaved = true
+      completedSteps.push('予約のルール')
+      remainingSteps[0] = '残った担当の設定'
       /* 「指名なし」の切替は全スタッフの is_designation_optional を揃える。 */
       if (noAssign !== null && noAssign !== initialNoAssign) {
         const targets = staff.filter((person) => person.is_active && (savedStaff.current.get(person.id) ?? Boolean(person.is_designation_optional)) !== noAssign)
@@ -243,6 +247,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           if (!updated.ok) throw new Error('担当の設定を保存できませんでした')
           if (!alive()) return
           savedStaff.current.set(person.id, noAssign)
+          completedSteps.push(person.display_name)
         }
       }
       if (!alive()) return
@@ -255,7 +260,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       if (noAssign !== null && noAssign !== initialNoAssign) onReload()
     } catch (cause) {
       if (!alive()) return
-      feedback.failure(bookingRulesErrorMessage(cause, '保存'), settingsSaved ? ['予約のルール', ...[...savedStaff.current.keys()].map(id => staff.find(person => person.id === id)?.display_name ?? '更新済みの担当')] : [], settingsSaved ? ['残った担当の設定'] : ['予約のルール'])
+      feedback.failure(bookingRulesErrorMessage(cause, '保存'), completedSteps, remainingSteps)
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
@@ -296,7 +301,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Rules">
-      <SaveFeedback state={feedback.state} onRetry={submit} />
+      <SaveFeedback state={feedback.state} onRetry={saveError?.includes('先に保存') ? () => { feedback.reset(); onReload() } : submit} retryLabel={saveError?.includes('先に保存') ? '最新の内容を読み直す' : undefined} />
       {/* 閲覧のみ：選ぶ部品・つまみは置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */}
       <div className="contents">
         <section className={styles.section}>

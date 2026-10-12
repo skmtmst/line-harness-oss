@@ -23,3 +23,11 @@ it('認証画面の見出し段と、フォーカス先のIDを共通部品で�
   title.focus()
   expect(document.activeElement).toBe(title)
 })
+
+it('短い言葉の説明は最初から本文へ広げず、画面全体の説明と別に開く', () => {
+  const { container } = render(<PageHeading title="一覧" help="短い言葉の意味" explanation="画面全体の説明" />)
+  expect(container.querySelector('[data-screen-explanation]')?.textContent).toBe('画面全体の説明')
+  expect(container.textContent).not.toContain('短い言葉の意味')
+  fireEvent.click(screen.getByRole('button', { name: '一覧の説明' }))
+  expect(screen.getByRole('note').textContent).toContain('短い言葉の意味')
+})

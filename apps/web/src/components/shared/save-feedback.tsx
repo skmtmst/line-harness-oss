@@ -29,11 +29,11 @@ export function useSaveFeedback() {
   return { state, begin, success, failure, reset, busy: state.kind === 'saving' }
 }
 
-export default function SaveFeedback({ state, onRetry, retryDisabled = false }: { state: SaveFeedbackState; onRetry: () => void | Promise<void>; retryDisabled?: boolean }) {
+export default function SaveFeedback({ state, onRetry, retryDisabled = false, retryLabel }: { state: SaveFeedbackState; onRetry: () => void | Promise<void>; retryDisabled?: boolean; retryLabel?: string }) {
   if (state.kind === 'idle' || state.kind === 'saving') return null
   if (state.kind === 'success') return <Notice tone="success" role="status" data-save-state="success">{state.subject}を保存しました。</Notice>
   return <Notice tone={state.kind === 'partial' ? 'warn' : 'danger'} role="alert" data-save-state={state.kind}
-    action={<Button onClick={onRetry} disabled={retryDisabled} busyLabel="保存しています…">{state.kind === 'partial' ? '残りだけもう一度' : 'もう一度保存する'}</Button>}>
+    action={<Button onClick={onRetry} disabled={retryDisabled} busyLabel="保存しています…">{retryLabel ?? (state.kind === 'partial' ? '残りだけもう一度' : 'もう一度保存する')}</Button>}>
     {state.kind === 'partial' ? <><p>{`できた分：${state.completed.join('・')}`}</p><p>{`残り：${state.remaining.join('・')}`}</p></> : null}
     <p>{state.reason}</p><p>入力は残っています。</p>
   </Notice>

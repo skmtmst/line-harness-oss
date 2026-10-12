@@ -720,12 +720,15 @@
             "apps/web/src/components/shared/pagination.module.css",
             "apps/web/src/components/ui/page-size-select.tsx",
             "apps/web/src/components/ui/list-range.tsx",
-            "apps/web/src/components/shared/page-size-select.tsx"
+            "apps/web/src/components/shared/page-size-select.tsx",
+            "apps/web/src/components/shared/inbox-list.tsx",
+            "apps/web/src/components/shared/inbox-list.module.css"
           ],
           "components": [
             "Pagination",
             "PageSizeSelect",
-            "ListPagePagination"
+            "ListPagePagination",
+            "InboxHistoryButton"
           ],
           "vars": []
         },
@@ -3064,7 +3067,8 @@
             "InboxFilterControls",
             "InboxMessage",
             "InboxMessageDay",
-            "InboxQuotedMessage"
+            "InboxQuotedMessage",
+            "InboxHistoryButton"
           ],
           "vars": []
         },

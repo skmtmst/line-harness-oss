@@ -178,7 +178,7 @@ describe('R280 成果地点の操作メニューは1つだけ', () => {
   it('クリックで詳細が開く', async () => {
     await mount()
     await click(moreButtons()[0])
-    await click(byText('中身を見る'))
+    await click(byText('成果地点の詳細を見る'))
     // 詳細の窓が開いた（閉じる×と成果地点の数え方が見える）。
     expect(document.body.querySelector('button[aria-label="閉じる"]')).toBeTruthy()
     expect(document.body.textContent).toContain('この成果地点の数え方と利用状況です。')
@@ -221,7 +221,7 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
       expect(byText('編集する')).toBeUndefined()
       expect(byText('止める')).toBeUndefined()
       expect(byText('使う場所を足す')).toBeUndefined()
-      await click(byText('中身を見る'))
+      await click(byText('成果地点の詳細を見る'))
       expect(byText('編集')).toBeUndefined()
       expect(byText('停止・削除する')).toBeUndefined()
       expect(byText('鍵を発行する')).toBeUndefined()

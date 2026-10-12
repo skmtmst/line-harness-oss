@@ -104,11 +104,11 @@ describe('V8 ウェビナー一覧', () => {
       return originalFetch(input, init)
     })
     await render()
-    const help = buttonByLabel('ウェビナーの説明')!
+    const help = host.querySelector<HTMLButtonElement>('[data-screen-explanation-toggle]')!
     const viewers = [...host.querySelectorAll('[data-kpi-presentation]')].find(card => card.querySelector('[data-kpi-label]')?.textContent?.includes('視聴'))
     expect(viewers?.textContent).toContain('—')
     await act(async () => help.click())
-    const note = document.querySelector('[role="note"]')!
+    const note = document.querySelector('[data-screen-explanation]')!
     expect(note.textContent?.match(/視聴区間の記録をまだ集計できないため/g)).toHaveLength(1)
     expect(note.textContent).not.toContain('視聴人数:')
   })

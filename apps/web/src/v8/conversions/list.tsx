@@ -889,7 +889,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
 
   const wideToolbar = (
-    <div className={`${styles.wideTools} ${role !== null && !canEdit ? styles.viewerTools : ''}`}>
+    <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>
 
       <ListToolbar
         search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 160, value: query, onChange: setQuery }}

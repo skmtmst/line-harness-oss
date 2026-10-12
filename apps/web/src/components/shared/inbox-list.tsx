@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+import Button from './button'
 import type { HTMLAttributes } from 'react'
 import styles from './inbox-list.module.css'
 
@@ -7,3 +9,8 @@ export function InboxListHeader(props: HTMLAttributes<HTMLElement>) { return <se
 export function InboxListHeadline(props: PartProps) { return <div {...props} className={styles.headline} /> }
 export function InboxListSearch(props: PartProps) { return <div {...props} className={styles.search} /> }
 export function InboxFilterControls(props: PartProps) { return <div {...props} className={styles.filters} /> }
+
+/** 会話・メール・古い本文の取得は画面が持ち、続きを読む操作の形は共通で持つ。 */
+export function InboxHistoryButton({ context, busy, onClick, children }: { context: 'list' | 'thread'; busy: boolean; onClick: () => void; children: ReactNode }) {
+  return <Button variant="text" type="button" busy={busy} busyLabel="読み込み中..." disabled={busy} onClick={onClick} className={context === 'list' ? styles.loadMore : styles.olderMessages}>{children}</Button>
+}

@@ -950,7 +950,7 @@
 <a id="screen-explanation"></a>
 ## screen-explanation この画面の説明（B-245）
 
-- **持ち主**：`shared/screen-explanation.tsx`・CSS、型のPageHeading（一覧・作る・詳細・設定・分析から共通に使う）。画面はhelpと必要ならexplanationKeyだけを渡す。
+- **持ち主**：`shared/screen-explanation.tsx`・CSS、型のPageHeading（一覧・作る・詳細・設定・分析から共通に使う）。画面全体の説明はexplanation、短い言葉の説明はhelp、必要ならexplanationKeyを渡す。
 - **形と動き**：題の横に青い文字と矢印、下に灰色・角8・12pxの文。初回は開き、担当者IDと画面・タブごとに開閉を保存。今だけの知らせと危ない操作の確認は残す。
 - **Pen**：B-245採用見本pkrzG。部品IDと合格の記録は司令塔。
 - **見張り**：`b244-behavior.test.tsx`、`page-heading-rules.test.tsx`、verify:design。
@@ -976,3 +976,5 @@
 - **持ち主**：`shared/aggregation-status.tsx`。未集計・集計中・失敗・完成、開始時刻・データの時点と再試行。ファネル・クロス分析・成果レポートは状態と実行の口だけを渡す。
 - **見張り**：共通動作試験、分析の404と同時開始の試験。データの時点が無い応答は未取得と表示し、時刻を捏造しない。
 - **Pen**：B-247採用見本ggPZt。共通部品IDと合格の記録は司令塔。
+
+受信箱の取得カーソルによる続きの操作は `shared/inbox-list` の `InboxHistoryButton` が形を持つ。会話・メール・古い本文の取得処理は画面に残し、ページ数が返らない履歴に全ページ数を作らない。画面から色・文字・影を上書きしない。
