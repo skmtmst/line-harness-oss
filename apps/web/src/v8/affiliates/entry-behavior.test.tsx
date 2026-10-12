@@ -122,6 +122,21 @@ describe('承認待ちの読み込み（WEB003）', () => {
 })
 
 describe('アフィリエイターを作る（今の入口 /affiliates/new）', () => {
+  beforeEach(() => { fixture.role = 'owner' })
+
+  it.each([null, 'staff', 'viewer'])('作る入口でも役割%sには保存と友だちの変更を出さない', role => {
+    fixture.role = role
+    render(<NewAffiliatePage />)
+    expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /登録して紹介リンクを発行する/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'LINE の友だちと結びつける' })).toBeNull()
+    expect(document.body.textContent).toContain('閲覧のみで見ています')
+    expect(screen.getByRole('textbox', { name: /名前（表示名）/ })).toHaveProperty('readOnly', true)
+    expect(screen.getByRole('checkbox', { name: 'すぐに計測を始める' })).toHaveProperty('disabled', true)
+    expect(create).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   const fillName = (value: string) => fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value } })
   const fillCode = (value: string) => fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value } })
 

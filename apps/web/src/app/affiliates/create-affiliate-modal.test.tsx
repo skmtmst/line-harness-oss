@@ -14,6 +14,7 @@ vi.mock('@/lib/api', async original => ({
 vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'line-acc-stg-nen', selectedAccount: { id: 'line-acc-stg-nen', name: '本店' } }) }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 const { default: CreateAffiliateV8 } = await import('@/v8/affiliates/create')
 const { ApiError } = await import('@/lib/api')
 const { affiliateNavigation } = await import('@/test-utils/affiliate-navigation-mock')
