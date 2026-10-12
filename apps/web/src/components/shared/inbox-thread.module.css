@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .day {
   margin: 0 0 var(--tpl-inbox-thread-gap);
   color: var(--color-ink-faint);
@@ -70,3 +72,4 @@
 .senderFace { background: var(--polish-status-info-dot); color: var(--color-on-action); }
 .senderBot { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
 .senderBot svg { width: var(--tpl-inbox-menu-search-icon); height: var(--tpl-inbox-menu-search-icon); }
+}
