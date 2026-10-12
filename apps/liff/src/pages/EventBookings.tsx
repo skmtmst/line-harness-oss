@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
@@ -64,24 +64,27 @@ export default function EventBookings() {
   // 混ぜると失敗を「予約0件」と言ってしまう。
   const [loadFailed, setLoadFailed] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setLoadFailed(false);
     setActionError(null);
     try {
       const res = await api.myEventBookings(tab);
-      setItems(res.items);
+      if (generation === requestGeneration.current) setItems(res.items);
     } catch (e) {
       logFailure('event-bookings', e);
-      setLoadFailed(true);
+      if (generation === requestGeneration.current) setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }, [tab]);
 
   useEffect(() => {
     void refresh();
+    return () => { requestGeneration.current++; };
   }, [refresh]);
 
   // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm()` は使わず、

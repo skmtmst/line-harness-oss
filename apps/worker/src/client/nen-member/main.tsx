@@ -1,6 +1,9 @@
 import { jstCalendar, jstDate } from '@line-crm/shared';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
+import LoadingView from '../../../../liff/src/components/LoadingView.js';
+import '../../../../liff/src/embedded.css';
 import './styles.css';
 
 type Ctx = { liffId: string; lineUserId: string; idToken: string };
@@ -493,10 +496,27 @@ function HealthSummaryView({ ctx, pet, onBack }: { ctx: Ctx; pet: Pet; onBack: (
 function HealthDiary({ ctx, pets }: { ctx: Ctx; pets: Pet[] }) {
   const [petId, setPetId] = useState(pets[0]?.id || ''); const [logs, setLogs] = useState<HealthLog[]>([]); const [keyName, setKeyName] = useState<HealthKey>('weight'); const [period, setPeriod] = useState<HealthPeriod>('week'); const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'diary' | 'record' | 'summary'>('diary'); const [showAll, setShowAll] = useState(false);
-  const loadLogs = useCallback(async () => { setLoading(true); try { const response = await call<{ data: HealthLog[] }>(ctx, '/api/liff/nen/health-logs'); setLogs(response.data); } finally { setLoading(false); } }, [ctx]);
-  useEffect(() => { void loadLogs(); }, [loadLogs]);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const requestGeneration = useRef(0);
+  const loadLogs = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const response = await call<{ data: HealthLog[] }>(ctx, '/api/liff/nen/health-logs');
+      if (!Array.isArray(response.data)) throw new Error('履歴の応答がありません');
+      if (generation === requestGeneration.current) setLogs(response.data);
+    } catch {
+      if (generation === requestGeneration.current) setLoadFailed(true);
+    } finally {
+      if (generation === requestGeneration.current) setLoading(false);
+    }
+  }, [ctx]);
+  useEffect(() => { void loadLogs(); return () => { requestGeneration.current++; }; }, [loadLogs]);
   useEffect(() => { if (!pets.some(pet => pet.id === petId)) setPetId(pets[0]?.id || ''); }, [pets, petId]);
   if (!pets.length) return <section className="nm-stack nm-home-stack nm-v6-health"><div className="nm-v6-heading"><span>HEALTH DIARY</span><h2>健康日記</h2><p>なるべく早く愛犬愛猫の異変に気付くためには、ご家庭での健康管理が大切です。</p></div><Notice>先にマイペットを登録してください。</Notice></section>;
+  if (loadFailed) return <LoadErrorView note="これまでの記録はなくなっていません。" onRetry={() => void loadLogs()} />;
+  if (loading) return <LoadingView label="記録を読み込んでいます" />;
   const pet = pets.find(item => item.id === petId) || pets[0]; const petLogs = logs.filter(log => log.pet_id === pet.id);
   if (view === 'record') return <section className="nm-stack nm-home-stack nm-v6-edit nm-v6-record-page"><button className="nm-back" type="button" onClick={() => setView('diary')}>← 健康日記へ戻る</button>
     <div className="nm-v6-heading-row"><div className="nm-v6-heading"><span>DAILY RECORD</span><h2>{petLabel(pet)}の今日を記録</h2></div>{pets.length > 1 && <select className="nm-v6-pet-select" aria-label="記録するペット" value={pet.id} onChange={e => setPetId(e.target.value)}>{pets.map(item => <option key={item.id} value={item.id}>{petLabel(item)}</option>)}</select>}</div>

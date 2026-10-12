@@ -794,6 +794,18 @@ describe('店舗共通の予約設定API', () => {
     expect(tooMany.status).toBe(400);
   });
 
+  test('SL-C02: 既存シフトを新規件数へ数えず、再生成しても既存時刻を変えない', async () => {
+    const { app, env } = makeApp(db);
+    sqlite.prepare(`INSERT INTO staff_shifts (id,staff_id,work_date,start_time,end_time) VALUES ('existing','staff-a','2026-09-20','10:00','17:00')`).run();
+    const request = () => app.request('/api/booking/admin/staff/staff-a/shifts/generate?account_id=account-a', {
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from_date:'2026-09-20',weeks:1,weekly_template:{sun:{start:'09:00',end:'18:00'},mon:{start:'09:00',end:'18:00'}}}),
+    },env);
+    await expect((await request()).json()).resolves.toEqual({inserted:1});
+    await expect((await request()).json()).resolves.toEqual({inserted:0});
+    expect(sqlite.prepare(`SELECT start_time,end_time FROM staff_shifts WHERE id='existing'`).get()).toEqual({start_time:'10:00',end_time:'17:00'});
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM staff_shifts WHERE staff_id='staff-a'`).get()).toEqual({count:2});
+  });
+
   test('シフト自動生成は12週を上限にし、日付と時刻を検証する', async () => {
     const { app, env } = makeApp(db);
     const request = async (body: unknown): Promise<Response> => app.request(
