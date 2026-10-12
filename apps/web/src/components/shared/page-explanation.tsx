@@ -50,7 +50,7 @@ export function PageExplanationToggle() {
   </button>
 }
 
-export function PageExplanationBody({ children, keepMounted = false }: { children: ReactNode; keepMounted?: boolean }) {
+export function PageExplanationBody({ children, keepMounted = false, inset }: { children: ReactNode; keepMounted?: boolean; inset?: 'notice' }) {
   const { open, bodyId, toggleId } = useExplanation()
-  return open || keepMounted ? <div hidden={!open} data-screen-explanation className={styles.body} id={bodyId} role="region" aria-labelledby={toggleId}>{children}</div> : null
+  return open || keepMounted ? <div hidden={!open} data-screen-explanation className={styles.body} data-explanation-inset={inset} id={bodyId} role="region" aria-labelledby={toggleId}>{children}</div> : null
 }

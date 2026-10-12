@@ -262,7 +262,7 @@ export default function HqBroadcastList() {
   }
 
   const toolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />

@@ -458,3 +458,9 @@
 :global(:root) .frame[data-height-mode='content'][data-page-template='settings']:not(:has([data-shared-part='sticky-bar'])) .settingsContent { padding-bottom: 0; }
 /* 申込者の数の帯も、本文と同じ左右24・上16。 */
 :global(:root) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }
+
+/* 閉じた説明の器は、道具の前に空の段を残さない。 */
+:global(:root) .explanation:has(> [hidden]) { display: none; }
+
+/* 受信箱も白い板の下に24を残し、本文だけを送る。 */
+:global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }

@@ -57,6 +57,7 @@ import { describeFriendAddFailure } from './failure';
 import { addTimeWindow, friendAddFlowSteps, friendAddReaddLines, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow';
 import { resendSuppressionText } from './text';
 import styles from './editor.module.css'
+import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls';
@@ -1221,7 +1222,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           })}
         </div>
         )}
-        <div className={styles.bodyBox}>
+        <MessageBody>
           <SaveErrorField names={["messageText","definition.messageText","message_text","mine","definition.message_text"]}><InsertTextField
             ref={messageRef}
             aria-label="最初に送るメッセージ"
@@ -1231,24 +1232,10 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             readOnly={!canEdit}
             onValueChange={(next) => setDefinition((current) => ({ ...current, messageText: next }))}
           /></SaveErrorField>
-          <div className={styles.insertRow}>
-            {/* 閲覧のみ：差し込むボタンは置かない（文字数だけ見せる）。 */}
-            {canEdit ? (<>
-              <span className={styles.insertLabel}>差し込む</span>
-              <Button type="button" variant="text" onClick={() => insertToken('{{name}}')}>
-                <User size={15} aria-hidden="true" />名前
-              </Button>
-              <Button type="button" variant="text" disabled title="友だち情報の欄を選ぶ口はこの版にありません">
-                <IdCard size={15} aria-hidden="true" />友だち情報
-              </Button>
-              <Button type="button" variant="text" disabled title="共通情報の値を選ぶ口はこの版にありません">
-                <Braces size={15} aria-hidden="true" />共通情報
-              </Button>
-            </>) : null}
-            <span className={styles.spacer} aria-hidden="true" />
-            <span className={styles.charCount}>{`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}</span>
-          </div>
-        </div>
+          <MessageInsertRow count={`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}>
+            {canEdit ? <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} /> : null}
+          </MessageInsertRow>
+        </MessageBody>
         {scenarioError && canEdit ? (
           <div className={styles.field}>
             <span className={styles.label}>実際に配信するシナリオ</span>

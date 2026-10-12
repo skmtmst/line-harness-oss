@@ -239,3 +239,8 @@
 html:root :global([data-template-region='toolbar']):has(> div > :is([data-design-part='notice'], [role='status'], [role='alert'])):has(> .slots > .toolbar) {
   row-gap: var(--polish-space-card);
 }
+
+/* 2段の型では、各段が道具の幅を持つ。display:contentsで段の外へ出さない。 */
+@container v8-page (max-width: 1099px) {
+:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; flex-wrap: wrap; width: 100%; }
+}

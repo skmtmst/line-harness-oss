@@ -3043,7 +3043,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-rest1-restaurant-dashboard-dashboard-font-size-2: 15px;
   --tpl-rest1-restaurant-dashboard-dashboard-line-height-2: 23px;
   --tpl-rest1-restaurant-dashboard-dashboard-gap-2: 12px;
-  --tpl-rest1-restaurant-booking-kit-shell-width-1: 142px;
+  --tpl-rest1-restaurant-booking-kit-shell-width-1: 182px;
   --tpl-rest1-restaurant-booking-kit-shell-flex-1: 0 0 142px;
   --tpl-rest1-restaurant-booking-kit-shell-padding-1: 0 24px 20px;
 }

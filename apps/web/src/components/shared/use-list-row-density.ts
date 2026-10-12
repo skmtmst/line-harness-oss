@@ -16,7 +16,7 @@ export function useListRowDensity(ref: RefObject<HTMLElement | null>) {
       frame = view.requestAnimationFrame(() => {
         const list = table.closest('[data-list-skeleton], [data-page-template="list"]')
           || table.dataset.tablePresentation === 'template-list'
-        const dedicated = table.dataset.tablePresentation && table.dataset.tablePresentation !== 'template-list'
+        const dedicated = table.dataset.tablePresentation && !['template-list', 'event-list'].includes(table.dataset.tablePresentation)
           || table.dataset.tableDensity || table.dataset.density
         const generalCard = table.closest('[data-design-part="card"]') && !dedicated
           && !table.hasAttribute('data-column-layout') && !table.hasAttribute('data-grid-table')

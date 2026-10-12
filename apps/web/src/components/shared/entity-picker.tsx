@@ -451,12 +451,12 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
       {empty ? <span className={styles.fieldPlaceholder}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
-        <TagPill name={name} color={color} aria-label={`選択中の${noun}：${name}`} />
+        <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size="sm" name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
     {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
-    {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty ? actionLabel : null}<ChevronRight size={16} /></span>}
+    {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix ? actionLabel : null}<ChevronRight size={16} /></span>}
   </div>
 }
 
