@@ -112,7 +112,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, children }: {
+export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -140,6 +140,8 @@ export default function RestaurantShell({ boardId, title, description, query, he
   boundary?: boolean
   /** 板の頭の大きさ。compact は E 系の板（題 20・説明の行 20）。 */
   templateHeading?: boolean
+  /** 既存の頭の内側余白。頭を持つ器の中では none を渡す。 */
+  headingInset?: 'none'
   headSize?: 'compact'
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
@@ -243,7 +245,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <PageHeading title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
+          <PageHeading inset={headingInset} title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
 
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
