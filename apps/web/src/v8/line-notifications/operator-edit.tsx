@@ -500,9 +500,9 @@ function OperatorEditInner() {
 
               <FormSection variant="aside" id="operator-links-heading" title="つながる先">
                 <p className={styles.linkRow}>
-                  <TextLink href="/chats">→ 受信箱</TextLink>
-                  <TextLink href="/staff">→ ログインユーザー</TextLink>
-                  <TextLink href="/line-notifications">→ 顧客へのお知らせ</TextLink>
+                  <TextLink href="/chats">受信箱</TextLink>
+                  <TextLink href="/staff">ログインユーザー</TextLink>
+                  <TextLink href="/line-notifications">顧客へのお知らせ</TextLink>
                 </p>
               </FormSection>
             </>}
