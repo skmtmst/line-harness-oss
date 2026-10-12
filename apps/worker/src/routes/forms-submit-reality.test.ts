@@ -305,9 +305,12 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const secondRes = settledSecond === 'TIMEOUT' ? await second : settledSecond;
 
     const statuses = [firstRes.status, secondRes.status];
-    expect(statuses).toContain(201);
+    // 落ちたときにどちらが何で断られたのか分かるよう、応答の中身まで出す。
+    const bodies = [await firstRes.clone().text(), await secondRes.clone().text()];
+    const detail = `statuses=${JSON.stringify(statuses)} bodies=${JSON.stringify(bodies)}`;
+    expect(statuses, detail).toContain(201);
     const other = statuses.find((status) => status !== 201);
-    expect(other === 200 || other === 429).toBe(true);
+    expect(other === 200 || other === 429, detail).toBe(true);
 
     // 実DBで数える。外部への呼び出しは勝った側の1回だけ。
     expect(count('form_submissions')).toBe(1);
@@ -327,6 +330,39 @@ describe('フォーム回答の冪等化(実DB)', () => {
     ).get(KEY) as { tenant_id: string; line_account_id: string; status: string };
     expect(claim.tenant_id).toBe('tenant-1');
     expect(claim.line_account_id).toBe('account-a');
+  });
+
+  // 送信の口は本文を二度読まない。手前の検査済みを使う経路と、
+  // 手前を通らない（本文なし）経路の両方で、断り方が変わっていないことを見る。
+  test('本文が無い・壊れている送信は本文を二度読まずに400で断る', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer user-1',
+      'Idempotency-Key': KEY,
+    };
+    const url = 'https://worker.example.test/api/forms/form-webhook/submit';
+
+    // 本文なし：手前の口は素通りし、ルート側の読み取りで断る。
+    const empty = await app().fetch(new Request(url, { method: 'POST', headers }), env());
+    expect(empty.status).toBe(400);
+
+    // 壊れたJSON：手前の口が符号つきで断る。
+    const broken = await app().fetch(
+      new Request(url, { method: 'POST', headers, body: '{"data":' }),
+      env(),
+    );
+    expect(broken.status).toBe(400);
+    expect((await broken.json() as { code?: string }).code).toBe('INVALID_JSON');
+
+    // どちらも回答を作らず、外部への送信もしない。
+    expect(count('form_submissions')).toBe(0);
+    expect(count('form_submit_claims')).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(pushCalls.length).toBe(0);
   });
 
   test('成功後のDB失敗は500にし、同じキーで再開して補完する', async () => {

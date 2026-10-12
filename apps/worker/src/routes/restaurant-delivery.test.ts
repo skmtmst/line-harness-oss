@@ -339,8 +339,13 @@ beforeEach(() => {
     LINE_LOGIN_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_SECRET: 'unused',
     WORKER_URL: 'https://worker.example.test',
+    // 戻り先URLはこの配備の設定から組み立てる。呼び出し元のホストからは作らない。
+    WORKER_PUBLIC_URL: 'https://worker.example.test',
     ADMIN_PUBLIC_URL: 'https://admin.example.test',
     LINE_CREDENTIAL_ENCRYPTION_KEY: ENC_KEY,
+    // 本物の値ではない。試験の中だけで使う作り物。
+    RT_DELIVERY_UBEREATS_CLIENT_ID: 'test-client-id',
+    RT_DELIVERY_UBEREATS_CLIENT_SECRET: 'test-client-secret',
     RT_DELIVERY_SEND_ENABLED: 'true',
     RT_DELIVERY_UBEREATS_API_BASE_URL: 'https://ubereats.example.test',
     RT_DELIVERY_UBEREATS_API_TOKEN: 'ubereats-token',
@@ -927,5 +932,377 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     const services = await servicesFromOrders();
     expect(services.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('open');
     expect(deliveryCalls).toHaveLength(0);
+  });
+});
+
+describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', () => {
+  const START_PATH = '/api/restaurant-test/delivery/ubereats/connect/start';
+  const CALLBACK_PATH = '/api/restaurant-test/delivery/ubereats/oauth/callback';
+  /** 認可画面から戻ってきた作り物の応答。本物のトークンではない。 */
+  const FAKE_ACCESS_TOKEN = 'fake-user-access-token';
+
+  function stateRows(): Array<Record<string, unknown>> {
+    return testDb.raw
+      .prepare('SELECT * FROM rt_delivery_uber_oauth_states ORDER BY created_at, state')
+      .all() as Array<Record<string, unknown>>;
+  }
+
+  function connectionRows(): Array<Record<string, unknown>> {
+    return testDb.raw.prepare('SELECT * FROM rt_delivery_uber_connections ORDER BY store_id').all() as Array<
+      Record<string, unknown>
+    >;
+  }
+
+  function seedState(overrides: Record<string, unknown> = {}): string {
+    const row = {
+      state: 'state-1',
+      account_id: 'account-2',
+      store_id: 'store-shibuya',
+      staff_id: 'owner-1',
+      mode: 'connect',
+      expires_at: NOW.getTime() + 600_000,
+      used_at: null,
+      created_at: NOW.getTime(),
+      ...overrides,
+    };
+    testDb.raw
+      .prepare(
+        `INSERT INTO rt_delivery_uber_oauth_states
+           (state, account_id, store_id, staff_id, mode, expires_at, used_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.state,
+        row.account_id,
+        row.store_id,
+        row.staff_id,
+        row.mode,
+        row.expires_at,
+        row.used_at,
+        row.created_at,
+      );
+    return row.state as string;
+  }
+
+  function seedConnection(overrides: Record<string, unknown> = {}): void {
+    const row = {
+      store_id: 'store-shibuya',
+      account_id: 'account-2',
+      status: 'connected',
+      ...overrides,
+    };
+    testDb.raw
+      .prepare(
+        `INSERT INTO rt_delivery_uber_connections
+           (store_id, account_id, status, version, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)`,
+      )
+      .run(row.store_id, row.account_id, row.status, NOW.getTime(), NOW.getTime());
+  }
+
+  /**
+   * 戻り先の受け口は統括の指定を付けずに呼ぶ。
+   * call() は必ず account_id を足してしまうので、ここでは直接組み立てる。
+   */
+  async function callback(
+    query: Record<string, string>,
+    init: { token?: string; cookie?: string } = {},
+  ): Promise<Response> {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${ADMIN_SESSION_BEARER_PREFIX}${init.token ?? 'owner-session'}`,
+    };
+    if (init.cookie !== undefined) headers.Cookie = `lh_uber_state=${init.cookie}`;
+    const search = new URLSearchParams(query).toString();
+    return await app().request(`${CALLBACK_PATH}?${search}`, { method: 'GET', headers }, env);
+  }
+
+  /** 戻り先URLの ubereats= に入った符号。 */
+  function resultCodeOf(response: Response): string | null {
+    const location = response.headers.get('location');
+    expect(location).not.toBeNull();
+    return new URL(location!).searchParams.get('ubereats');
+  }
+
+  /** 認可の符号をトークンに替える口の作り物。許された権限まで含めて返す。 */
+  function stubTokenEndpoint(
+    payload: Record<string, unknown> = {
+      access_token: FAKE_ACCESS_TOKEN,
+      scope: 'eats.pos_provisioning',
+      expires_in: 2_592_000,
+      refresh_token: '',
+    },
+    status = 200,
+  ): Array<{ url: string; body: string }> {
+    const calls: Array<{ url: string; body: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), body: String(init?.body ?? '') });
+        return new Response(JSON.stringify(payload), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    return calls;
+  }
+
+  it('IDとSecretが無い環境では認可の入口を開けない（受入条件5）', async () => {
+    delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_ID;
+    delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_SECRET;
+
+    const res = await call(START_PATH, { body: {} });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ success: false, code: 'oauth_not_configured' });
+    expect(stateRows()).toHaveLength(0);
+  });
+
+  it('認可の入口は配備の設定から戻り先を組み立て、1回使い切りのstateを10分だけ残す（受入条件2・3）', async () => {
+    const res = await call(START_PATH, { body: {} });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { mode: string; authorizeUrl: string };
+    expect(body.mode).toBe('connect');
+
+    const authorize = new URL(body.authorizeUrl);
+    expect(authorize.origin + authorize.pathname).toBe('https://auth.uber.com/oauth/v2/authorize');
+    expect(authorize.searchParams.get('client_id')).toBe('test-client-id');
+    expect(authorize.searchParams.get('response_type')).toBe('code');
+    expect(authorize.searchParams.get('scope')).toBe('eats.pos_provisioning');
+    // 呼び出し元のホストではなく WORKER_PUBLIC_URL から作る。
+    expect(authorize.searchParams.get('redirect_uri')).toBe(
+      'https://worker.example.test/api/restaurant-test/delivery/ubereats/oauth/callback',
+    );
+
+    const rows = stateRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      state: authorize.searchParams.get('state'),
+      account_id: 'account-2',
+      store_id: 'store-shibuya',
+      staff_id: 'owner-1',
+      mode: 'connect',
+      expires_at: NOW.getTime() + 600_000,
+      used_at: null,
+    });
+    expect(String(rows[0].state).length).toBeGreaterThanOrEqual(32);
+
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain('lh_uber_state=');
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).toContain('Max-Age=600');
+  });
+
+  it('つながっている店舗からの開始は「つなぎ直し」になる（受入条件3）', async () => {
+    seedConnection({ status: 'connected' });
+    const res = await call(START_PATH, { body: {} });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ mode: 'reconnect' });
+    expect(stateRows()[0]).toMatchObject({ mode: 'reconnect' });
+  });
+
+  it('担当者の権限では認可の入口を開けない（受入条件3）', async () => {
+    useStaffRole('staff');
+    const res = await call(START_PATH, { body: {}, token: 'staff-session' });
+    expect(res.status).toBe(403);
+    expect(stateRows()).toHaveLength(0);
+  });
+
+  it('知らないstateでは接続せず、接続情報も作らない（受入条件4）', async () => {
+    const calls = stubTokenEndpoint();
+    const res = await callback({ state: 'unknown-state', code: 'auth-code' });
+    expect(res.status).toBe(302);
+    expect(resultCodeOf(res)).toBe('error:invalid_state');
+    expect(connectionRows()).toHaveLength(0);
+    // 符号の交換そのものを試さない。
+    expect(calls).toHaveLength(0);
+  });
+
+  it('10分を過ぎたstateでは接続しない（受入条件2・4）', async () => {
+    const state = seedState();
+    vi.setSystemTime(new Date(NOW.getTime() + 11 * 60 * 1000));
+    const calls = stubTokenEndpoint();
+
+    const res = await callback({ state, code: 'auth-code' });
+    expect(resultCodeOf(res)).toBe('error:invalid_state');
+    expect(connectionRows()).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('一度使ったstateは二度目では接続しない（受入条件2・4）', async () => {
+    const state = seedState({ used_at: NOW.getTime() });
+    const calls = stubTokenEndpoint();
+
+    const res = await callback({ state, code: 'auth-code' });
+    expect(resultCodeOf(res)).toBe('error:invalid_state');
+    expect(connectionRows()).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  /**
+   * 「読んだ時はまだ未使用、更新しようとしたら既に使われていた」並びを作る。
+   * 同じstateのcallbackが2つ同時に来たときの、負けた側の経路そのもの。
+   */
+  function markUsedByOtherCallbackRightAfterRead(): void {
+    const real = env.DB;
+    (env as Record<string, unknown>).DB = {
+      ...real,
+      prepare: (sql: string) => {
+        const statement = real.prepare(sql);
+        if (!/FROM rt_delivery_uber_oauth_states/i.test(sql)) return statement;
+        return {
+          ...statement,
+          bind: (...args: unknown[]) => {
+            const bound = statement.bind(...args);
+            return {
+              ...bound,
+              first: async () => {
+                const row = await bound.first();
+                // ここで、もう一方のcallbackが先に使い切る。
+                testDb.raw
+                  .prepare('UPDATE rt_delivery_uber_oauth_states SET used_at = ? WHERE used_at IS NULL')
+                  .run(NOW.getTime());
+                return row;
+              },
+            } as unknown as D1PreparedStatement;
+          },
+        } as unknown as D1PreparedStatement;
+      },
+    } as unknown as D1Database;
+  }
+
+  it('同じstateのcallbackが同時に二度来ても、接続は1件・符号の交換も1回だけ（受入条件3）', async () => {
+    const state = seedState();
+    const calls = stubTokenEndpoint();
+
+    const [first, second] = await Promise.all([
+      callback({ state, code: 'auth-code' }, { cookie: state }),
+      callback({ state, code: 'auth-code' }, { cookie: state }),
+    ]);
+
+    // どちらが先に着くかは決まらないが、通るのは必ず片方だけ。
+    expect([resultCodeOf(first), resultCodeOf(second)].sort()).toEqual([
+      'error:invalid_state',
+      'pending_store',
+    ]);
+    expect(connectionRows()).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('読み取った後に別のcallbackが使い切ったstateでは、符号の交換へ進まない（受入条件3）', async () => {
+    const state = seedState();
+    const calls = stubTokenEndpoint();
+    markUsedByOtherCallbackRightAfterRead();
+
+    const res = await callback({ state, code: 'auth-code' }, { cookie: state });
+    expect(resultCodeOf(res)).toBe('error:invalid_state');
+    expect(connectionRows()).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('別の担当者が始めたstateでは接続しない（受入条件4）', async () => {
+    useStaffRole('admin');
+    const state = seedState({ staff_id: 'admin-1' });
+    const calls = stubTokenEndpoint();
+
+    const res = await callback({ state, code: 'auth-code' });
+    expect(resultCodeOf(res)).toBe('error:invalid_state');
+    expect(connectionRows()).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('Cookieのstateが食い違うときは接続しない（受入条件4）', async () => {
+    const state = seedState();
+    const calls = stubTokenEndpoint();
+
+    const res = await callback({ state, code: 'auth-code' }, { cookie: 'state-other' });
+    expect(resultCodeOf(res)).toBe('error:invalid_state');
+    expect(connectionRows()).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('店舗が許可しなかったときは使い切ったstateを残し、接続情報は作らない（受入条件4）', async () => {
+    const state = seedState();
+    const res = await callback({ state, error: 'access_denied' });
+    expect(resultCodeOf(res)).toBe('error:denied');
+    expect(connectionRows()).toHaveLength(0);
+    expect(stateRows()[0].used_at).toBe(NOW.getTime());
+  });
+
+  it('認可が通るとトークンを暗号化して1件だけ保存する（受入条件1）', async () => {
+    const state = seedState();
+    const calls = stubTokenEndpoint();
+
+    const res = await callback({ state, code: 'auth-code' }, { cookie: state });
+    expect(res.status).toBe(302);
+    expect(resultCodeOf(res)).toBe('pending_store');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('https://auth.uber.com/oauth/v2/token');
+    expect(calls[0].body).toContain('grant_type=authorization_code');
+    expect(calls[0].body).toContain(
+      'redirect_uri=https%3A%2F%2Fworker.example.test%2Fapi%2Frestaurant-test%2Fdelivery%2Fubereats%2Foauth%2Fcallback',
+    );
+
+    const rows = connectionRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      store_id: 'store-shibuya',
+      account_id: 'account-2',
+      status: 'pending_store',
+      granted_scope: 'eats.pos_provisioning',
+      connected_by_staff_id: 'owner-1',
+      access_token_expires_at: NOW.getTime() + 2_592_000 * 1000,
+      version: 1,
+      last_error: null,
+    });
+    // 暗号化した形式だけを保存する。生のトークンはどの欄にも現れない。
+    expect(String(rows[0].access_token_enc).startsWith('v1.')).toBe(true);
+    expect(JSON.stringify(rows[0])).not.toContain(FAKE_ACCESS_TOKEN);
+    // 更新用トークンの欄は作らない。
+    expect(Object.keys(rows[0])).not.toContain('refresh_token_enc');
+    // 使い切ったstateは二度使えない。
+    expect(stateRows()[0].used_at).toBe(NOW.getTime());
+  });
+
+  it('つなぎ直しは行を増やさず、同じ店舗の1件を書き換える（受入条件1）', async () => {
+    seedConnection({ status: 'expired' });
+    const state = seedState({ mode: 'reconnect' });
+    stubTokenEndpoint();
+
+    const res = await callback({ state, code: 'auth-code' }, { cookie: state });
+    expect(resultCodeOf(res)).toBe('pending_store');
+
+    const rows = connectionRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'pending_store', version: 2 });
+  });
+
+  it('権限が足りないときは接続情報を作らず、符号だけを残す（受入条件4）', async () => {
+    const state = seedState();
+    stubTokenEndpoint({ access_token: FAKE_ACCESS_TOKEN, scope: 'eats.store', expires_in: 2_592_000 });
+
+    const res = await callback({ state, code: 'auth-code' }, { cookie: state });
+    expect(resultCodeOf(res)).toBe('error:no_permission');
+    expect(connectionRows()).toHaveLength(0);
+    // サービスからの自由文は台帳にも記録にも出さない。
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(FAKE_ACCESS_TOKEN);
+  });
+
+  it('交換に失敗したときは既にある接続に理由だけを残す（受入条件4）', async () => {
+    seedConnection({ status: 'connected' });
+    const state = seedState({ mode: 'reconnect' });
+    stubTokenEndpoint({ error: 'invalid_grant', message: PROVIDER_FREE_TEXT }, 400);
+
+    const res = await callback({ state, code: 'auth-code' }, { cookie: state });
+    expect(resultCodeOf(res)).toBe('error:auth_expired');
+
+    const rows = connectionRows();
+    expect(rows).toHaveLength(1);
+    // 状態は勝手に変えず、理由の符号だけを足す。
+    expect(rows[0]).toMatchObject({ status: 'connected', last_error: 'auth_expired' });
+    expect(JSON.stringify(rows[0])).not.toContain(PROVIDER_FREE_TEXT);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
   });
 });

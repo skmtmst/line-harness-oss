@@ -6536,6 +6536,61 @@ CREATE TABLE rt_delivery_service_states (
   CHECK (intake_status = 'stopped' OR stop_until IS NULL)
 );
 
+CREATE TABLE rt_delivery_uber_app_tokens (
+  id TEXT PRIMARY KEY,
+  access_token_enc TEXT NOT NULL,
+  access_token_expires_at INTEGER NOT NULL,
+  granted_scope TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE rt_delivery_uber_connections (
+  store_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  -- Uber 側の店舗ID。これが照合の正。外部店舗IDは変わりうるので単独の照合キーにしない。
+  uber_store_id TEXT,
+  uber_store_name TEXT,
+  external_store_id TEXT,
+  access_token_enc TEXT,
+  access_token_expires_at INTEGER,
+  -- 許された権限を空白区切りで記録する。要求と違う権限が返ったときの切り分けに使う。
+  granted_scope TEXT,
+  status TEXT NOT NULL DEFAULT 'disconnected'
+    CHECK (status IN ('pending_store', 'connected', 'expired', 'no_permission', 'disconnected')),
+  connected_by_staff_id TEXT,
+  connected_at INTEGER,
+  disconnected_at INTEGER,
+  -- POST /pos_data が通った時刻。ここが入って初めて Uber 側で連携が有効。
+  provisioned_at INTEGER,
+  last_error TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE rt_delivery_uber_oauth_states (
+  state TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('connect', 'reconnect')),
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE rt_delivery_uber_store_candidates (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  uber_store_id TEXT NOT NULL,
+  uber_store_name TEXT NOT NULL,
+  external_store_id TEXT,
+  address_text TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (store_id, uber_store_id)
+);
+
 CREATE TABLE rt_email_digests (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -10660,6 +10715,12 @@ CREATE INDEX rt_delivery_orders_store_status
 
 CREATE INDEX rt_delivery_service_states_due
   ON rt_delivery_service_states(intake_status, stop_until);
+
+CREATE INDEX rt_delivery_uber_connections_status
+  ON rt_delivery_uber_connections(status, access_token_expires_at);
+
+CREATE INDEX rt_delivery_uber_oauth_states_expires
+  ON rt_delivery_uber_oauth_states(expires_at);
 
 CREATE UNIQUE INDEX rt_departure_one_active ON rt_reservation_departures(reservation_id) WHERE undone_at IS NULL;
 
