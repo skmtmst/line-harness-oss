@@ -288,6 +288,16 @@ export type Env = {
     RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
     RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
     RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
+    /**
+     * Uber Eats のログイン連携（設定 › デリバリー連携からお店の人が自分でつなぐ経路）。
+     * Uber の開発者画面で発行された値を、環境ごとの秘密設定として入れる。
+     * 入れるのは2つだけで、戻り先URLは WORKER_PUBLIC_URL から組み立てる。
+     * 2つそろわない環境では連携の口を開けない。
+     */
+    RT_DELIVERY_UBEREATS_CLIENT_ID?: string;
+    RT_DELIVERY_UBEREATS_CLIENT_SECRET?: string;
+    /** 既定では使わない。Uber 側の登録が別の文字列のときだけ上書きとして入れる。 */
+    RT_DELIVERY_UBEREATS_REDIRECT_URI?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
