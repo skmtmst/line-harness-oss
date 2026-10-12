@@ -648,6 +648,7 @@ export async function deleteAdminSessionForStaff(
     .run();
   if ((result.meta.changes ?? 0) > 0) {
     await db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash).run();
+    await db.prepare('UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL').bind(jstNow(), staffId).run();
   }
   return (result.meta.changes ?? 0) > 0;
 }
@@ -692,6 +693,8 @@ export async function getStaffByAdminSession(
 
 export async function deleteAdminSession(db: D1Database, tokenHash: string): Promise<void> {
   await db.batch([
+    db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE ended_at IS NULL
+      AND staff_id IN (SELECT staff_id FROM admin_sessions WHERE token_hash=?)`).bind(jstNow(), tokenHash),
     db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash),
     db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash),
   ]);
@@ -711,6 +714,7 @@ export async function deleteExpiredAdminSessions(db: D1Database, now: string): P
  */
 export async function revokeStaffAuthentication(db: D1Database, staffId: string): Promise<void> {
   await db.batch([
+    db.prepare('UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL').bind(jstNow(), staffId),
     db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=?)").bind(staffId),
     db.prepare('DELETE FROM admin_sessions WHERE staff_id = ?').bind(staffId),
     db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId),

@@ -343,20 +343,31 @@ export async function getActiveImpersonation(
   staffId: string,
   sessionTokenHash?: string | null,
 ): Promise<ImpersonationSession | null> {
+  await db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL
+    AND (julianday(started_at)<=julianday('now','-1 hour') OR NOT EXISTS
+      (SELECT 1 FROM platform_settings p JOIN admin_sessions s ON s.token_hash=p.value
+        WHERE p.key='auth.impersonation.session:'||impersonation_sessions.id AND s.staff_id=impersonation_sessions.staff_id
+          AND julianday(s.expires_at)>julianday('now')))`).bind(jstNow(), staffId).run();
   return db
     .prepare(
-      `SELECT * FROM impersonation_sessions
-       WHERE staff_id = ? AND ended_at IS NULL
+      `SELECT i.*, CASE WHEN i.pii_revealed=1 AND EXISTS
+         (SELECT 1 FROM pii_reveal_logs r WHERE r.impersonation_session_id=i.id AND r.staff_id=i.staff_id
+           AND r.tenant_id=i.tenant_id AND length(trim(r.reason))>=4) THEN 1 ELSE 0 END AS pii_revealed
+       FROM impersonation_sessions i
+       WHERE staff_id = ? AND ended_at IS NULL AND julianday(started_at)>julianday('now','-1 hour')
+         AND EXISTS(SELECT 1 FROM platform_settings p JOIN admin_sessions s ON s.token_hash=p.value
+             WHERE p.key='auth.impersonation.session:'||i.id AND s.staff_id=i.staff_id AND julianday(s.expires_at)>julianday('now')
+               AND (?=1 OR p.value=?))
        ORDER BY started_at DESC LIMIT 1`,
     )
-    .bind(staffId)
+    .bind(staffId, sessionTokenHash === undefined ? 1 : 0, sessionTokenHash ?? null)
     .first<ImpersonationSession>();
 }
 
 /** 既に有効なものがあれば先に終える。運営マスター 1 人につき同時に 1 件だけ。 */
 export async function startImpersonation(
   db: D1Database,
-  input: { staffId: string; tenantId: string },
+  input: { staffId: string; tenantId: string; sessionTokenHash: string },
 ): Promise<ImpersonationSession> {
   const now = jstNow();
   await db
@@ -371,6 +382,8 @@ export async function startImpersonation(
     )
     .bind(id, input.staffId, input.tenantId, now)
     .run();
+  if (input.sessionTokenHash) await db.prepare('INSERT INTO platform_settings(key,value,updated_by,updated_at) VALUES (?,?,?,?)')
+    .bind(`auth.impersonation.session:${id}`, input.sessionTokenHash, input.staffId, now).run();
   return {
     id,
     staff_id: input.staffId,
