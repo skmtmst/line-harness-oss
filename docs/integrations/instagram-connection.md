@@ -60,22 +60,70 @@ Instagram同時投稿の接続について、**済んだこと・証拠・原因
 | 許可を押しても必ず「同時投稿の許可がありません」 | 一度与えた許可が再認可で再提示されず、`instagram_business_content_publish` が付かない | 認可の入口に `force_reauth=true` を付けた（PR #1708） |
 | ページを持たない店舗で必ず失敗 | Facebookログイン方式でページ一覧を読んでいた | Instagram直接ログイン方式へ作り直し（`4e937a8d40`） |
 
+## 済んだこと（本番の裏側・証拠つき）
+
+判断D（先に裏側だけ整える）の範囲は**すべて完了**しました。本番の画面の見た目は変えていません。
+
+| 日付 | 操作 | 結果 | 証拠 |
+| --- | --- | --- | --- |
+| 2026-10-12 | Instagramのぶんを `main` へ反映（PR #1714 のマージ） | 成功 | マージ後の `main` = `c4a9d1a879e6a3331a2faf98c638355ae52775d5`（`git rev-parse origin/main` で再確認） |
+| 2026-10-12 | `META_TOKEN_ENCRYPTION_KEY` を Worker `nen-line` へ登録 | 成功 | Codexが登録できた事実のみ報告（**値は保持・記録しない**） |
+| 2026-10-12 | 本番D1 `nen-line` へ移行 603 を適用（表の新規作成） | 成功 | 適用前にTime Travelのbookmarkを取得。`_migrations` へ記録 |
+| 2026-10-12 | 本番D1 `nen-line` へ移行 611 を適用（既存 `rt_google_posts` へ7列・`instagram_connections` へ `scopes` 1列） | 成功 | 同上。順番は 603 → 611 を守った |
+| 2026-10-12 | 本番Worker `nen-line` を `main` から配備（100%） | 成功 | Codexの読み取り確認。ハーネス記録 `verified` |
+| 2026-10-12 | `apps/worker/wrangler.toml` の `META_GRAPH_API_VERSION` / `META_REDIRECT_URI` | 本番へ反映済み | 同ファイル71〜72行目（`v24.0` / `https://api.musubo.jp/api/instagram/oauth/callback`） |
+
+**済んだ操作は繰り返しません。** 以降の確認はすべて読み取りだけで行います。
+
+### 解消した食い違い（記録）
+
+下の「本番反映で分かった2つの食い違い」のうち、2番目（`main` にInstagramのぶんが
+1つも入っていない）は PR #1714 のマージで**解消済み**です。1番目（移行611が既存表を変更する）は
+事実として残り、適用は additive-only 規約の範囲で完了しています。
+
 ## 残っていること（本番）
 
 | 項目 | 担当 | 状態 |
 | --- | --- | --- |
 | Meta側 OAuthリダイレクトURI に `https://api.musubo.jp/api/instagram/oauth/callback` を追記 | **利用者** | 未 |
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` を Worker `nen-line` へ登録 | **利用者** | 未 |
-| `META_TOKEN_ENCRYPTION_KEY` を Worker `nen-line` へ登録（新しい乱数） | Codex | 未 |
-| `apps/worker/wrangler.toml` の `META_REDIRECT_URI` / `META_GRAPH_API_VERSION` | Claude | **設定ファイルへ追加済み**・`main` 反映と配備待ち |
-| **本番ブランチ `main` へInstagramのぶんを反映**（PR） | Codex（運搬） | 未。**masatoの承認が必要**（`docs/DEPLOY-GATE.md:43`） |
-| 本番D1 `nen-line` へ移行 603 を適用（表3つ＋索引1を新規作成） | Codex | 未 |
-| 本番D1 `nen-line` へ移行 611 を適用（**既存** `rt_google_posts` へ7列・`instagram_connections` へ1列を追加） | Codex | 未 |
-| 移行611の1行目「本番には適用しない」という書き置きを現在の承認状態へ書き直す（SQLは変更しない） | Codex（`packages/db/` の所有） | 未。`main` 向けPRの中で |
-| 本番配備（**必ず移行のあと**） | Codex | 未 |
 | 本番の管理画面にSNS連携の画面が無い（V8が `main` 未反映） | 利用者のご判断 | **Dに決定（2026-10-12）**。裏側だけ先に整え、画面は検証環境のまま使う |
 | 本番の管理画面で実際につなぐ | **利用者** | **見送り**（判断D）。新しい管理画面が `main` へ出る回で自動的に使えるようになる |
 | 本番で同時投稿を1件試す | **利用者**＋結果確認 | **見送り**（判断D）。接続・録画は `stg-admin.musubo.jp` で行う |
+
+上の2件（リダイレクトURIと `INSTAGRAM_APP_*`）が未登録のあいだは、
+`GET /api/instagram/connection` が `state: 'unconfigured'` を HTTP 200 で返します
+（`apps/worker/src/routes/instagram.ts` 102〜112行目）。画面では「設定がありません」に当たります。
+**これは配備の失敗ではなく、未登録のときの正常な状態です。**
+
+## 未確認のまま残っている2項目（合格扱いにしません）
+
+2026-10-12のCodexの本番配備で、次の2項目は**確認できていません**。
+確認方法・担当・前提条件を決めたので、実際に確認できた時点でここを更新します。
+
+### 1. 認証後のInstagram接続とGoogle投稿の動作（本番）
+
+| | 内容 |
+| --- | --- |
+| 状態 | **未確認** |
+| なぜ未確認か | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` が Worker `nen-line` に未登録で、Meta側のリダイレクトURIにも本番URLが未追記のため、認可そのものが始められない |
+| 前提条件 | ①利用者がMeta側のOAuthリダイレクトURIへ `https://api.musubo.jp/api/instagram/oauth/callback` を追記 ②利用者が `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` を Worker `nen-line` へ登録 ③本番の管理画面にSNS連携の画面が出ること（V8が `main` へ出る回） |
+| 担当 | **利用者**（①②は本人のみ。値は会話・記録に出しません）／画面は別件のV8反映 |
+| 確認方法 | 前提が揃ったあと、`GET /api/instagram/connection` が `unconfigured` から `disconnected` へ変わることを読み取りで確認 → 本番の管理画面で接続 → `state: 'connected'` と `@ユーザー名` の表示を確認 → Googleビジネスの投稿を1件出し、`rt_google_posts` の `instagram_*` 列が進むことを**列の有無と状態名だけ**で確認 |
+| いま確認できること | 判断Dにより、**接続操作と審査用の録画は検証環境 `stg-admin.musubo.jp` で続けます**。検証環境では2026-10-12に実機で接続成功を確認済みです（上の表） |
+
+### 2. 掃除ジョブ `instagram transient data retention` の成功
+
+| | 内容 |
+| --- | --- |
+| 状態 | **未確認**（確認方法を差し替えました） |
+| 分かったこと | **成功時にログを出さない実装です。** `apps/worker/src/services/instagram.ts` 601〜613行目の `purgeInstagramTransientData` は戻り値が `Promise<void>` で、件数も返さずログも書きません。`apps/worker/src/index.ts` 1886〜1895行目のジョブ定義も `console.log` を持ちません（隣の `restaurant raw mail retention` は `result.deleted + result.failed > 0` のときだけ出力します） |
+| したがって | 当初の引き継ぎに書いた「cronのログに出ること」という確認は**実装上できません**。確認の方法を変えます（判定を甘くするのではありません） |
+| 失敗したときは見えます | `apps/worker/src/services/scheduled-job-isolation.ts` 25〜39行目が、失敗したジョブだけ `console.error('instagram transient data retention error:', …)` を出します |
+| 走る間隔 | 6時間ごと（cron `0 */6 * * *`）。`apps/worker/wrangler.toml` 44行目の3本目で、`runSixHourlyHeavyJobs`（`index.ts` 1725行目〜）の中にあります |
+| 担当 | Codex（本番の読み取り確認） |
+| 差し替えた確認方法 | ①6時間ぶんのWorkerログに `instagram transient data retention error:` が**出ていない**こと ②本番D1で `SELECT COUNT(*) FROM instagram_oauth_states WHERE expires_at<=datetime('now')` が 0 であること ③同じく `SELECT COUNT(*) FROM instagram_messages WHERE created_at<datetime('now','-90 day')` が 0 であること（**件数だけ。行の中身は読みません**） |
+| 注意 | ②③は、まだ誰も本番で認可を始めていない現在は**そもそも行が0件**なので、「掃除が働いた」証拠にはなりません。本番で接続が始まったあとに確認します。それまでは①と単体テストだけが根拠です |
 
 ### 本番反映で分かった2つの食い違い（2026-10-12・Codexの検証で判明）
 
@@ -84,11 +132,12 @@ Instagram同時投稿の接続について、**済んだこと・証拠・原因
    `instagram_connections` へ1列を追加します。すべて空を許すか既定値つきで、
    `CONTRIBUTING.md` の Migration Policy で認められた追加操作の範囲内です。
    既にある行のデータは書き換えません。
-2. **本番は `main` から配備しますが、`main` にInstagramのぶんが1つも入っていません。**
+2. **（解消済み）本番は `main` から配備しますが、`main` にInstagramのぶんが1つも入っていませんでした。**
    移行603・611、`services/instagram.ts`、`routes/instagram.ts`、
-   `packages/shared/src/instagram.ts`、`META_*` の設定、いずれも未反映です。
-   さらに新しい管理画面（V8、1,138ファイル）も `main` には0ファイルで、
-   「設定 → SNS連携」の画面自体が本番にありません。
+   `packages/shared/src/instagram.ts`、`META_*` の設定、いずれも未反映でした。
+   → **PR #1714（`c4a9d1a879…`）のマージで解消しました。**
+   ただし新しい管理画面（V8、1,138ファイル）は今も `main` には0ファイルで、
+   「設定 → SNS連携」の画面自体が本番にありません（判断Dにより今回は作りません）。
 
 本番D1の「101件が未適用」という判定は、放置や損傷ではなく
 `codex/development` と `main` の差（103件）そのものです。本番D1は `main` と揃っています。
@@ -101,25 +150,33 @@ Instagram同時投稿の接続について、**済んだこと・証拠・原因
 | 項目 | 担当 | 状態 |
 | --- | --- | --- |
 | ビジネス認証（法人書類） | **利用者**（代行不可） | 未 |
-| プライバシーポリシーへInstagramの節を追記 | Claude（文案）→利用者が公開判断 | **文案作成済み**（<../instagram-privacy-section-draft.md>）。公開はご判断待ち |
+| プライバシーポリシーへInstagramの節を追記 | Claude（実装）→Codex（配備） | 文案を**2026-10-12に利用者が「文案のまま公開へ進める」と承認**（<../instagram-privacy-section-draft.md>）。`sites/musubo/**` への実装は**未**。施行日 `2026-10-04` は変えない |
 | 操作の録画（11項目） | **利用者の操作** | 未。判断Dにより**検証環境 `stg-admin.musubo.jp` で撮る** |
 | 審査用ログイン（オーナー／管理者） | Claude＋利用者確認 | 未 |
 | 申請の送信 | **利用者** | 未 |
 
 ## 次の1手
 
-**裏側を順番に整えること**（`main` への反映 → 移行603 → 移行611 → Worker配備）。
-2026-10-12のご判断は**D（先に裏側だけ整える）**です。本番の見た目は変えず、
-Instagramの接続操作と審査用の録画は検証環境（`stg-admin.musubo.jp`）で続けます。
-新しい管理画面（V8）が別の回で `main` へ出るとき、Instagramの画面も自動でそろいます。
+**プライバシーポリシーへInstagramの節を追記して公開すること**（Claudeが実装 → Codexが配備）。
+2026-10-12に利用者が「文案のまま公開へ進める」と選んだので、文案を
+`sites/musubo/**` へ入れて musubo.jp の5ページへ反映します。施行日 `2026-10-04` は変えません。
+審査の6要件のうち、開発側だけで進められる最後の項目です。
 
-この順番は守る必要があります。`restaurant-google-posts.ts` が611の列を無条件に読み書きし、
-本番ではGoogleビジネスの投稿が既に動いているためです。
+その次（利用者の操作が必要）：
 
-`main` への反映は**枝のマージではなく内容の移植**です。`codex/development` と `main` は
+1. Meta側のOAuthリダイレクトURIへ `https://api.musubo.jp/api/instagram/oauth/callback` を追記。
+2. `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` を Worker `nen-line` へ登録（**値は本人のみ**）。
+3. 審査用の録画（11項目）を検証環境 `stg-admin.musubo.jp` で撮る（判断D）。
+4. ビジネス認証の書類提出 → 申請の送信。
+
+**裏側（`main` への反映 → 移行603 → 移行611 → Worker配備）は2026-10-12に完了しました。**
+順番（603 → 611 → 配備）を守る必要があったのは、`restaurant-google-posts.ts` が611の列を
+無条件に読み書きし、本番ではGoogleビジネスの投稿が既に動いていたためです。守って適用しました。
+
+`main` への反映は**枝のマージではなく内容の移植**で行いました。`codex/development` と `main` は
 `apps/worker/src` だけで896ファイル・84,505行、`packages/shared/src` で80ファイル・3,548行
-離れており（7,608コミット）、枝ごとマージすると未検証の変更が本番へ入ります。
-Instagramに必要なぶんだけを選んで `main` 向けPRにします。
+離れており（7,608コミット）、枝ごとマージすると未検証の変更が本番へ入るためです。
+Instagramに必要なぶんだけを選んだPRが #1714 です。
 詳細は<../instagram-production-rollout.md>の手順4にあります。
 
 審査（アドバンスアクセス）は本番で1件つないで録画できるようになってから出します。
@@ -133,3 +190,7 @@ Instagramに必要なぶんだけを選んで `main` 向けPRにします。
 - 暗号化トークン列（`page_token_encrypted` / `user_token_encrypted`）と行の全文は
   読み出しません。確認は「許可名が含まれるか」「時刻が直近か」の はい/いいえ だけにします。
 - モックの成功だけで「接続できた」と言いません。実機の接続結果を証拠にします。
+- **確認方法を決めただけの項目を合格扱いにしません。** 上の「未確認のまま残っている2項目」は、
+  実際に確認コマンドを走らせて結果が出るまで**未確認**のままにします。
+  確認が不可能だと分かった場合は、判定を甘くするのではなく確認方法を差し替え、
+  差し替えた理由をコードの行番号つきでここに残します（掃除ジョブがその例です）。
