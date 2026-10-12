@@ -44,6 +44,6 @@ export default {
     retentionDays: DATA_RETENTION_DAYS,
     retention: `解約または無料体験の終了から${DATA_RETENTION_DAYS}日間はお客様のデータを保存し、その後に削除します。${DATA_RETENTION_DAYS}日の間にご連絡いただければ、それより早い削除にも対応します。`,
     overseasProcessing:
-      "お問い合わせメールの送受信は日本国内のサーバー（エックスサーバー）で処理します。サイトの配信とデータの保管（Cloudflare）、LINEの配信（LINEヤフー）、Googleビジネスプロフィールとの連携（Google）、決済（Stripe）、文章の生成（OpenAI）では、各社の設備の所在地により日本国外で処理される場合があります。委託先の一覧はプライバシーポリシーに記載しています。",
+      "お問い合わせメールの送受信は日本国内のサーバー（エックスサーバー）で処理します。サイトの配信とデータの保管（Cloudflare）、LINEの配信（LINEヤフー）、Googleビジネスプロフィールとの連携（Google）、Instagramへの投稿（Meta）、決済（Stripe）、文章の生成（OpenAI）では、各社の設備の所在地により日本国外で処理される場合があります。委託先の一覧はプライバシーポリシーに記載しています。",
   },
 };
