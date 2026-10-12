@@ -91,6 +91,13 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
     }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
+    for (const cell of all('[data-list-action-cell]')) {
+      const tools = [...cell.querySelectorAll('button,a[role="button"]')].filter(visible)
+      if (!tools.length) continue
+      const right = Math.max(...tools.map(el=>el.getBoundingClientRect().right))
+      const css = getComputedStyle(cell), expected = cell.getBoundingClientRect().right - (parseFloat(css.paddingRight)||0) - (parseFloat(css.borderRightWidth)||0)
+      if (expected-right > 1) add('F9',cell,'row actions do not occupy the shared right edge')
+    }
     for (const el of all('[data-list-name-cell] [data-design-node="xRvDB"]')) add('F9', el, 'state is in name column')
     if (root.getBoundingClientRect().width < 1100) {
       for (const toolbar of all('[data-shared-part="list-toolbar"]')) {

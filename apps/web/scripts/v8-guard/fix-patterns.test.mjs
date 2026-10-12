@@ -4,6 +4,17 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    await page.setContent('<style>td{width:180px;padding:8px;text-align:left}button{width:36px}</style><section data-page-template="list" data-list-skeleton="templates"><table><tbody><tr><td data-list-action-cell><button>…</button></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,1)
+    await page.addStyleTag({content:'td{text-align:right}'})
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0)
+  } finally {await browser.close()}
+})
+
 test('F1 counts clipped numeric notes independently from truncatable names and body', async () => {
   const browser=await chromium.launch()
   try {

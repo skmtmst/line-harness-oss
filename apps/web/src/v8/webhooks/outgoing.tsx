@@ -572,7 +572,7 @@ export default function WebhooksOutgoingV8() {
           }}
         >
         <div className={styles.tableWrap}>
-          <DataTable columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: narrow ? 'var(--tpl-af2-wh-narrow-row-h)' : 'var(--tpl-wh-row-h)', gap: narrow ? '0px' : 'var(--tpl-wh-col-gap)', padding: narrow ? 'var(--tpl-wh-narrow-column-pad)' : 'var(--tpl-wh-row-pad)', numberInset: 'var(--tpl-wh-num-pad-end)', nameInset: narrow ? 'var(--tpl-af2-wh-name-end)' : undefined }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-wh-col-gap)', padding: '0 var(--tpl-list-inset)', numberInset: 'var(--tpl-wh-num-pad-end)' }}>
             <thead>
               {narrow ? (
                 /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
@@ -628,7 +628,7 @@ export default function WebhooksOutgoingV8() {
                       <Td className={styles.colStateNarrow}>
                         <StatusBadge tone={tone === 'active' ? 'success' : tone}>{stateWord}</StatusBadge>
                       </Td>
-                      <Td className={styles.colOpsNarrow}>
+                      <ActionCell>
                         {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
                         <div className={styles.opsBox}>
                           <RowMenu
@@ -646,7 +646,7 @@ export default function WebhooksOutgoingV8() {
                             note={canManage ? undefined : MANAGE_REASON}
                           />
                         </div>
-                      </Td>
+                      </ActionCell>
                     </Tr>
                   )
                 }
