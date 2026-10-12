@@ -93,6 +93,10 @@
   border-radius: var(--radius-mini);
 }
 :root .button[data-size='small'] > :is(svg, img) { width: var(--tpl-icon-btn-sm-icon); height: var(--tpl-icon-btn-sm-icon); }
+/* 小さい形は素のボタンの32px下限で伸ばさない。タッチの44pxは保つ。 */
+@media (pointer: fine) {
+  :root .button[data-size='small'] { min-height: var(--tpl-icon-btn-sm); }
+}
 
 /*
  * 行の右端の「…」（size="row"・★V8 i0Ao0R・noVq4・DzdC3・wZPua の「その他の操作」）：28×28・角丸 control・印 14。

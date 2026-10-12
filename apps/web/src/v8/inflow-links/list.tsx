@@ -999,14 +999,13 @@ function TileMenu({
   const open = openId === id
   const label = `「${title}」のほかの操作`
   return (
-    <span className={styles.tileMenu}>
       <RowMenu
-        className={styles.tileMenuButton}
+        appearance="box"
+        size="small"
         label={label}
         open={open}
         onOpenChange={(next) => onOpenChange(next ? id : null)}
         items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect?.() } }))}
       />
-    </span>
   )
 }
