@@ -205,18 +205,21 @@
     {
       "id": "page-head",
       "name": "一覧・画面の頭",
-      "role": "板の題・「？」・右の主ボタンを1段で出す",
+      "role": "板の題・「？」・右の主ボタンを1段で出す。画面全体の説明はB-245の開閉できる灰色の説明",
       "rules": [
         "§5",
         "§6.12-2",
-        "B-158"
+        "B-158",
+        "B-245"
       ],
       "owner": {
         "code": {
           "files": [
             "apps/web/src/components/templates/page-frame.tsx",
             "apps/web/src/components/shared/page-header.tsx",
-            "apps/web/src/components/shared/help-tip.tsx"
+            "apps/web/src/components/shared/help-tip.tsx",
+            "apps/web/src/components/shared/page-explanation.tsx",
+            "apps/web/src/components/shared/page-explanation.module.css"
           ],
           "components": [
             "PageHeading",
@@ -228,7 +231,10 @@
             "DashboardPage",
             "SettingsPage",
             "AnalyticsPage",
-            "InboxPage"
+            "InboxPage",
+            "PageExplanationProvider",
+            "PageExplanationToggle",
+            "PageExplanationBody"
           ],
           "vars": [
             "--text-title"

@@ -15,7 +15,7 @@ import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag,
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bookmark, CalendarPlus, Copy, Folder as FolderIcon, Lightbulb, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, UserCheck, Users, Workflow } from 'lucide-react';
+import { Bookmark, CalendarPlus, CircleCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
 
 
 import Link from '@/components/shared/list-navigation'
@@ -72,6 +72,7 @@ import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback
 import { notifyToast } from '@/components/shared/toast';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -705,7 +706,7 @@ export default function ScenariosListV8() {
     },
     {
       title: '読み終えた人',
-      icon: UserCheck,
+      icon: CircleCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
       detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
@@ -1032,9 +1033,9 @@ export default function ScenariosListV8() {
   /* ===== 道具の段の部品（広い板と狭い板で同じものを並べ替える） ===== */
 
   const noteBand = (
-    <Notice tone="info" icon={<Lightbulb size={16} aria-hidden="true" />}>
+    <PageExplanationBody>
       作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
-    </Notice>
+    </PageExplanationBody>
   )
 
   const filterChips = (
@@ -1159,7 +1160,7 @@ export default function ScenariosListV8() {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <PageExplanationProvider pageKey="scenarios"><SaveErrorScope errors={saveErrors}><ListPage
       heightMode="content"
       toolbarSpacing="section"
       noticeSpacing="section"
@@ -1167,6 +1168,7 @@ export default function ScenariosListV8() {
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
+      titleAccessory={<PageExplanationToggle />}
 
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
@@ -1332,6 +1334,6 @@ export default function ScenariosListV8() {
         <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
-    </ListPage></SaveErrorScope>
+    </ListPage></SaveErrorScope></PageExplanationProvider>
   )
 }
