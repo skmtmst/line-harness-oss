@@ -1948,7 +1948,7 @@
   --tpl-inbox-pop-row-pad: 6px 0;         /* 小窓の行の上下 */
   --tpl-inbox-dot: 8px;                   /* 色の丸 */
   --tpl-inbox-dot-sm: 7px;                /* 頭の対応状況の丸 */
-  --tpl-inbox-chead-pad: 12px 20px;       /* 会話の頭の内側 */
+  --tpl-inbox-chead-pad: 12px 24px;       /* 会話の頭の内側 */
   --tpl-inbox-chead-gap: 8px;             /* 会話の頭の部品の間 */
   --tpl-inbox-chead-search-right: 24px;   /* 🔍 を浮かせる右端（やりとりの左右の余白にそろえる） */
   --tpl-inbox-chead-face: 28px;           /* 会話の頭の顔 */
@@ -1956,7 +1956,7 @@
   --tpl-inbox-chead-name: 15px;           /* 会話の頭の名前 */
   --tpl-inbox-chead-name-lh: 23px;
   --tpl-inbox-chead-sub-lh: 18px;
-  --tpl-inbox-chead-star: 34px;           /* 注目にするの四角 */
+  --tpl-inbox-chead-star: 32px;           /* 注目にするの四角 */
   --tpl-inbox-chead-star-icon: 15px;
   --tpl-inbox-chead-ctl: 36px;            /* 担当・対応状況・右の列の出し入れの高さ */
   --tpl-inbox-chead-ctl-pad: 0 10px 0 12px;
