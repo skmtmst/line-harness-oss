@@ -146,12 +146,16 @@ export async function decryptTotpSecret(payload: string, masterKey: string): Pro
   return (await decryptTotpEnrollment(payload, masterKey)).secret;
 }
 
-/** Recovery codes have 128 bits of entropy; only their hashes are persisted. */
+/** Eight 40-bit codes (8 base32 characters). Online attempts are account-throttled. Only hashes persist. */
 export async function createTotpEnrollment(secret: string, masterKey: string) {
-  const recoveryCodes = Array.from({ length: 8 }, () => {
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').match(/.{8}/g)!.join('-');
-  });
+  const uniqueCodes = new Set<string>();
+  while (uniqueCodes.size < 8) {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    const code = Array.from(bytes, b => alphabet[b & 31]).join('');
+    uniqueCodes.add(`${code.slice(0, 4)}-${code.slice(4)}`);
+  }
+  const recoveryCodes = [...uniqueCodes];
   const recoveryHashes = await Promise.all(recoveryCodes.map(hashRecoveryCode));
   return { encrypted: await encryptTotpSecret(JSON.stringify({ secret, recoveryHashes }), masterKey), recoveryCodes };
 }
@@ -162,7 +166,7 @@ async function hashRecoveryCode(code: string): Promise<string> {
 }
 
 export async function consumeTotpRecoveryCode(db: D1Database, staffId: string, encrypted: string, masterKey: string, code: string): Promise<boolean> {
-  if (!/^(?:[a-fA-F0-9]{8}-){3}[a-fA-F0-9]{8}$/.test(code.trim())) return false;
+  if (!/^[A-Za-z2-9]{4}-?[A-Za-z2-9]{4}$/.test(code.trim())) return false;
   const enrollment = await decryptTotpEnrollment(encrypted, masterKey);
   const hash = await hashRecoveryCode(code);
   if (!enrollment.recoveryHashes.includes(hash)) return false;

@@ -1,3 +1,4 @@
+import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
 import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
@@ -329,6 +330,9 @@ export function permissionForApiPath(path: string): string | null {
  */
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/auth/session'],
+  // These routes derive the target exclusively from the authenticated principal.
+  ['GET', '/api/auth/two-factor/self'],
+  ['POST', '/api/auth/two-factor/recovery'],
   ['POST', '/api/auth/step-up'],
   // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
   ['GET', '/api/auth/sessions'],
@@ -615,7 +619,7 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
-  const required = await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+  const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
   const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
   if (required || registered) {
     const verified = await getPlatformSetting(c.env.DB, `auth.mfa.session:${await sha256Hex(token)}`);
@@ -658,7 +662,7 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
-    const required = await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+    const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
     // This endpoint exchanges the primary credential for a challenge, never
     // for an authenticated staff context usable by other APIs.
     if (c.req.path !== '/api/auth/login' && (required || staff.totp_enabled_at)) return null;
@@ -667,7 +671,7 @@ export async function authenticateApiToken(
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    if (await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
+    if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
@@ -681,7 +685,7 @@ export async function authenticateApiToken(
     c.env.LEGACY_API_KEY !== c.env.API_KEY &&
     token === c.env.LEGACY_API_KEY
   ) {
-    if (await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
+    if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     console.log('[auth] accept_via=LEGACY_API_KEY');
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }

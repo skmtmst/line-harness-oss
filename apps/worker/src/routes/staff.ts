@@ -1,18 +1,19 @@
+import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { effectiveStaffEditKeys, SCOPE_OPERATION_KEYS } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
-  activatePlatformAdminIfAwaitingTotp,
+  activatePlatformAdminIfAwaitingTotp, getPlatformSetting, auditEventStatement,
   getStaffMembers, getStaffById, getStaffByInviteTokenHash, getStaffByEmailChangeTokenHash,
   createStaffMemberWithScopes, updateStaffMember, deleteStaffMemberWithScopes, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
   reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
 } from '@line-crm/db';
-import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
+import { consumeStepUpToken, sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
-import { sha256Hex } from '../middleware/auth.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import {
   sendStaffInviteEmail, sendStaffLineLinkEmail,
   sendStaffEmailChangeConfirmEmail, sendStaffEmailChangeNoticeEmail, sendStaffEmailChangeCompletedEmail,
@@ -1046,7 +1047,7 @@ function canEditMember(c: { get: (key: 'staff') => Env['Variables']['staff'] }, 
 }
 
 function totpMasterKey(c: { env: Env['Bindings'] }): string | null {
-  return c.env.TOTP_ENCRYPTION_KEY?.trim() || null;
+  return mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) ? c.env.TOTP_ENCRYPTION_KEY! : null;
 }
 
 staff.post('/api/staff/:id/two-factor/setup', inputJsonBoundary(), async (c) => {
@@ -1057,11 +1058,30 @@ staff.post('/api/staff/:id/two-factor/setup', inputJsonBoundary(), async (c) => 
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
 
-  if (member.totp_enabled_at) return c.json({ success: false, error: '登録済みの二段階認証は解除してから登録し直してください' }, 409);
+  if (c.get('impersonation') || c.get('staff').readOnly) return c.json({ success: false, error: '本人だけが登録し直せます' }, 403);
+  if (member.totp_enabled_at && !await consumeStepUpToken(c, 'auth.mfa.reenroll')) {
+    return c.json({ success: false, error: '登録し直す前に本人確認してください', code: 'STEP_UP_REQUIRED' }, 428);
+  }
   const secret = generateTotpSecret();
-  await updateStaffMember(c.env.DB, id, {
-    totp_pending_secret_enc: await encryptTotpSecret(secret, key),
-  });
+  const pending = await encryptTotpSecret(secret, key);
+  if (member.totp_enabled_at) {
+    const sessionHash = await adminSessionTokenHashFromRequest(c);
+    const grantHash = await sha256Hex(c.req.header('X-Step-Up-Token')!.trim());
+    const grant = await c.env.DB.prepare('SELECT expires_at FROM auth_step_up_grants WHERE token_hash=? AND staff_id=? AND purpose=? AND consumed_at IS NOT NULL')
+      .bind(grantHash, id, 'auth.mfa.reenroll').first<{ expires_at: string }>();
+    if (!sessionHash || !grant) return c.json({ success: false, error: '同じログインで本人確認からやり直してください' }, 401);
+    const proof = JSON.stringify({ sessionHash, grantHash, pendingHash: await sha256Hex(pending), expiresAt: grant.expires_at });
+    const saved = await c.env.DB.batch([
+      c.env.DB.prepare('UPDATE staff_members SET totp_pending_secret_enc=? WHERE id=? AND is_active=1 AND totp_secret_enc=? AND totp_pending_secret_enc IS ?')
+        .bind(pending, id, member.totp_secret_enc, member.totp_pending_secret_enc),
+      c.env.DB.prepare(`INSERT INTO platform_settings(key,value,updated_by,updated_at) SELECT ?,?,?,? WHERE changes()=1
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+        .bind(`auth.mfa.reenroll:${id}`, proof, id, new Date().toISOString()),
+    ]);
+    if (saved[0].meta.changes !== 1) return c.json({ success: false, error: '設定が変わりました。読み直してください' }, 409);
+  } else {
+    await updateStaffMember(c.env.DB, id, { totp_pending_secret_enc: pending });
+  }
   return c.json({
     success: true,
     data: {
@@ -1079,6 +1099,18 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
   if (!member?.totp_pending_secret_enc) return inputError(c, { success: false, error: '先にQRコードを表示してください' }, 400, []);
+  if (c.get('impersonation') || c.get('staff').readOnly) return c.json({ success: false, error: '本人だけが設定できます' }, 403);
+  const proofKey = `auth.mfa.reenroll:${id}`;
+  const proofValue = member.totp_enabled_at ? await getPlatformSetting(c.env.DB, proofKey) : null;
+  let proof: { sessionHash: string; grantHash: string; pendingHash: string; expiresAt: string } | null = null;
+  if (member.totp_enabled_at) {
+    try { proof = proofValue ? JSON.parse(proofValue) : null; } catch { /* malformed proof fails closed */ }
+    if (!proof || proof.sessionHash !== await adminSessionTokenHashFromRequest(c)
+      || proof.pendingHash !== await sha256Hex(member.totp_pending_secret_enc)
+      || !(Date.parse(proof.expiresAt) > Date.now())) {
+      return c.json({ success: false, error: '本人確認の時間が切れたかログインが変わりました。登録し直す操作からやり直してください' }, 401);
+    }
+  }
   const body = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
   const attempt = await reserveTwoFactorSetupAttempt(c.env.DB, id);
   if (!attempt) return c.json({ success: false, error: TWO_FACTOR_ATTEMPT_LIMIT_ERROR }, 429);
@@ -1088,9 +1120,20 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
     return inputError(c, { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' }, attempt.attempts >= attempt.maxAttempts ? 429 : 400, []);
   }
   const enrollment = await createTotpEnrollment(await decryptTotpSecret(encrypted, key), key);
-  const promoted = await c.env.DB.prepare(`UPDATE staff_members SET totp_secret_enc=?,totp_pending_secret_enc=NULL,
-    totp_enabled_at=?,totp_last_used_step=? WHERE id=? AND is_active=1 AND totp_enabled_at IS NULL AND totp_pending_secret_enc=?`)
-    .bind(enrollment.encrypted, new Date().toISOString(), result.step, id, encrypted).run();
+  const promotion = c.env.DB.prepare(`UPDATE staff_members SET totp_secret_enc=?,totp_pending_secret_enc=NULL,
+    totp_enabled_at=?,totp_last_used_step=? WHERE id=? AND is_active=1 AND totp_secret_enc IS ? AND totp_pending_secret_enc=?
+    ${proof ? `AND EXISTS(SELECT 1 FROM platform_settings WHERE key=? AND value=?)
+      AND EXISTS(SELECT 1 FROM auth_step_up_grants g WHERE g.token_hash=? AND g.staff_id=staff_members.id
+        AND g.purpose='auth.mfa.reenroll' AND g.consumed_at IS NOT NULL AND g.session_token_hash=?
+        AND julianday(g.expires_at)>julianday('now') AND (g.issued_policy_version IS NULL OR g.issued_policy_version=staff_members.policy_version))` : ''}`)
+    .bind(enrollment.encrypted, new Date().toISOString(), result.step, id, member.totp_secret_enc, encrypted,
+      ...(proof ? [proofKey, proofValue, proof.grantHash, proof.sessionHash] : []));
+  const promoted = proof ? (await c.env.DB.batch([
+    promotion,
+    auditEventStatement(c.env.DB, { category: 'auth', action: 'auth.mfa.reenroll', actorPrincipalId: id, actorRole: member.role,
+      tenantId: member.tenant_id, targetKind: 'staff', targetId: id, riskLevel: 'high', retentionClass: 'security' }, { sql: 'changes()=1', params: [] }),
+    c.env.DB.prepare('DELETE FROM platform_settings WHERE key=? AND value=? AND changes()=1').bind(proofKey, proofValue),
+  ]))[0] : await promotion.run();
   if (promoted.meta.changes !== 1) return c.json({ success: false, error: '二段階認証はすでに設定されています' }, 409);
   const updated = await getStaffById(c.env.DB, id);
   if (updated) {

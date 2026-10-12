@@ -1,3 +1,4 @@
+import { mfaConfiguration, mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -48,7 +49,7 @@ import {
   stepUpAttemptRetryAfterSeconds,
   updateStaffMember,
 } from '@line-crm/db';
-import { createTotpEnrollment, consumeTotpRecoveryCode, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
+import { createTotpEnrollment, decryptTotpEnrollment, consumeTotpRecoveryCode, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import { isStepUpPurpose } from '../lib/step-up.js';
 import { verifyPassword } from '../services/password-hash.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
@@ -87,7 +88,42 @@ adminAuth.get('/api/auth/two-factor/policy', async c => {
   const activeProxy = await getActiveImpersonation(c.env.DB, staff.id, await adminSessionTokenHashFromRequest(c));
   const canEdit = !activeProxy && !staff.readOnly && staff.id !== 'env-owner'
     && ((member?.role === 'owner' && member.is_active && member.account_scope !== 'accounts' && !staff.assignedLineAccountId) || Boolean(await getPlatformAdminByStaffId(c.env.DB, staff.id)));
-  return c.json({ success: true, data: { required: await loginMfaRequired(c.env.DB, staff.tenantId), canEdit: Boolean(canEdit), impersonating: Boolean(activeProxy) } });
+  const counts = await c.env.DB.prepare(`SELECT COUNT(*) total, COALESCE(SUM(CASE WHEN totp_enabled_at IS NOT NULL AND totp_secret_enc IS NOT NULL THEN 1 ELSE 0 END),0) registered FROM staff_members WHERE is_active=1 AND COALESCE(tenant_id,?)=?`).bind(DEFAULT_TENANT_ID, staff.tenantId ?? DEFAULT_TENANT_ID).first();
+  return c.json({ success: true, data: { required: await loginMfaRequired(c.env.DB, staff.tenantId, c.env.TOTP_ENCRYPTION_KEY), canEdit: Boolean(canEdit), impersonating: Boolean(activeProxy), ...mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY), ...counts } });
+});
+
+// Self-service security information contains counts only, never codes or hashes.
+adminAuth.get('/api/auth/two-factor/self', async c => {
+  const principal = c.get('staff');
+  if (c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '代理ログイン中は利用できません' }, 403);
+  const member = await getStaffById(c.env.DB, principal.id);
+  if (!member) return c.json({ success: false, error: '本人の設定を取得できません' }, 403);
+  const configuration = mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY);
+  const remaining = member.totp_enabled_at && member.totp_secret_enc && configuration.configured
+    ? (await decryptTotpEnrollment(member.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!)).recoveryHashes.length : null;
+  return c.json({ success: true, data: { staffId: member.id, enabledAt: member.totp_enabled_at, remaining,
+    total: 8, canEdit: !principal.readOnly && configuration.configured, ...configuration } });
+});
+
+adminAuth.post('/api/auth/two-factor/recovery', inputJsonBoundary(), async c => {
+  const principal = c.get('staff');
+  if (principal.readOnly || c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '本人だけが作り直せます' }, 403);
+  const member = await getStaffById(c.env.DB, principal.id);
+  if (!member?.totp_enabled_at || !member.totp_secret_enc) return c.json({ success: false, error: '先に二段階認証を登録してください' }, 400);
+  if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) return c.json({ success: false, error: MFA_KEY_NOTICE }, 400);
+  if (!await consumeStepUpToken(c, 'auth.mfa.recovery')) return stepUpRequiredResponse(c, '回復コードを作り直す前に本人確認してください');
+  const enrollment = await decryptTotpEnrollment(member.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!);
+  const next = await createTotpEnrollment(enrollment.secret, c.env.TOTP_ENCRYPTION_KEY!);
+  const changed = await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE staff_members SET totp_secret_enc=? WHERE id=? AND totp_secret_enc=? AND is_active=1')
+      .bind(next.encrypted, member.id, member.totp_secret_enc),
+    auditEventStatement(c.env.DB, { category: 'auth', action: 'auth.mfa.recovery.regenerate', tenantId: member.tenant_id,
+      actorPrincipalId: member.id, actorRole: member.role, targetKind: 'staff', targetId: member.id,
+      riskLevel: 'high', retentionClass: 'security' }, { sql: 'changes()=1', params: [] }),
+  ]);
+  if (changed[0].meta.changes !== 1) return c.json({ success: false, error: '設定が変わりました。読み直してください' }, 409);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, data: { recoveryCodes: next.recoveryCodes } });
 });
 
 adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boolean'] }), async c => {
@@ -100,9 +136,9 @@ adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boo
   }
   const body = await c.req.json<{ required?: boolean }>();
   if (typeof body.required !== 'boolean') return inputError(c, { success: false, error: 'OnかOffを選んでください' }, 400, ['required']);
-  if (body.required && (!c.env.TOTP_ENCRYPTION_KEY || c.env.TOTP_ENCRYPTION_KEY.length < 32)) {
+  if (body.required && !mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) {
     await mfaAudit(c, staff.id, 'auth.mfa.policy', 'denied');
-    return c.json({ success: false, error: '二段階認証を使う準備がまだできていません。運営にお知らせください' }, 503);
+    return c.json({ success: false, error: MFA_KEY_NOTICE }, 400);
   }
   // Always a fresh one-use grant. The usual ten-minute step-up window is not sufficient.
   if (!body.required && !await consumeStepUpToken(c, 'auth.mfa.policy')) {
@@ -111,7 +147,7 @@ adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boo
   const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
   const policyKey = mfaPolicyKey(tenantId);
   const previousValue = await getPlatformSetting(c.env.DB, policyKey);
-  const before = previousValue !== 'false';
+  const before = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && previousValue !== 'false';
   const authority = `EXISTS(SELECT 1 FROM staff_members sm WHERE sm.id=? AND sm.is_active=1
     AND COALESCE(sm.access_level,'full')<>'read_only' AND COALESCE(sm.tenant_id,?)=? AND
     ((sm.role='owner' AND COALESCE(sm.account_scope,'all')<>'accounts' AND sm.assigned_line_account_id IS NULL)
@@ -645,7 +681,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
    * 形式の検査は試行枠の確保より先に行う。形になっていない入力で
    * 試行回数を消費させないため。
    */
-  if (staff.totp_enabled_at && staff.totp_secret_enc && !c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定を確認できません' }, 503);
+  if (staff.totp_enabled_at && staff.totp_secret_enc && !mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) return c.json({ success: false, error: '二段階認証の設定を確認できません' }, 503);
   const useTotp = Boolean(staff.totp_enabled_at && staff.totp_secret_enc && c.env.TOTP_ENCRYPTION_KEY);
   const code = body.code?.trim() ?? '';
   const password = body.password ?? '';
@@ -872,6 +908,8 @@ adminAuth.get('/api/auth/session', async (c) => {
       impersonation,
       unfamiliarAt: currentSession?.unfamiliar_at ?? null,
       stepUpMethod,
+      recoveryCodesRemaining: staffRecord?.totp_enabled_at && staffRecord.totp_secret_enc && mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)
+        ? (await decryptTotpEnrollment(staffRecord.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!)).recoveryHashes.length : null,
     },
     csrfToken,
   });

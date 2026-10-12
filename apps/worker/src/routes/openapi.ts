@@ -1481,11 +1481,21 @@ const spec = {
     },
     '/api/auth/two-factor/policy': {
       get: { summary: '統括のログインで二段階認証を必須にする設定', tags: ['Auth'],
-        responses: { '200': { description: 'required と canEdit（初期値On）' }, '401': { description: '未ログイン' } } },
+        responses: { '200': { description: 'required・canEdit・登録済み人数・configured・notice（鍵ありは初期値On、鍵不足はOff）' }, '401': { description: '未ログイン' } } },
       put: { summary: 'オーナー・運営が二段階認証のOn/Offを変更', tags: ['Auth'],
         parameters: [{ name: 'X-Step-Up-Token', in: 'header', schema: { type: 'string' }, description: 'Offにする時の本人確認。セッションに結び付く1回限りの票' }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['required'], properties: { required: { type: 'boolean' } } } } } },
-        responses: { '200': { description: '監査へ保存。Onへの変更時は既存セッションを失効' }, '401': { description: '再確認が必要' }, '403': { description: '変更権限なし' }, '409': { description: '他の操作と競合' } } },
+        responses: { '200': { description: '監査へ保存。Onへの変更時は既存セッションを失効' }, '401': { description: '再確認が必要' }, '400': { description: '鍵が未設定のため必須にできない' }, '403': { description: '変更権限なし' }, '409': { description: '他の操作と競合' } } },
+    },
+    '/api/auth/two-factor/self': {
+      get: { summary: '本人の認証アプリ登録日と回復コードの残数', tags: ['Auth'],
+        responses: { '200': { description: '本人だけの登録日・残数・鍵の準備状態。コードとハッシュは返さない' }, '401': { description: '未ログイン' }, '403': { description: '代理ログイン中または本人設定なし' } } },
+    },
+    '/api/auth/two-factor/recovery': {
+      post: { summary: '本人確認後に回復コード8個を作り直す', tags: ['Auth'],
+        parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.mfa.recovery 用の1回限りの本人確認票' }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: '8文字4-4の回復コード8個をこの時だけ返す。前のコードは全部無効。応答保存禁止' }, '400': { description: '未登録または鍵未設定' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
     },
     '/api/auth/two-factor/setup': {
       post: {
@@ -1537,7 +1547,7 @@ const spec = {
     '/api/auth/step-up': {
       post: {
         tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行（V: パスワード経路あり）',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret'] } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret', 'auth.mfa.policy', 'auth.mfa.recovery', 'auth.mfa.reenroll'] } } } } } },
         responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong credential' }, '401': { description: 'Not authenticated (STEP_UP_UNAUTHORIZED)' }, '403': { description: 'Neither TOTP nor password configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },

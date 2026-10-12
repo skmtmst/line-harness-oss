@@ -4,20 +4,27 @@ import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { startTwoFactorChallenge, twoFactorRequired } from './admin-session.js';
 
+import { mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
+
 // Existing platform KV, namespaced by organization. Never stored in an account's
 // feature bundle: a store administrator must not weaken the organization's login.
 export function mfaPolicyKey(tenantId?: string | null): string {
   return `auth.mfa.required:${tenantId ?? DEFAULT_TENANT_ID}`;
 }
 
-export async function loginMfaRequired(db: D1Database, tenantId?: string | null): Promise<boolean> {
-  return (await getPlatformSetting(db, mfaPolicyKey(tenantId))) !== 'false';
+export async function loginMfaRequired(db: D1Database, tenantId?: string | null, key?: string): Promise<boolean> {
+  return mfaEncryptionConfigured(key) && (await getPlatformSetting(db, mfaPolicyKey(tenantId))) !== 'false';
 }
 
 export async function loginMfaChallenge(c: Context<Env>, staff: StaffMember, remember: boolean, force = false) {
   const registered = twoFactorRequired(staff);
-  if (!force && !registered && !await loginMfaRequired(c.env.DB, staff.tenant_id)) return null;
-  if (!c.env.TOTP_ENCRYPTION_KEY || c.env.TOTP_ENCRYPTION_KEY.length < 32) {
+  if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) {
+    console.warn('[auth] MFA_KEY_UNAVAILABLE: ' + MFA_KEY_NOTICE);
+    // Never bypass a person's existing enrollment or an operator's forced MFA.
+    if (!registered && !force) return null;
+  }
+  if (!force && !registered && !await loginMfaRequired(c.env.DB, staff.tenant_id, c.env.TOTP_ENCRYPTION_KEY)) return null;
+  if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) {
     throw new Error('MFA encryption is not configured');
   }
   return {

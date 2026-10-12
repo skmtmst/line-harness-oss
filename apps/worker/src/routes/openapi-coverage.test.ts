@@ -143,6 +143,8 @@ const ALLOWLIST_MAX = 771;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auth/two-factor/policy',
+  'GET /api/auth/two-factor/self',
+  'POST /api/auth/two-factor/recovery',
   'PUT /api/auth/two-factor/policy',
   'GET /api/images/{key}',
   'GET /api/account-settings/allergy-options',

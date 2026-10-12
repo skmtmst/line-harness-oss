@@ -7,6 +7,8 @@ import { adminAuth } from './admin-auth.js';
 import { authEmail } from './auth-email.js';
 import { hashPassword } from '../services/password-hash.js';
 import { encryptTotpSecret, decryptTotpEnrollment, totpAtStep } from '../lib/totp.js';
+import { staff } from './staff.js';
+import { createStepUpGrant } from '@line-crm/db';
 import { mfaPolicyKey } from '../services/login-mfa.js';
 
 const key = 'test-encryption-key-at-least-thirty-two-characters';
@@ -15,7 +17,7 @@ let db: SqliteD1;
 type MfaJson = { data: { challengeToken: string; provisioningUri: string; recoveryCodes: string[]; twoFactor: boolean; twoFactorSetup: boolean; token: string } };
 async function json(response: Response): Promise<MfaJson> { return response.json() as Promise<MfaJson>; }
 function app() {
-  const a = new Hono<Env>(); a.use('*', authMiddleware); a.route('/', adminAuth); a.route('/', authEmail);
+  const a = new Hono<Env>(); a.use('*', authMiddleware); a.route('/', adminAuth); a.route('/', authEmail); a.route('/', staff);
   a.get('/api/friends', c => c.json({ success: true })); return a;
 }
 function request(path: string, body?: unknown, token?: string, method = body ? 'POST' : 'GET', overrides = {}) {
@@ -142,7 +144,7 @@ describe('train30 MFA policy and recovery', () => {
   });
   it('On blocks direct staff and emergency keys; the key login can only issue a challenge', async () => {
     await seed();
-    const raw = (token: string, path = '/api/friends') => app().request(`https://api.example.com${path}`, { headers: { Authorization: `Bearer ${token}` } }, { DB: db.db, API_KEY: 'emergency-fixture' } as Env['Bindings']);
+    const raw = (token: string, path = '/api/friends') => app().request(`https://api.example.com${path}`, { headers: { Authorization: `Bearer ${token}` } }, { DB: db.db, API_KEY: 'emergency-fixture', TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
     expect((await raw('fixture-key-owner')).status).toBe(401);
     expect((await raw('emergency-fixture')).status).toBe(401);
     const challenge = await request('/api/auth/login', { apiKey: 'fixture-key-owner' });
@@ -160,12 +162,97 @@ describe('train30 MFA policy and recovery', () => {
   });
   it('cannot enable MFA until enrollment is ready; retains Off and the current session', async () => {
     await seed(); off(); const token = await session();
-    expect((await request('/api/auth/two-factor/policy', { required: true }, token, 'PUT', { TOTP_ENCRYPTION_KEY: undefined })).status).toBe(503);
+    expect((await request('/api/auth/two-factor/policy', { required: true }, token, 'PUT', { TOTP_ENCRYPTION_KEY: undefined })).status).toBe(400);
     expect(db.raw.prepare('SELECT value FROM platform_settings WHERE key=?').get(mfaPolicyKey())).toEqual({ value: 'false' });
     expect(db.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 1 });
   });
-  it('missing encryption configuration fails closed without issuing a session', async () => {
-    await seed(); const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123' }, undefined, 'POST', { TOTP_ENCRYPTION_KEY: undefined });
-    expect(res.status).toBe(500); expect(db.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 0 });
+  it.each([undefined, 'short', ' '.repeat(32)])('missing or short key %s permits an unenrolled primary login and usable session', async missing => {
+    await seed(); const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const overrides = { TOTP_ENCRYPTION_KEY: missing };
+    const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123' }, undefined, 'POST', overrides);
+    expect(res.status).toBe(200); expect((await json(res)).data.twoFactorSetup).toBeUndefined();
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 1 });
+    const token = await session();
+    expect((await request('/api/friends', undefined, token, 'GET', overrides)).status).toBe(200);
+    expect((await json(await request('/api/auth/two-factor/policy', undefined, token, 'GET', overrides))).data).toMatchObject({ required: false, configured: false, notice: '二段階認証の鍵が未設定のため、必須にできません' });
+    expect((await request('/api/auth/two-factor/policy', { required: true }, token, 'PUT', overrides)).status).toBe(400);
+    expect(log).toHaveBeenCalledWith('[auth] MFA_KEY_UNAVAILABLE: 二段階認証の鍵が未設定のため、必須にできません'); log.mockRestore();
   });
+  it('a missing key does not bypass an existing personal enrollment', async () => {
+    await seed(); await enroll();
+    const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123' }, undefined, 'POST', { TOTP_ENCRYPTION_KEY: undefined });
+    expect(res.status).toBe(500); expect(res.headers.get('set-cookie')).toBeNull();
+  });
+  it('regeneration needs a one-use self confirmation, invalidates all old codes and returns only counts afterwards', async () => {
+    await seed(); const old = await enroll(); expect(old.every(code => /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code))).toBe(true);
+    const token = await session();
+    expect((await request('/api/auth/two-factor/recovery', {}, token)).status).toBe(401);
+    const grant = 'fixture-recovery-grant';
+    await createStepUpGrant(db.db, { tokenHash: await sha256Hex(grant), staffId: 'owner', purpose: 'auth.mfa.recovery', expiresAt: new Date(Date.now()+60000).toISOString(), sessionTokenHash: await sha256Hex(token) });
+    const regenerate = () => app().request('https://api.example.com/api/auth/two-factor/recovery', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer lh_session:${token}`, 'X-Step-Up-Token': grant }, body: '{}' }, { DB: db.db, TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
+    const refreshed = await regenerate(); expect(refreshed.status).toBe(200); expect(refreshed.headers.get('cache-control')).toBe('private, no-store');
+    const codes = (await json(refreshed)).data.recoveryCodes; expect(codes).toHaveLength(8);
+    expect((await regenerate()).status).toBe(401);
+    const self = await request('/api/auth/two-factor/self', undefined, token); expect((await json(self)).data).toMatchObject({ remaining: 8, total: 8 });
+    const start = (await json(await login())).data;
+    expect((await request('/api/auth/two-factor/verify', { challengeToken: start.challengeToken, code: old[0] })).status).toBe(400);
+    for (const code of codes.slice(0, 6)) {
+      const start = (await json(await login())).data;
+      const res = await request('/api/auth/two-factor/verify', { challengeToken: start.challengeToken, code }); expect(res.status).toBe(200);
+    }
+    expect((await json(await request('/api/auth/session', undefined, token))).data).toMatchObject({ recoveryCodesRemaining: 2 });
+    expect(db.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='auth.mfa.recovery.regenerate'").get()).toEqual({ n: 1 });
+  });
+});
+
+ it('re-enrollment preserves the working app until a confirmed replacement, requires self confirmation and revokes sessions after replacing', async () => {
+    await seed(); await enroll(); const token = await session();
+    const previous = db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get() as { totp_secret_enc: string };
+    expect((await request('/api/staff/owner/two-factor/setup', {}, token)).status).toBe(428);
+    const grant = 'fixture-reenroll-grant';
+    await createStepUpGrant(db.db, { tokenHash: await sha256Hex(grant), staffId: 'owner', purpose: 'auth.mfa.reenroll', expiresAt: new Date(Date.now()+60000).toISOString(), sessionTokenHash: await sha256Hex(token) });
+    const start = await app().request('https://api.example.com/api/staff/owner/two-factor/setup', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer lh_session:${token}`, 'X-Step-Up-Token': grant }, body: '{}' }, { DB: db.db, TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
+    expect(start.status).toBe(200);
+    expect(db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get()).toEqual(previous);
+    const replacement = new URL((await json(start)).data.provisioningUri).searchParams.get('secret')!;
+    const confirmed = await request('/api/staff/owner/two-factor/confirm', { code: await totpAtStep(replacement, Math.floor(Date.now()/30000)) }, token);
+    expect(confirmed.status).toBe(200); expect((await json(confirmed)).data.recoveryCodes).toHaveLength(8);
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 0 });
+    expect((await decryptTotpEnrollment((db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get() as { totp_secret_enc: string }).totp_secret_enc, key)).secret).toBe(replacement);
+  });
+
+it('staff can inspect and regenerate only their own codes without an organization-management permission', async () => {
+  await seed('owner', 'staff'); const codes = await enroll(); const token = await session();
+  expect((await json(await request('/api/auth/two-factor/self?staffId=other', undefined, token))).data).toMatchObject({ staffId: 'owner', remaining: 8 });
+  expect((await request('/api/auth/two-factor/recovery', { staffId: 'other' }, token)).status).toBe(401);
+  const grant = 'fixture-staff-grant';
+  await createStepUpGrant(db.db, { tokenHash: await sha256Hex(grant), staffId: 'owner', purpose: 'auth.mfa.recovery', expiresAt: new Date(Date.now()+60000).toISOString(), sessionTokenHash: await sha256Hex(token) });
+  const res = await app().request('https://api.example.com/api/auth/two-factor/recovery', { method: 'POST', headers: { Authorization: `Bearer lh_session:${token}`, 'Content-Type': 'application/json', 'X-Step-Up-Token': grant }, body: JSON.stringify({ staffId: 'other' }) }, { DB: db.db, TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
+  expect(res.status).toBe(200); expect((await json(res)).data.recoveryCodes).toHaveLength(8);
+  expect(codes).toHaveLength(8);
+});
+
+it.each(['expired', 'different-session'])('re-enrollment %s proof leaves the old app and recovery codes intact', async scenario => {
+  await seed(); await enroll(); const token = await session();
+  const old = db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get() as { totp_secret_enc: string };
+  const grant = `reenroll-${scenario}`;
+  await createStepUpGrant(db.db, { tokenHash: await sha256Hex(grant), staffId: 'owner', purpose: 'auth.mfa.reenroll', expiresAt: new Date(Date.now()+60000).toISOString(), sessionTokenHash: await sha256Hex(token) });
+  const started = await app().request('https://api.example.com/api/staff/owner/two-factor/setup', { method: 'POST', headers: { Authorization: `Bearer lh_session:${token}`, 'Content-Type': 'application/json', 'X-Step-Up-Token': grant }, body: '{}' }, { DB: db.db, TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
+  expect(started.status).toBe(200);
+  const nextSecret = new URL((await json(started)).data.provisioningUri).searchParams.get('secret')!;
+  let currentToken = token;
+  if (scenario === 'expired') {
+    const row = db.raw.prepare("SELECT value FROM platform_settings WHERE key='auth.mfa.reenroll:owner'").get() as { value: string };
+    const proof = JSON.parse(row.value); proof.expiresAt = '2000-01-01T00:00:00Z';
+    db.raw.prepare("UPDATE platform_settings SET value=? WHERE key='auth.mfa.reenroll:owner'").run(JSON.stringify(proof));
+  } else {
+    currentToken = 'fixture-second-session';
+    const hash = await sha256Hex(currentToken);
+    db.raw.prepare('INSERT INTO admin_sessions(token_hash,staff_id,expires_at) VALUES (?,?,?)').run(hash,'owner',new Date(Date.now()+60000).toISOString());
+    db.raw.prepare('INSERT INTO platform_settings(key,value) VALUES (?,?)').run(`auth.mfa.session:${hash}`,'owner');
+  }
+  const denied = await request('/api/staff/owner/two-factor/confirm', { code: await totpAtStep(nextSecret, Math.floor(Date.now()/30000)) }, currentToken);
+  expect(denied.status).toBe(401);
+  expect(db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get()).toEqual(old);
+  expect(db.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='auth.mfa.reenroll'").get()).toEqual({ n: 0 });
 });
