@@ -110,7 +110,7 @@ function post(path: string, staffId: string, body: unknown): Promise<Response> {
 }
 
 beforeEach(() => {
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   insertAccount('acc-1');
   insertAccount('acc-2', 'tenant-B');
   insertStaff('owner-1', 'owner');

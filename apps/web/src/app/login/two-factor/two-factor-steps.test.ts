@@ -18,7 +18,11 @@ describe('二段階認証の手順の列（m18e・320px）', () => {
         const css = readFileSync(join(APP, 'v8/login/two-factor-ops.module.css'), 'utf8')
         expect(css).toContain('flex-direction: column;')
         expect(css).toContain('width: 100%;')
-      } else expect(source).toContain('grid-cols-1 gap-2 text-xs sm:grid-cols-2')
+      } else {
+        expect(readUiSource(join(APP, page))).toContain('<AuthForm')
+        const css = readFileSync(join(APP, 'components/templates/auth-page.module.css'), 'utf8')
+        expect(css).toContain('flex-direction: column;')
+      }
       expect(source).not.toContain('grid grid-cols-2 gap-2')
     })
   }

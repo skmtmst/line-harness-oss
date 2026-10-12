@@ -3009,6 +3009,35 @@
         ],
         "needed": ""
       }
+    },
+    {
+      "id": "auth-page",
+      "name": "認証の画面",
+      "role": "確認・初回登録・回復コードを同じログインの枠で見せる",
+      "rules": [
+        "B-263"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/auth-page.tsx",
+            "apps/web/src/components/templates/auth-page.module.css"
+          ],
+          "components": [
+            "AuthPage"
+          ],
+          "vars": [
+            "--tpl-ms-otp-card-w"
+          ]
+        },
+        "pen": [],
+        "status": "絵はあとで司令塔が描く"
+      },
+      "code": {
+        "selectorHint": "authPage",
+        "overrideSelectors": [],
+        "signals": []
+      }
     }
   ]
 }

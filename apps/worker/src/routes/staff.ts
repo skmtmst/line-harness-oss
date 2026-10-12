@@ -17,7 +17,7 @@ import {
   sendStaffInviteEmail, sendStaffLineLinkEmail,
   sendStaffEmailChangeConfirmEmail, sendStaffEmailChangeNoticeEmail, sendStaffEmailChangeCompletedEmail,
 } from '../services/staff-invite.js';
-import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
+import { createTotpEnrollment, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
 import { getLineAccounts } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1057,6 +1057,7 @@ staff.post('/api/staff/:id/two-factor/setup', inputJsonBoundary(), async (c) => 
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
 
+  if (member.totp_enabled_at) return c.json({ success: false, error: '登録済みの二段階認証は解除してから登録し直してください' }, 409);
   const secret = generateTotpSecret();
   await updateStaffMember(c.env.DB, id, {
     totp_pending_secret_enc: await encryptTotpSecret(secret, key),
@@ -1086,19 +1087,19 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
   if (!result.valid) {
     return inputError(c, { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' }, attempt.attempts >= attempt.maxAttempts ? 429 : 400, []);
   }
-  const updated = await updateStaffMember(c.env.DB, id, {
-    totp_secret_enc: encrypted,
-    totp_pending_secret_enc: null,
-    totp_enabled_at: new Date().toISOString(),
-    totp_last_used_step: null,
-  });
+  const enrollment = await createTotpEnrollment(await decryptTotpSecret(encrypted, key), key);
+  const promoted = await c.env.DB.prepare(`UPDATE staff_members SET totp_secret_enc=?,totp_pending_secret_enc=NULL,
+    totp_enabled_at=?,totp_last_used_step=? WHERE id=? AND is_active=1 AND totp_enabled_at IS NULL AND totp_pending_secret_enc=?`)
+    .bind(enrollment.encrypted, new Date().toISOString(), result.step, id, encrypted).run();
+  if (promoted.meta.changes !== 1) return c.json({ success: false, error: '二段階認証はすでに設定されています' }, 409);
+  const updated = await getStaffById(c.env.DB, id);
   if (updated) {
     await clearTwoFactorSetupAttempts(c.env.DB, id);
     // 運営メンバーの招待（★V6 37-10）: 2要素認証の登録が終わった時点で登録完了にする
     await activatePlatformAdminIfAwaitingTotp(c.env.DB, id);
     await revokeStaffAuthentication(c.env.DB, id);
   }
-  return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!, staffEmailVisibility(c, updated!.id)) });
+  return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, updated!, staffEmailVisibility(c, updated!.id)), recoveryCodes: enrollment.recoveryCodes } });
 });
 
 staff.delete('/api/staff/:id/two-factor', async (c) => {

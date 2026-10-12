@@ -1476,12 +1476,20 @@ const spec = {
       post: {
         tags: ['Auth'], summary: 'パスワードを再設定', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
-        responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
+        responses: { '200': { description: 'パスワード更新・既存セッション失効。TOTPは保持し、セッションは発行しない' }, '400': { description: 'Invalid or expired token' } },
       },
+    },
+    '/api/auth/two-factor/policy': {
+      get: { summary: '統括のログインで二段階認証を必須にする設定', tags: ['Auth'],
+        responses: { '200': { description: 'required と canEdit（初期値On）' }, '401': { description: '未ログイン' } } },
+      put: { summary: 'オーナー・運営が二段階認証のOn/Offを変更', tags: ['Auth'],
+        parameters: [{ name: 'X-Step-Up-Token', in: 'header', schema: { type: 'string' }, description: 'Offにする時の本人確認。セッションに結び付く1回限りの票' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['required'], properties: { required: { type: 'boolean' } } } } } },
+        responses: { '200': { description: '監査へ保存。Onへの変更時は既存セッションを失効' }, '401': { description: '再確認が必要' }, '403': { description: '変更権限なし' }, '409': { description: '他の操作と競合' } } },
     },
     '/api/auth/two-factor/setup': {
       post: {
-        tags: ['Auth'], summary: 'TOTP未登録の管理者向けに二段階認証の初回設定を開始', security: [],
+        tags: ['Auth'], summary: 'TOTP未登録の人が二段階認証の初回登録を開始', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken'], properties: { challengeToken: { type: 'string' } } } } } },
         responses: { '200': { description: 'provisioningUri and manualKey issued' }, '400': { description: 'Missing challenge token' }, '401': { description: 'Invalid or expired setup challenge' }, '409': { description: 'TOTP already configured' } },
       },
@@ -1490,7 +1498,7 @@ const spec = {
       post: {
         tags: ['Auth'], summary: '二段階認証の初回設定を確認してセッションを発行', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken', 'code'], properties: { challengeToken: { type: 'string' }, code: { type: 'string' } } } } } },
-        responses: { '200': { description: 'TOTP enabled; session issued' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
+        responses: { '200': { description: 'TOTP登録・確認済みセッション発行。回復コード8個をこの時だけ返す' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
     '/api/auth/ops-invite/check': {
@@ -1504,7 +1512,7 @@ const spec = {
       post: {
         tags: ['Auth'], summary: '運営メンバーの招待を受ける（名前・パスワード設定 → 2要素認証待ち）', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' }, name: { type: 'string' }, password: { type: 'string' } } } } } },
-        responses: { '200': { description: 'Session issued; next = two-factor-setup' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
+        responses: { '200': { description: '確認または登録用のchallengeTokenのみ。セッションは二段階の確認後に発行' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
       },
     },
     '/api/auth/sessions': {

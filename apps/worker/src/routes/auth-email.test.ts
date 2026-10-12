@@ -89,7 +89,7 @@ function lastMailSubject(): string {
 }
 
 beforeEach(() => {
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   mail.sendPlainMail.mockClear();
   turnstile.result = { ok: true };
 });
@@ -116,7 +116,7 @@ describe('会員登録（36-4）', () => {
     });
     expect(completed.status).toBe(200);
     const body = await json(completed);
-    // 二段階認証は一時解除中（利用者指示 2026-10-03）。登録が終わればそのまま入れる。
+    // この試験は明示したOffの登録・セッション互換を確かめる。
     expect(body.data.twoFactorSetup).toBeUndefined();
     expect(body.data.deviceMarker).toMatch(/^[A-Za-z0-9_-]{16,}$/);
     expect(completed.headers.get('set-cookie') ?? '').toContain('lh_admin_session=');
@@ -224,7 +224,7 @@ describe('メール＋パスワードのログイン', () => {
     const res = await call('POST', '/api/auth/password/login', { email: 'OWNER@example.com', password: 'Abcdefg1' });
     expect(res.status).toBe(200);
     const body = await json(res);
-    // 二段階認証は一時解除中（利用者指示 2026-10-03）。パスワードが合えばそのまま入れる。
+    // Offかつ未登録の本人はパスワードだけで入れる。
     expect(body.data.twoFactorSetup).toBeUndefined();
     expect(body.csrfToken).toBeTruthy();
     expect(res.headers.get('set-cookie') ?? '').toContain('lh_admin_session=');
@@ -271,27 +271,24 @@ describe('メール＋パスワードのログイン', () => {
       expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'wrong0000' })).status).toBe(401);
     }
     expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' })).status).toBe(429);
-    // 別の接続元は別に数える
+    // 別IPでも同じアカウントの制限を通り抜けない。
+    expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { ip: '198.51.100.7' })).status).toBe(429);
+    testDb.raw.prepare("UPDATE auth_throttles SET window_start='2000-01-01T00:00:00Z'").run();
     const ok = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { ip: '198.51.100.7' });
     expect(ok.status).toBe(200);
     expect((await json(ok)).csrfToken).toBeTruthy();
   });
 
-  /*
-   * 二段階認証は一時解除中（利用者指示 2026-10-03）。TOTP を登録済みの人でも
-   * ログイン時には合言葉を出さず、そのままセッションを発行する。
-   * 再有効化したらこの試験を「合言葉を返し、セッションはまだ出さない」へ戻す。
-   */
-  it('TOTPを登録済みの人も、解除中はログイン時に合言葉を求めない', async () => {
+  it('OffでもTOTPを登録済みの人は合言葉を求め、セッションを出さない', async () => {
     await seedOwner();
     testDb.raw.prepare(`UPDATE staff_members SET totp_secret_enc = 'enc', totp_enabled_at = '2026-09-01T00:00:00.000+09:00' WHERE id = 's1'`).run();
-    const res = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    const res = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { env: { TOTP_ENCRYPTION_KEY: 'test-master-key-which-is-longer-than-32-characters' } });
     expect(res.status).toBe(200);
     const body = await json(res);
-    expect(body.data.twoFactor).toBe(false);
-    expect(body.data.challengeToken).toBeUndefined();
-    expect(res.headers.get('set-cookie') ?? '').toContain('lh_admin_session=');
-    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 0 });
+    expect(body.data.twoFactor).toBe(true);
+    expect(body.data.challengeToken).toBeTruthy();
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 1 });
   });
 
   it('運営ログインは有効な運営メンバーだけが通る', async () => {
@@ -303,7 +300,7 @@ describe('メール＋パスワードのログイン', () => {
 
     const denied = await call('POST', '/api/auth/password/login', {
       email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
-    }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    }, { env: { TOTP_ENCRYPTION_KEY: 'test-master-key-which-is-longer-than-32-characters' } });
     expect(denied.status).toBe(403);
     expect((await json(denied)).code).toBe('not_platform_admin');
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 0 });
@@ -311,10 +308,10 @@ describe('メール＋パスワードのログイン', () => {
     testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('s1', 1, 'active')`).run();
     const allowed = await call('POST', '/api/auth/password/login', {
       email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
-    }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    }, { env: { TOTP_ENCRYPTION_KEY: 'test-master-key-which-is-longer-than-32-characters' } });
     expect(allowed.status).toBe(200);
-    expect((await json(allowed)).data.twoFactor).toBe(false);
-    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 0 });
+    expect((await json(allowed)).data.twoFactor).toBe(true);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 1 });
   });
 
   it('招待中の運営メンバーがログイン画面へ来たら招待リンクへ案内し、ループさせない', async () => {
@@ -339,7 +336,7 @@ describe('メール＋パスワードのログイン', () => {
     testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('invitee', 1, 'invited')`).run();
     const res = await call('POST', '/api/auth/password/login', {
       email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
-    }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    }, { env: { TOTP_ENCRYPTION_KEY: 'test-master-key-which-is-longer-than-32-characters' } });
     expect(res.status).toBe(200);
   });
 });

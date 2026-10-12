@@ -1,6 +1,8 @@
 'use client'
 import { Check, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import MfaPolicy from '@/v8/settings/staff/mfa-policy'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -28,6 +30,7 @@ type Session = { id: string; name: string; platformAdmin?: boolean; platformAdmi
  */
 export default function OpsTwoFactorV8() {
   const saveErrors = useSaveFormErrors()
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
   const [uri, setUri] = useState('')
@@ -114,6 +117,7 @@ export default function OpsTwoFactorV8() {
     const res = await opsCall(api.staff.confirmTwoFactorSetup(session.id, digits))
     setBusy(false)
     if (!res.success) { setError(otpFailureMessage(res.error || '認証コードが正しくありません')); return }
+    setRecoveryCodes(res.data?.recoveryCodes ?? [])
     setState('done')
   }
 
@@ -129,6 +133,7 @@ export default function OpsTwoFactorV8() {
       <section className={styles.card} aria-labelledby="ops-totp-title">
         <PageHeading title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
 
+        {session?.platformAdmin ? <MfaPolicy loginPath="/ops/login" /> : null}
         {state === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="準備しています" />
         ) : state === 'denied' ? (
@@ -136,7 +141,7 @@ export default function OpsTwoFactorV8() {
             <ListState permissionScope="hq" kind="forbidden" title="この画面は運営メンバーだけが開けます" description="招待メールのリンクから進んでください。" />
             <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button>
           </>
-        ) : state === 'done' ? (
+        ) : state === 'done' && recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => void logoutAndGoToLogin('/ops/login')} /> : state === 'done' ? (
           <>
             <NoteBar tone="info">2要素認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
             <Button variant="primary" onClick={() => void logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>

@@ -454,6 +454,7 @@ export type Env = {
     staff: AuthenticatedStaff;
     /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
     auditRecorded?: boolean;
+    mfaAuditRecorded?: boolean;
     /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
     /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */

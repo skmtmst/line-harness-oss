@@ -5,6 +5,7 @@ import { health } from './health.js';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async () => null),
   getAccountHealthLogs: vi.fn(async () => []),
   getLatestRiskLevel: vi.fn(async () => null),

@@ -50,7 +50,6 @@ shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/login/page.tsx
-shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer v8/mileage/score-rules.tsx
 shared-button-importer v8/nen-campaigns/column-intros.tsx
@@ -521,3 +520,5 @@ shared-button-importer v8/restaurant/google/profile-hours.tsx
 shared-button-importer components/shared/allergy-field.tsx
 shared-button-importer v8/settings/customer-look/screen.tsx
 shared-button-importer components/shared/selection-button.tsx
+shared-button-importer v8/login/recovery-codes.tsx
+shared-button-importer v8/login/two-factor-setup.tsx

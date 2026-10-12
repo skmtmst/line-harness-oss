@@ -2,6 +2,8 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { setDocumentTitle } from '@/lib/document-title'
+import { PageHeading } from '@/components/templates/page-frame'
+import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
 
 /**
@@ -17,17 +19,27 @@ export default function AuthCard({
   children,
   node,
   cardNode,
+  variant,
+  titleId,
 }: {
   title: string
   description: ReactNode
   children: ReactNode
   /** Pencil の画面ノード。 */
-  node: string
+  node?: string
   /** Pencil のカードノード。 */
-  cardNode: string
+  cardNode?: string
+  variant?: 'totp'
+  titleId?: string
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useEffect(() => { setDocumentTitle(title) }, [title])
+  // V8 login confirmation/enrollment inherits its existing card tokens.
+  if (variant === 'totp') return <main className={authStyles.page}><section className={authStyles.card} aria-label={title} data-design-node={cardNode}>
+    <PageHeading title={title} titleAs="h1" titleId={titleId} help={description} />
+    {children}
+  </section></main>
+
   return (
     <main data-design-node={node} className="flex min-h-svh flex-col items-center justify-center bg-shell px-4 py-8 sm:px-6">
       <section

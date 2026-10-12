@@ -1,8 +1,10 @@
 import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
-import { getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
+import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
+
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 import type { AdminSameSite } from './admin-auth-config.js';
 
@@ -216,6 +218,7 @@ export function isTenantSuspensionExemptPath(method: string, path: string): bool
 }
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
+  ['/api/auth/two-factor/policy', 'auth.mfa.policy'],
   ...DELIVERY_API_PERMISSIONS,
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
   ['/api/support', '/chats'], ['/api/operators', '/chats'],
@@ -612,6 +615,15 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
+  const required = await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+  const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
+  if (required || registered) {
+    const verified = await getPlatformSetting(c.env.DB, `auth.mfa.session:${await sha256Hex(token)}`);
+    if ((required && !registered) || verified !== staff.id) {
+      await deleteAdminSession(c.env.DB, await sha256Hex(token));
+      return null;
+    }
+  }
   return { ...toAuthenticatedStaff(staff), credential: 'session' };
 }
 
@@ -646,11 +658,16 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
+    const required = await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+    // This endpoint exchanges the primary credential for a challenge, never
+    // for an authenticated staff context usable by other APIs.
+    if (c.req.path !== '/api/auth/login' && (required || staff.totp_enabled_at)) return null;
     return { ...toAuthenticatedStaff(staff), credential: 'api-key' };
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
+    if (await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
@@ -664,6 +681,7 @@ export async function authenticateApiToken(
     c.env.LEGACY_API_KEY !== c.env.API_KEY &&
     token === c.env.LEGACY_API_KEY
   ) {
+    if (await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     console.log('[auth] accept_via=LEGACY_API_KEY');
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
@@ -756,7 +774,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // /api/ops/* は直後の route 側で requirePlatformAdmin() が全件を守るため、
   // ここで通常スタッフ向けの画面権限へ落とすと、登録済みの運営メンバーまで
   // 専用判定へ到達する前に 403 になる。運営 API だけは専用の門番へ委ねる。
-  const usesPlatformAdminAuthorization = path.startsWith('/api/ops/');
+  const usesPlatformAdminAuthorization = path.startsWith('/api/ops/') || path === '/api/auth/two-factor/policy';
   if (staff.role === 'staff'
       && !usesPlatformAdminAuthorization
       && !isStaffSelfEndpoint(method, path, staff.id)

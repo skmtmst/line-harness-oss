@@ -341,6 +341,7 @@ export interface ImpersonationSession {
 export async function getActiveImpersonation(
   db: D1Database,
   staffId: string,
+  sessionTokenHash?: string | null,
 ): Promise<ImpersonationSession | null> {
   return db
     .prepare(

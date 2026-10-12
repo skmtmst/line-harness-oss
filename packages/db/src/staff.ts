@@ -646,6 +646,9 @@ export async function deleteAdminSessionForStaff(
     .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash = ?')
     .bind(staffId, tokenHash)
     .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    await db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash).run();
+  }
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -655,6 +658,9 @@ export async function deleteOtherAdminSessions(
   staffId: string,
   keepTokenHash: string,
 ): Promise<number> {
+  await db.prepare(`DELETE FROM platform_settings WHERE key IN
+    (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=? AND token_hash<>?)`)
+    .bind(staffId, keepTokenHash).run();
   const result = await db
     .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
     .bind(staffId, keepTokenHash)
@@ -685,11 +691,15 @@ export async function getStaffByAdminSession(
 }
 
 export async function deleteAdminSession(db: D1Database, tokenHash: string): Promise<void> {
-  await db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash).run();
+  await db.batch([
+    db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash),
+    db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash),
+  ]);
 }
 
 export async function deleteExpiredAdminSessions(db: D1Database, now: string): Promise<void> {
-  await db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
+  await db.batch([db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE expires_at<=?)").bind(now),
+    db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now)]);
 }
 
 /**
@@ -701,6 +711,7 @@ export async function deleteExpiredAdminSessions(db: D1Database, now: string): P
  */
 export async function revokeStaffAuthentication(db: D1Database, staffId: string): Promise<void> {
   await db.batch([
+    db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=?)").bind(staffId),
     db.prepare('DELETE FROM admin_sessions WHERE staff_id = ?').bind(staffId),
     db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId),
   ]);

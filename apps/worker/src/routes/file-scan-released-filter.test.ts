@@ -73,7 +73,7 @@ async function get(path: string): Promise<Response> {
 }
 
 beforeEach(() => {
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   insertAccount('acc-1');
   insertStaff('owner-1');
 });
