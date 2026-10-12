@@ -9,7 +9,7 @@
  * 編集 n9Z2P）は dialogs.tsx。データの口は今の画面（app/accounts/detail）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ArchiveRestore, ArrowLeftRight, Pause, Pencil, Play, QrCode } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -67,6 +67,7 @@ const LINKS = [
 ] as const
 
 export default function AccountDetailV8() {
+  const archiveReasonId = useId()
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
   const role = useStaffRole()
@@ -396,10 +397,10 @@ export default function AccountDetailV8() {
                       {account.isActive ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
                       {account.isActive ? '送受信を止める' : '送受信を再開する'}
                     </Button>
-                    <Button type="button" variant="danger" disabled={blocked !== null} onClick={() => setArchiveTarget(account)}>
+                    <Button type="button" variant="danger" disabled={blocked !== null} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => setArchiveTarget(account)}>
                       アーカイブする
                     </Button>
-                    {blocked ? <p className={styles.note}>{blocked}</p> : null}
+                    {blocked ? <p id={archiveReasonId} className={styles.note}>{blocked}</p> : null}
                   </>
                 )}
               </div>
