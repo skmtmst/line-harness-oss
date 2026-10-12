@@ -159,11 +159,13 @@ export default function Select({
     if (size !== 'content' || !root || iconOnly) return
     let active = true
     const measure = () => { if (active) fitSelectContent(root) }
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(queue)
     observer?.observe(root)
     measure()
     void document.fonts?.ready.then(measure)
-    return () => { active = false; observer?.disconnect(); root.style.removeProperty('--list-select-content-width') }
+    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); root.style.removeProperty('--list-select-content-width') }
   }, [size, selected?.label, label, treatment, showChevron, iconOnly, icon])
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)

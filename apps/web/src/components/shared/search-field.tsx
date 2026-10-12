@@ -49,11 +49,13 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
     const measure = () => {
       if (active) fitListSearchPlaceholder(input)
     }
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(queue)
     observer?.observe(slot)
     measure()
     void document.fonts?.ready.then(measure)
-    return () => { active = false; observer?.disconnect(); slot.style.removeProperty('--list-search-content-min') }
+    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); slot.style.removeProperty('--list-search-content-min') }
   }, [props.placeholder])
   const setRefs = (node: HTMLInputElement | null) => {
     innerRef.current = node

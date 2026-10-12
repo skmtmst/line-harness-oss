@@ -18,7 +18,9 @@ function useToolbarFit() {
         for (const row of toolbar.querySelectorAll<HTMLElement>('[data-toolbar-row]')) fitToolbarWrap(row)
       } else fitToolbarWrap(toolbar)
     }
-    const observer = new ResizeObserver(measure)
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = new ResizeObserver(queue)
     const observe = () => {
       observer.disconnect()
       observer.observe(toolbar)
@@ -29,7 +31,7 @@ function useToolbarFit() {
     mutations.observe(toolbar, { childList: true, subtree: true, characterData: true })
     observe()
     void document.fonts?.ready.then(measure)
-    return () => { mutations.disconnect(); observer.disconnect() }
+    return () => { mutations.disconnect(); cancelAnimationFrame(frame); observer.disconnect() }
   }, [])
   return ref
 }
@@ -154,12 +156,14 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
       if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = content.getBoundingClientRect().width
       setCollapsed(!toolbarContentFit(toolbar, item, expandedWidthRef.current).fits)
     }
-    const observer = new ResizeObserver(measure)
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = new ResizeObserver(queue)
     observer.observe(toolbar)
     for (const group of toolbar.querySelectorAll('[data-toolbar-tools]')) for (const tool of group.children) observer.observe(tool)
     measure()
     void document.fonts?.ready.then(measure)
-    return () => observer.disconnect()
+    return () => { cancelAnimationFrame(frame); observer.disconnect() }
   }, [children, compact])
   return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
     onKeyDown={(event) => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}
@@ -206,11 +210,13 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
       choices.dataset.filterWidth = String(unfoldedWidth.current)
       setCollapsed(!toolbarContentFit(toolbar).fits)
     }
-    const observer = new ResizeObserver(measure)
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = new ResizeObserver(queue)
     observer.observe(toolbar); observer.observe(choices)
     measure()
     void document.fonts?.ready.then(measure)
-    return () => observer.disconnect()
+    return () => { cancelAnimationFrame(frame); observer.disconnect() }
   }, [children])
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')

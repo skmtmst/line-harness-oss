@@ -769,14 +769,12 @@ function WebinarList() {
     </div>
   )
   const sortBox = (
-    <div className={styles.sortBox}>
-      <SortSelect
+    <SortSelect
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={[{ value: 'updated', label: '更新順' }, { value: 'created', label: '作成順' }, { value: 'name', label: '名前順' }]}
         label="並び："
       />
-    </div>
   )
   const savedBox = (
     <div className={styles.savedBox}>

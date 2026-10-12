@@ -105,3 +105,14 @@ test('collapsed controls still wrap when their minimum widths cannot fit and ret
     assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具のはみ出し'))
   } finally { await browser.close() }
 })
+
+test('a requested secondary toolbar stays on its own row even when the primary controls fit', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar data-toolbar-layout="band" data-toolbar-fit="single" style="width:800px"><button style="width:200px;flex:none">検索</button><div class="secondary" data-toolbar-secondary><button style="width:300px;flex:none">並び</button></div></div></section></html>`)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具のはみ出し'))
+    const positions = await page.locator('button').evaluateAll(es => es.map(e => e.getBoundingClientRect().y))
+    assert.ok(positions[1] > positions[0], 'an explicit second section is not counted as a first-row tool')
+  } finally { await browser.close() }
+})
