@@ -135,6 +135,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   return (
     <>
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <StatRow>
         <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・アーカイブ" icon={null} presentation="band" value={null} unit="" />
         <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" icon={null} presentation="band" value={null} unit="" />

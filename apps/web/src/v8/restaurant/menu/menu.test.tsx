@@ -113,6 +113,7 @@ describe('MJoJR メニュー管理', () => {
     role.value = 'staff'
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /メニューを追加する/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /の操作$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
