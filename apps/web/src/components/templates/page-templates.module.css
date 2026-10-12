@@ -354,7 +354,6 @@
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsNav { width: auto; flex-direction: column; }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
 :global([data-theme='v8']) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }
-:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) :global([data-settings-nav='inline'] li > ul) { --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad); }
 /* 同じ畳み方を SettingsPage.layout のアカウント3板にも使う（x2dSNv は上24：アカウント担当の測り）。 */
 @container v8-page (max-width: 1099px) {
   :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
