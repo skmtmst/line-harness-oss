@@ -4,6 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { normalizeActionLabel } from './action-words'
 import Button from './button'
 import KpiCard from './kpi-card'
+import ActionMenu from './action-menu'
+import ConfirmDialog from './confirm-dialog'
 afterEach(cleanup)
 it.each([
   ['直す', '編集する'], ['編集', '編集する'], ['フォルダを直す', 'フォルダを編集する'],
@@ -22,4 +24,20 @@ it('数の帯は同じ操作の口で既存の絞り込みを呼び、リンク�
   fireEvent.click(screen.getByRole('button', { name: '編集する' }))
   expect(filter).toHaveBeenCalledOnce()
   expect(screen.getByRole('link', { name: '詳しく見る' }).getAttribute('href')).toBe('/history')
+})
+it('行の編集と確認窓の実行を統一し、別の動きと説明は保つ', () => {
+  const edit = vi.fn(), reload = vi.fn(), confirm = vi.fn()
+  const menu = render(<ActionMenu open items={[
+    { id: 'edit', label: '編集', onSelect: edit },
+    { id: 'reload', label: '読み直す', onSelect: reload },
+  ]} onClose={() => {}} />)
+  fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '読み直す' }))
+  expect(edit).toHaveBeenCalledOnce()
+  expect(reload).toHaveBeenCalledOnce()
+  menu.unmount()
+  render(<ConfirmDialog open title="受け皿の確認" description="届く中身を変更します。" confirmLabel="受け皿の中身を直す" onConfirm={confirm} onCancel={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: '受け皿の中身を編集する' }))
+  expect(confirm).toHaveBeenCalledOnce()
+  expect(screen.getByText('届く中身を変更します。')).toBeTruthy()
 })

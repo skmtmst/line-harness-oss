@@ -34,37 +34,6 @@
 /* 閲覧のみの帯（OxSw8）。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin-bottom: var(--tpl-cv-band-after); }
 
-/* 数の帯の説明の行と、右端の「直す →」。 */
-.kpiDetailRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-cv-gap-s);
-  width: 100%;
-}
-
-.kpiDetailText {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.kpiFix {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--tpl-cv-fix-gap);
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-action);
-  font: inherit;
-  font-weight: 600;
-  line-height: inherit;
-  cursor: pointer;
-}
-
 /* フォルダの列の注。 */
 .folderNote {
   margin: 0;

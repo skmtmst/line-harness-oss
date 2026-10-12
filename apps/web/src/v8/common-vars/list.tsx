@@ -14,7 +14,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
+import { Archive, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
