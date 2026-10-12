@@ -8,7 +8,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { Eye } from 'lucide-react';
 import type { Tag } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -105,9 +105,9 @@ export default function ColumnNew() {
         boardId="yRDwW"
         title="コラムを書く"
         help="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
-        footerActions={<></>} dirty={false}
+        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>} notice={<ReadOnlyNotice>閲覧のみで見ています。コラムを書くのは管理者に頼んでください。</ReadOnlyNotice>} dirty={false}
       >
-        <ReadOnlyNotice>閲覧のみで見ています。コラムを書くのは管理者に頼んでください。</ReadOnlyNotice>
+        {null}
       </CreatePage></SaveErrorScope>
     )
   }
@@ -157,16 +157,16 @@ export default function ColumnNew() {
           <span className={styles.bubbleText}>{`【コラム】${title}\n${excerpt}\n▶ コラムを読む`}</span>
         </LinePreviewMessage>}
       </LinePreview>
-      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-tips">
-        <h2 className={styles.sideTitle} id="nen-col-tips">読まれるコラムの書きかた</h2>
+      <Card role="region" variant="aside" gap="tight" aria-labelledby="nen-col-tips">
+        <CardHeader size="stacked" titleId="nen-col-tips" title={<>読まれるコラムの書きかた</>} />
         <ul className={styles.sideText}>
           <li>・相談の言葉から始める</li>
           <li>・売り込みを入れない</li>
           <li>・差し込む言葉（お名前・ペット名）は1つまで</li>
         </ul>
       </Card>
-      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-cannot">
-        <h2 className={styles.sideTitle} id="nen-col-cannot">この画面でできないこと</h2>
+      <Card role="region" variant="aside" gap="tight" aria-labelledby="nen-col-cannot">
+        <CardHeader size="stacked" titleId="nen-col-cannot" title={<>この画面でできないこと</>} />
         <p className={`${styles.sideText} ${styles.sideTextTight}`}>記事の本文を書く（外部サイトで書きます）・出しかたの細かい設定（一斉配信と同じ）</p>
       </Card>
     </div>
@@ -194,8 +194,8 @@ export default function ColumnNew() {
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-title-heading" data-nen-part="title">
-        <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-title-heading">題名と分類</h2>
-        <Field label="題名"><SaveErrorField names={["title","draft.title"]}><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
+        <CardHeader size="stacked" titleId="nen-col-title-heading" title={<>題名と分類</>} />
+        <Field label="題名" required><SaveErrorField names={["title","draft.title"]}><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-title-error">{errorFor('title')}</FieldError></Field>
         <div className={styles.row}>
           <Field label="分類"><SaveErrorField names={["category","draft.category"]}><TextField id="nen-col-category" aria-describedby={errorFor('category') ? 'nen-col-category-error' : undefined} aria-label="分類" value={draft.category} invalid={Boolean(errorFor('category'))} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} /></SaveErrorField>
@@ -210,8 +210,8 @@ export default function ColumnNew() {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-link" data-nen-part="article">
-        <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-link">記事のリンク</h2>
-        <Field label="記事の URL"><SaveErrorField names={["articleUrl","draft.articleUrl","article_url","draft.article_url"]}><TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} /></SaveErrorField>
+        <CardHeader size="stacked" titleId="nen-col-link" title={<>記事のリンク</>} />
+        <Field label="記事の URL" required><SaveErrorField names={["articleUrl","draft.articleUrl","article_url","draft.article_url"]}><TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-articleUrl-error">{errorFor('articleUrl')}</FieldError></Field>
         <div className={styles.field} id="nen-col-imageUrl" tabIndex={-1}>
           <span className={styles.label}>画像</span>
@@ -231,7 +231,7 @@ export default function ColumnNew() {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-kind">
-        <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-kind">届く形</h2>
+        <CardHeader size="stacked" titleId="nen-col-kind" title={<>届く形</>} />
         {/* 届く形は画像の URL で決まる（写真つき＝画像あり、文字だけ＝画像なし）。文字だけを選ぶと画像の URL を外し、写真つきを選ぶと画像の URL の欄へ移る。 */}
         <div className={styles.pickRow} role="radiogroup" aria-label="届く形">
           <RadioCard name="column-kind" value="card" checked={hasImage} onChange={() => { if (!hasImage) document.getElementById('nen-col-imageUrl')?.focus() }} icon={<ImageIcon size={16} aria-hidden="true" />} title="上の写真＋コラムを読む" note={hasImage ? '写真の下に題名とボタン' : '画像の URL を入れると選べます'} />
@@ -240,10 +240,7 @@ export default function ColumnNew() {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-when" data-nen-part="publish">
-        <div className={styles.cardHead}>
-          <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-when">いつ・だれに出しますか</h2>
-          <p className={`${styles.cardNote} ${styles.cardNoteDark}`}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります</p>
-        </div>
+        <CardHeader size="stacked" titleId="nen-col-when" title={<>いつ・だれに出しますか</>} meta={<>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります</>} />
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelRow}>
@@ -285,7 +282,7 @@ export default function ColumnNew() {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-read">
-        <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-read">読んだ人にすること</h2>
+        <CardHeader size="stacked" titleId="nen-col-read" title={<>読んだ人にすること</>} />
         <div className={styles.row}>
           <Field label="読了イベント名"><SaveErrorField names={["completionEventName","draft.completionEventName","completion_event_name","draft.completion_event_name"]}><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></SaveErrorField></Field>
           <div className={styles.field}>
