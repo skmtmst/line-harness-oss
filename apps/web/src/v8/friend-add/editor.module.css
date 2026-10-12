@@ -40,14 +40,6 @@
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
-/* 設定名＋フォルダ（220）の2列。 */
-.fieldPair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-fa-ed-folder-w);
-  align-items: end;
-  gap: var(--tpl-rule-row-gap);
-}
-
 /* だれに送るか：2枚の選ぶカード（高さ98・余白14）。 */
 .kindPair {
   display: grid;

@@ -12,6 +12,7 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import { ChoiceCardV8 } from './ui'
 import styles from './edit.module.css'
@@ -265,7 +266,7 @@ export function ReminderBasicsFormV8({
     <>
       <Card variant="form" gap="normal">
         <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
-        <div className={styles.fieldGrid}>
+        <SettingsFormRow layout="name-folder">
           <div className={styles.field}><Field label="リマインダ名（60文字まで）" htmlFor="v8-reminder-name" required><SaveErrorField names={["name","value.name"]}><TextField
               id="v8-reminder-name"
               invalid={fieldError?.key === 'name'}
@@ -277,7 +278,7 @@ export function ReminderBasicsFormV8({
             /></SaveErrorField>
 {fieldError?.key === 'name' ? <p id="v8-reminder-name-error" className={styles.fieldError} role="alert">{fieldError.message}</p> : null}</Field></div>
           <div className={styles.field}>
-            <span className={styles.label}>フォルダ</span>
+            <Field label="フォルダ">
             <div className={styles.testRow}>
               <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><FolderSelect
                 value={value.folderId}
@@ -296,15 +297,16 @@ export function ReminderBasicsFormV8({
                 <Button onClick={() => setFoldersReloadToken((current) => current + 1)}>もう一度読み込む</Button>
               ) : null}
             </div>
+            </Field>
           </div>
-          <div className={`${styles.field} ${styles.span2}`}><Field label="社内メモ" htmlFor="v8-reminder-memo">{value.description.includes('\n') ? (
+        </SettingsFormRow>
+          <div className={styles.field}><Field label="社内メモ" htmlFor="v8-reminder-memo">{value.description.includes('\n') ? (
               <SaveErrorField names={["description","value.description"]}><TextArea id="v8-reminder-memo" rows={3} value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} /></SaveErrorField>
             ) : (
               <SaveErrorField names={["description","value.description"]}><TextField id="v8-reminder-memo" value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} /></SaveErrorField>
             )}</Field></div>
-        </div>
       </Card>
 
       <Card variant="form" gap="normal">

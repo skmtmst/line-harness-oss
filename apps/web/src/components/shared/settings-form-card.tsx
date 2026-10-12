@@ -17,6 +17,6 @@ export function SettingsFormCard({ title, description, children, actions, ...pro
   </form>
 }
 
-export function SettingsFormRow({ children, postal = false }: { children: ReactNode; postal?: boolean }) {
-  return <div className={postal ? styles.postalRow : styles.row}>{children}</div>
+export function SettingsFormRow({ children, postal = false, layout }: { children: ReactNode; postal?: boolean; layout?: 'name-folder' }) {
+  return <div className={layout === 'name-folder' ? styles.nameFolderRow : postal ? styles.postalRow : styles.row} data-form-row={layout}>{children}</div>
 }

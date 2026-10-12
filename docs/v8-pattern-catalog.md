@@ -949,3 +949,5 @@
 - 持ち主：`components/shared/sticky-bar.tsx` の `StickyBarAction`。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。実際の削除・保管の処理と確認窓は呼び出す画面が保つ。
 
 - 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。
+
+- 名前とフォルダの2列は `SettingsFormRow layout="name-folder"`。名前2・フォルダ1の比率で行の幅を埋め、間は共通12。フォルダは既存 `FolderSelect size="full"`。文字数・再試行・社内メモは各入力の共通部品へ渡す。

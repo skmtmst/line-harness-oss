@@ -60,6 +60,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import SearchField from '@/components/shared/search-field'
@@ -1639,7 +1640,7 @@ function AutoReplyWizardV8Inner() {
             <>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
-                <div className={styles.fieldPair}>
+                <SettingsFormRow layout="name-folder">
                   <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name" required><SaveErrorField names={["ruleName","form.ruleName","rule_name","name","form.rule_name"]}><TextField
                       id="wiz-name"
                       value={form.ruleName}
@@ -1649,6 +1650,7 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.field}><Field label="フォルダ" htmlFor="wiz-folder"><SaveErrorField names={["folderId","form.folderId","folder_id","form.folder_id"]}><FolderSelect
                       id="wiz-folder"
                       aria-label="フォルダ"
+                      size="full"
                       value={form.folderId}
                       onChange={(value) => patch({ folderId: value })}
                       unfiled={{ value: '', label: '分けない' }}
@@ -1658,7 +1660,7 @@ function AutoReplyWizardV8Inner() {
                         ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
                     /></SaveErrorField></Field></div>
-                </div>
+                </SettingsFormRow>
                 <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><SaveErrorField names={["internalMemo","form.internalMemo","internal_memo","form.internal_memo"]}><TextField
                     id="wiz-memo"
                     value={form.internalMemo}

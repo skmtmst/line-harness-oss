@@ -20,6 +20,7 @@ import { Steps } from '@/components/templates/steps';
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts';
 import type { StepperStep } from '@/components/shared/stepper';
 import Button from '@/components/shared/button'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import CheckCard from '@/components/shared/check-card'
@@ -914,7 +915,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
     <>
       <Card variant="form" gap="normal" className={styles.card} aria-label="名前とフォルダ">
         <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
-        <div className={styles.fieldPair}>
+        <SettingsFormRow layout="name-folder">
           <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name" required><SaveErrorField names={["name","rule.name","mine"]}><TextField
               id="fa-name"
               value={rule.name}
@@ -940,7 +941,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
             )}</Field></div>
-        </div>
+        </SettingsFormRow>
         {canEdit ? <Button type="button" variant="text" onClick={() => setMemoOpen(true)}>社内メモ</Button> : null}
       </Card>
       <Dialog open={memoOpen && canEdit} title="社内メモ" onCancel={() => setMemoOpen(false)} footer={<Button type="button" onClick={() => setMemoOpen(false)}>閉じる</Button>}>
