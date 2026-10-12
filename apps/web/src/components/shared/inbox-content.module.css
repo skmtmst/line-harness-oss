@@ -1,0 +1,13 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.media { max-width: 100%; object-fit: contain; }
+.media[data-kind='sticker'] { max-width: var(--tpl-inbox-sticker-size); max-height: var(--tpl-inbox-sticker-size); }
+.media[data-kind='image'] { max-width: var(--tpl-inbox-image-width); border-radius: var(--radius-mini); }
+.media[data-kind='preview'] { display: block; margin-inline: auto; max-height: var(--tpl-inbox-image-preview-height); width: auto; border-radius: var(--radius-mini); }
+.flexMedia { max-width: var(--tpl-inbox-flex-width); }
+.floating { position: absolute; overflow-y: auto; background: var(--color-canvas); border: 1px solid var(--card-edge); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
+.floating[data-placement='below'] { top: 100%; right: 0; z-index: 40; margin-top: var(--space-8); width: var(--tpl-inbox-summary-width); max-width: var(--tpl-inbox-popup-viewport-width); max-height: var(--tpl-inbox-saved-views-height); padding: var(--space-16); }
+.floating[data-placement='above'] { bottom: 100%; left: var(--space-16); z-index: 30; margin-bottom: var(--space-8); width: var(--tpl-inbox-memo-width); max-width: var(--tpl-inbox-memo-max-width); max-height: var(--tpl-inbox-memo-height); padding: var(--polish-space-section); }
+.backdrop { position: fixed; inset: 0; z-index: 60; background: var(--color-scrim); }
+.emailHeading { min-height: var(--tpl-inbox-email-heading-height); padding: var(--polish-space-field) var(--space-16); padding-right: var(--tpl-inbox-email-heading-end); border-bottom: 1px solid var(--color-hairline); }
+}

@@ -30,8 +30,8 @@ export function InboxListPane({ selected, ...props }: RegionProps & { selected: 
 export function InboxConversationPane({ selected, ...props }: RegionProps & { selected: boolean }) {
   return <div {...props} className={styles.conversation} data-inbox-v4="talk-pane" data-selected={selected || undefined} />
 }
-export function InboxMessages({ className, ...props }: RegionProps) {
-  return <div {...props} className={[styles.inboxMessages, className].filter(Boolean).join(' ')} data-inbox-thread-scroller="" />
+export function InboxMessages(props: RegionProps) {
+  return <div {...props} className={styles.inboxMessages} data-inbox-thread-scroller="" />
 }
 export function InboxComposer(props: RegionProps) {
   return <div {...props} className={styles.inboxComposer} data-inbox-v4="composer" />

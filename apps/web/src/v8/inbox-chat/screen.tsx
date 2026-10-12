@@ -45,7 +45,6 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ChatThreadWindow from '@/components/chats/chat-thread-window'
 import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
-import searchStyles from '@/v8/inbox-search/chat-search-bar.module.css'
 import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
 import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
@@ -79,8 +78,12 @@ import Dialog from '@/components/shared/dialog'
 
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content'
 import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Bot, Send, Settings2, X } from 'lucide-react'
 
 type Chat = ChatListItem
@@ -203,11 +206,10 @@ function StickerMessageImage({ content }: { content: string }) {
   }
 
   return (
-    <img
+    <InboxMedia kind="sticker"
       key={retryKey}
       src={sticker.stickerUrl}
       alt={fallback}
-      className="max-h-[140px] max-w-[140px] object-contain"
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
@@ -252,11 +254,10 @@ function ChatImageMessage({ content }: { content: string }) {
   }
 
   return (
-    <img
+    <InboxMedia kind="image"
       key={retryKey}
       src={url}
       alt="画像"
-      className="max-w-[200px] rounded-mini"
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
@@ -420,6 +421,7 @@ function draftKeyOf(accountId: string | null | undefined, chatId: string | null 
 }
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   // URLが指す保存検索のID。再読込・URL共有からの復元元(N-021)。
@@ -933,13 +935,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       } else {
         // 口が success:false を返したときも、0件と区別できるよう失敗を出す。
         setEmailError('メールの読み込みに失敗しました。')
-        if (!append) setEmailItems([])
-      }
+        }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
       setEmailError('メールの読み込みに失敗しました。')
-      if (!append) setEmailItems([])
     } finally {
       if (append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
         emailMoreLockRef.current = false
@@ -1219,6 +1219,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setSavedViewSuccess(true)
       return { success: true }
     } catch (reason) {
+      saveErrors.capture(reason)
       /*
         **失敗の種類で言い分ける。** fetchApi は !ok を ApiError として投げる
         ので、409(同名の競合)も403(権限)も通信障害もここへ来る。全部を
@@ -2358,7 +2359,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     try {
       const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: jstDatetimeLocalToIso(nextAt) })
       if (res.success) await loadScheduledSends(selectedChatId)
-    } catch {
+    } catch (reason) {
+      saveErrors.capture(reason)
       setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
       void loadScheduledSends(selectedChatId)
     }
@@ -2371,7 +2373,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       await api.chats.update(selectedChatId, { operatorId, revision: chatDetail.revision })
       loadChatDetail(selectedChatId)
       loadChats()
-    } catch {
+    } catch (reason) {
+      saveErrors.capture(reason)
       setError('担当の更新に失敗しました。')
     }
   }
@@ -2599,8 +2602,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setShowMemoEditor(false)
       }
     } catch (memoSaveError) {
+      saveErrors.capture(memoSaveError)
       if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
-        setMemoError(memoSaveError instanceof Error ? memoSaveError.message : '内部メモを保存できませんでした')
+        setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした')
       }
     } finally {
       setMemoSaving(false)
@@ -2665,44 +2669,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const activeFriendId = (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
     ?? null
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: showMemoEditor && memoDraft !== (chatDetail?.notes ?? ''),
+    busy: memoSaving,
+    samePage: (destination) => destination.pathname === '/chats',
+    onDiscard: () => { setShowMemoEditor(false); setMemoDraft(chatDetail?.notes ?? '') },
+  })
   return (
-    <div className="space-y-3">
-      {savedViewSuccess ? (
-        /*
-          INBOX-11: 横幅は画面の左右16px以内。以前の minWidth:520 は
-          320/390px より大きく、閉じる操作まで画面外に出ていた。
-          閉じるボタンは縮めず、本文は折り返す。
-        */
-        <div
-          role="status"
-          className="bg-accent-soft text-accent-deep border-accent fixed top-20 left-1/2 z-50 flex w-[calc(100vw-2rem)] max-w-[520px] -translate-x-1/2 items-center gap-2 rounded-control border px-4 py-3 text-sm font-bold shadow-float"
-        >
-          <CheckCircle2 aria-hidden="true" size={18} className="shrink-0" />
-          <span className="min-w-0">保存した検索を作成しました</span>
-          <button
-            type="button"
-            onClick={() => setSavedViewSuccess(false)}
-            aria-label="保存完了のお知らせを閉じる"
-            className="hover:bg-accent/10 ml-auto shrink-0 rounded-control p-1"
-          >
-            <X aria-hidden="true" size={16} />
-          </button>
-        </div>
-      ) : null}
-      {/* Error */}
-      {error && (
-        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
-      )}
-      {/*
-        URLの保存検索IDが見つからなかったときの案内(N-021)。
-        既定条件へ戻したことだけを伝える。障害ではないので error とは分ける。
-      */}
-      {savedViewNotice && (
-        <div role="status" className="mb-4 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
-          {savedViewNotice}
-        </div>
-      )}
+    <SaveErrorScope errors={saveErrors}><div className="space-y-3">
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した内部メモ" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      {savedViewSuccess ? <Notice tone="success" onClose={() => setSavedViewSuccess(false)}>保存しました</Notice> : null}
 
+      {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
+      {savedViewNotice ? <Notice tone="info" message={savedViewNotice} /> : null}
       <InboxPage elementRef={panesRef} boardId="eovoG" composed>
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
@@ -2757,7 +2736,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             <Bookmark aria-hidden size={16} />
           </Button>
           {savedViewsOpen && (
-            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 max-h-[min(70dvh,32rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border bg-canvas p-4 shadow-float">
+            <InboxFloatingPanel placement="below">
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
@@ -2787,17 +2766,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       {typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'}
                     </span>
                     <div className="relative shrink-0">
-                      <MoreAction
+                      <RowMenu
                         label={`${view.name}の操作`}
-                        aria-expanded={savedViewMenuId === view.id}
-                        data-qa-open={view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined}
-                        onClick={() => setSavedViewMenuId((current) => current === view.id ? null : view.id)}
-                      />
-                      {/* ★V7（m13g）：保存した検索の操作も共通 ActionMenu にそろえる。できることは変えない。 */}
-                      <ActionMenu
+                        triggerProps={{ 'data-qa-open': view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined }}
+                        onOpenChange={(open) => setSavedViewMenuId(open ? view.id : null)}
                         open={savedViewMenuId === view.id}
-                        onClose={() => setSavedViewMenuId(null)}
-                        ariaLabel={`${view.name}の操作`}
                         items={[
                           {
                             id: `${view.id}-delete`,
@@ -2838,7 +2811,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
-            </div>
+            </InboxFloatingPanel>
           )}
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
@@ -2948,7 +2921,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               プルダウンが自分で名乗るため、外の字は置かない。
             */}
             <div className={styles.filterRow}>
-            <label className={`mt-3 inline-flex w-[calc(50%-4px)] items-center text-micro font-semibold text-ink-secondary ${styles.filterCell}`}>
+            <label className={`mt-3 inline-flex items-center text-micro font-semibold text-ink-secondary ${styles.filterCell}`}>
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
@@ -2972,7 +2945,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 )}
               </span>
             </label>
-            <div className={`ml-2 inline-block w-[calc(50%-4px)] min-w-0 align-bottom ${styles.filterCell}`}>
+            <div className={`ml-2 inline-block min-w-0 align-bottom ${styles.filterCell}`}>
               <Select aria-label="受信経路で絞り込む" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:`経路：${item.label}`}))} />
             </div>
             </div>
@@ -3328,27 +3301,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 })()}
 
                 {hasMoreChats && (
-                  <button
+                  <Button variant="text" busy={loadingMore} busyLabel="読み込み中..."
                     onClick={() => { void loadMoreChats() }}
                     disabled={loadingMore}
                     className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b border-hairline"
                   >
-                    {loadingMore ? '読み込み中...' : 'さらに読み込む'}
-                  </button>
+                    さらに読み込む
+                  </Button>
                 )}
                 {/*
                   メールの続き。メールは上限200件で切れていた分を offset で遡る。
                   LINEの「さらに読み込む」とは別物なので文言を分ける。
                 */}
                 {hasMoreEmails && (
-                  <button
+                  <Button variant="text" busy={loadingMoreEmails} busyLabel="読み込み中..."
                     onClick={() => { void loadEmails(emailItems.length, true) }}
                     disabled={loadingMoreEmails}
                     className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b"
                     style={{ borderBottomColor: 'var(--color-hairline)' }}
                   >
-                    {loadingMoreEmails ? '読み込み中...' : 'メールの続きを読み込む'}
-                  </button>
+                    メールの続きを読み込む
+                  </Button>
                 )}
             </>
           </div>
@@ -3444,21 +3417,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 見ている位置は窓分けの側で守るので、ブラウザの自動の位置合わせは切る
                 （二重に直すと飛ぶ）。行の間 8px は行の中に持つので space-y は付けない。
               */}
-              <InboxMessages ref={messagesScrollRef} className={searchStyles.hitScope}>
+              <InboxMessages ref={messagesScrollRef} data-inbox-search-scope="">
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
                 */}
                 {messagesHasMore && (chatDetail.messages?.length ?? 0) > 0 && (
                   <div className="flex justify-center pb-1">
-                    <button
+                    <Button variant="text" busy={loadingOlderMessages} busyLabel="読み込み中..."
                       type="button"
                       onClick={() => { void loadOlderMessages() }}
                       disabled={loadingOlderMessages}
                       className="bg-canvas/90 rounded-pill px-3 py-1 text-xs font-semibold text-action shadow-card disabled:opacity-50"
                     >
-                      {loadingOlderMessages ? '読み込み中...' : '前のメッセージ'}
-                    </button>
+                      前のメッセージ
+                    </Button>
                   </div>
                 )}
                 {(!chatDetail.messages || chatDetail.messages.length === 0) ? (
@@ -3491,9 +3464,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       bubbleContent = <span className="text-ink-faint">送信を取り消しました</span>
                     } else if (msg.messageType === 'flex') {
                       bubbleContent = (
-                        <div className="max-w-[300px]">
+                        <InboxFlexContent>
                           <FlexPreviewComponent content={msg.content} maxWidth={280} />
-                        </div>
+                        </InboxFlexContent>
                       )
                     } else if (msg.messageType === 'image') {
                       // INBOX-30: 404・期限切れ・回線断は空白にせず、
@@ -3756,7 +3729,7 @@ aria-expanded={showMemoEditor}>
                   直前のやり取りを見ながら書けるようにするため。
                 */}
                 {showMemoEditor && (
-                  <div
+                  <InboxFloatingPanel placement="above"
                     role="dialog"
                     aria-labelledby="chat-internal-memo-title"
                     data-inbox-v6="internal-memo-popover"
@@ -3767,7 +3740,6 @@ aria-expanded={showMemoEditor}>
                       スクロールさせ、見出しと操作が画面上部へ欠けない
                       ようにする。
                     */
-                    className="border-hairline rounded-panel shadow-float absolute bottom-full left-4 z-30 mb-2 max-h-[calc(100dvh-9rem)] w-[calc(100%-2rem)] max-w-[760px] overflow-y-auto border bg-canvas p-5"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <h2 id="chat-internal-memo-title" className="text-ink flex items-center gap-2 text-sm font-bold">
@@ -3782,7 +3754,7 @@ aria-expanded={showMemoEditor}>
                       対応方針や引き継ぎ内容を入力してください。顧客には表示・送信されません。
                     </p>
                     <label htmlFor="chat-internal-memo" className="sr-only">内部メモの本文</label>
-                    <textarea
+                    <SaveErrorField names={["notes", "memo"]}><textarea
                       id="chat-internal-memo"
                       value={memoDraft}
                       onChange={(event) => setMemoDraft(event.target.value)}
@@ -3790,6 +3762,7 @@ aria-expanded={showMemoEditor}>
                       placeholder="例：次回返信時に配送先住所を確認する"
                       className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
                     />
+                    </SaveErrorField>
                     {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
                     {/*
                       INBOX-19: 説明は独立した行へ。操作と同じ flex 行に置くと、
@@ -3810,7 +3783,7 @@ aria-expanded={showMemoEditor}>
                         disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中...">メモを保存する
                       </Button>
                     </div>
-                  </div>
+                  </InboxFloatingPanel>
                 )}
 
                 {/* N-025: 引用中のメッセージ。×で外す。 */}
@@ -3931,7 +3904,7 @@ aria-invalid={messageOverLimit} />
                       {messageOverLimit ? ' ・ 文字数が上限を超えています' : ''}
                     </span>
                     <span className="text-ink-faint shrink-0">
-                      {sendMode === 'enter' ? 'Enter で送る・Shift + Enter で改行' : 'Enter で改行・⌘Enter で送る'}
+                      {sendMode === 'enter' ? 'Enter で送る・Shift + Enter で改行' : 'Shift+Enter で送る・Enter で改行'}
                     </span>
                   </InboxDraftCount>
 
@@ -4048,7 +4021,7 @@ disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendin
               {/* INBOX-32: 添付画像を大きく確かめる窓。背景か Esc 相当の閉じるで戻る。 */}
               {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' ? (
                 <Dialog open title="添付した画像の確認" onCancel={() => setImagePreviewOpen(false)} designWidth={800}>
-                  <img src={pendingImage.originalContentUrl} alt={pendingImageMeta?.name ?? '添付した画像'} className="mx-auto max-h-[70vh] w-auto max-w-full rounded-mini object-contain" />
+                  <InboxMedia kind="preview" src={pendingImage.originalContentUrl} alt={pendingImageMeta?.name ?? '添付した画像'} />
                   <p className="text-ink-faint mt-3 truncate text-xs" title={pendingImageMeta?.name}>{pendingImageMeta?.name ?? '画像'}{pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}</p>
                 </Dialog>
               ) : null}
@@ -4082,11 +4055,7 @@ disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendin
               押しても閉じる。モバイルヘッダー(z-50)より上に置く。
               1536px 以上では右列として常設するので暗幕は CSS で消す。
             */}
-            <div
-              aria-hidden="true"
-              onMouseDown={() => setShowFriendInfo(false)}
-              className={`bg-scrim fixed inset-0 z-[60] ${wideInfoPanel ? 'hidden' : ''}`}
-            />
+            <InboxInfoBackdrop wide={wideInfoPanel} onMouseDown={() => setShowFriendInfo(false)} />
             <InboxSummaryPane wide={wideInfoPanel}
 ref={customerPanelRef}
 data-inbox-v4="customer-panel"
@@ -4120,10 +4089,10 @@ tabIndex={-1}>
                 const mail = emailItems.find((e) => e.threadId === selectedThreadId)
                 return (
                   <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
-                    <div className="min-h-[66px] border-b border-hairline px-4 py-3 pr-20">
+                    <InboxEmailHeading>
                       <p className="text-ink text-sm font-bold">顧客情報</p>
                       <p className="text-ink-faint mt-0.5 truncate text-micro">メールの相手を確認できます</p>
-                    </div>
+                    </InboxEmailHeading>
 
                     <div className="flex-1 overflow-y-auto divide-y divide-hairline">
                       <section className="flex flex-col items-center px-5 py-5 text-center">
@@ -4193,7 +4162,7 @@ tabIndex={-1}>
           </>
         )}
       </InboxPage>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

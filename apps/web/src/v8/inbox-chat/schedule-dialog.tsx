@@ -106,7 +106,7 @@ export default function ScheduleSendDialog({
           ))}
         </div>
       </div>
-      <div className={styles.schGroup}><Field note={<>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</>} label="日時を決める" htmlFor="schedule-at"><SaveErrorField names={["value"]}><DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} /></SaveErrorField>
+      <div className={styles.schGroup}><Field note={<>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</>} label="日時を決める" htmlFor="schedule-at"><SaveErrorField names={["value", "scheduledAt", "scheduled_at"]}><DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} /></SaveErrorField>
 
 {night ? (
           <p className={styles.schWarn} role="status">相手が夜中の時間です。送ってよいか確かめてください。</p>

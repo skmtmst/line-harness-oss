@@ -3104,3 +3104,18 @@ html:root button:not([role='tab']):is([aria-pressed='true'], [data-current]:not(
 :root { --tpl-media-file-surface: #e9ecef; --tpl-media-video-surface: #5a6577; --tpl-media-thumbnail-icon: 40px; }
 
 :root { --tpl-chart-summary-plot-h: 100px; }
+
+/* 受信箱の媒体と補助面：従来の会話から共通部品へ移した寸法。 */
+:root {
+  --tpl-inbox-sticker-size: 140px;
+  --tpl-inbox-image-width: 200px;
+  --tpl-inbox-flex-width: 300px;
+  --tpl-inbox-image-preview-height: 70vh;
+  --tpl-inbox-popup-viewport-width: calc(100vw - 2rem);
+  --tpl-inbox-saved-views-height: min(70dvh, 32rem);
+  --tpl-inbox-memo-width: calc(100% - 2rem);
+  --tpl-inbox-memo-max-width: 760px;
+  --tpl-inbox-memo-height: calc(100dvh - 9rem);
+  --tpl-inbox-email-heading-height: 66px;
+  --tpl-inbox-email-heading-end: 80px;
+}

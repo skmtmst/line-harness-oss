@@ -1,3 +1,1 @@
-import InboxScreen from '@/v8/inbox-chat/screen'
-
-export default InboxScreen
+export { default } from '@/v8/inbox-chat/screen'
