@@ -7,7 +7,7 @@ import { CalendarClock, ClipboardList, Coins, Package, Save, Send } from 'lucide
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
@@ -37,7 +37,6 @@ import { tapActionLiffUrl } from '@/lib/tap-actions'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
@@ -432,6 +431,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       help={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
       preview={previewOpen ? undefined : preview}
       hidePreviewWhenNarrow
+      readOnly={!canEdit}
       previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>プレビューを見る</Button>}
       status={status}
       footerActions={canEdit ? (
@@ -441,19 +441,13 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         </>
       ) : <></>} dirty={false}
     >
-      {!canEdit ? (
-        <ReadOnlyNotice role="status">閲覧のみで見ています。配信を直すのは管理者に頼んでください。</ReadOnlyNotice>
-      ) : null}
       {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-flow">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-flow">配信フロー</h2>
-          <p className={styles.cardNote}>{formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'}</p>
-        </div>
+        <CardHeader size="stacked" titleId="nen-edit-flow" title="配信フロー" meta={formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'} />
         <ol className={styles.flow} aria-label="配信フロー">
           <li className={styles.flowStep}><Package size={13} aria-hidden="true" />{trigger}</li>
           <li className={styles.flowStep}><CalendarClock size={13} aria-hidden="true" />{isBirthday ? '3日前 10:00' : `${merged.delayDays}日後 ${time}`}</li>
@@ -464,10 +458,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-when">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-when">いつ送りますか</h2>
-          <p className={styles.cardNote}>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p>
-        </div>
+        <CardHeader size="stacked" titleId="nen-edit-when" title="いつ送りますか" meta="このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます" />
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelSmall}>きっかけ</span>
@@ -526,18 +517,16 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-what">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-what">送るもの</h2>
-          <p className={styles.cardNote}>この配信は1通で届きます</p>
-        </div>
+        <CardHeader size="stacked" titleId="nen-edit-what" title="送るもの" meta="この配信は1通で届きます" />
         {/* 届く形を選ぶ口はまだ無い。画像があればリッチメッセージ、無ければ文字だけで届く（今の作りのまま）。 */}
         <div className={styles.radios} role="radiogroup" aria-label="届く形">
           <SaveErrorField names={["nen-message-kind","kindIsRich"]}><Radio name="nen-message-kind" checked={kindIsRich} readOnly disabled={!kindIsRich} title={kindIsRich ? undefined : '画像のある配信だけがリッチメッセージになります'}>リッチメッセージ</Radio></SaveErrorField>
           <SaveErrorField names={["nen-message-kind"]}><Radio name="nen-message-kind" checked={!kindIsRich} readOnly disabled={kindIsRich}>文字だけ</Radio></SaveErrorField>
         </div>
         <div className={styles.field}>
-          <Field label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
+          <Field required label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
             id="nen-edit-body"
+            aria-required="true"
             aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}
             aria-describedby={(validationSubmitted || !bodyCheck.fits) && bodyError ? 'nen-edit-body-error' : undefined}
             ref={bodyRef}
@@ -556,14 +545,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             <p className={styles.muted}>あと{formatNumber(bodyRemaining)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
           ) : null}
         </div>
-        <p className={styles.caution}>差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</p>
+        <Notice tone="warn">差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</Notice>
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-after">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-after">押されたあとにすること</h2>
-          <p className={styles.cardNote}>{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}</p>
-        </div>
+        <CardHeader size="stacked" titleId="nen-edit-after" title="押されたあとにすること" meta="{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}" />
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
