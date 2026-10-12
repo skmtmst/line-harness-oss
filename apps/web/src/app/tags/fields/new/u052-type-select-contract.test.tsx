@@ -10,6 +10,7 @@ it('14種類から選んだ状態を読み上げ、差し込み名は飾りを�
   const submit = vi.fn()
   render(<FieldEditor mode="create" folders={[]} foldersState="ready" siblings={[]} siblingsReady saving={false} backHref="/tags?tab=fields" onCancel={vi.fn()} onSubmit={submit} />)
   expect(screen.getAllByRole('radio')).toHaveLength(14)
+  expect(screen.getAllByText('{{field.')).toHaveLength(1)
   fireEvent.change(screen.getByLabelText('項目名'), { target: { value: '受付日時' } })
   fireEvent.change(screen.getByLabelText('差し込みの名前（英字）'), { target: { value: 'appointment_time' } })
   const datetime = screen.getByRole('radio', { name: '日時' }) as HTMLInputElement

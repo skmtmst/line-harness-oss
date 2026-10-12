@@ -402,7 +402,6 @@ export default function FieldEditor({
           <div  data-field="key"><Field required={mode === 'create'} label={<span id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>}>
 
             <span className={styles.keyRow}>
-              <span className={styles.keyBrace}>{'{{field.'}</span>
               {mode === 'create' ? (
                 <SaveErrorField names={["fieldKey","keyTouched","field_key","key_touched"]}><AffixedTextField monospace startAdornment="{{field." endAdornment="}}"
                   ref={(element) => { validationRefs.current.key = element }}
