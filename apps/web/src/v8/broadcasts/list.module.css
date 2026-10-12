@@ -70,27 +70,6 @@
 /* 「配信日：指定なし」。字のあとに暦の印。 */
 .datePopoverWrap { position: relative; flex-shrink: 0; }
 
-.dateButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bc-control-gap);
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-bc-date-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -0.5px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-chip-label-lh);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dateButton > svg { color: var(--color-ink-faint); }
-.dateButton[data-active='true'] { outline-color: var(--color-focus-ring); color: var(--color-action); }
-
 .datePopover {
   position: absolute;
   z-index: 30;

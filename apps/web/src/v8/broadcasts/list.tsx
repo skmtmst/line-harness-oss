@@ -791,16 +791,17 @@ export default function BroadcastListV8() {
 
   const dateBox = (
     <div className={styles.datePopoverWrap} ref={datePopoverRef}>
-      <button
+      <Button
         type="button"
-        className={styles.dateButton}
-        data-active={Boolean(dateFrom || dateTo)}
+        variant="secondary"
+        aria-pressed={Boolean(dateFrom || dateTo)}
+        aria-haspopup="dialog"
         aria-expanded={datePopoverOpen}
         onClick={() => setDatePopoverOpen((open) => !open)}
       >
         {dateRangeLabel(dateFrom, dateTo)}
         <CalendarDays size={14} aria-hidden="true" />
-      </button>
+      </Button>
       {datePopoverOpen ? (
         <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
           <p className={styles.datePopoverLabel}>配信日で絞る（開始〜終了）</p>

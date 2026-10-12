@@ -333,6 +333,33 @@ it('全件検索が上限を超えたら部分的な検索結果を表示しな�
   expect(host.textContent).toContain('10,000件')
   expect(host.querySelector('tbody')?.textContent ?? '').not.toContain('未購入者フォロー')
 })
+it('配信日の共通入口から期間を指定し、選択表示と解除を保つ', async () => {
+  resetUrl()
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  const trigger = buttonByText('配信日：指定なし')!
+  expect(trigger.getAttribute('aria-pressed')).toBe('false')
+  act(() => { trigger.click() })
+  expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  act(() => { (host.querySelector('button[aria-label="配信日（開始）"]') as HTMLButtonElement).click() })
+  await flush()
+  const month = document.querySelector('[role="grid"]')!.getAttribute('aria-label')!.match(/(\d+)年(\d+)月/)!
+  const prefix = `${month[1]}-${month[2].padStart(2,'0')}`
+  const chooseDay = (day:string) => ([...document.querySelectorAll<HTMLButtonElement>('[role="grid"] button:not([data-outside])')].find(button=>button.textContent===day)!).click()
+  act(() => { chooseDay('1') })
+  act(() => { (host.querySelector('button[aria-label="配信日（終了）"]') as HTMLButtonElement).click() })
+  await flush()
+  act(() => { chooseDay('2') })
+  await flush()
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:`${prefix}-01`,to:`${prefix}-02`}))
+  expect(trigger.getAttribute('aria-pressed')).toBe('true')
+  act(() => { buttonByText('外す')!.click() })
+  await flush()
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:undefined,to:undefined}))
+  expect(trigger.getAttribute('aria-pressed')).toBe('false')
+  act(() => { buttonByText('閉じる')!.click() })
+  expect(trigger.getAttribute('aria-expanded')).toBe('false')
+})
 it('保存した検索の送信済み・表示件数・古い順も復元する', async () => {
   resetUrl()
   listViews.mockResolvedValue({ success: true, data: [{ id: 'v1', name: '前月の送信', filters: { statusFilter: 'sent' }, sortKey: 'oldest', pageSize: 50 }] })
