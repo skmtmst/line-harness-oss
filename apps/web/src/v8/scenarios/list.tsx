@@ -15,7 +15,7 @@ import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag,
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bookmark, CalendarPlus, Copy, Folder as FolderIcon, Lightbulb, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, UserCheck, Users, Workflow } from 'lucide-react';
+import { Bookmark, CalendarPlus, CircleCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
 
 
 import Link from '@/components/shared/list-navigation'
@@ -59,7 +59,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import { TextField } from '@/components/shared/text-field';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
@@ -72,6 +72,7 @@ import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback
 import { notifyToast } from '@/components/shared/toast';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -646,8 +647,22 @@ export default function ScenariosListV8() {
     { value: UNFILED, label: 'フォルダ：未分類' },
   ]
 
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
+  const createButton = (full: boolean) => !canEdit ? null : (
+    <Button
+      type="button"
+      variant="primary"
+      className={full ? 'v8-folder-create w-full' : undefined}
+      onClick={handleCreate}
+    >
+      <Plus size={15} aria-hidden="true" />
+      シナリオを作る
+    </Button>
+  )
+
   const folderPanel = (
     <ManagedFolderPanel
+      createAction={createButton(true)}
       kind="scenario"
       accountId={selectedAccountId ?? null}
       folders={folders}
@@ -691,7 +706,7 @@ export default function ScenariosListV8() {
     },
     {
       title: '読み終えた人',
-      icon: UserCheck,
+      icon: CircleCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
       detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
@@ -915,9 +930,7 @@ export default function ScenariosListV8() {
                         label={s.name}
                         disabledReason={reorderDisabledReason}
                         onMove={(direction) => keyboardMove(s.id, direction)}
-                      >
-                        <span aria-hidden>⠿</span>
-                      </ReorderHandle>}
+                      />}
                     </Td>
                     <NameCell name={
                         <div className={styles.nameRow}>
@@ -957,6 +970,7 @@ export default function ScenariosListV8() {
                       <div className={styles.menuBox}>
                         <ContextMenu label={`シナリオ「${s.name}」の操作`} items={rowContextItems(s)}>
                           <RowMenu
+                            size="row"
                             label={`シナリオ「${s.name}」の操作`}
                             items={rowMenuItems(s)}
                             open={openMenuId === s.id}
@@ -1007,21 +1021,19 @@ export default function ScenariosListV8() {
     )
 
   /* ページ送りは型の pagination 枠へ。 */
-  const listPager = scenarioList.pageCount > 1 ? (
+  const listPager = scenarioList.loaded && !scenarioList.error ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)} 件
-      </span>
-      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
+      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage}
+        summary={paginationSummary(scenarioList.total, (scenarioList.page - 1) * scenarioList.limit + 1, Math.min(scenarioList.page * scenarioList.limit, scenarioList.total))} />
     </ListPagePagination>
   ) : null
 
   /* ===== 道具の段の部品（広い板と狭い板で同じものを並べ替える） ===== */
 
   const noteBand = (
-    <Notice tone="info" icon={<Lightbulb size={16} aria-hidden="true" />}>
+    <PageExplanationBody>
       作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
-    </Notice>
+    </PageExplanationBody>
   )
 
   const filterChips = (
@@ -1050,9 +1062,13 @@ export default function ScenariosListV8() {
 
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["savedFilter","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
+        size="full"
+        icon={<Bookmark aria-hidden="true" />}
+        valueAlign="start"
+        showChevron={false}
+        iconOnly={narrow}
         value={savedFilter}
         onChange={(value) => {
           setSavedFilter(value)
@@ -1067,19 +1083,6 @@ export default function ScenariosListV8() {
     <div data-per-page-select>
       <PageSizeSelect className="w-full" value={perPage} onChange={setPerPage} options={PAGE_SIZE_OPTIONS} label={null} />
     </div>
-  )
-
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = (full: boolean) => !canEdit ? null : (
-    <Button
-      type="button"
-      variant="primary"
-      className={full ? 'v8-folder-create w-full' : undefined}
-      onClick={handleCreate}
-    >
-      <Plus size={15} aria-hidden="true" />
-      シナリオを作る
-    </Button>
   )
 
   const folderSelect = (
@@ -1115,7 +1118,7 @@ export default function ScenariosListV8() {
       </ListToolbarRow>
       <ListToolbarRow>
         {filterChips}
-        <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
+        {savedBox}
       </ListToolbarRow>
       {filteredCount}
     </ListToolbarFrame>
@@ -1155,11 +1158,15 @@ export default function ScenariosListV8() {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <PageExplanationProvider pageKey="scenarios"><SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
+      toolbarSpacing="section"
+      noticeSpacing="section"
       skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
+      titleAccessory={<PageExplanationToggle />}
 
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
@@ -1315,8 +1322,6 @@ export default function ScenariosListV8() {
       </>}
       folders={<>
         <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
-      {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-        {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
@@ -1327,6 +1332,6 @@ export default function ScenariosListV8() {
         <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
-    </ListPage></SaveErrorScope>
+    </ListPage></SaveErrorScope></PageExplanationProvider>
   )
 }

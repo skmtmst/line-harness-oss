@@ -192,7 +192,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             </div>
             <SaveErrorField names={["pageSize","u.pageSize","page_size","u.page_size"]}><Select
               aria-label="表示件数"
-              width={96}
+              size="page-size"
               value={String(u.pageSize)}
               onChange={(value) => u.setPageSize(Number(value))}
               options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}

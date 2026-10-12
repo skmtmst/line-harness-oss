@@ -165,6 +165,11 @@
     min-height: 0;
     overscroll-behavior: contain;
   }
+
+  /* 短い板は内容の下で止める。長い内容は同じmainの中で送り、外枠は伸ばさない。 */
+  :root .main:has(> .content > [data-frame-height='content']) {
+    flex: 0 1 auto;
+  }
 }
 
 /* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
@@ -234,3 +239,9 @@
     flex: 1;
   }
 }
+
+/* 運営の板も固定絵の外側24を共通の外枠が持つ。 */
+:root .content[data-content-layout='ops'] { padding: var(--polish-space-section); }
+
+/* 固定絵が内容の下で終わる板。送りは main 内に保つ。 */
+:root .main:has([data-height-mode='content']) { flex: 0 1 auto; }

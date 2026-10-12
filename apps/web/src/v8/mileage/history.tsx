@@ -28,7 +28,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   formatMileageChange,
   formatMileageShortDateTime,
@@ -38,7 +38,7 @@ import {
   mileageSourceNoteText,
   mileageStatusLabel,
 } from './display'
-import { MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
@@ -367,14 +367,14 @@ export default function HistoryTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>いつ・だれに</Th>
-            <Th className={`${styles.colDelta} ${styles.num}`}>増減</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>いつ・だれに</Th>
+            <Th align="right" className={styles.colDelta}>増減</Th>
             <Th className={styles.colWhy}>なぜ</Th>
-            <Th className={`${styles.colAfter} ${styles.num}`}>残高</Th>
-            <Th className={styles.colWho}>だれが</Th>
+            <Th align="right" className={styles.colAfter}>残高</Th>
+            <Th collapseAt="narrow" className={styles.colWho}>だれが</Th>
             <Th className={styles.colOpsHistory}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -386,7 +386,7 @@ export default function HistoryTab() {
             return (
               <Tr
                 key={item.id}
-                className={styles.row}
+
                 data-table-layout="columns"
                 interactive
                 onClick={(event) => {
@@ -394,11 +394,11 @@ export default function HistoryTab() {
                   router.push(friendHref)
                 }} data-row-id={item.id}
               >
-                <Td className={styles.colName}><FolderDotName>
-                  <span className={styles.rowName} title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
+                <Td grow><FolderDotName>
+                  <span  title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
 
                 </FolderDotName></Td>
-                <Td className={`${styles.colDelta} ${styles.num}`}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
+                <Td align="right" className={styles.colDelta}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
                 <Td className={styles.colWhy}>
                   <span
                     className={styles.cellMain}
@@ -408,15 +408,15 @@ export default function HistoryTab() {
                   </span>
                   <span className={styles.cellSub}>{`${mileageEntryTypeLabel(item.entryType)}・${mileageStatusLabel(item.status)}`}</span>
                 </Td>
-                <Td className={`${styles.colAfter} ${styles.num}`}>
+                <Td align="right" className={styles.colAfter}>
                   <span className={styles.cellMain}>{item.balanceAfter === null ? emptyValue('unknown') : formatNumber(item.balanceAfter)}</span>
                 </Td>
-                <Td className={styles.colWho}>
+                <Td collapseAt="narrow" className={styles.colWho}>
                   <span className={styles.cellMain}>
                     {item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}
                   </span>
                 </Td>
-                <Td className={styles.colOpsHistory}>
+                <ActionCell className={styles.colOpsHistory}>
                   <span className={styles.rowActions}>
                     {pending ? (
                       <Button onClick={() => openPending('confirm', item)}>確定する</Button>
@@ -437,7 +437,7 @@ export default function HistoryTab() {
                       />
                     </div>
                   </span>
-                </Td>
+                </ActionCell>
               </Tr>
             )
           })}

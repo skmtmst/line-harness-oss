@@ -19,12 +19,13 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
 import { currentSettlementPeriod, formatDate, formatMonthDay, formatYen, pageCountOf, pageOf, periodText } from './display'
 import { AffiliatePaymentConfirmDialog } from './dialogs'
-import { AffiliateFrame, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
 import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
@@ -372,13 +373,13 @@ export default function PaymentTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tablePayment}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>払う相手</Th>
-            <Th className={`${styles.colPayAmount} ${styles.num}`}>今回 払う額</Th>
-            <Th className={`${styles.colPayCount} ${styles.num}`}>中身</Th>
-            <Th className={styles.colPayBank}>振込先</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>払う相手</Th>
+            <Th align="right" className={styles.colPayAmount}>今回 払う額</Th>
+            <Th collapseAt="narrow" align="right" className={styles.colPayCount}>中身</Th>
+            <Th collapseAt="narrow" className={styles.colPayBank}>振込先</Th>
             <Th className={styles.colPayState}>状態</Th>
             <Th className={styles.colPayOps}>操作</Th>
           </TableHeadRow>
@@ -388,27 +389,27 @@ export default function PaymentTab() {
             const summary = summaries.get(item.affiliateId)
             const gross = item.grossAmount ?? item.amount + (item.deduction ?? 0)
             return (
-              <Tr key={item.affiliateId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}><FolderDotName>
+              <Tr key={item.affiliateId} data-table-layout="columns">
+                <Td grow><FolderDotName>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={item.affiliateName} onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</button>
+                    <RowNameButton title={item.affiliateName} onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</RowNameButton>
 
                   </span>
                 </FolderDotName></Td>
-                <Td className={`${styles.colPayAmount} ${styles.num}`}>
+                <Td align="right" className={styles.colPayAmount}>
                   <span className={styles.stackEnd}>
                     <span className={styles.cellNum}>{formatYen(item.amount)}</span>
-                    <span className={styles.rowWrapEnd}>{`元の報酬 ${formatYen(gross)} − 取消 ${formatYen(item.deduction ?? 0)}`}</span>
+                    <span className={styles.rowWrapEnd}><TruncatedText value={`元の報酬 ${formatYen(gross)} − 取消 ${formatYen(item.deduction ?? 0)}`} /></span>
                   </span>
                 </Td>
-                <Td className={`${styles.colPayCount} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(item.conversionCount)} 件`}</span></Td>
-                <Td className={styles.colPayBank}>
+                <Td collapseAt="narrow" align="right" className={styles.colPayCount}><span className={styles.cellNum}>{`${formatNumber(item.conversionCount)} 件`}</span></Td>
+                <Td collapseAt="narrow" className={styles.colPayBank}>
                   {item.bankProfileRegistered ? (
                     <span className={styles.stack}>
                       <span className={styles.cellNum}>登録済み</span>
                       <span className={styles.rowPlan}>口座番号は本人だけに表示</span>
                     </span>
-                  ) : <StatusPill tone="danger">未登録</StatusPill>}
+                  ) : <span className={styles.cellNum}>未登録</span>}
                 </Td>
                 <Td className={styles.colPayState}>
                   <span className={styles.stack}>

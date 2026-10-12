@@ -8,7 +8,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Activity, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react';
+import { Activity, Archive, Copy, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -17,7 +17,7 @@ import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAdd
 import { api } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { ListPage, ListPagePagination } from '@/components/templates';
+import { ListPage } from '@/components/templates';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
@@ -41,6 +41,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { notifyToast } from '@/components/shared/toast';
 import { RowMenu } from '@/components/shared/row-actions';
+import { CursorPagination } from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
@@ -146,7 +147,7 @@ function statusTone(rule: FriendAddRule) {
 
 function StatusPill({ rule }: { rule: FriendAddRule }) {
   return (
-    <SharedStatusPill tone={statusTone(rule) === 'active' ? 'success' : statusTone(rule) === 'always' ? 'info' : 'neutral'}>{statusLabel(rule)}</SharedStatusPill>
+    <SharedStatusPill tone={statusTone(rule) === 'neutral' ? 'neutral' : 'success'}>{statusLabel(rule)}</SharedStatusPill>
   )
 }
 
@@ -198,7 +199,7 @@ function FriendAddList() {
   const [statusFilter, setStatusFilter] = useListUrlValue<FriendAddRuleStatus | ''>('statusFilter', searchParams.get('status') === 'draft' ? 'draft' : '')
   const [folder, setFolder] = useListUrlValue<string | null>('folder', null)
   const [perPage, setPerPage] = useListUrlValue('perPage', 20)
-  const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
+  const { cursor, page, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
@@ -520,10 +521,10 @@ function FriendAddList() {
   const locked = (item: ActionMenuItem): ActionMenuItem[] => (canEdit ? [item] : [])
 
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => rule.status === 'archived' ? [
-    ...locked({ id: 'restore', label: '保管から戻す', disabled: restoringId !== null, onSelect: () => void restore(rule) }),
-    { id: 'runs', label: '実行結果を見る', onSelect: () => router.push(runsHref(rule.id)) },
+    ...locked({ id: 'restore', label: '保管から戻す', icon: <Archive size={15} />, disabled: restoringId !== null, onSelect: () => void restore(rule) }),
+    { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} />, onSelect: () => router.push(runsHref(rule.id)) },
   ] : [
-    ...locked({ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => void duplicate(rule) }),
+    ...locked({ id: 'duplicate', label: '複製する', icon: <Copy size={15} />, disabled: duplicatingId !== null, onSelect: () => void duplicate(rule) }),
     ...locked({ id: 'edit', label: '編集する', icon: <Pencil size={15} />, onSelect: () => router.push(editHref(rule.id)) }),
     { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} />, onSelect: () => router.push(runsHref(rule.id)) },
     ...locked({ id: 'test', label: 'テストを送る', icon: <Send size={15} />, onSelect: () => router.push(testHref(rule.id)) }),
@@ -551,6 +552,7 @@ function FriendAddList() {
           ...locked({
             id: 'delete',
             label: '保管する',
+            icon: <Archive size={15} />,
             tone: 'danger' as const,
             dividerBefore: true,
             onSelect: () => {
@@ -583,7 +585,6 @@ function FriendAddList() {
       key: 'unknown', icon: CircleHelp, title: narrow ? '経路が不明' : '経路が分からなかった人', value: error ? null : summary?.unknownRoute ?? null, unit: '人',
       /* 1152 では2行に折れる。行の高さを絵の18にそろえる（帯の高さを134に保つ）。 */
       detail: <span className={styles.kpiDetail}>共通の案内が動いた</span>,
-      help: '直近7日に追加され、流入リンクが分からなかった人数です。経路が分からなかった人へ共通の案内が動きます。',
       action: { label: '流入リンクを見る', href: '/inflow-links' },
     },
   ]
@@ -650,7 +651,7 @@ function FriendAddList() {
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       {notice}
       {errorBand}
       <ListToolbarRow>
@@ -783,13 +784,13 @@ function FriendAddList() {
                     title={canReorder ? '上下に動かして並び替え' : reorderReason}
                   >
                     <span className={styles.orderBox}>
-                      {canEdit ? <ReorderHandle
+                      <ReorderHandle
                         label={rule.name}
                         disabledReason={canReorder ? null : reorderReason ?? READONLY_REASON}
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`} />}
+                      </ReorderHandle>
                       <span className={styles.orderNum}>{rule.priority}</span>
                     </span>
                   </Td>
@@ -833,20 +834,15 @@ function FriendAddList() {
     )
   }
 
-  const pager = data && (canPrev || data.nextCursor) ? (
-    <ListPagePagination>
-      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)} 件</span>
-      <span className={styles.pagerButtons} aria-label="ページ送り">
-        <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
-        <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && goNext(data.nextCursor)}>次へ</Button>
-      </span>
-    </ListPagePagination>
-  ) : null
+  const pager = data && !error ? <CursorPagination page={page} pageSize={perPage} shown={items.length} total={data.total}
+    hasNext={Boolean(data.nextCursor)} disabled={loading} onPrevious={goPrev} onNext={() => goNext(data.nextCursor)} /> : null
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
-      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
+      heightMode="content"
+      toolbarSpacing="section"
+      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}{kpis.map(kpi => kpi.help ? <p key={kpi.key}>{kpi.title}：{kpi.help}</p> : null)}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
@@ -884,7 +880,6 @@ function FriendAddList() {
               presentation="band"
               title={kpi.title}
               icon={<kpi.icon size={13} aria-hidden="true" />}
-              help={kpi.help}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}
@@ -896,6 +891,8 @@ function FriendAddList() {
       folders={<>
         <FolderPanel
           createAction={createButton}
+          readOnly={!canEdit}
+          reserveCreateSpace={canEdit}
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
@@ -915,10 +912,9 @@ function FriendAddList() {
           open={fallbackStop}
           designNode="cFo2p"
           designLayout="stacked"
-          designWidth={600}
           designTop={280}
           footerAlign="start"
-          designFooterGap={84}
+          designFooterGap={18}
           confirmFirst
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"

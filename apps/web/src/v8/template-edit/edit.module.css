@@ -24,7 +24,6 @@
 
 /* 左の段（白い箱）：余白20・中の間14。題 15/700・説明 12。 */
 /* 絵の箱は内側の線（outline）で余白20。Card の枠1px の分だけ余白を引く。 */
-.card { gap: var(--tpl-section-gap); min-width: 0; padding: calc(var(--tpl-section-pad) - 1px); }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-te-head-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-te-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

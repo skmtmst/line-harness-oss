@@ -47,12 +47,19 @@ button.item:disabled {
   opacity: 0.4;
 }
 
-/*
- * いま開いているページ。**白文字が乗るので `$accent-deep`。**
- * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
- */
+.control {
+  width: 64px;
+}
+
+.page {
+  width: 38px;
+}
+
+/* B-211：いま開いているページは薄い緑・緑の枠・濃い緑の文字。 */
 .current {
-  border-color: transparent;
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  color: var(--color-selection-border);
   font-weight: 500;
 }
 
@@ -124,14 +131,19 @@ button.item:disabled {
   font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
 }
 :root .current {
-  outline-color: transparent; background: var(--color-ink); color: var(--color-canvas);
+  outline: 1px solid var(--color-selection-border); outline-offset: -1px;
 }
-:root span.item { outline-color: transparent; }
+/* B-211：通常の .item の色より現在地の選択色を優先する。 */
+html:root .current {
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  color: var(--color-selection-border);
+}
+:root span.item:not(.current) { outline-color: transparent; }
 :root .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
 
 :root .summary { flex: 1; gap: 0; }
 :root .pagination[data-spacing='restaurant']{padding:8px 0;gap:8px;}
-:root .pagination[data-spacing='restaurant'] .current{background:var(--color-accent-deep);color:var(--color-canvas);}
 
 :root .pagination[data-spacing='roomy'] { padding: calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-rsv-head-row-gap)) calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-cell-side)); }
 
@@ -143,5 +155,11 @@ button.item:disabled {
 :root :global([data-list-skeleton]) .pagination:has(> .summary) { flex: 1; min-width: 0; }
 :root :global([data-list-skeleton]) .pagination:has(> .summary) .summary { margin-right: auto; }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
-html:root .current { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+/* 前後に進めない時も、送り先の枠を残し、矢印だけを薄くする。 */
+html:root button.control:disabled {
+  opacity: 1;
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  box-shadow: var(--control-shadow);
+}
+html:root button.control:disabled .controlGlyph { opacity: .5; }

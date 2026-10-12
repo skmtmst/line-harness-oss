@@ -6,7 +6,7 @@
  * 板が狭い（≒1152画面）と右欄はスマホを畳んで操作ボタンだけにする。
  *
  * 値は全部トークン（直書きを数える試験がある）。板だけの色は
- * globals.css の [data-theme="v8"] にある --v8-* を読む。
+ * globals.css の :root にある --v8-* を読む。
  */
 
 /* 白い板自体は app-shell が持つ（板・余白・角16）。ここでは中身だけ。 */
@@ -142,7 +142,7 @@
   flex-direction: column;
   gap: var(--tpl-bm-16);
   min-width: 0;
-  padding: var(--tpl-bm-24) var(--tpl-bm-28);
+  padding: var(--tpl-bm-24);
 }
 
 /* 予約経路の連携（絵 ZyDd6）は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
@@ -264,7 +264,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-bm-12);
-  padding: var(--tpl-bm-20);
+  padding: var(--tpl-bm-24);
   outline: 1px solid var(--card-edge);
   outline-offset: calc(var(--tpl-bm-1) * -1);
   border-radius: var(--radius-card);

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import Toggle from '@/components/shared/toggle'
-import { CircleDot, Download, Plus, Star } from 'lucide-react'
+import { CircleDot, Download, Inbox, Plus, Star } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
@@ -999,12 +999,13 @@ function LineNotificationsPage() {
     <KpiCard
       key={kpi.label}
       presentation="band"
-      icon={null}
+      icon={<Inbox size={16} aria-hidden="true" />}
       title={kpi.label}
       value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
-      unit=""
-      detail={kpi.note === '取得失敗' ? '取得失敗' : kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      unit={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      valueTextWithUnit
+      detail={kpi.note === '取得失敗' ? '取得失敗' : null}
       help={kpi.note || undefined}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}

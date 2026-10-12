@@ -117,8 +117,8 @@ export type RowMenuProps = {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /**
-   * 見た目。'box' は ★V8 の行の「…」（KspUx の印ボタン＋横の3点）。
-   * 'plain' は枠の無い V5 の「…」（RowActions・v7 の一覧）。
+   * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
+   * V8では両方とも共通の薄い枠を持つ（B-253・一覧の型i0Ao0R）。
    */
   appearance?: 'box' | 'plain'
   /**
@@ -150,7 +150,7 @@ export function RowMenu({
   note,
   open: openProp,
   onOpenChange,
-  appearance = 'box',
+  appearance = 'plain',
   size,
   className,
   title,
@@ -179,7 +179,7 @@ export function RowMenu({
       {appearance === 'plain' ? (
         <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
-        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} data-row-menu="">
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} variant="plain" data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
         </IconButton>
       )}

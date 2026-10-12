@@ -42,7 +42,7 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
@@ -1122,14 +1122,8 @@ export default function BroadcastListV8() {
 
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
-      </span>
-      {pageCount > 1 ? (
-        <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
-      ) : null}
+      <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
+        summary={paginationSummary(resultTotal ?? visibleBroadcasts.length, rangeFirst, rangeLast)} />
     </ListPagePagination>
   ) : null
 
@@ -1137,6 +1131,7 @@ export default function BroadcastListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
       skeleton
       boardId={boardId}
       headingSize="compact"

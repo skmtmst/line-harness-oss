@@ -3,6 +3,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 export interface SettingsPageProps extends PageHeadingProps {
+  heightMode?: 'viewport' | 'content'
   /** 板ごとの寸法。画面CSSから型の領域を上書きしない。 */
   layout?: 'accounts' | 'account-detail' | 'account-handover' | 'wide-nav' | 'narrow-nav' | 'customer-look'
   preview?: ReactNode
@@ -14,9 +15,9 @@ export interface SettingsPageProps extends PageHeadingProps {
   /** 保存の帯を本文幅に置く。省略時は板全体の下。 */
   savePlacement?: 'content'
 }
-export function SettingsPage({ boardId, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, ...heading }: SettingsPageProps) {
+export function SettingsPage({ boardId, heightMode, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, ...heading }: SettingsPageProps) {
   const footer = saveActions ? <div className={styles.footer} style={savePlacement === 'content' ? { marginBlock: 0 } : undefined} data-template-region="footer"><StickyBar actions={saveActions} status={saveStatus} /></div> : null
-  return <PageFrame kind="settings" layout={layout} boardId={boardId} standalone={standalone} hasFooter={!!saveActions}>
+  return <PageFrame kind="settings" heightMode={heightMode} layout={layout} boardId={boardId} standalone={standalone} hasFooter={!!saveActions}>
     <PageHeading {...heading} />
     <div className={styles.settings} data-template-region="body" data-content-layout={contentLayout}>
       <nav aria-label="この設定の目次" className={styles.settingsNav} data-template-region="navigation">{navigation}</nav>

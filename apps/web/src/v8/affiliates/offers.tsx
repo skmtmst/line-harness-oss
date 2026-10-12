@@ -9,6 +9,7 @@ import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
@@ -18,9 +19,10 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
+import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import {
   currentSettlementPeriod,
   deltaText,
@@ -33,7 +35,7 @@ import {
   pageOf,
   previousSettlementPeriod,
 } from './display'
-import { AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
 import OfferFormModal from './offer-form'
 import OfferTermsDialog from './offer-terms'
 import {
@@ -43,7 +45,6 @@ import {
   RowMenu,
   SavedSelect,
   StateCard,
-  StatusPill,
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
@@ -423,6 +424,8 @@ export default function OffersTab() {
       folders={[]}
       onChanged={() => undefined}
       canManage={!readonly}
+      createAction={createButton(true)}
+      reserveCreateSpace={false}
       itemLabel="案件"
       activeId="all"
       onSelect={() => undefined}
@@ -477,7 +480,7 @@ export default function OffersTab() {
       narrow={narrow}
       notices={<ToolbarNotices info="アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。" />}
       search={{ placeholder: '案件名・説明で探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={narrow ? chips : <>{folderSelect}{chips}</>}
+      chips={<><ListToolbarOptional compact label="成果のときの動き">{folderSelect}</ListToolbarOptional>{chips}</>}
       trailing={trailing}
       narrowLead={<>{createButton(false)}{folderSelect}</>}
     />
@@ -485,14 +488,15 @@ export default function OffersTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableOffers}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>案件</Th><Th>状態</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>案件</Th>
             <Th className={styles.colOfferReward}>報酬</Th>
-            <Th className={styles.colOfferAction}>成果が出たときの動き</Th>
-            <Th className={`${styles.colOfferPeople} ${styles.num}`}>紹介している人</Th>
-            <Th className={`${styles.colOfferConv} ${styles.num}`}>成果</Th>
+            <Th collapseAt="narrow" className={styles.colOfferAction}>成果が出たときの動き</Th>
+            <Th collapseAt="narrow" align="right" className={styles.colOfferPeople}>紹介している人</Th>
+            <Th align="right" className={styles.colOfferConv}>成果</Th>
+            <Th align="right" className={styles.colOfferState}>状態</Th>
             <Th className={styles.colOfferOps}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -500,38 +504,38 @@ export default function OffersTab() {
           {paged.map((offer) => {
             const stat = offerStats.get(offer.id)
             return (
-              <Tr key={offer.id} className={styles.row} data-table-layout="columns" data-row-id={offer.id}>
-                <Td className={styles.colName}>
+              <Tr key={offer.id} data-table-layout="columns" data-row-id={offer.id}>
+                <Td grow>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                     <FolderDotName folder={null} dot={!narrow}>
                       {readonly ? (
-                        <span className={styles.rowNameText} ><TruncatedText value={String(offer.name ?? '')} /></span>
+                        <span><TruncatedText value={String(offer.name ?? '')} /></span>
                       ) : (
-                        <button type="button" className={styles.rowName} title={offer.name}  onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
+                        <RowNameButton title={offer.name}  onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</RowNameButton>
                       )}
                     </FolderDotName>
 
                   </span>
                 </Td>
-                <Td><StatusPill tone={offer.isActive ? 'active' : 'neutral'}>{offer.isActive ? '公開中' : '下書き'}</StatusPill></Td>
                 <Td className={styles.colOfferReward}>
                   <span className={styles.stack}>
                     <span className={styles.cellNum}>{rewardText(offer)}</span>
                     {offer.rewardMiles > 0 ? <span className={styles.rowPlan}>{`＋${formatNumber(offer.rewardMiles)}マイル`}</span> : null}
                   </span>
                 </Td>
-                <Td className={styles.colOfferAction}>
+                <Td collapseAt="narrow" className={styles.colOfferAction}>
                   <span className={styles.cellNum} title={actionText(offer)}>{actionText(offer)}</span>
                 </Td>
-                <Td className={`${styles.colOfferPeople} ${styles.num}`}>
+                <Td collapseAt="narrow" align="right" className={styles.colOfferPeople}>
                   <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')}</span>
                 </Td>
-                <Td className={`${styles.colOfferConv} ${styles.num}`}>
+                <Td align="right" className={styles.colOfferConv}>
                   <span className={styles.stackEnd}>
                     <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')) : emptyValue('unknown')}</span>
                     {stat ? <span className={styles.rowPlan}>{`確定 ${formatYen(stat.reward)}`}</span> : null}
                   </span>
                 </Td>
+                <Td align="right" className={styles.colOfferState}><StatusBadge tone={offer.isActive ? 'success' : 'neutral'}>{offer.isActive ? '公開中' : '下書き'}</StatusBadge></Td>
                 <Td className={styles.colOfferOps}>
                   <span className={styles.rowActions}>
 
@@ -590,7 +594,7 @@ export default function OffersTab() {
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
-      folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

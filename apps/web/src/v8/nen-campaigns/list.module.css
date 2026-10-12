@@ -1,7 +1,7 @@
 /*
  * ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4・oqSJP）。
  * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
- * 数字は app/globals.css の [data-theme="v8"] の --tpl-nc-* に置く。
+ * 数字は app/globals.css の :root の --tpl-nc-* に置く。
  */
 
 /* タブ（絵：高さ28・文字の下10・文字 13/18）。 */
@@ -253,21 +253,7 @@
 }
 
 /* 引き出し（中身・クーポンの決めごと）。絵 oqSJP の幅は 520（共通の引き出しは 660）。 */
-:global(:root [data-design-part='drawer']):has(.couponForm) {
-  width: min(var(--tpl-nc-drawer-w), 100%);
-}
 /* 絵 oqSJP の引き出しは頭・中・足に線を引かず、全体を余白24・間16で並べる。 */
-:global(:root [data-design-part='drawer']):has(.couponForm) > :global(header) {
-  padding: var(--tpl-nc-drawer-head-pad);
-  border-bottom: 0;
-}
-:global(:root [data-design-part='drawer']):has(.couponForm) > :global(div) {
-  padding: var(--tpl-nc-drawer-body-pad);
-}
-:global(:root [data-design-part='drawer']):has(.couponForm) > :global(footer) {
-  padding: var(--tpl-nc-drawer-foot-pad);
-  border-top: 0;
-}
 .drawerBody,
 .couponForm {
   display: flex;

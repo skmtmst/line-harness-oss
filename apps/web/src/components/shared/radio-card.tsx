@@ -109,6 +109,8 @@ export interface RadioCardProps {
   height?: 'default' | 'short'
   /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
   size?: 'default' | 'small'
+  /** 図・本文を右上の丸の下へ置く箱。本文の右側を丸用に狭めない。 */
+  contentPlacement?: 'standard' | 'below-indicator'
 }
 
 export default function RadioCard({
@@ -131,6 +133,7 @@ export default function RadioCard({
   compactTypography = 'default',
   height = 'default',
   size = 'default',
+  contentPlacement = 'standard',
 }: RadioCardProps) {
   const field = useFieldContext()
   invalid = invalid || Boolean(field?.invalid)
@@ -149,6 +152,7 @@ export default function RadioCard({
       ].filter(Boolean).join(' ')}
       data-choice-card={variant !== 'row' || undefined}
       data-variant={variant}
+      data-content-placement={contentPlacement}
       data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
     >

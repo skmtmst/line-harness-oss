@@ -1212,7 +1212,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     // V8は数字と単位を別要素へ出す。表と数カードの両方の実データを守る。
     expect(screen.getByRole('table', { name: '顧客へのお知らせ' }).textContent).toContain('7')
     const number = document.querySelector('[data-kpi-number]')
-    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.parentElement?.textContent)
+    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.textContent)
     expect(number).toBeTruthy()
     expect(numbers).toContain('7')
     expect(numbers).toContain('2')

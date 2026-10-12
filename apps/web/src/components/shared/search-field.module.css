@@ -126,7 +126,7 @@
 :root .input:focus-visible { outline: none; }
 
 :root .input {
-  font-size: var(--text-label);
+  font-size: var(--text-body);
 }
 
 /*

@@ -104,7 +104,7 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
 
   it('件数は表の下のページ送りに出て、フォルダには内訳を出す', () => {
     render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
-    expect(screen.getAllByText('2 件中 1〜2 件')).toHaveLength(1)
+    expect(screen.getAllByText('2件中 1〜2件')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'すべて 2' })).toBeTruthy()
     expect(screen.queryByText('タグ数')).toBeNull()
   })
@@ -116,7 +116,7 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
     const flow = pager.closest('[data-list-toolbar]')
     expect(flow).not.toBeNull()
     expect(flow!.contains(menu)).toBe(true)
-    expect(flow!.contains(screen.getByText('2 件中 1〜2 件'))).toBe(false)
+    expect(flow!.contains(screen.getByText('2件中 1〜2件'))).toBe(false)
   })
 
   it('「よく使う」は重ねて選べ、絞り込みに効く', async () => {

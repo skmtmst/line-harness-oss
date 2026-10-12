@@ -2,7 +2,7 @@
  * ★V8 テンプレートの一覧（Pencil `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`、
  * 削除 `V6JFnd`・削除できない `Z0g3si`、状態は `susGP`）。
  * 枠・見出し・タブ・数の帯・フォルダの列・道具の段の外枠は型（ListPage）が持つ。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-tl-*`。
+ * 値は globals.css の `:root` の `--tpl-tl-*`。
  */
 
 .folderNote {
@@ -165,7 +165,7 @@
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
-/* 種類の札（白い地・薄い枠・角6）。 */
+/* 統括の一覧もこのクラスを読む。店側を共通札へ移しても宣言を残す。 */
 .kindBadge {
   display: inline-block;
   padding: var(--tpl-tl-badge-pad);

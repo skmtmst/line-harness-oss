@@ -65,20 +65,14 @@
 
 /*
  * ★V8「絞り込みの札」（O2fCAt・XGJDa）：高さ36・文字12/500。
- * 選んだ札は書き出し正本 XGJDa の墨の地＋白文字。v7 は濃い緑の地。
+ * 選んだ札は B-211 の薄い緑の地・緑の枠・濃い緑の文字。
  */
 :root .v6-filter-chip {
   height: 36px;
-  gap: 5px;
-  padding: 0 10px;
+  gap: calc(var(--tpl-toolbar-gap) / 2);
+  padding: 0 var(--polish-space-field);
   font-size: var(--text-caption);
   font-weight: 500;
-}
-
-:root .v6-filter-chip[aria-pressed='true'] {
-  background: var(--color-ink);
-  color: var(--color-on-accent);
-  outline-color: var(--color-ink);
 }
 
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count {
@@ -96,14 +90,11 @@
 
 /* V8 正本 O2fCAt / XGJDa。 */
 :root .v6-filter-chip { height: 36px; border: 0; outline: 1px solid var(--color-control-border); box-shadow: var(--control-shadow); outline-offset: -0.5px; color: var(--color-ink); line-height: 18px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-:root .v6-filter-chip[aria-pressed='true'] { background: var(--color-ink); color: var(--color-on-accent); outline-color: var(--color-ink); box-shadow: none; }
+:root .v6-filter-chip[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); outline-color: var(--color-selection-border); box-shadow: none; }
 :root .v6-filter-chip__icon { width: var(--polish-icon-control); height: var(--polish-icon-control); }
-:root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-on-accent); }
+:root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-selection-border); }
 :root .v6-filter-chip:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 :root .v6-filter-chip { border-radius: 999px; }
 
 :root .v6-filter-chip[data-size='compact'] { height: var(--tpl-msg-composer-sticker-chip-h); padding: var(--tpl-msg-composer-sticker-chip-pad); }
-
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
-html:root .v6-filter-chip[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); outline-color: var(--color-selection-border); }

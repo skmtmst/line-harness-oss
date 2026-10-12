@@ -18,6 +18,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import {
@@ -87,7 +88,7 @@ export default function GettingStartedV8() {
 
   return (
     <div className={frame.screen}>
-      <SettingsPage layout="accounts"
+      <SettingsPage layout="accounts" heightMode="content"
         boardId="xuJ7D"
         title="はじめの設定"
         help="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"
@@ -106,25 +107,27 @@ export default function GettingStartedV8() {
               <progress className={styles.bar} value={done} max={Math.max(steps.length, 1)} aria-hidden="true" />
             </div>
 
-            <ol className={styles.steps} aria-label="はじめの設定の順路">
-              {steps.map((step) => <StepRow key={step.key} step={step} />)}
-            </ol>
+            <Card padding="rows" overflow="hidden">
+              <ol className={styles.steps} aria-label="はじめの設定の順路">
+                {steps.map((step) => <StepRow key={step.key} step={step} />)}
+              </ol>
+            </Card>
 
             <div className={styles.bottom}>
               {reasons.length > 0 ? (
-                <section className={styles.card} aria-label="いま止まっている理由">
+                <Card layout="vertical" className={styles.card} contentPadding="var(--tpl-sa-card-pad)" gap="var(--tpl-sa-card-gap)" aria-label="いま止まっている理由">
                   <h2 className={styles.cardTitle}>いま止まっている理由</h2>
                   {reasons.map((line) => <p key={line} className={styles.cardLine}>{line}</p>)}
-                </section>
+                </Card>
               ) : null}
-              <section className={styles.card} aria-label="気をつけること">
+              <Card layout="vertical" className={styles.card} contentPadding="var(--tpl-sa-card-pad)" gap="var(--tpl-sa-card-gap)" aria-label="気をつけること">
                 <h2 className={styles.cardTitle}>気をつけること</h2>
                 <p className={styles.cardLine}>
                   {CARE_LINES[0]}
                   <br />
                   {CARE_LINES[1]}
                 </p>
-              </section>
+              </Card>
             </div>
           </>
         )}

@@ -14,6 +14,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import { RowMenu } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import MediaPreviewOverlay from './media-preview-overlay'
+import MediaThumbnail from '@/components/shared/media-thumbnail'
 import Dialog from '@/components/shared/dialog'
 import { blockedReason, canDelete as canDeleteMedia, checkedAtText, dialogTitle, referenceKindText, referenceNameText, summarizeBulkDeleteResult, usageText } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
@@ -1119,7 +1120,7 @@ export default function MediaLibraryListV8() {
   const kpiCards = [
     { key: 'total', title: '登録メディア', icon: Images, value: kpiTotalText === '—' ? null : (overallTotal ?? total), unit: '件', detail: kindBreakdown || '—（未取得）' },
     { key: 'unused', title: 'どこでも使っていない', icon: EyeOff, value: kpis.unusedTotal ?? null, unit: '件', detail: '消してよいか確かめられます' },
-    { key: 'usage', title: '使っている容量', icon: HardDrive, value: null, valueText: quota ? formatMediaSize(quota.usageBytes) : undefined, unit: '', detail: quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の ${quotaPercent}%` : '—（未取得）' },
+    { key: 'usage', title: '使っている容量', icon: HardDrive, value: null, valueText: quota ? formatMediaSize(quota.usageBytes).split(' ')[0] : undefined, valueTextWithUnit: true, unit: quota ? formatMediaSize(quota.usageBytes).split(' ')[1] : '', detail: quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の ${quotaPercent}%` : '—（未取得）' },
     { key: 'archived', title: 'アーカイブ', icon: Archive, value: kpis.archivedTotal ?? null, unit: '件', detail: '一覧と新規選択から外したもの' },
   ]
 
@@ -1153,9 +1154,10 @@ export default function MediaLibraryListV8() {
   ]
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
       skeleton
       boardId="O7hUt7"
+      toolbarRowGap="card"
       headingSize="regular"
       title="登録メディア一覧"
       help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
@@ -1172,7 +1174,8 @@ export default function MediaLibraryListV8() {
               icon={<card.icon size={13} aria-hidden="true" />}
               value={card.value}
               valueText={card.valueText}
-              unit={card.value == null ? '' : card.unit}
+              valueTextWithUnit={card.valueTextWithUnit}
+              unit={card.value == null && card.valueText == null ? '' : card.unit}
               detail={card.detail}
             />
           ))}
@@ -1230,7 +1233,7 @@ export default function MediaLibraryListV8() {
             search={{
               placeholder: 'ファイル名で探す',
               label: 'ファイル名で探す',
-              width: 258,
+              width: 240,
               value: query,
               onChange: (value) => {
                 setQuery(value)
@@ -1240,6 +1243,7 @@ export default function MediaLibraryListV8() {
             filters={(
               <div role="group" aria-label="種類と使い方で絞り込む" className={styles.chipGroup}>
                 <FilterChip
+                  icon={<Images size={13} aria-hidden="true" />}
                   selected={kinds.size === 1 && kinds.has('image') && !showArchivedOnly}
                   onChange={(selectedValue) => {
                     if (selectedValue) {
@@ -1255,6 +1259,7 @@ export default function MediaLibraryListV8() {
                   {`画像${kpis.kindTotals.image == null ? '' : ` ${formatNumber(kpis.kindTotals.image as number)}`}`}
                 </FilterChip>
                 <FilterChip
+                  icon={<EyeOff size={13} aria-hidden="true" />}
                   selected={showUnusedOnly}
                   onChange={(selectedValue) => {
                     setShowUnusedOnly(selectedValue)
@@ -1790,6 +1795,51 @@ function MediaCardV8({
       : item.usageCount > 0
         ? '使用先から外すまで削除できません'
         : undefined
+  const mediaMenu = (
+    <span className={styles.menuWrap} title={canManageMedia ? undefined : managementPermissionReason}>
+      <RowMenu
+        appearance="plain"
+        label={`${item.filename}のその他操作`}
+        menuLabel={`${item.filename}の操作`}
+        open={menuOpen}
+        onOpenChange={(next) => (next ? onToggleMenu() : onCloseMenu())}
+        triggerProps={{ 'data-qa-open': 'YfTfJ' }}
+        items={[
+          {
+            id: 'preview',
+            label: 'プレビュー',
+            onSelect: onPreview,
+          },
+          ...(canManageMedia
+            ? [{ id: 'detail', label: '使用箇所を見る', onSelect: onDetail }]
+            : []),
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'rename', label: '名前を変える', onSelect: onRenameStart }]
+            : []),
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'move', label: 'フォルダへ移す', onSelect: onMoveStart }]
+            : []),
+          {
+            id: 'download',
+            label: 'ダウンロード',
+            disabled: downloading,
+            disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
+            onSelect: onDownload,
+          },
+          ...(canManageMedia
+            ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: onArchiveStart }]
+            : []),
+          // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
+            : []),
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'replace', label: '別のメディアに差し替える', onSelect: onReplaceStart }]
+            : []),
+        ]}
+      />
+    </span>
+  )
   return (
     <div className={view === 'grid' ? styles.card : styles.row}>
       <button
@@ -1798,13 +1848,7 @@ function MediaCardV8({
         aria-label={`${item.filename}のプレビューを見る`}
         className={view === 'grid' ? styles.thumbButton : `${styles.thumbButton} ${styles.thumbNarrow}`}
       >
-        {item.kind === 'image' ? (
-          <MediaThumbV8 src={displaySrc} alt={item.filename} />
-        ) : (
-          <span className={styles.thumbLabel}>
-            {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
-          </span>
-        )}
+        <MediaThumbnail kind={item.kind} src={displaySrc} alt={item.filename} />
       </button>
 
       <div className={view === 'grid' ? styles.cardBody : styles.rowBody}>
@@ -1826,6 +1870,7 @@ function MediaCardV8({
             {renameError && (
               <p className={styles.renameError} role="alert">{renameError}</p>
             )}
+            {mediaMenu}
             <div className={styles.renameActions}>
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>
                 キャンセル
@@ -1861,6 +1906,7 @@ function MediaCardV8({
               <span className={styles.fileName} >
                 <TruncatedText value={String(item.filename ?? '')} />
               </span>
+              {mediaMenu}
             </span>
             <p className={styles.meta} title={formatMediaDetails(item)}>
               {`${kindLabel}・${formatMediaSize(item.sizeBytes)}`}
@@ -1874,66 +1920,7 @@ function MediaCardV8({
             </p>
           </>
         )}
-
-        <div className={styles.cardFoot}>
-          <span className={styles.menuWrap} title={canManageMedia ? undefined : managementPermissionReason}>
-            <RowMenu
-              appearance="plain"
-              label={`${item.filename}のその他操作`}
-              menuLabel={`${item.filename}の操作`}
-              open={menuOpen}
-              onOpenChange={(next) => (next ? onToggleMenu() : onCloseMenu())}
-              triggerProps={{ 'data-qa-open': 'YfTfJ' }}
-              items={[
-                {
-                  id: 'preview',
-                  label: 'プレビュー',
-                  onSelect: onPreview,
-                },
-                ...(canManageMedia
-                  ? [{ id: 'detail', label: '使用箇所を見る', onSelect: onDetail }]
-                  : []),
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'rename', label: '名前を変える', onSelect: onRenameStart }]
-                  : []),
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'move', label: 'フォルダへ移す', onSelect: onMoveStart }]
-                  : []),
-                {
-                  id: 'download',
-                  label: 'ダウンロード',
-                  disabled: downloading,
-                  disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
-                  onSelect: onDownload,
-                },
-                ...(canManageMedia
-                  ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: onArchiveStart }]
-                  : []),
-                // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
-                  : []),
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'replace', label: '別のメディアに差し替える', onSelect: onReplaceStart }]
-                  : []),
-              ]}
-            />
-          </span>
-        </div>
       </div>
     </div>
   )
-}
-
-/**
- * 一覧の縮小画像。読み込めないとき、ブラウザの壊れた画像の印と
- * ファイル名（代替文字）が枠からはみ出さないよう種類の文字に切り替える。
- */
-function MediaThumbV8({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return <span className={styles.thumbLabel}>画像を表示できません</span>
-  // 静的書き出しのため next/image の最適化は使えない。
-  // 一覧20件の同時取得を避けるため遅延読み込みにする。
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className={styles.thumbImage} />
 }

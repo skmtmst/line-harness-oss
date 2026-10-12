@@ -77,6 +77,11 @@
 :root .field {
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
+  font-size: var(--polish-text-body);
+}
+
+@media (pointer: coarse) {
+  :root .field { font-size: var(--text-lead); }
 }
 
 :root .invalid {

@@ -48,6 +48,12 @@ export interface ListPageBodyProps {
   /** 小窓の一覧は、ページの幅と独立してフォルダを横に並べる。 */
   dialogLayout?: boolean
   toolbar?: ReactNode
+  /** 固定した絵で道具の上下余白が16の一覧。通常の14は変えない。 */
+  toolbarSpacing?: 'section'
+  /** 案内の帯と道具の段の間を16にする固定絵。既定の段間は変えない。 */
+  noticeSpacing?: 'section'
+  /** 案内と道具を別の行に置く一覧。行同士はカードの間隔（16）。 */
+  toolbarRowGap?: 'card'
   /** 表の操作説明。本文に長い文を置かず、道具の段の「？」から読む。 */
   listHelp?: ReactNode
   children: ReactNode
@@ -55,13 +61,14 @@ export interface ListPageBodyProps {
   overlays?: ReactNode
 }
 export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
+  heightMode?: 'viewport' | 'content'
   boardId?: string
   layout?: 'event-list'
   standalone?: boolean
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, listHelp, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
@@ -70,7 +77,7 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
     <div className={styles.split} data-template-region="body">
       {folders ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
-        {toolbar || collapsed || listHelp ? <div className={styles.toolbar} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp ? undefined : ''}>
+        {toolbar || collapsed || listHelp ? <div className={styles.toolbar} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp ? undefined : ''}>
           {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}
           {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}
         </div> : null}
@@ -91,9 +98,9 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, layout, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
-  return <PageFrame kind="list" boardId={boardId} layout={layout} standalone={standalone} skeleton={body.skeleton}>
-    <PageHeading {...{ title, help, identity, actions, crumbs, steps, headingSize }} />
+export function ListPage({ boardId, layout, heightMode, standalone, tabs, title, help, titleAccessory, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
+  return <PageFrame kind="list" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
+    <PageHeading {...{ title, help, titleAccessory, identity, actions, crumbs, steps, headingSize }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...body} />
   </PageFrame>

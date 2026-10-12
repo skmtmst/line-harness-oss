@@ -201,9 +201,10 @@ describe('V8 コンバージョンの一覧', () => {
   it('管理できる人：作る・使う場所を足すがあり、「…」から止めると確認画面が開く（理由が無いと止められない）', async () => {
     await mount()
     expect(screen.getAllByRole('link', { name: /成果地点を作る/ }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: '使う場所を足す' }).length).toBe(2)
+    expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
     await flush()
+    expect(screen.getByRole('menuitem', { name: '使う場所を足す' }).getAttribute('href')).toContain('/analytics?')
     expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '複製する' })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
@@ -223,7 +224,10 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText(READ_ONLY_MESSAGE)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /成果地点を作る/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
-    expect(Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)).toEqual([])
+    // 1ページでも頁送りを出すV8。端の前/次だけは押せない（閲覧の境界）。変更操作は隠す。
+    const disabled = Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)
+    expect(disabled.filter((button) => !button.closest('[data-pagination]'))).toEqual([])
+    expect(disabled.map((button) => button.getAttribute('aria-label'))).toEqual(['前のページ', '次のページ'])
     fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
     await flush()
     expect(screen.getByRole('menuitem', { name: '中身を見る' })).toBeTruthy()

@@ -142,7 +142,8 @@
 <a id="page-head"></a>
 ## page-head 一覧・画面の頭
 
-- **役目**：板の題・「？」・右の主ボタンを1段で出す
+- **役目**：板の題・「？」・右の主ボタンを1段で出す。画面全体の説明はB-245の「この画面の説明」で灰色の説明を開閉する。
+- **B-245の持ち主**：`components/shared/page-explanation.tsx` の `PageExplanationProvider`・`PageExplanationToggle`・`PageExplanationBody`。型の題の横と既存の説明の位置へ置き、人・画面ごとの開閉を覚える。欄や数の用語説明は `HelpTip`、一時的な失敗・閲覧のみは `Notice` のまま。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-frame.tsx`・`apps/web/src/components/shared/page-header.tsx`・`apps/web/src/components/shared/help-tip.tsx`（部品 `PageHeading`・`PageTitle`・`PageFrame`・`ListPage`・`CreatePage`・`DetailPage`・`DashboardPage`・`SettingsPage`・`AnalyticsPage`・`InboxPage`）
   - 読む変数：`--text-title`
 - **持ち主（Pen）**：`EnlYo`「板の頭」・`KjC1z`「？」
@@ -223,8 +224,9 @@
 <a id="table"></a>
 ## table 表
 
-- **役目**：一覧の行を見出し40・行56・左右16・線は黒7%で並べる
+- **役目**：表を見出し40・左右24・線は黒7%で並べる
 - **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
+  - 行高の対応（§6.5-3・2026-10-12 B-254）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧は、**セル内の描画文字が1行なら52、2行・3行なら60**。判定は共通表の `useListRowDensity`、値は `--tpl-list-row-h`／`--tpl-list-row-multi-h`。文字のない高さ40の見本画像は複数行相当。WQmepの受信表は絵で確認した既存の専用口60を保持。1行の `ListSkeleton` は52、一般の表・`TableSkeleton` は56。行高の正本は見た目の決まり §6.5-3。
   - 読む変数：`--color-table-head`・`--color-hairline`
 - **持ち主（Pen）**：`ASVsl`「表の見出し」・`JpOg0`「表の行」・`TBCUY`「横に送れる表」
 - **見つけ方（コード）**：
@@ -353,6 +355,7 @@
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
 
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
+- 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
 - **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
 - **持ち主（Pen）**：**未定**
   - 注：Pen の欄の部品 ID が無い（決まりの板 MqqcW・aXUuh は見本。板では「選んだもの（B-163 窓で選ぶ）」の名前）
@@ -373,6 +376,7 @@
 - **役目**：数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ
 - **持ち主（コード）**：`apps/web/src/components/shared/select.tsx`・`apps/web/src/components/shared/select.module.css`・`apps/web/src/components/shared/select-menu.tsx`・`apps/web/src/components/shared/select-menu.module.css`・`apps/web/src/components/shared/menu-portal.tsx`（部品 `Select`・`SelectMenu`）
   - 読む変数：`--color-control-border`・`--radius-control`
+  - 既存の栞付き絞り込み（axFrW／wjfLe）は `icon`・`valueAlign="start"`・`showChevron={false}`、狭い段は `iconOnly`。画面側でボタンの余白・矢印・値を上書きしない。
 - **持ち主（Pen）**：`wMMk6`「選ぶ欄」・`StFE7`「選ぶ欄/開いた」
   - 部品の板の html に書き出されていない ID：`StFE7`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：

@@ -104,7 +104,7 @@ describe('広告とのつなぎ（FDBsG）', () => {
   it('対応表を成果地点ごとに1行で出し、返している／返していないを札にする', async () => {
     await render(<AdConnectionsV8 />, '来店予約')
     expect(host.querySelector('[data-design-node="FDBsG"]')).not.toBeNull()
-    const rows = [...host.querySelectorAll('[role="row"]')].slice(1).map((row) => row.textContent)
+    const rows = [...host.querySelectorAll('tr, [role="row"]')].slice(1).map((row) => row.textContent)
     expect(rows[0]).toContain('purchase_first')
     expect(rows[0]).toContain('Purchase')
     expect(rows[0]).toContain('返している')

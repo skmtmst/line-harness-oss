@@ -7,7 +7,8 @@
 /* 道具の段の先頭に置く帯（案内・失敗・済んだ知らせ）。1行を取る。 */
 .fullRow {
   flex-basis: 100%;
-  margin-bottom: var(--tpl-af-notice-after);
+  margin-bottom: var(--polish-space-row);
+  order: -1;
 }
 
 .chipGroup {
@@ -20,40 +21,7 @@
 .tableWrap {
   min-width: 0;
 }
-.table {
-  border: 0;
-}
-:global(:root) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-af-col-gap);
-  height: var(--tpl-af-head-h);
-  padding: var(--tpl-af-head-pad);
-}
-:global(:root) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-af-col-gap);
-  height: var(--tpl-af-row-h);
-  padding: var(--tpl-af-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-}
-:global(:root) .table .headRow[data-table-layout='columns'] > th,
-:global(:root) .table .row[data-table-layout='columns'] > td {
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global(:root) .table .row[data-table-layout='columns'] > .num,
-:global(:root) .table .headRow[data-table-layout='columns'] > .num {
-  padding-right: var(--tpl-af-num-pad-end);
-  text-align: right;
-}
-:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
-:global(:root) .table .row[data-table-layout='columns'] > td.colName {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.num { text-align: right; }
+.colState { width: var(--tpl-af-col-state); }
 .colCheck { width: var(--tpl-af-col-check); }
 /* アフィリエイター（nJlxX）：紹介リンク 76・友だち追加 84・成果 60・報酬 84・操作 140。 */
 .colLinks { width: var(--tpl-af-col-links); }
@@ -62,26 +30,6 @@
 .colReward { width: var(--tpl-af-col-reward); }
 .colOps { width: var(--tpl-af-col-ops); }
 
-/* 名前（緑の 13/600）と下の行。 */
-.rowName {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-row-name-size);
-  font-weight: 600;
-  line-height: var(--tpl-row-name-lh);
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.rowName:hover { text-decoration: underline; }
 .rowPlan {
   display: block;
   max-width: 100%;
@@ -96,7 +44,6 @@
 .cellNum {
   display: block;
   color: var(--color-ink);
-  font-size: var(--text-label);
   line-height: normal;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -218,18 +165,6 @@
 
 /* 道具の段の右：よく使う絞り込み（左に印）。 */
 .savedBox { position: relative; width: var(--tpl-af-saved-w); }
-.savedBox :global(*) { max-width: 100%; }
-.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
-.savedBox :global(button) > svg:last-child { display: none; }
-.savedIcon {
-  position: absolute;
-  top: 50%;
-  left: var(--tpl-rule-row-gap);
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
 
 /* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {
@@ -252,7 +187,6 @@
 /* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin: var(--tpl-af-ro-before) var(--tpl-head-pad-side) var(--tpl-af-ro-after); }
 /* 閲覧のみで隠した作るボタン（＋下の間）の場所だけ空ける。 */
-.viewerCreateSpace { display: block; height: var(--tpl-af-viewer-create-h); }
 
 /* タブの段（絵 nJlxX：タブの高さ 28）。共通のタブは変えず、この板の下の余白だけ詰める。 */
 .tabsBox :global([role='tab']) { min-height: 0; padding-bottom: var(--tpl-af-tab-pad-bottom); }
@@ -271,30 +205,16 @@
   gap: var(--tpl-toolbar-gap);
 }
 
-/* 閲覧のみの名前（押せない形）。 */
-.rowNameText {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-row-name-size);
-  font-weight: 600;
-  line-height: var(--tpl-row-name-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* 案件（h7dmB）：報酬 110・動き 150・紹介している人 96・成果 100・操作 170。行 56。 */
-:global(:root) .tableOffers .row[data-table-layout='columns'] { height: var(--tpl-af-offer-row-h); }
 .colOfferReward { width: var(--tpl-af-col-offer-reward); min-width: 0; }
 .colOfferAction { width: var(--tpl-af-col-offer-action); min-width: 0; }
 .colOfferAction .cellNum { overflow: hidden; text-overflow: ellipsis; }
 .colOfferPeople { width: var(--tpl-af-col-offer-people); }
 .colOfferConv { width: var(--tpl-af-col-offer-conv); }
-.colOfferOps { width: var(--tpl-af-col-offer-ops); }
+.colOfferState { width: calc(var(--tpl-af-col-offer-ops) - var(--tpl-icon-btn-row-hit) - var(--tpl-af-col-gap)); }
+.colOfferOps { width: var(--tpl-icon-btn-row-hit); }
 
 /* 成果承認（OylSV）：紹介した人 96・アカウント 92・案件 150・報酬 72・確認 72・決める 124。行 56。 */
-:global(:root) .tableApprovals .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-offer-row-h); }
 .colApAffiliate { width: var(--tpl-af-col-ap-affiliate); min-width: 0; }
 .colApAccount { width: var(--tpl-af-col-ap-account); min-width: 0; }
 .colApOffer { width: var(--tpl-af-col-ap-offer); min-width: 0; }
@@ -479,7 +399,6 @@
 }
 
 /* 支払い（aINnz）：払う額 150・中身 70・振込先 170・状態 130・操作 170。行 59。 */
-:global(:root) .tablePayment .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-pay-row-h); }
 .colPayAmount { width: var(--tpl-af-col-pay-amount); }
 .colPayCount { width: var(--tpl-af-col-pay-count); }
 .colPayBank { width: var(--tpl-af-col-pay-bank); min-width: 0; }
@@ -550,32 +469,10 @@
 }
 
 /* レポート（Eo56k）：見出し 12/24・行 61・成果と売上 130・報酬 160・操作 28。 */
-:global(:root) .tableReport .headRow[data-table-layout='columns'] { height: var(--tpl-af-rep-head-h); padding: var(--tpl-af-rep-pad); }
-:global(:root) .tableReport .row[data-table-layout='columns'] { height: var(--tpl-af-rep-row-h); padding: var(--tpl-af-rep-pad); }
 .colRepConv { width: var(--tpl-af-col-rep-conv); }
 .colRepReward { width: var(--tpl-af-col-rep-reward); }
 .colRepOps { width: var(--tpl-af-col-rep-ops); }
 .colRepOps :global(button) { width: var(--tpl-af-col-rep-ops); height: var(--tpl-af-col-rep-ops); min-height: 0; }
-.rowLink,
-.rowLinkText {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--tpl-row-name-size);
-  font-weight: 600;
-  line-height: normal;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.rowLink { cursor: pointer; }
-.rowLink:hover { text-decoration: underline; }
 .cellStrong {
   color: var(--color-ink);
   font-size: var(--text-caption);
@@ -614,3 +511,6 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-row-name-lh);
 }
+
+/* 案内と1段の道具の間。道具の内側の余白は型が持つ。 */
+.wideTools { display: contents; }

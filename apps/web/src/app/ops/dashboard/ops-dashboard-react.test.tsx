@@ -103,7 +103,8 @@ describe('画面', () => {
   it('数値カード・グラフ・要対応・チケット・使用量が出る', async () => {
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
-    const text = host.textContent ?? ''
+    await act(async () => { (host.querySelector('button[aria-label="ダッシュボードの説明"]') as HTMLButtonElement).click() })
+    const text = document.body.textContent ?? ''
     const details = Array.from(host.querySelectorAll('[title]')).map(item => item.getAttribute('title')).join(' ')
     expect(text).toContain('契約先の売上・使用量・お問い合わせ')
     expect(text).toContain('¥398,000')

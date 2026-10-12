@@ -122,7 +122,8 @@
 :root .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
 
 /* B-152・仕上げ1：ラベルと欄 */
-:root .labelRow { margin-bottom: var(--polish-space-row); }
+:root .field { gap: var(--polish-space-row); }
+:root .labelRow { margin-bottom: 0; }
 
 /* B-152・仕上げ2 */
 :root .field .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
@@ -146,6 +147,9 @@
   font-weight: var(--tpl-field-label-weight);
 }
 
+/* B-152：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
+html:root .field:not([data-density]):not([data-spacing]) { gap: var(--polish-space-row); }
+html:root .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bottom: 0; }
 /*
  * 題と中身の間（Field の contentGap）。
  * 共通の間は「題の行の下 8（--polish-space-row）＋段の間 6」で 14。絵の間が

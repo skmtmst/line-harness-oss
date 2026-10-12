@@ -465,7 +465,7 @@ export default function AffiliateDrawer({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
+      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" layout="inset" busy={paymentOpen} onClose={onClose}
         heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
           const response = await api.affiliates.update(affiliate.id, { name: next.trim() })

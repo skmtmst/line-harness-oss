@@ -9,9 +9,12 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -352,7 +355,6 @@ export default function AdsV8() {
   const otherTotal = [...totalCostByCurrency].find(([currency]) => currency !== 'JPY') ?? null
   const routeById = new Map(entryRoutes.map((route) => [route.id, route]))
   const workerHost = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '')
-  const selectedEntry = manualEntries.find((entry) => entry.id === selectedEntryId) ?? null
 
   if (!selectedAccountId) {
     return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告費だけを表示します。" /></SaveErrorScope>
@@ -402,7 +404,7 @@ export default function AdsV8() {
               const legacyCost = legacyMonthlyCost(platform, costRows)
               const Icon = provider.icon
               return (
-                <div key={provider.key} className={styles.provider} role="listitem">
+                <Card key={provider.key} variant="aside" className={styles.provider} contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" role="listitem">
                   <div className={styles.providerHead}>
                     <Icon size={16} aria-hidden="true" className={styles.providerIcon} />
                     <span className={styles.providerName}>{provider.label}</span>
@@ -431,7 +433,7 @@ export default function AdsV8() {
                       )}
                     </span>
                   ) : null}
-                </div>
+                </Card>
               )
             })}
           </div>
@@ -452,47 +454,47 @@ export default function AdsV8() {
               description="広告をつなぐと毎日自動で取り込みます。取り込めない分は「費用を手で入れる」から足せます。"
             />
           ) : (
-            <div className={styles.table} role="table" aria-labelledby="ads-costs">
-              <div className={styles.tableHead} role="row">
-                <span className={styles.colSource} role="columnheader">流入元</span>
-                <span className={styles.colMedia} role="columnheader">媒体</span>
-                <span className={styles.colLink} role="columnheader">計測リンク</span>
-                <span className={styles.colCost} role="columnheader">この30日の費用</span>
-                <span className={styles.colNum} role="columnheader">友だち追加</span>
-                <span className={styles.colNum} role="columnheader">1人あたり</span>
-                <span className={styles.colImport} role="columnheader">取り込み</span>
-              </div>
+            <DataTable label="流入元ごとの費用" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+              <TableHeadRow data-table-layout="columns">
+                <Th grow>流入元</Th>
+                <Th className={styles.colMedia}>媒体</Th>
+                <Th className={styles.colLink} collapseAt="narrow">計測リンク</Th>
+                <Th className={styles.colCost} align="right">この30日の費用</Th>
+                <Th className={styles.colNum} align="right">友だち追加</Th>
+                <Th className={styles.colNum} align="right">1人あたり</Th>
+                <Th className={styles.colImport}>取り込み</Th>
+              </TableHeadRow></thead><tbody>
               {costRows.map((row) => {
                 const platform = platforms.find((item) => item.id === row.adPlatformId)
                 const route = row.entryRouteId ? routeById.get(row.entryRouteId) : undefined
                 const link = route ? `${workerHost}/r/${route.refCode}` : null
                 const cost = row.totals.length === 0 ? emptyValue('unknown') : row.totals.map((total) => formatMinor(total.amountMinor, total.currency)).join(' ')
                 return (
-                  <div key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`} className={styles.tableRow} role="row">
-                    <span className={styles.colSource} role="cell"><span className={styles.cell} title={route ? `${route.name}（${row.sourceLabel}）` : row.sourceLabel}>{route?.name ?? row.sourceLabel}</span></span>
-                    <span className={styles.colMedia} role="cell"><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}</span></span>
-                    <span className={styles.colLink} role="cell"><span className={styles.cell} title={link ?? undefined}>{link ?? emptyValue('unknown')}</span></span>
-                    <span className={styles.colCost} role="cell"><span className={row.totals.length === 0 ? styles.faint : undefined}>{cost}</span></span>
-                    <span className={styles.colNum} role="cell">{row.friendAdds == null ? emptyValue('unknown') : formatNumber(row.friendAdds)}</span>
-                    <span className={styles.colNum} role="cell">
+                  <Tr key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`} data-table-layout="columns">
+                    <Td grow><span className={styles.cell} title={route ? `${route.name}（${row.sourceLabel}）` : row.sourceLabel}>{route?.name ?? row.sourceLabel}</span></Td>
+                    <Td className={styles.colMedia}><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}</span></Td>
+                    <Td className={styles.colLink} collapseAt="narrow"><span className={styles.cell} title={link ?? undefined}>{link ?? emptyValue('unknown')}</span></Td>
+                    <Td className={styles.colCost} align="right"><span className={row.totals.length === 0 ? styles.faint : undefined}>{cost}</span></Td>
+                    <Td className={styles.colNum} align="right">{row.friendAdds == null ? emptyValue('unknown') : formatNumber(row.friendAdds)}</Td>
+                    <Td className={styles.colNum} align="right">
                       <span className={row.costPerFriendMinor == null ? styles.faint : undefined}>
                         {row.costPerFriendMinor == null ? emptyValue('unknown') : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                       </span>
-                    </span>
-                    <span className={styles.colImport} role="cell">
+                    </Td>
+                    <Td className={styles.colImport}>
                       {row.source === 'manual'
                         ? <StatusBadge tone="neutral" size="compact">手入力</StatusBadge>
                         : <StatusBadge tone="success" size="compact">自動</StatusBadge>}
-                    </span>
-                  </div>
+                    </Td>
+                  </Tr>
                 )
               })}
-            </div>
+            </tbody></DataTable>
           )}
           <p className={styles.notice}>取り込んだ費用と手入力の分です。取れない日は「—」になります。秘密の鍵は画面に表示しません。中継リンクを通った人だけ広告と結びつきます。</p>
 
           {manualEntries.length > 0 ? (
-            <section className={styles.card} aria-labelledby="ads-manual">
+            <Card variant="panel" contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-labelledby="ads-manual">
               <h2 className={styles.cardTitle} id="ads-manual">手で入れた費用</h2>
               <p className={styles.lead}>行の「…」から取り消すと、その日の費用は集計から外れます。</p>
               {manualEntries.map((entry) => {
@@ -509,27 +511,18 @@ export default function AdsV8() {
                     <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? emptyValue('unknown')}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? emptyValue('unknown')}`}</span>
                     <span className={styles.entryMenu}>
                       {manage && !cancelled ? (
-                        <MoreAction
-                          title={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
-                          aria-label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
-                          aria-expanded={selectedEntryId === entry.id}
-                          aria-controls="ads-entry-actions"
-                          onClick={() => setSelectedEntryId((current) => (current === entry.id ? null : entry.id))}
-                         />
+                        <RowMenu
+                          label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
+                          open={selectedEntryId === entry.id}
+                          onOpenChange={(open) => setSelectedEntryId(open ? entry.id : null)}
+                          items={[{ id: 'cancel', label: '取り消す', icon: <XCircle size={15} aria-hidden />, onSelect: () => openCancel(entry) }]}
+                        />
                       ) : null}
                     </span>
                   </div>
                 )
               })}
-              {manage ? (
-                <div className={styles.rowActions} id="ads-entry-actions" role="group" aria-label="選んだ費用の操作">
-                  <span className={styles.rowActionsLabel}>{selectedEntry ? `「${shortDay(selectedEntry.day)} ${selectedEntry.sourceLabel}」の操作：` : '「…」を開いたとき：'}</span>
-                  <Button disabled={!selectedEntry} onClick={() => selectedEntry && openCancel(selectedEntry)}>
-                    <XCircle size={15} aria-hidden="true" />取り消す
-                  </Button>
-                </div>
-              ) : null}
-            </section>
+            </Card>
           ) : null}
         </>}
       </div>

@@ -92,7 +92,7 @@
   padding: var(--tpl-setnav-item-pad);
   border-radius: var(--tpl-setnav-radius);
   color: var(--color-ink-secondary);
-  font-size: var(--text-label);
+  font-size: var(--polish-text-body);
   font-weight: 500;
   white-space: nowrap;
 }

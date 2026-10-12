@@ -44,7 +44,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import Pagination from '@/components/shared/pagination'
+import { ListPager } from '@/components/templates/list-page'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table';
@@ -1094,20 +1095,10 @@ export default function RemindersListV8() {
           </BulkBar>
         ) : null}
 
-        <div className={styles.pagerRow}>
-          <span className={styles.pagerCount}>
-            {reminderList.pageCount > 1
-              ? `${(reminderList.page - 1) * reminderList.limit + 1}〜${Math.min(reminderList.page * reminderList.limit, reminderList.total)} / ${formatNumber(reminderList.total)}件`
-              : `${formatNumber(reminderList.total)}件`}
-          </span>
-          {reminderList.pageCount > 1 ? (
-            <Pagination
-              page={reminderList.page}
-              pageCount={reminderList.pageCount}
-              onPageChange={reminderList.setPage}
-            />
-          ) : null}
-        </div>
+        <ListPager>
+          <Pagination page={reminderList.page} pageCount={reminderList.pageCount} onPageChange={reminderList.setPage}
+            summary={paginationSummary(reminderList.total, (reminderList.page - 1) * reminderList.limit + 1, Math.min(reminderList.page * reminderList.limit, reminderList.total))} />
+        </ListPager>
       </>
     )
 
@@ -1137,7 +1128,7 @@ export default function RemindersListV8() {
   const perPageSelect = <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame skeleton kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
+    <SaveErrorScope errors={saveErrors}><PageFrame heightMode="content" skeleton kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
       <PageHeading headingSize="regular" title={<>リマインダ</>} help={<>
             予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
           </>}  />
@@ -1267,15 +1258,10 @@ export default function RemindersListV8() {
       </ConfirmDialog>
 
       <ListPageBody skeleton folders={<>
-          {canEdit ? (
-            <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
-              ＋ リマインダを作る
-            </Button>
-          ) : (
-            /* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ）。 */
-            <span className={`v8-folder-create ${styles.viewerCreateSpace}`} aria-hidden="true" />
-          )}
           <ManagedFolderPanel
+            createAction={canEdit ? <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
+              ＋ リマインダを作る
+            </Button> : undefined}
             kind="reminder"
             folders={folders}
             onChanged={loadFolders}

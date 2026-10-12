@@ -179,7 +179,7 @@
 }
 :root .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
 :root .radio:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
-:root .checked, :root .checked:hover { background: var(--color-accent-soft); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+:root .checked, :root .checked:hover { background: var(--color-choice-selected); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
 :root .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
 :root .disabled .radio { outline-color: var(--color-ink-disabled); }
 :root .invalid, :root .invalid .radio { outline-color: var(--color-status-danger); }
@@ -190,7 +190,7 @@
  * V8 の小さい箱（compact・バナー生成の脇のパネル）は装飾の丸を出さない。
  * 普通の箱（card）は絵（A0pDt・VE1u5・選ぶカード fNPdg/r3xz1W）どおり右上に丸を出す（2026-10-06 オーナー）。
  * 小さい箱では、選んだことは枠と面の色で
- * 分かる（[data-theme='v8'] .checked）。読み上げ・矢印キー・Space のために
+ * 分かる（:root .checked）。読み上げ・矢印キー・Space のために
  * 本物の input は残し、見えない大きさで同じ位置に置く。キーボードで来たことは
  * 箱の枠に出す（:has）。行（row）の丸は下の .row 側でそのまま出す。
  *
@@ -220,7 +220,7 @@
  * 2列で並べる大きさ。箱（card）の寸法は変えない。
  *
  * 角は数字で書かず $radius-segment を使う。この約束の値は :root でも
- * [data-theme='v8'] でも 8 のままなので、承認した角 8 がそのまま出る。
+ * :root でも 8 のままなので、承認した角 8 がそのまま出る。
  * （$radius-control は v8 で 10 になるため、ここでは使えない。）
  */
 :root .compact {
@@ -339,6 +339,9 @@ html:root .invalid, html:root .invalid .radio { border-color: var(--color-danger
 
 html:root .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
 html:root .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
+/* B-203/229：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
+html:root .card:not(.row)[data-content-placement='below-indicator'] { padding-top: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
+html:root .card:not(.row)[data-content-placement='below-indicator'] .body { padding-right: 0; }
 html:root .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* B-229：カードのラジオは例外なく右上。行型は左のまま。 */

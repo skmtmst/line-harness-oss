@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChartNoAxesColumn } from 'lucide-react'
+import { ArrowRight, ChartNoAxesColumn, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import { isKpiNumberText } from './kpi-number-text'
@@ -19,6 +19,20 @@ function hasDetail(node: ReactNode): boolean {
   })
 }
 
+/** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
+function staticMenuDescription(menu: ReactNode): string | undefined {
+  if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
+  const props = menu.props
+  if (props.type !== 'button' || typeof props.title !== 'string' || !Object.keys(props).every(key => ['type', 'title', 'className', 'aria-label', 'children'].includes(key))) return
+  const child = props.children
+  const decorativeDots = React.isValidElement<Record<string, unknown>>(child)
+    && child.type === MoreHorizontal
+    && (child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true')
+    && Object.keys(child.props).every(key => ['size', 'aria-hidden'].includes(key))
+  if (child !== '…' && child !== '...' && !decorativeDots) return
+  return props.title.trim() || undefined
+}
+
 export type KpiCardProps = {
   title: string
   /** 図柄。省略時は棒グラフ。`null` で図柄なし（X4STXS の絵どおり）。 */
@@ -32,6 +46,8 @@ export type KpiCardProps = {
    * null だけでなく undefined・NaN も「—」にする。呼び出し側が
    * `x?.y` をそのまま渡しても画面ごと落ちない。**0 は 0 のまま出す。**
    */
+  /** B-145：数の帯に『…』を置かず、数から既存の内訳を開く。 */
+  valueAction?: { label: string; expanded: boolean; onClick: () => void }
   value: number | null | undefined
   unit: string
   /** 数字と単位を続けて出す板用。既定の間隔は変えない。 */
@@ -112,6 +128,7 @@ export default function KpiCard({
   delta,
   menu,
   value,
+  valueAction,
   unit,
   unitSpacing = 'normal',
   signed = false,
@@ -145,8 +162,14 @@ export default function KpiCard({
   const textIsNumber = valueText === undefined || isKpiNumberText(valueText)
   const statusText = textIsNumber ? undefined : valueText
   const numberText = textIsNumber ? valueText : undefined
-  const tip = help ?? description
+  const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
+  const tip = help ?? description ?? menuDescription
   const hasTip = tip !== undefined && tip !== null
+
+  const numberAndUnit = <>
+    <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
+    {(numberText !== undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
+  </>
 
   return (
     <div
@@ -163,6 +186,7 @@ export default function KpiCard({
           全文は title で読めるようにする（読み上げは変わらない）。
         */}
         <p
+          data-kpi-label
           className={styles.label}
           title={title || undefined}
         >
@@ -181,7 +205,7 @@ export default function KpiCard({
             </HelpTip>
           ) : null}
         </p>
-        {menu ? <span className={styles.menu}>{menu}</span> : null}
+        {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
         {badge ? (
           <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
         ) : null}
@@ -201,8 +225,10 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-          {numberText !== undefined || statusText ? null : <span className={styles.unit}>{unit}</span>}
+          {valueAction ? (
+            <button type="button" className={styles.valueAction} aria-label={valueAction.label} aria-expanded={valueAction.expanded} onClick={valueAction.onClick}>{numberAndUnit}</button>
+          ) : numberAndUnit}
+
         </p>
       )}
 

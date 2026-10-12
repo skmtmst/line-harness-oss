@@ -139,7 +139,6 @@
 :root .trailing > * { width: max-content; flex: none; }
 :root .toolbar :global([data-design-node='rpot9']),
 :root .toolbar :global([data-design-node='Gfsb4']),
-:root .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
 :root .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
 :root .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
 :root .toolbar:has(.optional) .row1 > .search { flex: none; }
@@ -182,8 +181,8 @@
   flex-wrap: wrap; min-width: 0;
 }
 :root :global([data-list-skeleton]) .row1 > .search {
-  width: var(--tpl-list-search-w);
-  flex: 0 1 var(--tpl-list-search-w);
+  width: var(--list-search-width, var(--tpl-list-search-w));
+  flex: 0 1 var(--list-search-width, var(--tpl-list-search-w));
   min-width: min(var(--tpl-list-search-min), 100%);
 }
 :root :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
@@ -201,11 +200,20 @@
 
 .filterChoices, .filterWide { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
 .filterNarrow { display: none; }
-@container v8-page (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }
 
-/* B-191/205：白い板ではなく、道具に実際に残った幅で札を畳む。 */
+
+/* B-191/205：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
 .toolbar, .slots { container-type: inline-size; container-name: v8-list-toolbar; }
-@container v8-list-toolbar (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }
+.filterChoices[data-filter-collapsed] .filterWide { display: none; }
+.filterChoices[data-filter-collapsed] .filterNarrow { display: flex; }
 .slots { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .slots > .slotsRow { display: contents; }
+.slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
+.slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+/* A notice and the search controls form two sections. Preserve the section gap
+   even when the old screen supplied an extra wrapper around the notice. */
+html:root :global([data-template-region='toolbar']):has(> div > :is([data-design-part='notice'], [role='status'], [role='alert'])):has(> .slots > .toolbar) {
+  row-gap: var(--polish-space-card);
+}

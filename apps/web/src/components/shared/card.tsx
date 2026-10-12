@@ -15,18 +15,19 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
    */
   spacing?: 'settings' | 'integration' | 'preview' | 'normal' | 'roomy' | 'tight' | 'controls'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
+  /** rows は各行が端の余白を持つ一覧。外側に同じ余白を重ねない。 */
+  padding?: 'none' | 'rows' | 'compact' | 'default' | 'roomy' | 'spacious'
   corner?: 'card' | 'segment' | 'control'
   /** 板ごとの余白はトークンで渡す（例 'var(--tpl-...)'）。枠の描画はこの部品が持つ。 */
   contentPadding?: string
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
-  variant?: 'default' | 'form' | 'aside' | 'panel'
+  variant?: 'default' | 'form' | 'aside' | 'panel' | 'records'
   /** 枠と段の間を部品へ任せる連携設定のカード。既定の面は変えない。 */
   appearance?: 'outlined'
   /** 'tight' | 'normal' | 'loose' は決まった段。それ以外はトークン（例 'var(--tpl-...)'）を中の間として渡す。 */
   gap?: 'tight' | 'normal' | 'loose' | (string & {})
   /** 内側の線で寸法を保つカード（inset）・薄い面（muted）・NEN の設定の枠（bordered）。指定した面だけに適用。 */
-  surface?: 'standard' | 'inset' | 'muted' | 'bordered'
+  surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -80,7 +81,7 @@ export default function Card({
       data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
-      style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding, '--card-content-gap': gapValue } as CSSProperties : style} {...props}>
+      style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding ?? '0px', '--card-content-gap': gapValue ?? '0px' } as CSSProperties : style} {...props}>
       {children}
     </section>
   )

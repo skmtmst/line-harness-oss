@@ -1083,21 +1083,24 @@
           "class": "current",
           "prop": "border-color",
           "source": "#087a3e",
-          "resolved": "#087a3e"
+          "resolved": "#087a3e",
+          "selector": "html[data-theme='v8'] .current"
         },
         {
           "pencil": "2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
           "class": "current",
           "prop": "background",
           "source": "#e8f5ec",
-          "resolved": "#e8f5ec"
+          "resolved": "#e8f5ec",
+          "selector": "html[data-theme='v8'] .current"
         },
         {
           "pencil": "2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
           "class": "current",
           "prop": "color",
           "source": "#087a3e",
-          "resolved": "#087a3e"
+          "resolved": "#087a3e",
+          "selector": "html[data-theme='v8'] .current"
         },
         {
           "pencil": "Blot6 current label fontWeight: 500（★V7 §2 3段化）",

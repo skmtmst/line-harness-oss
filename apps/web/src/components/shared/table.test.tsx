@@ -11,6 +11,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   DataTable,
+  DateCell,
   SortTh,
   TableHeadRow,
   TableStateRow,
@@ -36,6 +37,15 @@ function renderTable(ui: React.ReactNode) {
 }
 
 describe('既存の使い方を壊さない', () => {
+  it('日時セルは日付の内容・読み上げ・共通セルの配置を保つ', () => {
+    renderTable(<Tr><DateCell align="right" title="2026年10月11日"><time dateTime="2026-10-11T12:34:00+09:00">10/11 12:34</time></DateCell></Tr>)
+    const time = screen.getByText('10/11 12:34')
+    expect(time.getAttribute('datetime')).toBe('2026-10-11T12:34:00+09:00')
+    expect(time.closest('td')?.getAttribute('data-align')).toBe('right')
+    expect(time.closest('td')?.getAttribute('title')).toBe('2026年10月11日')
+    expect(tableCss).toMatch(/\.dateCell\s*\{[^}]*color:\s*var\(--color-ink-secondary\);[^}]*font-variant-numeric:\s*tabular-nums;[^}]*white-space:\s*nowrap;/s)
+  })
+
   it('Th は今までどおり th・scope=col・左寄せ', () => {
     renderTable(
       <tr>

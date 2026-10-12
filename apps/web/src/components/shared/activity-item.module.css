@@ -83,6 +83,6 @@
 :root .marker svg { flex-shrink: 0; }
 
 /* B-152②：役割ごとの文字の段。 */
-:root .title { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
+:root .title { font-size: var(--polish-text-body); font-weight: var(--polish-weight-label); }
 
 :root .title { font-size: var(--text-body); }

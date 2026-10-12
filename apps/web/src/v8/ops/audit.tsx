@@ -181,7 +181,7 @@ export default function OpsAuditV8() {
             ))}
           </div>
         )}
-        {pageCount > 1 ? (
+        {rows.length > 0 ? (
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>

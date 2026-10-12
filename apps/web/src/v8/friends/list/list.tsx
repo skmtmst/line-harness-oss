@@ -36,7 +36,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast';
 import MenuPortal from '@/components/shared/menu-portal'
@@ -723,7 +723,7 @@ export default function FriendsListV8() {
         {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"
-          width={98}
+          size="page-size"
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
@@ -931,15 +931,14 @@ export default function FriendsListV8() {
 
   const pager = (
     <ListPager>
-      <span className={styles.pagerCount}>
-        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : emptyValue('unknown')}
-      </span>
-      <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
+      <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ"
+        summary={loadStatus === 'ready' ? paginationSummary(total, rangeStart, rangeEnd, '人') : emptyValue('unknown')} />
     </ListPager>
   )
 
   return (
     <ListPage
+      heightMode="content"
       skeleton
       boardId="x6QsVz"
       headingSize="compact"

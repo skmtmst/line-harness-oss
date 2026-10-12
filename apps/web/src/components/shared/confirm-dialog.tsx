@@ -53,6 +53,7 @@ interface ConfirmDialogProps {
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number
   confirmFirst?: boolean
+  size?: 'small' | 'medium' | 'large' | 'wide'
   designWidth?: number
   /** ★V8：絵の窓の上からの位置 px（Dialog の designTop と同じ）。 */
   designTop?: number
@@ -94,7 +95,8 @@ export default function ConfirmDialog({
   designNode,
   designHeaderPadding,
   designHeaderHeight,
-  designWidth = CONFIRM_WIDTH,
+  designWidth,
+  size,
   designLayout,
   footerAlign,
   designFooterGap,
@@ -157,7 +159,8 @@ export default function ConfirmDialog({
       designNode={designNode}
       designHeaderPadding={designHeaderPadding}
       designHeaderHeight={designHeaderHeight}
-      designWidth={designWidth}
+      size={size}
+      designWidth={designWidth ?? (size ? undefined : CONFIRM_WIDTH)}
       designLayout={designLayout}
       footerAlign={footerAlign}
       designFooterGap={designFooterGap}

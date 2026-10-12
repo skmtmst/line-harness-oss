@@ -65,7 +65,7 @@ export default function TruncatedText({ value, url = false, className, ...props 
     return () => { document.removeEventListener('keydown', escape, true); window.removeEventListener?.('scroll', close, true); window.removeEventListener?.('resize', close) }
   }, [position, close])
   return <>
-    <span {...props} ref={ref} className={[styles.text, className].filter(Boolean).join(' ')} data-truncated-text="" tabIndex={nested ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={shown !== value ? value : props['aria-label']} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
+    <span {...props} ref={ref} className={[styles.text, className].filter(Boolean).join(' ')} data-truncated-text="" tabIndex={nested ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={props['aria-label'] ?? (shown !== value || clipped ? value : undefined)} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
     {position ? createPortal(<span id={id} role="tooltip" className={styles.tooltip} data-below={position.below} style={{ left: position.left, top: position.top }} onMouseEnter={clear} onMouseLeave={leave}>{value}</span>, document.body) : null}
   </>
 }

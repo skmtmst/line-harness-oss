@@ -1,5 +1,7 @@
 'use client'
 
+
+import Card from '@/components/shared/card'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -286,7 +288,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         {error ? <Notice tone="danger" message={error} /> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
-        <section className={styles.card} aria-labelledby="q-name">
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="q-name">
           <h2 className={styles.cardTitle} id="q-name">名前とフォルダ</h2>
           <div className={styles.row}>
             <Field label="テンプレート名"><SaveErrorField names={["name"]}><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
@@ -313,9 +315,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               /></SaveErrorField>
             </div>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="q-question">
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="q-question">
           <h2 className={styles.cardTitle} id="q-question">質問</h2>
           <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><input className={styles.input} value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
           <Field label="質問文（160文字まで）"><SaveErrorField names={["text","question.text"]}><input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
@@ -328,9 +330,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               ))}
             </span>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="q-choices">
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="q-choices">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="q-choices">選択肢</h2>
             <p className={styles.note}>答えをどこに残すかを、選択肢ごとに決めます</p>
@@ -355,7 +357,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <Plus size={15} aria-hidden="true" />{`選択肢を足す（最大 ${MAX_CHOICES} つ）`}
             </Button>
           </span>
-        </section>
+        </Card>
       </TemplateEditFrame>
 
       {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}

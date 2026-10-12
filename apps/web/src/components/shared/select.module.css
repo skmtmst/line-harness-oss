@@ -70,13 +70,13 @@
 }
 
 /*
- * ★V8「選ぶ欄」（wMMk6）：高さ36・左12右10・文字13/500。
+ * ★V8「選ぶ欄」（wMMk6）：高さ36・左右12・間8（wMMk6）。文字の段はB-159を優先。
  * 開いた矢印は ink-faint のまま（v7 と同じ）。
  */
 :root .trigger {
   height: 36px;
-  gap: 6px;
-  padding: 0 10px 0 12px;
+  gap: var(--tpl-select-gap);
+  padding: 0 var(--tpl-select-inset);
   border-color: var(--color-control-border);
   font-size: var(--text-label);
   font-weight: 500;
@@ -116,15 +116,15 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-:root .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; padding: 0 10px 0 12px; gap: 6px; box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; padding: 0 var(--tpl-select-inset); gap: var(--tpl-select-gap); box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 :root .value { font-size: 13px; font-weight: 500; line-height: 20px; }
-:root .chevron { width: 14px; height: 14px; }
+:root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 :root .trigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .invalid .trigger { outline-color: var(--color-danger); }
-:root .chevron { flex-basis: 14px; }
+:root .chevron { flex-basis: var(--polish-icon-control); }
 }
-/* B-192: 表示件数は文字と矢印の幅を保つ。96では「20 件表示」が切れる。 */
-:root .pageSize { width: 100px; min-width: 100px; flex-shrink: 0; }
+/* B-192：左右12・間8・矢印16を含め、件数の文字を省略しない幅を共通で確保する。 */
+:root .pageSize { width: max-content; min-width: max-content; flex-shrink: 0; display: flex; justify-content: flex-end; }
 
 /*
  * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。
@@ -191,6 +191,11 @@
   flex: 1;
   text-align: left;
 }
+
+/* 狭い一覧の栞。幅は呼ぶ型が持ち、印と候補は同じSelectが持つ。 */
+:root .trigger:not([data-chevron]) { padding-inline: var(--tpl-button-pad-side); }
+:root .trigger[data-icon-only] { justify-content: center; padding: 0; gap: 0; }
+:root .trigger[data-icon-only] .value { display: none; }
 
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
 :root .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

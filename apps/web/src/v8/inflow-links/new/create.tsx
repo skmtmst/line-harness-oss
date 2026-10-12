@@ -19,6 +19,7 @@ import { CreatePage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
@@ -32,7 +33,7 @@ import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
 import CouponSettings, { type CouponSettingsValue } from '../coupon-settings'
 import styles from './create.module.css'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
@@ -353,12 +354,14 @@ function InflowCreate() {
   const preview = (
     <div className={styles.side}>
       <h2 className={styles.sideTitle}>お客さまはこの順に進みます</h2>
+      <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)">
       <ol className={styles.steps}>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">1</span><span>QR コード・URL を開く</span></li>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">2</span><span>LINE で友だちになる（この経路で数える）</span></li>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">3</span><span>{tagName ? `タグ「${tagName}」が付く` : 'タグは付かない'}</span></li>
         <li className={styles.step}><span className={`${styles.stepNum} ${styles.stepNumNow}`} aria-hidden="true">4</span><span>{step4}</span></li>
       </ol>
+      </Card>
       <div>
         <LinePreview title={null} accountName={selectedAccount?.name ?? '公式アカウント'} caption="登録した日 10:00">
           <LinePreviewMessage accountName={selectedAccount?.name ?? '公式アカウント'} avatar={(selectedAccount?.name ?? '公').slice(0, 1)} time="10:00">
@@ -394,13 +397,13 @@ function InflowCreate() {
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}
 
-      <section className={styles.card} aria-labelledby="ir-new-where">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-where">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-where">どこに置くリンクですか</h2>
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
         <div className={styles.fieldRow}>
-          <Field label="名前"><SaveErrorField names={["name","mine"]}><TextField
+          <div className={styles.field}><Field label="名前" required><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
               value={name}
@@ -414,9 +417,9 @@ function InflowCreate() {
               aria-invalid={Boolean(fieldErrors['ir-name'])}
               aria-describedby={fieldErrors['ir-name'] ? 'ir-name-error' : undefined}
             /></SaveErrorField>
-{fieldErrors['ir-name'] ? <span id="ir-name-error" className={styles.fieldError} role="alert">{fieldErrors['ir-name']}</span> : null}</Field>
+<FieldError id="ir-name-error">{fieldErrors['ir-name']}</FieldError></Field></div>
           <div className={styles.field}>
-            <span className={styles.pickLabel}>フォルダ</span>
+            <Field label="フォルダ">
             <SaveErrorField names={["genre"]}><Select
               id="ir-genre"
               value={genre}
@@ -428,7 +431,7 @@ function InflowCreate() {
                 ...genres.map((item) => ({ value: item.name, label: item.name })),
                 { value: '__new', label: '新しいフォルダ…' },
               ]}
-            /></SaveErrorField>
+            /></SaveErrorField></Field>
           </div>
         </div>
         {genre === '__new' ? (
@@ -452,7 +455,7 @@ function InflowCreate() {
             aria-invalid={Boolean(fieldErrors['ir-redirect'])}
             aria-describedby={fieldErrors['ir-redirect'] ? 'ir-redirect-error' : undefined}
           /></SaveErrorField>
-{fieldErrors['ir-redirect'] ? <span id="ir-redirect-error" className={styles.fieldError} role="alert">{fieldErrors['ir-redirect']}</span> : null}</Field>
+<FieldError id="ir-redirect-error">{fieldErrors['ir-redirect']}</FieldError></Field>
         <Field label="見分けるための文字（URL の最後に付く）"><SaveErrorField names={["refCode","refTouched","ref_code","ref_touched"]}><TextField
             id="ir-ref"
             type="text"
@@ -462,10 +465,10 @@ function InflowCreate() {
             aria-invalid={Boolean(fieldErrors['ir-ref']) || (refCode !== '' && !validRef)}
             aria-describedby={fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? 'ir-ref-error' : undefined}
           /></SaveErrorField>
-{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <span id="ir-ref-error" className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}</Field>
-      </section>
+{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <FieldError id="ir-ref-error">半角英数字・_・ハイフンで1〜64文字にしてください</FieldError> : null}</Field>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-account">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-account">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-account">どの LINE アカウントに入れますか</h2>
           <p className={styles.cardNote}>友だちになる先のアカウント</p>
@@ -491,13 +494,13 @@ function InflowCreate() {
             ]}
           /></SaveErrorField>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="クーポン QR">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-label="クーポン QR">
         <CouponSettings accountId={selectedAccountId} value={coupon} onChange={setCoupon} onOptionsLoaded={setCouponOptions} disabled={saving} />
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-after">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-after">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-after">友だちになったときにすること</h2>
           <p className={styles.cardNote}>何も決めないと「動きが未設定」になり、数えるだけになります</p>
@@ -518,9 +521,9 @@ function InflowCreate() {
           renderEditor={(action, update) => <EntityPickerField label="操作の対象" noun="対象" value={action.id} items={action.kind === 'tag' ? tags : action.kind === 'template' ? templates : scenarios} onChange={id => update({ ...action, id })}
             />}
             /></SaveErrorField>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-url">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-url">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-url">発行される URL</h2>
           <p className={styles.cardNote}>発行したあと、一覧の「…」から QR コードと URL をコピーできます</p>
@@ -543,7 +546,7 @@ function InflowCreate() {
             </span>
           </div>
         </div>
-      </section>
+      </Card>
 
       <Dialog
         open={conflict !== null && showCompare}

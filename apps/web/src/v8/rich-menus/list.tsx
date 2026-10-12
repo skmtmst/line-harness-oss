@@ -839,7 +839,7 @@ export default function RichMenusListV8() {
       onChanged={loadFolders}
       canManage={canEdit}
       itemLabel="メニュー"
-      createAction={createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+      createAction={createButton}
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
@@ -948,7 +948,7 @@ export default function RichMenusListV8() {
         search={{
           placeholder: 'メニュー名・ボタン名',
           label: 'メニュー名・ボタン名で探す',
-          width: 200,
+          width: 240,
           value: query,
           onChange: (value) => {
             setQuery(clampSearchQuery(value))
@@ -1160,18 +1160,11 @@ export default function RichMenusListV8() {
     </>
   )
 
-  /* 表の下：件数（1ページでも出す・絵どおり）とページ送り。 */
+  /* B-231：1ページでも件数とページ送りを共通部品で出す。 */
   const listPager = selectedAccount && !listLoading && !error && groups.length > 0 ? (
-    <div className={styles.pagerRow}>
-      <span className={styles.pagerCount}>
-        {pageCount > 1
-          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)} 件`
-          : `${formatNumber(groupTotal)} 件`}
-      </span>
-      {pageCount > 1 ? (
-        <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
-      ) : null}
-    </div>
+    <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage}
+      ariaLabel="リッチメニューのページ送り"
+      summary={`${formatNumber(groupTotal)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)}件`} />
   ) : null
 
   /* ===== 削除の窓（yOyCg：消せない理由を外す順に。読めないときは消させない） ===== */
@@ -1305,7 +1298,7 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
       skeleton
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"

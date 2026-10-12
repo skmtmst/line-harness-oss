@@ -547,6 +547,7 @@ function ConversionCreate() {
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
+      hidePreviewWhenNarrow
       boardId="j8p3yj"
       title="成果地点を作る"
       help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
@@ -563,7 +564,7 @@ function ConversionCreate() {
 
       {viewerOnly ? null : (<>
 
-      <Card variant="form" aria-labelledby="cv-new-what">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-what">何が起きたら数えますか</h2>
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
@@ -617,7 +618,7 @@ function ConversionCreate() {
         </div>
       </Card>
 
-      <Card variant="form" aria-labelledby="cv-new-dedup">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-dedup">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-dedup">同じ人を何回まで数えるか</h2>
           <p className={styles.cardNote}>くり返し起きるできごとは、数えすぎを防ぎます</p>
@@ -653,7 +654,7 @@ function ConversionCreate() {
         </RadioCardGroup></SaveErrorField>
       </Card>
 
-      <Card variant="form" aria-labelledby="cv-new-value">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-value">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-value">金額をどう出すか</h2>
           <p className={styles.cardNote}>アフィリエイトの報酬や、配信ごとの売上の計算に使います</p>
@@ -704,7 +705,7 @@ function ConversionCreate() {
         ) : null}
       </Card>
 
-      <Card variant="form" aria-labelledby="cv-new-exclusion" id="cv-exclusion">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-exclusion" id="cv-exclusion">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
           <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
@@ -731,7 +732,7 @@ function ConversionCreate() {
         </div>
       </Card>
 
-      <Card variant="form" aria-labelledby="cv-new-more">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-more">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-more">下書きと詳細設定</h2>
           <p className={styles.cardNote}>任意。すぐに数えはじめないときや、紐づける日数を変えるときに</p>
