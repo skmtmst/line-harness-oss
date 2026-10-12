@@ -49,6 +49,11 @@ export function scanListSkeleton() {
         continue
       }
       if (toolbar.scrollWidth > toolbar.clientWidth + 1) fail('B-178 道具のはみ出し', toolbar)
+      for (const sort of toolbar.querySelectorAll('[data-list-sort]')) {
+        const value = sort.querySelector('[data-select-value]')
+        if (visible(sort) && (!value || !visible(value) || !/^並び[：:].+/.test(value.textContent.trim())
+          || /^(?:transparent|rgba\([^)]*,\s*0\))$/.test(getComputedStyle(value).color))) fail('U4 並びの現在値なし', sort)
+      }
       for (const input of toolbar.querySelectorAll('input[type="search"]')) {
         if (!visible(input) || input.value || !input.placeholder) continue
         const css = getComputedStyle(input), context = document.createElement('canvas').getContext('2d')

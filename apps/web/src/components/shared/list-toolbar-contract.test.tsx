@@ -5,7 +5,7 @@ const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from './list-toolbar'
 
 afterEach(cleanup)
 
@@ -145,4 +145,20 @@ it('並びは道具の段の共通欄だけで選ぶ', () => {
   const html = renderToStaticMarkup(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} sort={{ value: 'recent', onChange: vi.fn(), options: [{ value: 'recent', label: '新しい順' }] }} />)
   expect(html).toContain('data-list-sort')
   expect(html).toContain('aria-label="並び"')
+})
+
+it('U4：並びの現在値を表示し、選んだ順序を元の受け口へ返す', () => {
+  const change = vi.fn()
+  render(<ListToolbarSort aria-label="並び順" value="newest" options={[{ value: 'newest', label: '新しい順' }, { value: 'name', label: '名前順' }]} onChange={change} />)
+  const trigger = screen.getByRole('button', { name: '並び' })
+  expect(trigger.textContent).toContain('並び：新しい順')
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('option', { name: '名前順' }).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith('name')
+})
+it('U4：並びの候補が無ければ空の欄を置かない', () => {
+  const change = vi.fn()
+  const { container } = render(<ListToolbarSort value="" options={[]} onChange={change} />)
+  expect(container.querySelector('button')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
 })

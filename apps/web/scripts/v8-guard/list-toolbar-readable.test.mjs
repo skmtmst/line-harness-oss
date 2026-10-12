@@ -188,3 +188,16 @@ test('U1: timestamps stay on one line and their columns reserve the full current
     }
   } finally { await browser.close() }
 })
+
+test('U4: a sort keeps its visible current value; hiding it behind an icon is detected', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('select')}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><span data-list-sort><div class="root content"><button class="trigger" aria-haspopup="listbox"><span class="value" data-select-value>並び：新しい順</span></button></div></span></div></section></html>`)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('U4 並びの現在値なし'))
+    await page.locator('[data-select-value]').evaluate(el => el.style.visibility = 'hidden')
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U4 並びの現在値なし'))
+    await page.locator('[data-select-value]').evaluate(el => { el.style.visibility = ''; el.style.color = 'transparent' })
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U4 並びの現在値なし'))
+  } finally { await browser.close() }
+})

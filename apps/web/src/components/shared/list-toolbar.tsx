@@ -176,6 +176,7 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
 export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
 /** 並びの名前と選ぶ操作はこの欄にそろえる。 */
 export function ListToolbarSort(props: ListToolbarSortProps) {
+  if (props.options.length === 0) return null
   const options = props.options.map(option => ({ ...option, label: option.label.replace('使われている数が多い順', '使用数が多い順') }))
   return <span data-list-sort><Select {...props} options={options} size="content" width={undefined} label="並び" aria-label="並び" /></span>
 }

@@ -20,20 +20,6 @@
 .chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 .spacer { flex: 1 1 0; }
 
-/* 並び（絵に無い機能）：印だけの小さな箱。中の選ぶ部品は透明にして箱いっぱいに重ねる。 */
-.sortBox { position: relative; width: var(--tpl-rml-sort-w); flex-shrink: 0; }
-.sortBox :global(*) { max-width: 100%; }
-.sortBox :global(button) { width: 100%; padding: 0; color: transparent; }
-.sortBox :global(button) * { visibility: hidden; }
-.sortIcon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
 .perPageBox { flex-shrink: 0; }
 
 /* 1152 の板（Y9ASp）：案内の帯 → 1段目 → 2段目。 */

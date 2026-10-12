@@ -6,7 +6,7 @@ import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/f
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
-import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
+import { CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -882,17 +882,14 @@ export default function RichMenusListV8() {
       ))}
     </div>
   )
-  /* 並び（絵に無いが機能がある）。右端の件数の左に、印だけの小さな箱で置く。 */
+  /* 並びの文字・幅は共通の選ぶ欄が持つ。 */
   const sortBox = (
-    <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
-      <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
       <SaveErrorField names={["sortKey","sort","sort_key"]}><ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={SORT_OPTIONS}
       /></SaveErrorField>
-    </div>
   )
   const perPageBox = (
     <div className={styles.perPageBox} data-per-page-select>
