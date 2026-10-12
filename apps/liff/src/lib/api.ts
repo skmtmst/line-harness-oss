@@ -22,6 +22,7 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
+  payment_mode?: 'none' | 'onsite' | 'online';
   sort_order: number;
   /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
@@ -81,9 +82,16 @@ export interface LiffBookingSettings extends LiffLookApiSettings {
 export interface CreateBookingResponse {
   booking_id: string;
   status: string;
+  payment_required?: boolean;
   payment?: { id: string; status: string; holdUntil: string | null } | null;
   /** 無断キャンセルが続いている人への前払いのみの案内。対象のときだけ付く。 */
   prepayNotice?: string;
+}
+
+/** 支払い必須の不完全な成功応答は、通常予約・待ちからの予約とも完了にしない。 */
+export function assertBookingPaymentResponse(created: CreateBookingResponse): CreateBookingResponse {
+  if (created.payment_required && !created.payment?.id) throw new Error('booking_payment_unavailable');
+  return created;
 }
 
 /** 前回と同じで予約：本人の前回の予約。無い・使えないときは available=false。 */
@@ -410,7 +418,7 @@ export const api = {
       '/api/liff/booking/requests',
       body,
       { 'Idempotency-Key': idempotencyKey },
-    ),
+    ).then(assertBookingPaymentResponse),
   /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
   startBookingPayment: (bookingId: string) =>
     post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(
@@ -437,7 +445,7 @@ export const api = {
   seatAvailability:(query:{storeId:string;startsAt:string;endsAt:string;guestCount:number})=>get<{success:true;data:import('@line-crm/shared').RestaurantSeatAvailability}>(`/api/liff/booking/seat-availability?${new URLSearchParams({store_id:query.storeId,starts_at:query.startsAt,ends_at:query.endsAt,guest_count:String(query.guestCount)})}`),
   seatWaitlists:(id?:string)=>get<{waitlist:CustomerSeatWaitlist[]}>(`/api/liff/booking/seat-waitlist${id?'?id='+encodeURIComponent(id):''}`),
   registerSeatWaitlist:(body:RegisterSeatWaitlistInput)=>post<{id:string}>('/api/liff/booking/seat-waitlist',body),
-  acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}),
+  acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}).then(assertBookingPaymentResponse),
   acceptSeatWaitlist:(id:string,key:string)=>post<{reservation_id:string;status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}/accept`,{}, {'Idempotency-Key':key}),
   cancelSeatWaitlist:(id:string)=>remove<{status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}`),
   /** 枠を指定して自分の待ち登録を返す。 */

@@ -12,6 +12,36 @@ const slot = {date:'2099-01-01',start:'10:00'};
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('外部通信は禁止'); })); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
+it('REV-H2: 支払い必須なのに記録がない応答では完了へ進まない', async () => {
+  vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: true } as never);
+  const onSubmitted = vi.fn();
+  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={true} onBack={()=>{}} onSubmitted={onSubmitted}/>);
+  fireEvent.click(screen.getByRole('button', { name: /予約を確定/ }));
+  await act(async () => {});
+  expect(onSubmitted).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert').textContent).toContain('予約できませんでした');
+});
+
+it('REV-I2: 表示後に手動承認へ変わっても支払い不要の受付結果を採用する', async () => {
+  vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: false });
+  const onSubmitted = vi.fn();
+  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={true} onBack={()=>{}} onSubmitted={onSubmitted}/>);
+  fireEvent.click(screen.getByRole('button', { name: /予約を確定/ }));
+  await act(async () => {});
+  expect(onSubmitted).toHaveBeenCalledWith({ bookingId: 'b', status: 'requested', payment: null, prepayNotice: null });
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('REV-I2: 表示後に店払いへ変わっても古いonlineの表示で成功を拒まない', async () => {
+  vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: false });
+  const onSubmitted = vi.fn();
+  render(<Confirm menu={{...menu, payment_mode: 'online'}} staff={{...staff, price: 1000}} slot={slot} autoConfirm={false} onBack={()=>{}} onSubmitted={onSubmitted}/>);
+  fireEvent.click(screen.getByRole('button', { name: /予約をリクエスト/ }));
+  await act(async () => {});
+  expect(onSubmitted).toHaveBeenCalledWith({ bookingId: 'b', status: 'requested', payment: null, prepayNotice: null });
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
 it('XL-01: 共通予約の送信中に戻ったあと古い成功では完了しない', async () => {
   let resolve!: (value: {booking_id:string;status:string}) => void;
   const promise = new Promise<{booking_id:string;status:string}>(r => {resolve=r;});

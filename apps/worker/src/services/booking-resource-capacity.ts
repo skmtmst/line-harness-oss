@@ -123,6 +123,8 @@ export async function insertBookingWithResourceSnapshot(
     bookingId: string;
     lineAccountId: string;
     menuId: string;
+    /** 支払い記録・確定回収の記録も予約と同じ取引で保存する。 */
+    additionalStatements?: D1PreparedStatement[];
   },
 ): Promise<{ inserted: boolean; consumptionCount: number }> {
   const snapshot = db.prepare(
@@ -150,6 +152,7 @@ export async function insertBookingWithResourceSnapshot(
   const [bookingResult, snapshotResult] = await db.batch<D1Result<unknown>>([
     input.bookingInsert,
     snapshot,
+    ...(input.additionalStatements ?? []),
   ]);
   return {
     inserted: (bookingResult?.meta?.changes ?? 0) > 0,
