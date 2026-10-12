@@ -3956,6 +3956,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ['email', 'メール', 'email', 'sample@example.test'],
       ['tel', '電話', 'tel', '09012345678'],
       ['address', '住所', 'textarea', '東京都新宿区1-2'],
+      // B-235：基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
+      ['allergy', 'アレルギー', 'checkbox', JSON.stringify(['小麦', 'えび', 'くるみ'])],
     ]
     const basics = specs.map(([fixedKey, name, type, value], index) => ({
       id: `fixed-${fixedKey}`, fixedKey, name, fieldKey: `fixed_${fixedKey}`, type, value,

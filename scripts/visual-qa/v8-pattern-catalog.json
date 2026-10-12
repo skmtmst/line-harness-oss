@@ -3029,7 +3029,9 @@
             "apps/web/src/components/shared/inbox-content.tsx",
             "apps/web/src/components/shared/inbox-content.module.css",
             "apps/web/src/components/shared/inbox-list.tsx",
-            "apps/web/src/components/shared/inbox-list.module.css"
+            "apps/web/src/components/shared/inbox-list.module.css",
+            "apps/web/src/components/shared/inbox-thread.tsx",
+            "apps/web/src/components/shared/inbox-thread.module.css"
           ],
           "components": [
             "InboxPage",
@@ -3053,7 +3055,10 @@
             "InboxListHeader",
             "InboxListHeadline",
             "InboxListSearch",
-            "InboxFilterControls"
+            "InboxFilterControls",
+            "InboxMessage",
+            "InboxMessageDay",
+            "InboxQuotedMessage"
           ],
           "vars": []
         },

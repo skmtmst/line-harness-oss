@@ -5,6 +5,7 @@ import { jstDate, jstCalendar } from '@/lib/jst-datetime'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageTitle } from '@/components/templates/page-frame'
 import FilterChip from '@/components/shared/filter-chip'
+import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread'
 import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls } from '@/components/shared/inbox-list'
 
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
@@ -86,7 +87,7 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content'
-import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Bot, Send, Settings2, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Send, Settings2, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -3502,72 +3503,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                        * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは v7 と同じ。
                        */
                       const quotedNode = msg.quoted ? (
-                        <div data-inbox-v6="quoted-message" className={chatStyles.quoted}>
+                        <InboxQuotedMessage>
                           {msg.quoted.isUnsent
                             ? '取り消されたメッセージ'
                             : msg.quoted.messageType === 'text'
                               ? msg.quoted.content
                               : `[${msg.quoted.messageType}]`}
-                        </div>
+                        </InboxQuotedMessage>
                       ) : null
-                      const meta = (
-                        <span className={chatStyles.meta}>
-                          <time>{formatTime(msg.createdAt)}</time>
-                          {!msg.isUnsent && (
-                            <button
-                              type="button"
-                              data-inbox-v6="quote-reply"
-                              className={chatStyles.quoteBtn}
-                              onClick={() => {
-                                setQuotedMessage(msg)
-                                textareaRef.current?.focus()
-                              }}
-                            >
-                              引用
-                            </button>
-                          )}
-                        </span>
-                      )
                       const autoLabel = AUTO_SOURCE_LABEL[msg.source ?? ''] ?? null
-                      return (
-                        <>
-                          {showDateSep && (
-                            <div className={chatStyles.day} data-first={idx === 0 || undefined}>{formatDayJa(msg.createdAt)}</div>
-                          )}
-                          <div className={isOutgoing ? chatStyles.rowOut : chatStyles.rowIn} data-last={isLast || undefined}>
-                            {isOutgoing ? (
-                              <div className={chatStyles.outCol}>
-                                <div className={chatStyles.outLine}>
-                                  {meta}
-                                  <div className={chatStyles.bubbleOut} data-search-hit={searchHit ?? undefined}>
-                                    {quotedNode}
-                                    {bubbleContent}
-                                  </div>
-                                </div>
-                                {msg.sentByStaffName ? (
-                                  <span className={chatStyles.sender} title={msg.sentByStaffName}>
-                                    <span aria-hidden="true" className={chatStyles.senderFace}>{msg.sentByStaffName.charAt(0)}</span>
-                                    {msg.sentByStaffName} が送信
-                                  </span>
-                                ) : (
-                                  <span className={chatStyles.sender}>
-                                    <span aria-hidden="true" className={chatStyles.senderBot}><Bot aria-hidden="true" /></span>
-                                    {autoLabel ? `自動：${autoLabel}` : '自動で送信'}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <>
-                                <div className={chatStyles.bubbleIn} data-search-hit={searchHit ?? undefined}>
-                                  {quotedNode}
-                                  {bubbleContent}
-                                </div>
-                                {meta}
-                              </>
-                            )}
-                          </div>
-                        </>
-                      )
+                      return <>
+                        {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
+                        <InboxMessage outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}
+                          onQuote={msg.isUnsent ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}>
+                          {quotedNode}{bubbleContent}
+                        </InboxMessage>
+                      </>
                     }
                   }}
                   />

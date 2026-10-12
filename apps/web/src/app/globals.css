@@ -1971,9 +1971,10 @@
   --tpl-inbox-menu-pill-pad: 2px 8px;     /* 対応状況の札の内側 */
   --tpl-inbox-menu-search-h: 32px;        /* 担当者名を検索 */
   --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
+  --tpl-inbox-out-column-gap: 4px;   /* 送った文と送り手の間（eovoG） */
   --tpl-inbox-thread-gap: 12px;           /* 吹き出しの行と行・日付と吹き出しの間 */
   --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
-  --tpl-inbox-bubble-pad: 10px 14px;      /* 吹き出しの内側 */
+  --tpl-inbox-bubble-pad: 12px 16px;      /* 吹き出しの内側 */
   --tpl-inbox-bubble-radius: var(--polish-radius-card);
   --tpl-inbox-bubble-text: var(--polish-text-body);
   --tpl-inbox-bubble-lh: 21px;
