@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { api } from '@/lib/api'
 import {canEditManualLinks as canEditTable} from '@/lib/manual-link-access'
 import styles from './settings-nav-v8.module.css'
-import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, type LucideIcon } from 'lucide-react'
+import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, Truck, type LucideIcon } from 'lucide-react'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 
 /**
@@ -55,9 +55,11 @@ const TAIL_LINKS: NavLink[] = [
   { href: '/settings/sns', label: 'SNS 連携', icon: Share2 },
 ]
 
-/* 予約サイト・グルメ媒体（提案 E-4）。飲食店向け（テスト）が使える環境だけ、SNS 連携の下に足す。 */
+/* 予約サイト・グルメ媒体（提案 E-4）とデリバリー連携（承認案 DL-1 `dF4Ov`）。
+   飲食店向け（テスト）が使える環境だけ、SNS 連携の下に足す。 */
 const RESTAURANT_LINKS: NavLink[] = [
   { href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: Store },
+  { href: '/settings/delivery', label: 'デリバリー連携', icon: Truck },
 ]
 
 export function SettingsNavV8() {
