@@ -2,8 +2,9 @@
  * @param {HTMLElement} toolbar
  * @param {HTMLElement | null} [expandedItem]
  * @param {number} [expandedWidth]
+ * @param {boolean} [includeExpanded]
  */
-export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0) {
+export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0, includeExpanded = true) {
   const flatten = element => getComputedStyle(element).display === 'contents'
     ? [...element.children].flatMap(flatten) : [element]
   const tools = [...toolbar.children].flatMap(flatten).filter(tool => {
@@ -20,10 +21,17 @@ export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 
       if (minimum > 0) width = Math.min(width, minimum)
     }
     if (expandedItem && (tool === expandedItem || tool.contains(expandedItem))) width += Math.max(0, expandedWidth - expandedItem.getBoundingClientRect().width)
-    for (const group of tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll('[data-filter-width]')]) {
+    for (const group of includeExpanded ? tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll('[data-filter-width]')] : []) {
       width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
     }
     return sum + width
   }, 0) + gap * Math.max(0, tools.length - 1)
   return { available, required, fits: required <= available }
+}
+
+/** The remaining controls may need a second row even after optional tools collapse.
+ * @param {HTMLElement} toolbar
+ */
+export function fitToolbarWrap(toolbar) {
+  toolbar.dataset.toolbarFit = toolbarContentFit(toolbar, null, 0, false).fits ? 'single' : 'wrap'
 }

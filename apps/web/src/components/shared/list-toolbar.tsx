@@ -6,7 +6,33 @@ import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import styles from './list-toolbar.module.css'
-import { toolbarContentFit } from './list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap } from './list-toolbar-fit.mjs'
+
+function useToolbarFit() {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const toolbar = ref.current
+    if (!toolbar || !window.ResizeObserver) return
+    const measure = () => {
+      if (toolbar.dataset.toolbarLayout?.includes('stacked')) {
+        for (const row of toolbar.querySelectorAll<HTMLElement>('[data-toolbar-row]')) fitToolbarWrap(row)
+      } else fitToolbarWrap(toolbar)
+    }
+    const observer = new ResizeObserver(measure)
+    const observe = () => {
+      observer.disconnect()
+      observer.observe(toolbar)
+      for (const tool of toolbar.querySelectorAll<HTMLElement>('[data-toolbar-search], [data-toolbar-tool], [data-list-sort], [data-filter-width], button[aria-haspopup="listbox"]')) observer.observe(tool)
+      measure()
+    }
+    const mutations = new MutationObserver(observe)
+    mutations.observe(toolbar, { childList: true, subtree: true, characterData: true })
+    observe()
+    void document.fonts?.ready.then(measure)
+    return () => { mutations.disconnect(); observer.disconnect() }
+  }, [])
+  return ref
+}
 
 export type ListToolbarSearch = {
   placeholder: string
@@ -69,8 +95,9 @@ export default function ListToolbar({
    */
   layout?: 'band' | 'stacked'
 }) {
+  const ref = useToolbarFit()
   return (
-    <div className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
+    <div ref={ref} className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1} data-toolbar-tools data-toolbar-row>
         {search ? <div className={styles.search} data-toolbar-search><SearchField
           placeholder={search.placeholder}
@@ -86,7 +113,7 @@ export default function ListToolbar({
       {filters || trailing || sort ? (
         <div className={styles.row2} data-toolbar-row>
           {filters ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}</div> : null}
-          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{trailing}</div> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</div> : null}
         </div>
       ) : null}
       {secondary ? <div className={styles.secondary} data-toolbar-secondary>{secondary}</div> : null}
@@ -96,7 +123,8 @@ export default function ListToolbar({
 
 /** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
 export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked' }) {
-  return <div {...props} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>{children}</div>
+  const ref = useToolbarFit()
+  return <div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>{children}</div>
 }
 
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {

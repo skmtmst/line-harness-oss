@@ -5,7 +5,7 @@ import { chromium } from '@playwright/test'
 import { fitListSearchPlaceholder } from '../../src/components/shared/search-field-size.mjs'
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
-import { toolbarContentFit } from '../../src/components/shared/list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap } from '../../src/components/shared/list-toolbar-fit.mjs'
 import { fitSelectContent } from '../../src/components/shared/select-content-size.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
@@ -87,5 +87,21 @@ test('a notice owns its full row; a zero-width tool band with clipped controls f
     assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具の幅0'))
     await page.locator('.slots').evaluate(el => el.style.setProperty('flex-wrap', 'nowrap', 'important'))
     assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具の幅0'))
+  } finally { await browser.close() }
+})
+
+test('collapsed controls still wrap when their minimum widths cannot fit and return to one row', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{flex:none;width:150px;height:36px}</style><section data-list-skeleton><div class="slots" data-list-toolbar data-toolbar-layout="slots" style="width:852px"><div class="slotsRow"><button>作る</button><button>フォルダ</button><div class="searchSlot" data-toolbar-search style="--list-search-content-min:190px;--list-search-width:280px">検索</div><button>並び</button><button>件数</button><span class="filterChoices" data-filter-width="460"><button>状態</button></span></div></div></section></html>`)
+    await page.addScriptTag({ content: toolbarContentFit.toString() })
+    await page.locator('.slots').evaluate(fitToolbarWrap)
+    assert.equal(await page.locator('.slots').getAttribute('data-toolbar-fit'), 'wrap')
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具のはみ出し'))
+    await page.locator('.slots').evaluate(el => { el.style.width = '1200px' })
+    await page.locator('.slots').evaluate(fitToolbarWrap)
+    assert.equal(await page.locator('.slots').getAttribute('data-toolbar-fit'), 'single')
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具のはみ出し'))
   } finally { await browser.close() }
 })
