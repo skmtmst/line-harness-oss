@@ -18,6 +18,7 @@ import {
   EXTERNAL_DELIVERY_MAX_ATTEMPTS,
   externalDeliveryRetryAt,
 } from './external-delivery-retry.js';
+import type { UberOAuthClient } from './uber-eats.js';
 
 export const DELIVERY_SERVICES = ['ubereats', 'demaecan', 'rocketnow'] as const;
 export type DeliveryService = (typeof DELIVERY_SERVICES)[number];
@@ -263,6 +264,44 @@ export interface DeliveryEnv {
   RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
   RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
   RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
+  /**
+   * Uber Eats のログイン連携（お店の人が設定画面から自分でつなぐ経路）。
+   * ここに入るのは Uber の開発者画面で発行された値で、画面には出さない。
+   */
+  RT_DELIVERY_UBEREATS_CLIENT_ID?: string;
+  RT_DELIVERY_UBEREATS_CLIENT_SECRET?: string;
+  /** 既定では使わない。Uber 側の登録が別の文字列のときだけ上書きとして入れる。 */
+  RT_DELIVERY_UBEREATS_REDIRECT_URI?: string;
+  /** 戻り先URLの土台。配備の設定で環境ごとに決まる。 */
+  WORKER_PUBLIC_URL?: string;
+}
+
+/** 認可画面からの戻り先の道。Uber のアプリ登録と同じ文字列にする。 */
+export const UBER_OAUTH_CALLBACK_PATH = '/api/restaurant-test/delivery/ubereats/oauth/callback';
+
+/**
+ * Uber Eats のログイン連携の設定。ID と Secret がそろっていないときは連携の口を開けない。
+ * 戻り先は呼び出し元のホストからは組み立てない。入口と戻り先で1文字でも違うと Uber 側で
+ * はじかれるため、配備の設定（WORKER_PUBLIC_URL）に固定する（Google 接続と同じ考え方）。
+ */
+export function uberOAuthClient(env: DeliveryEnv): UberOAuthClient | null {
+  const clientId = env.RT_DELIVERY_UBEREATS_CLIENT_ID?.trim();
+  const clientSecret = env.RT_DELIVERY_UBEREATS_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) return null;
+
+  const override = env.RT_DELIVERY_UBEREATS_REDIRECT_URI?.trim();
+  const base = env.WORKER_PUBLIC_URL?.trim().replace(/\/+$/, '');
+  const redirectUri = override || (base ? `${base}${UBER_OAUTH_CALLBACK_PATH}` : '');
+  if (!redirectUri.startsWith('https://')) return null;
+  return { clientId, clientSecret, redirectUri };
+}
+
+/**
+ * Uber からの通知を確かめる鍵。公式仕様では client_secret そのものが署名の鍵になる。
+ * 静的なトークンの経路（RT_DELIVERY_*_WEBHOOK_SECRET）とは別の値なので混ぜない。
+ */
+export function uberWebhookSecret(env: DeliveryEnv): string | null {
+  return uberOAuthClient(env)?.clientSecret ?? null;
 }
 
 /** 'true' のときだけ各サービスへ送る。既定は送らない（読み取りと記録だけ）。 */
