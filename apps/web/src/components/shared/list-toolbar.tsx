@@ -225,7 +225,7 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
     if (!item || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       if (!item.hasAttribute('data-collapsed')) expandedWidth.current = fitToolbarOptionalWidth(item)
-      setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && owner?.closest('[data-page-template]')?.getBoundingClientRect().width! < 1100)).fits)
+      setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
     let frame = 0
     const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
@@ -280,7 +280,7 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
       choices.dataset.filterWidth = String(unfoldedWidth.current)
-      setCollapsed(!toolbarContentFit(toolbar, null, 0, true, Boolean(flat && owner?.closest('[data-page-template]')?.getBoundingClientRect().width! < 1100)).fits)
+      setCollapsed(!toolbarContentFit(toolbar, null, 0, true, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
     let frame = 0
     const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
