@@ -11,8 +11,6 @@ const createTemplate = (kind) => ({
 // 普通の一覧の撮影だけを4行にする。削除確認で使う未使用の下書きは共通見本に残す。
 const richMenuItems = RICH_MENU_GROUPS.filter(group => group.id !== 'rich-menu-safe').map(group => ({
   ...group,
-  // 一覧の見本名だけを絵へそろえる。編集・削除確認が使う元の名前は変えない。
-  ...(group.id === 'rich-menu-target' ? { name: '通常メニュー' } : {}),
   ...(group.id === 'rmg-gold' ? { audienceCount: 182 } : {}),
   // 10/5の予約が撮影日を過ぎても、予約状態の絵を再現する。
   ...(group.id === 'rmg-autumn' ? { publishingAt: `${new Date().getUTCFullYear() + 1}-10-05T00:00:00.000+09:00` } : {}),

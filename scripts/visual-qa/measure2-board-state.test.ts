@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 // @ts-expect-error 撮影用スクリプトは素のJS。
 import { applyBoardStateProfiles, BOARD_STATE_PROFILES } from './measure2-board-state.mjs'
 // @ts-expect-error 共通の見本も素のJS。
-import { RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, BROADCASTS } from './fixtures.mjs'
+import { RICH_MENU_GROUP_DETAILS, BROADCASTS } from './fixtures.mjs'
 
 // JSの見本は画面ごとに異なる形。試験で扱う行の境界だけを明示する。
 type FixtureRow = Record<string, any>
@@ -20,8 +20,6 @@ describe('板ごとの撮影条件', () => {
     expect(groups.total).toBe(groups.items.length)
     expect(groups.facets.published).toBe(groups.items.filter((group: FixtureRow) => group.status === 'published').length)
     expect(groups.items.some((group: FixtureRow) => group.id === 'rich-menu-safe')).toBe(false)
-    expect(groups.items.find((group: FixtureRow) => group.id === 'rich-menu-target').name).toBe('通常メニュー')
-    expect(RICH_MENU_GROUPS.find((group: FixtureRow) => group.id === 'rich-menu-target')?.name).toBe('通常メニュー（会員向け）')
     expect(groups.items.find((group: FixtureRow) => group.id === 'rmg-autumn').publishingAt > new Date().toISOString()).toBe(true)
   })
   it('作成状態は保存や本文入力をせず、開く操作だけで再現する', () => {
