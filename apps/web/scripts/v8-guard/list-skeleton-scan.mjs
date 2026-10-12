@@ -49,6 +49,15 @@ export function scanListSkeleton() {
         continue
       }
       if (toolbar.scrollWidth > toolbar.clientWidth + 1) fail('B-178 道具のはみ出し', toolbar)
+      const controls = [...toolbar.querySelectorAll('input,button')].filter(el => visible(el)
+        && !el.closest('[role="menu"],[role="listbox"],[role="dialog"]')
+        && !el.closest('[data-toolbar-optional][data-collapsed] [data-toolbar-optional-content]'))
+      for (const [index, control] of controls.entries()) for (const other of controls.slice(index + 1)) {
+        if (control.contains(other) || other.contains(control)) continue
+        const a = control.getBoundingClientRect(), b = other.getBoundingClientRect()
+        if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
+          && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) fail('U5 道具の重なり', control)
+      }
       for (const sort of toolbar.querySelectorAll('[data-list-sort]')) {
         const value = sort.querySelector('[data-select-value]')
         if (visible(sort) && (!value || !visible(value) || !/^並び[：:].+/.test(value.textContent.trim())

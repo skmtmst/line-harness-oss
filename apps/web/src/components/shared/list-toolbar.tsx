@@ -6,7 +6,7 @@ import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import styles from './list-toolbar.module.css'
-import { toolbarContentFit, fitToolbarWrap } from './list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from './list-toolbar-fit.mjs'
 
 function useToolbarFit() {
   const ref = useRef<HTMLDivElement>(null)
@@ -152,8 +152,7 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
     const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') ? item?.closest<HTMLElement>('[data-toolbar-row]') ?? owner : owner
     if (!item || !toolbar || !window.ResizeObserver) return
     const measure = () => {
-      const content = item.querySelector<HTMLElement>('[data-toolbar-optional-content]')!
-      if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = content.getBoundingClientRect().width
+      if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = fitToolbarOptionalWidth(item)
       setCollapsed(!toolbarContentFit(toolbar, item, expandedWidthRef.current).fits)
     }
     let frame = 0

@@ -563,7 +563,7 @@ export default function EarningRulesTab() {
         presentation="band"
         title="直近30日 使われたマイル"
         icon={<Gift size={14} aria-hidden="true" />}
-        value={ready ? spentMiles ?? 0 : null}
+        value={ready ? Math.abs(spentMiles ?? 0) : null}
         unit=""
         detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)} 件`)}
       />

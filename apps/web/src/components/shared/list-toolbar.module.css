@@ -143,6 +143,7 @@
 :root .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
 :root .toolbar:has(.optional) .row1 > .search { flex: none; }
 .optional { position: relative; flex: none; width: max-content; }
+:root .optional:not([data-collapsed]) { min-width: var(--toolbar-optional-width, max-content); }
 .optional > summary { display: none; }
 .optional > div { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 .optional[data-collapsed] > summary {

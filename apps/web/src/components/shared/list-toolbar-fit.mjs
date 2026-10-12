@@ -36,3 +36,14 @@ export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 
 export function fitToolbarWrap(toolbar) {
   toolbar.dataset.toolbarFit = toolbarContentFit(toolbar, null, 0, false).fits ? 'single' : 'wrap'
 }
+
+/** Reserve a readable control even when an old wrapper is narrower than it.
+ * @param {HTMLElement} item
+ */
+export function fitToolbarOptionalWidth(item) {
+  const content = item.querySelector('[data-toolbar-optional-content]')
+  if (!content || item.hasAttribute('data-collapsed')) return 0
+  const width = Math.ceil(Math.max(content.getBoundingClientRect().width, content.scrollWidth))
+  item.style.setProperty('--toolbar-optional-width', `${width}px`)
+  return width
+}
