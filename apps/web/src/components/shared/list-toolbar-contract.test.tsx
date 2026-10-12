@@ -10,6 +10,24 @@ import PageSizeSelect from './page-size-select'
 
 afterEach(cleanup)
 
+it('nested Frame and Toolbar render the leading actions once and keep their handler', () => {
+  const create = vi.fn()
+  render(<ListToolbarLeading leading={<button onClick={create}>作る</button>}><ListToolbarFrame><ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} /></ListToolbarFrame></ListToolbarLeading>)
+  expect(screen.getAllByRole('button', { name: '作る' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '作る' }))
+  expect(create).toHaveBeenCalledOnce()
+})
+
+it('the shared end orders sort before page size while preserving selection', () => {
+  const change = vi.fn()
+  const { container } = render(<ListToolbarEnd><PageSizeSelect value={20} onChange={change} /><ListToolbarSort value="new" onChange={vi.fn()} options={[{ value: 'new', label: '新しい順' }]} /></ListToolbarEnd>)
+  const buttons = [...container.querySelectorAll('button[aria-haspopup="listbox"]')]
+  expect(buttons.map(el => el.getAttribute('aria-label'))).toEqual(['並び', '表示件数'])
+  fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+  fireEvent.click(screen.getByRole('option', { name: /50/ }).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith(50)
+})
+
 describe('B-178 共通の道具の段の操作', () => {
   it('検索の変更と消す操作を元の受け口へ返す', async () => {
     const onChange = vi.fn()

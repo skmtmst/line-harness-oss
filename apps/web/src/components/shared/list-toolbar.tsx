@@ -134,7 +134,7 @@ export default function ListToolbar({
         <div className={styles.row2} data-toolbar-row>
           {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}{secondary}</div> : null}
           {actions ? <span className={styles.actions} data-toolbar-actions>{actions}</span> : null}
-          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</div> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
         </div>
       ) : null}
     </div>
@@ -145,9 +145,12 @@ export default function ListToolbar({
 export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked' }) {
   const ref = useToolbarFit()
   const leading = useContext(LeadingContext)
+  const containsToolbar = (nodes: ReactNode): boolean => Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
+    && (node.type === ListToolbar || node.props.children && containsToolbar(node.props.children)))
+  const ownsLeading = !containsToolbar(children)
   return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>
-    {leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
-    <span className={styles.rowBreak} aria-hidden="true" />{children}
+    {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
+    {ownsLeading ? <span className={styles.rowBreak} aria-hidden="true" /> : null}{children}
   </div></FrameContext.Provider>
 }
 
@@ -178,7 +181,14 @@ export function ListToolbarSearchSlot({ children, width }: { children: ReactNode
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{children}</span>
+  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(children)}</span>
+}
+
+/** B-244: the shared end owns order; keep each control and its handler intact. */
+function orderedTrailingTools(nodes: ReactNode): ReactNode[] {
+  const flatten = (items: ReactNode): ReactNode[] => Children.toArray(items).flatMap(node => isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment ? flatten(node.props.children) : [node])
+  const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2 })[toolbarRole(node)]
+  return flatten(nodes).sort((a, b) => rank(a) - rank(b))
 }
 
 /** B-244：省略記号へ畳まず、操作名を持つ元の道具を表示する。 */

@@ -3281,6 +3281,44 @@
         ],
         "needed": ""
       }
+    },
+    {
+      "id": "list-status-cell",
+      "name": "一覧の状態の列",
+      "role": "名前と状態を分け、複数札を共通の間で並べる",
+      "rules": [
+        "B-194",
+        "B-254",
+        "B-267"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/table.tsx",
+            "apps/web/src/components/shared/data-table.module.css"
+          ],
+          "components": [
+            "StatusCell"
+          ],
+          "vars": [
+            "--tpl-slot-gap"
+          ]
+        },
+        "pen": []
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/table.test.tsx"
+        ],
+        "needed": ""
+      }
     }
   ]
 }

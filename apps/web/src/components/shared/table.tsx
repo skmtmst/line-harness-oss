@@ -279,6 +279,11 @@ export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>)
   return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
 }
 
+/** B-194: states belong to their column; stacked badges keep the 60px row. */
+export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'className'> & { primary?: ReactNode }) {
+  return <Td {...cellProps} className={shell.statusCell} data-list-status-cell><div className={shell.statusStack}>{primary ? <span className={shell.statusPrimary}>{primary}</span> : null}{children}</div></Td>
+}
+
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
 export function NameCell({ name, folder, annotation, className }: {
   name: ReactNode

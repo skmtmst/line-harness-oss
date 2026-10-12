@@ -405,7 +405,7 @@
 :global(:root) [data-list-skeleton] .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-16); }
 
 /* ページ送りを別の子で組む一覧でも、型の余白を二重に足さない。 */
-:global(:root) [data-list-skeleton] .pagination .pagination { padding: 0; }
+:global(:root) .listBody .pagination .pagination { padding: 0; }
 
 /* 道具の段の左右・上下の余白は型が一度だけ持つ。 */
 :global(:root) [data-list-skeleton] .toolbar :global([data-list-toolbar]) { padding: 0; }
@@ -437,8 +437,8 @@
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
-:global(:root) [data-list-skeleton] .paginationRow,
-:global(:root) [data-list-skeleton] .pagination { justify-content: space-between; }
+:global(:root) .listBody .paginationRow,
+:global(:root) .listBody .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-16); }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }
 
 /* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */

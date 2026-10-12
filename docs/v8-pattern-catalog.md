@@ -948,6 +948,12 @@
 - **見つけ方・増殖の見張り**：`formatListTimestamp(...).split(...)` を画面で書かず、共通部品へ日時を渡す。
 - **見張り**：共通の書式と部品の試験（別年の時刻、SQL UTC、店舗時間帯、無効値）と一覧の実幅測定。Pen の変更は司令塔へ渡す。
 
+## list-status-cell 一覧の状態の列
+
+- **役目**：公開状態と後処理の未完など、同じ記録の状態を名前と分けて表示する。複数の札は縦に並べ、共通4pxを挟む。余分な上下のセル余白を重ねず、行の52/60を守る。
+- **持ち主**：`components/shared/table.tsx` の `StatusCell` と `data-table.module.css`。札の正本はStatusBadge。文字の実寸はDataTableの内容による列配分が確保する。
+- **見張り**：状態の列と名前の列の動作試験、実物CSSの複数札60px・切れ0・余分padding故障注入。
+
 - **L4 差し戻しI**：操作の「直す／編集」は `shared/action-words.ts` が「編集する」へ統一し、Button（actionWording）・ActionMenu・FolderEditorDialog・KpiCard が読む。任意の値・名前を出すボタンや窓の題はそのまま保つ。「読み直す／作り直す／最新を取り込んで直す」は別の動きのため保つ。KPIの操作は共通 `action` へ渡す（リンク・既存の処理の両方を受ける）。
 
 - **L4 差し戻しJ**：数の帯に行メニューを置かず、絞り込みと行き先は `KpiCard.action`／`valueAction` へ。別の行き先の入口は残す。行の登録は共通 `Button` の `size="compact"` を使い、表の52/60を変更しない。CIの `pendec2-rules` が帯の中の行メニューを検出する（故障注入あり）。

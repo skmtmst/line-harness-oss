@@ -161,6 +161,9 @@
 }
 :root .row + .row .bodyCell { border-top: 0; }
 :root .name { line-height: 18px; }
+:root .statusCell { padding-block: 0; }
+.statusStack { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-slot-gap); width: max-content; max-width: 100%; }
+.statusPrimary { display: inline-flex; align-items: center; gap: var(--tpl-slot-gap); white-space: nowrap; }
 :root .sub { margin-top: var(--tpl-sub-gap); line-height: 16px; }
 :root .memo { line-height: 16px; }
 :root .row[data-table-layout='columns'] {

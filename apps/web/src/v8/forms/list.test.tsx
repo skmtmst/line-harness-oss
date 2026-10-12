@@ -134,6 +134,17 @@ afterEach(() => {
 });
 
 describe('V8 回答フォーム一覧', () => {
+  it.each([false,true])('未完を名前と分けて状態の列に残し、詳細の入口を保つ（狭い=%s）', async (small) => {
+    narrow.value = small
+    fetchApi.mockImplementation(async (path: string) => path.startsWith('/api/forms?') ? {
+      success: true, data: { items: [{ ...baseForm, id: 'f-1', name: '来店アンケート', folderId: null, pendingPostActionCount: 2 }], total: 1, all_total: 1, page: 1, limit: 20 },
+    } : { success: true, data: {} })
+    await mount()
+    const row = host.querySelector('tr[data-row-id="f-1"]')!
+    expect(row.querySelector('[data-list-name-cell]')?.textContent).not.toContain('未完')
+    expect(row.querySelector('[data-list-status-cell]')?.textContent).toContain('後処理の未完 2')
+    expect(row.querySelector('[data-list-name-cell] a')?.getAttribute('href')).toContain('/form-submissions/edit?id=f-1')
+  })
   it('未分類の行にフォルダの口の unfiledCount を出す', async () => {
     await mount()
     const unfiled = screen.getByRole('button', { name: /未分類/ })
