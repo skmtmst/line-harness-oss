@@ -1,4 +1,6 @@
 'use client'
+import StatusBadge from '@/components/shared/status-badge'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import TagPill from '@/components/shared/tag-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -27,7 +29,7 @@ import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/co
 import { Tabs } from '@/components/shared/tabs'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
-import { distributedAccountsLine, templateSubLine } from './list-row'
+import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
 import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
 import storeStyles from '../templates/list.module.css'
 import hqStyles from './store-list.module.css'
@@ -382,6 +384,7 @@ export default function HqStoreList(props: HqStoreListProps) {
    *   回答フォーム wZPua：状態・配布先・更新・［配る］・「…」
    * ［配る］の列は見出しが空の幅60（絵の「列 配る」）、「…」との間は 16。閲覧のみ（配れない人）には列ごと出さない。
    */
+  const narrow = useNarrowViewport()
   const rankOf = new Map(type === 'rich_menu'
     ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
     : [])
@@ -402,10 +405,9 @@ export default function HqStoreList(props: HqStoreListProps) {
   const stateCell = (row: HqTemplate) => {
     const state = stateOf(row)
     return (
-      <span className={storeStyles.publishPill} data-tone={state.tone}>
-        <span className={storeStyles.publishDot} aria-hidden="true" />
+      <StatusBadge tone={state.tone === 'live' ? 'success' : state.tone === 'changes' ? 'warning' : 'neutral'}>
         {state.label}
-      </span>
+      </StatusBadge>
     )
   }
   /* 列の幅（col）と中身の箱（Td）は列ごとに書く（className を変数で渡すと見張りが読めない）。 */
@@ -413,11 +415,11 @@ export default function HqStoreList(props: HqStoreListProps) {
   const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={storeStyles.cellPlain} title={title}>{text}</Td>
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
-    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => boxedTd('kind', <span className={storeStyles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span>) },
+    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => boxedTd('kind', <TagPill name={!row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : KIND_LABEL[row.kind]} />) },
     { key: 'state', head: '公開', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
-    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+    ...(!narrow ? [{ key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row: HqTemplate) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },] : []),
   ] : type === 'tag' ? [
     { key: 'friends', head: '人数', col: <col key="friends" className={storeStyles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? emptyValue('unknown') : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
     { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? emptyValue('unknown')) },

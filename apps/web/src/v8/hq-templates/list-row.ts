@@ -1,3 +1,4 @@
+import { messageTypeText } from '../templates/words'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 
 /**
@@ -17,4 +18,9 @@ export function distributedAccountsLine(row: Pick<HqTemplate, 'distributed_accou
   if (names.length === 0) return null
   const more = row.distributed_account_more ?? 0
   return more > 0 ? `${names.join('・')} ほか ${more}` : names.join('・')
+}
+
+/** メッセージのタブでも、保存された形はテキスト・画像・カード型と異なる。 */
+export function hqMessageTypeLabel(row: Pick<HqTemplate, 'message_type'>): string {
+  return row.message_type ? messageTypeText(row.message_type) : '種類を確認できません'
 }

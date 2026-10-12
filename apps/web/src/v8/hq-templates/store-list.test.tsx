@@ -62,6 +62,17 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it('メッセージのタブでも保存した形の札を出し、古い応答からテキストを推測しない', async () => {
+    await render({ rows: [
+      { ...row('text', '文字の案内', 0), message_type: 'text' },
+      { ...row('flex', 'カードの案内', 0), message_type: 'flex' },
+      { ...row('image', '写真の案内', 0), message_type: 'image' },
+      row('legacy', '古い応答', 0),
+    ] })
+    const cells = [...host.querySelectorAll('tbody tr')].map((tr) => tr.querySelectorAll('td')[1].textContent)
+    expect(cells).toEqual(['テキスト', 'カード型', '画像', '種類を確認できません'])
+  })
+
   it.each([true, false])('フォルダの取得失敗でも作る操作と閲覧時の場所を保つ（編集=%s）', async canEdit => {
     const h = await render({ folderLoadFailed: true, canEdit })
     const panel = host.querySelector('aside[aria-label="フォルダ"]')!
