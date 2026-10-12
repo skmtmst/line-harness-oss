@@ -82,7 +82,7 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
     <div className={styles.split} data-template-region="body">
       {folders ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
-        {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation ? undefined : ''}>
+        {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation ? undefined : ''}>
           {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted>{explanation}</PageExplanationBody></div> : null}
           {toolbar ? <ListToolbarLeading leading={collapsed}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}
           {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}

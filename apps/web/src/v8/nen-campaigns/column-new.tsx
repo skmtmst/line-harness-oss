@@ -195,7 +195,7 @@ export default function ColumnNew() {
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-title-heading" data-nen-part="title">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-title-heading">題名と分類</h2>
-        <Field label="題名"><SaveErrorField names={["title","draft.title"]}><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
+        <Field density="input" label="題名"><SaveErrorField names={["title","draft.title"]}><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-title-error">{errorFor('title')}</FieldError></Field>
         <div className={styles.row}>
           <Field label="分類"><SaveErrorField names={["category","draft.category"]}><TextField id="nen-col-category" aria-describedby={errorFor('category') ? 'nen-col-category-error' : undefined} aria-label="分類" value={draft.category} invalid={Boolean(errorFor('category'))} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} /></SaveErrorField>

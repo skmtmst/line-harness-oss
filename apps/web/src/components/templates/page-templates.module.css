@@ -28,6 +28,8 @@
 :global(:root) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 題とタブの間は headingText の gap が持つ。二重に余白を足さない。 */
 :global(:root) .headingTabs { margin-top: 0; }
+/* メタ情報を持つ詳細のタブは、頭の段間8を保つ。 */
+:global(:root) [data-page-template='detail'] .headingTabs { margin-top: var(--tpl-head-gap); }
 /* タブ付きの頭は固定絵の下余白16。通常の頭の12とは分ける。 */
 :global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-folder-pad-block); }
 /* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
@@ -48,6 +50,7 @@
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
+:global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
