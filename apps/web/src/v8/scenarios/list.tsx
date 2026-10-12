@@ -1,7 +1,7 @@
 'use client'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -865,7 +865,7 @@ export default function ScenariosListV8() {
         <span className="sr-only" role="status" aria-live="polite">
           {moveNotice}
         </span>
-        <div className={narrow ? `${styles.tableWrap} ${styles.narrowTable}` : styles.tableWrap} data-content-in="">
+        <div className={styles.tableWrap} data-content-in="">
           <DataTable>
             {colgroup}
             <thead>
@@ -1060,24 +1060,24 @@ export default function ScenariosListV8() {
     </div>
   )
 
-  const savedBox = (
-    <div className={styles.savedBox}>
-      <SaveErrorField names={["savedFilter","saved_filter"]}><Select
-        aria-label="よく使う絞り込み"
-        size="full"
-        icon={<Bookmark aria-hidden="true" />}
-        valueAlign="start"
-        showChevron={false}
-        iconOnly={narrow}
-        value={savedFilter}
-        onChange={(value) => {
-          setSavedFilter(value)
-          if (value === 'active') setStoppedOnly(false)
-        }}
-        options={SAVED_FILTER_OPTIONS}
-      /></SaveErrorField>
-    </div>
+  const savedFilterControl = (
+    <SaveErrorField names={["savedFilter","saved_filter"]}><Select
+      aria-label="よく使う絞り込み"
+      size="full"
+      icon={<Bookmark aria-hidden="true" />}
+      valueAlign="start"
+      showChevron={false}
+      iconOnly={narrow}
+      width={narrow ? 56 : undefined}
+      value={savedFilter}
+      onChange={(value) => {
+        setSavedFilter(value)
+        if (value === 'active') setStoppedOnly(false)
+      }}
+      options={SAVED_FILTER_OPTIONS}
+    /></SaveErrorField>
   )
+  const savedBox = narrow ? savedFilterControl : <div className={styles.savedBox}>{savedFilterControl}</div>
 
   const perPageBox = (
     <div data-per-page-select>
@@ -1086,7 +1086,7 @@ export default function ScenariosListV8() {
   )
 
   const folderSelect = (
-    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
+    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select width={narrow ? 152 : undefined} aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
   )
 
   const filteredCount =
@@ -1099,29 +1099,30 @@ export default function ScenariosListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <>
       {noteBand}
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で探す"
-            value={nameQuery}
-            onChange={(value) => setNameQuery(clampSearchQuery(value))}
-            onClear={() => setNameQuery('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {savedBox}
-      </ListToolbarRow>
-      {filteredCount}
-    </ListToolbarFrame>
+      <ListToolbarFrame layout="stacked">
+        <ListToolbarRow>
+          {createButton(false)}
+          {folderSelect}
+          <ListToolbarSearchSlot width={200}>
+            <SearchField
+              placeholder="シナリオ名で探す"
+              aria-label="シナリオ名で探す"
+              value={nameQuery}
+              onChange={(value) => setNameQuery(clampSearchQuery(value))}
+              onClear={() => setNameQuery('')}
+            />
+          </ListToolbarSearchSlot>
+          <ListToolbarEnd>{perPageBox}</ListToolbarEnd>
+        </ListToolbarRow>
+        <ListToolbarRow>
+          {filterChips}
+          {savedBox}
+        </ListToolbarRow>
+        {filteredCount}
+      </ListToolbarFrame>
+    </>
   )
 
   const wideToolbar = (
@@ -1160,7 +1161,7 @@ export default function ScenariosListV8() {
   return (
     <PageExplanationProvider pageKey="scenarios"><SaveErrorScope errors={saveErrors}><ListPage
       heightMode="content"
-      toolbarSpacing="section"
+      toolbarSpacing={narrow ? undefined : 'section'}
       noticeSpacing="section"
       skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
@@ -1184,6 +1185,7 @@ export default function ScenariosListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              detailLayout={narrow ? 'qualifier' : undefined}
             />
           ))}
         </KpiBand>

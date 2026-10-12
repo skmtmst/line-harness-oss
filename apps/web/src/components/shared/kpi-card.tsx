@@ -67,6 +67,8 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
+  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
+  detailLayout?: 'qualifier'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
@@ -133,6 +135,7 @@ export default function KpiCard({
   unitSpacing = 'normal',
   signed = false,
   detail,
+  detailLayout,
   description,
   descriptionLabel,
   help,
@@ -176,6 +179,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}
@@ -237,7 +241,7 @@ export default function KpiCard({
       </div>
 
       <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
-        <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
+        <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}

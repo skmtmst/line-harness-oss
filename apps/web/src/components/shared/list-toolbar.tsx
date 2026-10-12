@@ -102,8 +102,8 @@ export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttr
   return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools>{compactFilterGroups(children)}</Tag>
 }
 
-export function ListToolbarSearchSlot({ children }: { children: ReactNode }) {
-  return <div className={styles.searchSlot} data-toolbar-search>{children}</div>
+export function ListToolbarSearchSlot({ children, width }: { children: ReactNode; width?: number }) {
+  return <div className={styles.searchSlot} data-toolbar-search style={width ? ({ '--list-search-width': `${width}px` } as React.CSSProperties) : undefined}>{children}</div>
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {

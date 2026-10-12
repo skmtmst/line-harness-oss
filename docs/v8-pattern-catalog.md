@@ -121,6 +121,7 @@
 ## kpi-band 数の帯
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
+- **補足の変わり形（wjfLe）**：説明と括弧の補足を2行で読む絵では、KpiCard の `detailLayout="qualifier"` で補足を次の行へ置く。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。通常の1行省略は既定のまま（§6.5-10、B-152）。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
   - 読む変数：`--color-hairline`
 - **持ち主（Pen）**：`Pp3nS`「数のマス」

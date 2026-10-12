@@ -109,3 +109,11 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] {
   font-size: var(--text-caption);
   line-height: 18px;
 }
+
+/* B-152：説明文は折り返せる。マスの高さは帯の格子がそろえる。 */
+html:root [data-list-skeleton] [data-kpi-detail-layout='qualifier'] [data-kpi-detail] > span:first-child {
+  white-space: pre-line;
+  word-break: normal;
+  overflow: visible;
+  text-overflow: clip;
+}

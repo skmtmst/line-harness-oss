@@ -194,7 +194,7 @@
 /* B-178：独自の段組みを持っていた一覧の移行用。中身とイベントだけ渡す。 */
 .slots { display: flex; flex: 1 0 100%; width: 100%; flex-direction: column; min-width: 0; gap: var(--tpl-list-gap); }
 .slotsRow { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--tpl-list-gap); }
-.searchSlot { flex: 0 1 var(--tpl-list-search-w); min-width: min(var(--tpl-list-search-min), 100%); max-width: 100%; }
+.searchSlot { flex: 0 1 var(--list-search-width, var(--tpl-list-search-w)); min-width: min(var(--list-search-width, var(--tpl-list-search-min)), 100%); max-width: 100%; }
 .searchSlot > * { width: 100%; min-width: 0; }
 .slotsEnd { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; min-width: 0; gap: var(--tpl-list-gap); }
 
@@ -210,6 +210,7 @@
 .slots > .slotsRow { display: contents; }
 .slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
+.slots[data-toolbar-layout='slots-stacked'] > .slotsRow:has(.slotsEnd) { flex-wrap: nowrap; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
 
 /* A notice and the search controls form two sections. Preserve the section gap
