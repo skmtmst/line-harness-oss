@@ -178,6 +178,9 @@ export type AuditAction =
   | 'restaurant.delivery.intake.resume'
   // 履歴CSVの書き出し（注文番号・金額が店舗の外へ出るため、他の出力と同じく残す）。
   | 'restaurant.delivery.history.export'
+  // Uber Eats のログイン連携。店舗の代理で使えるトークンを得る操作なので必ず残す。
+  | 'restaurant.delivery.ubereats.connect.start'
+  | 'restaurant.delivery.ubereats.connect'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'
