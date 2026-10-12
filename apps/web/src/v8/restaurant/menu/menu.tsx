@@ -25,6 +25,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 
 /*
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
@@ -228,7 +229,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       >
         {!canEdit ? <ReadOnlyNotice /> : null}
         {editing ? <Notice tone="info">{`提供時間：${periodLabel(safeArray(editing.service_periods_json))} ／ 所要時間：${editing.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown')}`}</Notice> : null}
-        <fieldset className={styles.fields} disabled={!canEdit || busy}>
+        {canEdit ? <fieldset className={styles.fields} disabled={busy}>
         <DialogField label="種類" kind="select">
           <SaveErrorField names={["kind","draft.kind"]}><Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></SaveErrorField>
         </DialogField>
@@ -260,7 +261,15 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
             : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。あとから価格を変えるときは承認ワークフローへ申請されます。'}
         </DialogNote>
-        </fieldset>
+        </fieldset> : <CreateSummaryCard title="メニューの内容" rows={[
+          { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
+          { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
+          { label: '価格（税込）', value: draft.price.trim() ? formatYen(Number(draft.price)) : emptyValue('unconfigured') },
+          { label: '提供時間', value: editing ? periodLabel(safeArray(editing.service_periods_json)) : periodLabel([draft.period]) },
+          { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
+          { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
+          { label: '変更後の価格の開始日時', value: editing?.pendingEffectiveAt ? polishFormatDateTime(new Date(editing.pendingEffectiveAt)) : emptyValue('unconfigured') },
+        ]} />}
       </RsDialog>
       <RsDialog
         open={Boolean(stopping)}

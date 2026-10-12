@@ -8,7 +8,6 @@ import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import PeriodPicker from '@/components/shared/period-picker'
-import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type SearchConsoleMetric, type SearchConsoleMetricRow, type SearchConsolePerformance, type SearchConsoleSetup } from '@/lib/api'
@@ -24,6 +23,7 @@ import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
@@ -68,8 +68,7 @@ function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetr
 
 function SetupCard({ setup, denied }: { setup: SearchConsoleSetup | null; denied: boolean }) {
   return <Card variant="form" aria-labelledby="sc-setup-title">
-    <CardHeader size="stacked" titleId="sc-setup-title" title={denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'} />
-    <Notice tone="info">Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。</Notice>
+    <CardHeader size="stacked" titleId="sc-setup-title" title={denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'} meta="Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。" />
     <div className={styles.compareRow}><span >対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? emptyValue('unconfigured')}</strong></div>
     <div className={styles.compareRow}><span >追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? emptyValue('unconfigured')}</strong></div>
   </Card>
@@ -158,7 +157,7 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></SaveErrorField></Field>
+            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field>
             <StatePill tone="ok">連携中</StatePill>
             {periodControl}
             <span className={styles.spacer} />

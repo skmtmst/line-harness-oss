@@ -128,8 +128,11 @@ it('閲覧のみでも提供時間と所要時間を詳細で読み、保存は�
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByText(/提供時間：/)).toBeTruthy()
   expect(within(dialog).queryByRole('button', { name: /保存/ })).toBeNull()
-  const fieldset = dialog.querySelector('fieldset')!
-  expect(fieldset.disabled).toBe(true)
+  expect(dialog.querySelector('fieldset')).toBeNull()
+  expect(within(dialog).queryByRole('textbox')).toBeNull()
+  expect(within(dialog).getByText('メニューの内容')).toBeTruthy()
+  expect(within(dialog).getByText('所要時間')).toBeTruthy()
+  expect(within(dialog).getByText('アレルギー')).toBeTruthy()
   expect(fixture.updateMenu).not.toHaveBeenCalled()
   expect(fixture.createMenu).not.toHaveBeenCalled()
 })

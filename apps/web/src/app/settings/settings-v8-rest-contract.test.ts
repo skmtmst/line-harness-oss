@@ -40,6 +40,6 @@ describe('設定の残り板', () => {
 
   it('はじめの設定の順路に板IDを付ける（xuJ7D）', () => {
     expect(START).toMatch(/(?:data-design-node|boardId)="xuJ7D"/)
-    expect(START).toContain('aria-label="はじめの設定の順路"')
+    expect(START).toMatch(/<GridTable\s+label="はじめの設定の順路"/)
   })
 })

@@ -429,7 +429,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   </GridCell>
                   <GridCell><Status value={s.status} /></GridCell>
                   <GridCell align="right">
-                    {readOnly ? null : <Button onClick={() => { setEditingStoreId(s.id); setShowStoreForm(false) }}>編集する</Button>}
+                    {readOnly ? null : <RowActions subjectName={s.name} edit={{ onClick: () => { setEditingStoreId(s.id); setShowStoreForm(false) } }} />}
                   </GridCell>
                 </GridRow>
               ))}
