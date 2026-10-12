@@ -20,7 +20,7 @@ export default function scanPendec2Rules() {
     }
     return parts.join(' > ')
   }
-  const add = (kind, el, measure, other) => findings.push({ kind, target: sel(el), text: (el.innerText || el.textContent || '').replace(/\s+/g,' ').slice(0,120), measure, ...(other ? {other:sel(other)} : {}) })
+  const add = (kind, el, measure, other) => findings.push({ kind, target: sel(el), text: ((kind === 'canvasbottom' ? el.querySelector('h1,h2')?.textContent : null) || el.innerText || el.textContent || '').replace(/\s+/g,' ').slice(0,120), measure, ...(other ? {other:sel(other)} : {}) })
   const all = selector => [...root.querySelectorAll(selector)].filter(visible)
   const framed = el => { const c=css(el); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth)>0 || ['Top','Right','Bottom','Left'].every(x => c['border'+x+'Style']!=='none' && parseFloat(c['border'+x+'Width'])>0) || c.boxShadow!=='none' }
   const choiceSelector = '[data-choice-card],label[class*="radio-card_card"]:not([data-variant="row"]),label[class*="layout-picker_tile"]'
@@ -48,7 +48,7 @@ export default function scanPendec2Rules() {
     if(gap<23) add('canvasbottom',board,{deficit:Math.ceil(24-gap)})
   }
   for(const band of all('[data-kpi-strip],[data-kpi-band]')) {
-    for (const menu of [...band.querySelectorAll('[data-row-menu],button[aria-haspopup="menu"]')].filter(visible)) add('kpimenu',menu,{count:1})
+    for (const menu of [...band.querySelectorAll('[data-row-menu],button[aria-haspopup="menu"]:not(:has([data-kpi-number]))')].filter(visible)) add('kpimenu',menu,{count:1})
     const details=[...band.querySelectorAll('[data-kpi-detail]')]
     const hasDetail=details.some(el=>el.hasAttribute('data-kpi-detail-present') || el.textContent.trim() || el.querySelector('a[href],button'))
     if(!hasDetail && details.some(visible)) add('kpiblank',band,{count:1})

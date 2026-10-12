@@ -281,18 +281,18 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
    * 欄の真下に理由を出して赤くし、別のカードの欄ならそのカードを選んでから移る。カードの札には直す欄の数の赤い丸。
    */
   const fields = useFormErrors()
-  if (!inline) fields.define('name', 'テンプレート名', () => (name.trim() ? null : '名前を入力してください'))
+  if (!inline) fields.define('name', 'テンプレート名', () => (name.trim() ? null : '名前を入力してください'), { required: true })
   const someImage = panels.some((p) => p.thumbnailImageUrl.trim())
   panels.forEach((p, i) => {
     const opts = { reveal: () => setSelected(i), group: `card-${i}` }
-    fields.define(`card-${i}-image`, `カード${i + 1}の画像`, () => (someImage && !p.thumbnailImageUrl.trim() ? '画像は全部のカードに入れるか、全部入れないかにしてください' : null), opts)
-    fields.define(`card-${i}-title`, `カード${i + 1}のタイトル`, () => ([...p.title].length > TITLE_MAX ? `タイトルは${TITLE_MAX}文字までです（いま${[...p.title].length}文字）` : null), opts)
+    fields.define(`card-${i}-image`, `カード${i + 1}の画像`, () => (someImage && !p.thumbnailImageUrl.trim() ? '画像は全部のカードに入れるか、全部入れないかにしてください' : null), { ...(opts), required: someImage })
+    fields.define(`card-${i}-title`, `カード${i + 1}のタイトル`, () => ([...p.title].length > TITLE_MAX ? `タイトルは${TITLE_MAX}文字までです（いま${[...p.title].length}文字）` : null), { ...(opts), required: false })
     fields.define(`card-${i}-text`, `カード${i + 1}の本文`, () => (
       !p.text.trim() ? '本文を入力してください'
         : [...p.text].length > textMaxFor(p) ? `本文は${textMaxFor(p)}文字までです（いま${[...p.text].length}文字）` : null
-    ), opts)
+    ), { ...(opts), required: true })
     p.actions.forEach((a, ai) => {
-      fields.define(`card-${i}-button-${ai}`, `カード${i + 1}のボタン${ai + 1}`, () => buttonProblem(a, liffId, hqHost), opts)
+      fields.define(`card-${i}-button-${ai}`, `カード${i + 1}のボタン${ai + 1}`, () => buttonProblem(a, liffId, hqHost), { ...(opts), required: true })
     })
   })
 
@@ -471,7 +471,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             {inline ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
               <div className={styles.row}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="cr-name-input"><SaveErrorField names={["name"]}><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="cr-name-input" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
 <FieldError id="cr-name-input-error">{fields.error('name')}</FieldError></Field></div>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>

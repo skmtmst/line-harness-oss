@@ -216,6 +216,7 @@ export default function AdConnectionsV8() {
     <SaveErrorScope errors={saveErrors}><DetailPage boardId="FDBsG" contentPadding="0 var(--tpl-head-pad-side)" title={<>広告とのつなぎ</>}
         help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
         actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>}>
+
       <div className={adsStyles.body}>
         {editing && manage ? <AdMappingDialog key={`${accountId}:${editing.pointId}:${editing.provider}`} item={editing} onClose={() => setEditing(null)} onSave={(values) => saveMapping(editing, values)} /> : null}
         {readonly ? (

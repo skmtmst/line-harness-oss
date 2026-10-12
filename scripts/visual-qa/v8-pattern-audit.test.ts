@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 点検の道具は素のJSで型定義を持たない。
-import { DEFAULT_CATALOG, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, stripThemeScope } from './v8-pattern-audit.mjs'
+import { DEFAULT_CATALOG, forwardedEntryMoves, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, stripThemeScope } from './v8-pattern-audit.mjs'
 
 const ROOT = join(__dirname, '../..')
 
@@ -352,4 +352,42 @@ it('顧客欄とLIFF外枠は共通部品の利用を認識し、同じ名前の
   expect(broken.code.a['customer-info'].length).toBeGreaterThan(0)
   expect(broken.code.a['phone-preview'].length).toBeGreaterThan(0)
   expect(broken.code.a['detail-panel'].length).toBeGreaterThan(0)
+})
+
+
+describe('列車26b: ファイル移動と共通部品の読み上げ属性', () => {
+  it('同じ画面のdefault再exportだけを移動の証拠にし、コピーの追加は残す', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pattern-forward-'))
+    const old = mkdtempSync(join(tmpdir(), 'pattern-forward-base-'))
+    const entry = 'apps/web/src/app/chats/page.tsx', target = 'apps/web/src/v8/chat/screen.tsx'
+    put(old, entry, 'export default function Chat(){ return <button>さらに読み込む</button> }')
+    put(root, entry, "export { default } from '@/v8/chat/screen'")
+    put(root, target, 'export default function Chat(){ return <button>さらに読み込む</button> }')
+    const moves = forwardedEntryMoves(root, old)
+    expect(moves.get(entry)).toBe(target)
+    const hit = { file: entry, scope: 'other', signal: 'more', identity: 'same', text: 'same' }
+    const before = { code: { a: { pagination: [hit] } } }
+    const moved = { ...hit, file: target, scope: 'v8' }
+    expect(newCodeFindings(before, { code: { a: { pagination: [moved] } } }, moves)).toEqual([])
+    expect(newCodeFindings(before, { code: { a: { pagination: [moved, moved] } } }, moves)).toHaveLength(1)
+    put(root, entry, "export { default } from '@/v8/chat/screen'; export const another = 1")
+    expect(forwardedEntryMoves(root, old).has(entry)).toBe(false)
+  })
+  it('クリックの検索文字列は窓やメニューに数えず、実際のnative roleは検出する', () => {
+    const { root, pen } = fixture(), rel = 'apps/web/src/v8/guard/probe.tsx'
+    put(root, rel, `export function Probe(){return <div onClick={event => event.target.closest('[role="menu"]')}>本文</div>}`)
+    const before = run({ code: root, pen })
+    expect(before.code.a.select?.filter((hit: {file:string})=>hit.file===rel) ?? []).toEqual([])
+    put(root, rel, `export function Probe(){return <div role="menu">新しい手書き</div>}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).some((hit: {file:string;pattern:string})=>hit.file===rel&&hit.pattern==='select')).toBe(true)
+  })
+  it('窓の読み上げ名を保ったroleの移動は1件のまま、別の窓と同じ窓の複製は新規になる', () => {
+    const { root, pen } = fixture(), rel = 'apps/web/src/v8/guard/dialog.tsx'
+    put(root, rel, `export function Probe(){return <div role="dialog" aria-label="元の窓"><div>本文</div></div>}`)
+    const before = run({ code: root, pen })
+    put(root, rel, `export function Probe(){return <div><div role="dialog" aria-label="元の窓">本文</div></div>}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((hit: {pattern:string})=>hit.pattern==='dialog')).toEqual([])
+    put(root, rel, `export function Probe(){return <><div role="dialog" aria-label="元の窓">本文</div><div role="dialog" aria-label="元の窓">複製</div><div role="dialog" aria-label="別の窓">本文</div></>}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((hit: {pattern:string})=>hit.pattern==='dialog')).toHaveLength(2)
+  })
 })

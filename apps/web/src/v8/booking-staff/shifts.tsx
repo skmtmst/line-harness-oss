@@ -13,6 +13,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -1102,7 +1103,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           {/* 閲覧のみのときは選ぶ部品・押す口を置かず、いまの値を文字で見せる（API も 403 で断る。2026-10-06 オーナー決定）。 */}
           <fieldset className={styles.fieldset}>
             {/* いつもの勤務時間 */}
-            <section className={layout.card} aria-labelledby="bks-week" data-design="Week"><fieldset disabled={savingRules} className={styles.fieldset}>
+            <Card variant="form" gap="normal" aria-labelledby="bks-week" data-design="Week"><fieldset disabled={savingRules} className={styles.fieldset}>
               <div className={layout.cardHead}>
                 <h2 id="bks-week" className={layout.cardTitle}>いつもの勤務時間</h2>
                 {canEdit ? <Button onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>保存</Button> : null}
@@ -1132,10 +1133,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               })}
               {rulesSavedAt ? <p className={styles.savedNote} role="status">保存しました。右の予約画面に反映されています。</p> : null}
               {ruleError ? <p className={layout.fieldError} role="alert">{ruleError}</p> : null}
-            </fieldset></section>
+            </fieldset></Card>
 
             {/* 休憩 */}
-            <section className={layout.card} aria-labelledby="bks-breaks" data-design="Breaks"><fieldset disabled={savingBreaks} className={styles.fieldset}>
+            <Card variant="form" gap="normal" aria-labelledby="bks-breaks" data-design="Breaks"><fieldset disabled={savingBreaks} className={styles.fieldset}>
               <div className={layout.cardHead}>
                 <h2 id="bks-breaks" className={layout.cardTitle}>休憩</h2>
                 {canEdit ? <Button onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>保存</Button> : null}
@@ -1195,10 +1196,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {breaksSavedAt ? <p className={styles.savedNote} role="status">保存しました。</p> : null}
               {breakSaveConflict.conflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の休憩を最新の内容に置き換えます。" action={<Button onClick={() => void breakSaveConflict.reloadLatest()} disabled={savingBreaks}>最新を読み込んで続ける</Button>} /> : null}
               {breakError ? <p className={layout.fieldError} role="alert">{breakError}</p> : null}
-            </fieldset></section>
+            </fieldset></Card>
 
             {/* この日だけ（休み・シフト・休憩） */}
-            <section className={layout.card} aria-labelledby="bks-days" data-design="Special"><fieldset disabled={savingShift || dayAddBusy || deleting} className={styles.fieldset}>
+            <Card variant="form" gap="normal" aria-labelledby="bks-days" data-design="Special"><fieldset disabled={savingShift || dayAddBusy || deleting} className={styles.fieldset}>
               <div className={layout.cardHead}><h2 id="bks-days" className={layout.cardTitle}>この日だけ（休み・シフト・休憩）</h2></div>
               <p className={layout.cardNote}>その日だけ休む・時間を変える・休憩を足すときに使います。いつもの勤務時間より優先されます。</p>
               {dayRows.length === 0 ? (
@@ -1294,10 +1295,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               ) : null}
               {dateSaveConflict.conflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の日付付き休憩を最新の内容に置き換えます。" action={<Button onClick={() => void dateSaveConflict.reloadLatest()} disabled={savingShift}>最新を読み込んで続ける</Button>} /> : null}
               {shiftError ? <p className={layout.fieldError} role="alert">{shiftError}</p> : null}
-            </fieldset></section>
+            </fieldset></Card>
 
             {/* 何週分かのシフトを作る（作るための欄だけなので、閲覧のみには出さない） */}
-            {canEdit ? <section className={layout.card} aria-labelledby="bks-gen">
+            {canEdit ? <Card variant="form" gap="normal" aria-labelledby="bks-gen">
               <div className={layout.cardHead}><h2 id="bks-gen" className={layout.cardTitle}>何週分かのシフトを作る</h2></div>
               <p className={layout.cardNote}>いつもの勤務時間から、日ごとのシフトをまとめて作ります。作ったあと1日ずつ直せます。</p>
               <div className={styles.genRow}>
@@ -1314,10 +1315,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               </div>
               {genError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{genError}</Notice> : null}
               {generatedCount !== null && !genError ? <p className={styles.savedNote} role="status">{generatedCount}日分作りました。</p> : null}
-            </section> : null}
+            </Card> : null}
 
             {/* Google カレンダー */}
-            <section className={layout.card} aria-labelledby="bks-cal">
+            <Card variant="form" gap="normal" aria-labelledby="bks-cal">
               <div className={layout.cardHead}><h2 id="bks-cal" className={layout.cardTitle}>Google カレンダー</h2></div>
               <p className={layout.cardNote}>{isSelf
                 ? 'あなたの Google カレンダーの予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。'
@@ -1353,7 +1354,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 </div>
               ) : null}
               {calendarFormError ? <p className={layout.fieldError} role="alert">{calendarFormError}</p> : null}
-            </section>
+            </Card>
           </fieldset>
         </div>
 

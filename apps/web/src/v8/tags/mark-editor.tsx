@@ -1,4 +1,6 @@
 'use client'
+import Card from '@/components/shared/card'
+import { markNameRequirement } from '@/v8/tags/mark-requirement'
 import { createPageReturnHref } from '@/components/shared/create-page';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import { notifySaved } from '@/components/shared/toast';
@@ -286,7 +288,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   }
 
   const save = async () => {
-    if (!name.trim()) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    if (markNameRequirement.check(name)) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
@@ -445,10 +447,10 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           保管すると、新しく付けられなくなります。いま付いている人は、確認画面で選ぶマークへ置き換わり、履歴に残ります。
         </p>
       ) : null}
-      <div className={styles.field}>
+      <div ><Field>
         <SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} disabled={selected?.isDefault} onCheckedChange={setIsDefault}>新しい友だちに最初から付ける</Checkbox></SaveErrorField>
         <p className={styles.fieldNote}>最初から付けるマークは1つだけ選べます</p>
-      </div>
+      </Field></div>
     </div>
   )
 
@@ -491,7 +493,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           <>
             <MarkBasicFields name={name} color={color} onName={(value) => { setName(value); setNameError('') }} onColor={setColor} nameDuplicates={nameDuplicates} disabled={saving} error={nameError} nameRef={nameRef} />
 
-            <section className={styles.card} aria-labelledby="mark-rules">
+            <Card variant="form" gap="normal" aria-labelledby="mark-rules">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="mark-rules">自動で変えるきまり</h2>
                 <p className={styles.cardNote}>条件に合ったら、このマークに変えます</p>
@@ -551,7 +553,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   <Button type="button" variant="text" onClick={() => setCreateRule(true)}><Plus size={15} aria-hidden="true" />きまりを作る</Button>
                 </span>
               )}
-            </section>
+            </Card>
           </>
         )}
       </CreatePage>

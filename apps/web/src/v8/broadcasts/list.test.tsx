@@ -277,7 +277,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     const trigger = rowOf('1月の限定メニュー')?.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
     act(() => { trigger.click() })
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim())
-    expect(labels).toContain('見る')
+    expect(labels).toContain('配信の詳細を見る')
     expect(labels).toContain('複製')
     expect(labels.some((label) => label?.includes('削除'))).toBe(false)
     expect(labels.some((label) => label?.includes('編集'))).toBe(false)

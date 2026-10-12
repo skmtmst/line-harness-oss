@@ -208,7 +208,7 @@ test('U5: optional controls reserve the overflowing readable width and keep the 
     const page = await browser.newPage()
     for (const width of [1440, 1152]) {
       await page.setViewportSize({ width, height: 900 })
-      await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;flex:none}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><details class="optional" data-toolbar-optional open><summary>…</summary><div data-toolbar-optional-content><div style="width:150px"><button style="width:177px">報酬の決め方：すべて</button></div></div></details><button style="width:90px">計測中</button></div></section></html>`)
+      await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;flex:none}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><span class="optional" data-toolbar-optional><span data-toolbar-optional-content><div style="width:150px"><button style="width:177px">報酬の決め方：すべて</button></div></span></span><button style="width:90px">計測中</button></div></section></html>`)
       assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U5 道具の重なり'))
       await page.locator('[data-toolbar-optional]').evaluate(fitToolbarOptionalWidth)
       const gap = await page.locator('.toolbar').evaluate(el => { const [a,b] = [...el.querySelectorAll('button')].map(e=>e.getBoundingClientRect());return b.x-a.right })

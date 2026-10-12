@@ -1,6 +1,6 @@
 /*
  * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
- * 寸法は app/globals.css の [data-theme="v8"] の --tpl-steps-*（丸22・名13・線24×1.5・間8・丸と名6）。
+ * 寸法は app/globals.css の :root の --tpl-steps-*（丸22・名13・線24×1.5・間8・丸と名8）。
  * 1行を守る：折り返さず、入らない幅では今の段だけ名を出す（data-compact）。
  */
 .root {

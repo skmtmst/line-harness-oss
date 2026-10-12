@@ -11,6 +11,7 @@ import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '
 import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -327,7 +328,7 @@ export default function StaffNewV8() {
         <div className={layout.main}>
           <fieldset disabled={saving} className="contents">
           {/* ① お客さまに見える情報 */}
-          <section className={layout.card} aria-labelledby="bs-card-info">
+          <Card variant="form" gap="normal" aria-labelledby="bs-card-info">
             <div className={layout.cardHead}><h2 id="bs-card-info" className={layout.cardTitle}>お客さまに見える情報</h2></div>
             <div className={styles.grid}>
               <div className={layout.field}><Field label="スタッフ名（管理画面での呼び名）" htmlFor="bs-name"><SaveErrorField names={["name"]}><input
@@ -361,10 +362,10 @@ export default function StaffNewV8() {
             </div>
             <div className={layout.field}><Field label="紹介文" htmlFor="bs-bio">{/* 絵は1行の高さ。改行も書けるよう textarea のまま、下の角で広げられる。 */}
 <SaveErrorField names={["bio"]}><textarea id="bs-bio" rows={1} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="トリミング歴10年。小型犬が得意です。" className={`${layout.input} ${styles.bio}`} /></SaveErrorField></Field></div>
-          </section>
+          </Card>
 
           {/* ② 予約を受けられるメニュー */}
-          <section className={layout.card} aria-labelledby="bs-card-menus">
+          <Card variant="form" gap="normal" aria-labelledby="bs-card-menus">
             <div className={layout.cardHead}><h2 id="bs-card-menus" className={layout.cardTitle}>予約を受けられるメニュー</h2></div>
             <p className={layout.cardNote}>チェックしたメニューだけ、このスタッフを指名できます。1つも選ばないと予約画面に出ません。</p>
             {menusLoading ? (
@@ -385,12 +386,12 @@ export default function StaffNewV8() {
             ) : (
               <EntitySelect aria-label="予約を受けられるメニュー" noun="予約メニュー" values={[...offered]} onChange={(ids) => setOffered(new Set(ids))} invalid={!!fieldErrors.menus && offered.size === 0} options={menus.map((m) => ({ value: m.id, label: m.name, description: `${m.duration_minutes}分・${priceLabel(m)}` }))} />
             )}
-          </section>
+          </Card>
 
           {fieldErrors.menus && offered.size === 0 ? <p className={layout.fieldError} role="alert">{fieldErrors.menus}</p> : null}
 
           {/* ③ 受付と表示 */}
-          <section className={layout.card} aria-labelledby="bs-card-accept">
+          <Card variant="form" gap="normal" aria-labelledby="bs-card-accept">
             <div className={layout.cardHead}><h2 id="bs-card-accept" className={layout.cardTitle}>受付と表示</h2></div>
             <div className={styles.switchRow} title="個別に変えるときは、登録後に「勤務とシフト」で調整できます。">
               <SettingCheckbox label="店舗の営業時間に合わせる" checked locked />
@@ -414,10 +415,10 @@ export default function StaffNewV8() {
               </span>
               <span className={styles.colorNote}>カレンダーでの見分けに使います</span>
             </div>
-          </section>
+          </Card>
 
           {/* ④ ログインユーザーとのひも付け */}
-          <section className={layout.card} aria-labelledby="bs-card-member">
+          <Card variant="form" gap="normal" aria-labelledby="bs-card-member">
             <div className={layout.cardHead}><h2 id="bs-card-member" className={layout.cardTitle}>ログインユーザーとのひも付け</h2></div>
             <p className={layout.cardNote}>ひも付けると、その人が左メニュー「自分の勤務」で、このスタッフのシフト・休憩・Google カレンダーを決められます。</p>
             {membersLoading ? (
@@ -448,7 +449,7 @@ export default function StaffNewV8() {
                 </span>
               </div>
             )}
-          </section>
+          </Card>
 
           {createdStaffId ? <p className={layout.warnBand} role="status">スタッフは登録済みです。担当メニューの設定が残っています。</p> : null}
           {saveError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{saveError}</Notice> : null}

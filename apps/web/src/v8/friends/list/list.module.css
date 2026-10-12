@@ -186,14 +186,12 @@
 :global(:root) .table td.tdMenu { padding-right: var(--tpl-fr-row-side); }
 
 /*
- * 高さが32px以下の欄だけ、画面外の中身の描画を後回しにする。
- * 文字・操作・行はDOMに残す。名前と対応の欄は常に測るため、行の高さは
- * 最低52pxのまま実データで決まり、戻ってきた欄も同じ位置に描かれる。
+ * 大きな一覧は行を限定して描く。セルも content-visibility で省くと、
+ * 行高やタグ幅を測るたびに画面外のセルを描き直すため、セルは省かない。
+ * 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。
  */
 :global(:root) .table td:is(.tdCheck, .tdStar, .tdMenu, .fixedContent) {
-  content-visibility: auto;
-  contain-intrinsic-block-size: auto var(--tpl-fr-avatar);
-  /* 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。 */
+  contain: layout style paint;
   overflow-clip-margin: var(--tpl-fr-cell-inset);
 }
 

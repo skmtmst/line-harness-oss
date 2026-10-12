@@ -459,38 +459,13 @@ export default function AutomationListV8() {
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">ルールは1人で試してから動かすと、まちがいを防げます。動いた結果は「動いた記録」で見られます。</Notice>
-    </div>
+    null
   )
   /* 1152 の板（En14p）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      {notice}
-      <div className={styles.narrowRow}>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
-          <SearchField
-            value={search}
-            onChange={setSearch}
-            onClear={() => setSearch('')}
-            placeholder="ルール名・きっかけで探す"
-            aria-label="ルールを検索"
-          />
-        </div>
-      </div>
-      <div className={styles.narrowRow}>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
-        {perPageBox}
-      </div>
-    </div>
-  )
+
   const wideToolbar = (
     <>
-      {notice}
+
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
@@ -609,6 +584,7 @@ export default function AutomationListV8() {
             : '行の「…」から 動いた記録を見る。'}{estimatedHoursSaved === null
               ? '削減時間はまだ数えられていません。'
               : `およそ${formatNumber(estimatedHoursSaved)}時間の削減（この30日の実行1回30秒として計算しています）。`}</>}
+      explanation="ルールは1人で試してから動かすと、まちがいを防げます。動いた結果は「動いた記録」で見られます。"
       boardId={narrow ? 'En14p' : viewerOnly ? 'nH9L8' : 'LWQXd'}
       headingSize="regular"
       title="オートメーション"
@@ -641,8 +617,8 @@ export default function AutomationListV8() {
           placeholder="例： 予約・購入"
         />
       </>}
-      collapsedFolders={narrow ? undefined : foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>{createButton(false)}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>{createButton(false)}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={pager}
       overlays={<>
         {folderMove.overlays}

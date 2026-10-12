@@ -43,7 +43,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageCrumbs: () => {},
 }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: (role: string) => role === 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => 'admin', canManageRole: (role: string) => role === 'admin' }))
 
 import WebinarsPage from './page'
 

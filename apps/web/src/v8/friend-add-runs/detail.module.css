@@ -23,7 +23,6 @@
 .stepSub { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-fm2-rd-sub-lh); }
 .failedSub { color: var(--color-danger); }
 /* 時刻だけの2行目は固定版のInterの11/17。 */
-.stepSub[data-kind='time'] { font-family: var(--font-inter), Inter, sans-serif; font-size: var(--text-micro); line-height: var(--tpl-fm2-rd-time-lh); }
 
 .notice { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
 

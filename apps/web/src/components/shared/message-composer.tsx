@@ -8,7 +8,7 @@ import Card from './card'
 import HelpTip from './help-tip'
 import IconButton from './icon-button'
 import InsertTextField, { type InsertTextFieldHandle, type InsertTextFieldProps } from './insert-text-field'
-import MessageInsertRow, { MessageBody } from './message-insert-row'
+import { MessageBody } from './message-insert-row'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { MAX_BUBBLES, MAX_TEXT_LENGTH, messageLengthLabel } from '@/components/broadcasts/message-limits'
 import MessageKindFields, { emptyMessageKindState, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
@@ -69,7 +69,7 @@ function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<Me
   const change = (text: string) => onChange({ ...bubble, content: { ...bubble.content, text } })
   return <MessageBody>
     <InsertTextField ref={ref} aria-label={index ? `${index + 1}通目の本文` : '本文'} placeholder="テキストを入力" maxLength={MAX_TEXT_LENGTH} value={value} onValueChange={change} extraTokens={extraTokens} className={styles.text} />
-    {inserts ? <MessageInsertRow count={messageLengthLabel(value.length)}>{inserts(ref, value, change)}</MessageInsertRow> : <InsertToolbar compact targetRef={ref} value={value} onChange={change} count={messageLengthLabel(value.length)} />}
+    {inserts ? inserts(ref, value, change) : <InsertToolbar compact targetRef={ref} value={value} onChange={change} count={messageLengthLabel(value.length)} />}
   </MessageBody>
 
 }
@@ -88,9 +88,9 @@ export default function MessageComposer(props: MessageComposerProps) {
       const name = String(bubble.content.templateName ?? bubble.content.assetName ?? '')
       const reason = unavailable[bubble.type as ComposerKind]
       const KindIcon = KIND_ICONS[bubble.type] ?? MessageSquare
-      return <Card key={bubble.id} className={styles.bubble} overflow="hidden" aria-label={`${index + 1}通目の吹き出し`}>
+      return <Card key={bubble.id} className={styles.bubble} padding="rows" overflow="hidden" aria-label={`${index + 1}通目の吹き出し`}>
         <div className={styles.header}>
-          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={12} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
+          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={16} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
           <div className={styles.controls}><IconButton size="row" aria-label={`${index + 1}通目を上へ移動`} disabled={busy || index === 0} onClick={() => onMove(index, -1)}><ArrowUp size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を下へ移動`} disabled={busy || index === bubbles.length - 1} onClick={() => onMove(index, 1)}><ArrowDown size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を削除する`} disabled={busy || bubbles.length === 1} onClick={() => onDelete(index)}><Trash2 size={14} aria-hidden /></IconButton></div>
         </div>
         <div className={styles.tabs} role="tablist" aria-label={`${index + 1}通目のメッセージ形式`} onKeyDown={(event) => {

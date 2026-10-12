@@ -178,3 +178,21 @@ test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の
     assert.deepEqual(values, { display: 'block', padding: '0px', border: '0px' });
   } finally { await browser.close(); }
 });
+
+// B-245：説明文の移動で、同じ板の同じ下余白を新しい場所と誤認しない。
+test('板の下余白は題で照合し、説明文が変わっても実寸の悪化を止める', async () => {
+  const { assessAgainstBase } = await import('./layout-defects.mjs')
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const board = (description, padding) => shell(`<section data-page-template="create" style="padding-bottom:${padding}px"><header><h2>レポートを作る</h2>${description}</header><div>内容</div></section>`)
+    await page.setContent(board('',12))
+    const base = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    await page.setContent(board('<button data-screen-explanation-toggle>この画面の説明</button><p data-screen-explanation>説明の本文</p>',12))
+    const same = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    assert.equal(assessAgainstBase(same,base,'/fixture',1152,[]).failures.length,0)
+    await page.setContent(board('<p data-screen-explanation>説明の本文</p>',0))
+    const worse = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    assert.equal(assessAgainstBase(worse,base,'/fixture',1152,[]).failures.length,1)
+  } finally { await browser.close() }
+})

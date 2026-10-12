@@ -112,7 +112,7 @@
   box-shadow: var(--card-shadow);
 }
 :root .form {
-  gap: var(--tpl-cn-card-gap);
+  gap: var(--polish-space-field);
   padding: var(--tpl-cn-card-pad);
 }
 :root .aside {

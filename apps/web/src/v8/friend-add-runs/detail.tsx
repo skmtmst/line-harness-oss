@@ -1,5 +1,6 @@
 'use client'
 
+import { ActivityTime } from '@/components/shared/activity-item'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 
 /*
@@ -326,9 +327,9 @@ function FriendAddRunDetailInner() {
                 <span className={styles.stepIndex}>{index + (messageSent ? 2 : 1)}</span>
                 <span className={styles.stepText}>
                   <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>
-                  <span className={`${styles.stepSub}${state === 'ng' ? ` ${styles.failedSub}` : ''}`} data-kind={message || state === 'wait' ? undefined : 'time'}>
-                    {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
-                  </span>
+                  {message || state === 'wait' ? <span className={`${styles.stepSub}${state === 'ng' ? ` ${styles.failedSub}` : ''}`}>
+                    {message ?? `${time}・実行を待っています`}
+                  </span> : <ActivityTime lineHeight="var(--tpl-fm2-rd-time-lh)">{action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time}</ActivityTime>}
                 </span>
               </Card></li>
             )

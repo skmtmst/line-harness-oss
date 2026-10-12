@@ -63,10 +63,10 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(screen.queryByRole('button', { name: 'フォルダ' })).toBeNull()
   })
 
-  it('左の列が無い（画面が狭い幅で列を外した）ときは出さない。1152 用の道具の段と二重にしない', () => {
+  it('B-244：画面が狭い幅で左の列を外しても、渡されたフォルダの操作を失わない', () => {
     const { container } = render(<ListPageBody folderNav={{ rows, activeId: '', onSelect: () => {} }}>本文</ListPageBody>)
-    expect(collapsedRegion(container)).toBeNull()
-    expect(toolbarRegion(container)).toBeNull()
+    expect(collapsedRegion(container)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'フォルダ' })).toBeTruthy()
   })
 
   it('道具を渡さない画面では、畳んだ段だけの道具の段に印を付ける（広い板では CSS が隠す）', () => {
@@ -89,8 +89,8 @@ describe('一覧の型の CSS：畳んだ段は板が 1100 未満のときだけ
     expect(narrowBlock).toMatch(/\.collapsedFolders \{ display: flex;/)
     expect(narrowBlock).toMatch(/\.toolbar\[data-collapsed-only\] \{ display: flex; \}/)
   })
-  it('選ぶ欄の幅は 1152 の板の値（変数）を使う', () => {
-    expect(css).toMatch(/\.collapsedSelect \{[^}]*width: var\(--tpl-narrow-folder-w\)/)
+  it('選ぶ欄は選択中の名前の実寸を確保する', () => {
+    expect(css).toMatch(/\.collapsedSelect \{[^}]*width: max-content/)
   })
 })
 

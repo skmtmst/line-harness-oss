@@ -5,6 +5,13 @@
  */
 import type { CommonVar, CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { requiredText, type FormRequirement } from '@/lib/form-requirement'
+
+export const reasonRequirement = requiredText('理由を入力してください。')
+export function typedKeyRequirement(impact: CommonVarDeleteImpact | null): FormRequirement {
+  const expected = impact ? placeholderText(impact.variable.varKey) : ''
+  return { required: Boolean(impact?.canDelete), check: value => value.trim() === expected ? null : `確認のため ${expected} を入力してください。` }
+}
 
 export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused' | 'draft' | 'stopped' | 'expired'
 export type CommonVarOrder = 'usage_desc' | 'updated_desc' | 'name_asc'
@@ -131,8 +138,8 @@ export function canDelete(input: {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
-  if (!input.reason.trim()) return false
-  return input.typedKey.trim() === placeholderText(impact.variable.varKey)
+  if (reasonRequirement.check(input.reason)) return false
+  return typedKeyRequirement(impact).check(input.typedKey) === null
 }
 
 /** 押せない理由。**押せないボタンを黙って出さない。** */
@@ -147,10 +154,9 @@ export function blockedReason(input: {
     return `${formatNumber(impact.blockingTotal)}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
-  if (!input.reason.trim()) return '消した理由を入力してください。'
-  if (input.typedKey.trim() !== placeholderText(impact.variable.varKey)) {
-    return `確認のため ${placeholderText(impact.variable.varKey)} を入力してください。`
-  }
+  if (reasonRequirement.check(input.reason)) return '消した理由を入力してください。'
+  const keyProblem = typedKeyRequirement(impact).check(input.typedKey)
+  if (keyProblem) return keyProblem
   return null
 }
 

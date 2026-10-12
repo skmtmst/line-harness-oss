@@ -73,6 +73,10 @@
 }
 
 .status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */

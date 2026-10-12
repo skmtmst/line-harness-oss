@@ -97,7 +97,7 @@ describe('フォルダの行ごとに追加する操作', () => {
     const items = [...document.querySelectorAll('[role="menuitem"]')]
     expect(items[0].textContent).toBe('このフォルダを配る')
     expect(items[0].querySelector('strong')).not.toBeNull()
-    expect(items[1].parentElement?.querySelector('hr')).not.toBeNull()
+    expect(items[1].parentElement?.querySelector('hr')).toBeNull() // B-244：同じ整理の組の中は区切らない。
     await act(async () => (items[0] as HTMLButtonElement).click())
     expect(distribute).toHaveBeenCalledTimes(1)
   })

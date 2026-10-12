@@ -115,6 +115,7 @@ export default function InflowListV8({
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const loadRequestRef = useRef(0)
+  const [openTileMenu, setOpenTileMenu] = useState<string | null>(null)
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
   const [auxiliaryError,setAuxiliaryError]=useState(false)
@@ -881,10 +882,18 @@ export default function InflowListV8({
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
             detail="友だちになっても何も起きない"
-            action={routeCountAvailable && unconfiguredCount > 0 ? {
-              label: '未設定を見る',
-              onClick: () => { setFilter('unconfigured'); setPage(1) },
-            } : undefined}
+            valueMenu={{
+              label: "動きが未設定の経路の操作",
+              open: openTileMenu === "unconfigured",
+              onOpenChange: open => setOpenTileMenu(open ? "unconfigured" : null),
+              items: [{
+                id: 'filter',
+                label: '動きが未設定の経路だけに絞る',
+                disabled: !routeCountAvailable || unconfiguredCount === 0,
+                disabledReason: !routeCountAvailable || unconfiguredCount === 0 ? '動きが未設定の経路はありません' : undefined,
+                onSelect: () => { setFilter('unconfigured'); setPage(1) },
+              }],
+            }}
           />
           <KpiCard
             presentation="band"
@@ -893,7 +902,15 @@ export default function InflowListV8({
             value={adConnected ? adConnected.total : null}
             unit={adConnected ? '件' : ''}
             detail={adNamesSub}
-            action={{ label: '広告連携を開く', href: '/inflow-links?tab=ads' }}
+            valueMenu={{
+              label: "広告とつないだ経路の操作",
+              open: openTileMenu === "ads",
+              onOpenChange: open => setOpenTileMenu(open ? "ads" : null),
+              items: [
+                { id: 'ads', label: '広告連携を開く', external: false, href: '/inflow-links?tab=ads', onSelect: () => router.push('/inflow-links?tab=ads') },
+                { id: 'connections', label: '広告とのつなぎを開く', external: false, href: '/inflow-links?tab=connections', onSelect: () => router.push('/inflow-links?tab=connections') },
+              ],
+            }}
           />
         </KpiBand>
       </>}

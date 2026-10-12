@@ -34,7 +34,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * 打っている途中には出さない（窓の下の帯にも出さない）。
  */
 function CheckedField({ id, label, fields, name, children }: { id: string; label: string; fields: FormErrors; name: string; children: React.ReactNode }) {
-  return <SharedField label={label} htmlFor={id}>{children}<FieldError id={`${id}-error`}>{fields.error(name)}</FieldError></SharedField>
+  return <SharedField label={label} htmlFor={id} requirement={fields.requirement(name)}>{children}<FieldError id={`${id}-error`}>{fields.error(name)}</FieldError></SharedField>
 }
 const checkedProps = (fields: FormErrors, name: string, id: string) => ({ ...fields.bind(name), id, invalid: fields.invalid(name), 'aria-describedby': fields.invalid(name) ? `${id}-error` : undefined })
 
@@ -49,8 +49,8 @@ export function RewardDialog({ open, reward, onClose, onSave }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setName(reward?.name ?? ''); setStamps(reward ? String(reward.stamps) : ''); fields.reset() } }, [open, reward])
   const n = toInt(stamps)
-  fields.define('name', '特典の名前', () => (name.trim() ? null : '特典の名前を入れてください。'))
-  fields.define('stamps', '何個で使えるか', () => (Number.isInteger(n) && n >= 1 ? null : '何個で使えるかを 1 以上の数で入れてください。'))
+  fields.define('name', '特典の名前', () => (name.trim() ? null : '特典の名前を入れてください。'), { required: true })
+  fields.define('stamps', '何個で使えるか', () => (Number.isInteger(n) && n >= 1 ? null : '何個で使えるかを 1 以上の数で入れてください。'), { required: true })
   return (
     <EditorSurface surface={reward ? 'inline' : 'dialog'} open={open} title={reward ? '特典を変える' : '特典を足す'} confirmLabel={reward ? '変える' : '足す'} onCancel={onClose}
       onConfirm={() => { if (fields.submit().length === 0) onSave({ id: reward?.id ?? `reward-${Date.now().toString(36)}`, name: name.trim(), stamps: n }) }}>
@@ -96,13 +96,13 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
     setFrom(toDate(multiplier?.from)); setTo(toDate(multiplier?.to, true))
   }, [open, multiplier]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   const r = Number(rate)
-  fields.define('rate', '倍率', () => (!Number.isFinite(r) || r < 1 || r > 100 ? '倍率は 1〜100 で入れてください。' : null))
-  fields.define('start', '時間の始まり', () => (start === '' && end !== '' ? '始まりも選んでください。' : null))
+  fields.define('rate', '倍率', () => (!Number.isFinite(r) || r < 1 || r > 100 ? '倍率は 1〜100 で入れてください。' : null), { required: true })
+  fields.define('start', '時間の始まり', () => (start === '' && end !== '' ? '始まりも選んでください。' : null), { required: end !== '' })
   fields.define('end', '時間の終わり', () => (
     end === '' && start !== '' ? '終わりも選んでください。'
       : start !== '' && end !== '' && Number(start) >= Number(end) ? '終わりの時間を始まりより後にしてください。' : null
-  ))
-  fields.define('to', '期間の終わり', () => (from && to && from > to ? '期間の終わりを始まりより後にしてください。' : null))
+  ), { required: start !== '' })
+  fields.define('to', '期間の終わり', () => (from && to && from > to ? '期間の終わりを始まりより後にしてください。' : null), { required: false })
   const timeOptions = [{ value: '', label: '指定なし' }, ...MINUTES.map((m) => ({ value: String(m), label: minuteLabel(m) }))]
   const endOptions = [{ value: '', label: '指定なし' }, ...MINUTES.slice(1).map((m) => ({ value: String(m), label: minuteLabel(m) })), { value: '1440', label: '24:00' }]
   return (
@@ -150,7 +150,7 @@ export function BonusDialog({ open, value, onClose, onSave }: { open: boolean; v
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setCount(String(value || 1)); fields.reset() } }, [open, value])
   const n = toInt(count)
-  fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'))
+  fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'), { required: true })
   return (
     <EditorSurface surface={'inline'} open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
       <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><SaveErrorField names={["count"]}><NumberInput numericText {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></SaveErrorField></CheckedField>
@@ -169,7 +169,7 @@ export function RankDialog({ open, settings, onClose, onSave }: {
     if (open) setRows(settings.rankMultipliers.length ? settings.rankMultipliers.map((r) => ({ tagName: r.tagName, multiplier: String(r.multiplier) })) : [{ tagName: '', multiplier: '1.5' }])
   }, [open, settings.rankMultipliers]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   const used = rows.filter((r) => r.tagName.trim())
-  rows.forEach((row, i) => fields.define(`rate-${i}`, `倍率 ${i + 1}`, () => (row.tagName.trim() && !(Number(row.multiplier) >= 1 && Number(row.multiplier) <= 100) ? '倍率は 1〜100 で入れてください。' : null)))
+  rows.forEach((row, i) => fields.define(`rate-${i}`, `倍率 ${i + 1}`, () => (row.tagName.trim() && !(Number(row.multiplier) >= 1 && Number(row.multiplier) <= 100) ? '倍率は 1〜100 で入れてください。' : null), { required: Boolean(row.tagName.trim()) }))
   return (
     <EditorSurface surface={'inline'} open={open} title="会員ランクの倍率" description="友だちに付いたタグの名前ごとに倍率を決めます。いくつも当たるときは、いちばん高い倍率だけを使います。" confirmLabel="変える" onCancel={onClose}
       onConfirm={() => {
@@ -201,7 +201,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, busy, err
   const fields = useFormErrors()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setReason(''); fields.reset() } }, [open])
-  fields.define('reason', '理由', () => (reason.trim() ? null : '理由を入れてください。'))
+  fields.define('reason', '理由', () => (reason.trim() ? null : '理由を入れてください。'), { required: true })
   return (
     <Dialog open={open} title={title} description={description} confirmLabel={confirmLabel} tone="destructive" busy={busy} error={error} onCancel={onClose}
       onConfirm={() => { if (fields.submit().length === 0) onConfirm(reason.trim()) }}>
@@ -219,8 +219,8 @@ export function PinDialog({ open, staff, busy, error, onClose, onSave }: {
   const fields = useFormErrors()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setStaffId(staff[0]?.id ?? ''); setPin(''); fields.reset() } }, [open, staff])
-  fields.define('staff', '店員', () => (staffId ? null : '店員を選んでください。'))
-  fields.define('pin', '暗証番号', () => (/^\d{4}$/.test(pin) ? null : '暗証番号は4桁の数字で入れてください。'))
+  fields.define('staff', '店員', () => (staffId ? null : '店員を選んでください。'), { required: true })
+  fields.define('pin', '暗証番号', () => (/^\d{4}$/.test(pin) ? null : '暗証番号は4桁の数字で入れてください。'), { required: true })
   return (
     <Dialog open={open} title="店員の暗証番号" description="特典を使用済みにするとき、店員がお客さまのスマホで打つ4桁の番号です。保存したあとは番号を表示しません。" confirmLabel="保存する" busy={busy} error={error}
       onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(staffId, pin) }}>

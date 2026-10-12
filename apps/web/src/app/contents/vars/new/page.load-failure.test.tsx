@@ -79,9 +79,9 @@ async function settle() {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
 }
 
-function typeRadio(type: string): HTMLButtonElement {
+function typeRadio(type: string): HTMLInputElement {
   const labels: Record<string, string> = { text: '標準', long_text: '長文', number: '数値', url: 'URL', image: '画像', date: '年月日', datetime: '日時', boolean: 'はい／いいえ' }
-  const radio = [...document.querySelectorAll<HTMLButtonElement>('[role=radio]')].find(el => el.textContent?.startsWith(labels[type]))
+  const radio = [...document.querySelectorAll<HTMLInputElement>('input[type=radio]')].find(el => el.value === type && el.closest('label')?.textContent?.startsWith(labels[type]))
   if (!radio) throw new Error('Missing type option: ' + type)
   return radio
 }

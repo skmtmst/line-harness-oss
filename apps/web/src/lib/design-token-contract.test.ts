@@ -143,9 +143,9 @@ describe('設計の実測値に合わせる', () => {
     expect(BUTTON).toMatch(/border-radius:\s*var\(--radius-control\)/)
     expect(token('radius-control')).toBe('10px')
     expect(BUTTON).toMatch(/font-size:\s*var\(--text-body\)/)
-    expect(BUTTON).toMatch(/:root \.button \{[^}]*font-weight:\s*var\(--tpl-button-weight\)/s)
+    expect(BUTTON).toMatch(/:root \.button\s*{[^}]*font-weight:\s*var\(--tpl-button-weight\)/s)
     expect(token('tpl-button-weight')).toBe('600')
-    expect(BUTTON).toMatch(/:root \.button\.inline\.text \{[^}]*font-weight:\s*var\(--polish-weight-body\)/s)
+    expect(BUTTON).toMatch(/:root \.button\.inline\.text\s*{[^}]*font-weight:\s*var\(--polish-weight-body\)/s)
     expect(token('polish-weight-body')).toBe('400')
     // タッチ端末（pointer: coarse）は44pxの当たり判定を確保する
     expect(BUTTON).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^}]*min-height:\s*44px/s)

@@ -76,7 +76,7 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).toContain('saveStoredCrossRun(accountId')
     expect(PAGE).toContain('clearStoredCrossRun(accountId)')
     expect(PAGE).toContain('crossStartInFlight')
-    expect(PAGE).toContain('Boolean(crossRunId)')
+    expect(PAGE).toContain('crossRunId || loading')
     // 認証切れは再ログイン後に復元できるよう控えを残すが、無限再試行はしない。
     expect(PAGE).toContain('caught.status === 401')
     expect(PAGE).toContain('ログインし直した後、同じ集計を確認できます')

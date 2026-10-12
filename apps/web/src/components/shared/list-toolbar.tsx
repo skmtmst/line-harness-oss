@@ -1,10 +1,11 @@
 'use client'
 import type React from 'react'
 
-import { Children, isValidElement, cloneElement, useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
+import { useRef, useState, useLayoutEffect, Fragment, Children, isValidElement, cloneElement, createContext, useContext, type ReactNode, type HTMLAttributes } from 'react'
 import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
+import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
 import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from './list-toolbar-fit.mjs'
 
@@ -34,6 +35,22 @@ function useToolbarFit() {
     return () => { mutations.disconnect(); cancelAnimationFrame(frame); observer.disconnect() }
   }, [])
   return ref
+}
+
+
+
+/** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
+const LeadingContext = createContext<ReactNode>(null)
+const FrameContext = createContext(false)
+export function ListToolbarLeading({ children, leading }: { children: ReactNode; leading: ReactNode }) {
+  // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
+  const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? Children.toArray(children.props.children) : null
+  const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
+    && (node.type === ListToolbar || node.type === ListToolbarFrame || node.type === Fragment && containsLayout(Children.toArray(node.props.children))))
+  const needsFrame = nodes && nodes.some(node => isValidElement(node) && node.type === ListToolbarRow) && !containsLayout(nodes)
+  const tools = needsFrame ? <ListToolbarFrame>{nodes.map((node, index) => isValidElement(node) && node.type === ListToolbarRow
+    ? node : <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>)}</ListToolbarFrame> : children
+  return <LeadingContext.Provider value={leading}>{tools}</LeadingContext.Provider>
 }
 
 export type ListToolbarSearch = {
@@ -98,9 +115,11 @@ export default function ListToolbar({
   layout?: 'band' | 'stacked'
 }) {
   const ref = useToolbarFit()
+  const leading = useContext(LeadingContext)
   return (
     <div ref={ref} className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1} data-toolbar-tools data-toolbar-row>
+        {leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
         {search ? <div className={styles.search} data-toolbar-search><SearchField
           placeholder={search.placeholder}
           aria-label={search.label ?? search.placeholder}
@@ -110,15 +129,14 @@ export default function ListToolbar({
           maxLength={search.maxLength}
           loading={search.loading}
         /></div> : searchSlot ? <div className={styles.search} data-toolbar-search>{searchSlot}</div> : null}
-        {actions}
       </div>
-      {filters || trailing || sort ? (
+      {filters || secondary || actions || trailing || sort ? (
         <div className={styles.row2} data-toolbar-row>
-          {filters ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}</div> : null}
-          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-end>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</div> : null}
+          {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}{secondary}</div> : null}
+          {actions ? <span className={styles.actions} data-toolbar-actions>{actions}</span> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</div> : null}
         </div>
       ) : null}
-      {secondary ? <div className={styles.secondary} data-toolbar-secondary>{secondary}</div> : null}
     </div>
   )
 }
@@ -126,11 +144,33 @@ export default function ListToolbar({
 /** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
 export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked' }) {
   const ref = useToolbarFit()
-  return <div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>{children}</div>
+  const leading = useContext(LeadingContext)
+  return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>
+    {leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
+    <span className={styles.rowBreak} aria-hidden="true" />{children}
+  </div></FrameContext.Provider>
 }
 
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {
-  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools data-toolbar-row>{compactFilterGroups(children)}</Tag>
+  const leading = useContext(LeadingContext)
+  const inFrame = useContext(FrameContext)
+  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools data-toolbar-row>
+    {!inFrame && leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
+    {!inFrame ? <span className={styles.rowBreak} aria-hidden="true" /> : null}
+    {Children.toArray(compactFilterGroups(children)).map((child, index) => <span key={isValidElement(child) ? child.key ?? index : index} className={styles.slotTool} data-toolbar-role={toolbarRole(child)}>{child}</span>)}
+  </Tag>
+}
+
+/** 保存検査の包みを含め、部品の役目から並べる。画面CSSで順序を上書きしない。 */
+function toolbarRole(node: ReactNode): 'search' | 'filter' | 'sort' | 'count' {
+  if (!isValidElement<{ children?: ReactNode; 'aria-label'?: string; label?: string }>(node)) return 'filter'
+  if (node.type === ListToolbarSearchSlot || node.type === SearchField) return 'search'
+  if (node.type === PageSizeSelect) return 'count'
+  if (node.type === ListToolbarSort) return 'sort'
+  if (/表示件数|1ページ|件表示/.test(node.props['aria-label'] ?? node.props.label ?? '')) return 'count'
+  if (/並び/.test(node.props['aria-label'] ?? node.props.label ?? '')) return 'sort'
+  const roles = Children.toArray(node.props.children).map(toolbarRole)
+  return roles.find(role => role !== 'filter') ?? 'filter'
 }
 
 export function ListToolbarSearchSlot({ children, width }: { children: ReactNode; width?: number }) {
@@ -138,38 +178,23 @@ export function ListToolbarSearchSlot({ children, width }: { children: ReactNode
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span {...props} className={styles.slotsEnd} data-toolbar-end>{children}</span>
+  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{children}</span>
 }
 
-/** 優先度の低い道具。帯に入らないときだけ「…」から同じ操作へ到達する。 */
-export function ListToolbarOptional({ children, label = 'ほかの絞り込み', compact = false }: { children: ReactNode; label?: string; compact?: boolean }) {
-  const ref = useRef<HTMLDetailsElement>(null)
-  const expandedWidthRef = useRef(0)
-  const [collapsed, setCollapsed] = useState(false)
+/** B-244：省略記号へ畳まず、操作名を持つ元の道具を表示する。 */
+export function ListToolbarOptional({ children }: { children: ReactNode; label?: string; compact?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const item = ref.current
-    const owner = item?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
-    const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') ? item?.closest<HTMLElement>('[data-toolbar-row]') ?? owner : owner
-    if (!item || !toolbar || !window.ResizeObserver) return
-    const measure = () => {
-      if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = fitToolbarOptionalWidth(item)
-      setCollapsed(!toolbarContentFit(toolbar, item, expandedWidthRef.current).fits)
-    }
-    let frame = 0
-    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
-    const observer = new ResizeObserver(queue)
-    observer.observe(toolbar)
-    for (const group of toolbar.querySelectorAll('[data-toolbar-tools]')) for (const tool of group.children) observer.observe(tool)
+    if (!item || !window.ResizeObserver) return
+    const measure = () => fitToolbarOptionalWidth(item)
+    const observer = new ResizeObserver(measure)
+    observer.observe(item)
+    for (const child of item.querySelectorAll('button')) observer.observe(child)
     measure()
-    void document.fonts?.ready.then(measure)
-    return () => { cancelAnimationFrame(frame); observer.disconnect() }
-  }, [children, compact])
-  return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
-    onKeyDown={(event) => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}
-    onBlur={(event) => { if (collapsed && !event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.open = false }}>
-    <summary aria-label={label} title={label}>…</summary>
-    <div data-toolbar-optional-content>{children}</div>
-  </details>
+    return () => observer.disconnect()
+  }, [children])
+  return <span ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional><span data-toolbar-optional-content>{children}</span></span>
 }
 
 export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }

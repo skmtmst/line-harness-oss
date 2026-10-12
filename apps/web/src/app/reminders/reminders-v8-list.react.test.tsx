@@ -173,8 +173,8 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
     const labels = [...menu!.querySelectorAll('[role="menuitem"]')]
       .map((item) => item.textContent?.trim())
     expect(labels).toEqual([
-      '詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る',
-      '編集する', '複製する', '一時停止する', 'フォルダへ移す', '削除',
+      'リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理',
+      '編集する', '複製する', 'フォルダへ移す', '一時停止する', '削除',
     ])
     // 板 SkY9V：行の「…」を開いた印
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
@@ -234,7 +234,7 @@ test('v8 の閲覧のみ（a5C1p）は選ぶ枠だけを残し、作る・一括
   await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     const labels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(labels).toEqual(['詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る'])
+    expect(labels).toEqual(['リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理'])
   })
 })
 

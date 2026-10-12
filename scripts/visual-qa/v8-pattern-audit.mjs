@@ -245,6 +245,11 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
       const proof = sourceEvidence(rel, content, m.index, m[0].length)
       if (proof?.comment) continue
+      // 共通の欄・浮く面へ渡す読み上げ属性は、その面を画面が手書きした証拠ではない。
+      if (proof?.imports?.[proof.tag]?.path.startsWith('@/components/') && codeRoot && existsSync(join(codeRoot, 'apps/web/src', proof.imports[proof.tag].path.slice(2) + '.tsx')) && ['role', 'aria-modal', 'aria-invalid'].includes(proof.attribute) && ['raw-dialog', 'raw-alert', 'own-invalid'].includes(signal.id)) continue
+      // 必須・エラーのFieldで正の押したらの欄を包んでも、手書きの選択肢にはならない。
+      if (signal.id === 'more' && pattern.owner?.code?.components?.includes(proof?.tag) && proof.imports?.[proof.tag]?.path.startsWith('@/components/shared/') && p.ownerFiles.some(re => re.test('apps/web/src/' + proof.imports[proof.tag].path.slice(2) + '.tsx'))) continue
+      if (signal.id === 'own-label' && proof?.imports?.[proof.tag]?.path === '@/components/shared/form-controls' && proof.descendantTags?.some(tag => pattern.owner?.code?.components?.includes(tag) && proof.imports?.[tag]?.path.startsWith('@/components/shared/'))) continue
       if (proof?.searchString && ['raw-grid', 'raw-dialog', 'raw-alert', 'raw-check', 'own-listbox'].includes(signal.id)) continue
       if (signal.id === 'own-phone' && proof && !proof.returnsJsx) continue
       if (signal.id === 'own-phone' && ownedReturn(proof, pattern)) continue
@@ -293,10 +298,11 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (signal.id === 'raw-alert' && /^<(Notice|ReadOnlyNotice)\b/.test(content.slice(content.lastIndexOf('<', m.index), m.index))) continue
       if (COMMENT_LINE.test(raw)) continue
       if (p.excludeLine.some((re) => re.test(text))) continue
-      if (seen.has(line)) continue
-      seen.add(line)
+      const hitKey = proof?.jsxStart ?? m.index
+      if (seen.has(hitKey)) continue
+      seen.add(hitKey)
       const jsxShape = proof?.tag && /^(<|role=|aria-)/.test(m[0])
-      const identity = jsxShape ? proof.shapeIdentity : (signal.id === 'own-size' ? raw.trim() : m[0].split('\n')[0].replace(/\s+/g, ' ').trim())
+      const identity = signal.id === 'raw-dialog' && proof?.dialogIdentity ? proof.dialogIdentity : jsxShape ? proof.shapeIdentity : (signal.id === 'own-size' ? raw.trim() : m[0].split('\n')[0].replace(/\s+/g, ' ').trim())
       hits.push({ line, signal: signal.id, why: signal.why, ...(rel.endsWith('.css') ? { identity: canonicalSelector(raw) } : { identity, sourceUnits: proof?.units }), text })
     }
   }
@@ -847,6 +853,21 @@ export function newCodeFindings(before, after, moves = new Map()) {
   })
 }
 
+/** 本文を移した入口が同じ画面を再exportする場合、その行き先を改名と同じ一対一で照合する。 */
+export function forwardedEntryMoves(root, baseRoot) {
+  const moves = new Map()
+  for (const file of walkFiles(join(root, 'apps/web/src/app'))) {
+    const rel = relative(root, file).replace(/\\/g, '/')
+    if (!rel.startsWith('apps/web/src/app/') || !existsSync(join(baseRoot, rel))) continue
+    const source = readFileSync(file, 'utf8').trim()
+    const forward = source.match(/^export\s*\{\s*default\s*\}\s*from\s*['"](@\/v8\/[^'"]+)['"];?$/)
+    if (!forward) continue
+    const target = 'apps/web/src/' + forward[1].slice(2) + '.tsx'
+    if (existsSync(join(root, target))) moves.set(rel, target)
+  }
+  return moves
+}
+
 /** 同じ対応表を base と head に当てる。生の候補を全件残す。 */
 export function checkBase(args, head) {
   if (!args.code) throw new Error('--base には --code が必要です')
@@ -865,6 +886,7 @@ export function checkBase(args, head) {
       const from = changes[i++]
       if (status.startsWith('R')) moves.set(from, changes[i++])
     }
+    for (const [from, to] of forwardedEntryMoves(root, dir)) moves.set(from, to)
     return { sha, moves: Object.fromEntries(moves), findings: newCodeFindings(base, head, moves) }
   } finally {
     rmSync(dir, { recursive: true, force: true })

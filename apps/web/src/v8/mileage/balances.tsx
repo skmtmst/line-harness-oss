@@ -410,9 +410,6 @@ export default function BalancesTab() {
 
   const toolbar = (
     <ListToolbarFrame>
-      <div className={styles.fullRow}>
-        <Notice tone="info">残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。</Notice>
-      </div>
       {approval ? <div className={styles.fullRow}>{approval}</div> : null}
       <MileageToolbar
         narrow={narrow}
@@ -539,6 +536,7 @@ export default function BalancesTab() {
   return (
     <MileageFrame
       help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
           <RefreshCw size={15} aria-hidden="true" /> 残高を再読み込み

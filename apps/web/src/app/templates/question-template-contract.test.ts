@@ -53,14 +53,13 @@ describe('V8 質問テンプレート', () => {
 describe('V8 質問テンプレートの共通の値', () => {
   it('パネルの角丸と影はV8の共通の値を読む', () => {
     expect(page).toContain('<TemplateEditFrame')
-    expect(css).toContain('border-radius: var(--radius-card)')
-    expect(page).toContain('<Card layout="vertical"')
-    const sharedCard = readFileSync(join(HERE, '../../components/shared/card.module.css'), 'utf8')
-    expect(sharedCard).toContain('box-shadow: var(--card-shadow)')
+    expect(page).toContain('<Card variant="form" gap="normal"')
+    const common = readFileSync(join(HERE, '../../components/shared/card.module.css'), 'utf8')
+    expect(common).toContain('box-shadow: var(--card-shadow)')
   })
 
   it('入力欄は共通Fieldと採用済みのV8の寸法を使う', () => {
-    expect(page).toContain('<Field label="質問文（160文字まで）">')
+    expect(page).toContain(`<Field label="質問文（160文字まで）" requirement={fields.requirement('text')}`)
     expect(css).toContain('height: var(--tpl-cn-control-h)')
     expect(css).toContain('font-size: var(--text-body)')
     expect(page).not.toContain('px-3 py-2 text-sm')

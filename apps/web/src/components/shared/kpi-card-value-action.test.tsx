@@ -19,3 +19,15 @@ it('数から既存の内訳を開閉でき、読み込み中は操作できな�
   rerender(<KpiCard {...props} loading />)
   expect(screen.queryByRole('button')).toBeNull()
 })
+
+it('数字を押して操作を開き、項目の処理と閉じる動きを保つ', () => {
+  const onOpenChange = vi.fn(), onSelect = vi.fn()
+  const valueMenu = { label: '経路の操作', open: false, onOpenChange, items: [{ id: 'filter', label: 'この経路だけに絞る', onSelect }] }
+  const { rerender } = render(<KpiCard title="動きが未設定" value={2} unit="件" valueMenu={valueMenu} />)
+  fireEvent.click(screen.getByRole('button', { name: valueMenu.label }))
+  expect(onOpenChange).toHaveBeenCalledWith(true)
+  rerender(<KpiCard title="動きが未設定" value={2} unit="件" valueMenu={{ ...valueMenu, open: true }} />)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'この経路だけに絞る' }))
+  expect(onSelect).toHaveBeenCalledOnce()
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+})

@@ -1489,40 +1489,7 @@ export default function AutoRepliesListV8() {
    * 1152 の板（WPrd5）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame layout="stacked">
-      <Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice>
-      <ListToolbarRow>
-        {canEdit && <CreateRuleButton
-          compact
-          disabled={false}
-          menuOpen={createMenuOpen}
-          onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
-        />}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="ルール名・言葉で探す"
-            aria-label="ルール名・言葉で探す"
-            value={query}
-            onChange={(value) => {
-              setQuery(clampSearchQuery(value))
-              setPage(1)
-            }}
-            onClear={() => {
-              setQuery('')
-              setPage(1)
-            }}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <ListToolbarEnd>{sortBox}<ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>{perPageBox}</ListToolbarEnd>
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
@@ -1530,6 +1497,7 @@ export default function AutoRepliesListV8() {
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
       </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}{kpis.map((kpi) => kpi.help).filter(Boolean).join(" ")}</>}
+      explanation="上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。"
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
@@ -1725,11 +1693,10 @@ export default function AutoRepliesListV8() {
           />
           {folderPanel}
         </>}
-        collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-        noticeSpacing={narrow ? undefined : 'section'}
-        toolbar={narrow ? narrowToolbar : <>
+        collapsedFolders={<>{createButton}{folderSelect}</>}
+        toolbar={<>
           {/* 案内の帯は表の上の主列に置く（板 uE9gf）。左のフォルダの列を押し下げないよう toolbar 枠の先頭に置き、一行を取る。 */}
-          <div style={{ flexBasis: '100%' }}><Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice></div>
+
           {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
           <ListToolbar
             search={{

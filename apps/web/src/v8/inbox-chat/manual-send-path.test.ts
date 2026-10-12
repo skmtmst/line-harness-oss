@@ -7,7 +7,7 @@
  * この経路では付けない（worker の chat-attachments.test.ts も「付けない」を見ている）。
  * 予約した送信（あとで自動で出る）も手動の印は付けない。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'

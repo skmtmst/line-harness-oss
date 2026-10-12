@@ -720,12 +720,15 @@
             "apps/web/src/components/shared/pagination.module.css",
             "apps/web/src/components/ui/page-size-select.tsx",
             "apps/web/src/components/ui/list-range.tsx",
-            "apps/web/src/components/shared/page-size-select.tsx"
+            "apps/web/src/components/shared/page-size-select.tsx",
+            "apps/web/src/components/shared/inbox-list.tsx",
+            "apps/web/src/components/shared/inbox-list.module.css"
           ],
           "components": [
             "Pagination",
             "PageSizeSelect",
-            "ListPagePagination"
+            "ListPagePagination",
+            "InboxHistoryButton"
           ],
           "vars": []
         },
@@ -743,11 +746,6 @@
           "pagination|pager"
         ],
         "signals": [
-          {
-            "id": "own-range-text",
-            "re": "(?:summary=\\{\\s*|\\b(?:const|let)\\s+(?:pagerSummary|summary)\\s*=\\s*)`[^`]{0,500}(?:件中|人中)",
-            "why": "ページ送りの件数文を画面で組む（Pagination.rangeへ数値を渡す）"
-          },
           {
             "id": "own-size",
             "re": "\\b(const|let)\\s+\\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\\w*\\s*=",
@@ -886,8 +884,7 @@
             "apps/web/src/components/shared/dialog.tsx",
             "apps/web/src/components/shared/dialog.module.css",
             "apps/web/src/components/shared/confirm-dialog.tsx",
-            "apps/web/src/components/shared/overlay-utils.ts",
-            "apps/web/src/components/shared/action-words.ts"
+            "apps/web/src/components/shared/overlay-utils.ts"
           ],
           "components": [
             "Dialog",
@@ -2516,8 +2513,7 @@
             "apps/web/src/components/shared/button.tsx",
             "apps/web/src/components/shared/button.module.css",
             "apps/web/src/components/shared/icon-button.tsx",
-            "apps/web/src/components/shared/icon-button.module.css",
-            "apps/web/src/components/shared/action-words.ts"
+            "apps/web/src/components/shared/icon-button.module.css"
           ],
           "components": [
             "Button",
@@ -2684,8 +2680,7 @@
             "SegmentedControl",
             "RadioCard",
             "RadioCardGroup",
-            "CheckCard",
-            "UnavailableSelection"
+            "CheckCard"
           ],
           "vars": [
             "--shadow-controls-toggle"
@@ -3022,6 +3017,216 @@
           "apps/web/src/components/shared/folder-select-rollout-contract.test.ts"
         ],
         "needed": ""
+      }
+    },
+    {
+      "id": "inbox-frame",
+      "name": "受信箱の列・入力・補助面",
+      "role": "受信箱の列と会話の媒体、返信入力、保存した検索と内部メモの補助面",
+      "rules": [
+        "§2",
+        "§6.12",
+        "B-152",
+        "B-172"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/inbox-page.tsx",
+            "apps/web/src/components/shared/inbox-composer.tsx",
+            "apps/web/src/components/shared/inbox-composer.module.css",
+            "apps/web/src/components/shared/inbox-content.tsx",
+            "apps/web/src/components/shared/inbox-content.module.css",
+            "apps/web/src/components/shared/inbox-list.tsx",
+            "apps/web/src/components/shared/inbox-list.module.css",
+            "apps/web/src/components/shared/inbox-thread.tsx",
+            "apps/web/src/components/shared/inbox-thread.module.css"
+          ],
+          "components": [
+            "InboxPage",
+            "InboxListPane",
+            "InboxConversationPane",
+            "InboxMessages",
+            "InboxComposer",
+            "InboxSummaryPane",
+            "InboxComposerTools",
+            "InboxToolButton",
+            "InboxInputBox",
+            "InboxDraftArea",
+            "InboxDraftCount",
+            "InboxComposerBottom",
+            "InboxComposerActions",
+            "InboxMedia",
+            "InboxFlexContent",
+            "InboxFloatingPanel",
+            "InboxInfoBackdrop",
+            "InboxEmailHeading",
+            "InboxListHeader",
+            "InboxListHeadline",
+            "InboxListSearch",
+            "InboxFilterControls",
+            "InboxMessage",
+            "InboxMessageDay",
+            "InboxQuotedMessage",
+            "InboxHistoryButton"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "eovoG",
+            "name": "受信箱"
+          }
+        ]
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/app/chats/quote-schedule-react.test.tsx",
+          "apps/web/src/components/support/email-thread-react.test.tsx"
+        ],
+        "needed": "絵との照合はF組の測定と左右画像で確認する。"
+      }
+    },
+    {
+      "id": "screen-explanation",
+      "name": "この画面の説明",
+      "role": "人ごと・画面ごとに開閉を覚える説明",
+      "rules": [
+        "§6.44",
+        "B-245"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/screen-explanation.tsx",
+            "apps/web/src/components/shared/screen-explanation.module.css"
+          ],
+          "components": [
+            "ScreenExplanation"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "save-feedback",
+      "name": "保存の4つの状態",
+      "role": "送信中・成功・失敗・一部成功と残りだけの再試行",
+      "rules": [
+        "§6.45",
+        "B-246 D1"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/save-feedback.tsx"
+          ],
+          "components": [
+            "SaveFeedback",
+            "useSaveFeedback"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "friend-filter-band",
+      "name": "お客さまで絞った一覧の帯",
+      "role": "名前をURLへ入れず絞り込み解除と詳細への帰り道を示す",
+      "rules": [
+        "§6.46",
+        "B-247 E1"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/friend-filter-band.tsx",
+            "apps/web/src/components/shared/friend-filter-band.module.css"
+          ],
+          "components": [
+            "FriendFilterBand"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "aggregation-status",
+      "name": "集計の状態",
+      "role": "未集計・集計中・失敗・完成と再試行",
+      "rules": [
+        "§6.46",
+        "B-247 E2"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/aggregation-status.tsx"
+          ],
+          "components": [
+            "AggregationStatus"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
       }
     },
     {

@@ -37,10 +37,10 @@ describe('R31 一覧のまとめは直近7日にそろえる', () => {
     expect(host.textContent).toContain('直近7日の送信')
     expect(host.textContent).toContain('経路が分からなかった人')
     // 司令塔の10-11指示：帯の補足は題の横の「？」へまとめる。
-    const help = host.querySelector<HTMLButtonElement>('[aria-label="友だち追加時の配信の説明"]')!
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="友だち追加時の配信の説明"]')!
     expect(help).not.toBeNull()
     await act(async () => { help.click() })
-    const note = document.querySelector('[role="note"]')?.textContent
+    const note = document.querySelector('[role="note"][id]')?.textContent
     expect(note).toContain('直近7日')
     expect(note).toContain('実際に送った通数')
 

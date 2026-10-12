@@ -1,5 +1,11 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  exportReason: requiredText("書き出す理由を入れてください。"),
+}
+
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { RowNameLink } from '@/components/shared/table'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -143,7 +149,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const closeExport = () => { if (busy === 'csv') return; setExportError(''); setExportReasonError(''); onExportClose() }
   const exportCsv = async () => {
     if (!lineAccountId || busy) return
-    if (!exportReason.trim()) {
+    if ((b244Requirements.exportReason.check(exportReason) !== null)) {
       setExportReasonError('書き出す理由を入れてください。')
       exportReasonRef.current?.focus()
       exportReasonRef.current?.scrollIntoView?.({ block: 'center' })
@@ -178,7 +184,6 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       <KpiCard presentation="band" icon={<CircleX size={14} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
     </KpiBand>
 
-    <Notice tone="info" icon={null}>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</Notice>
 
     <div className={styles.toolbar}>
       <div className={styles.opSearch}>
@@ -256,7 +261,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       onConfirm={() => exportCsv()}
       onCancel={closeExport}
     >
-      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError}><SaveErrorField names={["exportReason","exportReasonError","export_reason","export_reason_error"]}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></SaveErrorField></Field>
+      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError} requirement={b244Requirements.exportReason}><SaveErrorField names={["exportReason","exportReasonError","export_reason","export_reason_error"]}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></SaveErrorField></Field>
     </ConfirmDialog>
   </>
 }

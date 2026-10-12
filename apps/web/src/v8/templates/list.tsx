@@ -999,38 +999,7 @@ export default function TemplatesListV8() {
   )
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame layout="stacked">
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>
-          <SaveErrorField names={["selectedCategory","selected_category"]}><Select
-            aria-label="フォルダ"
-            value={selectedCategory}
-            onChange={(value) => {
-              setSelectedCategory(value)
-              setPage(1)
-            }}
-            options={folderSelectOptions}
-          /></SaveErrorField>
-        </div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            aria-label="テンプレートを検索"
-            placeholder="名前・本文で探す"
-            value={templateQuery}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.spacer} aria-hidden="true" />
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <ListToolbarEnd>{savedBox(true)}{perPageBox}</ListToolbarEnd>
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1699,9 +1668,9 @@ export default function TemplatesListV8() {
           ))}
         </KpiBand>
       }
-      folderNav={narrow ? undefined : { rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
+      folderNav={{ rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
       folders={folderPanel}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      toolbar={wideToolbar}
       pagination={listPager}
       overlays={overlays}
     >

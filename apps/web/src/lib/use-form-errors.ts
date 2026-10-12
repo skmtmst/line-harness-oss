@@ -10,6 +10,8 @@ export type FormFieldProblem = {
 
 /** `define` の第4引数。隠れた所にある欄の開け方と、印を数える束。 */
 export type FormFieldOptions = {
+  /** B-244：保存の検査と必須の札の正本。 */
+  required?: boolean
   /**
    * 欄が隠れた所（別のカード・別のタブ・閉じた段・別の手順）にあるとき、
    * そこを開く関数。「1つ目へ」・保存で落ちたときに、移る前に呼ぶ（B-139）。
@@ -191,7 +193,8 @@ export function useFormErrors() {
    * ref で要素を覚えて「1つ目へ移る」に使う。プルダウン・画像の枠などの
    * 束の枠（div）に付けてもよい（移るときは中の1つ目の押せる所へ）。
    */
-  const bind = (key: string): { onBlur: () => void; ref: (el: HTMLElement | null) => void } => ({
+  const bind = (key: string): { 'aria-required'?: boolean; onBlur: () => void; ref: (el: HTMLElement | null) => void } => ({
+    'aria-required': defsRef.current.get(key)?.required,
     onBlur: () => touch(key),
     ref: (el) => {
       if (!el) {
@@ -325,7 +328,8 @@ export function useFormErrors() {
     bump((v) => v + 1)
   }
 
-  return { register, registerReveal, define, error, errorFor, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }
+  const requirement = (key: string) => ({ required: Boolean(defsRef.current.get(key)?.required) })
+  return { register, registerReveal, define, requirement, error, errorFor, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }
 }
 
 export type FormErrors = ReturnType<typeof useFormErrors>

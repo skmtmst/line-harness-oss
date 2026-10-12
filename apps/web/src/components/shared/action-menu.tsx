@@ -2,13 +2,17 @@
 import { normalizeActionLabel } from './action-words'
 
 import Link, { useListNavigationHref } from './list-navigation'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Eye, Pencil, Pause, Trash2 } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
 import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
+export type ActionMenuGroup = 'view' | 'manage' | 'destructive'
+
 export type ActionMenuItem = {
+  /** B-244：見る／変える・整理する／止める・消す。権限と動きは項目側で保つ。 */
+  group?: ActionMenuGroup
   id: string
   label: string
   icon?: ReactNode
@@ -45,6 +49,28 @@ export type ActionMenuItem = {
    */
   qaOpen?: string
   onSelect?: () => void
+}
+
+/** B-244：旧い呼び口も同じ順で表示する。渡された配列と操作は変更しない。 */
+export function actionMenuGroup(item: ActionMenuItem): ActionMenuGroup {
+  if (item.tone === 'danger' || (!/再開|復元/.test(item.label) && /停止|止める|削除|消す|取り消|取消|取り下げ|保管する/.test(item.label))) return 'destructive'
+  if (item.group) return item.group
+  return /見る|確認|開く|戻る|履歴|結果|プレビュー|ダウンロード|コピー/.test(item.label) && !/編集|変更|再|更新|複製/.test(item.label) ? 'view' : 'manage'
+}
+
+export function orderActionMenuItems(items: ActionMenuItem[]): ActionMenuItem[] {
+  const groups: ActionMenuGroup[] = ['view', 'manage', 'destructive']
+  const titles = { view: '見る', manage: '変える・整理する', destructive: '止める・消す' }
+  let previous: ActionMenuGroup | undefined
+  return groups.flatMap(group => items.filter(item => actionMenuGroup(item) === group).map(item => {
+    const first = previous !== group
+    const dividerBefore = first && previous !== undefined
+    previous = group
+    const Icon = group === 'view' ? Eye : group === 'manage' ? Pencil : /削除|消す/.test(item.label) ? Trash2 : Pause
+    return { ...item, group, tone: group === 'destructive' ? 'danger' as const : item.tone,
+      icon: item.icon ?? <Icon size={16} aria-hidden="true" />,
+      dividerBefore, sectionBefore: first && items.length >= 5 ? titles[group] : undefined }
+  }))
 }
 
 export type ActionMenuProps = {
@@ -183,11 +209,11 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {items.map((item) => {
+      {orderActionMenuItems(items).map((item) => {
         const itemLabel = normalizeActionLabel(item.label)
         const Item = item.href && !item.disabled ? 'a' : 'button'
         return (
-        <div key={item.id}>
+        <div key={item.id} data-menu-group={item.group}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
           {item.sectionBefore ? (
             <p className={styles.section} role="presentation">

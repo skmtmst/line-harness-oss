@@ -34,7 +34,7 @@ import type { FormEditHost } from './host';
 import { conflictMessage, conflictTitle, describeConflictDiff, describePublishChanges, firstInputBlockId, formSavedContentMatches, ogImageUrlError, readPage, readTab, type ConflictSide, type EditTab, type FormSavedContent } from './model';
 import { ContentTab } from './content-tab';
 import { AfterTab } from './after-tab';
-import { AppearanceTab } from './appearance-tab';
+import { AppearanceTab, formNameRequirement } from './appearance-tab';
 import { FormEditAttemptContext } from './field-issues';
 import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
@@ -523,7 +523,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   type SaveProblem = { message: string; name?: boolean; tab?: EditTab; target?: string; page?: number; blockId?: string; inline?: boolean }
   const saveProblem = (publishAfter: boolean): SaveProblem | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
-    if (!name.trim()) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
+    if (formNameRequirement.check(name)) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
     const untitledPage = layout.sections.findIndex((s) => s.blocks.some((b) => b.kind === 'input' && !b.label.trim()))
     if (untitledPage >= 0) {

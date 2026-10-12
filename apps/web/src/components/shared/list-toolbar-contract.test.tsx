@@ -5,7 +5,8 @@ const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from './list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from './list-toolbar'
+import PageSizeSelect from './page-size-select'
 
 afterEach(cleanup)
 
@@ -17,6 +18,15 @@ describe('B-178 共通の道具の段の操作', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('予約'))
     fireEvent.click(screen.getByRole('button', { name: /消/ }))
     expect(onChange).toHaveBeenCalledWith('')
+  })
+
+  it('保存した条件の操作を2段目の口へ渡し、元のイベントを保つ', () => {
+    const useCondition = vi.fn()
+    render(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} actions={<button onClick={useCondition}>保存した条件</button>} />)
+    const action = screen.getByRole('button', { name: '保存した条件' })
+    expect(action.closest('[data-toolbar-actions]')).toBeTruthy()
+    fireEvent.click(action)
+    expect(useCondition).toHaveBeenCalledOnce()
   })
 
   it('読み上げ名が省略されたときは探す欄の説明を使う', () => {
@@ -32,6 +42,36 @@ describe('B-178 共通の道具の段の操作', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '表示件数' }), { target: { value: '50件' } })
     expect(filter).toHaveBeenCalledOnce()
     expect(size).toHaveBeenCalledOnce()
+  })
+
+  it('字ラベルを省略した表示件数も共通の件数の役目として右端へ渡す', () => {
+    render(<ListToolbarRow><button>よく使う絞り込み</button><PageSizeSelect label={null} value={20} onChange={vi.fn()} /></ListToolbarRow>)
+    const count = screen.getByRole('button', { name: '表示件数' })
+    expect(count.closest('[data-toolbar-role="count"]')).toBeTruthy()
+    expect(count.closest('[data-toolbar-role="filter"]')).toBeNull()
+  })
+
+  it('断片の道具も型の口でまとめ、作る・検索・件数の役目とフォーム送信を保つ', () => {
+    const submit = vi.fn((event: React.FormEvent) => event.preventDefault())
+    render(<ListToolbarLeading leading={<button>タグを作る</button>}><>
+      <ListToolbarSearchSlot><input aria-label="タグを探す" /></ListToolbarSearchSlot>
+      <ListToolbarRow as="form" onSubmit={submit}><PageSizeSelect label={null} value={20} onChange={vi.fn()} /><button type="submit">検索する</button></ListToolbarRow>
+    </></ListToolbarLeading>)
+    const search = screen.getByRole('textbox', { name: 'タグを探す' })
+    expect(search.closest('[data-toolbar-role="search"]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '表示件数' }).closest('[data-toolbar-role="count"]')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'タグを作る' })).toHaveLength(1)
+    fireEvent.submit(screen.getByRole('button', { name: '検索する' }).closest('form')!)
+    expect(submit).toHaveBeenCalledOnce()
+  })
+
+  it('入れ子の断片に既存の道具の型があれば二重に包まず、作る操作を保つ', () => {
+    const { container } = render(<ListToolbarLeading leading={<button>流入リンクを作る</button>}><><>
+      <ListToolbar search={{ placeholder: '流入元を探す', value: '', onChange: vi.fn() }} />
+    </></></ListToolbarLeading>)
+    expect(container.querySelectorAll('[data-toolbar-layout="band"]')).toHaveLength(1)
+    expect(container.querySelector('[data-toolbar-layout="slots"]')).toBeNull()
+    expect(screen.getAllByRole('button', { name: '流入リンクを作る' })).toHaveLength(1)
   })
 
   it('フォームを共通の段へ移しても検索の送信と条件操作を保つ', () => {
@@ -88,8 +128,9 @@ describe('B-178 共通の道具の段の操作', () => {
   it('畳む道具がないV8一覧では実際の空き幅に合わせて折り返す', () => {
     const css = read('list-toolbar.module.css')
     expect(css).toMatch(/:root\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
-    // 「…」へ畳む一覧と、段を明示する一覧の指定は残す。
-    expect(css).toContain('.optional[data-collapsed] > summary')
+    // B-244：名前の無い「…」へ畳まず、狭い白い板で2段にする。
+    expect(css).not.toContain('.optional[data-collapsed] > summary')
+    expect(css).toContain('@container v8-page (max-width: 1099px)')
     expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
   })
 

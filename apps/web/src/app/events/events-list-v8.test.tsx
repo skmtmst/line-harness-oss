@@ -184,7 +184,7 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     await act(async () => { menuButton!.click() })
     await flush()
     const labels = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((m) => m.textContent)
-    expect(labels.some((t) => t?.includes('中身を見る')), '中身を見る').toBe(true)
+    expect(labels.some((t) => t?.includes('イベントの設定を見る')), 'イベントの設定を見る').toBe(true)
     expect(labels.some((t) => t?.includes('申込者を見る')), '申込者を見る').toBe(true)
     expect(labels.some((t) => t?.includes('プレビュー')), 'プレビュー').toBe(true)
     expect(labels.some((t) => t?.includes('削除する')), '削除する').toBe(true)

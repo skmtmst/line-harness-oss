@@ -379,6 +379,8 @@ type FieldBase = {
   listFooter?: ReactNode
   state?: ReactNode
   placeholder?: string
+  valuePrefix?: string
+  compact?: boolean
   disabled?: boolean
   readOnly?: boolean
   invalid?: boolean
@@ -424,7 +426,7 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
   color?: string | null
@@ -436,12 +438,14 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   onClear?: () => void
   selection?: ReactNode
   ariaLabel?: string
+  valuePrefix?: string
+  compact?: boolean
 }) {
   const field = useFieldContext()
   const empty = !name
   const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
   const isInvalid = invalid || Boolean(field?.invalid)
-  return <div className={styles.field} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
+  return <div className={styles.field} data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
       disabled={disabled} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
       aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}
@@ -449,12 +453,12 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
       {empty ? <span className={styles.fieldPlaceholder}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
-        <TagPill name={name} color={color} aria-label={`選択中の${noun}：${name}`} />
+        <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size={compact ? 'sm' : 'md'} name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
     {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
-    {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty ? actionLabel : null}<ChevronRight size={16} /></span>}
+    {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix ? actionLabel : null}<ChevronRight size={16} /></span>}
   </div>
 }
 
@@ -481,8 +485,8 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const pickedColor = props.multiple ? undefined : items.find(item => item.id === props.value)?.color
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
-      ariaLabel={props.ariaLabel}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
+      ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} compact={props.compact}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null

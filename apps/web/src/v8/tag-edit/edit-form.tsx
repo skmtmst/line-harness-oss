@@ -11,6 +11,7 @@ import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api
 import { formatDay } from '@/lib/format';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -251,7 +252,7 @@ export function TagEditForm({
         {error ? <Notice tone="danger" message={error} /> : null}
         {/* 閲覧のみには入力の部品・押す口を置かず、いまの値を文字で見せる（2026-10-06 オーナー決定）。 */}
         <fieldset disabled={saving || readOnly} className={styles.fieldset}>
-          <section className={styles.card} aria-label="基本">
+          <Card variant="form" gap="normal" aria-label="基本">
             <h2 className={styles.cardTitle}>基本</h2>
             <div className={styles.field}><Field label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><SaveErrorField names={["name", "tag.name", "definition.tag.name"]}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></SaveErrorField></Field>}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field></div>
@@ -270,9 +271,10 @@ export function TagEditForm({
               </div>
               {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["isStarred","is_starred"]}><SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>}
             </div>
-          </section>
+          </Card>
 
-          <section className={styles.card} aria-label="タグ連動" ref={actionsRef}>
+          <section aria-label="タグ連動" ref={actionsRef}>
+            <Card variant="form" gap="normal">
             <div className={styles.cardHead}>
               <div className={styles.cardTitles}>
                 <div className={styles.titleRow}>
@@ -304,10 +306,11 @@ export function TagEditForm({
                 ) : <p className={styles.emptyBox}>連動はオフです。右上のスイッチをオンにすると、付いたときの動きとマイルを決められます。</p>}
               </>
             ) : null}
+            </Card>
           </section>
 
           {linked || host ? (
-            <section className={styles.card} aria-label="マイル">
+            <Card variant="form" gap="normal" aria-label="マイル">
               <div className={styles.cardTitles}>
                 <h2 className={styles.cardTitle}>マイル</h2>
                 <div className={styles.noteRow}>
@@ -378,7 +381,7 @@ export function TagEditForm({
                   )}
                 </>
               ) : null}
-            </section>
+            </Card>
           ) : null}
         </fieldset>
       </CreatePage>

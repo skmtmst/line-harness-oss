@@ -11,9 +11,11 @@ export function useTableActionWidth<T extends HTMLElement>() {
     const view = table.ownerDocument.defaultView
     if (!view?.requestAnimationFrame || !view.cancelAnimationFrame) return
     let frame = 0
+    let disposed = false
     const measure = () => {
-      view.cancelAnimationFrame(frame)
+      if (disposed || frame) return
       frame = view.requestAnimationFrame(() => {
+        frame = 0
         const buttons = [...table.querySelectorAll<HTMLElement>('[data-row-actions] > :is(button,a):not([data-row-menu]), [data-row-quick-action], [data-list-action-cell] :is(button,a):not([data-row-menu])')]
           .filter(el => el.getBoundingClientRect().width > 0)
         // width は伸ばした後の値なので使わない。自然な中身の幅で最大を取る。
@@ -22,7 +24,8 @@ export function useTableActionWidth<T extends HTMLElement>() {
           const css = getComputedStyle(el)
           return (typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect().width : 0) + parseFloat(css.paddingLeft || '0') + parseFloat(css.paddingRight || '0') + parseFloat(css.borderLeftWidth || '0') + parseFloat(css.borderRightWidth || '0')
         }))
-        table.style.setProperty('--row-action-width', `${Math.ceil(width)}px`)
+        const value = `${Math.ceil(width)}px`
+        if (table.style.getPropertyValue('--row-action-width') !== value) table.style.setProperty('--row-action-width', value)
       })
     }
     const Observer = table.ownerDocument.defaultView?.MutationObserver
@@ -32,7 +35,7 @@ export function useTableActionWidth<T extends HTMLElement>() {
     sizes?.observe(table)
     void document.fonts?.ready.then(measure)
     measure()
-    return () => { view.cancelAnimationFrame(frame); mutations?.disconnect(); sizes?.disconnect() }
+    return () => { disposed = true; view.cancelAnimationFrame(frame); mutations?.disconnect(); sizes?.disconnect() }
   }, [])
   return ref
 }

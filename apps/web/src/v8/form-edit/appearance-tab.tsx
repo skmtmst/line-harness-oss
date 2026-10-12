@@ -1,4 +1,7 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+export const formNameRequirement = requiredText('フォーム名を入力してください')
+
 
 import Card from '@/components/shared/card'
 import { useRef, useState } from 'react'
@@ -259,7 +262,7 @@ export function AppearanceTab(props: Props) {
           <h2 id="fe-about-title" className={styles.cardTitle}>フォームのこと</h2>
           <p className={styles.cardNote}>名前は一覧と題に出ます。覚え書きはお客さまには出ません。</p>
         </div>
-        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name"><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onBlur={props.onBlurName} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
+        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name" requirement={formNameRequirement}><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onBlur={props.onBlurName} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
 {props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}</Field></div>
         <div className={styles.field}><Field label="覚え書き" htmlFor="fe-desc"><SaveErrorField names={["description","props.description"]}><TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} /></SaveErrorField></Field></div>
       </Card>

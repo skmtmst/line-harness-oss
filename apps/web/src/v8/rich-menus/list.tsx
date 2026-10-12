@@ -906,35 +906,11 @@ export default function RichMenusListV8() {
     </div>
   )
   const priorityNotice = (
-    <Notice tone="info" icon={<ListOrdered size={16} />} className={styles.priorityNotice}>
-      {PRIORITY_NOTE}
-    </Notice>
+    null
   )
 
   /* 1152 の板（Y9ASp）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame layout="stacked">
-      {priorityNotice}
-      <ListToolbarRow>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="メニュー名・ボタン名"
-            aria-label="メニュー名・ボタン名で探す"
-            value={query}
-            onChange={(value) => {
-              setQuery(clampSearchQuery(value))
-              setPage(1)
-            }}
-            onClear={() => setQuery('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.spacer} aria-hidden="true" />
-      </ListToolbarRow>
-      <ListToolbarRow>{filterChips}<ListToolbarEnd>{sortBox}{perPageBox}</ListToolbarEnd></ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <>
@@ -1299,6 +1275,7 @@ export default function RichMenusListV8() {
       headingSize="regular"
       title="リッチメニュー"
       help="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
+      explanation="上のメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、いちばん上の1つだけが出ます。順番は行の左のつまみで入れ替えます。"
       actions={
         <Button
           type="button"
@@ -1367,7 +1344,7 @@ export default function RichMenusListV8() {
       </>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: (id) => { setFolderFilter(id); setPage(1) }, createAction: createButton ?? undefined }}
       folders={narrow ? undefined : folderPanel}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      toolbar={wideToolbar}
       pagination={listPager}
       overlays={<>
 

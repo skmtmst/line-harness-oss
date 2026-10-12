@@ -236,7 +236,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                   const personId = mergedPersonIdOf(row)
                   const open = expanded === row.identityKey
                   const items: ActionMenuItem[] = [
-                    ...(personId ? [{ id: 'open', label: '詳細を見る', onSelect: () => onOpen(personId) }] : []),
+                    ...(personId ? [{ id: 'open', label: "友だちの詳細を見る", onSelect: () => onOpen(personId) }] : []),
                     { id: 'accounts', label: open ? '登録アカウントを閉じる' : '登録アカウントを見る', onSelect: () => setExpanded(open ? null : row.identityKey) },
                   ]
                   const main = (

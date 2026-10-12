@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowRight, ChartNoAxesColumn, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
+import ActionMenu, { type ActionMenuItem } from './action-menu'
 import { isKpiNumberText } from './kpi-number-text'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
@@ -48,6 +49,7 @@ export type KpiCardProps = {
    * `x?.y` をそのまま渡しても画面ごと落ちない。**0 は 0 のまま出す。**
    */
   /** B-145：数の帯に『…』を置かず、数から既存の内訳を開く。 */
+  valueMenu?: { label: string; open: boolean; items: ActionMenuItem[]; onOpenChange: (open: boolean) => void }
   valueAction?: { label: string; expanded: boolean; onClick: () => void }
   value: number | null | undefined
   unit: string
@@ -132,6 +134,7 @@ export default function KpiCard({
   menu,
   value,
   valueAction,
+  valueMenu,
   unit,
   unitSpacing = 'normal',
   signed = false,
@@ -157,6 +160,7 @@ export default function KpiCard({
   valueTextWithUnit = false,
   ...cardProps
 }: KpiCardProps) {
+  const valueRef = React.useRef<HTMLButtonElement>(null)
   const classes = [styles.card, className].filter(Boolean).join(' ')
 
   /*
@@ -230,7 +234,7 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          {valueAction ? (
+          {valueMenu ? <button ref={valueRef} type="button" className={styles.valueAction} aria-label={valueMenu.label} aria-haspopup="menu" aria-expanded={valueMenu.open} onClick={() => valueMenu.onOpenChange(!valueMenu.open)}>{numberAndUnit}</button> : valueAction ? (
             <button type="button" className={styles.valueAction} aria-label={valueAction.label} aria-expanded={valueAction.expanded} onClick={valueAction.onClick}>{numberAndUnit}</button>
           ) : numberAndUnit}
 
@@ -241,6 +245,7 @@ export default function KpiCard({
       {delta ? <span className={styles.delta}>{delta}</span> : null}
       </div>
 
+      {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
         <span role="note" className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (

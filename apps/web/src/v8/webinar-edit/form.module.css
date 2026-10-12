@@ -1,19 +1,5 @@
 /* ★V8 ウェビナーの作る手順の段の中身（j7PP04・VWNaA・LPOe7・Q0Jrk・E7iAYs・XCUNf）で共通の箱と欄。 */
 
-/* 段のカード：線1・角12・内側20・中の間14。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wc-card-gap);
-  min-width: 0;
-  padding: var(--tpl-wc-an-card-pad);
-  border-radius: var(--tpl-wc-card-radius);
-
-  background: var(--color-canvas);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-}
-.card[data-gap='tight'] { gap: var(--tpl-wc-an-gap); }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-wc-cm-head-gap); min-width: 0; }
 .cardHeadRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
 .cardTitle {

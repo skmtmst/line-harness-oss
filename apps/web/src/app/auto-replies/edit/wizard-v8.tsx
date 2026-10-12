@@ -1548,7 +1548,7 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
+    <SaveErrorScope errors={saveErrors}><CreatePage footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (

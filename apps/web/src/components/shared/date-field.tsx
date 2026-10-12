@@ -170,7 +170,7 @@ export default function DateField({
         aria-controls={open ? dialogId : undefined}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        aria-invalid={invalid || undefined}
+        aria-required={field?.required || undefined} aria-invalid={invalid || undefined}
         aria-describedby={joinDescribedBy(ariaDescribedBy, field?.describedBy)}
         data-open={open || undefined}
         onClick={() => (open ? setOpen(false) : openCalendar())}
