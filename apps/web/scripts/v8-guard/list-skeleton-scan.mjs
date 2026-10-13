@@ -138,7 +138,7 @@ export function scanListSkeleton() {
     }
     if (root.scrollWidth > root.clientWidth + 1) fail('B-178 一覧のはみ出し', root)
   }
-  return { scopes: roots.length, coverage, failures: [...new Set(failures)], examples }
+  return { scopes: roots.length, coverage, failures: [...new Set(failures)], failureCounts: Object.fromEntries([...new Set(failures)].map(reason=>[reason,failures.filter(rule=>rule===reason).length])), examples }
 }
 
 /** 一覧に出ない3部品も、実際の作る画面で測る。 */
