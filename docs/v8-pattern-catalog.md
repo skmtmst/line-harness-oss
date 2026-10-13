@@ -977,6 +977,7 @@
 ## 認証の画面（B-263）
 
 - 持ち主：`components/templates/auth-page.tsx`。ログインの確認・初回登録・回復コードを同じ型で組む。
+- 補足は `AuthHelp`（共通の小さい文字）、設定の見出しと値は `AuthDetailRow`（薄い見出しと太い値）。操作は共通の本文リンク、印はログインと同じ緑地・白文字を使う。
 - 形と値：BOj1aと修正案A〜E（2FA-PEN-1012）を使う。欄・トグル・確認は共通部品。回復コードは共有 `OtpInput` の recovery（8マス・4-4）と `RecoveryCodeList`（8個・2列）で組む。幅いっぱいの主ボタンは `Button.fullWidth` で中央文字（B-264）。
 - 見張り：`v8-pattern-audit.mjs` と二段階認証の操作試験。
 
