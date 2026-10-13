@@ -1831,7 +1831,7 @@ function MediaCardV8({
     </span>
   )
   return (
-    <Card padding="rows" layout={view === 'grid' ? 'block' : 'horizontal'} overflow="hidden">
+    <Card padding="rows" layout={view === 'grid' ? 'media' : 'horizontal'} overflow="hidden">
       <button
         onClick={onPreview}
         title="プレビューを見る"

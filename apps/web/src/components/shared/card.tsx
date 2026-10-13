@@ -7,7 +7,7 @@ import styles from './card.module.css'
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
   frame?: 'raised' | 'inset'
-  layout?: 'block' | 'vertical' | 'horizontal'
+  layout?: 'block' | 'vertical' | 'horizontal' | 'media'
   /**
    * 設定の箱。'settings' は16の余白・10の間（EC設定）。
    * 'integration'（外部連携の設定）・'preview'（見本）は枠と内側の間を持つ。
@@ -63,7 +63,7 @@ export default function Card({
     spacing === 'roomy' ? styles.spacingRoomy : null,
     spacing === 'tight' ? styles.spacingTight : null,
     spacing === 'controls' ? styles.spacingControls : null,
-    layout === 'vertical' ? styles.vertical : layout === 'horizontal' ? styles.horizontal : null,
+    layout === 'vertical' ? styles.vertical : layout === 'horizontal' ? styles.horizontal : layout === 'media' ? styles.media : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'compact' ? styles.paddingCompact : null,
     padding === 'default' ? styles.paddingDefault : null,

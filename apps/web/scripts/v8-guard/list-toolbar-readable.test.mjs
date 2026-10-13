@@ -385,3 +385,20 @@ test('page size shares the final row with a shorter centered switch; an earlier 
     assert.ok((await page.evaluate(scanListSkeleton)).failures.includes(rule),'the right-edge tolerance is unchanged')
   } finally { await browser.close() }
 })
+
+test('media cards stretch the thumbnail and its empty tiles while content owns one 16px inset', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const layoutCss = read('../../src/v8/hq-banners/list.module.css')
+    await page.setContent(`<style>${read('../../src/app/globals.css')}\n${css('card')}\n${layoutCss}\n*{box-sizing:border-box}.card{width:320px}</style><section class="card media" data-card-padding="rows" data-card-variant="default"><button class="mosaic"><span class="thumb"></span><span class="thumb"></span><span class="thumb"></span></button><div class="content">画像のない見本</div></section>`)
+    const widths=()=>page.locator('.card').evaluate(el=>({card:el.getBoundingClientRect().width,image:el.querySelector('button').getBoundingClientRect().width,tiles:[...el.querySelectorAll('.thumb')].map(t=>t.getBoundingClientRect().width)}))
+    const good=await widths()
+    assert.equal(good.image,good.card)
+    assert.ok(good.tiles.every(w=>w>0))
+    assert.equal(await page.locator('.card').evaluate(el=>getComputedStyle(el).padding),'0px')
+    assert.equal(await page.locator('.content').evaluate(el=>getComputedStyle(el).padding),'16px')
+    await page.locator('.card').evaluate(el=>el.classList.remove('media'))
+    assert.ok((await widths()).image<good.card,'removing the shared media layout reproduces the collapsed image')
+  } finally { await browser.close() }
+})

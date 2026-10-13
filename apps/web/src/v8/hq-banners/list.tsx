@@ -414,7 +414,7 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
     ? '— ・ いま作成中'
     : `${project.imageCount} 枚 ・ ${monthDay(project.updatedAt)} 更新`
   return (
-    <Card padding="rows" overflow="hidden" aria-label={project.name}>
+    <Card padding="rows" layout="media" overflow="hidden" aria-label={project.name}>
       <button type="button" className={styles.mosaic} onClick={onOpen} aria-label={`${project.name} を開く`}>
         {[0, 1, 2].map((i) => <Thumb key={i} image={thumbnails[i] ?? null} />)}
       </button>

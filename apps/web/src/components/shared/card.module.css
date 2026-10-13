@@ -17,6 +17,8 @@
   flex-direction: column;
 }
 .horizontal { display: flex; align-items: center; justify-content: space-between; }
+/* Edge-to-edge media above padded content; the content owns its inset. */
+.media { display: flex; flex-direction: column; gap: 0; }
 
 .overflowHidden {
   overflow: hidden;
