@@ -107,7 +107,7 @@ export default function SummaryDrawerV8({
             </section>
             {s.logs.length > 0 ? (
               <DataTable label="記録の表" grid={{
-                columns: 'var(--tpl-nph-lcol-date) var(--tpl-nph-lcol-weight) repeat(4, minmax(0, 1fr)) minmax(0, 2fr)',
+                columns: 'var(--tpl-nph-lcol-date) var(--tpl-nph-lcol-weight) minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr)',
                 padding: 'var(--tpl-nph-log-row-pad)', headPadding: 'var(--tpl-nph-log-head-pad)',
                 gap: 'var(--tpl-nph-pair-gap)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)',
               }}>
