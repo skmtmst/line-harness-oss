@@ -37,6 +37,9 @@ import MediaReplacementDialog from './media-replacement-dialog'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import MediaUploadDialog from './media-upload-dialog'
 import { ListPage } from '@/components/templates'
+import SegmentedControl from '@/components/shared/segmented'
+import Card, { CardContent } from '@/components/shared/card'
+import { ListPageCards } from '@/components/templates/list-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
@@ -1156,6 +1159,7 @@ export default function MediaLibraryListV8() {
   return (
     <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
       skeleton
+      contentInset
       boardId="O7hUt7"
       toolbarRowGap="card"
       headingSize="regular"
@@ -1184,7 +1188,6 @@ export default function MediaLibraryListV8() {
       )}
       folders={(
         <>
-          {uploadButton}
           {/*
             共通のフォルダの列（種類 media・B-136）。m18s: 見出しの総数は「すべて」の行と同じ数なので出さない。
             閲覧のみ：フォルダを追加・「…」は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。
@@ -1205,6 +1208,8 @@ export default function MediaLibraryListV8() {
             unfiledCount={unfiledCount}
             onAdded={(created) => setFolderFilter(created.id)}
             placeholder="例：01_商品写真"
+            createAction={uploadButton}
+            reserveCreateSpace={false}
           >
             {folderFailure ? (
               <Notice tone="danger" action={<> {folderForbidden ? null : (
@@ -1296,24 +1301,11 @@ export default function MediaLibraryListV8() {
                     }}
                   /></SaveErrorField>
                 </div>
-                <div role="group" aria-label="並べ方" className={styles.viewToggle}>
-                  {([
-                    ['grid', '格子で並べる', LayoutGrid],
-                    ['list', '一覧で並べる', ListIcon],
-                  ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setView(value)}
-                      aria-pressed={view === value}
-                      aria-label={label}
-                      title={label}
-                      className={view === value ? `${styles.viewButton} ${styles.viewButtonActive}` : styles.viewButton}
-                    >
-                      <Icon aria-hidden="true" size={16} />
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl<MediaView> aria-label="並べ方" size="small" value={view} onChange={setView}
+                  options={[
+                    {value:'grid',label:<LayoutGrid aria-hidden="true" size={16} />,ariaLabel:'格子で並べる'},
+                    {value:'list',label:<ListIcon aria-hidden="true" size={16} />,ariaLabel:'一覧で並べる'},
+                  ]} />
                 <SaveErrorField names={["pageSize","limit","page_size"]}><Select
                   aria-label="表示件数"
                   value={String(pageSize)}
@@ -1338,7 +1330,6 @@ export default function MediaLibraryListV8() {
             <ListPager>
                 <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
                 {canManageMedia ? (
-                  <label className={styles.selectAll}>
                     <SaveErrorField names={["allSelected","selected","all_selected"]}><Checkbox
                       checked={allSelected}
                       onCheckedChange={() =>
@@ -1349,9 +1340,7 @@ export default function MediaLibraryListV8() {
                           return next
                         })
                       }
-                    /></SaveErrorField>
-                    すべてのメディアを選択
-                  </label>
+                    >すべてのメディアを選択</Checkbox></SaveErrorField>
                 ) : (
                   <span>{managementPermissionReason}。</span>
                 )}
@@ -1673,7 +1662,7 @@ export default function MediaLibraryListV8() {
               />
             </div>
           ) : (
-            <div className={view === 'grid' ? styles.cards : styles.rows}>
+            <ListPageCards columns={view === 'grid' ? 4 : 1}>
               {current.map((item) => (
                 <MediaCardV8
                   key={item.id}
@@ -1716,7 +1705,7 @@ export default function MediaLibraryListV8() {
                   }}
                 />
               ))}
-            </div>
+            </ListPageCards>
           )}
     </ListPage></SaveErrorScope>
   )
@@ -1842,7 +1831,7 @@ function MediaCardV8({
     </span>
   )
   return (
-    <div className={view === 'grid' ? styles.card : styles.row}>
+    <Card layout={view === 'grid' ? 'vertical' : 'horizontal'} overflow="hidden">
       <button
         onClick={onPreview}
         title="プレビューを見る"
@@ -1852,7 +1841,7 @@ function MediaCardV8({
         <MediaThumbnail kind={item.kind} src={displaySrc} alt={item.filename} />
       </button>
 
-      <div className={view === 'grid' ? styles.cardBody : styles.rowBody}>
+      <CardContent className={view === 'grid' ? styles.cardBody : styles.rowBody}>
         {renaming ? (
           <div className={styles.renameBox}>
             <SaveErrorField names={["value","renaming.value"]}><input
@@ -1921,7 +1910,7 @@ function MediaCardV8({
             </p>
           </>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

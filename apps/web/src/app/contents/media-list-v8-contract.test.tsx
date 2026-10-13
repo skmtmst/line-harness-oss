@@ -178,6 +178,21 @@ async function renderPage() {
 }
 
 describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
+  test('共通の表示切替から一覧へ移り、戻してもメディアと登録操作を保つ', async () => {
+    await renderPage()
+    const list=host!.querySelector<HTMLButtonElement>('button[aria-label="一覧で並べる"]')!
+    const grid=host!.querySelector<HTMLButtonElement>('button[aria-label="格子で並べる"]')!
+    expect(grid.getAttribute('aria-pressed')).toBe('true')
+    await act(async()=>{list.click()})
+    expect(list.getAttribute('aria-pressed')).toBe('true')
+    expect(grid.getAttribute('aria-pressed')).toBe('false')
+    expect(host!.textContent).toContain('秋の新商品.jpg')
+    expect(host!.textContent).toContain('メディアを登録する')
+    await act(async()=>{grid.click()})
+    expect(grid.getAttribute('aria-pressed')).toBe('true')
+    expect(host!.textContent).toContain('メニュー表.pdf')
+  })
+
   test('v8 では新しい一覧（O7hUt7）が出て、v7 は出ない', async () => {
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
