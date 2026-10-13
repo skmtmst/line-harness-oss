@@ -611,7 +611,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             {/* 絵に無いが今ある設定：押せる回数（「動きを実行する」ボタンだけが対象）。統括の入口は URL だけなので出さない。 */}
             {hqHost || inline ? null : <Card variant="form" gap="normal" aria-labelledby="cr-limit">
               <CardHeader title="押せる回数" titleId="cr-limit" size="stacked" meta="「動きを実行する」ボタンだけが対象です。URLを開くボタンはLINEの外へ出るので数えられません。" />
-              <SegmentedControl aria-label="押せる回数" value={tapLimitMode} options={[{ value: 'none', label: '何度でも押せる' }, { value: 'once', label: '1人につき1回だけ' }]} onChange={setTapLimitMode} />
+              <SegmentedControl fit="content" aria-label="押せる回数" value={tapLimitMode} options={[{ value: 'none', label: '何度でも押せる' }, { value: 'once', label: '1人につき1回だけ' }]} onChange={setTapLimitMode} />
               {tapLimitMode === 'once' ? (
                 <Field label="2回目に押されたときの返事空なら何も返さない"><SaveErrorField names={["tapLimitText","tap_limit_text"]}><TextField value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} /></SaveErrorField></Field>
               ) : null}

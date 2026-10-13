@@ -324,7 +324,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><TextField value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
           <Field label="質問文（160文字まで）" requirement={fields.requirement('text')}><SaveErrorField names={["text","question.text"]}><TextField {...fields.bind('text')} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
           <FieldError id="q-text-error">{fields.error('text')}</FieldError>
-          <Field label="答え方" optional={false}><SegmentedControl aria-label="答え方" value={question.tapMode} options={[{ value: 'single', label: '1つだけ選ぶ' }, { value: 'multiple', label: 'いくつでも選ぶ' }]} onChange={tapMode => setQuestion(current => ({ ...current, tapMode }))} /></Field>
+          <Field label="答え方" optional={false}><SegmentedControl fit="content" aria-label="答え方" value={question.tapMode} options={[{ value: 'single', label: '1つだけ選ぶ' }, { value: 'multiple', label: 'いくつでも選ぶ' }]} onChange={tapMode => setQuestion(current => ({ ...current, tapMode }))} /></Field>
         </Card>
 
         <Card variant="form" gap="normal" aria-labelledby="q-choices">
