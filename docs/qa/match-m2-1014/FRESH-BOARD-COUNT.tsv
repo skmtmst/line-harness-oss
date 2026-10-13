@@ -32,7 +32,7 @@ Nx5dz	その他	開けるが型の検出範囲なし	404 管理画面 ページ�
 OPGU2	窓・引き出し	窓 560px	シナリオ配信 止める確認（小窓） V8	/scenarios/detail?id=scenario-0	3	3	3	最初から0	—	—	—
 P6vbxn	窓・引き出し	窓 560px	一斉配信 かんたんに送る（小窓 640）V8	/broadcasts	3	3	3	指摘1〜3種	F8	—	—
 PUWyq	窓・引き出し	窓 560px	重ねた板	/restaurant-test/dashboard	3	3	3	最初から0	—	—	—
-Ptr2u	その他	その他：指定状態未取得	ウェビナー 公開中の編集：頭の「…」に［停止］V8（B-106 WEB-166・2026-10-09）	/webinars/edit?id=webinar-1&pane=video	3	0	0	測れない	—	状態が要る	親画面は開いたが、指定の停止操作まで未到達。現在の操作の名称と対象の状態を次回に確認
+Ptr2u	その他	その他：指定状態未取得	ウェビナー 公開中の編集：頭の「…」に［停止］V8（B-106 WEB-166・2026-10-09）	/webinars/edit?id=webinar-1&pane=video	3	0	0	測れない	—	複数状態の一部だけ	メニューと停止確認を並べた見本のうち、停止確認だけを計測。メニューの部分は追加取得するまで全板の0へ数えない。
 R2w4j	その他	ページの型：restaurant	予約台帳 今日（融合 B-186）	/restaurant-test/reservations	3	3	3	指摘1〜3種	F1,F2,F8	—	—
 R5ckwJ	その他	開けるが型の検出範囲なし	運営 ナレッジの記事 V8	/ops/knowledge	3	3	0	測れない	—	測定範囲不足（開ける）	指定状態の実表示は3幅で取得。ページの型の検出範囲が無いためF1〜F10を0としない。崩れの値は部分取得
 R8NNi	窓・引き出し	窓 560px	マイル 点数の変化の明細 V8	/mileage?tab=score	3	3	3	指摘1〜3種	F6	—	—
@@ -78,7 +78,7 @@ pUT4L	窓・引き出し	窓 480px	コンバージョン 一覧（止める・�
 qw80E	その他	その他：指定状態未取得	統括 LINEアカウント 接続確認（手動の項目）V8	/accounts/new	3	0	0	測れない	—	状態が要る	状態が要る：接続直後の状態。アカウント接続の更新は実行しない
 rE0ML	窓・引き出し	窓 640px	リッチメニュー 作る② 回答フォームを選ぶ（1つ選ぶ窓）V8（dJZ7Q の窓・B-133）	/rich-menus/new?id=rmg-draft&step=buttons	3	3	3	指摘1〜3種	F8	—	—
 rI5uh	窓・引き出し	窓 960px	統括 バナー生成（画像の詳細）V8	/hq/banners/project?id=banner-project-qa-1	3	3	3	指摘1〜3種	F8	—	—
-sDXNy	その他	その他：指定状態未取得	LINE通知 運用者へのお知らせ 公開前の確認 V8	/line-notifications/operator/new	3	3	3	最初から0	—	—	—
+sDXNy	その他	その他：指定状態未取得	LINE通知 運用者へのお知らせ 公開前の確認 V8	/line-notifications/operator/new	3	0	0	測れない	—	状態が要る	公開の確認の前に下書き保存が必要。保存の更新を実行せず、確認窓は未到達。親の画面は証拠へ代用しない。
 sFwWf	その他	ページの型：create	友だち追加時の配信 テストで自分に送る（機能追加 F-12・API待ち）	/friend-add-settings	3	3	3	指摘1〜3種	F3	—	—
 svUTk	窓・引き出し	引き出し 480px	見出し	/restaurant-test/dashboard	3	3	3	指摘1〜3種	F2	—	—
 tnTn9	窓・引き出し	引き出し 540px	成果とアフィリエイト アフィリエイターの詳細（引き出し）V8	/affiliates?affiliate=af-1	3	3	3	最初から0	—	—	—

@@ -236,9 +236,9 @@ rE0ML	窓・引き出し	窓 640px	/rich-menus/new?id=rmg-draft&step=buttons	192
 rI5uh	窓・引き出し	窓 960px	/hq/banners/project?id=banner-project-qa-1	1440	True	True	overlay	0	0	0	0	0	0	0	1	0	0	0	0	0	0	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:22.268Z
 rI5uh	窓・引き出し	窓 960px	/hq/banners/project?id=banner-project-qa-1	1152	True	True	overlay	0	0	0	0	0	0	0	1	0	0	0	0	0	0	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:25.200Z
 rI5uh	窓・引き出し	窓 960px	/hq/banners/project?id=banner-project-qa-1	1920	True	True	overlay	0	0	0	0	0	0	0	1	0	0	0	0	0	0	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:28.036Z
-sDXNy	その他	その他：指定状態未取得	/line-notifications/operator/new	1440	True	True	page	0	0	0	0	0	0	0	0	0	0	0	0	0	1	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:28.711Z
-sDXNy	その他	その他：指定状態未取得	/line-notifications/operator/new	1152	True	True	page	0	0	0	0	0	0	0	0	0	0	0	0	0	1	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:31.941Z
-sDXNy	その他	その他：指定状態未取得	/line-notifications/operator/new	1920	True	True	page	0	0	0	0	0	0	0	0	0	0	0	0	0	1	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:34.801Z
+sDXNy	その他	その他：指定状態未取得	/line-notifications/operator/new	1440	False	False	page	—	—	—	—	—	—	—	—	—	—	0	0	0	1	指定の窓が出ていない（親の数を撤回）	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:28.711Z
+sDXNy	その他	その他：指定状態未取得	/line-notifications/operator/new	1152	False	False	page	—	—	—	—	—	—	—	—	—	—	0	0	0	1	指定の窓が出ていない（親の数を撤回）	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:31.941Z
+sDXNy	その他	その他：指定状態未取得	/line-notifications/operator/new	1920	False	False	page	—	—	—	—	—	—	—	—	—	—	0	0	0	1	指定の窓が出ていない（親の数を撤回）	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:34.801Z
 sFwWf	その他	ページの型：create	/friend-add-settings	1440	True	True	page	0	0	1	0	0	0	0	0	0	0	0	0	0	1	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:31.271Z
 sFwWf	その他	ページの型：create	/friend-add-settings	1152	True	True	page	0	0	1	0	0	0	0	0	0	0	0	0	0	1	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:35.653Z
 sFwWf	その他	ページの型：create	/friend-add-settings	1920	True	True	page	0	0	1	0	0	0	0	0	0	0	0	0	0	1	—	793b662ef37c397fa2b6f01860dd8409b3f29c8b	2026-10-13T17:20:39.372Z
