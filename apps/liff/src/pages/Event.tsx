@@ -88,7 +88,7 @@ export default function Event() {
           );
         } catch (authErr) {
           // 認証なし → 上限の数えだけ弱くなり、通常表示で続行。
-          console.warn('[event] me bookings unavailable:', authErr);
+          console.warn(JSON.stringify({"code":"pages_Event_warn"}));
         }
       } catch (err) {
         if (!cancelled) {

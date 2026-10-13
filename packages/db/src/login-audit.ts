@@ -68,7 +68,7 @@ export async function recordLoginAudit(
       )
       .run();
   } catch (error) {
-    console.error('login_audit insert failed:', error);
+    console.error(JSON.stringify({"code":"src_login_audit_failed"}));
   }
   try {
     const actor = input.adminUserId
@@ -104,7 +104,7 @@ export async function recordLoginAudit(
     });
   } catch (error) {
     // 認証自体は成功させ、保存失敗は安全な固定文言だけを運用ログへ残す。
-    console.error('audit_events auth insert failed:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"src_login_audit_failed"}));
   }
 }
 

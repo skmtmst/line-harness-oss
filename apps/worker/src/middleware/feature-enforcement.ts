@@ -799,7 +799,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     classification = { kind: 'feature', featureId: 'forms' };
   }
   if (!classification) {
-    console.error(JSON.stringify({ event: 'route.feature.unclassified', method: c.req.method, path: c.req.path }));
+    console.error(JSON.stringify({"code":"route.feature.unclassified"}));
     return c.json({
       success: false,
       error: 'APIの機能分類が未設定です',

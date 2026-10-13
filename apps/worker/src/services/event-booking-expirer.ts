@@ -80,7 +80,7 @@ export async function runEventBookingExpirer(
         cancelReason: `event_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      console.error('reminder cancel (event expired) failed:', error);
+      console.error(JSON.stringify({"code":"services_event_booking_expirer_failed"}));
     }
     await enqueueEventWaitlistPromotion(db, {
       lineAccountId: row.line_account_id,
@@ -124,11 +124,11 @@ export async function runEventBookingExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        console.error('reminder repair (event leftover) failed:', error);
+        console.error(JSON.stringify({"code":"services_event_booking_expirer_failed"}));
       }
     }
   } catch (error) {
-    console.error('reminder repair (event leftover scan) failed:', error);
+    console.error(JSON.stringify({"code":"services_event_booking_expirer_failed"}));
   }
 
   const idempotencyPurged = await purgeExpiredEventIdempotency(db, params.now);

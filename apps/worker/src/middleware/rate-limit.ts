@@ -1,5 +1,6 @@
 /**
- * In-memory sliding window rate limiter for Cloudflare Workers.
+ * General burst budgets use isolate memory. Sensitive actions additionally
+ * reserve shared D1 budgets in sensitive-rate-limit.ts, before doing work.
  *
  * Cloudflare Workers have per-isolate memory that persists across
  * requests to the same instance. Counters are lost on cold start,
@@ -9,6 +10,7 @@
 
 import type { Context, Next } from 'hono';
 import type { Env } from '../index.js';
+import { authenticatedSensitiveLimit, preAuthSensitiveLimit } from './sensitive-rate-limit.js';
 
 // ---------------------------------------------------------------------------
 // Core rate-limit logic
@@ -108,6 +110,8 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
   if (path === '/docs' || path === '/openapi.json' || path.startsWith('/r/')) {
     return next();
   }
+  const denied = await preAuthSensitiveLimit(c);
+  if (denied) return denied;
 
   let key: string;
   let max: number;
@@ -144,6 +148,8 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
 export async function authenticatedRateLimitMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   const staff = c.get('staff');
   if (!staff || isUnauthenticatedPath(c.req.path)) return next();
+  const denied = await authenticatedSensitiveLimit(c);
+  if (denied) return denied;
   const result = check(`staff:${staff.tenantId ?? ''}:${staff.id}`, AUTHENTICATED_MAX, AUTHENTICATED_WINDOW);
   if (!result.ok) return c.json({ success: false, error: 'Too many requests. Please try again later.' },
     { status: 429, headers: { 'Retry-After': String(result.retryAfter) } });

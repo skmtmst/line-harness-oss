@@ -1,2 +1,7 @@
 /*
   X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Content-Security-Policy: frame-ancestors 'self' https://*.line.me https://*.line-apps.com; object-src 'none'; base-uri 'self'; form-action 'self' https://access.line.me
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://static.line-scdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https:; frame-src 'self' https://access.line.me https://*.line.me https://*.line-apps.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://*.line.me https://*.line-apps.com

@@ -131,7 +131,7 @@ async function recordLedger(what: string, write: () => Promise<void>): Promise<v
   try {
     await write();
   } catch (error) {
-    console.error(`tag side effect ledger write failed (${what}):`, error);
+    console.error(JSON.stringify({"code":"services_friend_tag_attach_failed"}));
   }
 }
 
@@ -181,10 +181,7 @@ async function notifyIfStuck(
   } catch (error) {
     // ここで投げると、止まったことを知らせられないうえに呼び出し口まで
     // 巻き添えにする。台帳には残っているので、記録を出して先へ進む。
-    console.error(
-      `tag side effect stuck notice failed (step=${step} friend=${friendId} tag=${tagId}):`,
-      error,
-    );
+    console.error(JSON.stringify({"code":"services_friend_tag_attach_failed"}));
   }
 }
 
@@ -216,10 +213,7 @@ async function claimAndRunStep(
   } catch (error) {
     // 予約が取れたか分からない。走らせない。行は元の状態で残るので、
     // 次にこの経路へ来たときに拾える。
-    console.error(
-      `tag side effect claim failed (step=${step} friend=${friendId} tag=${tagId}):`,
-      error,
-    );
+    console.error(JSON.stringify({"code":"services_friend_tag_attach_failed"}));
     return { outcome: 'failed', error };
   }
 
@@ -231,10 +225,7 @@ async function claimAndRunStep(
   try {
     await STEP_DEFINITIONS[step].run(db, friendId, tagId, assignedAt, push);
   } catch (error) {
-    console.error(
-      `tag side effect failed (step=${step} friend=${friendId} tag=${tagId}):`,
-      error,
-    );
+    console.error(JSON.stringify({"code":"services_friend_tag_attach_failed"}));
     await recordLedger(step, () =>
       markFriendTagSideEffectFailed(db, friendId, tagId, step, error, assignedAt),
     );
@@ -273,7 +264,7 @@ export async function retryFriendTagSideEffects(
   try {
     unfinished = await listUnfinishedFriendTagSideEffectRuns(db, friendId, tagId);
   } catch (error) {
-    console.error('tag side effect ledger read failed:', error);
+    console.error(JSON.stringify({"code":"services_friend_tag_attach_failed"}));
     return { retried: 0, failed: 0 };
   }
 
@@ -346,7 +337,7 @@ export async function attachTagAndFireSideEffects(
       metadata: { tagId },
     });
   } catch (error) {
-    console.error('tag conversion record failed:', error);
+    console.error(JSON.stringify({"code":"services_friend_tag_attach_failed"}));
   }
 
   // 従来どおり、シナリオ登録と tag_change の失敗は呼び出し口へ知らせる。

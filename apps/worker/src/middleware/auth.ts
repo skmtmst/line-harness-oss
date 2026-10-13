@@ -329,6 +329,10 @@ export function permissionForApiPath(path: string): string | null {
  * 新しい口は fail-closed (staff 403) に倒す。
  */
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
+  // Self-service handlers require a real session and derive the only target from it.
+  ['GET', '/api/auth/api-key'],
+  ['POST', '/api/auth/api-key'],
+  ['DELETE', '/api/auth/api-key'],
   ['GET', '/api/auth/session'],
   // These routes derive the target exclusively from the authenticated principal.
   ['GET', '/api/auth/two-factor/self'],

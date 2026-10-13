@@ -124,9 +124,9 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
         });
         accessToken = token.access_token;
 
-        console.log(`🔄 Token refreshed: ${account.name} (expires ${expiresAtJst})`);
+        console.log(JSON.stringify({"code":"services_token_refresh_log"}));
       } catch (err) {
-        console.error(`❌ Token refresh failed for ${account.name}:`, err);
+        console.error(JSON.stringify({"code":"services_token_refresh_failed"}));
       }
     }
 
@@ -142,7 +142,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
           });
         }
       } catch (err) {
-        console.error(`❌ LINE profile sync failed for ${account.name}:`, err);
+        console.error(JSON.stringify({"code":"services_token_refresh_failed"}));
       }
     }
   }

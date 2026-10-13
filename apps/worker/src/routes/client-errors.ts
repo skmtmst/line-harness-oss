@@ -33,7 +33,7 @@ clientErrors.post('/api/client-errors', requireRole('owner', 'admin', 'staff'), 
         : undefined,
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'client_error_slack_report_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"client_error_slack_report_failed","route":"POST /api/client-errors"}));
   }
   return c.json({ success: true }, 202);
 });

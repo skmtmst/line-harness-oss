@@ -416,7 +416,7 @@ export async function processMultiAccountDedupBroadcast(
     if (stopRequested) break; // 停止済み — 新しいアカウントの送信を始めない
     const account = await getLineAccountById(db, accountResult.accountId);
     if (!account || !account.is_active) {
-      console.log(`[multi-account-dedup] skipping inactive/missing account ${accountResult.accountId}`);
+      console.log(JSON.stringify({"code":"services_dedup_broadcast_log"}));
       continue;
     }
     // 緊急停止 (#1050): broadcast_dispatch が止まっているアカウントの束は
@@ -471,7 +471,7 @@ export async function processMultiAccountDedupBroadcast(
           continue;
         }
       } catch (err) {
-        console.error(`[multi-account-dedup] account ${account.id} failed to load common vars:`, err);
+        console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
         failedAccountIds.push(account.id);
         continue;
       }
@@ -488,9 +488,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
       if (missing.size > 0) {
-        console.error(
-          `[multi-account-dedup] account ${account.id} missing common vars: ${[...missing].join(', ')} — skipping without cross-account fallback`,
-        );
+        console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
         failedAccountIds.push(account.id);
         continue;
       }
@@ -659,7 +657,7 @@ export async function processMultiAccountDedupBroadcast(
         try {
           await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
         } catch (afterError) {
-          console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+          console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
         }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
@@ -677,7 +675,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
     } catch (err) {
-      console.error(`[multi-account-dedup] account ${account.id} failed:`, err);
+      console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
       failedAccountIds.push(account.id);
     }
   }

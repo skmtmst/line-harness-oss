@@ -153,7 +153,7 @@ function outgoingEventTypes(raw: string | null | undefined, webhookId: string): 
     if (!Array.isArray(parsed)) throw new Error('event_types is not an array');
     return parsed.map((entry) => String(entry));
   } catch {
-    console.error(JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId }));
+    console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
     return [];
   }
 }
@@ -435,7 +435,7 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), a
       })),
     });
   } catch (err) {
-    console.error('GET /api/webhooks/incoming error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/incoming"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -504,10 +504,7 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch {
-    console.error(JSON.stringify({
-      event: 'incoming_webhook_detail_failed',
-      path: c.req.path,
-    }));
+    console.error(JSON.stringify({"code":"incoming_webhook_detail_failed","route":"GET /api/webhooks/incoming/:id"}));
     return c.json({ success: false, error: '受け取り口の詳細を表示できませんでした' }, 500);
   }
 });
@@ -540,10 +537,7 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), inputJ
     auditLog(c, 'webhook.incoming.config.update', { kind: 'incoming_webhook', id: result.item.id });
     return c.json({ success: true, data: { id: result.item.id, version: result.item.version } });
   } catch {
-    console.error(JSON.stringify({
-      event: 'incoming_webhook_config_update_failed',
-      path: c.req.path,
-    }));
+    console.error(JSON.stringify({"code":"incoming_webhook_config_update_failed","route":"PATCH /api/webhooks/incoming/:id/config"}));
     return c.json({ success: false, error: '受け取り口の設定を保存できませんでした' }, 500);
   }
 });
@@ -602,7 +596,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), inputJsonBoundary(
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    console.error('POST /api/webhooks/incoming error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -689,7 +683,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), inputJsonBounda
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    console.error('PUT /api/webhooks/incoming/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"PUT /api/webhooks/incoming/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -708,7 +702,7 @@ webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) =>
     auditLog(c, 'webhook.incoming.delete', { kind: 'incoming_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/webhooks/incoming/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"DELETE /api/webhooks/incoming/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -745,7 +739,7 @@ webhooks.post('/api/webhooks/incoming/:id/restore', requireRole('owner'), inputJ
       },
     });
   } catch (err) {
-    console.error('POST /api/webhooks/incoming/:id/restore error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/restore"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -819,7 +813,7 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
       }),
     });
   } catch (err) {
-    console.error('GET /api/webhooks/incoming/:id/unmatched error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/incoming/:id/unmatched"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -896,7 +890,7 @@ webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', '
       });
     } catch (logError) {
       // 台帳の一時障害で試し自体を止めない。
-      console.error('受け取りの試しの記録に失敗:', logError);
+      console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/test"}));
     }
     auditLog(c, 'webhook.incoming.test', { kind: 'incoming_webhook', id: webhook.id }, { lineAccountId });
     return c.json({
@@ -920,7 +914,7 @@ webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', '
       },
     });
   } catch (err) {
-    console.error('POST /api/webhooks/incoming/:id/test error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/test"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -965,7 +959,7 @@ webhooks.post('/api/webhooks/unmatched/:id/resolve', requireRole('owner', 'admin
       { kind: 'incoming_webhook_unmatched', id: item.id }, { lineAccountId });
     return c.json({ success: true, data: { id: item.id, status: action === 'link' ? 'resolved' : 'dismissed' } });
   } catch (err) {
-    console.error('POST /api/webhooks/unmatched/:id/resolve error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/unmatched/:id/resolve"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1029,7 +1023,7 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
       }),
     });
   } catch {
-    console.error(JSON.stringify({ event: 'outgoing_webhook_list_failed', path: c.req.path }));
+    console.error(JSON.stringify({"code":"outgoing_webhook_list_failed","route":"GET /api/webhooks/outgoing"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1068,7 +1062,7 @@ webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch (err) {
-    console.error('GET /api/webhooks/outgoing/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/outgoing/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1155,7 +1149,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), inputJsonBoundary(
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    console.error('POST /api/webhooks/outgoing error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/outgoing"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1302,7 +1296,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), inputJsonBounda
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    console.error('PUT /api/webhooks/outgoing/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"PUT /api/webhooks/outgoing/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1371,7 +1365,7 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
     auditLog(c, 'webhook.outgoing.test', { kind: 'outgoing_webhook', id: webhook.id }, { lineAccountId });
     return c.json({ success: true, data: { delivered: result.ok, responseStatus: result.lastStatus ?? null } });
   } catch (err) {
-    console.error('POST /api/webhooks/outgoing/:id/test error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/outgoing/:id/test"}));
     return c.json({ success: false, error: '試し送信に失敗しました' }, 502);
   }
 });
@@ -1390,7 +1384,7 @@ webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) =>
     auditLog(c, 'webhook.outgoing.delete', { kind: 'outgoing_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/webhooks/outgoing/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"DELETE /api/webhooks/outgoing/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1430,7 +1424,7 @@ webhooks.post('/api/webhooks/outgoing/:id/restore', requireRole('owner'), inputJ
       },
     });
   } catch (err) {
-    console.error('POST /api/webhooks/outgoing/:id/restore error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/outgoing/:id/restore"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1528,7 +1522,7 @@ webhooks.get('/api/webhooks/interactions', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch (err) {
-    console.error('GET /api/webhooks/interactions error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/interactions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1546,7 +1540,7 @@ webhooks.get('/api/webhooks/interactions/:id/payload', requireRole('owner', 'adm
       data: { id: original.id, body: masked.body, available: masked.available },
     });
   } catch (err) {
-    console.error('GET /api/webhooks/interactions/:id/payload error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/interactions/:id/payload"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1604,7 +1598,7 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     if (code === 'webhook_inactive' || code === 'payload_unavailable') {
       return inputError(c, { success: false, error: code }, 400, []);
     }
-    console.error('POST /api/webhooks/interactions/:id/retry error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/interactions/:id/retry"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1651,7 +1645,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
       data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview, excluded },
     });
   } catch (err) {
-    console.error('POST /api/webhooks/interactions/retry-failed error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/interactions/retry-failed"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1700,10 +1694,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret の移行に必要な鍵がありません' }, 503);
     }
-    console.error(JSON.stringify({
-      event: 'webhook_secret_backfill_failed',
-      path: c.req.path,
-    }));
+    console.error(JSON.stringify({"code":"webhook_secret_backfill_failed","route":"POST /api/webhooks/maintenance/secret-backfill"}));
     return c.json({ success: false, error: 'secret の移行に失敗しました' }, 500);
   }
 });
@@ -1762,10 +1753,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
         return c.json({ success: false, error: 'Invalid signature' }, 401);
       }
       expected = previousExpected;
-      console.log(JSON.stringify({
-        event: 'incoming_webhook_previous_secret_used',
-        webhookId: wh.id,
-      }));
+      console.log(JSON.stringify({"code":"incoming_webhook_previous_secret_used","route":"POST /api/webhooks/incoming/:id/receive"}));
     }
 
     /*
@@ -1845,10 +1833,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
       return c.json({ success: false, error: 'Webhook processing in progress' }, 503);
     }
     if (reserved.kind === 'completed') {
-      console.log(JSON.stringify({
-        event: 'incoming_webhook_duplicate_signature',
-        webhookId: wh.id,
-      }));
+      console.log(JSON.stringify({"code":"incoming_webhook_duplicate_signature","route":"POST /api/webhooks/incoming/:id/receive"}));
       return c.json({
         success: true,
         data: { received: true, duplicate: true, source: wh.source_type },
@@ -1865,10 +1850,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
           maskedPayloadShape(payload),
         );
       } catch {
-        console.error(JSON.stringify({
-          event: 'incoming_webhook_masked_sample_update_failed',
-          webhookId: wh.id,
-        }));
+        console.error(JSON.stringify({"code":"incoming_webhook_masked_sample_update_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
       }
     }
 
@@ -1890,7 +1872,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
         })).id }));
       } catch (logError) {
         // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
-        console.error('受信Webhookの記録開始に失敗:', logError);
+        console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
       }
     }
     let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
@@ -1954,7 +1936,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
             failureReason: 'processing_failed',
           });
         } catch (logError) {
-          console.error('受信Webhookの失敗記録を更新できませんでした:', logError);
+          console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
         }
       }
       throw eventError;
@@ -1969,7 +1951,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
         });
       } catch (logError) {
         // 受信処理は完了している。台帳の一時障害だけで送信元へ500を返さない。
-        console.error('受信Webhookの成功記録を更新できませんでした:', logError);
+        console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
       }
     }
 
@@ -1992,7 +1974,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
     if (execution) {
       try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
     }
-    console.error('POST /api/webhooks/incoming/:id/receive error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2032,7 +2014,7 @@ webhooks.get('/api/webhooks/api-tokens', requireRole('owner', 'admin', 'staff'),
     const items = await listIntegrationApiTokens(c.env.DB, lineAccountId, { includeRevoked });
     return c.json({ success: true, data: items.map(serializeApiToken) });
   } catch (err) {
-    console.error('GET /api/webhooks/api-tokens error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/api-tokens"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2077,7 +2059,7 @@ webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), inputJsonBoundar
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/webhooks/api-tokens error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2099,7 +2081,7 @@ webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), input
     auditLog(c, 'webhook.api_token.revoke', { kind: 'integration_api_token', id }, { lineAccountId });
     return c.json({ success: true, data: { id } });
   } catch (err) {
-    console.error('POST /api/webhooks/api-tokens/:id/revoke error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens/:id/revoke"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2127,7 +2109,7 @@ webhooks.post('/api/webhooks/api-tokens/:id/reactivate', requireRole('owner'), i
     const row = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
     return c.json({ success: true, data: serializeApiToken(row!) });
   } catch (err) {
-    console.error('POST /api/webhooks/api-tokens/:id/reactivate error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens/:id/reactivate"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2169,7 +2151,7 @@ webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), input
       },
     });
   } catch (err) {
-    console.error('POST /api/webhooks/api-tokens/:id/rotate error:', err);
+    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens/:id/rotate"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

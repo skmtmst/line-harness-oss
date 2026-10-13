@@ -131,7 +131,7 @@ export async function resolveSendCommonVars(
       )));
     } catch (ledgerError) {
       // 台帳の書き込み失敗で送信拒否自体を潰さない。拒否は必ず成立させる。
-      console.error('common_var_resolution_failures insert failed:', ledgerError);
+      console.error(JSON.stringify({"code":"services_interpolation_context_failed"}));
     }
     throw new CommonVarResolutionFailedError(resolved.failures, source);
   }

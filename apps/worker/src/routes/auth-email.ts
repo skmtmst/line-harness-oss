@@ -89,10 +89,7 @@ async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Pro
       userAgent: c.req.header('user-agent') ?? null,
     });
   } catch (error) {
-    console.error('[auth-email] authentication branch failed', {
-      branch: 'recordLoginAudit',
-      name: error instanceof Error ? error.name : 'UnknownError',
-    });
+    console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
   }
 }
 
@@ -224,7 +221,7 @@ authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
     await sendSignupVerifyMail(c.env, { email, completeUrl: `${base}/register/complete?token=${encodeURIComponent(token)}` });
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error('[auth-email] register request failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_auth_email_failed","route":"POST /api/auth/register/request"}));
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
@@ -447,7 +444,7 @@ authEmail.post('/api/auth/password/forgot', inputJsonBoundary(), async (c) => {
     }
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error('[auth-email] password forgot failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_auth_email_failed","route":"POST /api/auth/password/forgot"}));
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });

@@ -813,13 +813,7 @@ export async function recordFeatureExecutionSkipped(
   input: { accountId: string; featureId: FeatureId; job: string; occurredAt?: string },
 ): Promise<void> {
   const occurredAt = input.occurredAt ?? new Date().toISOString();
-  console.info(JSON.stringify({
-    event: 'feature.execution.skipped',
-    lineAccountId: input.accountId,
-    featureId: input.featureId,
-    job: input.job,
-    occurredAt,
-  }));
+  console.info(JSON.stringify({"code":"feature.execution.skipped"}));
   // 同じ job が5分ごとに監査表を増やさないよう、日・account・feature・job を
   // 一意な監査IDにする。構造化ログはtickごとの観測用なので毎回残す。
   const auditId = `feature-skip:${occurredAt.slice(0, 10)}:${input.accountId}:${input.featureId}:${input.job}`;

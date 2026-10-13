@@ -77,14 +77,7 @@ function logWebhookStepFailure(
   lineAccountId: string | null,
   event?: WebhookEvent,
 ): void {
-  console.error({
-    event: 'line_webhook_step_failed',
-    stage,
-    webhook_event_id: event?.webhookEventId ?? null,
-    line_account_id: lineAccountId,
-    event_type: event?.type ?? null,
-    reason: classifyLineWebhookError(error),
-  });
+  console.error(JSON.stringify({"code":"line_webhook_step_failed"}));
 }
 
 async function recordWebhookAnalyticsEvent(
@@ -157,13 +150,10 @@ async function ensureFriendFromWebhookUser(
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。C-2b まではこのアカウント用の
       // friend 行を作れないので、相手の行に触れずイベントを諦める。
-      console.warn({
-        event: 'line_webhook_friend_scope_conflict',
-        line_account_id: lineAccountId,
-      });
+      console.warn(JSON.stringify({"code":"line_webhook_friend_scope_conflict"}));
       return null;
     }
-    console.log({ event: 'line_webhook_friend_registered', line_account_id: lineAccountId });
+    console.log(JSON.stringify({"code":"line_webhook_friend_registered"}));
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
@@ -272,7 +262,7 @@ webhook.post('/webhook', async (c) => {
         .bind(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, -1) + '+09:00', matchedAccountId)
         .run();
     } catch (stampError) {
-      console.error('last_webhook_received_at update failed:', stampError);
+      console.error(JSON.stringify({"code":"routes_webhook_failed","route":"POST /webhook"}));
     }
   }
 
@@ -498,12 +488,7 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    console.log({
-      event: 'line_webhook_follow_received',
-      webhook_event_id: event.webhookEventId,
-      line_account_id: lineAccountId,
-      event_type: event.type,
-    });
+    console.log(JSON.stringify({"code":"line_webhook_follow_received"}));
 
     // プロフィール取得 & 友だち登録/更新
     let profile: Awaited<ReturnType<LineClient['getProfile']>> | undefined;
@@ -527,12 +512,7 @@ async function handleEvent(
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
       // 進められないので、相手の行に触れずこのイベントを諦める (Issue #961)。
-      console.warn({
-        event: 'line_webhook_friend_scope_conflict',
-        webhook_event_id: event.webhookEventId,
-        line_account_id: lineAccountId,
-        event_type: event.type,
-      });
+      console.warn(JSON.stringify({"code":"line_webhook_friend_scope_conflict"}));
       return;
     }
     if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(friend.last_followed_at)?friend.last_followed_at:`${friend.last_followed_at}${friend.last_followed_at.length===10?'T00:00:00':''}+09:00`) > event.timestamp)) return;
@@ -906,14 +886,14 @@ async function handleEvent(
           if (sent) {
             friendAddDeliveryCount += 1;
             await noteDelivered();
-            console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
+            console.log(JSON.stringify({"code":"routes_webhook_log"}));
           }
         } catch (err) {
           logWebhookStepFailure('routed_scenario_delivery', err, lineAccountId, event);
         }
       }
       if (routing.suppressed) {
-        console.log(`[friend-add-routing] suppressed (kind=${routing.kind})`);
+        console.log(JSON.stringify({"code":"routes_webhook_log"}));
       }
     }
 
@@ -968,7 +948,7 @@ async function handleEvent(
           if (sent) {
             friendAddDeliveryCount += 1;
             await noteDelivered();
-            console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
+            console.log(JSON.stringify({"code":"routes_webhook_log"}));
           }
         } catch (err) {
           logWebhookStepFailure('scenario_enrollment', err, lineAccountId, event);
@@ -1012,7 +992,7 @@ async function handleEvent(
               throw pushErr;
             }
             noteSendOutcome('delivered');
-            console.log(`[follow] referral intro push sent route=${referralRoute.id}`);
+            console.log(JSON.stringify({"code":"routes_webhook_log"}));
           }
         } catch (err) {
           logWebhookStepFailure('referral_intro_push', err, lineAccountId, event);
@@ -1028,7 +1008,7 @@ async function handleEvent(
       if (referralRoute.scenario_id && await holdSendRight()) {
         try {
           const enrollment = await enrollFriendInScenario(db, friend.id, referralRoute.scenario_id);
-          console.log(`[follow] referral scenario enrolled scenario=${referralRoute.scenario_id}`);
+          console.log(JSON.stringify({"code":"routes_webhook_log"}));
           if (enrollment && await holdSendRight({ external: true })) {
             await pushImmediateFirstStep(
               db,

@@ -107,7 +107,7 @@ async function notifyUnfamiliarLogin(
       after: { note: 'いつもと違う端末・場所からのログイン' },
     });
   } catch (error) {
-    console.error('[admin-session] unfamiliar login audit failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
   try {
     if (!staff?.email) return;
@@ -133,7 +133,7 @@ async function notifyUnfamiliarLogin(
       ].join('\n'),
     });
   } catch (error) {
-    console.error('[admin-session] unfamiliar login mail failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
 }
 
@@ -156,7 +156,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
       unfamiliarAt = new Date().toISOString();
     }
   } catch (error) {
-    console.error('[admin-session] unfamiliar check failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
   await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt, {
     userAgent,

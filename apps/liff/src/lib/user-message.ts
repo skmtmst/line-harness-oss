@@ -29,5 +29,5 @@ export const SUBMIT_FAILED_MESSAGE =
  * 失敗のくわしい中身を console にだけ残す。画面には出さない。
  */
 export function logFailure(scope: string, err: unknown): void {
-  console.error(`[liff:${scope}]`, err);
+  console.error(JSON.stringify({"code":"lib_user_message_failed"}));
 }
