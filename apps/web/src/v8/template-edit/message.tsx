@@ -23,7 +23,6 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
@@ -43,6 +42,7 @@ import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
@@ -89,7 +89,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
   const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries> } | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * 新しく作る画面で自動保存が先に作ったテンプレート（一斉配信と同じく、
@@ -492,15 +491,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
             compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
-        side={(
+        side={(inDialog) => (
           <>
-            <div className={styles.previewToggle}>
-              <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
-            </div>
             <SenderCard emptyUsage={id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length === 0 ? 'この変更が使われる場所（0か所）。このテンプレートはまだどこからも呼ばれていません。' : undefined} />
             {id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length > 0 ? <UsageCard usedBy={editor.usedBy} published={(editor.publishedVersion ?? 0) >= 1} /> : null}
             <h2 className={styles.previewHead}>届き方</h2>
-            <div className={styles.phone}>{phone}</div>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
         status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
@@ -545,10 +541,10 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <Card variant="form" gap="normal">
               <CardHeader size="stacked" title="名前とフォルダ" meta="一覧に出る名前です。友だちには見えません。" />
-              <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
+              <SettingsFormRow layout="name-folder">
+                <div className={`${styles.field} ${styles.grow}`}><Field requirement={fields.requirement('name')} label="テンプレート名" htmlFor="te-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
-                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
+                <div className={styles.field}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect size="full"
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -561,7 +557,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
                   /></SaveErrorField></Field></div>
-              </div>
+              </SettingsFormRow>
             </Card>
 
             <Card variant="form" gap="normal">
@@ -620,10 +616,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           </>
         )}
       </TemplateEditFrame>
-
-      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
 
       <ConfirmDialog
         open={compareOpen}

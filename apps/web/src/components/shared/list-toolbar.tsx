@@ -287,6 +287,7 @@ function compactFilterGroups(node: ReactNode): ReactNode {
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
     return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
   return children.map(child => {
+    if (isValidElement(child) && child.type === ResponsiveFilterChips) return child
     if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
       return contentSizedSelect(child)
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {

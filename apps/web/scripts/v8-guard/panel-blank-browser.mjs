@@ -36,6 +36,19 @@ export default function scanPanelBlank() {
     for (const d of el.querySelectorAll('*')) {
       if (!visible(d)) continue
       const dr = d.getBoundingClientRect()
+      // スクロールするLINE見本は文字の終端でなく、実際に描かれる端末の箱までが内容。
+      // 親全体を除外せず、端末の後の本当の空きは今までどおり検出する。
+      const phone = d.matches('[data-line-preview-part="phone"]') && d.querySelector('[data-line-preview-part="talk"]')
+      if (phone) {
+        let top = dr.top, end = dr.bottom
+        for (let clip = d.parentElement; clip && el.contains(clip); clip = clip.parentElement) {
+          if (getComputedStyle(clip).overflowY !== 'visible') {
+            const cr = clip.getBoundingClientRect(); top = Math.max(top, cr.top); end = Math.min(end, cr.bottom)
+          }
+        }
+        top = Math.max(top, r.top); end = Math.min(end, r.bottom)
+        if (end > top) bottom = Math.max(bottom, end)
+      }
       // B-180 D-7：入れ子のカードの余白を親へ重ねて数えない。
       // カード自身の余りは、このループで別に検査する。
       const nestedCard = d.matches('[data-design-part="card"]') && d.textContent.trim() !== ''

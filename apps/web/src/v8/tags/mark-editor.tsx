@@ -464,6 +464,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
         help={<>{description}{<AttributeKindGuide current="mark" />}</>}
         identity={back}
+        previewLabel="表示設定を見る"
+        previewTitle="対応マークの表示"
         preview={aside}
         destructive={editing && selected && !hideForm ? (
           <StickyBarAction label="保管する" icon={Pause} onClick={() => openArchive()} disabledReason={archiveBlockReason} />

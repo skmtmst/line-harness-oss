@@ -34,12 +34,45 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     const isList = root.dataset.pageTemplate === 'list'
     if (isList && !root.hasAttribute('data-list-skeleton') && !root.querySelector('[data-list-skeleton]')) add('F4', root, 'list template is missing its shared standard and audit scope')
     const heading = root.querySelector('[data-template-region="heading"],[data-template-region="header"]')
+    const explanationBodies = [...root.querySelectorAll('[data-screen-explanation]')]
+      .filter(el => el.closest('[data-page-template]') === root)
+    const explanationToggles = heading ? [...heading.querySelectorAll('[data-screen-explanation-toggle]')].filter(visible) : []
+    for (const panel of explanationBodies) {
+      if (!panel.id || !explanationToggles.some(toggle => toggle.getAttribute('aria-controls') === panel.id)) {
+        add('F4', panel, 'screen explanation body is missing its heading control')
+      }
+    }
+    for (const toggle of explanationToggles) {
+      if (toggle.getAttribute('aria-expanded') === 'true'
+        && !explanationBodies.some(panel => panel.id && panel.id === toggle.getAttribute('aria-controls'))) {
+        add('F4', toggle, 'open screen explanation control is missing its scoped body')
+      }
+    }
+    const body = root.querySelector('[data-list-folders]')
+    const hasFolders = body ? body.dataset.listFolders === 'true' : !!root.querySelector('[data-template-region="folders"], [data-toolbar-leading] [aria-label="フォルダ"]')
+    if (isList && !hasFolders) {
+      for (const el of all('[data-template-region="toolbar"] a[href], [data-template-region="toolbar"] button')) {
+        if (/作る|登録する|追加する/.test(el.textContent) && !el.hasAttribute('aria-haspopup')) add('F9',el,'folderless list creation belongs in heading actions')
+      }
+      for (const el of all('[data-list-name] [data-folder-dot]')) add('F9',el,'folderless list name has a folder dot')
+    }
+    if (heading) {
+      const controls = [...heading.querySelectorAll('button')].filter(visible)
+      const explanation = controls.find(el => /この画面の説明/.test(el.textContent))
+      const help = controls.find(el => /^[?？]$/.test(el.textContent.trim()))
+      if (help && explanation && (help.compareDocumentPosition(explanation) & Node.DOCUMENT_POSITION_PRECEDING)) add('F3',heading,'heading help must precede screen explanation')
+    }
     if (heading) for (const chip of [...heading.querySelectorAll('button.v6-filter-chip')].filter(visible)) add('F5',chip,'heading action uses a filter chip instead of a shared button')
     for (const chip of all('button.v6-filter-chip')) if (/^アーカイブ済み(?:\s*\d+)?$/.test(chip.textContent.trim()) && !chip.querySelector('svg')) add('F4',chip,'archive filter is missing its shared icon')
     inventory.push({
       board: root.dataset.designNode, template: root.dataset.pageTemplate, frame: root.dataset.heightMode,
       help: heading ? [...heading.querySelectorAll('button')].filter(visible).map(el => el.getAttribute('aria-label') || el.textContent.trim()) : [],
+      explanationBodies: explanationBodies.length,
+      explanationToggles: explanationToggles.length,
       folders: all('[data-template-region="folders"]').length,
+      folderCapability: isList ? hasFolders : null,
+      folderDots: all('[data-list-name] [data-folder-dot]').length,
+      headingCreates: heading ? [...heading.querySelectorAll('a[href],button')].filter(el => visible(el) && /作る|登録する|追加する/.test(el.textContent)).length : 0,
       folderSelect: all('[data-toolbar-leading] button[aria-haspopup="listbox"]').filter(el => /フォルダ/.test(el.getAttribute('aria-label') ?? el.textContent)).length,
       folderCreate: all('[data-template-region="folders"] button').filter(el => /フォルダ.*追加/.test(el.textContent)).length,
       checks: all('tbody input[type="checkbox"]').length,
@@ -58,7 +91,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const selectedValueContentWidth = el.getBoundingClientRect().width - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
       const selectedValueIsEllipsized = el.matches('[data-select-value]') && css.textOverflow === 'ellipsis' && paintedWidth > selectedValueContentWidth
       if (selectedValueIsEllipsized || paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
-        || el.scrollHeight > el.clientHeight + 1) add('F1', el, 'short text does not fit')
+        || rects.some(r => r.top < el.getBoundingClientRect().top + (parseFloat(css.paddingTop) || 0) - 1 || r.bottom > el.getBoundingClientRect().bottom - (parseFloat(css.paddingBottom) || 0) + 1)) add('F1', el, 'short text does not fit')
     }
     for (const el of all('input[type="search"]')) {
       if (el.value || !el.placeholder) continue
@@ -66,7 +99,12 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (canvas.measureText(el.placeholder).width > el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1) add('F1', el, 'search placeholder does not fit')
     }
     for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button')) {
-      if (lines(el) > 1) add('F2', el, 'short text wraps')
+      // A column of title/instructions is a composite control. Audit each
+      // short label; explicit line breaks in instructions are intentional.
+      const css = getComputedStyle(el)
+      const composite = el.matches('button') && css.display.includes('flex') && css.flexDirection === 'column'
+      const targets = composite ? [...el.children].filter(child => visible(child) && child.textContent.trim() && !child.matches('svg') && !child.querySelector('br')) : [el]
+      for (const target of targets) if (lines(target) > 1) add('F2', target, 'short text wraps')
     }
     for (const el of all('button,a[role="button"],[data-page-title]')) {
       if (/\d+\s+件表示/.test(el.textContent) && el.matches('button') && !el.querySelector('button')) add('F3', el, 'page size does not use the shared compact wording')
@@ -102,6 +140,23 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     for (const el of all('[data-template-region="toolbar"] button:disabled,[data-template-region="toolbar"] input:disabled')) {
       const explained = el.title || (el.getAttribute('aria-describedby') || '').split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())
       if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
+    }
+    // A read-only sort description is still painted text. Control-only overlap
+    // scans miss it when a shrinking filter group spills over its neighbour.
+    for (const end of all('[data-template-region="toolbar"] [data-toolbar-trailing]')) {
+      const toolbar = end.closest('[data-template-region="toolbar"]')
+      const controls = [...toolbar.querySelectorAll('button,input,select,summary,a[href]')].filter(el => visible(el) && !end.contains(el))
+      const walker = document.createTreeWalker(end, 4)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const el = node.parentElement
+        if (!node.textContent.trim() || !visible(el) || el.closest('button,input,select,summary,a[href],svg')) continue
+        const range = document.createRange(); range.selectNodeContents(node)
+        if ([...range.getClientRects()].some(text => controls.some(control => {
+          const rect = control.getBoundingClientRect()
+          return Math.min(text.right, rect.right) - Math.max(text.left, rect.left) > 1
+            && Math.min(text.bottom, rect.bottom) - Math.max(text.top, rect.top) > 1
+        }))) add('F6', el, 'toolbar trailing text overlaps another control')
+      }
     }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const cell of all('[data-list-action-cell]')) {

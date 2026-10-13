@@ -1,4 +1,6 @@
 'use client'
+
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card from '@/components/shared/card'
 
 import { requiredText } from '@/lib/form-requirement'
@@ -338,13 +340,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       {scheduled ? null : (
         <Card variant="form" gap="normal" aria-labelledby="webinar-period-title">
           <div className={form.cardHead}><h2 id="webinar-period-title" className={form.cardTitle}>公開期間</h2></div>
-          <div className={form.pair}>
+          <SettingsFormRow layout="columns">
             <div className={form.field}><Field label="公開の開始" htmlFor="webinar-period-start"><SaveErrorField names={["startsAt","starts_at"]}><DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} /></SaveErrorField></Field></div>
             <div className={form.field}><Field label="公開の終了" htmlFor="webinar-period-end">{noEnd
                 ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
                 : <SaveErrorField names={["endsAt","ends_at"]}><DateTimeField id="webinar-period-end" value={endsAt} readOnly={readOnly} onChange={setEndsAt} /></SaveErrorField>}
 {!readOnly && !noEnd ? <SaveErrorField names={["noEnd","publicationEndsAt","no_end"]}><Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox></SaveErrorField> : null}</Field></div>
-          </div>
+          </SettingsFormRow>
           {periodError ? <Notice tone="danger">{periodError}</Notice> : null}
         </Card>
       )}
@@ -390,13 +392,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
 
       <Card variant="form" gap="normal" aria-labelledby="webinar-count-title">
         <div className={form.cardHead}><h2 id="webinar-count-title" className={form.cardTitle}>視聴の数え方</h2></div>
-        <div className={form.pair}>
+        <SettingsFormRow layout="columns">
           <div className={form.field}><Field label="視聴完了とみなす" htmlFor="webinar-completion"><TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" /></Field></div>
           <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-policy">{readOnly
               ? <ReadValue label="結果が取れないとき">{policy === 'escalate' ? '担当へ上げる' : '翌日に取り直す'}</ReadValue>
               : <SaveErrorField names={["policy"]}><Select id="webinar-policy" aria-label="結果が取れないとき" size="full" value={policy} disabled={policyBusy} onChange={(value) => void savePolicy(value as 'escalate' | 'retry_next_day')} options={[{ value: 'retry_next_day', label: '翌日に取り直す' }, { value: 'escalate', label: '担当へ上げる' }]} /></SaveErrorField>}
 {policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}</Field></div>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       {adding ? <AddRuleDialog mode={adding} busy={busy} error={error} onCancel={() => { if (!busy) { setAdding(null); setError('') } }} onAdd={async (rules) => { if (await saveSchedule([...webinar.schedule, ...rules])) setAdding(null) }} /> : null}
@@ -542,10 +544,10 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
         ) : null}
         {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><SaveErrorField names={["date"]}><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
-          <div className={form.pair}>
+          <SettingsFormRow layout="columns">
             <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from" requirement={b244Requirements.from}><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
             <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to" requirement={b244Requirements.to}><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
-          </div>
+          </SettingsFormRow>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><SaveErrorField names={["time"]}><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></SaveErrorField></div>
       </div>

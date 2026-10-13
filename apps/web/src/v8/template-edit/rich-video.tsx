@@ -16,7 +16,6 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
 import { AttachmentRow } from '@/components/shared/file-drop'
 import MediaSlot from '@/components/shared/media-slot'
 import FolderSelect, { folderById, hostFolderCreate } from '@/components/shared/folder-select'
@@ -58,7 +57,6 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const baseUrl = useRef('')
   const [loading,setLoading] = useState(Boolean(id))
   const [loadFailed,setLoadFailed] = useState(false)
-  const [previewOpen,setPreviewOpen] = useState(false)
   const [needsImage,setNeedsImage] = useState(false)
   const [fileName,setFileName] = useState('')
   const [binding,setBinding] = useState<string | null>(null)
@@ -106,7 +104,6 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
     }).catch(()=>{if(current===generation.current){setLoadFailed(true);setError('読み込めませんでした。一覧から開き直してください。')}}).finally(()=>{if(current===generation.current)setLoading(false)})
     return ()=>{generation.current++}
   },[id,visual,scopeAccountId])
-
 
   const upload = async (file: File, image = false) => {
     if(!canMutate || (!hqHost && !selectedAccountId) || busy)return
@@ -236,7 +233,7 @@ setError(cause instanceof Error?cause.message:'保存できませんでした。
       {draft.buttonEnabled?<span className={videoStyles.action}>{draft.actionLabel}</span>:null}
     </div></div>
   </LinePreview>
-  const side=<><div className={styles.previewToggle}><Button onClick={()=>setPreviewOpen(true)}>LINEでの見え方を見る</Button></div><section className={styles.sideCard}><h2 className={styles.sideTitle}>リッチメッセージとの違い</h2><p className={styles.sideText}>リッチビデオはトークで自動で流れる動画です。画像を面に分けて押した所ごとに動かしたいときは、リッチメッセージを使います。</p></section><h2 className={styles.previewHead}>届き方</h2><div className={styles.phone}>{phone}</div></>
+  const side=(inDialog:boolean)=><><section className={styles.sideCard}><h2 className={styles.sideTitle}>リッチメッセージとの違い</h2><p className={styles.sideText}>リッチビデオはトークで自動で流れる動画です。画像を面に分けて押した所ごとに動かしたいときは、リッチメッセージを使います。</p></section><h2 className={styles.previewHead}>届き方</h2><div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div></>
   return <SaveErrorScope errors={saveErrors}><>
     <TemplateEditFrame composerHost={host ? { ...host, busy: busy || loading || Boolean(host.busy), onCancel: () => guarded(host.onCancel) } : undefined} onComposerInsert={(alsoSave)=>void save(alsoSave)} boardId={hqHost?'Ni0V8':'oIFk7'} title={id?'リッチビデオを編集':'リッチビデオを作る'} description={host?.description ?? 'トーク画面で自動で流れる動画。見終わったらボタンで案内'} side={side}
       band={!canMutate && role ? <ReadOnlyNotice />:undefined}
@@ -257,7 +254,6 @@ setError(cause instanceof Error?cause.message:'保存できませんでした。
       </Card>
       <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)"><div className={styles.toggleRow}><h2 className={styles.cardTitle}>通知に出る文（代わりの文）</h2><HelpTip label="通知に出る文の説明">通知やトーク一覧に、動画の代わりに出る文です。</HelpTip></div><SaveErrorField names={["altText","draft.altText","alt_text","draft.alt_text"]}><TextField id="rv-altText" invalid={issue?.field==='altText'} aria-describedby={issue?.field==='altText'?'rv-altText-error':undefined} aria-label="通知に出る文" value={draft.altText} onChange={e=>patch({altText:e.target.value})} maxLength={1500} disabled={!canMutate||busy||loading||loadFailed}/></SaveErrorField>{fieldError('altText')}</Card>
     </TemplateEditFrame>
-    <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={()=>setPreviewOpen(false)}><div className={styles.previewDialog}>{phone}</div></Dialog>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="リッチビデオの変更" onConfirm={confirmLeave} onCancel={cancelLeave}/>
   </></SaveErrorScope>
 }
