@@ -98,8 +98,8 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
   const selected = rows.find((row) => row.id === activeId)
   return <>
     {createAction ? <span className={styles.collapsedCreate}>{createAction}</span> : null}
-    <span className={styles.collapsedSelect} style={width ? { width } : undefined}>
-      <Select aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
+    <span className={styles.collapsedSelect} style={width ? { minWidth: width } : undefined}>
+      <Select size="content" aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
     </span>
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>

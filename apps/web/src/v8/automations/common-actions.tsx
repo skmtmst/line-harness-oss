@@ -1,4 +1,5 @@
 'use client'
+import StatusBadge from '@/components/shared/status-badge'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
@@ -35,7 +36,7 @@ import PageSizeSelect from '@/components/shared/page-size-select'
 import { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
@@ -43,6 +44,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
   AUTOMATIONS_DESCRIPTION,
+  AUTOMATION_TABLE_LAYOUT,
   AutomationBand,
   AutomationTabs,
   READONLY_REASON,
@@ -87,10 +89,10 @@ export function versionsHref(id: string): string {
 function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
-      <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>{selection}アクション名</Th>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow>{selection}アクション名</Th>
         <Th className={styles.colState}>状態</Th>
-        <Th className={styles.colSteps}>中の処理</Th>
+        <Th collapseAt="narrow" className={styles.colSteps}>中の処理</Th>
         <Th className={styles.colUsed} align="right">呼び出し元</Th>
         <Th className={styles.colVersion}>版</Th>
         <Th className={styles.colOps}>操作</Th>
@@ -329,7 +331,7 @@ export default function CommonActionsV8() {
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={AUTOMATION_TABLE_LAYOUT}>
             <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {items.map((item) => {
@@ -338,8 +340,8 @@ export default function CommonActionsV8() {
                   ? `古い版 ${item.oldVersionBindingCount}`
                   : item.status === 'published' && item.draftVersion != null ? '下書きあり' : null
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id} href={versionsHref(item.id)}>
-                    <Td className={styles.colName}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id} href={versionsHref(item.id)}>
+                    <Td grow>
                       {/* 名前の前に分類先の色の丸。説明は名前の頭にそろえる。 */}
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
                         <a className={styles.name} href={versionsHref(item.id)}  onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); router.push(versionsHref(item.id)) } }}><TruncatedText value={String(item.name ?? '')} /></a>
@@ -347,20 +349,19 @@ export default function CommonActionsV8() {
 
                     </Td>
                     <Td className={styles.colState}>
-                      <span className={styles.pill} data-tone={item.status === 'published' ? 'active' : 'neutral'}>
-                        <span className={styles.pillDot} aria-hidden="true" />
+                      <StatusBadge tone={item.status === 'published' ? 'success' : 'neutral'}>
                         {STATUS_LABEL[item.status]}
-                      </span>
+                      </StatusBadge>
                     </Td>
-                    <Td className={styles.colSteps}><span className={styles.main}>{`${item.actionCount} 個の処理`}</span></Td>
+                    <Td collapseAt="narrow" className={styles.colSteps}><span className={styles.main}>{`${item.actionCount} 個の処理`}</span></Td>
                     <Td className={styles.colUsed}><span className={styles.main}>{`${formatNumber(item.bindingCount)} か所`}</span></Td>
                     <Td className={styles.colVersion}>
                       <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : emptyValue('unknown')}</span>
                       {versionSub ? <span className={item.oldVersionBindingCount > 0 ? styles.subWarn : styles.sub}>{versionSub}</span> : null}
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        <Button href={versionsHref(item.id)}>中身を見る</Button>
+                        <Button size="compact" href={versionsHref(item.id)}>中身を見る</Button>
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === item.id}
@@ -369,7 +370,7 @@ export default function CommonActionsV8() {
                           items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -381,12 +382,9 @@ export default function CommonActionsV8() {
   }
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-  const pager = !loading && !loadFailed && pageCount > 1 ? (
+  const pager = !loading && !loadFailed && items.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)} / {formatNumber(total)} 件
-      </span>
-      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="共通アクション一覧のページ送り" />
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="共通アクション一覧のページ送り" range={{ total: total, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, total) }} />
     </ListPagePagination>
   ) : null
 

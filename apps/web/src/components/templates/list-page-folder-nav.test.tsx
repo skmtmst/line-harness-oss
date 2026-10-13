@@ -89,8 +89,8 @@ describe('一覧の型の CSS：畳んだ段は板が 1100 未満のときだけ
     expect(narrowBlock).toMatch(/\.collapsedFolders \{ display: flex;/)
     expect(narrowBlock).toMatch(/\.toolbar\[data-collapsed-only\] \{ display: flex; \}/)
   })
-  it('選ぶ欄の幅は 1152 の板の値（変数）を使う', () => {
-    expect(css).toMatch(/\.collapsedSelect \{[^}]*width: var\(--tpl-narrow-folder-w\)/)
+  it('選ぶ欄は選択中の名前の実寸を確保する', () => {
+    expect(css).toMatch(/\.collapsedSelect \{[^}]*width: max-content/)
   })
 })
 

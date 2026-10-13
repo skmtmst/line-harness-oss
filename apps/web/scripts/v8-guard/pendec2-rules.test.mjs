@@ -31,6 +31,7 @@ const cases = {
   'internal-window-copy':['<p>詳細の小窓</p>','<p>詳細</p>'],
   kpiblank:['<div data-kpi-strip><p data-kpi-detail style="min-height:18px"></p></div>','<div data-kpi-strip><p data-kpi-detail style="display:none"></p></div>'],
   kpialign:['<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="display:none"></p></div>','<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="min-height:18px"></p></div>'],
+  kpimenu:['<div data-kpi-strip><button data-row-menu aria-haspopup="menu">…</button></div>', '<div data-kpi-strip><button>未設定を見る</button><a href="/ads">広告連携を開く</a></div>'],
 }
 test('閉じたdetailsの中は箱のはみ出し・下の余白に数えず、開いたら検出する', async () => {
   const browser = await chromium.launch()
@@ -57,7 +58,7 @@ test('baseの共通Cardの印でも新しい種類を測り、属性を増やし
     assert.deepEqual(await page.evaluate(scan), [])
   } finally { await browser.close() }
 })
-test('B-219〜233の19種類は故障注入で落ち、修正後は0（1152・1440・1920）', async () => {
+test('B-219〜233と帯の行メニューは故障注入で落ち、修正後は0（1152・1440・1920）', async () => {
   const browser=await chromium.launch()
   try {
     const page=await browser.newPage()

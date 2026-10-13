@@ -1,7 +1,7 @@
 'use client'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import ListToolbar, { ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useFeatureAccess } from '@/lib/use-feature-access';
@@ -11,7 +11,7 @@ import { useSearchParams } from 'next/navigation';
 import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react';
 
 import Link from '@/components/shared/list-navigation'
-import { RowNameLink } from '@/components/shared/table';
+import { RowNameLink, StatusCell } from '@/components/shared/table';
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye, Link2 } from 'lucide-react';
@@ -44,7 +44,6 @@ import { withViewTransition } from '@/components/shared/view-transition';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { notifyToast } from '@/components/shared/toast';
@@ -1078,7 +1077,7 @@ export default function FormsListV8() {
       <DelayedSkeleton
         loading
         skeleton={
-          <DataTable>
+          <DataTable columnSizing="content">
             {tableHead}
             <tbody aria-hidden="true">
               {[0, 1, 2, 3, 4].map((index) => (
@@ -1153,7 +1152,7 @@ export default function FormsListV8() {
   } else {
     listBody = (
       <div className={styles.tableWrap}>
-        <DataTable>
+        <DataTable columnSizing="content">
           {tableHead}
           <tbody>
             {duplicateFeedback.order(visibleForms).map((form) => {
@@ -1182,14 +1181,14 @@ export default function FormsListV8() {
                   {!narrow && (
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
                   )}
-                  <Td>
-                    <span className={styles.statusPill} data-tone={form.isActive ? 'live' : 'draft'}>
-                      <span className={styles.dot} aria-hidden="true" />
+                  <StatusCell primary={<>
+                    <StatusBadge tone={form.isActive ? 'success' : 'neutral'}>
                       {form.isActive ? '公開中' : '下書き'}
-                    </span>
+                    </StatusBadge>
+                    {reviewMode && form.accountScopeReviewRequired ? <StatusBadge tone="warning" size="compact">管理者確認</StatusBadge> : null}
+                  </>}>
                     {pendingCount > 0 ? <StatusBadge tone="danger" size="compact">{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
-                    {reviewMode && form.accountScopeReviewRequired ? <span className={styles.reviewBadge}>管理者確認</span> : null}
-                  </Td>
+                  </StatusCell>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (
                       <span className={styles.answerCount}>{answerCount ? `${formatNumber(answerCount)}件` : emptyValue('unknown')}</span>
@@ -1273,15 +1272,7 @@ export default function FormsListV8() {
       pageCount={pageCount}
       onPageChange={(next) => updateListState({ page: next })}
       ariaLabel="回答フォームのページ送り"
-      summary={(
-        <ListRange
-          bare
-          className={styles.pagerCount}
-          total={listTotal}
-          first={pageStart + 1}
-          last={Math.min(pageStart + visibleForms.length, listTotal)}
-        />
-      )}
+      range={{ total: listTotal, first: pageStart + 1, last: Math.min(pageStart + visibleForms.length, listTotal) }}
     />
   )
 

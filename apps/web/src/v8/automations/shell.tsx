@@ -26,6 +26,16 @@ import styles from './shell.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
+/** 一覧の列組み。線・セル・行の余白は共通Tableが持つ。 */
+export const AUTOMATION_TABLE_LAYOUT = {
+  headHeight: 'var(--tpl-am-head-h)',
+  rowHeight: 'var(--tpl-am-row-h)',
+  gap: 'var(--tpl-am-col-gap)',
+  padding: '0 var(--tpl-list-inset)',
+  numberInset: 'var(--tpl-am-num-pad-end)',
+  collapseScope: 'page' as const,
+}
+
 export type AutomationTabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
 /** オートメーションの説明（全タブ共通の題の下）。 */

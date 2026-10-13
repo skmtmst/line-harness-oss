@@ -1,9 +1,10 @@
 'use client'
 
 import { LoaderCircle, Search, X } from 'lucide-react'
-import React, { forwardRef, useEffect, useRef, useState } from 'react'
+import React, { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { InputHTMLAttributes } from 'react'
 import { guardCompositionEnter } from './composition-enter'
+import { fitListSearchPlaceholder } from './search-field-size.mjs'
 import styles from './search-field.module.css'
 
 export interface SearchFieldProps
@@ -37,6 +38,25 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
   useEffect(() => cancel, [])
   const hasValue = draft.length > 0
   const innerRef = useRef<HTMLInputElement>(null)
+  // B-191: the list owns the slot, while the control knows its real text and chrome.
+  // Keep the placeholder readable without changing either the query or its scope.
+  useLayoutEffect(() => {
+    const input = innerRef.current
+    const slot = input?.closest<HTMLElement>('[data-toolbar-search]')
+    const control = input?.parentElement
+    if (!input || !slot || !control || !props.placeholder) return
+    let active = true
+    const measure = () => {
+      if (active) fitListSearchPlaceholder(input)
+    }
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(queue)
+    observer?.observe(slot)
+    measure()
+    void document.fonts?.ready.then(measure)
+    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); slot.style.removeProperty('--list-search-content-min') }
+  }, [props.placeholder])
   const setRefs = (node: HTMLInputElement | null) => {
     innerRef.current = node
     if (typeof ref === 'function') ref(node)

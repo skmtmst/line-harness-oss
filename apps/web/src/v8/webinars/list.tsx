@@ -1,7 +1,7 @@
 'use client'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowNameLink } from '@/components/shared/table';
 
 
@@ -39,7 +39,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -47,7 +47,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label';
 import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { runUndoable } from '@/lib/undoable';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import { formatListTimestamp, formatNumber } from '@/lib/format';
 import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview } from '@/lib/api';
 import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
 import styles from './list.module.css'
@@ -100,12 +100,15 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? formatDateTime(rule.at) : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? formatListTimestamp(rule.at) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
 
 function periodSummary(webinar: WebinarListItem): string {
+  if (webinar.publicationState === 'scheduled') return formatListTimestamp(webinar.publicationStartsAt)
+  if (webinar.publicationState === 'period' && webinar.publicationStartsAt && webinar.publicationEndsAt)
+    return `${formatListTimestamp(webinar.publicationStartsAt)}〜${formatListTimestamp(webinar.publicationEndsAt)}`
   return publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt)
     ?? scheduleSummary(webinar)
 }
@@ -769,14 +772,12 @@ function WebinarList() {
     </div>
   )
   const sortBox = (
-    <div className={styles.sortBox}>
-      <SortSelect
+    <SortSelect
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={[{ value: 'updated', label: '更新順' }, { value: 'created', label: '作成順' }, { value: 'name', label: '名前順' }]}
         label="並び："
       />
-    </div>
   )
   const savedBox = (
     <div className={styles.savedBox}>
@@ -925,7 +926,7 @@ function WebinarList() {
   const pager = hasListData ? (
     <ListPagePagination>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り"
-        summary={paginationSummary(visibleTotal, (currentPage - 1) * pageSize + 1, (currentPage - 1) * pageSize + visibleItems.length)} />
+        range={{ total: visibleTotal, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + visibleItems.length }} />
     </ListPagePagination>
   ) : null
 

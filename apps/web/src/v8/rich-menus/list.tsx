@@ -1,12 +1,12 @@
 'use client'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
-import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
+import { CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -882,17 +882,14 @@ export default function RichMenusListV8() {
       ))}
     </div>
   )
-  /* 並び（絵に無いが機能がある）。右端の件数の左に、印だけの小さな箱で置く。 */
+  /* 並びの文字・幅は共通の選ぶ欄が持つ。 */
   const sortBox = (
-    <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
-      <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
       <SaveErrorField names={["sortKey","sort","sort_key"]}><ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={SORT_OPTIONS}
       /></SaveErrorField>
-    </div>
   )
   const perPageBox = (
     <div className={styles.perPageBox} data-per-page-select>
@@ -1117,7 +1114,8 @@ export default function RichMenusListV8() {
                   <Td className={styles.menuCell}>
                     <div className={styles.menuBox}>
                       <RowMenu
-                        className={styles.menuBtn}
+                        appearance="box"
+                        size="row"
                         label={menuLabel}
                         items={rowMenuItems(g)}
                         open={openMenuId === g.id}
@@ -1138,7 +1136,7 @@ export default function RichMenusListV8() {
   const listPager = selectedAccount && !listLoading && !error && groups.length > 0 ? (
     <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage}
       ariaLabel="リッチメニューのページ送り"
-      summary={`${formatNumber(groupTotal)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)}件`} />
+      range={{ total: groupTotal, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, groupTotal) }} />
   ) : null
 
   /* ===== 削除の窓（yOyCg：消せない理由を外す順に。読めないときは消させない） ===== */

@@ -28,9 +28,8 @@ describe('m18s FolderPanelの見出しに絞り込み件数を出さない', () 
     // 登録メディア: フッターの ListRange（絞り込み後の total）
     expect(contents).toContain('<ListRange total={total}')
     // 共通情報: フッターの ListRange（絞り込み後の filtered.length）
-    expect(vars).toContain('const pagerSummary =')
-    expect(vars).toContain('formatNumber(filtered.length)')
-    expect(vars).toContain('{pagerSummary}</span>')
+    expect(vars).toContain('<Pagination')
+    expect(vars).toContain('range={{ total: filtered.length')
     // 一斉配信: 表の上の ListRange（タイトル・日付で絞った visibleBroadcasts）
     expect(broadcasts).toContain('<Pagination')
     expect(broadcasts).toContain("resultTotal ?? visibleBroadcasts.length")

@@ -90,7 +90,7 @@ describe('#640 日時表記の統一（JST・フォーマット）', () => {
   })
 
   it('/contents/vars: 更新日は JST、日付型の値は formatStamp の「/」区切り', () => {
-    expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?formatDay\(date\)/)
+    expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?formatListTimestamp\(value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, item\.value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, pending\.value\)/)
   })

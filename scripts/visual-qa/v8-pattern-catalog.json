@@ -766,6 +766,11 @@
             "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:前へ|次へ)",
             "why": "前へ・次へを手で置く",
             "onlyWithoutCanonical": true
+          },
+          {
+            "id": "own-range-text",
+            "re": "(?:summary=\\{\\s*|\\b(?:const|let)\\s+(?:pagerSummary|summary)\\s*=\\s*)`[^`]{0,500}(?:件中|人中)",
+            "why": "ページ送りの件数文を画面で組む（Pagination.rangeへ数値を渡す）"
           }
         ]
       },
@@ -884,7 +889,8 @@
             "apps/web/src/components/shared/dialog.tsx",
             "apps/web/src/components/shared/dialog.module.css",
             "apps/web/src/components/shared/confirm-dialog.tsx",
-            "apps/web/src/components/shared/overlay-utils.ts"
+            "apps/web/src/components/shared/overlay-utils.ts",
+            "apps/web/src/components/shared/action-words.ts"
           ],
           "components": [
             "Dialog",
@@ -2513,7 +2519,8 @@
             "apps/web/src/components/shared/button.tsx",
             "apps/web/src/components/shared/button.module.css",
             "apps/web/src/components/shared/icon-button.tsx",
-            "apps/web/src/components/shared/icon-button.module.css"
+            "apps/web/src/components/shared/icon-button.module.css",
+            "apps/web/src/components/shared/action-words.ts"
           ],
           "components": [
             "Button",
@@ -2680,7 +2687,8 @@
             "SegmentedControl",
             "RadioCard",
             "RadioCardGroup",
-            "CheckCard"
+            "CheckCard",
+            "UnavailableSelection"
           ],
           "vars": [
             "--shadow-controls-toggle"
@@ -3227,6 +3235,97 @@
         "tests": [
           "apps/web/src/components/shared/b244-behavior.test.tsx"
         ]
+      }
+    },
+    {
+      "id": "list-date-time",
+      "name": "一覧の日時",
+      "role": "時刻を持つ記録を統一した日付と時刻で1行に表示し、共通4pxの間隔と実寸を確保する",
+      "rules": [
+        "B-260",
+        "B-262"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/lib/format.ts",
+            "apps/web/src/components/shared/list-date-time.tsx",
+            "apps/web/src/components/shared/list-date-time.module.css"
+          ],
+          "components": [
+            "ListDateTime"
+          ],
+          "vars": [
+            "--tpl-slot-gap"
+          ]
+        },
+        "pen": [],
+        "status": "U1：Penの書式と役目の同期は司令塔"
+      },
+      "code": {
+        "selectorHint": "listDateTime",
+        "overrideSelectors": [
+          "listDateTime"
+        ],
+        "signals": [
+          {
+            "id": "own-split",
+            "re": "formatListTimestamp\\([^\\n]*\\)\\.split\\(",
+            "why": "日時の段分けを画面で書く（ListDateTimeへ日時を渡す）"
+          }
+        ]
+      },
+      "pen": {
+        "names": [
+          "一覧の日時"
+        ],
+        "types": [],
+        "ancestorNot": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/list-date-time.test.tsx",
+          "apps/web/src/lib/format.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "list-status-cell",
+      "name": "一覧の状態の列",
+      "role": "名前と状態を分け、複数札を共通の間で並べる",
+      "rules": [
+        "B-194",
+        "B-254",
+        "B-267"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/table.tsx",
+            "apps/web/src/components/shared/data-table.module.css"
+          ],
+          "components": [
+            "StatusCell"
+          ],
+          "vars": [
+            "--tpl-slot-gap"
+          ]
+        },
+        "pen": []
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/table.test.tsx"
+        ],
+        "needed": ""
       }
     }
   ]

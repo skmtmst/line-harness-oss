@@ -122,7 +122,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
   it('名前が空なら保存せず、欄を赤くしてそこへ移動し、直すと理由が消える', async () => {
     await render('pets')
     await click(byLabel('「こむぎ」の操作'))
-    await click(byText('ペットの情報を直す'))
+    await click(byText('ペットの情報を編集する'))
     const name = document.querySelector<HTMLInputElement>('input[aria-label="ペットの名前"]')!
     const update = vi.spyOn(api.nenCampaigns, 'updatePet')
     await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
@@ -141,7 +141,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
   it('「…」→ペットの情報を直す：版つきで保存し、体重の「kg」は外して数で送る', async () => {
     await render('pets')
     await click(byLabel('「こむぎ」の操作'))
-    await click(byText('ペットの情報を直す'))
+    await click(byText('ペットの情報を編集する'))
     expect(document.body.textContent).toContain('飼い主 田中 明子さん・EC-10234')
     const weight = document.querySelector<HTMLInputElement>('input[aria-label="体重"]')
     expect(weight?.value).toBe('9.2 kg')
@@ -157,7 +157,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
   it('ほかの人が先に直していたら（409）止めて、入力を残したまま知らせる', async () => {
     await render('pets')
     await click(byLabel('「こむぎ」の操作'))
-    await click(byText('ペットの情報を直す'))
+    await click(byText('ペットの情報を編集する'))
     const update = vi.spyOn(api.nenCampaigns, 'updatePet').mockRejectedValue(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { latest: { updatedAt: '2026-10-02T00:00:00Z' } }))
     await click(byText('保存する'))
     expect(update).toHaveBeenCalledTimes(1)
@@ -188,7 +188,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     await render('pets')
     expect(host.textContent).toContain('閲覧のみで見ています')
     await click(byLabel('「こむぎ」の操作'))
-    expect(byText('ペットの情報を直す')).toBeFalsy()
+    expect(byText('ペットの情報を編集する')).toBeFalsy()
     expect(byText('飼い主を開く')).toBeTruthy()
     expect(buttons().some((b) => b.textContent?.includes('CSVで書き出す'))).toBe(true)
     await act(async () => { root.render(<PetsV8 accountId="acc-1" tab="feeding" onChangeTab={() => {}} />) })

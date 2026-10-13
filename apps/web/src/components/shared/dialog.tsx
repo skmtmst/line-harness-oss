@@ -333,6 +333,7 @@ export default function Dialog({
             {cancelLabel}
           </Button>
           <Button
+            actionWording
             data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}

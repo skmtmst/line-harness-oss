@@ -9,6 +9,7 @@ import type {
   ReactNode,
 } from 'react'
 import styles from './button.module.css'
+import { normalizeActionLabel, normalizeActionNode } from './action-words'
 
 type CommonProps = {
   /**
@@ -44,6 +45,8 @@ type CommonProps = {
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
   presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
+  /** Authored action words only; entity names and arbitrary values remain unchanged. */
+  actionWording?: boolean
   children: ReactNode
 }
 
@@ -111,8 +114,9 @@ function hasButtonText(children: ReactNode): boolean {
     return hasButtonText(child.props.children)
   })
 }
-function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:string;'aria-labelledby'?:string}) {
-  return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+function iconButtonLabel(props: {children:ReactNode;title?:string;actionWording?:boolean;'aria-label'?:string;'aria-labelledby'?:string}) {
+  const label = props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+  return props.actionWording && typeof label === 'string' ? normalizeActionLabel(label) : label
 }
 
 /** 字の色の指定を束ねの名前へ。`action`（既定）は何も足さない。 */
@@ -130,11 +134,11 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
-        {children}
+        {props.actionWording ? normalizeActionNode(children) : children}
         {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
@@ -145,7 +149,8 @@ export default function Button(props: ButtonProps) {
 
 function NativeButton(props: NativeButtonProps & { classes: string }) {
   const {
-    children,
+    children: rawChildren,
+    actionWording: _actionWording,
     classes,
     className: _className,
     variant: _variant,
@@ -165,6 +170,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     onClick,
     ...buttonProps
   } = props
+  const children = props.actionWording ? normalizeActionNode(rawChildren) : rawChildren
 
   /*
    * ★V7 仕上げ §2「保存中・完了」。DOM に出す文字は常に今のラベル1つだけ

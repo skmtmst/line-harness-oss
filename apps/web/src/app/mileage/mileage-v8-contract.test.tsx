@@ -373,3 +373,13 @@ test('旧テーマの属性が残っていてもV8を出す', async () => {
   })
   expect(host.querySelector('[data-mileage-design="v6"]')).toBeNull()
 })
+
+test('U5：使われたマイルは支出の絶対量で、交換回数を保つ', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => {
+    const card = [...host.querySelectorAll('[data-design-version="v8"]')].find(el => el.querySelector('[data-kpi-label]')?.textContent === '直近30日 使われたマイル')
+    expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('200')
+    expect(card?.textContent).toContain('交換 2 件')
+  })
+})

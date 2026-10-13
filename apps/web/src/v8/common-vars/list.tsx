@@ -2,7 +2,7 @@
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -14,7 +14,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
+import { Archive, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -30,7 +30,7 @@ import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -51,13 +51,13 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
 import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
-import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { formatListTimestamp, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import { reasonRequirement, typedKeyRequirement, blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field, RequiredBadge } from '@/components/shared/form-controls';
-import { emptyValue } from '@/components/shared/empty-value';
+import { displayValue, emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -119,14 +119,9 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50件表示' },
 ]
 
-/*
- * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す（v7 と同じ）。
- * 更新日は UTC の ISO で来るので JST 固定で出す。
- */
+/** 記録の更新日時は別年でも時刻を残す。業務値の日付は変えない。 */
 function formatListDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return formatDay(date)
+  return formatListTimestamp(value)
 }
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
@@ -1048,7 +1043,7 @@ function CommonVarsListInner() {
             {`「${firstEmpty.name}」が空のまま ${typeof firstEmpty.usageCount === 'number' ? `${formatNumber(firstEmpty.usageCount)}か所` : '何か所か'}で使われています。差し込んだところが空欄のまま送られます。`}
           </span>
           <span className={styles.alertSpacer} aria-hidden="true" />
-          <Button type="button" onClick={applyEmptyFilter}>直す</Button>
+          <Button type="button" actionWording onClick={applyEmptyFilter}>{canWrite ? "直す" : "空のままを見る"}</Button>
         </div>
       ) : null}
       {listLimited && !listFailed ? (
@@ -1115,8 +1110,7 @@ function CommonVarsListInner() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canWrite ? (
-                    <SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
+                  {canWrite ? (<SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && someOnPageSelected}
                       onCheckedChange={() =>
@@ -1130,8 +1124,7 @@ function CommonVarsListInner() {
                         })
                       }
                       aria-label="このページの共通情報をすべて選ぶ"
-                    /></SaveErrorField>
-                  ) : null}
+                    /></SaveErrorField>) : <UnavailableSelection label="このページの共通情報をすべて選ぶ" />}
                 </Th>
                 <Th className={styles.headCell}>共通情報（差し込み名）</Th>
                 <Th className={styles.headCell}>中身</Th>
@@ -1159,13 +1152,11 @@ function CommonVarsListInner() {
 
                   >
                     <Td className={styles.selectCell}>
-                      {canWrite ? (
-                        <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
+                      {canWrite ? (<SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
                           onCheckedChange={() => toggle(item.id)}
                           aria-label={`${item.name}を選ぶ`}
-                        /></SaveErrorField>
-                      ) : null}
+                        /></SaveErrorField>) : <UnavailableSelection label={`${item.name}を選ぶ`} />}
                     </Td>
                     <NameCell name={
                         <div className={styles.dotLine}>
@@ -1182,8 +1173,8 @@ function CommonVarsListInner() {
                         </div>
                       } folder={folderDotOf(item)}
                     />
-                    <Td className={styles.valueCell} title={valueText || '（空）'}>
-                      {valueText || <span className={styles.valueEmpty}>（空）</span>}
+                    <Td className={styles.valueCell} title={displayValue(valueText, 'unconfigured')}>
+                      {valueText || <span className={styles.valueEmpty}>{emptyValue('unconfigured')}</span>}
                     </Td>
                     <Td>
                       <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
@@ -1191,7 +1182,7 @@ function CommonVarsListInner() {
                     {!narrow && (
                       <Td>
                         {item.usageCount === undefined ? (
-                          <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
+                          <span className={styles.usageNone} title="使われている場所を取得できていません">{emptyValue('unknown')}</span>
                         ) : item.usageCount === 0 ? (
                           <span className={styles.usageNone}>{emptyValue('none')}</span>
                         ) : (
@@ -1210,7 +1201,8 @@ function CommonVarsListInner() {
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
                       <div className={styles.menuBox}>
                         <RowMenu
-                          className={styles.rowMenuButton}
+                          appearance="box"
+                          size="row"
                           label={`共通情報「${item.name}」の操作`}
                           items={rowMenuItems(item)}
                           open={openMenuId === item.id}
@@ -1234,15 +1226,8 @@ function CommonVarsListInner() {
     </>
   )
 
-  const pagerSummary = filtered.length === 0
-    ? '0件'
-    : pageCount > 1
-      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
-      : `${formatNumber(filtered.length)} 件`
-  const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : pageCount > 1 ? (
-    <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
-  ) : (
-    <p className={styles.pagerSolo}>{pagerSummary}</p>
+  const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : (
+    <Pagination page={page} pageCount={pageCount} onPageChange={setPage} range={{ total: filtered.length, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, filtered.length) }} />
   )
 
   /* 数の帯。取れていない数字は「—」（0 とは言わない）。 */
@@ -1764,7 +1749,7 @@ function CommonVarsListInner() {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
       stats={
-        <KpiBand data-design="KPIs" aria-label="共通情報の集計" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs" aria-label="共通情報の集計">
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}
@@ -1773,15 +1758,8 @@ function CommonVarsListInner() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={kpi.fix ? (
-                /* 絵：説明の右端に「直す →」。押すと「空のまま」で絞り込む。 */
-                <span className={styles.kpiDetailRow}>
-                  <span className={styles.kpiDetailText}>{kpi.detail}</span>
-                  <button type="button" className={styles.kpiFix} onClick={applyEmptyFilter}>
-                    直す<ArrowRight size={12} aria-hidden="true" />
-                  </button>
-                </span>
-              ) : kpi.detail}
+              detail={kpi.detail}
+              action={kpi.fix ? { label: canWrite ? '直す' : '空のままを見る', onClick: applyEmptyFilter } : undefined}
             />
           ))}
         </KpiBand>

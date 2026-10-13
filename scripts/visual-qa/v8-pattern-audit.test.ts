@@ -70,6 +70,15 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('ページ送りの件数文の再導入を止め、共通部品へ渡す数値は通す', () => {
+    const { root } = fixture()
+    const file = 'apps/web/src/v8/other/pager.tsx'
+    put(root, file, 'export const Pager = () => <Pagination page={1} pageCount={1} onPageChange={change} range={{ total: 7, first: 1, last: 7 }} />')
+    const audit = () => run({ code: root, only: ['pagination'] })
+    const before = audit()
+    put(root, file, 'export const Pager = () => <Pagination page={1} pageCount={1} onPageChange={change} summary={`${total}件中 ${first}〜${last}件`} />')
+    expect(newCodeFindings(before, audit()).some((item: { signal: string }) => item.signal === 'own-range-text')).toBe(true)
+  })
   it('移動した同じ中身は通し、コピー・中身の変更・移動先の新しい手書きは止める', () => {
     const { root } = fixture()
     const old = 'apps/web/src/v8/other/source.tsx'
