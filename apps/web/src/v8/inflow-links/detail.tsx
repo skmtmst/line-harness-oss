@@ -35,7 +35,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Td, Th, Tr, PersonCell } from '@/components/shared/table'
 import EditRouteModal from './edit-route-dialog'
 import QrDialog from './qr-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
@@ -650,12 +650,9 @@ function InflowDetailContent() {
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
                         </span>
                       </Td>
-                      <Td className={styles.colFriend}>
-                        <span className={styles.face} aria-hidden="true">{friend.displayName.slice(0, 1)}</span>
-                        <RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
-                          {friend.displayName}
-                        </RowNameLink>
-                      </Td>
+                      <PersonCell className={styles.colFriend} avatarName={friend.displayName} name={
+                        <RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>{friend.displayName}</RowNameLink>
+                      } />
                       <Td className={styles.colAccount} collapseAt="narrow"><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
                       <Td className={styles.colState}>
                         {blocked ? (

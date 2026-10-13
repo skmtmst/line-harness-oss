@@ -433,7 +433,7 @@ function FriendAddRunsInner() {
   const head = {
     boardId: 'REIxB',
     title: '実行結果：友だち追加時の配信',
-    description: 'だれが・どの経路から来て・何を送ったか、失敗した処理を見ます。',
+    help: 'だれが・どの経路から来て・何を送ったか、失敗した処理を見ます。',
   }
 
   if (!accountLoading && !loading && !selectedAccountExists) {

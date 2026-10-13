@@ -70,21 +70,6 @@
 .colResult { width: var(--tpl-ar-run-col-time); flex-shrink: 0; min-width: 0; }
 .colMenu { width: var(--tpl-ar-run-col-menu); flex-shrink: 0; }
 .when { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
-.face {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-ar-run-face);
-  height: var(--tpl-ar-run-face);
-  border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 700;
-}
 .cellText,
 .cellSub,
 .cellFaint { min-width: 0; overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
