@@ -411,12 +411,14 @@
   line-height: var(--tpl-sb-ec-lh);
 }
 :root .frame[data-grid-table] .table tbody tr {min-height:var(--table-grid-row-height,0px);}
+:root .frame[data-grid-table] .table tbody tr { font-size: var(--table-body-text-size); }
 :root .frame[data-grid-table] .table thead tr {
+  font-size: var(--table-head-text-size);
   padding: var(--table-head-padding);
   background: var(--color-surface-pearl);
   box-shadow: none;
 }
-:root .frame[data-grid-table] .table :is(th, td) {
+html:root .frame[data-grid-table] .table.table > :is(thead, tbody) > tr > :is(th, td):nth-child(n) {
   min-width: 0;
   height: auto;
   padding: 0;
@@ -609,3 +611,6 @@ html:root .frame[data-column-sizing='content'] .table.table tr[data-table-layout
 html:root .frame[data-column-sizing='content'] .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-support-column] {
   flex: 0 0 var(--list-content-column-width); min-width: 0;
 }
+
+/* 中身で測る設定表でも、全行が同じ列幅を使う。外部リンクの印も幅に含める。 */
+:root .frame[data-grid-table][data-column-sizing='content'] .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }

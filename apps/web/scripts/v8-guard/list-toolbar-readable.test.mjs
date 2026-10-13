@@ -402,3 +402,19 @@ test('media cards stretch the thumbnail and its empty tiles while content owns o
     assert.ok((await widths()).image<good.card,'removing the shared media layout reproduces the collapsed image')
   } finally { await browser.close() }
 })
+
+test('explicit picker widths remain readable in a flex toolbar; allowing shrink clips the same labels', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const fields = [['タグ：すべて',119],['担当者：すべて',132],['シナリオ：すべて',147]]
+    const summary = fields.map(([label,width]) => `<div data-entity-picker-field style="width:${width}px;max-width:100%;flex-shrink:0"><div class="field" data-empty><span class="fieldValue"><span class="fieldPlaceholder">${label}</span></span><span class="fieldAction"><svg width="16" height="16"></svg></span></div></div>`).join('')
+    await page.setContent(`<html><style>${css('entity-picker')}*{box-sizing:border-box}:root{--tpl-picker-gap:4px;--tpl-picker-field-pad:8px 12px;--text-caption:12px}body{font:12px Arial}[data-entity-picker-field]{min-width:0}main{display:flex;gap:8px;width:350px}input{width:100px;flex:none}</style><main><input aria-label="探す">${summary}</main></html>`)
+    const clipped = () => page.locator('.fieldPlaceholder').evaluateAll(nodes=>nodes.filter(el=>el.scrollWidth>el.clientWidth+1).map(el=>el.textContent))
+    assert.deepEqual(await clipped(),[])
+    await page.locator('[data-entity-picker-field]').evaluateAll(nodes=>nodes.forEach(el=>el.style.flexShrink='1'))
+    assert.deepEqual(await clipped(),fields.map(([label])=>label))
+    const source = read('../../src/components/shared/entity-select.tsx')
+    assert.match(source,/style=\{width \? \{ width, maxWidth: '100%', flexShrink: 0 \}/)
+  } finally { await browser.close() }
+})

@@ -145,7 +145,7 @@ export function DataTable({
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string; headTextSize?: string; bodyTextSize?: string }
   /** 補助列の内容幅を読み、名前へ残りの幅を割り当てる。 */
   columnSizing?: 'content'
 }) {
@@ -174,6 +174,8 @@ export function DataTable({
         '--table-grid-gap':grid.gap,
         '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
+        '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
+        '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
       } as CSSProperties : undefined}>{children}</table>
     </div>
   )
@@ -285,7 +287,7 @@ export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'c
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, annotation, selection, className }: {
+export function NameCell({ name, folder, annotation, selection, className, grow }: {
   name: ReactNode
   /** 名前の横の状態札。名前やリンクの中には入れない。 */
   annotation?: ReactNode
@@ -293,9 +295,11 @@ export function NameCell({ name, folder, annotation, selection, className }: {
   selection?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
+  /** 列の余りを名前へ配る。見出しの Th と同じ役割を渡す。 */
+  grow?: boolean
 }) {
   return (
-    <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+    <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
       <div className={shell.name}><FolderDotName folder={folder} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
     </td>
   )

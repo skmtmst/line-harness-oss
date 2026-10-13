@@ -25,7 +25,6 @@ import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -48,7 +47,7 @@ import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { ListToolbarRow, ListToolbarSort } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
@@ -360,7 +359,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       toolbar={<>
         <BannerLimitNotice usage={usage} />
         <ListToolbar search={{placeholder:'プロジェクト名・説明で探す',label:'プロジェクト名・説明で探す',value:query,onChange:setQuery}}
-          filters={viewFilter} trailing={<Select aria-label="プロジェクトの並び順" size="content" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} />} />
+          filters={viewFilter} trailing={<SaveErrorField names={["sort"]}><ListToolbarSort aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
       </>}
     >

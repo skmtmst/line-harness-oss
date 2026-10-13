@@ -64,7 +64,7 @@ for (const [title, Component, query, actions] of entries) {
     state.query = query
     render(<Component />)
     if (role === 'staff') {
-      await screen.findByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+      await screen.findByText(/^閲覧のみで見ています。変える操作は(?:オーナーか)?管理者に頼んでください。$/)
       for (const name of actions) expect(screen.queryByRole('button', { name, exact: true })).toBeNull()
     } else {
       await waitFor(() => {

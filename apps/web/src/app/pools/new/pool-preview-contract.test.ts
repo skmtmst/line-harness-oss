@@ -5,7 +5,7 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('プール作成のプレビュー', () => {
   it('入力中のURLと受け入れ先を右側で確認できる', () => {
-    expect(PAGE).toContain('>プレビュー</h2>')
+    // 共通CardHeaderの見出しはcreate.test.tsxの実描画で確認する。
     expect(PAGE).toContain("/pool/${slugValid ? slug : 'shibuya'}")
     expect(PAGE).toContain("selectedAccounts.map((account) => account.name).join('・')")
   })

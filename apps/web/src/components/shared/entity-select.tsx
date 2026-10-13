@@ -97,7 +97,7 @@ export default function EntitySelect(props: EntitySelectProps) {
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
     describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix,
   }
-  return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%' } : undefined} data-entity-picker-field>
+  return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%', flexShrink: 0 } : undefined} data-entity-picker-field>
     {name ? <input type="hidden" name={name} value={props.values ? props.values.join(',') : props.value} disabled={disabled} /> : null}
     {props.values !== undefined ? <EntityPickerField key={account?.selectedAccountId ?? 'unscoped'} {...common} multiple value={props.values} onChange={props.onChange} />
       : <EntityPickerField key={account?.selectedAccountId ?? 'unscoped'} {...common} value={props.value} onChange={props.onChange} clearable={props.clearable}

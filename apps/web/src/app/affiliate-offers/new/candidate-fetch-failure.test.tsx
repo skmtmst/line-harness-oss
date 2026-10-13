@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -63,12 +64,8 @@ function setInput(id: string, value: string) {
 
 async function openOptions(buttonId: string) {
   const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
-  const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
-  if (toggle && !toggle.checked) await act(async () => { toggle.click() })
-  // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-  const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag' : `#${buttonId}`)
-  expect(button).toBeTruthy()
-  await act(async () => { button!.click() })
+  await act(async () => { screen.getByRole('button', { name: '行うことを足す' }).click() })
+  await act(async () => { screen.getByRole('menuitem', { name: switchName }).click() })
   if (buttonId === 'of-tag') {
     const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')].map((el) => el.getAttribute('aria-label') ?? '')
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })

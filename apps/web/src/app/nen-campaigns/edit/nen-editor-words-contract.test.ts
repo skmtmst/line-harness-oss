@@ -45,7 +45,7 @@ describe('V8 NEN配信編集の運用者向け文言契約', () => {
     expect(EDITOR).not.toContain('吹き出しを追加する')
     expect(EDITOR).not.toContain('<Button>差し替える</Button>')
     expect(EDITOR).toContain('この配信は1通で届きます')
-    expect(EDITOR).toContain('回答フォームを開かせる（任意）')
+    expect(EDITOR).toContain('回答フォームを開かせる <OptionalBadge />')
     expect(EDITOR).toContain('value={formAction?.formId')
     expect(EDITOR).toContain('const MILEAGE_CHOICES = [50, 100, 200, 300, 500, 1000]')
     expect(EDITOR).toContain("{ kind: 'award_mileage', amount: Number(value), trigger: 'form_submitted' }")

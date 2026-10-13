@@ -39,12 +39,14 @@ async function render() {
 const buttons = () => Array.from(host.querySelectorAll('button')).map((b) => b.textContent?.trim())
 
 describe('案件を作る（Td4TN）', () => {
-  test('管理者には保存の2つを出し、成果地点は押せない形で置く', async () => {
+  test('管理者には保存の2つを出し、成果地点は未対応の理由と既存の行き先を出す', async () => {
     await render()
     expect(host.querySelector('[data-design-node="Td4TN"]')).not.toBeNull()
     expect(buttons()).toContain('保存して続けて作る')
     expect(buttons()).toContain('保存して公開')
-    expect(host.querySelector<HTMLButtonElement>('#of-point')?.disabled).toBe(true)
+    expect(host.querySelector('#of-point')).toBeNull()
+    expect(host.textContent).toContain('成果地点と案件をつなぐ設定は、まだ保存できません')
+    expect(host.querySelector('a[href="/conversions"]')?.textContent).toContain('成果地点を見る')
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 

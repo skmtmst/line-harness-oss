@@ -126,7 +126,7 @@ export default function TagEditV8() {
   const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => {
-    if (!tag || !definition || !selectedAccountId || saving) return
+    if (!canEdit || !tag || !definition || !selectedAccountId || saving) return
     const savingTarget = targetKey
     const savingGeneration = requestRef.current
     const stillHere = () => targetRef.current === savingTarget && requestRef.current === savingGeneration

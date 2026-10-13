@@ -21,6 +21,7 @@ import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrat
 import styles from './migrations.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -196,21 +197,22 @@ export default function CsvMigrationsV8() {
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
-          <DataTable className={styles.table}>
-            <colgroup>
-              <col className={styles.colDate} />
-              <col className={styles.colKind} />
-              <col className={styles.colKind} />
-              <col />
-              <col className={styles.colState} />
-            </colgroup>
+          <DataTable grid={{
+            columns: 'var(--tpl-fr-mig-col-date) var(--tpl-fr-mig-col-kind) var(--tpl-fr-mig-col-kind) minmax(0, 1fr) var(--tpl-fr-mig-col-state)',
+            padding: '0 var(--polish-space-card)',
+            headPadding: 'var(--polish-space-field) var(--polish-space-card)',
+            gap: 'var(--tpl-toolbar-gap)',
+            rowHeight: 'var(--tpl-fr-mig-row-h)',
+            headTextSize: 'var(--text-caption)',
+            bodyTextSize: 'var(--text-caption)',
+          }}>
             <thead>
               <TableHeadRow>
-                <Th className={styles.th}>日時</Th>
-                <Th className={styles.th}>種類</Th>
-                <Th className={styles.th}>件数</Th>
-                <Th className={styles.th}>した人</Th>
-                <Th className={styles.th}>状態</Th>
+                <Th>日時</Th>
+                <Th>種類</Th>
+                <Th>件数</Th>
+                <Th>した人</Th>
+                <Th>状態</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -220,11 +222,11 @@ export default function CsvMigrationsV8() {
                 const downloadable = job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString())
                 return (
                   <Tr key={`${job.kind}-${job.id}`} className={styles.row}>
-                    <Td className={styles.td}>{slashDateTime(job.created_at)}</Td>
-                    <Td className={styles.td}><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
-                    <Td className={styles.td}>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
-                    <Td className={styles.td}>{job.created_by_name}</Td>
-                    <Td className={styles.td}>
+                    <Td>{slashDateTime(job.created_at)}</Td>
+                    <Td><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
+                    <Td>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
+                    <Td><TruncatedText value={job.created_by_name ?? emptyValue('unknown')} /></Td>
+                    <Td>
                       <span className={styles.stateCell}>
                         <span className={`${styles.pill} ${job.status === 'completed' ? styles.pillOk : job.status === 'previewed' ? styles.pillWarn : styles.pillMuted}`}>
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}

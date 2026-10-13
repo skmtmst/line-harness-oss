@@ -45,9 +45,13 @@ export function fitListColumns(frame) {
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
     // A genuinely long secondary value keeps its existing truncation budget.
     const required = Math.max(0, ...cells.map(intrinsic))
-    const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, input, [data-design-node="xRvDB"], [data-list-date-time]'))
+    const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, a, input, [data-design-node="xRvDB"], [data-list-date-time]'))
     return Math.ceil(unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
+  if (frame.hasAttribute('data-grid-table')) {
+    const columns = widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ')
+    frame.style.setProperty('--table-content-columns', columns)
+  }
   // A native fixed-layout table reads <col> before the first row's cell width.
   // Keep its column model in sync with the same measured content budget.
   if (getComputedStyle(body).display !== 'flex') {

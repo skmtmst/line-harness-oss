@@ -149,3 +149,13 @@ describe('webhooks/new の保存失敗文（D005・結合）', () => {
     expect(host.textContent).toContain('もう一度お試しください')
   })
 })
+
+for (const role of [null, 'admin', 'staff', 'viewer']) it(`作成に必要なowner権限${role}の確認なしでは操作と送信を出さない`, async () => {
+  if (role === null) fixture.staffMe.mockImplementation(() => new Promise(() => {}))
+  else fixture.staffMe.mockResolvedValue({ success: true, data: { role } })
+  await render(); await flush()
+  expect(host.querySelector('#wh-new-name')).toBeNull()
+  expect(host.querySelector('a[href="/webhooks"]')).toBeTruthy()
+  expect(host.textContent).not.toContain('つくって動かす')
+  expect(fixture.outgoingCreate).not.toHaveBeenCalled()
+})

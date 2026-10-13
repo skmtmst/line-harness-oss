@@ -57,7 +57,7 @@ describe('ATTR-05: 既存の情報欄を編集できる入口がある', () => {
     expect(page).toContain('差し込みの名前（変えられません）')
     expect(page).toContain('種類は変えられません')
     expect(page).toContain("if (mode === 'create' && !keyTouched) setFieldKey")
-    expect(page).toContain('{field?.fieldKey}</span>')
+    expect(page).toMatch(/<AffixedTextField[^>]*readOnly[^>]*value=\{field\?\.fieldKey \?\? ''\}/)
     // 変更できる項目: 名前・選択肢・既定値・保護・使用状況
     for (const label of ['項目名', '既定値', '個人情報として保護', 'EC側の値を正とする']) {
       expect(page).toContain(label)

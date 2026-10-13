@@ -135,6 +135,8 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(buttons('送受信を止める')).toHaveLength(1)
     const archive = buttons('アーカイブする')[0] as HTMLButtonElement
     expect(archive.disabled).toBe(true)
+    expect(archive.title).toContain('先に送受信を止めてください')
+    expect(document.getElementById(archive.getAttribute('aria-describedby')!)?.textContent).toContain('先に送受信を止めてください')
     expect(document.body.textContent).toContain('先に送受信を止めてください')
     expect(document.body.textContent).toContain('高田 誠')
   })

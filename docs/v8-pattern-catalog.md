@@ -22,6 +22,12 @@
 
 実際に使われる経路の76ファイルの帯、15ファイル26か所の状態カード、一覧の件数定数、欄に結び付かない失敗の知らせを共通部品へ寄せた。同じ表での候補数は (a) 7032→6767、(b) 1435→1416、(c) 2497→2493。正規表現の全体一覧には未使用コードと要確認候補が残る。新しい候補0は、残りの候補が全部違反なしという意味ではない。Penの部品IDと見た目の合格は司令塔が記録する。
 
+## 列車31b：既存の型の小さい口（2026-10-13）
+
+- 作成の2列：`templates/create-page.tsx` の `CreateColumns`。見え方は入力の高さに収め、長い見本はその欄で送る。380幅と1100未満の畳み方は型が持つ。保存・プレビューの内容は画面が渡す。
+- 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。
+- 履歴の表：既存の `shared/table.tsx` の `DataTable.grid`。列・端の余白と本文／見出しの文字の大きさを共通の口へ渡す。画面で表の子を上書きしない。
+
 ## 使い方（必ず守る）
 
 1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
@@ -497,6 +503,12 @@
 - **見張り**：`apps/web/src/components/shared/optional-badge.test.tsx`・`apps/web/src/components/shared/text-field-unified.react.test.tsx`／**要る試験**：「（任意）」「＊」を書いたら落ちる試験
 - **10-09 の数**：(a) 804（v8 332）・(b) 52・(c) 196・(d) 手描き 1（1 板）／写し 4・効く範囲 269 ファイル／91 機能／Pen 104 板
 
+- **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
+
+- **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
+
+- **10-12の色選択の変わり形（F組）**：固定色をその場で選ぶ欄は`FolderColorButton`の`appearance="palette"`。丸は24px、選んだ色に輪。保存色が候補外でも現在色の選択を出す。色の名前・選択・矢印キーは同じ正本が持つ。既定のフォルダ色メニューは保つ。
+
 <a id="field-error"></a>
 ## field-error 欄の赤表示
 
@@ -660,7 +672,7 @@
 ## customer-info 顧客情報の欄
 
 - **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集・決まった8つの欄・タグ・マイル…）
-- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
+- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。マイルの数・記録・再試行は`customer-info-mileage.tsx`・同CSS。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
 - **持ち主（Pen）**：`GBTyR`「顧客情報の欄（B-167）」
   - 2026-10-11確認：両画面の入口は別でも欄の持ち主は CustomerInfoPanel。取得・保存・権限は呼び出す側が渡す。
   - 部品の板の html に書き出されていない ID：`GBTyR`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
@@ -921,6 +933,8 @@
 
 - **役目**：本文枠の内側の下端で、差し込む項目と文字数を同じ形で見せる。
 - **持ち主（コード）**：`apps/web/src/components/shared/message-insert-row.tsx`・`message-insert-row.module.css`（`MessageBody`・`MessageInsertRow`・`MessageInsertButton`）。本文中の札は `insert-text-field.tsx`・`insert-tokens.ts`、統括の種類の受け渡しは `hq-message-inserts.tsx`。
+- **閲覧のみ（2026-10-12 F3）**：MessageInsertRow.readOnly は差し込む操作と案内を置かず、文字数だけを同じ共通の行で表示する。既定の編集用の行は変えない。
+- **入力の大きさ（2026-10-12 F3）**：`InsertTextField.editorSize=message|code`。本文88／コード264の既存の高さと、共通の内側10/12を部品が持つ。保存する文字・札・カーソルの口と、既定／compactは変えない。
 - **持ち主（Pen）**：リマインダの採用形（B-221）。共通の部品IDは司令塔の確定待ち。V6xAo・U5rxyH・Bb8xi・pIHp3 等は画面の板のIDで、部品IDと混同しない。
 - **決まり**：[§6.34](v8-design-rules.md)・B-221・B-238。「差し込む」11px＋印付き文字ボタン＋右端の文字数。狭い時はその他にまとめ文字数は枠下。統括の項目は店名／電話／予約ページ／名前＋固定8つ。
 - **見つけ方**：枠外の「＋ 名前」の札・「差し込み：」・古い編集部品・同じ役目の自前行を探す。本文中の札と保存する {{…}} は違反ではない。
@@ -977,7 +991,7 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
-- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
+- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
 
@@ -1021,3 +1035,13 @@
 受信箱の取得カーソルによる続きの操作は `shared/inbox-list` の `InboxHistoryButton` が形を持つ。会話・メール・古い本文の取得処理は画面に残し、ページ数が返らない履歴に全ページ数を作らない。画面から色・文字・影を上書きしない。
 
 - **B-266 道具の2段**：ListToolbarFrameは狭い白い板で先頭と検索を同じ段へ、残りを次の段へそろえる。左列の作るボタンの全幅指定は先頭の口へ持ち込まない。ListToolbarOptional(collapse=overflow)は入りきらない組だけを操作名つきの入口に畳み、元の操作と入力は保持する。文字だけを小さくしたり無名の「…」へ消したりしない。
+### 下の帯の左端の操作（F組4回目・Q）
+- 持ち主：`components/shared/sticky-bar-action.tsx` の `StickyBarAction`（`sticky-bar.tsx` からも公開）。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。帯自身は配置だけを持ち、実際の削除・保管の処理と確認窓は呼び出す画面が保つ。
+
+- 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。
+
+- 名前とフォルダの2列は `SettingsFormRow layout="name-folder"`。名前2・フォルダ1の比率で行の幅を埋め、間は共通12。フォルダは既存 `FolderSelect size="full"`。文字数・再試行・社内メモは各入力の共通部品へ渡す。
+
+- 固定の保存項目しか持たない行うことは `FixedActionList` から既存 `ActionList` へ渡す。種類は保存できる物だけ、順序は固定。対象の選択を確定するまで行を作らず、保存形式は画面の既存の口へ戻す。
+
+- 条件を足す種類も `ConditionBuilder` の `EntityPickerDialog` で選ぶ。種類の制限・AND/ORの保存形を保ち、取消では条件を追加しない。条件のかたまりの箱と頭は共通 `Card` / `CardHeader`。

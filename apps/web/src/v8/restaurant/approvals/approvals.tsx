@@ -3,6 +3,9 @@
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
+import Card, { CardHeader } from '@/components/shared/card'
+import StatusBadge from '@/components/shared/status-badge'
+import Notice from '@/components/shared/notice'
 import { Check, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -26,7 +29,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 数4 → 承認カード（種類・状態・店舗・申請者・変更内容・差戻しコメント・差戻し／承認する）→ 公開境界。
  * 閲覧のみ（変える権限が無い人）には案内の帯を出し、差戻し・承認するのボタンは置かない
  * （2026-10-06 オーナー決定。場所だけ空けて、下の並びを動かさない）。
- * 承認待ちのカードは閲覧のみのとき枠を緑にして目立たせる（n4DT7）。動きは BEHAVIOR.md。
+ * 承認待ちは共通の状態札で知らせる。動きは BEHAVIOR.md。
  */
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
@@ -109,15 +112,15 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
 }) {
   const pending = item.status === 'pending'
   return (
-    <article className={`${styles.card} ${readOnly && pending ? styles.cardPending : ''}`}>
+    <Card variant="form">
       <div className={styles.cardHead}>
-        <span className={styles.kindChip}>{kindLabel[item.kind]}</span>
+        <StatusBadge dot={false} tone="neutral">{kindLabel[item.kind]}</StatusBadge>
         <Status value={item.status} />
         <span className={styles.store}>{store?.name || '全店舗'}</span>
         <span className={styles.spacer} aria-hidden="true" />
         {pending && !readOnly ? (
           <>
-            <Button className={styles.returnButton} disabled={busy} onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
+            <Button disabled={busy} onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
             <Button disabled={busy} onClick={() => onApprove(item)}><Check aria-hidden className={styles.buttonIcon} />承認する</Button>
           </>
         ) : pending ? (
@@ -125,14 +128,14 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
           <span className={styles.actionsSpace} aria-hidden="true" />
         ) : null}
       </div>
-      <h3 className={styles.cardTitle}>{item.title}</h3>
+      <CardHeader size="stacked" headingLevel={3} title={item.title} />
       <p className={styles.requested}>{`申請：${item.requested_by || emptyValue('unknown')} ・ ${formatStamp(item.created_at)}`}</p>
-      <div className={styles.payload}>
+      <Card surface="muted" layout="vertical" padding="compact" gap="var(--polish-space-row)">
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />
-      </div>
-      {item.review_comment ? <p className={styles.returnComment}>{item.review_comment}</p> : null}
-    </article>
+      </Card>
+      {item.review_comment ? <Notice tone="warn">{item.review_comment}</Notice> : null}
+    </Card>
   )
 }
 
@@ -214,7 +217,7 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       {rows.length === 0 ? (
-        <div className={styles.emptyBox}><ListState kind="empty" title="承認待ちはありません" /></div>
+        <ListState kind="empty" title="承認待ちはありません" />
       ) : (
         rows.map((item) => (
           <ApprovalCard
@@ -229,10 +232,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
           />
         ))
       )}
-      <section className={styles.boundary}>
-        <h2 className={styles.boundaryTitle}>公開境界</h2>
+      <Card variant="aside">
+        <CardHeader size="stacked" title="公開境界" />
         <p className={styles.boundaryText}>承認しても検証中は外部公開しません。状態は「承認済」まで進みます。Google投稿、LINE送信、メニュー媒体反映は、接続承認後に別工程として有効化します。</p>
-      </section>
+      </Card>
       <ReturnDialog
         item={returnTarget}
         store={data.stores.find((s) => s.id === returnTarget?.store_id)}

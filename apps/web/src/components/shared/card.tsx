@@ -3,6 +3,7 @@
 import { useCardHeights } from './use-card-heights'
 import React, { type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './card.module.css'
+import { OptionalBadge } from './form-controls'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
@@ -94,6 +95,7 @@ export function CardContent({ children, className }: { children: ReactNode; clas
 
 export function CardHeader({
   title,
+  optional = false,
   meta,
   action,
   size = 'standard',
@@ -102,6 +104,7 @@ export function CardHeader({
   titleId,
 }: {
   title: ReactNode
+  optional?: boolean
   meta?: ReactNode
   action?: ReactNode
   size?: 'standard' | 'roomy' | 'stacked' | 'panel' | 'restaurant' | 'content'
@@ -116,7 +119,7 @@ export function CardHeader({
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>
-        <Heading id={titleId} className={styles.title}>{title}</Heading>
+        <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (

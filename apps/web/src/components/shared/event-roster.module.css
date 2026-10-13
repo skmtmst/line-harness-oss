@@ -29,6 +29,11 @@
   .table[data-roster-kind='applicants'] { --record-columns: var(--tpl-roster-main-compact-cols); }
   .header, .header[data-split-action] { grid-template-columns: minmax(0, 1fr); }
   .headerAction { justify-content: flex-start; }
+  /* 狭い申込表では、期限を操作の予約幅で潰さない。 */
+  .table[data-roster-kind='applicants'] .row { padding-block: var(--polish-space-field); }
+  .table[data-roster-kind='applicants'] .actionCell { display: grid; gap: var(--polish-space-row); }
+  .table[data-roster-kind='applicants'] .actions { flex-wrap: wrap; justify-content: flex-start; }
+
 }
 
 .attendance { display: flex; align-items: flex-start; gap: var(--tpl-wh-check-gap); padding: var(--tpl-ev-bk-att-pad); border-radius: var(--radius-segment); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-row-name-lh); }
