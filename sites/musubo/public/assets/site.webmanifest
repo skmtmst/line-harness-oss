@@ -1,0 +1,14 @@
+{
+  "name": "musubo",
+  "short_name": "musubo",
+  "description": "お店とお客さまを結ぶ、LINE運用ツール",
+  "lang": "ja",
+  "start_url": "/",
+  "display": "browser",
+  "theme_color": "#143E34",
+  "background_color": "#F9FAF8",
+  "icons": [
+    { "src": "/assets/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
