@@ -156,3 +156,15 @@ test('REM3-06 new staff can choose registered media and save its public URL',asy
     expect(screen.queryByRole('checkbox', { name: '店舗の営業時間に合わせる' })).toBeNull()
     expect(screen.queryByRole('button', { name: /予約枠の色/ })).toBeNull()
  })
+
+ test.each([false, true])('F7-D: 既存4人でも編集中の担当を見本で読める（指名なし=%s）', async (designationFree) => {
+    fixture.staff = Array.from({ length: 4 }, (_, index) => ({ id: `existing-${index}`, name: `既存担当${index}`, display_name: `既存担当${index}`, role: '担当', sort_order: index, is_designation_optional: 0, is_active: 1 }))
+    render(<StaffNewV8 />)
+    await screen.findByRole('button', { name: '予約を受けられるメニュー' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }), { target: { value: '新しい担当' } })
+    if (designationFree) fireEvent.click(screen.getByRole('checkbox', { name: '「指名なし」の枠にも含める' }))
+    const phone = screen.getByRole('region', { name: 'お客さまの予約画面の見本' })
+    expect(within(phone).getByText('新しい担当')).toBeTruthy()
+    for (let index = 0; index < 4; index++) expect(within(phone).getByText(`既存担当${index}`)).toBeTruthy()
+    expect(within(phone).getAllByText(/既存担当|新しい担当/).map(node => node.textContent)).toEqual(['既存担当0', '既存担当1', '既存担当2', '既存担当3', '新しい担当'])
+ })
