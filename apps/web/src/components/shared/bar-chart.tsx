@@ -220,8 +220,8 @@ export function BarChart({
         <thead>
           <tr>
             <Th scope="col">日付</Th>
-            <Th scope="col">{addedLabel}</Th>
-            <Th scope="col">{removedLabel}</Th>
+            <Th scope="col">{distribution ? addedLabel : '増えた'}</Th>
+            <Th scope="col">{distribution ? removedLabel : '減った'}</Th>
           </tr>
         </thead>
         <tbody>
