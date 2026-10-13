@@ -462,6 +462,13 @@ jobs:
             echo "- D1 migration: 未適用 ${{ steps.pending_migrations.outputs.count || '確認失敗' }} 件（このWorkflowでは適用しません）"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Release the staging lock after successful verification
-        if: success() && steps.staging_lock.outcome == 'success'
+      # 取得できた run は、途中で落ちても中断されても必ずここを通して解放する。
+      # success() にしていたため、取得後に1段でも失敗するとこの段が飛ばされ、
+      # 誰も配備していないのに排他が残り続けた（run 38250060610。管理画面の配備が
+      # Cloudflare 側の Unknown internal error で落ち、staging のロックが242分残留）。
+      # ロックは「いま配備中」の宣言なので、run が終わった時点で手放すのが正しい。
+      # 途中まで配備された事実は run の失敗と上の Summarize が示す。
+      # 取得していない場合（outcome != success）は他担当のロックなので触らない。
+      - name: Release the staging lock when the run ends
+        if: always() && steps.staging_lock.outcome == 'success'
         run: pnpm deploy:lock release staging --remote origin
