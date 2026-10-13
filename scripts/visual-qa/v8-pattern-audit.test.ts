@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 点検の道具は素のJSで型定義を持たない。
-import { DEFAULT_CATALOG, forwardedEntryMoves, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, stripThemeScope } from './v8-pattern-audit.mjs'
+import { DEFAULT_CATALOG, forwardedEntryMoves, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, scanCodeFile, stripThemeScope } from './v8-pattern-audit.mjs'
 
 const ROOT = join(__dirname, '../..')
 
@@ -390,4 +390,19 @@ describe('列車26b: ファイル移動と共通部品の読み上げ属性', ()
     put(root, rel, `export function Probe(){return <><div role="dialog" aria-label="元の窓">本文</div><div role="dialog" aria-label="元の窓">複製</div><div role="dialog" aria-label="別の窓">本文</div></>}`)
     expect(newCodeFindings(before, run({ code: root, pen })).filter((hit: {pattern:string})=>hit.pattern==='dialog')).toHaveLength(2)
   })
+})
+
+
+it('行うことの共通部品への設定だけを区別し、隣やeditor内の手書きと同名の自作は止める', () => {
+  const root = mkdtempSync(join(tmpdir(), 'fixed-action-ownership-'))
+  put(root, 'apps/web/src/components/shared/fixed-action-list.tsx', readFileSync(join(ROOT, 'apps/web/src/components/shared/fixed-action-list.tsx'), 'utf8'))
+  const catalog = loadCatalog()
+  const pattern = catalog.patterns.find((p: { id: string }) => p.id === 'tap-extra')
+  const file = 'apps/web/src/v8/demo/create.tsx'
+  const shared = `import Actions from '@/components/shared/fixed-action-list'; export default function Page() { return <Actions options={[{ id: 'tag', label: 'タグを付ける', enabled: false, onEnabledChange() {} }]} /> }`
+  const scan = (source: string) => scanCodeFile(pattern, file, source, catalog._global, root).filter((hit: { signal: string }) => hit.signal === 'own-extra')
+  expect(scan(shared)).toHaveLength(0)
+  expect(scan(shared + `; export function Other() { return <button>タグを付ける</button> }`)).toHaveLength(1)
+  expect(scan(shared.replace("enabled: false", "editor: <button>タグを付ける</button>, enabled: false"))).toHaveLength(1)
+  expect(scan(shared.replace("@/components/shared/fixed-action-list", './fake'))).toHaveLength(1)
 })
