@@ -43,9 +43,9 @@ function useToolbarFit() {
 
 
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
-const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean }>({ leading: null })
+const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean; trailingAccessory?: ReactNode }>({ leading: null })
 const FrameContext = createContext(false)
-export function ListToolbarLeading({ children, leading, persistent }: { children: ReactNode; leading: ReactNode; persistent?: boolean }) {
+export function ListToolbarLeading({ children, leading, persistent, trailingAccessory }: { children: ReactNode; leading: ReactNode; persistent?: boolean; trailingAccessory?: ReactNode }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
   const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? Children.toArray(children.props.children) : null
   const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
@@ -53,7 +53,7 @@ export function ListToolbarLeading({ children, leading, persistent }: { children
   const needsFrame = nodes && nodes.some(node => isValidElement(node) && node.type === ListToolbarRow) && !containsLayout(nodes)
   const tools = needsFrame ? <ListToolbarFrame>{nodes.map((node, index) => isValidElement(node) && node.type === ListToolbarRow
     ? node : <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>)}</ListToolbarFrame> : children
-  return <LeadingContext.Provider value={{ leading, persistent }}>{tools}</LeadingContext.Provider>
+  return <LeadingContext.Provider value={{ leading, persistent, trailingAccessory }}>{tools}</LeadingContext.Provider>
 }
 
 export type ListToolbarSearch = {
@@ -118,7 +118,7 @@ export default function ListToolbar({
   layout?: 'band' | 'stacked'
 }) {
   const ref = useToolbarFit()
-  const { leading, persistent } = useContext(LeadingContext)
+  const { leading, persistent, trailingAccessory } = useContext(LeadingContext)
   return (
     <div ref={ref} className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1} data-toolbar-tools data-toolbar-row>
@@ -133,11 +133,11 @@ export default function ListToolbar({
           loading={search.loading}
         /></div> : searchSlot ? <div className={styles.search} data-toolbar-search>{searchSlot}</div> : null}
       </div>
-      {filters || secondary || actions || trailing || sort ? (
+      {filters || secondary || actions || trailing || sort || trailingAccessory ? (
         <div className={styles.row2} data-toolbar-row>
           {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}{secondary}</div> : null}
           {actions ? <span className={styles.actions} data-toolbar-actions>{actions}</span> : null}
-          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
+          {trailing || sort || trailingAccessory ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
         </div>
       ) : null}
     </div>
@@ -184,7 +184,8 @@ export function ListToolbarSearchSlot({ children, width }: { children: ReactNode
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(children)}</span>
+  const { trailingAccessory } = useContext(LeadingContext)
+  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{children}</>)}</span>
 }
 
 /** B-244: the shared end owns order; keep each control and its handler intact. */

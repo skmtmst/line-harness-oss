@@ -62,6 +62,8 @@ export interface ListPageBodyProps {
   /** 表の操作説明。本文に長い文を置かず、道具の段の「？」から読む。 */
   explanation?: ReactNode
   listHelp?: ReactNode
+  /** 明示の道具のEndへ説明を渡す。既定は道具の外側。 */
+  listHelpPlacement?: 'end'
   children: ReactNode
   pagination?: ReactNode
   overlays?: ReactNode
@@ -82,12 +84,14 @@ function hasListFolders({ folderNav, folders, collapsedFolders }: ListPageBodyPr
   return navs.length ? navs.some(nav => nav.rows.length > 1) : !!(folders || collapsedFolders)
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const navs = listFolderNavs(folderNav)
   const hasFolders = hasListFolders({ folderNav, folders, collapsedFolders, children })
   const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
   const visibleNavs = navs.filter(nav => nav.rows.length > 1 || nav.createAction || nav.rows.find(row=>row.id===nav.activeId)?.leadingActions?.length)
   const collapsed = collapsedFolders ?? (visibleNavs.length > 0 ? visibleNavs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
+  const help = listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null
+  const helpAtEnd = listHelpPlacement === 'end' && Boolean(toolbar)
   return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {readOnly ? <ReadOnlyNotice /> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
@@ -96,8 +100,8 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
       <div className={styles.main}>
         {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation || noFolderChoices ? undefined : ''}>
           {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset="notice">{explanation}</PageExplanationBody></div> : null}
-          {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}
-          {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}
+          {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices} trailingAccessory={helpAtEnd ? help : undefined}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}
+          {helpAtEnd ? null : help}
         </div> : null}
         <div className={styles.content} data-template-region="content" data-content-inset={contentInset || undefined}>{children}</div>
         {pagination ? <div className={styles.pagination} data-template-region="pagination">{pagination}</div> : null}
