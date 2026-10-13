@@ -70,6 +70,28 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('題の正の型へ渡す説明を実ファイルまで照合し、偽の再公開や説明内の操作は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/templates/create-page.tsx', 'export function CreatePage() { return null }')
+    put(root, 'apps/web/src/components/templates/index.ts', "export { CreatePage } from './create-page'")
+    const file = 'apps/web/src/v8/demo/help.tsx'
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file.endsWith('help.tsx'))
+    put(root, file, "import { CreatePage as Page } from '@/components/templates'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(0)
+    put(root, file, "import { CreatePage } from '@/components/templates/create-page'; export const P = () => <CreatePage help={'タグを付ける条件を設定します'} />")
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/shared/create-page.tsx', 'export default function CreatePage() { return null }')
+    put(root, file, "import Page from '@/components/shared/create-page'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(0)
+    put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help={<button>タグを付ける</button>} />")
+    expect(findings()).toHaveLength(1)
+    put(root, file, "import { CreatePage } from './own-page'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/index.ts', "export { CreatePage } from './own-page'")
+    put(root, 'apps/web/src/components/templates/own-page.tsx', 'export function CreatePage() { return null }')
+    put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(1)
+  })
   it('正の行うことの選択肢データを通し、同じ語の手書きや偽の持ち主は止める', () => {
     const { root } = fixture()
     put(root, 'apps/web/src/components/shared/action-list.tsx', 'export default function ActionList() { return null }')

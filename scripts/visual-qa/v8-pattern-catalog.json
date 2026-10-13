@@ -216,6 +216,8 @@
         "code": {
           "files": [
             "apps/web/src/components/templates/page-frame.tsx",
+            "apps/web/src/components/templates/create-page.tsx",
+            "apps/web/src/components/shared/create-page.tsx",
             "apps/web/src/components/shared/page-header.tsx",
             "apps/web/src/components/shared/help-tip.tsx",
             "apps/web/src/components/shared/page-explanation.tsx",
