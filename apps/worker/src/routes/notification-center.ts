@@ -79,7 +79,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/notifications/center error:', err);
+    console.error(JSON.stringify({"code":"routes_notification_center_failed","route":"GET /api/notifications/center"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -103,7 +103,7 @@ notificationCenter.post(
     });
     return c.json({ success: true, data: { updated } });
   } catch (err) {
-    console.error('POST /api/notifications/center/read-all error:', err);
+    console.error(JSON.stringify({"code":"routes_notification_center_failed","route":"POST /api/notifications/center/read-all"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
   },
@@ -127,7 +127,7 @@ notificationCenter.post(
     if (!updated) return c.json({ success: false, error: '通知が見つかりません' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('POST /api/notifications/center/:id/read error:', err);
+    console.error(JSON.stringify({"code":"routes_notification_center_failed","route":"POST /api/notifications/center/:id/read"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
   },

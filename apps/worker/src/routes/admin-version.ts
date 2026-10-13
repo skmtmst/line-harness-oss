@@ -19,8 +19,7 @@ type Env = {
 // Unauthenticated by design — returns build-time public metadata used by the
 // dashboard's upgrade banner before the user logs in. The manifest proxy exists
 // because GitHub release assets do not reliably send browser CORS headers.
-// Task 18's /admin/update/* mounts under the same /admin prefix but layers
-// ADMIN_API_KEY middleware on those subpaths.
+// The retired /admin/update/* router does not affect this public metadata.
 const app = new Hono<Env>();
 
 /*

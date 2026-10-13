@@ -499,12 +499,7 @@ async function safeHeartbeat(write: () => Promise<void>, jobName: string, phase:
   try {
     await write();
   } catch (error) {
-    console.error(JSON.stringify({
-      event: 'operation_dispatcher_heartbeat_write_failed',
-      job: jobName,
-      phase,
-      error: error instanceof Error ? error.name : 'UnknownError',
-    }));
+    console.error(JSON.stringify({"code":"operation_dispatcher_heartbeat_write_failed"}));
   }
 }
 

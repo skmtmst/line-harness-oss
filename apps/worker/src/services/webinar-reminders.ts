@@ -133,7 +133,7 @@ export async function processWebinarReminders(
       await markWebinarRegistrationNotified(db, reg.id);
       sent++;
     } catch (err) {
-      console.error('webinar reminder error:', reg.id, err);
+      console.error(JSON.stringify({"code":"services_webinar_reminders_failed"}));
       failed++;
     }
   }
@@ -176,6 +176,6 @@ export async function sendWebinarRegistrationConfirmation(
       },
     ], retryKey, options.proxyDispatch, 'reminder_dispatch');
   } catch (err) {
-    console.error('webinar registration confirmation error:', err);
+    console.error(JSON.stringify({"code":"services_webinar_reminders_failed"}));
   }
 }

@@ -973,7 +973,7 @@ featureSettings.get('/api/settings/features/visibility', async (c) => {
       ),
     });
   } catch (err) {
-    console.error('GET /api/settings/features/visibility error:', err);
+    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"GET /api/settings/features/visibility"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1025,7 +1025,7 @@ featureSettings.get('/api/settings/features', requireRole('owner', 'admin'), asy
       },
     });
   } catch (err) {
-    console.error('GET /api/settings/features error:', err);
+    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"GET /api/settings/features"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1122,7 +1122,7 @@ featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admi
       },
     });
   } catch (err) {
-    console.error('POST /api/settings/features/impact error:', err);
+    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"POST /api/settings/features/impact"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1475,9 +1475,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), inp
           .map((_, index) => index)
           .filter((index) => index !== casIndex && changed(index) > 0);
         if (leaked.length > 0) {
-          console.error('PUT /api/settings/features CAS partial write:', JSON.stringify({
-            accountId, expectedVersion: current.version, leaked,
-          }));
+          console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"PUT /api/settings/features"}));
         }
         const reread = await loadFeatureSettings(
           c.env.DB,
@@ -1545,7 +1543,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), inp
       data: savedVersion === null ? null : { version: savedVersion },
     });
   } catch (err) {
-    console.error('PUT /api/settings/features error:', err);
+    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"PUT /api/settings/features"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

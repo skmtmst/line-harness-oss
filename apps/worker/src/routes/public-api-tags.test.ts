@@ -441,3 +441,30 @@ describe('R431 同時再発行は1本だけ成功する', () => {
     raw.close();
   });
 });
+
+
+describe('S08 integration tokens cannot use another tenant’s legacy tags', () => {
+  test.each(['read', 'write'])('another tenant cannot %s NULL tags, while its own tags work', async (operation) => {
+    const { db, raw } = createTestD1();
+    try {
+      seedBase(raw);
+      raw.prepare("INSERT INTO tenants (id,name,status) VALUES ('tenant-other','Synthetic tenant','active')").run();
+      raw.prepare("UPDATE line_accounts SET tenant_id='tenant-other' WHERE id='acc-b'").run();
+      raw.prepare("INSERT INTO friends (id,line_user_id,line_account_id) VALUES ('friend-b','synthetic-user-b','acc-b')").run();
+      raw.prepare("INSERT INTO tags (id,name,line_account_id,status) VALUES ('tag-b','Synthetic tag','acc-b','active')").run();
+      const { token } = await createIntegrationApiToken(db, {
+        lineAccountId: 'acc-b', name: 'Synthetic integration', scopes: ['tags:read','tags:write'], createdBy: 'synthetic-owner',
+      });
+      const app = publicApp(db);
+      const read = await app.request('/api/public/v1/tags', { headers: { authorization: `Bearer ${token}` } }, { DB: db });
+      expect(read.status).toBe(200);
+      const tags = (await read.json() as any).data.map((tag: any) => tag.id);
+      if (operation === 'read') expect(tags).toEqual(['tag-b']);
+      expect((await postTag(app, db, token, 'friend-b', 'tag-common')).status).toBe(404);
+      expect(raw.prepare("SELECT count(*) AS n FROM friend_tags WHERE friend_id='friend-b'").get()).toEqual({ n: 0 });
+      expect((await postTag(app, db, token, 'friend-b', 'tag-a')).status).toBe(404);
+      expect((await postTag(app, db, token, 'friend-a', 'tag-b')).status).toBe(404);
+      expect((await postTag(app, db, token, 'friend-b', 'tag-b')).status).toBe(201);
+    } finally { raw.close(); }
+  });
+});

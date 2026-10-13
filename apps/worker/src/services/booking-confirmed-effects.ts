@@ -112,6 +112,6 @@ export async function recoverConfirmedBookingSideEffects(db: D1Database, options
       AND op.status IN ('queued','retry_wait') ORDER BY op.created_at, op.id LIMIT 200`).all<{ id: string }>();
   for (const row of rows.results ?? []) {
     try { await runConfirmedBookingSideEffects(db, row.id, options); }
-    catch { console.error(JSON.stringify({ event: 'booking_confirmation_recovery_failed' })); }
+    catch { console.error(JSON.stringify({"code":"booking_confirmation_recovery_failed"})); }
   }
 }

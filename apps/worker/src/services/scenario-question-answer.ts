@@ -469,7 +469,7 @@ async function sendReply(
     await lineClient.pushMessage(friend.line_user_id, [{ type: 'text', text }])
     return false
   } catch (err) {
-    console.error('[scenario-question] reply failed', err)
+    console.error(JSON.stringify({"code":"services_scenario_question_answer_failed"}))
     return false
   }
 }

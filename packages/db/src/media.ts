@@ -517,7 +517,7 @@ async function setMediaArchiveState(
         ).bind(existing.archived_at ?? null, existing.archived_by ?? null,
           existing.archive_reason ?? null, input.id).run();
     if ((reverted.meta?.changes ?? 0) === 0) {
-      console.error('media archive audit failed and rollback lost the race', error);
+      console.error(JSON.stringify({"code":"src_media_failed"}));
     }
     throw error;
   }

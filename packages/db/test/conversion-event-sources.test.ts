@@ -203,7 +203,10 @@ describe('コンバージョン起点の実イベント接続', () => {
     // 捨てずに記録が残る。運用者が後から辿れること。
     expect(log).toHaveBeenCalledTimes(1);
     expect(String(log.mock.calls[0][0])).toContain('conversion_source_unmatched');
-    expect(String(log.mock.calls[0][0])).toContain('mystery_future_event');
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual({ code: 'conversion_source_unmatched' });
+    for (const value of ['mystery_future_event', 'account-1', 'friend-1', 'x-1']) {
+      expect(String(log.mock.calls[0][0])).not.toContain(value);
+    }
   });
 
   it('停止中の地点は数えない', async () => {

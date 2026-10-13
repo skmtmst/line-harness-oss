@@ -693,7 +693,7 @@ export async function matchAndReply(
           // 動作は済んだのに完了の記録だけ書けなかった。ここで
           // permanent_failed を書くと、成功した動作が「もう一度実行」の
           // 対象になり二度動いてしまう。行は claimed のまま残す。
-          console.error('[auto-reply] failed to write action run outcome', finishError);
+          console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
         }
       } catch (err) {
         actionSummary.failed += 1;
@@ -705,9 +705,9 @@ export async function matchAndReply(
             errorCode: safeErrorCode(err),
           });
         } catch (finishError) {
-          console.error('[auto-reply] failed to mark action run failed', finishError);
+          console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
         }
-        console.error('[auto-reply] failed to run action', err);
+        console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
       }
       if (actionFailed && action.onFailure === 'stop' && !continueAfterEventBookingStop) break;
     }
@@ -773,7 +773,7 @@ export async function matchAndReply(
     });
   } catch (err) {
     replyError = err;
-    console.error(`Failed to send auto-reply${logContext ? ` (${logContext})` : ''}`, err);
+    console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
   }
 
   if (replyTokenConsumed) {
@@ -795,7 +795,7 @@ export async function matchAndReply(
       });
     } catch (error) {
       // LINEへの返信は既に成功している。集計の失敗を「返信失敗」へ書き換えない。
-      console.error('[auto-reply] failed to record successful hit', error);
+      console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
     }
   } else {
     await markAutoReplyEvaluationFinished(db, {
@@ -969,7 +969,7 @@ export async function retryAutoReplyActionRuns(
           errorCode: safeErrorCode(error),
         });
       } catch (finishError) {
-        console.error('[auto-reply] retry: failed to mark action run failed', finishError);
+        console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
       }
       continue;
     }
@@ -983,7 +983,7 @@ export async function retryAutoReplyActionRuns(
     } catch (finishError) {
       // 動作は済んだのに完了の記録だけ書けなかった。行は claimed のまま
       // 残す——permanent_failed へ戻すと、成功した動作がもう一度動く。
-      console.error('[auto-reply] retry: failed to write action run outcome', finishError);
+      console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
       continue;
     }
     retriedCount += 1;

@@ -909,12 +909,7 @@ export async function processTiktokPnlTick(
       if (one.status === 'error') result.failed += 1;
     } catch (error) {
       result.failed += 1;
-      console.error(JSON.stringify({
-        event: 'tiktok_pnl_sync_failed',
-        lineAccountId: integration.line_account_id,
-        error: error instanceof GoogleBusinessError ? error.kind
-          : error instanceof Error ? error.name : 'unknown',
-      }));
+      console.error(JSON.stringify({"code":"tiktok_pnl_sync_failed"}));
     }
   }
   return result;

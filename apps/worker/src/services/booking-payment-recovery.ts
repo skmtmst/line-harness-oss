@@ -82,7 +82,7 @@ export async function reconcilePaidBookingPayment(
       WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
       .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
     try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials }); }
-    catch { console.error(JSON.stringify({ event: 'paid_booking_confirmation_incomplete' })); }
+    catch { console.error(JSON.stringify({"code":"paid_booking_confirmation_incomplete"})); }
   }
   return { duplicate: !applyPaid || (result[0]?.meta?.changes ?? 0) === 0 };
 }
@@ -97,7 +97,7 @@ export async function recoverPaidBookingPayments(db: D1Database, now: Date, cred
     ORDER BY p.id LIMIT 200`).all<{ id: string }>();
   for (const row of rows.results ?? []) {
     try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }
-    catch { console.error(JSON.stringify({ event: 'paid_booking_recovery_failed' })); }
+    catch { console.error(JSON.stringify({"code":"paid_booking_recovery_failed"})); }
   }
 }
 

@@ -244,7 +244,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch (err) {
-    console.error('GET /api/getting-started error:', err);
+    console.error(JSON.stringify({"code":"routes_getting_started_failed","route":"GET /api/getting-started"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -268,7 +268,7 @@ gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin'
     ).bind(staff.id).run();
     return c.json({ success: true, data: { dismissed: true } });
   } catch (err) {
-    console.error('POST /api/getting-started/dismiss error:', err);
+    console.error(JSON.stringify({"code":"routes_getting_started_failed","route":"POST /api/getting-started/dismiss"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

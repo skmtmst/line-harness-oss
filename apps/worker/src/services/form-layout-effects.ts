@@ -397,13 +397,13 @@ async function runEffectStep(
     await run();
   } catch (err) {
     failed.push(effectId);
-    console.error(`form effect (${effectId}) failed:`, err);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
     return;
   }
   if (failed.length > beforeInnerFailed || stats.failed > beforeFailed) {
     // 内側の動作が欠けたまま終わった。再開時に補完するため未完に残す。
     if (!failed.includes(effectId)) failed.push(effectId);
-    console.error(`form effect (${effectId}) partial failure`);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
     return;
   }
   await input.onEffectComplete?.(effectId, {
@@ -418,7 +418,7 @@ async function runTracked(failed: string[], label: string, run: () => Promise<un
     await run();
   } catch (err) {
     failed.push(label);
-    console.error(`form effect (${label}) failed:`, err);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
   }
 }
 
@@ -560,7 +560,7 @@ async function trackDestinationWrite(
     else stats.failed += count;
   } catch (error) {
     stats.failed += count;
-    console.error('form destination write failed:', error);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
   }
 }
 

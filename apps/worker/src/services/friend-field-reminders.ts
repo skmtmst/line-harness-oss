@@ -116,7 +116,7 @@ export async function processFriendFieldReminders(
           try {
             matched = await matchesCondition(db, friend.friend_id, targetCondition);
           } catch (err) {
-            console.error(`[friendFieldReminders] target condition failed for reminder ${reminder.id}`, err);
+            console.error(JSON.stringify({"code":"services_friend_field_reminders_failed"}));
           }
           if (!matched) {
             skipped++;
@@ -143,7 +143,7 @@ export async function processFriendFieldReminders(
       if (nextCursor !== null) hasMore = true;
     } catch (err) {
       // 1つのリマインダで転んでも、残りは続ける。
-      console.error(`[friendFieldReminders] reminder ${reminder.id} failed`, err);
+      console.error(JSON.stringify({"code":"services_friend_field_reminders_failed"}));
       hasMore = true;
     }
   }
