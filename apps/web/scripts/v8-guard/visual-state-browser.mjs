@@ -1,4 +1,4 @@
-/** B-269: inspect the painted surface, person name and requested state separately. */
+/** Inspect the painted surface, person name and requested state separately. */
 export default function scanVisualState({ expectedState = null } = {}) {
   const visible = el => el && el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0
     && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[hidden],[inert]')
@@ -19,7 +19,23 @@ export default function scanVisualState({ expectedState = null } = {}) {
     if (background !== white) findings.push({ kind: 'preview-background', background, expected: white })
   }
   // Use the first painted name, not the secondary description in the same cell.
-  for (const avatar of document.querySelectorAll('main td [data-avatar], main [role="cell"] [data-avatar]')) {
+  const avatars = new Set(document.querySelectorAll('main td [data-avatar], main [role="cell"] [data-avatar]'))
+  // Person cells can paint an initial directly instead of using Avatar.
+  // Identify their semantic name column and circular painted face, not a page class.
+  for (const el of document.querySelectorAll('main td [aria-hidden="true"],main [role="cell"] [aria-hidden="true"],main td img,main [role="cell"] img')) {
+    if (!visible(el) || el.closest('[data-avatar]') || el.matches('svg') || el.querySelector('svg')) continue
+    const cell = el.closest('td,[role="cell"]'), row = cell.parentElement
+    const index = [...row.children].indexOf(cell)
+    const table = cell.closest('table,[role="table"]')
+    const header = table?.querySelectorAll('thead th,[role="columnheader"]')[index]?.textContent ?? ''
+    const person = /友だち|会員|ユーザー|スタッフ|担当者|氏名/.test(header)
+      || [...cell.querySelectorAll('a[href]')].some(link => /\/(?:friends|staff)\/detail/.test(link.getAttribute('href')))
+    if (!person || !(el.matches('img') || el.textContent.trim())) continue
+    const rect = el.getBoundingClientRect(), radius = getComputedStyle(el).borderTopLeftRadius
+    const rounded = radius.endsWith('%') ? parseFloat(radius) >= 50 : parseFloat(radius) >= Math.min(rect.width,rect.height) / 2
+    if (Math.abs(rect.width-rect.height) <= 1 && rounded) avatars.add(el)
+  }
+  for (const avatar of avatars) {
     if (!visible(avatar)) continue
     const cell = avatar.closest('td,[role="cell"]'), walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT)
     let name, rects
