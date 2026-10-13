@@ -42,7 +42,7 @@ export default function SheetDialog({
   onClose: () => void
 }) {
   return <Dialog open={open} title={title} description={description} onCancel={onClose} busy={busy} error={error} designNode={designNode}
-    tone={destructive ? 'destructive' : 'default'} confirmation designLayout="stacked" designWidth={720}
+    tone={destructive ? 'destructive' : 'default'} confirmation designLayout="stacked" designWidth={480}
     footer={<>{destructive}{actions}</>} footerAlign="center">
     {band ? <div className={styles.band} data-tone={bandTone}><TriangleAlert size={16} aria-hidden="true" className={styles.bandIcon} /><div className={styles.bandText}>{band}</div></div> : null}
   </Dialog>

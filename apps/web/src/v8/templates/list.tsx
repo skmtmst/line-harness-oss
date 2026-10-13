@@ -1307,6 +1307,7 @@ export default function TemplatesListV8() {
         description={DELETE_UNUSED_DESCRIPTION}
         destructive busy={deleting} error={deleteError}
         designNode="V6JFnd"
+        contentLayout="form"
         confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
         onConfirm={() => confirmDelete()}
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
