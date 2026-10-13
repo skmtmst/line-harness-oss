@@ -29,5 +29,5 @@
 | N-171/N-179 | 回答検索・CSV(apps/worker/src/routes/forms.ts submissions。PR #88) | /form-submissions 系 | 参考実装(対応済み)。土台への寄せは後続で判断 |
 | N-423 | auth.tsの対応表 | — | 対象外(auth.tsは本票の禁止領域) |
 
-- E-IDに境界ものは現在ない(docs/audit-status.mdで確認)。
+- 機能ごとの境界は[要件の索引](v6-requirements/v6-requirements-master-index.md)と、Workerの認可・アカウント範囲の試験で確認する。
 - N-043(友だち属性の一括更新)は本流統合済みのため表に入れない。
