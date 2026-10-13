@@ -1029,7 +1029,6 @@ export default function BookingsPage() {
         }}
         toolbar={<>
           {view === 'month' ? <Notice tone="info" role="status">今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</Notice> : null}
-          <div data-design="Bar"><div data-design="Saved">
             <ListToolbar
             search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
             filters={
@@ -1095,7 +1094,6 @@ export default function BookingsPage() {
               ) : null
             }
           />
-          </div></div>
         </>}
         pagination={view === 'month'
           ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} range={{ total, first: (current - 1) * PAGE_SIZE + 1, last: Math.min(current * PAGE_SIZE, total) }} />
