@@ -8,7 +8,7 @@ import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Info, Pause, Pencil, QrCode } from 'lucide-react'
+import { ArrowLeft, Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag, RotateCcw } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -476,18 +476,18 @@ function InflowDetailContent() {
       ) : <>
         <div >
           {route.couponEnabled ? <KpiBand aria-label={`${route.name}のクーポン概要`}>
-            <KpiCard presentation="band" icon={null} title="読み取り" value={funnel?.click_count ?? null} unit="回" detail="累計" />
-            <KpiCard presentation="band" icon={null} title="友だち追加" value={funnel?.new_friend_add_count ?? null} unit="人" detail="新しく友だちになった人" />
-            <KpiCard presentation="band" icon={null} title="クーポンを受け取った" value={funnel?.coupon_received_count ?? null} unit="人" detail="既存の友だちを含む" />
-            <KpiCard presentation="band" icon={null} title="使った" value={funnel?.coupon_used_count ?? null} unit="人" detail="受け取り後に使った人" />
+            <KpiCard presentation="band" icon={<QrCode size={14} aria-hidden="true" />} title="読み取り" value={funnel?.click_count ?? null} unit="回" detail="累計" />
+            <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="友だち追加" value={funnel?.new_friend_add_count ?? null} unit="人" detail="新しく友だちになった人" />
+            <KpiCard presentation="band" icon={<Gift size={14} aria-hidden="true" />} title="クーポンを受け取った" value={funnel?.coupon_received_count ?? null} unit="人" detail="既存の友だちを含む" />
+            <KpiCard presentation="band" icon={<Check size={14} aria-hidden="true" />} title="使った" value={funnel?.coupon_used_count ?? null} unit="人" detail="受け取り後に使った人" />
           </KpiBand> : <KpiBand aria-label={`${route.name}の概要`}>
-            <KpiCard presentation="band" icon={null} title="今月 友だちになった" value={monthTotal} unit="人"
+            <KpiCard presentation="band" icon={<CalendarDays size={14} aria-hidden="true" />} title="今月 友だちになった" value={monthTotal} unit="人"
               detail={`先月より ${monthDelta == null ? emptyValue('unknown') : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
-            <KpiCard presentation="band" icon={null} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
+            <KpiCard presentation="band" icon={<Users size={14} aria-hidden="true" />} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
               detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? emptyValue('unknown') : formatNumber(funnel.remainingCount)}人`} />
-            <KpiCard presentation="band" icon={null} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
+            <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
-            <KpiCard presentation="band" icon={null} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
+            <KpiCard presentation="band" icon={<Target size={14} aria-hidden="true" />} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
               detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
           </KpiBand>}
         </div>
@@ -515,11 +515,11 @@ function InflowDetailContent() {
             </p>
             {funnel ? (
               <KpiBand aria-label="流入後の成果">
-                <KpiCard presentation="band" icon={null} title="クリック" value={funnel.click_count} unit="回" detail={null} />
-                <KpiCard presentation="band" icon={null} title="友だち追加" value={funnel.friend_add_count} unit="人" detail={addRate == null ? '追加率は集計できません' : `追加率 ${addRate}%`} />
-                <KpiCard presentation="band" icon={null} title="フォーム" value={funnel.form_submission_count} unit="件" detail={null} />
-                <KpiCard presentation="band" icon={null} title="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
-                <KpiCard presentation="band" icon={null} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
+                <KpiCard presentation="band" icon={<MousePointerClick size={14} aria-hidden="true" />} title="クリック" value={funnel.click_count} unit="回" detail={null} />
+                <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="友だち追加" value={funnel.friend_add_count} unit="人" detail={addRate == null ? '追加率は集計できません' : `追加率 ${addRate}%`} />
+                <KpiCard presentation="band" icon={<FileText size={14} aria-hidden="true" />} title="フォーム" value={funnel.form_submission_count} unit="件" detail={null} />
+                <KpiCard presentation="band" icon={<ShoppingBag size={14} aria-hidden="true" />} title="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
+                <KpiCard presentation="band" icon={<RotateCcw size={14} aria-hidden="true" />} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
               </KpiBand>
             ) : funnelError ? (
               <div className={styles.funnelError}>

@@ -3,7 +3,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
-import { Download, Eye, PencilLine } from 'lucide-react';
+import { Download, Eye, PencilLine, Play, CircleCheck, Clock, LogOut } from 'lucide-react';
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared';
 import { api, ApiError, type ScenarioRuns } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
@@ -459,19 +459,19 @@ export default function ScenarioResultsV8() {
         <>
           <div className={styles.kpiBox}>
           <KpiBand data-design="KPIs">
-            <KpiCard icon={null} title="始まった" value={enrolled} unit="人" detail="購読を始めた人" />
+            <KpiCard icon={<Play size={14} aria-hidden="true" />} title="始まった" value={enrolled} unit="人" detail="購読を始めた人" />
             <KpiCard
               presentation="cell"
-              icon={null}
+              icon={<CircleCheck size={14} aria-hidden="true" />}
               title="読み終えた"
               value={completedCount}
               unit="人"
               detail={enrolled && completedCount !== null ? percentLabel(completedCount, enrolled) : emptyValue('unknown')}
             />
-            <KpiCard icon={null} title="途中" value={inProgress} unit="人" detail="いま途中にいる人" />
+            <KpiCard icon={<Clock size={14} aria-hidden="true" />} title="途中" value={inProgress} unit="人" detail="いま途中にいる人" />
             <KpiCard
               presentation="cell"
-              icon={null}
+              icon={<LogOut size={14} aria-hidden="true" />}
               title="離れた"
               value={leftCount}
               unit="人"

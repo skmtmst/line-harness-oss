@@ -5,7 +5,7 @@ import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleDot, Plug, Star } from 'lucide-react'
+import { CircleDot, Plug, Star, CircleCheck, Clock, CircleSlash, TriangleAlert } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
@@ -354,10 +354,10 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   return (
     <>
       <KpiBand presentation="band">
-        <KpiCard presentation="band" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="件" detail={null} loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="処理中" value={processingCount ?? null} unit="件" detail={null} loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="件" detail="送る設定がない" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="失敗" value={failedCount ?? null} unit="件" detail={null} valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleCheck size={14} aria-hidden="true" />} title="処理完了" value={listedSummary?.succeeded ?? null} unit="件" detail={null} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<Clock size={14} aria-hidden="true" />} title="処理中" value={processingCount ?? null} unit="件" detail={null} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleSlash size={14} aria-hidden="true" />} title="送信なし" value={listedSummary?.skipped ?? null} unit="件" detail="送る設定がない" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗" value={failedCount ?? null} unit="件" detail={null} valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
       </KpiBand>
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">
