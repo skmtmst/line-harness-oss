@@ -207,7 +207,11 @@ describe('受信箱の右の列のエラー境界', () => {
     await openChatAndCustomerInfo(root)
 
     await eventually(() => expect(host.textContent).toContain('タグなし'))
-    expect(host.textContent).toContain('回答はまだありません')
+    // フォーム回答は「顧客情報をすべて表示」を押すと出る。押せるボタンであることも見る。
+    const showAll = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '顧客情報をすべて表示')
+    expect(showAll, '顧客情報をすべて表示').toBeTruthy()
+    await act(async () => { showAll!.click() })
+    await eventually(() => expect(host.textContent).toContain('回答はまだありません'))
     // 回答を1件も受け取れていないのに「1〜0件を表示」とは出さない。
     expect(host.textContent).not.toContain('件中')
     expect(sidebarFailure()).toBeNull()
