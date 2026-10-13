@@ -9,9 +9,10 @@ import Link from '@/components/shared/list-navigation'
 import type { Tag, TagGroup } from '@line-crm/shared';
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api';
 import { formatDay } from '@/lib/format';
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -163,6 +164,7 @@ export function TagEditForm({
   }, [tag.id, accountId, values.rewardMiles, values.referralRewardMiles, retroactiveReference, host])
 
   const requestSave = () => {
+    if (readOnly) return
     const problem = tagNameProblem(name)
     if (problem) { setNameError(problem); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
@@ -234,7 +236,7 @@ export function TagEditForm({
         identity={host ? undefined : <></>}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         preview={host ? host.preview(values) : side}
-        destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
+        destructive={host || readOnly ? undefined : <StickyBarAction label="タグを削除する" icon={Trash2} onClick={onDelete} />}
         footerActions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
@@ -251,10 +253,10 @@ export function TagEditForm({
       >
         {error ? <Notice tone="danger" message={error} /> : null}
         {/* 閲覧のみには入力の部品・押す口を置かず、いまの値を文字で見せる（2026-10-06 オーナー決定）。 */}
-        <fieldset disabled={saving || readOnly} className={styles.fieldset}>
+        <fieldset disabled={saving} className={styles.fieldset}>
           <Card variant="form" gap="normal" aria-label="基本">
-            <h2 className={styles.cardTitle}>基本</h2>
-            <div className={styles.field}><Field label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><SaveErrorField names={["name", "tag.name", "definition.tag.name"]}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></SaveErrorField></Field>}
+            <CardHeader size="stacked" title="基本" />
+            <div className={styles.field}><Field required error={nameError || undefined} label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <SaveErrorField names={["name", "tag.name", "definition.tag.name"]}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></SaveErrorField>}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field></div>
             <div className={styles.field}>
               <span className={styles.label}>所属フォルダ</span>
@@ -275,28 +277,16 @@ export function TagEditForm({
 
           <section aria-label="タグ連動" ref={actionsRef}>
             <Card variant="form" gap="normal">
-            <div className={styles.cardHead}>
-              <div className={styles.cardTitles}>
-                <div className={styles.titleRow}>
-                  <h2 className={styles.cardTitle}>タグ連動（このタグが付いたときの動き）</h2>
-                  <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip>
-                  <span className={styles.titleSpacer} />
-                  <span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>
-                  {readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}
-                </div>
-                <div className={styles.noteRow}>
-                  <p className={styles.cardNote}>上から順に動きます。並べ替えは上下の印で</p>
-                  {actionsOpen ? <button type="button" className={styles.openButton} onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></button> : null}
-                </div>
-                {actionsOpen ? null : (
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryText}>{host && actions.length === 0 ? 'まだありません。［開く］から連動アクションを足せます' : actionsSummary(actions, linked)}</span>
-                    <span className={styles.titleSpacer} />
-                    <button type="button" className={styles.openButton} onClick={() => setActionsOpen(true)} aria-expanded={false}>開く<ChevronDown size={14} aria-hidden="true" /></button>
-                  </div>
-                )}
+            <CardHeader size="stacked" title={<>タグ連動（このタグが付いたときの動き）<HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip></>}
+              meta="上から順に動きます。並べ替えは上下の印で"
+              action={<><span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>{readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}</>} />
+            {actionsOpen ? <Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (
+              <div className={styles.summaryRow}>
+                <span className={styles.summaryText}>{host && actions.length === 0 ? 'まだありません。［開く］から連動アクションを足せます' : actionsSummary(actions, linked)}</span>
+                <span className={styles.titleSpacer} />
+                <Button variant="text" onClick={() => setActionsOpen(true)} aria-expanded={false}>開く<ChevronDown size={14} aria-hidden="true" /></Button>
               </div>
-            </div>
+            )}
             {actionsOpen ? (
               <>
                 {linked || host ? (
@@ -311,20 +301,14 @@ export function TagEditForm({
 
           {linked || host ? (
             <Card variant="form" gap="normal" aria-label="マイル">
-              <div className={styles.cardTitles}>
-                <h2 className={styles.cardTitle}>マイル</h2>
-                <div className={styles.noteRow}>
-                  <p className={styles.cardNote}>このタグが付いている人の、これからのマイルの倍率</p>
-                  {mileageOpen ? <button type="button" className={styles.openButton} onClick={() => setMileageOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></button> : null}
+              <CardHeader size="stacked" title="マイル" meta="このタグが付いている人の、これからのマイルの倍率" />
+              {mileageOpen ? <Button variant="text" onClick={() => setMileageOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryText}>{host && !multiplier && !Number(reward) && !Number(referralReward) ? '変えない（ひな形の既定）' : mileageSummary(multiplier, Number(reward) || 0, Number(referralReward) || 0)}</span>
+                  <span className={styles.titleSpacer} />
+                  <Button variant="text" onClick={() => setMileageOpen(true)} aria-expanded={false}>開く<ChevronDown size={14} aria-hidden="true" /></Button>
                 </div>
-                {mileageOpen ? null : (
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryText}>{host && !multiplier && !Number(reward) && !Number(referralReward) ? '変えない（ひな形の既定）' : mileageSummary(multiplier, Number(reward) || 0, Number(referralReward) || 0)}</span>
-                    <span className={styles.titleSpacer} />
-                    <button type="button" className={styles.openButton} onClick={() => setMileageOpen(true)} aria-expanded={false}>開く<ChevronDown size={14} aria-hidden="true" /></button>
-                  </div>
-                )}
-              </div>
+              )}
               {mileageOpen ? (
                 <>
                   <div className={styles.pair}>
@@ -363,9 +347,9 @@ export function TagEditForm({
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
                   </div>
                   <div className={styles.pair}>
-                    <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <SaveErrorField names={["reward", "rewardMiles", "mileageReward", "mileage.self", "tag.mileage.self", "definition.tag.mileage.self"]}><NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /></SaveErrorField>}<span className={styles.unit}>mile</span></span>
+                    <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <SaveErrorField names={["reward", "rewardMiles", "mileageReward", "mileage.self", "tag.mileage.self", "definition.tag.mileage.self"]}><NumberInput unit="mile" type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} /></SaveErrorField>}{readOnly ? <span className={styles.unit}>mile</span> : null}</span>
 </Field>
-                    <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <SaveErrorField names={["referralReward", "referral_reward", "referralRewardMiles", "referralMileageReward", "mileage.referrer", "tag.mileage.referrer", "definition.tag.mileage.referrer"]}><NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /></SaveErrorField>}<span className={styles.unit}>mile</span></span>
+                    <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <SaveErrorField names={["referralReward", "referral_reward", "referralRewardMiles", "referralMileageReward", "mileage.referrer", "tag.mileage.referrer", "definition.tag.mileage.referrer"]}><NumberInput unit="mile" type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} /></SaveErrorField>}{readOnly ? <span className={styles.unit}>mile</span> : null}</span>
 </Field>
                   </div>
                   {readOnly ? (

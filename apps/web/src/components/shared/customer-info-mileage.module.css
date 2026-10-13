@@ -1,0 +1,14 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.summary { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.caption { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fdt-small-lh); }
+.available { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--tpl-fdt-title-gap); min-width: 0; }
+.number { color: var(--color-ink); font-size: var(--tpl-fdt-mile-size); font-weight: 700; line-height: var(--tpl-fdt-mile-lh); font-variant-numeric: tabular-nums; }
+.unit { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-fdt-small-lh); }
+.history { display: flex; flex-direction: column; gap: var(--space-8); border-top: 1px solid var(--color-hairline); padding-top: var(--space-8); }
+.entry { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); font-size: var(--text-micro); line-height: var(--tpl-fdt-small-lh); }
+.reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-faint); }
+.amount { flex: none; color: var(--color-ink-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.amount[data-positive] { color: var(--color-success); }
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-micro); line-height: var(--tpl-fdt-small-lh); }
+}

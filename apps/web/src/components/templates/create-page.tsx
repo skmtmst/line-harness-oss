@@ -8,6 +8,9 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface CreatePageProps extends PageHeadingProps {
   readOnly?: boolean
+  /** 本文の入力をネイティブfieldsetでまとめて無効にする。 */
+  contentDisabled?: boolean
+  contentLabel?: string
   dirty?: boolean
   busy?: boolean
   boardId?: string
@@ -47,16 +50,17 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+  const Content = contentDisabled === undefined ? 'div' : 'fieldset'
   return <PageFrame kind="create" boardId={boardId} standalone={standalone} heightMode={heightMode} hasFooter>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
-    {readOnly ? <ReadOnlyNotice /> : null}
+    {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
     {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher>{preview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
-      <div className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing}>{children}</div>
+      <Content className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing} disabled={contentDisabled} aria-label={contentDisabled === undefined ? undefined : contentLabel ?? '入力内容'}>{children}</Content>
       {preview ? <aside className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{preview}</div></aside> : null}
     </div>
     <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>

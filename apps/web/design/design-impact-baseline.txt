@@ -147,6 +147,7 @@ shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/shared/save-conflict.tsx
 shared-button-importer components/shared/entity-picker.tsx
 shared-button-importer components/shared/source-picker-dialog.tsx
+shared-button-importer components/shared/sticky-bar-action.tsx
 shared-button-importer components/shared/tag-picker-field.tsx
 shared-button-importer components/shared/tap-extras-field.tsx
 shared-button-importer components/shared/target-missing.tsx
@@ -485,6 +486,7 @@ shared-button-importer components/shared/list-state.tsx
 
 shared-button-importer components/shared/form-file-attachments.tsx
 shared-button-importer components/shared/form-document-retention.tsx
+shared-button-importer components/shared/customer-info-mileage.tsx
 shared-button-importer components/shared/customer-info-panel.tsx
 shared-button-importer components/friend-fields/linked-action-list.tsx
 shared-button-importer components/shared/action-list.tsx

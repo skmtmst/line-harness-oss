@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, within, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConversionsPage from './page'
 import EditPage from './edit/page'
@@ -350,20 +350,20 @@ describe('S4-OR 編集の数えない条件は空のかたまりを黙って落�
   /** 編集の窓の中の or 追加ボタン。作成と同じ共通部品。 */
   function orAddButton(): HTMLElement | undefined {
     return [...document.body.querySelectorAll('button')]
-      .find((node) => node.textContent?.includes('いずれか1つ以上を満たす'))
+      .find((node) => node.getAttribute('aria-label') === 'いずれか条件のかたまりを足す')
   }
 
   /** 編集の窓の中の条件の足し口。最初は1つ、or 追加で2つ。 */
   function kindPickers(): HTMLElement[] {
-    return [...document.body.querySelectorAll('[role="combobox"]')]
+    return [...document.body.querySelectorAll('button')]
       .filter((node) => node.getAttribute('aria-label') === '追加する条件を選ぶ')
   }
 
-  function pickKind(node: HTMLElement, query: string) {
-    fireEvent.focus(node)
-    fireEvent.change(node, { target: { value: query } })
-    fireEvent.keyDown(node, { key: 'ArrowDown' })
-    fireEvent.keyDown(node, { key: 'Enter' })
+  async function pickKind(field: HTMLElement, query: string) {
+    await click(field)
+    const dialog = screen.getByRole('dialog', { name: '条件を選ぶ', hidden: true })
+    await click(within(dialog).getByRole('radio', { name: query, hidden: true }))
+    await click(within(dialog).getByRole('button', { name: '条件を足す', hidden: true }))
   }
 
   it('空の or かたまりのまま決めると案内が出て、版上げの口は呼ばれない', async () => {
@@ -384,9 +384,7 @@ describe('S4-OR 編集の数えない条件は空のかたまりを黙って落�
     await mount()
     await openEditDialog()
     await click(orAddButton())
-    await act(async () => {
-      pickKind(kindPickers()[1], '行動スコア')
-    })
+    await pickKind(kindPickers()[1], '行動スコア')
     await click(byText('この内容にする'))
 
     const revise = net.calls.find((call) => call.path.includes('/revise'))

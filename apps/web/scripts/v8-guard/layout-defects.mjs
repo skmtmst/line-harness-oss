@@ -16,11 +16,12 @@ import scanPanelBlank from './panel-blank-browser.mjs'
 import scanBlankGap from './blank-gap-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
+import scanFormRules from './form-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
 export const keyOf = f => JSON.stringify([f.kind, f.target, f.other || '', f.text])
-const KINDS = ['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'control-overlap', 'control-blocked', 'liffshadow','liffradio','canvasbottom','kpiblank','kpialign','kpimenu','cardspill','cardbottom','segempty','segselected','segstyle','choice-radio','choice-color','pageredge','rowmenu','bandtouch','customer-edit','insertoutside','insertlegacy','internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname']
+const KINDS = ['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'control-overlap', 'control-blocked', 'liffshadow', 'liffradio', 'canvasbottom', 'kpiblank', 'kpialign', 'kpimenu', 'cardspill', 'cardbottom', 'segempty', 'segselected', 'segstyle', 'choice-radio', 'choice-color', 'pageredge', 'rowmenu', 'bandtouch', 'customer-edit', 'insertoutside', 'insertlegacy', 'internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname', 'form-shrink', 'form-color', 'form-footer-action', 'form-optional', 'form-row-end']
 export function validateAllowances(allowances) {
   if (!Array.isArray(allowances)) throw new Error('許可リストは配列です')
   const keys = new Set()
@@ -109,7 +110,7 @@ export async function measurePage(page) {
       extra.push({kind:'blank-kpi',target:b.sel.replace(/__[\w-]+/g,''),text:'数の帯の全マスが高い',measure:{minExcess:Math.min(...b.cardH.map((h,i)=>h-b.contentH[i]-16)),maxExcess:Math.max(...b.cardH.map((h,i)=>h-b.contentH[i]-16))}})
   }
   for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
-  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanB244Rules)]
+  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanB244Rules), ...await page.evaluate(scanFormRules)]
   return await page.evaluate(identifyStableTargets, findings)
 }
 async function measureRoute(browser, baseUrl, route, width) {

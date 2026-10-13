@@ -80,20 +80,11 @@
   background: var(--color-surface-pearl);
 }
 
-.cardContent {
-  gap: 14px;
-  min-width: 0;
-}
+.cardContent { min-width: 0; }
 .cardHeading {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 15px;
-  font-weight: 700;
 }
 .cardNote {
   margin: 0;
@@ -108,17 +99,6 @@
   gap: var(--tpl-field-gap-basic);
 }
 
-/* ルール名＋フォルダの2列（`K7HWG`）。狭い板では縦に積む。 */
-.fieldPair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  gap: 12px;
-}
-@media (max-width: 640px) {
-  .fieldPair {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 .label {
   color: var(--color-ink);
   font-size: var(--text-label);
@@ -655,16 +635,6 @@
   outline-offset: -1px;
   background: var(--color-canvas);
 }
-.bodyText {
-  min-height: calc(var(--tpl-body-lh) * 2);
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font-size: var(--text-label);
-  line-height: var(--tpl-body-lh);
-  resize: vertical;
-}
 .insertChips {
   display: flex;
   flex-wrap: wrap;
@@ -707,23 +677,7 @@
 
 
 /* 右の列の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */
-.sideCard {
-  gap: var(--tpl-side-card-gap);
-  align-self: stretch;
-  min-width: 0;
-  padding: var(--tpl-side-card-pad);
-  /* 絵の枠は内側の線（場所を取らない）。border だと中身が1つ下がる。 */
-  border: 0;
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
-.sideTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: var(--tpl-side-title-lh);
-}
+.sideCard { align-self: stretch; min-width: 0; }
 .sideCard .kvList {
   gap: var(--tpl-side-row-gap);
 }

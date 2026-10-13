@@ -10,7 +10,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Field, TextArea as LegacyTextArea, TextInput } from './form-controls'
-import { TextArea, TextField } from './text-field'
+import { AffixedTextField, TextArea, TextField } from './text-field'
 
 afterEach(() => cleanup())
 
@@ -23,6 +23,22 @@ const describedText = (el: HTMLElement) =>
     .map((id) => document.getElementById(id)?.textContent ?? `(無い id: ${id})`)
 
 describe('Field と入力欄の読み上げ', () => {
+  it('前後の固定文字を入力値へ混ぜず、ref・説明・必須・誤りを元の欄へ渡す', () => {
+    const ref = React.createRef<HTMLInputElement>()
+    let changed = ''
+    render(<Field label="差し込み名" htmlFor="key" required error="名前が重複しています">
+      <AffixedTextField ref={ref} startAdornment="{{var." endAdornment="}}" defaultValue="hours" onChange={event => { changed = event.target.value }} />
+    </Field>)
+    const input = screen.getByLabelText(/差し込み名/) as HTMLInputElement
+    expect(ref.current).toBe(input)
+    expect(input.value).toBe('hours')
+    expect(input.getAttribute('aria-required')).toBe('true')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(describedText(input)).toEqual(['名前が重複しています'])
+    expect(screen.getByText('{{var.').getAttribute('aria-hidden')).toBe('true')
+    fireEvent.change(input, { target: { value: 'business_hours' } })
+    expect(changed).toBe('business_hours')
+  })
   it('説明を aria-describedby でつなぐ（呼ぶ側の分も残す）', () => {
     render(
       <>

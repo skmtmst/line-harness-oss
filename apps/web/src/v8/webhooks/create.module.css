@@ -2,18 +2,6 @@
  * ★V8 外部連携「送り先を作る」（hsD8e）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここはカード（枠1・角12・余白20・間14）と、右の列のカード（余白16・間8）の中身だけ。
  */
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-wh-card-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-wh-card-title-lh);
-}
 .cardNote {
   margin: 0;
   color: var(--color-ink-secondary);
@@ -72,14 +60,6 @@
 }
 
 /* いつ送るか：出来事の箱（薄い地・角8・余白 12/14・間8）。 */
-.eventGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-wh-event-pad);
-  border-radius: var(--radius-segment);
-  background: var(--color-surface-pearl);
-}
 .eventGroupTitle {
   margin: 0;
   color: var(--color-ink);
@@ -100,13 +80,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-body-pad);
-}
-.sideTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: var(--tpl-chip-label-lh);
 }
 .sideNote {
   margin: 0;

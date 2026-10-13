@@ -4,13 +4,6 @@
  * 寸法は globals.css の --tpl-ml-*。
  */
 /* 段（白・薄い枠・角丸12・中20・間14）。 */
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-ml-card-title-size);
-  font-weight: 600;
-  line-height: var(--tpl-ml-card-title-lh);
-}
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -35,27 +28,6 @@
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
-.conditionBox {
-  padding: var(--tpl-ml-phone-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-table-head);
-}
-.linkButton {
-  display: inline-flex;
-  min-height: 0;
-  height: var(--tpl-ml-select-label-h);
-  line-height: normal;
-  align-items: center;
-  gap: var(--tpl-ml-back-gap);
-  width: fit-content;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  cursor: pointer;
-}
-.linkButton:hover { text-decoration: underline; }
 
 /* 右の列：お客さまの画面での見え方・出す前に。 */
 .aside {
@@ -76,14 +48,6 @@
   margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--tpl-row-sub-size);
-}
-.phoneRow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-ml-phone-gap);
-  padding: var(--tpl-ml-phone-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-table-head);
 }
 .phoneName {
   line-height: normal;

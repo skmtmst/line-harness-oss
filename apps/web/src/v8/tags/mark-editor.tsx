@@ -1,5 +1,6 @@
 'use client'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import IconButton from '@/components/shared/icon-button'
 import { markNameRequirement } from '@/v8/tags/mark-requirement'
 import { createPageReturnHref } from '@/components/shared/create-page';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
@@ -11,6 +12,7 @@ import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls';
@@ -464,9 +466,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (
-          <Button type="button" variant="danger" onClick={() => openArchive()} busyLabel="処理中…" disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
-            <Pause size={15} aria-hidden="true" />保管する
-          </Button>
+          <StickyBarAction label="保管する" icon={Pause} onClick={() => openArchive()} disabledReason={archiveBlockReason} />
         ) : undefined}
         footerActions={hideForm ? <></> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
@@ -494,10 +494,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
             <MarkBasicFields name={name} color={color} onName={(value) => { setName(value); setNameError('') }} onColor={setColor} nameDuplicates={nameDuplicates} disabled={saving} error={nameError} nameRef={nameRef} />
 
             <Card variant="form" gap="normal" aria-labelledby="mark-rules">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle} id="mark-rules">自動で変えるきまり</h2>
-                <p className={styles.cardNote}>条件に合ったら、このマークに変えます</p>
-              </div>
+              <CardHeader size="stacked" titleId="mark-rules" title="自動で変えるきまり" meta="条件に合ったら、このマークに変えます" />
               {editing ? (
                 <>
                   {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません。</p> : null}
@@ -515,12 +512,12 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                       <Zap className={styles.ruleIcon} aria-hidden="true" />
                       <span className={styles.ruleWhen} title={rule.name}>{`${WHEN_WORDS[rule.event] ?? eventLabel(rule.event)}${rule.isActive ? '' : '（止めています）'}`}</span>
                       <span className={styles.ruleThen}>{`→ ${name.trim() || 'このマーク'}にする`}</span>
-                      <button type="button" className={styles.iconButton} aria-label={`きまり「${rule.name}」を直す`} title="直す" onClick={() => setRulesOpen(true)}>
+                      <IconButton size="small" aria-label={`きまり「${rule.name}」を直す`} title="直す" onClick={() => setRulesOpen(true)}>
                         <Pencil className={styles.wayIcon} aria-hidden="true" />
-                      </button>
-                      <button type="button" className={styles.iconButton} aria-label={`きまり「${rule.name}」を止める`} title="止める" onClick={() => { setRuleError(''); setStoppingRule(rule) }}>
+                      </IconButton>
+                      <IconButton size="small" aria-label={`きまり「${rule.name}」を止める`} title="止める" onClick={() => { setRuleError(''); setStoppingRule(rule) }}>
                         <Trash2 className={styles.wayIcon} aria-hidden="true" />
-                      </button>
+                      </IconButton>
                     </div>
                   ))}
                   {rulesState === 'ready' || rulesState === 'loading' ? (

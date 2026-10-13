@@ -60,7 +60,8 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import Card, { CardHeader } from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import SearchField from '@/components/shared/search-field'
 import Dialog from '@/components/shared/dialog'
@@ -1366,8 +1367,8 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'trigger' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
-                <h2 className={styles.sideTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
+              <Card variant="aside" gap="tight" className={styles.sideCard}>
+                <CardHeader size="stacked" title={<>保存したあとに、過去28日で当たった数が出ます</>} />
                 {/* 絵 A0pDt：数（— 件）→ 説明 → 試しの文2つ（いまの言葉で当たるか）。 */}
                 <p className={styles.countRow} aria-label="当たった受信（過去28日）">
                   <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
@@ -1397,8 +1398,8 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'response' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
-                <h2 className={styles.sideTitle}>送るものの確認</h2>
+              <Card variant="aside" gap="tight" className={styles.sideCard}>
+                <CardHeader size="stacked" title={<>送るものの確認</>} />
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">返すもの</dt>
@@ -1452,7 +1453,7 @@ function AutoReplyWizardV8Inner() {
             <>
               {/* 絵 Guoye：重なりを1件ずつ確かめる（クリーム地）→ 重なりの確認（行3つ）。 */}
               <section className={styles.conflictCard} aria-label="重なりを1件ずつ確かめる">
-                <h2 className={styles.sideTitle}>重なりを1件ずつ確かめる</h2>
+                <CardHeader size="stacked" title={<>重なりを1件ずつ確かめる</>} />
                 <p className={styles.conflictDesc}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
                 {conflicts.length === 0 ? (
                   <p className={styles.conflictDesc}>同時に当たるルールはありません。</p>
@@ -1515,8 +1516,8 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'confirm' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
-                <h2 className={styles.sideTitle}>設定内容</h2>
+              <Card variant="aside" gap="tight" className={styles.sideCard}>
+                <CardHeader size="stacked" title={<>設定内容</>} />
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">状態</dt>
@@ -1637,13 +1638,10 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'basic' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.cardTitle}>名前とフォルダ</h2>
-                  <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
-                </div>
-                <div className={styles.fieldPair}>
-                  <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name"><SaveErrorField names={["ruleName","form.ruleName","rule_name","name","form.rule_name"]}><TextField
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
+                <SettingsFormRow layout="name-folder">
+                  <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name" required><SaveErrorField names={["ruleName","form.ruleName","rule_name","name","form.rule_name"]}><TextField
                       id="wiz-name"
                       value={form.ruleName}
                       onChange={(e) => patch({ ruleName: e.target.value })}
@@ -1652,6 +1650,7 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.field}><Field label="フォルダ" htmlFor="wiz-folder"><SaveErrorField names={["folderId","form.folderId","folder_id","form.folder_id"]}><FolderSelect
                       id="wiz-folder"
                       aria-label="フォルダ"
+                      size="full"
                       value={form.folderId}
                       onChange={(value) => patch({ folderId: value })}
                       unfiled={{ value: '', label: '分けない' }}
@@ -1661,7 +1660,7 @@ function AutoReplyWizardV8Inner() {
                         ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
                     /></SaveErrorField></Field></div>
-                </div>
+                </SettingsFormRow>
                 <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><SaveErrorField names={["internalMemo","form.internalMemo","internal_memo","form.internal_memo"]}><TextField
                     id="wiz-memo"
                     value={form.internalMemo}
@@ -1674,11 +1673,8 @@ function AutoReplyWizardV8Inner() {
                 新しく作るルールは、一覧のいちばん下（最後に見る順番）に足されます。順番は手順4「優先順位」で確かめます。
               </Notice>
 
-              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.starterSection}`}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
-                  <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
-                </div>
+              <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.starterSection}`}>
+                <CardHeader size="stacked" title="ひな形から作る" optional meta={<>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</>} />
                 <CreateStarterCards
                   items={STARTER_TEMPLATES.map((tpl) => ({
                     key: tpl.key,
@@ -1697,11 +1693,8 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'trigger' && (
             <>
-              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.cardTitle}>1. どのメッセージに反応するか</h2>
-                  <p className={styles.cardDesc}>届いた言葉で決めます。</p>
-                </div>
+              <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.stepTrigger}`}>
+                <CardHeader size="stacked" title={<>1. どのメッセージに反応するか</>} meta={<>届いた言葉で決めます。</>} />
                 <SaveErrorField names={["trigger-kind","respondToAll","form.respondToAll"]}><RadioCardGroup legend="反応するメッセージ" className={styles.radioPair}>
                   <RadioCard
                     name="trigger-kind"
@@ -1892,11 +1885,8 @@ function AutoReplyWizardV8Inner() {
 
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.cardTitle}>2. いつ反応するか</h2>
-                  <p className={styles.cardDesc}>曜日と時間帯を決めます。祝日は「営業日」の設定に従います。</p>
-                </div>
+              <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.stepTrigger}`}>
+                <CardHeader size="stacked" title={<>2. いつ反応するか</>} meta={<>曜日と時間帯を決めます。祝日は「営業日」の設定に従います。</>} />
                 <div className={styles.field}>
                   <span className={styles.label}>曜日</span>
                   <div className={styles.weekdayRow}>
@@ -2007,8 +1997,8 @@ function AutoReplyWizardV8Inner() {
                 </div>
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
-                <h2 className={styles.cardTitle}>3. 誰に反応するか</h2>
+              <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.stepTrigger}`}>
+                <CardHeader size="stacked" title={<>3. 誰に反応するか</>} />
                 <SaveErrorField names={["friend-target","friendTarget","form.friendTarget"]}><RadioCardGroup legend="反応する相手" className={styles.radioPair}>
                   <RadioCard
                     name="friend-target"
@@ -2047,8 +2037,8 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'response' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <h2 className={styles.cardTitle}>返すもの</h2>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>返すもの</>} />
                 <div className={styles.chips} role="group" aria-label="返すもの">
                   {(
                     [
@@ -2079,7 +2069,7 @@ function AutoReplyWizardV8Inner() {
                       aria-invalid={!!fieldError('wiz-content') || undefined}
                       aria-describedby={fieldError('wiz-content') ? 'wiz-content-error' : undefined}
                       aria-label="返す文"
-                      className={styles.bodyText}
+                      editorSize="message"
                       value={form.responseContent}
                       onValueChange={(next) => patch({ responseContent: next })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
@@ -2155,11 +2145,8 @@ function AutoReplyWizardV8Inner() {
                 )}
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.cardTitle}>返したあとに行うこと</h2>
-                  <p className={styles.cardNote}>上から順に動きます。失敗したときの動きも決められます。</p>
-                </div>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>返したあとに行うこと</>} meta={<>上から順に動きます。失敗したときの動きも決められます。</>} />
                 <InlineActionRowsV8
                   actions={form.actions}
                   onChange={(next) => patch({ actions: next })}
@@ -2167,8 +2154,8 @@ function AutoReplyWizardV8Inner() {
                 />
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <h2 className={styles.cardTitle}>細かい決まり</h2>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>細かい決まり</>} />
                 <div className={styles.ruleRows}>
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
@@ -2270,11 +2257,8 @@ function AutoReplyWizardV8Inner() {
                 上のルールから順に見て、最初に当たった1つだけが動きます。このルールより上に、同じ受信に当たるルールがあると、このルールは動きません。
               </Notice>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.cardTitle}>動く順番</h2>
-                  <p className={styles.cardNote}>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</p>
-                </div>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>動く順番</>} meta={<>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</>} />
                 {priorityState === 'error' ? (
                   <p className={styles.hint}>
                     ルールの並びを読み込めませんでした。
@@ -2348,11 +2332,8 @@ function AutoReplyWizardV8Inner() {
                 )}
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <div className={styles.cardHeading}>
-                <h2 className={styles.cardTitle}>試しに送ってみる</h2>
-                  <p className={styles.cardDesc}>本番には影響しません。友だちには届きません。</p>
-                </div>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>試しに送ってみる</>} meta={<>本番には影響しません。友だちには届きません。</>} />
                 {/* 絵 Guoye：送信者の行 → 届いたメッセージと「試す」の行。友だちを名前で探す欄は機能なので送信者の行の右に残す。 */}
                 <div className={styles.testRow}>
                   <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
@@ -2441,8 +2422,8 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'confirm' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <h2 className={styles.cardTitle}>設定の確認</h2>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>設定の確認</>} />
                 <div className={styles.summaryList}>
                   <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
                     {thisRuleName}
@@ -2504,8 +2485,8 @@ function AutoReplyWizardV8Inner() {
                 </div>
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <h2 className={styles.cardTitle}>有効にする前の確認</h2>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>有効にする前の確認</>} />
                 {confirmState === 'loading' && <p className={styles.hint}>確かめています…</p>}
                 {confirmState === 'error' && (
                   <p className={styles.hint}>

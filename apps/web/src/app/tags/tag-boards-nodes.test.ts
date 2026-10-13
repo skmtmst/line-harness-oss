@@ -30,7 +30,8 @@ describe('タグの残りの板ID', () => {
   it('タグの編集を見るだけの人に fkGUR の帯が出て操作が止まる', () => {
     expect(EDIT).toMatch(/(?:data-design-node|boardId)="fkGUR"/)
     expect(EDIT).toContain('閲覧のみで見ています')
-    expect(EDIT).toContain('<fieldset disabled={saving || readOnly}')
+    expect(EDIT).toContain('readOnly={readOnly}')
+    expect(EDIT).toContain('if (readOnly) return')
   })
 
   it('タグの編集の競合に xn95q の帯と比較み・読み込みが出る', () => {
