@@ -19,7 +19,7 @@ import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows, useManagedFolders, folderDotFor } from '@/components/shared/managed-folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -48,6 +48,7 @@ import {
 } from './display'
 import { AffiliateArchiveDialog } from './dialogs'
 import AffiliateDrawer from './drawer'
+import { useFolderMove } from '@/components/shared/use-folder-move'
 import MonthlyFlow from './monthly-flow'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
 import {
@@ -111,6 +112,10 @@ export default function AffiliatorsTab() {
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
   /* ===== 一覧 ===== */
+  const { folders, error: folderError, reload: reloadFolders } = useManagedFolders('affiliate', accountId)
+  const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
+  const folderAccount = useRef(accountId)
+  useEffect(() => { if (folderAccount.current !== accountId) { folderAccount.current = accountId; setFolderId('all'); setPage(1) } }, [accountId, setFolderId])
   const [rows, setRows] = useState<AffiliateListRow[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
 
@@ -276,8 +281,8 @@ export default function AffiliatorsTab() {
   /* ===== 絞り込み ===== */
   const groupRows = useMemo(() => {
     const match = GROUPS.find((g) => g.key === group)?.match ?? (() => true)
-    return rows.filter(match)
-  }, [group, rows])
+    return rows.filter(match).filter(row => folderId === 'all' || (folderId === 'unfiled' ? !row.folderId : row.folderId === folderId))
+  }, [group, rows, folderId])
   const shownRows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
     return groupRows
@@ -308,6 +313,7 @@ export default function AffiliatorsTab() {
     setQuery('')
     setFilters([])
     setGroup('all')
+    setFolderId('all')
     setSaved('')
     setPage(1)
   }
@@ -424,21 +430,20 @@ export default function AffiliatorsTab() {
   )
 
   const groupCount = (key: GroupKey) => rows.filter(GROUPS.find((g) => g.key === key)?.match ?? (() => true)).length
-  /* 左の列は共通の ManagedFolderPanel。アフィリエイターをフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
+  const chooseFolder = (id: string) => resetPage(() => setFolderId(id))
   const folderPanel = (
-    <ManagedFolderPanel
-      kind={null}
-      folders={[]}
-      onChanged={() => undefined}
-      canManage={!readonly}
-      createAction={createButton(true)}
-      reserveCreateSpace={false}
-      itemLabel="アフィリエイター"
-      activeId="all"
-      onSelect={() => undefined}
-      allCount={ready ? rows.length : null}
-    />
+    <ManagedFolderPanel kind="affiliate" accountId={accountId} folders={folders}
+      onChanged={async () => { await reloadFolders(); await loadList() }} canManage={!readonly} createAction={createButton(false)}
+      itemLabel="アフィリエイター" activeId={folderId} onSelect={chooseFolder}
+      allCount={ready ? rows.length : null} error={folderError}
+      unfiledCount={ready ? rows.filter(row => !row.folderId).length : null}
+      countOf={folder => ready ? rows.filter(row => row.folderId === folder.id).length : null}
+      onDeleted={id => { if (folderId === id) chooseFolder('all'); void loadList() }} />
   )
+  const folderMove = useFolderMove({ accountId, canEdit: !readonly, items: pagedRows, folders,
+    move: async (row, targetId) => { const result = await api.affiliates.update(row.id, { folderId: targetId }); if (!result.success) throw new Error(result.error) },
+    onChanged: async () => { await loadList(); await reloadFolders() },
+  })
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
@@ -556,7 +561,7 @@ export default function AffiliatorsTab() {
               </Td>
               <Td grow>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                  <FolderDotName folder={null}>
+                  <FolderDotName folder={folderDotFor(folders, row.folderId)}>
                     {nameButton(row)}
                   </FolderDotName>
 
@@ -575,6 +580,7 @@ export default function AffiliatorsTab() {
                     items={[
                       { id: 'copy', label: '紹介リンクをコピー', content: <CopyTextButton role="menuitem" label="紹介リンクをコピー" value={row.id} getValue={() => copyFirstLink(row)} aria-label="紹介リンクをコピー" />, onSelect: () => {} },
                       ...(readonly ? [] : [
+                        { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(row) },
                         { id: 'edit', label: '編集', onSelect: () => openDrawer(row.id, true) },
                         ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : [{ id: 'resume', label: '紹介を再開する', onSelect: () => { setResumeError(''); setResumeTarget({ id: row.id, name: row.name }) } }]),
                       ]),
@@ -658,11 +664,12 @@ export default function AffiliatorsTab() {
         </>
       }
       stats={stats}
-      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('affiliate', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
       folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <MonthlyFlow open={monthlyFlowOpen} accountId={accountId} onClose={() => setMonthlyFlowOpen(false)} />
         <ConfirmDialog open={resumeTarget !== null} title={`「${resumeTarget?.name ?? ''}」の紹介を再開しますか？`} description="紹介リンクからの成果を再び数えます。" confirmLabel="紹介を再開する" busy={resuming} error={resumeError} onConfirm={() => void resumeReferral()} onCancel={() => { if (!resuming) setResumeTarget(null) }} />
         <AffiliateArchiveDialog

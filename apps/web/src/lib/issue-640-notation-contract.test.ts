@@ -39,7 +39,7 @@ describe('#640 省略表示の全文確認（title）', () => {
 
   it('/contents/vars: 省略した中身・使用箇所・更新と操作に全文を残す', () => {
     expect(VARS).toContain('<TableHeadRow>')
-    expect(VARS).toContain('title={displayValue(valueText, \'unconfigured\')}')
+    expect(VARS).toContain("title={displayValue(valueText, 'unconfigured')}")
     expect(VARS).toContain('title={`${formatNumber(item.usageCount)}か所で使われています`}')
     expect(VARS).toContain('const updateTitle = `最終更新 ')
     expect(VARS).toContain('title={updateTitle}')

@@ -75,16 +75,18 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
 export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
-  const collapsed = collapsedFolders ?? (navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
+  const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
+  const visibleNavs = navs.filter(nav => nav.rows.length > 1 || nav.createAction || nav.rows.find(row=>row.id===nav.activeId)?.leadingActions?.length)
+  const collapsed = collapsedFolders ?? (visibleNavs.length > 0 ? visibleNavs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {readOnly ? <ReadOnlyNotice /> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
-      {folders ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
+      {folders && !noFolderChoices ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
-        {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation ? undefined : ''}>
+        {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation || noFolderChoices ? undefined : ''}>
           {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset="notice">{explanation}</PageExplanationBody></div> : null}
-          {toolbar ? <ListToolbarLeading leading={collapsed}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}
+          {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}
           {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}
         </div> : null}
         <div className={styles.content} data-template-region="content" data-content-inset={contentInset || undefined}>{children}</div>
@@ -98,9 +100,9 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
   const selected = rows.find((row) => row.id === activeId)
   return <>
     {createAction ? <span className={styles.collapsedCreate}>{createAction}</span> : null}
-    <span className={styles.collapsedSelect} style={width ? { minWidth: width } : undefined}>
+    {rows.length > 1 ? <span className={styles.collapsedSelect} style={width ? { minWidth: width } : undefined}>
       <Select size="content" aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
-    </span>
+    </span> : null}
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }

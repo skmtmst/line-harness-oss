@@ -1,5 +1,6 @@
 'use client'
 
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import ListDateTime from '@/components/shared/list-date-time'
 import StatusBadge from '@/components/shared/status-badge'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -74,11 +75,7 @@ const WORDS: Record<TemplateType, { title: string; item: string; create: string;
   scenario: { title: 'シナリオ', item: 'シナリオ', create: 'シナリオを作る', search: 'シナリオ名で探す', column: 'シナリオ', description: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。' },
 }
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** M月D日（店の一覧と同じ。時刻は title）。 */
 

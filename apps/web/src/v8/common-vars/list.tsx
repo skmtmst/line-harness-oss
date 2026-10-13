@@ -1,5 +1,6 @@
 'use client'
 
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
@@ -113,11 +114,7 @@ const ORDER_OPTIONS: Array<{ value: CommonVarOrder; label: string }> = [
 ]
 
 /** 表示件数（絵：10・20・50件）。 */
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 記録の更新日時は別年でも時刻を残す。業務値の日付は変えない。 */
 function formatListDate(value: string): string {

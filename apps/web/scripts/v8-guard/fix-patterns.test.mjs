@@ -87,3 +87,50 @@ test('F1/F2/F3/F7/F9/F10 count defects, preserve presence and ignore truncated n
     assert.ok(Object.values(after.counts).every(n => n === 0), JSON.stringify(after.findings))
   } finally { await browser.close() }
 })
+
+
+test('W1 scans linked creation and native selects across the whole template toolbar', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>*{box-sizing:border-box}section{width:900px}a,button,select,input{display:inline-flex;height:36px;padding:0 12px;border:1px solid;align-items:center;font:13px Arial}a{width:max-content}div{display:flex;gap:8px}input{width:280px}</style><section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar" style="display:block"><div data-toolbar-leading><a href="/new">送り先を作る</a><select aria-label="フォルダ"><option>フォルダ：すべて</option></select><input type="search"></div><div><select aria-label="状態"><option>状態：すべて</option></select><button>よく使う絞り込み</button><button>20件表示</button></div></div></section>`)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F10,0)
+    await page.locator('a').evaluate(el=>el.style.width='100%')
+    assert.ok((await page.evaluate(scanFixPatterns)).findings.some(f=>f.reason.includes('create action stretches')))
+    await page.locator('[data-toolbar-leading]').evaluate(el=>el.style.flexDirection='column')
+    const broken = await page.evaluate(scanFixPatterns)
+    assert.ok(broken.findings.some(f=>f.reason.includes('tool rows')))
+    assert.ok(broken.findings.some(f=>f.reason.includes('isolated select')))
+  } finally { await browser.close() }
+})
+
+
+test('W2 and W3 count empty folder rails and spaced page-size wording', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates" style="width:1200px"><aside data-template-region="folders"><nav><button>すべて</button></nav></aside><button>20 件表示</button></section>')
+    const before=await page.evaluate(scanFixPatterns)
+    assert.equal(before.counts.F8,1)
+    assert.equal(before.counts.F3,1)
+    await page.locator('aside').evaluate(el=>el.remove())
+    await page.locator('button').evaluate(el=>el.textContent='20件表示')
+    const after=await page.evaluate(scanFixPatterns)
+    assert.equal(after.counts.F8,0)
+    assert.equal(after.counts.F3,0)
+  } finally {await browser.close()}
+})
+
+
+test('W4 distinguishes heading actions and archive filters without board IDs',async()=>{
+ const browser=await chromium.launch()
+ try{const page=await browser.newPage()
+ await page.setContent('<section data-page-template="list" data-list-skeleton style="width:1200px"><header data-template-region="heading"><button class="v6-filter-chip">管理者確認</button></header><button class="v6-filter-chip">アーカイブ済み</button></section>')
+ const before=await page.evaluate(scanFixPatterns)
+ assert.equal(before.counts.F5,1);assert.equal(before.counts.F4,1)
+ await page.locator('header button').evaluate(el=>el.className='button_secondary__x')
+ await page.locator('button.v6-filter-chip').evaluate(el=>el.insertAdjacentHTML('afterbegin','<svg width="13" height="13" aria-hidden="true"></svg>'))
+ const after=await page.evaluate(scanFixPatterns)
+ assert.equal(after.counts.F5,0);assert.equal(after.counts.F4,0)
+ }finally{await browser.close()}
+})

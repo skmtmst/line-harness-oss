@@ -271,7 +271,7 @@
 ## pagination ページ送り
 
 - **役目**：ページを送り、10・20・50件を切り替える
-- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`ListPagePagination`）
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
 - **持ち主（Pen）**：`jX2Uw`「ページ送り」
   - 注：PageSizeSelect は shared が持つ（B-172）。
 - **見つけ方（コード）**：
@@ -967,6 +967,7 @@
 - **L4 差し戻しI**：操作の「直す／編集」は `shared/action-words.ts` が「編集する」へ統一し、Button（actionWording）・ActionMenu・FolderEditorDialog・KpiCard が読む。任意の値・名前を出すボタンや窓の題はそのまま保つ。「読み直す／作り直す／最新を取り込んで直す」は別の動きのため保つ。KPIの操作は共通 `action` へ渡す（リンク・既存の処理の両方を受ける）。
 
 - **L4 差し戻しJ**：数の帯に行メニューを置かず、絞り込みと行き先は `KpiCard.action`／`valueAction` へ。別の行き先の入口は残す。行の登録は共通 `Button` の `size="compact"` を使い、表の52/60を変更しない。CIの `pendec2-rules` が帯の中の行メニューを検出する（故障注入あり）。
+
 ## 認証の画面（B-263）
 
 - 持ち主：`components/templates/auth-page.tsx`。ログインの確認・初回登録・回復コードを同じ型で組む。

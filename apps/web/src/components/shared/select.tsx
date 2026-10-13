@@ -1,5 +1,6 @@
 'use client'
 
+import { pageSizeLabel } from './page-size-options'
 import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
@@ -116,7 +117,7 @@ export default function Select({
   valueAlign,
   showChevron = true,
   iconOnly = false,
-  options,
+  options: suppliedOptions,
   size = 'standard',
   pageSizeControl = false,
   value,
@@ -125,6 +126,12 @@ export default function Select({
   createAction,
   menuHeading,
 }: SelectProps) {
+  // Width is a visual preset; a duration selector may use it too. The role
+  // comes from the explicit flag or the control's accessible page-size name.
+  const isPageSizeControl = pageSizeControl || /表示件数|1ページ|件表示/.test(ariaLabel ?? label ?? '')
+  const options = useMemo(() => isPageSizeControl
+    ? suppliedOptions.map(option => /^\d+$/.test(option.value) ? { ...option, label: pageSizeLabel(Number(option.value)) } : option)
+    : suppliedOptions, [suppliedOptions, isPageSizeControl])
   // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
   const field = useFieldContext()
   const invalid = Boolean(error) || invalidProp || Boolean(field?.invalid)
@@ -321,7 +328,7 @@ export default function Select({
         setOpen(false)
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
-      data-list-page-size={pageSizeControl || size === 'page-size' || undefined}
+      data-list-page-size={isPageSizeControl || undefined}
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <button

@@ -470,3 +470,6 @@
 :global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }
 /* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
 :global(:root) fieldset.createContent { border: 0; margin: 0; }
+
+/* No-choice lists retain their create action even without other tools. */
+:global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }

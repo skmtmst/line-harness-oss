@@ -439,7 +439,7 @@ export default function WebhooksOutgoingV8() {
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
   const createButton = canManage
-    ? <Button variant="primary" href="/webhooks/new" className={styles.createButton}><Plus size={15} aria-hidden="true" />送り先を作る</Button>
+    ? <Button variant="primary" href="/webhooks/new"><Plus size={15} aria-hidden="true" />送り先を作る</Button>
     : <span className={styles.createSpace} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */

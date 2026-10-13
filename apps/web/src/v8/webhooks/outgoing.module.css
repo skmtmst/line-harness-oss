@@ -3,18 +3,12 @@
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  */
 
-/* 左の列の作るボタン（列いっぱい）と、閲覧のみで隠したときの場所。 */
-.createButton {
-  width: 100%;
-}
+/* 作成の幅は共通Buttonと一覧型が持つ。 */
 .createSpace {
   display: block;
   flex-shrink: 0;
   height: var(--tpl-chip-h);
   margin-bottom: var(--tpl-wh-create-after);
-}
-.narrowRow .createButton {
-  width: auto;
 }
 .narrowRow .createSpace {
   width: var(--tpl-wh-create-w);
