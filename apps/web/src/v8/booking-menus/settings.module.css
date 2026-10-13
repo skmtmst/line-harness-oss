@@ -1563,6 +1563,12 @@
   color: var(--color-canvas);
 }
 
+.phoneCatNow[data-category-tone='customer'] {
+  background: var(--v8-liff-primary-soft);
+  color: var(--v8-liff-primary);
+  outline: 1px solid var(--v8-liff-primary);
+}
+
 /* 選ぶカード（メニュー・担当）。 */
 .phoneCard {
   display: flex;
