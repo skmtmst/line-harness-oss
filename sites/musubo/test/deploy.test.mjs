@@ -30,7 +30,8 @@ test("first-install program is valid bash and scoped to the approved host", () =
   assert.doesNotMatch(script, /rm -|--delete|wrangler|\.env/);
   assert.ok(script.indexOf("tar -czf") < script.indexOf("started=1"));
   assert.ok(script.indexOf("started=1") < script.indexOf("install -m"));
-  assert.equal(publicFiles.length, 11);
+  assert.equal(publicFiles.length, 18);
+  assert.ok(publicFiles.includes("404.html"));
   assert.ok(!publicFiles.includes(".user.ini"));
   assert.ok(!publicFiles.includes("default_page.png"));
 });
@@ -108,7 +109,21 @@ test("update program for the installed review site is valid bash, verified, back
   assert.equal(isInitialState(".user.ini\ndefault_page.png\nindex.html"), true);
   assert.equal(isInitialState(installedRootNames.join("\n")), false);
   const ok = { rootNames: installedRootNames.join("\n"), files: installedFiles.join("\n"), symlinks: "" };
-  assert.doesNotThrow(() => validateInstalledState(ok));
+  assert.equal(validateInstalledState(ok), publicFiles);
+  const { legacyInstalledRootNames, legacyInstalledFiles, legacyPublicFiles } = await import("../deploy-preview.mjs");
+  assert.equal(
+    validateInstalledState({
+      rootNames: legacyInstalledRootNames.join("\n"),
+      files: legacyInstalledFiles.join("\n"),
+      symlinks: "",
+    }),
+    legacyPublicFiles,
+  );
+  const legacySums = legacyPublicFiles.map((f, i) => `${String(i).padStart(64, "b")}  ${f}`).join("\n");
+  const migrate = remoteUpdate("20261013083000-123456789abc", "fixtureuser", legacySums, legacyPublicFiles);
+  execFileSync("bash", ["-n"], { input: migrate });
+  assert.match(migrate, /failed-added\/404\.html/);
+  assert.doesNotMatch(migrate, /rm -|--delete/);
   assert.throws(() => validateInstalledState({ ...ok, rootNames: ok.rootNames + "\nindex.php" }), /想定外/);
   assert.throws(() => validateInstalledState({ ...ok, files: ok.files + "\nassets/extra.js" }), /想定外/);
   assert.throws(() => validateInstalledState({ ...ok, symlinks: "index.html" }), /シンボリック/);

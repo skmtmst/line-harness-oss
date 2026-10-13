@@ -21,19 +21,9 @@ export function deploymentPaths(user) {
     backups: `${accountRoot}/musubo-site-backups`,
   };
 }
-export const publicFiles = [
-  ".htaccess",
-  "assets/site.css",
-  "assets/site.js",
-  "assets/symbol.svg",
-  "terms/index.html",
-  "privacy/index.html",
-  "legal/index.html",
-  "contact/index.html",
-  "robots.txt",
-  "sitemap.xml",
-  "index.html",
-];
+// Same served-file lists as the production deployer (legacy = before the 2026-10 redesign).
+export { legacyPublicFiles, publicFiles } from "./deploy-production.mjs";
+import { legacyPublicFiles, publicFiles } from "./deploy-production.mjs";
 const initialIndex =
   "3be3cd528345bb63771b934886d37c3c9011400095f0506ae3e596cea4ff6190";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -69,7 +59,7 @@ finish() {
   trap - EXIT
   if [ "$status" -ne 0 ] && [ "$started" = 1 ]; then
     mkdir -p "$backup/failed-output"
-    for name in .htaccess assets terms privacy legal contact robots.txt sitemap.xml; do
+    for name in .htaccess 404.html assets terms privacy legal contact robots.txt sitemap.xml; do
       if [ -e "$root/$name" ]; then mv "$root/$name" "$backup/failed-output/$name"; fi
     done
     tar -xzf "$backup/before.tar.gz" -C "$root" ./index.html
@@ -105,20 +95,13 @@ echo "復元用バックアップ: $backup/before.tar.gz"
 }
 
 // ---- updates of an installed review site -------------------------------------------------
-export const installedRootNames = [
-  ".htaccess",
-  ".user.ini",
-  "assets",
-  "contact",
-  "default_page.png",
-  "index.html",
-  "legal",
-  "privacy",
-  "robots.txt",
-  "sitemap.xml",
-  "terms",
-];
-export const installedFiles = [...publicFiles, ".user.ini", "default_page.png"];
+const hostFiles = [".user.ini", "default_page.png"];
+const rootNamesFor = (files) =>
+  [...new Set([...files.map((file) => file.split("/")[0]), ...hostFiles])].sort();
+export const installedRootNames = rootNamesFor(publicFiles);
+export const installedFiles = [...publicFiles, ...hostFiles];
+export const legacyInstalledRootNames = rootNamesFor(legacyPublicFiles);
+export const legacyInstalledFiles = [...legacyPublicFiles, ...hostFiles];
 const sortedLines = (value) =>
   String(value)
     .split("\n")
@@ -133,45 +116,64 @@ export function isInitialState(names) {
   );
 }
 
+// Returns the served-file list found on the review site (current or legacy inventory).
 export function validateInstalledState({ rootNames, files, symlinks }) {
-  if (sortedLines(rootNames).join("\n") !== [...installedRootNames].sort().join("\n"))
+  if (sortedLines(symlinks).length)
+    throw new Error("確認用サイトにシンボリックリンクがあります。配備しません");
+  const roots = sortedLines(rootNames).join("\n");
+  const found = sortedLines(files).join("\n");
+  for (const [served, r, f] of [
+    [publicFiles, installedRootNames, installedFiles],
+    [legacyPublicFiles, legacyInstalledRootNames, legacyInstalledFiles],
+  ]) {
+    if (roots === [...r].sort().join("\n") && found === [...f].sort().join("\n")) return served;
+  }
+  if (roots !== installedRootNames.join("\n") && roots !== legacyInstalledRootNames.join("\n"))
     throw new Error(
       `確認用サイトの直下に想定外の差分があります。上書きせず停止します: ${sortedLines(rootNames).join(", ")}`,
     );
-  if (sortedLines(files).join("\n") !== [...installedFiles].sort().join("\n"))
-    throw new Error(
-      `確認用サイトの配信ファイルに想定外の差分があります。上書きせず停止します: ${sortedLines(files).join(", ")}`,
-    );
-  if (sortedLines(symlinks).length)
-    throw new Error("確認用サイトにシンボリックリンクがあります。配備しません");
+  throw new Error(
+    `確認用サイトの配信ファイルに想定外の差分があります。上書きせず停止します: ${sortedLines(files).join(", ")}`,
+  );
 }
 
-export function validateChecksums(value) {
+export function validateChecksums(value, files = publicFiles) {
   const checksumLines = sortedLines(value);
   const named = new Set(checksumLines.map((line) => line.slice(66)));
-  if (checksumLines.length !== publicFiles.length || named.size !== publicFiles.length)
+  if (checksumLines.length !== files.length || named.size !== files.length)
     throw new Error("現在配信中のハッシュを全件取得できませんでした");
   for (const line of checksumLines) {
     const match = line.match(/^([0-9a-f]{64})  (.+)$/);
-    if (!match || !publicFiles.includes(match[2]))
+    if (!match || !files.includes(match[2]))
       throw new Error("現在配信中のハッシュ形式が不正です");
   }
   return checksumLines.join("\n");
 }
 
-export function remoteUpdate(id, user, beforeChecksums) {
+export function remoteUpdate(id, user, beforeChecksums, beforeFiles = publicFiles) {
   if (!/^\d{14}-[0-9a-f]{12}$/.test(id)) throw new Error("Invalid release ID");
-  const verifiedBefore = validateChecksums(beforeChecksums);
+  if (beforeFiles !== publicFiles && beforeFiles !== legacyPublicFiles)
+    throw new Error("配信前のファイル一覧が不正です");
+  const verifiedBefore = validateChecksums(beforeChecksums, beforeFiles);
   const { target, lock, backups } = deploymentPaths(user);
   const backup = `${backups}/stg-${id}`;
-  const rootInventory = [...installedRootNames].sort().join("|") + "|";
-  const fileInventory = [...installedFiles].sort().join("|") + "|";
+  const rootInventory = rootNamesFor(beforeFiles).join("|") + "|";
+  const fileInventory = [...beforeFiles, ...hostFiles].sort().join("|") + "|";
+  // Files this release adds; on failure they are moved aside (never deleted).
+  const added = publicFiles.filter((file) => !beforeFiles.includes(file));
   const installLines = publicFiles
     .map((file) => `install -m 644 ${quote(`${backup}/payload/${file}`)} ${quote(`${target}/${file}`)}`)
     .join("\n");
-  const restoreLines = publicFiles
-    .map((file) => `install -m 644 ${quote(`${backup}/before/${file}`)} ${quote(`${target}/${file}`)}`)
-    .join("\n");
+  const restoreLines = [
+    ...beforeFiles.map(
+      (file) => `install -m 644 ${quote(`${backup}/before/${file}`)} ${quote(`${target}/${file}`)}`,
+    ),
+    ...added.map((file) => {
+      const parent = dirname(file);
+      const dir = parent === "." ? `${backup}/failed-added` : `${backup}/failed-added/${parent}`;
+      return `if [ -e ${quote(`${target}/${file}`)} ]; then mkdir -p ${quote(dir)}; mv ${quote(`${target}/${file}`)} ${quote(`${backup}/failed-added/${file}`)}; fi`;
+    }),
+  ].join("\n");
   return `set -euo pipefail
 root=${quote(target)}
 lock=${quote(lock)}
@@ -283,19 +285,21 @@ async function main() {
   const names = remote(`ls -1A ${quote(target)}`);
   const firstInstall = isInitialState(names);
   let beforeChecksums = "";
+  let beforeFiles = publicFiles;
   if (firstInstall) {
     const indexHash = remote(
       `sha256sum ${quote(`${target}/index.html`)} | cut -d ' ' -f 1`,
     ).trim();
     validateInitialState(names, indexHash);
   } else {
-    validateInstalledState({
+    beforeFiles = validateInstalledState({
       rootNames: remote(`find ${quote(target)} -mindepth 1 -maxdepth 1 -printf '%f\\n'`),
       files: remote(`find ${quote(target)} -mindepth 1 -type f -printf '%P\\n'`),
       symlinks: remote(`find ${quote(target)} -type l -printf '%P\\n'`),
     });
     beforeChecksums = validateChecksums(
-      remote(`cd ${quote(target)} && sha256sum ${publicFiles.map(quote).join(" ")}`),
+      remote(`cd ${quote(target)} && sha256sum ${beforeFiles.map(quote).join(" ")}`),
+      beforeFiles,
     );
   }
   const work = await mkdtemp(join(tmpdir(), "musubo-xserver-"));
@@ -343,7 +347,7 @@ async function main() {
     sha.slice(0, 12);
   console.log(
     remote(
-      `bash -c ${quote(firstInstall ? remoteInstall(id, user) : remoteUpdate(id, user, beforeChecksums))}`,
+      `bash -c ${quote(firstInstall ? remoteInstall(id, user) : remoteUpdate(id, user, beforeChecksums, beforeFiles))}`,
       await readFile(archive),
     ),
   );

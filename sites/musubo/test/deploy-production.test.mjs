@@ -5,6 +5,9 @@ import {
   deploymentPaths,
   expectedApexFiles,
   expectedRootNames,
+  legacyApexFiles,
+  legacyPublicFiles,
+  legacyRootNames,
   payloadTarEnvironment,
   publicFiles,
   relativeTarget,
@@ -44,7 +47,9 @@ test("production deploy program is valid bash and scoped to the apex", () => {
   assert.doesNotMatch(script, /rsync --delete|rm -|wrangler|\.env/);
   assert.ok(script.indexOf("tar -czf") < script.indexOf("started=1"));
   assert.match(script, /started=1\ninstall -m 644 '[^']+\/payload\//);
-  assert.equal(publicFiles.length, 11);
+  assert.equal(legacyPublicFiles.length, 11);
+  assert.equal(publicFiles.length, 18);
+  assert.ok(legacyPublicFiles.every((file) => publicFiles.includes(file)));
   assert.ok(!publicFiles.includes(".user.ini"));
   assert.ok(!publicFiles.includes("default_page.png"));
 });
@@ -55,7 +60,26 @@ test("only the audited apex inventory is accepted", () => {
     apexFiles: expectedApexFiles.join("\n"),
     symlinks: "",
   };
-  assert.doesNotThrow(() => validateRemoteState(state));
+  assert.equal(validateRemoteState(state), publicFiles);
+  // The live site before the redesign is accepted once, so the first deploy can add files.
+  assert.equal(
+    validateRemoteState({
+      rootNames: legacyRootNames.join("\n"),
+      apexFiles: legacyApexFiles.join("\n"),
+      symlinks: "",
+    }),
+    legacyPublicFiles,
+  );
+  // A half-migrated mix of the two inventories is not.
+  assert.throws(
+    () =>
+      validateRemoteState({
+        rootNames: legacyRootNames.join("\n"),
+        apexFiles: [...legacyApexFiles, "assets/og.png"].join("\n"),
+        symlinks: "",
+      }),
+    /想定外/,
+  );
   assert.throws(
     () => validateRemoteState({ ...state, rootNames: `${state.rootNames}\nmanual.txt` }),
     /想定外/,
@@ -92,6 +116,9 @@ test("production markers are required and staging markers fail closed", () => {
       }),
     /新しい削除期限/,
   );
+  // Only the 404 page may be noindex.
+  assert.doesNotThrow(() => validateProductionHtml("404.html", '<meta name="robots" content="noindex,nofollow">'));
+  assert.throws(() => validateProductionHtml("404.html", "確認用サイト"), /staging用/);
   for (const marker of ["noindex", "確認用サイト", "stg.musubo.jp"])
     assert.throws(
       () => validateProductionHtml("index.html", marker),
@@ -117,4 +144,27 @@ test("payload tar disables macOS AppleDouble metadata", () => {
   const env = payloadTarEnvironment({ KEEP: "yes", COPYFILE_DISABLE: "0" });
   assert.equal(env.KEEP, "yes");
   assert.equal(env.COPYFILE_DISABLE, "1");
+});
+
+test("first redesign deploy from the legacy inventory restores exactly the old files on failure", () => {
+  const legacySums = legacyPublicFiles
+    .map((file, index) => `${String(index).padStart(64, "0")}  ${file}`)
+    .join("\n");
+  const script = remoteInstall("20261013083000-123456789abc", "fixtureuser", legacySums, legacyPublicFiles);
+  execFileSync("bash", ["-n"], { input: script });
+  // Before-state checks use the legacy inventory (no 404.html yet).
+  assert.match(script, /'\.htaccess\|\.user\.ini\|assets\|contact\|/);
+  assert.doesNotMatch(script, /\/before\/404\.html/);
+  // Added files are moved aside, never deleted.
+  assert.match(script, /mv '\/home\/fixtureuser\/musubo\.jp\/public_html\/404\.html'/);
+  assert.match(script, /failed-added\/assets\/og\.png/);
+  assert.doesNotMatch(script, /rm -|--delete/);
+  assert.throws(
+    () => remoteInstall("20261013083000-123456789abc", "fixtureuser", legacySums, [...legacyPublicFiles]),
+    /ファイル一覧/,
+  );
+  assert.throws(
+    () => remoteInstall("20261013083000-123456789abc", "fixtureuser", checksums, legacyPublicFiles),
+    /ハッシュ/,
+  );
 });

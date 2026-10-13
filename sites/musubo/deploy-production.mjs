@@ -11,7 +11,9 @@ import { build } from "./build.mjs";
 import config from "./site.config.mjs";
 
 export const relativeTarget = "musubo.jp/public_html";
-export const publicFiles = [
+// The 11 files served before the 2026-10 redesign. A live site still in this state is
+// accepted once, so the first redesign deploy can add the new files.
+export const legacyPublicFiles = [
   ".htaccess",
   "assets/site.css",
   "assets/site.js",
@@ -25,26 +27,25 @@ export const publicFiles = [
   "index.html",
 ];
 
-export const expectedRootNames = [
-  ".htaccess",
-  ".user.ini",
-  "assets",
-  "contact",
-  "default_page.png",
-  "index.html",
-  "legal",
-  "privacy",
-  "robots.txt",
-  "sitemap.xml",
-  "stg.musubo.jp",
-  "terms",
+export const publicFiles = [
+  ...legacyPublicFiles,
+  "404.html",
+  "assets/og.png",
+  "assets/favicon-16.png",
+  "assets/favicon-32.png",
+  "assets/apple-touch-icon.png",
+  "assets/icon-512.png",
+  "assets/site.webmanifest",
 ];
 
-export const expectedApexFiles = [
-  ...publicFiles,
-  ".user.ini",
-  "default_page.png",
-];
+const hostFiles = [".user.ini", "default_page.png"];
+const rootNamesFor = (files) =>
+  [...new Set([...files.map((file) => file.split("/")[0]), ...hostFiles, "stg.musubo.jp"])].sort();
+
+export const expectedRootNames = rootNamesFor(publicFiles);
+export const expectedApexFiles = [...publicFiles, ...hostFiles];
+export const legacyRootNames = rootNamesFor(legacyPublicFiles);
+export const legacyApexFiles = [...legacyPublicFiles, ...hostFiles];
 
 export function payloadTarEnvironment(env = process.env) {
   return { ...env, COPYFILE_DISABLE: "1" };
@@ -71,22 +72,32 @@ export function deploymentPaths(user) {
   };
 }
 
+// Returns the list of served files found on the server (current or legacy inventory).
 export function validateRemoteState({ rootNames, apexFiles, symlinks }) {
-  const actualRoot = lines(rootNames);
-  const actualFiles = lines(apexFiles);
+  const actualRoot = lines(rootNames).join("\n");
+  const actualFiles = lines(apexFiles).join("\n");
   const links = lines(symlinks);
-  if (actualRoot.join("\n") !== [...expectedRootNames].sort().join("\n"))
-    throw new Error(
-      `apex直下に想定外の差分があります。上書きせず停止します: ${actualRoot.join(", ")}`,
-    );
-  if (actualFiles.join("\n") !== [...expectedApexFiles].sort().join("\n"))
-    throw new Error(
-      `apexの配信ファイルに想定外の差分があります。上書きせず停止します: ${actualFiles.join(", ")}`,
-    );
   if (links.length)
     throw new Error(
       `apexにシンボリックリンクがあります。配備しません: ${links.join(", ")}`,
     );
+  for (const [served, roots, files] of [
+    [publicFiles, expectedRootNames, expectedApexFiles],
+    [legacyPublicFiles, legacyRootNames, legacyApexFiles],
+  ]) {
+    if (actualRoot === [...roots].sort().join("\n") && actualFiles === [...files].sort().join("\n"))
+      return served;
+  }
+  if (
+    actualRoot !== [...expectedRootNames].sort().join("\n") &&
+    actualRoot !== [...legacyRootNames].sort().join("\n")
+  )
+    throw new Error(
+      `apex直下に想定外の差分があります。上書きせず停止します: ${lines(rootNames).join(", ")}`,
+    );
+  throw new Error(
+    `apexの配信ファイルに想定外の差分があります。上書きせず停止します: ${lines(apexFiles).join(", ")}`,
+  );
 }
 
 export function validateProductionHtml(
@@ -94,7 +105,9 @@ export function validateProductionHtml(
   html,
   { effectiveDate = false, retention = false } = {},
 ) {
-  if (/noindex/i.test(html) || html.includes("確認用サイト") || html.includes("stg.musubo.jp"))
+  // The custom 404 page is the only page that is meant to be noindex.
+  const noindexAllowed = file === "404.html";
+  if ((!noindexAllowed && /noindex/i.test(html)) || html.includes("確認用サイト") || html.includes("stg.musubo.jp"))
     throw new Error(`staging用の表示が残っています: ${file}`);
   if (effectiveDate && !html.includes("施行日：2026-10-04"))
     throw new Error(`本番用の新しい法務文面がありません: ${file}`);
@@ -102,24 +115,29 @@ export function validateProductionHtml(
     throw new Error(`本番用の新しい削除期限がありません: ${file}`);
 }
 
-function validateChecksums(value) {
+function validateChecksums(value, files = publicFiles) {
   const checksumLines = lines(value);
-  if (checksumLines.length !== publicFiles.length)
+  const named = new Set(checksumLines.map((line) => line.slice(66)));
+  if (checksumLines.length !== files.length || named.size !== files.length)
     throw new Error("現在配信中のハッシュを全件取得できませんでした");
   for (const line of checksumLines) {
     const match = line.match(/^([0-9a-f]{64})  (.+)$/);
-    if (!match || !publicFiles.includes(match[2]))
+    if (!match || !files.includes(match[2]))
       throw new Error("現在配信中のハッシュ形式が不正です");
   }
   return checksumLines.join("\n");
 }
 
-const rootInventory = [...expectedRootNames].sort().join("|") + "|";
-const apexInventory = [...expectedApexFiles].sort().join("|") + "|";
-
-export function remoteInstall(id, user, beforeChecksums) {
+export function remoteInstall(id, user, beforeChecksums, beforeFiles = publicFiles) {
   if (!/^\d{14}-[0-9a-f]{12}$/.test(id)) throw new Error("Invalid release ID");
-  const verifiedBefore = validateChecksums(beforeChecksums);
+  if (beforeFiles !== publicFiles && beforeFiles !== legacyPublicFiles)
+    throw new Error("配信前のファイル一覧が不正です");
+  const verifiedBefore = validateChecksums(beforeChecksums, beforeFiles);
+  const rootInventory = rootNamesFor(beforeFiles).join("|") + "|";
+  const apexInventory = [...beforeFiles, ...hostFiles].sort().join("|") + "|";
+  // Files this release adds. On failure they are moved aside (never deleted) so the
+  // served set matches the pre-deploy hashes again.
+  const added = publicFiles.filter((file) => !beforeFiles.includes(file));
   const { target, lock, backups } = deploymentPaths(user);
   const backup = `${backups}/production-${id}`;
   const managedArgs = publicFiles.map(quote).join(" ");
@@ -129,12 +147,17 @@ export function remoteInstall(id, user, beforeChecksums) {
         `install -m 644 ${quote(`${backup}/payload/${file}`)} ${quote(`${target}/${file}`)}`,
     )
     .join("\n");
-  const restoreLines = publicFiles
-    .map(
+  const restoreLines = [
+    ...beforeFiles.map(
       (file) =>
         `install -m 644 ${quote(`${backup}/before/${file}`)} ${quote(`${target}/${file}`)}`,
-    )
-    .join("\n");
+    ),
+    ...added.map((file) => {
+      const parent = dirname(file);
+      const dir = parent === "." ? `${backup}/failed-added` : `${backup}/failed-added/${parent}`;
+      return `if [ -e ${quote(`${target}/${file}`)} ]; then mkdir -p ${quote(dir)}; mv ${quote(`${target}/${file}`)} ${quote(`${backup}/failed-added/${file}`)}; fi`;
+    }),
+  ].join("\n");
   const failedCopyLines = publicFiles
     .map((file) => {
       const parent = dirname(file);
@@ -273,9 +296,10 @@ async function main() {
     `find ${quote(target)} -mindepth 1 -maxdepth 2 -type f -printf '%P\\n' | grep -v '^stg\\.musubo\\.jp/' | LC_ALL=C sort`,
   );
   const symlinks = remote(`find ${quote(target)} -type l -printf '%P\\n'`);
-  validateRemoteState({ rootNames, apexFiles, symlinks });
+  const beforeFiles = validateRemoteState({ rootNames, apexFiles, symlinks });
   const beforeChecksums = validateChecksums(
-    remote(`cd ${quote(target)} && sha256sum ${publicFiles.map(quote).join(" ")}`),
+    remote(`cd ${quote(target)} && sha256sum ${beforeFiles.map(quote).join(" ")}`),
+    beforeFiles,
   );
 
   const work = await mkdtemp(join(tmpdir(), "musubo-production-"));
@@ -295,7 +319,7 @@ async function main() {
   }
 
   console.log(
-    `対象: ${config.origin} / [Xserver apex]\nSHA: ${sha}\nモード: ${apply ? "apply" : "dry-run"}\n生成物: ${work}`,
+    `対象: ${config.origin} / [Xserver apex]\nSHA: ${sha}\n配信中の構成: ${beforeFiles === legacyPublicFiles ? "刷新前（新ファイルを追加します）" : "刷新後"}\nモード: ${apply ? "apply" : "dry-run"}\n生成物: ${work}`,
   );
   console.log("遠隔ファイル一覧:");
   console.log(lines(rootNames).join("\n"));
@@ -331,7 +355,7 @@ async function main() {
     sha.slice(0, 12);
   console.log(
     remote(
-      `bash -c ${quote(remoteInstall(id, user, beforeChecksums))}`,
+      `bash -c ${quote(remoteInstall(id, user, beforeChecksums, beforeFiles))}`,
       await readFile(archive),
     ),
   );
