@@ -82,7 +82,8 @@ describe('Stripe請求書同期', () => {
     );
     expect(result).toMatchObject({ imported: 1, failed: 1, completed: false, syncedAt: null });
     expect(testDb.raw.prepare(`SELECT value FROM platform_settings WHERE key = 'billing_invoices_last_synced_at'`).get()).toBeUndefined();
-    expect(warn.mock.calls.join(' ')).toContain('tenant-a');
+    expect(warn.mock.calls.join(' ')).toContain('billing_invoice_sync_failed');
+    expect(warn.mock.calls.join(' ')).not.toContain('tenant-a');
     expect(warn.mock.calls.join(' ')).not.toContain('9,800');
     warn.mockRestore();
   });

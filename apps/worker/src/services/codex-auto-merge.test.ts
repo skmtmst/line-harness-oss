@@ -196,8 +196,8 @@ describe('Codex自動マージ処理', () => {
 
     expect(postedText(fetcher)).toContain(`GitHub APIが失敗しました (${status} /repos/skmtmst/line-harness-oss/pulls/344)`);
     const logged = error.mock.calls.flat().join(' ');
-    expect(logged).toContain(`"status":${status}`);
-    expect(logged).toContain('"path":"/repos/skmtmst/line-harness-oss/pulls/344"');
+    expect(logged).toContain('"code":"codex_auto_merge_github_failed"');
+    expect(logged).not.toContain('/pulls/344');
     expect(logged).not.toContain('github-token');
     expect(logged).not.toContain('token github-token rejected');
     error.mockRestore();

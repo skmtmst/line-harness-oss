@@ -18,10 +18,7 @@ const HOLIDAY_YEAR_MAX = 2099;
 function isHolidayOn(isoDate: string): boolean {
   const year = Number(isoDate.slice(0, 4));
   if (!Number.isInteger(year) || year < HOLIDAY_YEAR_MIN || year > HOLIDAY_YEAR_MAX) {
-    console.warn(
-      `[auto-reply] 祝日の計算に対応していない年です。祝日ではない日として扱いました。` +
-        `表の更新が必要です（対応: ${HOLIDAY_YEAR_MIN}〜${HOLIDAY_YEAR_MAX}年）。 date=${isoDate}`,
-    );
+    console.warn(JSON.stringify({"code":"services_auto_reply_conditions_warn"}));
     return false;
   }
   return holidaysOfYear(year).some((holiday) => holiday.date === isoDate);

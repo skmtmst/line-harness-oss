@@ -54,7 +54,7 @@ lineWebhookEvents.get(
       }
       return c.json({ success: true, data: visible });
     } catch {
-      console.error({ event: 'line_webhook_events_list_failed', reason: 'db_error' });
+      console.error(JSON.stringify({"code":"line_webhook_events_list_failed","route":"GET /api/line-webhook-events"}));
       return c.json({ success: false, error: 'Webhook台帳を取得できませんでした' }, 500);
     }
   },
@@ -84,7 +84,7 @@ lineWebhookEvents.post(
         error: result.status === 'needs_review' ? `要確認：${result.reason}` : result.status === 'busy' ? '処理中です。時間をおいて確認してください' : '再処理に失敗しました。保存済みの工程からもう一度再開できます',
       }, result.status === 'failed' ? 503 : 409);
     } catch {
-      console.error({ event: 'line_webhook_event_retry_check_failed', reason: 'db_error' });
+      console.error(JSON.stringify({"code":"line_webhook_event_retry_check_failed","route":"POST /api/line-webhook-events/:id/retry"}));
       return c.json({ success: false, error: 'Webhookイベントを確認できませんでした' }, 500);
     }
   },

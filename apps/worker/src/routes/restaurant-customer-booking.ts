@@ -120,9 +120,7 @@ async function finish(c: Context<Env>, store: CustomerStore) {
     await processScenarioSourceJobs(c.env);
     await processRestaurantCustomerNotices(c.env, store.id);
   } catch {
-    console.error(
-      JSON.stringify({ event: 'restaurant_customer_notice_pending' }),
-    );
+    console.error(JSON.stringify({"code":"restaurant_customer_notice_pending"}));
   }
 }
 restaurantCustomerBooking.get('/api/liff/restaurant/link/:token', async (c) => {

@@ -171,12 +171,7 @@ function warnPlaintextCredentialFallback(
   error: unknown,
 ): void {
   // Credential values and thrown error messages are deliberately excluded.
-  console.warn({
-    event: 'line_credential_plaintext_fallback',
-    line_account_id: context.lineAccountId,
-    field: context.field,
-    reason: classifyCredentialFailure(error),
-  });
+  console.warn(JSON.stringify({"code":"line_credential_plaintext_fallback"}));
 }
 
 export interface CreateLineAccountInput {

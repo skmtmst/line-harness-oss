@@ -92,11 +92,7 @@ function metricsError(c: Context<Env>, error: unknown): Response {
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  console.error(JSON.stringify({
-    event: 'nen_campaign_metrics_failed',
-    path: c.req.path,
-    reason: error instanceof Error ? error.message : String(error),
-  }));
+  console.error(JSON.stringify({"code":"nen_campaign_metrics_failed"}));
   return c.json({ success: false, error: 'NEN配信の情報を取得できませんでした' }, 500);
 }
 
@@ -104,7 +100,7 @@ function columnOperationError(c: Context<Env>, error: unknown): Response {
   if (error instanceof NenColumnOperationError) {
     return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
-  console.error('NEN column operation failed:', error);
+  console.error(JSON.stringify({"code":"routes_nen_campaigns_failed"}));
   return c.json({ success: false, error: 'NENコラムを操作できませんでした' }, 500);
 }
 
@@ -718,10 +714,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
     if (isNenColumnSlugConflict(error)) {
       return c.json({ success: false, error: 'column_already_exists' }, 409);
     }
-    console.error(JSON.stringify({
-      message: 'failed to create NEN column draft',
-      error: error instanceof Error ? error.message : String(error),
-    }));
+    console.error(JSON.stringify({"code":"routes_nen_campaigns_failed","route":"POST /api/nen-campaigns/columns"}));
     return c.json({ success: false, error: 'column_create_failed' }, 500);
   }
   return c.json({ success: true, data: { id, queued: 0 } }, 201);
@@ -1336,12 +1329,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   // ではない。#711 の司令塔裁定で、経路ごとに違う上限を持たないことを優先し、
   // 管理画面と同じ120を採った。
   if (body.title.length > 120) {
-    console.error(JSON.stringify({
-      event: 'nen_eccube_column_title_rejected',
-      slug: body.slug,
-      titleLength: body.title.length,
-      maxLength: 120,
-    }));
+    console.error(JSON.stringify({"code":"nen_eccube_column_title_rejected","route":"POST /api/integrations/eccube/columns"}));
     return inputError(c, { success: false, error: 'title_invalid' }, 400, ["title"]);
   }
   const requestedLineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
@@ -1455,11 +1443,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
         metadata: { couponCode: code, orderNumber },
       });
     } catch (conversionError) {
-      console.error(JSON.stringify({
-        event: 'nen_coupon_usage_conversion_failed',
-        coupon_code: code,
-        reason: conversionError instanceof Error ? conversionError.message : String(conversionError),
-      }));
+      console.error(JSON.stringify({"code":"nen_coupon_usage_conversion_failed","route":"POST /api/integrations/eccube/coupon-usages"}));
     }
   }
   return c.json({ success: true, data: { couponCode: code, usedAt: when } });

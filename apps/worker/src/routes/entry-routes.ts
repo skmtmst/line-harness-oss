@@ -115,7 +115,7 @@ entryRoutes.get('/api/entry-route-genres', async (c) => {
     const rows = await getEntryRouteGenres(c.env.DB);
     return c.json({ success: true, data: rows.map(serializeGenre) });
   } catch (err) {
-    console.error('GET /api/entry-route-genres error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"GET /api/entry-route-genres"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -130,7 +130,7 @@ entryRoutes.post('/api/entry-route-genres', requireRole('owner', 'admin'), input
     const row = await createEntryRouteGenre(c.env.DB, name);
     return c.json({ success: true, data: serializeGenre(row) }, 201);
   } catch (err) {
-    console.error('POST /api/entry-route-genres error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"POST /api/entry-route-genres"}));
     if (String(err).includes('UNIQUE constraint failed: entry_route_genres.name')) {
       return c.json({ success: false, error: '同じ名前のジャンルが既にあります' }, 409);
     }
@@ -150,7 +150,7 @@ entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), 
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeGenre(row) });
   } catch (err) {
-    console.error('PATCH /api/entry-route-genres/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"PATCH /api/entry-route-genres/:id"}));
     if (String(err).includes('UNIQUE constraint failed: entry_route_genres.name')) {
       return c.json({ success: false, error: '同じ名前のジャンルが既にあります' }, 409);
     }
@@ -177,7 +177,7 @@ entryRoutes.get('/api/entry-routes', async (c) => {
     });
     return c.json({ success: true, data: visible.map(serialize) });
   } catch (err) {
-    console.error('GET /api/entry-routes error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"GET /api/entry-routes"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -191,7 +191,7 @@ entryRoutes.get('/api/entry-routes/:id', async (c) => {
     if (!row || !canAccessEntryRoute(row, tenantId) || !await canAccessEntryRouteAccount(c.env.DB, c.get('staff'), row)) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(row) });
   } catch (err) {
-    console.error('GET /api/entry-routes/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"GET /api/entry-routes/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -256,7 +256,7 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), inputJsonBo
     const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId, lineAccountId });
     return c.json({ success: true, data: serialize(row) }, 201);
   } catch (err) {
-    console.error('POST /api/entry-routes error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"POST /api/entry-routes"}));
     if (String(err).includes('UNIQUE constraint failed: entry_routes.ref_code')) {
       return c.json({ success: false, error: 'この ref_code は既に使われています' }, 409);
     }
@@ -316,7 +316,7 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), inputJ
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(row) });
   } catch (err) {
-    console.error('PATCH /api/entry-routes/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"PATCH /api/entry-routes/:id"}));
     if (String(err).includes('UNIQUE constraint failed: entry_routes.ref_code')) {
       return c.json({ success: false, error: 'この ref_code は既に使われています' }, 409);
     }
@@ -362,7 +362,7 @@ entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async
     }
     return c.json({ success: true });
   } catch (err) {
-    console.error('DELETE /api/entry-routes/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"DELETE /api/entry-routes/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -389,7 +389,7 @@ entryRoutes.post('/api/entry-routes/:id/qr-image', requireEntryRouteManagement()
     } });
   } catch (error) {
     if (error instanceof QrInputError) return c.json({ success: false, error: 'URLが長すぎるか、大きさが足りません' }, 400);
-    console.error('POST /api/entry-routes/:id/qr-image error:', error);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"POST /api/entry-routes/:id/qr-image"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -451,7 +451,7 @@ entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), 
       },
     });
   } catch (err) {
-    console.error('POST /api/entry-routes/:id/qr-pdf error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"POST /api/entry-routes/:id/qr-pdf"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -466,7 +466,7 @@ entryRoutes.get('/api/entry-routes/:id/funnel', async (c) => {
     const funnel = await getEntryRouteFunnel(c.env.DB, id);
     return c.json({ success: true, data: funnel });
   } catch (err) {
-    console.error('GET /api/entry-routes/:id/funnel error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"GET /api/entry-routes/:id/funnel"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -483,7 +483,7 @@ entryRoutes.get('/api/entry-routes/:id/sources', async (c) => {
     const sources = await getEntryRouteSources(c.env.DB, id);
     return c.json({ success: true, data: sources });
   } catch (err) {
-    console.error('GET /api/entry-routes/:id/sources error:', err);
+    console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"GET /api/entry-routes/:id/sources"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

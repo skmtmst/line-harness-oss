@@ -626,10 +626,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     line.includes('instagram_oauth_callback_failed'),
   );
   expect(record).toBeDefined();
-  // 原因調べに使う種別・番号は残る。
-  expect(record).toContain('type=OAuthException');
-  expect(record).toContain('code=100');
-  expect(record).toContain('subcode=33');
+  expect(JSON.parse(record!)).toEqual({ code: 'instagram_oauth_callback_failed', route: 'GET /api/instagram/oauth/callback' });
   // 説明文（message）自体を記録に出さないため、どの表現も残らない。
   expect(record).not.toContain('message=');
   for (const secret of [

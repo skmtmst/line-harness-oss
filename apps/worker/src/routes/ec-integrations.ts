@@ -648,7 +648,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       eventId: row.id, lineAccountId, status: 'retryable_failed',
       errorCode: 'read_model_failed', errorMessageSafe: '注文情報を取り込めませんでした', now,
     }).catch(() => undefined);
-    console.error(`[ec-event] read model failed event=${event.event_id}`, error);
+    console.error(JSON.stringify({"code":"routes_ec_integrations_failed","route":"POST /api/integrations/eccube/events"}));
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }
 
@@ -685,15 +685,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         reason: event.event_type === 'ec.order.cancelled' ? 'order_cancelled' : 'order_refunded',
       });
       if (cancelled > 0) {
-        console.log(JSON.stringify({
-          event: 'nen_order_followups_stopped',
-          lineAccountId,
-          orderNumber: event.order?.number ?? null,
-          stopped: cancelled,
-        }));
+        console.log(JSON.stringify({"code":"nen_order_followups_stopped","route":"POST /api/integrations/eccube/events"}));
       }
     } catch (followUpError) {
-      console.error(`[ec-event] follow-up stop failed event=${event.event_id}`, followUpError);
+      console.error(JSON.stringify({"code":"routes_ec_integrations_failed","route":"POST /api/integrations/eccube/events"}));
     }
   }
 
@@ -712,7 +707,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       });
     } catch (notificationError) {
       // 受注の取り込みは通知の失敗で止めない。送り残しは回収口から拾う。
-      console.error(`[ec-event] operator notification failed event=${event.event_id}`, notificationError);
+      console.error(JSON.stringify({"code":"routes_ec_integrations_failed","route":"POST /api/integrations/eccube/events"}));
     }
   }
 

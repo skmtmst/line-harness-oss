@@ -945,7 +945,7 @@ export async function processDueRichMenuSchedules(
   try {
     result.reclaimed = await reclaimStaleClaims(db, leaseClock(), limit);
   } catch (error) {
-    console.error('rich-menu schedule reclaim error:', error);
+    console.error(JSON.stringify({"code":"services_rich_menu_schedule_executor_failed"}));
   }
 
   const due = await getDueRichMenuSchedules(db, now.toISOString(), limit);

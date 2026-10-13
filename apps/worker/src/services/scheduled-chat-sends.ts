@@ -97,7 +97,7 @@ async function dispatchOne(
         title: null,
       });
     } catch (skipError) {
-      console.error('[scheduled-chat-sends] skipped ledger write failed:', skipError);
+      console.error(JSON.stringify({"code":"services_scheduled_chat_sends_failed"}));
     }
     return;
   }
@@ -276,7 +276,7 @@ export async function processDueScheduledChatSends(
     try {
       await dispatchOne(env, row);
     } catch (error) {
-      console.error('scheduled chat send dispatch error:', row.id, error);
+      console.error(JSON.stringify({"code":"services_scheduled_chat_sends_failed"}));
       failed += 1;
       continue;
     }

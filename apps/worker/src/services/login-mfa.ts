@@ -19,7 +19,7 @@ export async function loginMfaRequired(db: D1Database, tenantId?: string | null,
 export async function loginMfaChallenge(c: Context<Env>, staff: StaffMember, remember: boolean, force = false) {
   const registered = twoFactorRequired(staff);
   if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) {
-    console.warn('[auth] MFA_KEY_UNAVAILABLE: ' + MFA_KEY_NOTICE);
+    console.warn(JSON.stringify({"code":"mfa_key_unavailable"}));
     // Never bypass a person's existing enrollment or an operator's forced MFA.
     if (!registered && !force) return null;
   }
