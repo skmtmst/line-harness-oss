@@ -524,7 +524,7 @@ function Responses() {
                       {recents.slice(0, 2).map((item) => {
                         const text = String((item.data as Record<string, unknown>)[longKey])
                         return (
-                          <Tr key={item.id} interactive={false}>
+                          <Tr key={item.id} interactive={false} data-table-layout="columns">
                             <Td grow><TruncatedText value={`「${text}」`} /></Td>
                             <Td align="right"><TruncatedText value={`${shortDay(item.createdAt)} ${item.friendName ?? '不明'}`} /></Td>
                           </Tr>
