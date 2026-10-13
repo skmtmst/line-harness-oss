@@ -14,7 +14,7 @@ import ChannelsTabV8 from './channels-tab'
 import type { useBookingSettings } from './settings'
 import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, V8_TABS } from './settings-parts'
 
-export default function BookingSettingsView({ accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, registerTabEdit, switchTarget, setSwitchTarget, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, phone }: ReturnType<typeof useBookingSettings> & { phone: ReactNode }) {
+export default function BookingSettingsView({ accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, hasChanges, registerTabEdit, switchTarget, setSwitchTarget, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, phone }: ReturnType<typeof useBookingSettings> & { phone: ReactNode }) {
   const previewContent = <>
             <div className={styles.sideActions}>
               {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
@@ -51,7 +51,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                   <Button
                     variant="primary"
                     onClick={() => {
-                      if (!tabEdit.dirty) {
+                      if (!hasChanges) {
                         notifyToast('変更はありません。')
                         return
                       }
@@ -65,7 +65,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                   </Button>
                 </>
               ) : null}
-        status={tabEdit?.dirty ? `${tabEdit.subject}があります` : undefined}
+        status={hasChanges && tabEdit ? `${tabEdit.subject}があります` : undefined}
       >
             {!accountId ? (
               <StateCard
