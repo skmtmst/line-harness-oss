@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
@@ -1243,15 +1244,12 @@ export default function ScenariosListV8() {
         >
           <div className={styles.moveBody}>
             <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <SaveErrorField names={["moveDraft","move_draft"]}><Select
+            <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
               onChange={(value) => setMoveDraft(value)}
-              options={[
-                { value: '', label: '未分類' },
-                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-              ]}
+              folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
             /></SaveErrorField>
           </div>
         </ConfirmDialog>

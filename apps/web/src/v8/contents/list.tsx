@@ -34,7 +34,7 @@ import MediaDetailDialog from './media-detail-dialog'
 import FileScanStoppedBanner from './file-scan-stopped-banner'
 import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
-import { folderById, folderCreator } from '@/components/shared/folder-select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import MediaUploadDialog from './media-upload-dialog'
 import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
@@ -1363,7 +1363,7 @@ export default function MediaLibraryListV8() {
               count={selected.size}
               total={selectionTotal}
               onSelectAll={selectAllMedia}
-              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => readSelectableMedia()} busyLabel="処理中…">もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><Notice tone="danger">{selectionError}</Notice><Button size="compact" onClick={() => readSelectableMedia()} busyLabel="処理中…">もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
@@ -1587,13 +1587,10 @@ export default function MediaLibraryListV8() {
       >
         <div className={styles.moveField}>
           <span className={styles.moveLabel}>移し先のフォルダ</span>
-          <SaveErrorField names={["moveFolderId","folderId","move_folder_id"]}><Select
+          <SaveErrorField names={["moveFolderId","folderId","move_folder_id"]}><FolderSelect
             aria-label="移し先のフォルダ"
             value={moveFolderId}
-            options={[
-              { value: '', label: '未分類' },
-              ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-            ]}
+            folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
             onChange={(value) => setMoveFolderId(value)}
           /></SaveErrorField>
         </div>
