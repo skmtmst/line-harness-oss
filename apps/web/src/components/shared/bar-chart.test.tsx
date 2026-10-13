@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BarChart, BarChartEmpty, BarChartLegend, barChartTicks, toBarChartItems, type BarChartLegendItem } from './bar-chart'
+import { BarChart, BarChartEmpty, BarChartLegend, barChartTicks, toBarChartItems, type BarChartLegendItem, BarChartEventMark } from './bar-chart'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const tsx = readFileSync(join(DIR, 'bar-chart.tsx'), 'utf8')
@@ -218,5 +218,46 @@ describe('グラフの吹き出しは白（黒をなくす #2）', () => {
     expect(tooltip).toMatch(/background:\s*var\(--color-canvas\)/)
     expect(tooltip).toMatch(/color:\s*var\(--color-ink\)/)
     expect(tooltip).not.toMatch(/background:\s*var\(--color-ink\)/)
+  })
+})
+
+
+describe('日別の増減と出来事の役目', () => {
+  it('減少を下へ指定しても日付・元の数・選択を保つ', () => {
+    const picked: string[] = []
+    const { container } = render(<BarChart items={SAMPLE} distribution="diverging" onSelect={key => picked.push(key)} />)
+    expect(container.querySelector('[data-chart-distribution="diverging"]')).not.toBeNull()
+    expect(container.querySelector('[data-chart-baseline]')).not.toBeNull()
+    expect(container.querySelector('[data-chart-series="removed"]')?.getAttribute('style')).toContain('height:')
+    fireEvent.click(screen.getByRole('button', { name: '9月21日 増えた0人・減った2人' }))
+    expect(picked).toEqual(['2026-09-21'])
+    const table = screen.getByRole('table', { name: '日ごとの増減' })
+    expect(table.textContent).toContain('2人')
+    expect(table.textContent).not.toContain('-2人')
+  })
+
+  it('配信とシナリオの印を凡例と同じ役目で日付へ渡す', () => {
+    const items = toBarChartItems([{ date: '2026-09-20', added: 6, removed: 0 }], { campaigns: [
+      { date: '2026-09-20', name: '朝の配信', kind: 'broadcast' },
+      { date: '2026-09-20', name: '来店のお礼', kind: 'scenario' },
+    ] })
+    const { container } = render(<>
+      <BarChartLegend items={[{ label: '増えた', tone: 'added' }, { label: '配信した日', tone: 'broadcast' }, { label: 'シナリオを始めた日', tone: 'scenario' }]} layout="analytics" />
+      <BarChart items={items} distribution="diverging" showLegend={false} />
+      <BarChartEventMark tone="broadcast" />
+    </>)
+    const tones = [...container.querySelectorAll('[data-chart-event]')].map(mark => mark.getAttribute('data-chart-event'))
+    expect(tones).toContain('broadcast')
+    expect(tones).toContain('scenario')
+    expect(container.querySelector('[data-chart-tone="broadcast"]')?.className).not.toBe(container.querySelector('[data-chart-tone="added"]')?.className)
+    expect(screen.getByRole('button', { name: '9月20日 増えた6人・減った0人・朝の配信、来店のお礼' })).not.toBeNull()
+    expect(screen.getAllByRole('list', { name: '凡例' })).toHaveLength(1)
+  })
+
+  it('追加の指定が無いグラフに基準線上下や出来事の印を足さない', () => {
+    const { container } = render(<BarChart items={SAMPLE} />)
+    expect(container.querySelector('[data-chart-distribution]')).toBeNull()
+    expect(container.querySelector('[data-chart-baseline]')).toBeNull()
+    expect(container.querySelector('[data-chart-event]')).toBeNull()
   })
 })

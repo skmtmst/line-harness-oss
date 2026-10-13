@@ -1074,3 +1074,9 @@
 
 - 役目：顔と名前を横並び1行で読む。持ち主は shared/table.tsx の PersonCell、顔は shared/avatar.tsx。名前と既存の行き先を name、表示名を avatarName へ渡す。幅が狭い時は名前だけ省略し全文を title で読む。フォルダ付きの NameCell とは役目を分ける。
 - 件数は shared/pagination.tsx の range（total/first/last）へ。手書きの件数文を足さない。
+
+### 日別グラフの基準線と出来事
+
+- 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
+- `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
+- 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
