@@ -96,7 +96,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const css = getComputedStyle(el); canvas.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
       if (canvas.measureText(el.placeholder).width > el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1) add('F1', el, 'search placeholder does not fit')
     }
-    for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button')) {
+    for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button,[data-page-title],[data-template-region="heading"] h1,[data-template-region="heading"] h2')) {
       if (lines(el) > 1) add('F2', el, 'short text wraps')
     }
     for (const el of all('button,a[role="button"],[data-page-title]')) {

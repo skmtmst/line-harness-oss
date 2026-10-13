@@ -16,6 +16,7 @@ import { countFixPatterns, countTable, sourceCountTable } from './fix-pattern-co
 import { screenReady } from './screen-ready.mjs'
 import { WIDTHS } from './browser-env.mjs'
 import scanTableColumnAlignment from './table-column-alignment-browser.mjs'
+import scanVisualState from './visual-state-browser.mjs'
 
 const [base = 'http://127.0.0.1:4310', output = '/tmp/fix-patterns.json', casesPath] = process.argv.slice(2)
 const registry = JSON.parse(readFileSync(new URL('../../design/list-skeleton.json', import.meta.url)))
@@ -98,13 +99,14 @@ try {
       const layout = assess(await measurePage(page),entry.route,width,[])
       Object.assign(result,{...patterns,...countFixPatterns(patterns,skeleton,layout),skeleton,layout})
       result.columnAlignment = await page.evaluate(scanTableColumnAlignment)
+      result.visualState = await page.evaluate(scanVisualState, { expectedState: entry.expectedState ?? null })
       if (process.env.FIX_PATTERN_SCREENSHOTS === '1') {
         const imageDir = join(dirname(output),basename(output,'.json')+'-images'); mkdirSync(imageDir,{recursive:true})
         result.screenshot = join(imageDir,`${entry.board ?? String(cases.indexOf(entry))}-${width}.png`)
         await page.screenshot({path:result.screenshot,fullPage:true,animations:'disabled'})
       }
       result.overflow = await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)
-      failed ||= !!result.findings.length || !!result.layout.failures.length || !!result.overflow || !!result.columnAlignment.findings.length
+      failed ||= !!result.findings.length || !!result.layout.failures.length || !!result.overflow || !!result.columnAlignment.findings.length || !!result.visualState.findings.length
     } catch (e) { result.error=e.message; result.visibleText=await page.locator('main').innerText().catch(()=>null); failed=true }
     result.sourceCandidates = entry.sourceFiles.length ? sourceHits.filter(hit=>entry.sourceFiles.includes(hit.file)) : null
     result.sourceCoverage = {sha:sourceReport.meta.sha,dirty:sourceReport.meta.dirty,files:entry.sourceFiles, candidates:result.sourceCandidates?.length??null}

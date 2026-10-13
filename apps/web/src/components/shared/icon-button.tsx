@@ -20,9 +20,10 @@ export default function IconButton({
   ref?: Ref<HTMLButtonElement>
   /**
    * 'small' は行の中の 24×24（印 12・角丸 6。ダッシュボード編集 mcOqK の上下）。
-   * 'row' は行の右端の「…」の 28×28（印 14・押せる所は 36。★V8 i0Ao0R ほか）。どちらも v8 だけで効く。
+   * 'row' は行の右端の「…」の 28×28（印 14・押せる所は 36。★V8 i0Ao0R ほか）。
+   * 'compact' は狭い道具の枠つき32角。通常の36角と行の「…」は保つ。
    */
-  size?: 'small' | 'row'
+  size?: 'small' | 'row' | 'compact'
   /** 枠のない行内操作。既定の枠つきボタンには効かない。 */
   variant?: 'plain'
   /** Controlled selection, for actions such as starring an item. */

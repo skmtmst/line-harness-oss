@@ -18,7 +18,7 @@ export function countTable(results) {
   const cells = value => String(value ?? '').replace(/[\t\r\n]/g,' ')
   return [['board','route','width',...keys,'pageScopes','overflow','errors','writes','status','sha'], ...results.map(r=>[
     r.board,r.route,r.width,...keys.map(k=>r.error ? '' : r.counts?.[k]),r.coverage?.pages,r.overflow,r.errors.length,r.writes.length,
-    r.error ? `unmeasured: ${r.error}` : r.findings.length || r.overflow || r.errors.length || r.writes.length ? 'fail' : 'pass',r.version?.git_commit,
+    r.error ? `unmeasured: ${r.error}` : r.findings.length || r.overflow || r.errors.length || r.writes.length || r.visualState?.findings.length ? 'fail' : 'pass',r.version?.git_commit,
   ])].map(row=>row.map(cells).join('\t')).join('\n')+'\n'
 }
 
