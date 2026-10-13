@@ -200,6 +200,7 @@ export default function BookingsPage() {
    * 知らない値は既定へ落とす。
    */
   const urlInitRef = useRef(false)
+  const [ledgerRestored, setLedgerRestored] = useState(false)
   // R317: 復元で絞り込みが変わっても、戻したページは1へ戻さない。
   const pageResetRef = useRef({ seenMount: false, restoreTransition: false })
   useEffect(() => {
@@ -263,6 +264,7 @@ export default function BookingsPage() {
     if (bookingParam) {
       setActiveBookingId(bookingParam)
     }
+    setLedgerRestored(true)
   }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
@@ -790,7 +792,7 @@ export default function BookingsPage() {
     ...(activeBookingId ? [`booking=${encodeURIComponent(activeBookingId)}`] : []),
   ].join('&')
   useEffect(() => {
-    if (!urlInitRef.current) return
+    if (!urlInitRef.current || !ledgerRestored) return
     try {
       window.sessionStorage.setItem(
         LEDGER_STORAGE_KEY,
@@ -806,7 +808,7 @@ export default function BookingsPage() {
     if (current !== ledgerQuery) {
       router.replace(ledgerQuery ? `/booking/bookings?${ledgerQuery}` : '/booking/bookings')
     }
-  }, [ledgerQuery, router])
+  }, [ledgerQuery, ledgerRestored, router])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。

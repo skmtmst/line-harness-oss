@@ -20,7 +20,6 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { ListPage } from '@/components/templates/list-page'
-import { PageContent } from '@/components/templates/page-frame'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import { useOpsReadOnly } from './use-ops-read-only'
@@ -163,7 +162,12 @@ export default function OpsTenantsV8() {
           <KpiCard presentation="cell" icon={<CreditCard size={13} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Pause size={13} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
         </KpiBand>}
-        toolbar={<ListToolbarFrame><ListToolbarRow>
+        toolbar={<>
+          <Notice tone="warn">
+            <ShieldCheck aria-hidden="true" />運営コンソール：契約先のデータを扱います。操作はすべて記録されます
+            {opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL) === 'staging' ? '（検証環境）' : null}
+          </Notice>
+          <ListToolbarFrame><ListToolbarRow>
           <ListToolbarSearchSlot>
             <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="統括名・メール・店舗名で探す" aria-label="契約先を探す" />
           </ListToolbarSearchSlot>
@@ -175,7 +179,7 @@ export default function OpsTenantsV8() {
               {f.label}
             </FilterChip>
           ))}
-        </ListToolbarRow></ListToolbarFrame>}
+        </ListToolbarRow></ListToolbarFrame></>}
         overlays={
       <Dialog
         open={creating}
@@ -204,11 +208,6 @@ export default function OpsTenantsV8() {
       </Dialog>
 }
       >
-        <PageContent>
-        <Notice tone="warn">
-          <ShieldCheck aria-hidden="true" />運営コンソール：契約先のデータを扱います。操作はすべて記録されます
-          {opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL) === 'staging' ? '（検証環境）' : null}
-        </Notice>
         {loading && rows.length === 0 ? (
           <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
         ) : listLoadError && rows.length === 0 ? (
@@ -255,7 +254,6 @@ export default function OpsTenantsV8() {
             })}
           </div>
         )}
-        </PageContent>
     </ListPage>
   )
 }

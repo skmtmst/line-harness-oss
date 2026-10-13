@@ -264,6 +264,8 @@ describe('監査 R317: 条件と表示日をURLへ持ち、再読み込みで復
     })
     expect(screen.getByRole('button', { name: /^今月/ }).getAttribute('aria-pressed')).toBe('true')
     expect((screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement).value).toBe('変更した条件')
+    const writes = nav.replace.mock.calls.map(([url]) => new URL(String(url), 'http://localhost'))
+    expect(writes.every(url => url.searchParams.get('view') === 'month')).toBe(true)
   })
 
   it('URLの表示方法・絞り込み・検索語で一覧を開く', async () => {
