@@ -85,6 +85,8 @@ export type ListToolbarSearch = {
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
+  /** 入力直後の操作も同じ検索条件を使う画面で指定する。 */
+  updateMode?: 'debounced' | 'immediate'
 }
 
 /**
@@ -145,6 +147,7 @@ export default function ListToolbar({
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
+          updateMode={search.updateMode}
         /></div> : searchSlot ? <div className={styles.search} data-toolbar-search>{searchSlot}</div> : null}
       </div>
       {filters || secondary || actions || trailing || sort || trailingAccessory ? (
