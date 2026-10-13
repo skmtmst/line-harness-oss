@@ -42,7 +42,7 @@ import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } fr
 import FriendPickerField from '@/components/shared/friend-picker-field';
 import SegmentedControl from '@/components/shared/segmented'
 import { TextArea, TextField } from '@/components/shared/text-field';
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
 import { SettingCheckbox } from '@/components/shared/checkbox';
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
@@ -1055,12 +1055,12 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
     <>
       <Card variant="form" gap="normal" className={styles.card} aria-label="どの流入リンクから来た人に送るか" data-friend-add-routes>
         <CardHeader size="stacked" title={<>どの流入リンクから来た人に送るか</>} meta={<>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</>} />
-        <SaveErrorField names={["query"]}><SearchField
-            value={query}
-            placeholder="流入リンクの名前で探す"
-            aria-label="流入リンクの名前で探す"
-            onChange={setQuery}
-          /></SaveErrorField>
+        <ListToolbar search={{
+          value: query,
+          placeholder: '流入リンクの名前で探す',
+          label: '流入リンクの名前で探す',
+          onChange: setQuery,
+        }} />
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)
