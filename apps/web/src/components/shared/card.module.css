@@ -223,3 +223,9 @@ html:root .records {
 }
 html:root .records > .header { padding-inline: var(--polish-space-section); }
 html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
+
+/* 段の中の頭はCardの余白を使う。通常の頭の左右16を重ねない。 */
+html:root .headerStacked { padding: 0; }
+
+/* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
+html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }

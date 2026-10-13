@@ -177,7 +177,7 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 2, pageSize: 20 }))
     expect(await screen.findByText('88 件中 21〜40 件')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '記録の表示件数' }))
-    fireEvent.click(await screen.findByRole('button', { name: '10 件ずつ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '10件表示' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 10 }))
     expect(await screen.findByText('88 件中 1〜10 件')).toBeTruthy()
   })

@@ -67,6 +67,8 @@ export interface InsertTextFieldProps
   extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'onChange'> {
   /** 高さ72の短い本文欄。指定しなければ従来の呼び出し側の見た目。 */
   compact?: boolean
+  /** 本文／コードの大きさと内側の余白を共通にする。 */
+  editorSize?: 'message' | 'code'
   value: string
   onValueChange: (next: string) => void
   /** 画面ごとに意味が違う差し込み（リマインダの {{date}}＝予約日時、統括の {店名} など）。 */
@@ -267,6 +269,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     tokenNames = EMPTY_NAMES,
     className,
     compact,
+    editorSize,
     style,
     placeholder,
     maxLength,
@@ -627,7 +630,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
       aria-placeholder={placeholder}
       {...({ placeholder } as Record<string, string | undefined>)}
       data-insert-field=""
-      className={`${styles.editor} ${compact ? styles.editorCompact : ''} ${className ?? ''}`}
+      className={`${styles.editor} ${editorSize ? styles.editorMessage : ''} ${editorSize === 'code' ? styles.editorCode : ''} ${compact ? styles.editorCompact : ''} ${className ?? ''}`}
       style={{ ...minHeight, ...style }}
       contentEditable={editable}
       suppressContentEditableWarning

@@ -144,6 +144,8 @@ function NewInner() {
     <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="j7PP04"
+        readOnly={readOnly}
+        notice={readOnly ? <ReadOnlyNotice>閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : undefined}
         title="ウェビナーを作る"
         identity={<BackLink />}
         steps={<WizardSteps current="basic" stateOf={(key) => (key === 'basic' ? 'current' : 'todo')} />}
@@ -158,7 +160,6 @@ function NewInner() {
         </>}
         preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
-        {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {/* 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（作る画面なので見せる中身は無い。2026-10-06 オーナー決定）。 */}
         {readOnly ? null : <BasicForm

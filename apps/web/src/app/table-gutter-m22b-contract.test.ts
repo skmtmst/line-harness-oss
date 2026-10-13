@@ -40,14 +40,7 @@ describe('m22b 表の左右の余白（共通部品）', () => {
 
 describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
 
-  it('/common-actions：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('v8', 'automations', 'common-actions.tsx')
-    expect(body).toContain('<Td className={styles.colOps}')
-    expect(body).toContain('className={styles.opsBox}')
-    const css = read('v8', 'automations', 'common-actions.module.css')
-    expect(css).toContain('.colOps { width: var(--tpl-am-run-col-ops); flex-shrink: 0; }')
-    expect(css).toMatch(/\.opsBox[^}]*display: flex;[^}]*align-items: center;/)
-  })
+  // common-actionsの手書きTd／固定120は廃止。ActionCellの実幅を実画面で測る。
 
   it('/affiliate-offers（案件タブ）：操作は右端にそろえる', () => {
     const body = read('v8', 'affiliates', 'offers.tsx')

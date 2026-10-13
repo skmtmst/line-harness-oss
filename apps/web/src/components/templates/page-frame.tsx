@@ -98,10 +98,16 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', title
 export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false, elementRef }: {
   kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean; elementRef?: Ref<HTMLDivElement>
 }) {
-  return <div ref={elementRef} className={styles.frame} data-frame-height={heightMode} data-height-mode={heightMode} data-list-skeleton={skeleton ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  const resolvedHeight = heightMode ?? (kind === 'list' && !standalone ? 'content' : undefined)
+  return <div ref={elementRef} className={styles.frame} data-frame-height={resolvedHeight} data-height-mode={resolvedHeight} data-list-skeleton={skeleton || kind === 'list' ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */
 export function PageFooter({ actions, status, presentation }: { actions: ReactNode; status?: ReactNode; presentation?: 'distribution' }) {
   return <div className={styles.footer} data-template-region="footer"><StickyBar actions={actions} status={status} presentation={presentation} /></div>
+}
+
+/** 内容で終わる板の本文。下の24はPageFrameが持ち、本文と二重にしない。 */
+export function PageContent({ children, layout, ...props }: Omit<import('react').HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & { layout?: 'columns' }) {
+  return <div {...props} className={styles.pageContent} data-content-layout={layout} data-template-region="content">{children}</div>
 }

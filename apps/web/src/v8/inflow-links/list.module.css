@@ -81,34 +81,6 @@
   justify-content: flex-end;
 }
 
-/* 数の帯のマスの「…」（16 の印だけ。マスの上の行を高くしない）。 */
-.tileMenu {
-  display: inline-flex;
-  align-items: center;
-}
-/* 「…」は共通の RowMenu。今の見た目（枠なし・地なし・印の大きさだけ）を共通の印ボタンより強く当てる。 */
-.tileMenu > button.tileMenuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  height: auto;
-  flex: 0 0 auto;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  border-radius: var(--radius-control);
-  background: none;
-  color: var(--color-ink-faint);
-  cursor: pointer;
-}
-.tileMenu > button.tileMenuButton:hover,
-.tileMenu > button.tileMenuButton[aria-expanded='true'] {
-  background: none;
-  color: var(--color-ink);
-}
-
 /* 表の下の案内。 */
 .footNote {
   margin: 0;

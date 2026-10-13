@@ -38,6 +38,7 @@ import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CreateColumns } from '@/components/templates/create-page'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -847,7 +848,7 @@ export default function HqBroadcastCreate() {
         ) : null}
         {draftState === 'error' ? <Notice tone="danger" role="alert">下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
-        <div className={formStyles.body}>
+        <CreateColumns>
           <div className={formStyles.input}>
             {/* ① 基本設定（lmWCZ） */}
             {shows('basic') ? (
@@ -1171,7 +1172,7 @@ export default function HqBroadcastCreate() {
             </div>
             <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
           </aside>
-        </div>
+        </CreateColumns>
 
         <StickyBar className={formStyles.footer} actions={(
           <>

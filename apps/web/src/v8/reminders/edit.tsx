@@ -53,6 +53,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
+import StatusBadge from '@/components/shared/status-badge'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -1836,14 +1838,11 @@ export function DoneStageV8({
     <PageFrame kind="create" boardId={boardId}>
       <PageHeading {...heading} />
       <div className={styles.doneBody}>
-        <div className={styles.doneCard}>
-          <span className={styles.doneIcon}>
-            <Check size={24} aria-hidden="true" />
-          </span>
-          <h2 className={styles.doneTitle}>「{settings.name}」を有効にしました</h2>
-          <p className={styles.doneNote}>
-            これから{settings.triggerType === 'friend_field' ? '基準日が入った人' : '予約が入った人'}にも、自動で予定が作られます。止めたいときは、詳細の「一時停止する」から止められます。
-          </p>
+        <Card variant="form" className={styles.doneCard}>
+          <StatusBadge tone="success" dot={false}><Check size={16} aria-hidden="true" />有効</StatusBadge>
+          <CardHeader size="stacked" title={`「${settings.name}」を有効にしました`} meta={
+            <>これから{settings.triggerType === 'friend_field' ? '基準日が入った人' : '予約が入った人'}にも、自動で予定が作られます。止めたいときは、詳細の「一時停止する」から止められます。</>
+          } />
           <dl className={styles.doneFacts}>
             <div className={styles.doneFact}>
               <dt>最初に送る</dt>
@@ -1863,7 +1862,7 @@ export function DoneStageV8({
               <ArrowRight size={15} aria-hidden="true" />詳細を見る
             </Button>
           </div>
-        </div>
+        </Card>
       </div>
     </PageFrame>
   )

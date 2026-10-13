@@ -18,7 +18,8 @@ import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import { AffixedTextField, TextArea, TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
@@ -31,7 +32,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
@@ -398,25 +399,13 @@ export default function NewCommonVarV8() {
 
   const preview = (
     <>
-      <div className={styles.secretCard}>
-        <p className={styles.secretTitle}>秘密の値は入れないでください</p>
-        <p className={styles.secretText}>
-          パスワード・APIキー・トークンなどは保存できません（入れると止めます）。配信文に誤って差し込まれるおそれがあります。外部連携の設定に登録してください。
-        </p>
-      </div>
+      <Notice tone="warn" heading="秘密の値は入れないでください">
+        パスワード・APIキー・トークンなどは保存できません（入れると止めます）。配信文に誤って差し込まれるおそれがあります。外部連携の設定に登録してください。
+      </Notice>
       <LinePreview caption="差し込んだ例" accountName="然 - NEN -" note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
-        <div className={styles.talkRow}>
-          <span className={styles.talkIcon} aria-hidden="true">然</span>
-          <div className={styles.talkCol}>
-            <span className={styles.talkName}>然 - NEN -</span>
-            <div className={styles.talkBubbleRow}>
-              <p className={styles.talkBubble}>
-                {`いつもありがとうございます。\n${previewName}は ${value || emptyValue('unconfigured')} です。`}
-              </p>
-              <span className={styles.talkTime}>10:00</span>
-            </div>
-          </div>
-        </div>
+        <LinePreviewMessage accountName="然 - NEN -" avatar="然" time="10:00">
+          {`いつもありがとうございます。\n${previewName}は ${value || emptyValue('unconfigured')} です。`}
+        </LinePreviewMessage>
       </LinePreview>
     </>
   )
@@ -462,11 +451,9 @@ export default function NewCommonVarV8() {
       )}
 
       <Card variant="form" gap="normal" aria-labelledby="cv-new-name-heading">
-        <div className={styles.cardHead}>
-          <h2 id="cv-new-name-heading" className={styles.cardTitle}>名前と差し込み名</h2>
-        </div>
+        <CardHeader size="stacked" titleId="cv-new-name-heading" title="名前と差し込み名" />
         <div className={styles.nameRow}>
-          <div className={styles.field}><Field density="input" label="共通情報名（友だちには見えません）" htmlFor="cv-name"><SaveErrorField names={["name"]}><input
+          <div className={styles.field}><Field density="input" required label="共通情報名（友だちには見えません）" htmlFor="cv-name"><SaveErrorField names={["name"]}><TextField
               id="cv-name"
               type="text"
               maxLength={NAME_MAX}
@@ -479,7 +466,6 @@ export default function NewCommonVarV8() {
               }}
               onBlur={() => setNameFieldError(validateVarName(name) ?? '')}
               placeholder="営業時間"
-              className={styles.fieldInput}
               aria-invalid={nameFieldError ? true : undefined}
               title={`${name.length}/${NAME_MAX}文字`}
             /></SaveErrorField>
@@ -507,10 +493,11 @@ export default function NewCommonVarV8() {
         </div>
         <div className={styles.field}><Field density="input" note={<>
             半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
-          </>} label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
-            <span className={styles.keyBox}>
-              <span className={styles.keyMark} aria-hidden="true">{'{{var.'}</span>
-              <SaveErrorField names={["varKey","keyTouched","var_key","key_touched"]}><input
+          </>} required label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
+            <SaveErrorField names={["varKey","keyTouched","var_key","key_touched"]}><AffixedTextField
+                monospace
+                startAdornment="{{var."
+                endAdornment="}}"
                 id="cv-key"
                 type="text"
                 value={varKey}
@@ -522,22 +509,16 @@ export default function NewCommonVarV8() {
                 }}
                 onBlur={() => setKeyFieldError(validateVarKey(varKey) ?? '')}
                 placeholder="shop_hours"
-                className={styles.keyInput}
                 aria-invalid={keyFieldError ? true : undefined}
               /></SaveErrorField>
-              <span className={styles.keyMark} aria-hidden="true">{'}}'}</span>
-            </span>
-            <CopyTextButton value={`{{var.${varKey.trim()}}}`} aria-label="差し込み名をコピー" disabled={!varKey.trim()} />
+            <CopyTextButton label="コピーする" value={`{{var.${varKey.trim()}}}`} aria-label="差し込み名をコピー" disabled={!varKey.trim()} />
           </div>
 <VarFieldError message={keyFieldError} />
 </Field></div>
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="cv-new-type-heading">
-        <div className={styles.cardHead}>
-          <h2 id="cv-new-type-heading" className={styles.cardTitle}>種別と中身</h2>
-          <p className={styles.cardNote}>種別は作ったあと変えられません</p>
-        </div>
+        <CardHeader size="stacked" titleId="cv-new-type-heading" title="種別と中身" meta="種別は作ったあと変えられません" />
         <RadioCardGroup legend="種別" className={styles.typeGrid}>
           {TYPES.map((entry) => {
             const Icon = entry.icon
@@ -564,7 +545,7 @@ export default function NewCommonVarV8() {
         <div className={styles.field}><Field density="input" label="中身" htmlFor="cv-value" required={COMMON_VAR_VALUE_REQUIRED.has(type)}>{type === 'boolean' ? (
             <SaveErrorField names={["value"]}><Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
           ) : type === 'long_text' ? (
-            <SaveErrorField names={["value"]}><textarea
+            <SaveErrorField names={["value"]}><TextArea
               id="cv-value"
               maxLength={10000}
               value={value}
@@ -573,7 +554,6 @@ export default function NewCommonVarV8() {
                 setSecretWarningFields(null)
               }}
               placeholder={spec.placeholder}
-              className={styles.fieldArea}
               aria-invalid={valueFieldError ? true : undefined}
               rows={3}
               title={`${value.length}/10000文字`}
@@ -593,7 +573,7 @@ export default function NewCommonVarV8() {
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
             /></SaveErrorField>
           ) : (
-            <SaveErrorField names={["value"]}><input
+            <SaveErrorField names={["value"]}><TextField
               ref={valueRef}
               id="cv-value"
               type={type === 'number' ? 'number' : 'text'}
@@ -601,7 +581,6 @@ export default function NewCommonVarV8() {
               value={value}
               onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
               placeholder={spec.placeholder}
-              className={styles.fieldInput}
               aria-invalid={valueFieldError ? true : undefined}
               title={type === 'number' ? undefined : `${value.length}/${VALUE_MAX}文字`}
             /></SaveErrorField>
@@ -610,10 +589,7 @@ export default function NewCommonVarV8() {
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="cv-new-period-heading">
-        <div className={styles.cardHead}>
-          <h2 id="cv-new-period-heading" className={styles.cardTitle}>使える期間</h2>
-          <p className={styles.cardNote}>空なら期間を決めません。予約した配信は、送り始める時刻で判断します</p>
-        </div>
+        <CardHeader size="stacked" titleId="cv-new-period-heading" title="使える期間" meta="空なら期間を決めません。予約した配信は、送り始める時刻で判断します" />
         <div className={styles.periodGrid}>
 
           <Field density="input" label="始まり" htmlFor="cv-valid-from"><SaveErrorField names={["validFrom","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
@@ -631,20 +607,19 @@ export default function NewCommonVarV8() {
             ) : type === 'datetime' ? (
               <SaveErrorField names={["fallbackValue","fallback_value"]}><DateTimeField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} /></SaveErrorField>
             ) : (
-              <SaveErrorField names={["fallbackValue","fallback_value"]}><input
+              <SaveErrorField names={["fallbackValue","fallback_value"]}><TextField
                 id="cv-fallback-value"
                 type={type === 'number' ? 'number' : 'text'}
                 value={fallbackValue}
                 onChange={(e) => setFallbackValue(e.target.value)}
-                className={styles.fieldInput}
-                aria-invalid={fallbackFieldError ? true : undefined}
+                  aria-invalid={fallbackFieldError ? true : undefined}
               /></SaveErrorField>
             )}
 <VarFieldError message={fallbackFieldError} /></Field></div>
         )}
       </Card>
 
-      <div className={styles.field}><Field density="input" label="社内メモ" htmlFor="cv-memo"><SaveErrorField names={["memo"]}><input
+      <div className={styles.field}><Field density="input" label="社内メモ" htmlFor="cv-memo"><SaveErrorField names={["memo"]}><TextField
           id="cv-memo"
           type="text"
           maxLength={MEMO_MAX}
@@ -654,7 +629,6 @@ export default function NewCommonVarV8() {
             setSecretWarningFields(null)
           }}
           placeholder="臨時休業のときは「臨時のお知らせ」も直す"
-          className={styles.fieldInput}
         /></SaveErrorField></Field></div>
 
       {secretWarningFields && (

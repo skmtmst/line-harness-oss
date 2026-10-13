@@ -5,7 +5,8 @@ import EntitySelect from '@/components/shared/entity-select'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import { CreatePage } from '@/components/templates'
 import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
@@ -14,7 +15,6 @@ import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
-import StickyBar from '@/components/shared/sticky-bar'
 import VersionCompare from '@/components/shared/version-compare'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -24,11 +24,10 @@ import './report-v8.css'
 import { TextField } from '@/components/shared/text-field'
 import NumberInput from '@/components/shared/number-field'
 import HelpTip from '@/components/shared/help-tip'
-import { Field } from '@/components/shared/form-controls'
+import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import PeriodPicker from '@/components/shared/period-picker'
-import { Check, ChevronDown, GitCompareArrows, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Check, ChevronDown, GitCompareArrows, RefreshCw } from 'lucide-react'
 import { formatDateTime, formatTime } from '@/lib/format'
-import ReportHeadV8 from './report-head-v8'
 import {
   api,
   ApiError,
@@ -1031,23 +1030,37 @@ function AnalyticsReportFormPage() {
 
   return (
     <div className="report-v8-page" ref={reportRef} data-design-node={updateConflict ? 'G83vi' : 'H5UoIu'}>
-      <ReportHeadV8 editing={Boolean(editing)} />
-      {updateConflict && (
-        /* G83vi：板の頭の下に、だれがいつ保存したかと、比べる・読み込む操作の帯。 */
-        <div className="report-v8-conflictWrap">
-          <div className="report-v8-conflict" role="alert">
-            <TriangleAlert size={16} aria-hidden="true" className="report-v8-conflictIcon" />
-            <div className="report-v8-conflictText">
-              <p className="report-v8-conflictTitle">{conflictLatest ? <>ほかの人が <time dateTime={conflictLatest.updatedAt} title={formatDateTime(conflictLatest.updatedAt)}>{formatTime(conflictLatest.updatedAt)}</time> にこのレポートを保存しました</> : 'ほかの人がこのレポートを先に保存しました'}</p>
-              <p className="report-v8-conflictSub">このまま保存すると、相手の変更が消えます。入力は残っています。</p>
-            </div>
-            <div className="report-v8-conflictActions">
-              {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
-              <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreatePage
+        boardId={updateConflict ? 'G83vi' : 'H5UoIu'}
+        title={editing ? '定期レポートを直す' : 'レポートを作る'}
+        help="見たい数をまとめて、決まった曜日・時刻に LINE やメールで届けます。数が急に動いたときだけ知らせることもできます。"
+        readOnly={!canManage}
+        contentDisabled={!canManage || saving || compareBusy || latestBusy}
+        contentLabel="レポートの設定"
+        notice={updateConflict ? <Notice tone="warn" role="alert"
+          heading={conflictLatest ? <>ほかの人が <time dateTime={conflictLatest.updatedAt} title={formatDateTime(conflictLatest.updatedAt)}>{formatTime(conflictLatest.updatedAt)}</time> にこのレポートを保存しました</> : 'ほかの人がこのレポートを先に保存しました'}
+          action={<>
+            {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
+            <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+          </>}>
+          このまま保存すると、相手の変更が消えます。入力は残っています。
+        </Notice> : null}
+        dirty={false}
+        preview={        <>
+          <Card variant="aside">
+            <CardHeader size="stacked" title={`${nextLabel} に、こう届きます`} meta="見本" />
+            <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="tight"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日）</p>{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{PREVIEW_LABEL[id] ?? sectionTitleOf(id)} <strong>送信時に集計</strong></p>)}<p className="report-v8-previewMore">くわしくは musubo の分析で</p></Card>
+          </Card>
+          <Card variant="aside"><CardHeader size="stacked" title="レポートが見ているもの" /><p className="report-v8-kvRow">LINE アカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></p><p className="report-v8-kvRow">保存した分析 <strong>{savedAnalysisIds.length} 件</strong></p></Card>
+          <Card variant="aside"><CardHeader size="stacked" title="気をつけること" /><ul className="report-v8-notes"><li>数は送る時刻の時点で集めます</li><li>宛先がブロックしていると、LINE では届きません</li></ul></Card>
+        </>}
+        footerActions={<>
+        <Button href="/analytics">キャンセル</Button>
+        {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
+        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
+      </>}
+      >
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} />}
       {conflictId && (
@@ -1058,41 +1071,32 @@ function AnalyticsReportFormPage() {
           同じ操作で作った予約が既にあります。内容を変えて送り直したため、新しい予約は作りませんでした。
         </Notice>
       )}
-      <div className="report-v8-columns">
-        <fieldset className="report-v8-fields" disabled={!canManage || saving || compareBusy || latestBusy}>
-          <legend className="sr-only">レポートの設定</legend>
+
           <Card variant="form" gap="normal">
-            <h2 className="report-v8-cardTitle">名前を付けます</h2>
+            <CardHeader size="stacked" title="名前を付けます" />
             <Field label="名前" required><TextField id="report-name" aria-describedby={nameError ? 'report-name-error' : undefined} value={name} onChange={(event) => { setName(event.target.value); setNameError(''); setValidation(null) }} placeholder="例：週次まとめ" aria-invalid={nameError ? true : undefined} /></Field>
             {nameError && <p id="report-name-error" className="report-v8-fieldError" role="alert">{nameError}</p>}
           </Card>
           <Card variant="form" gap="normal">
             {/* 絵に無い「使われ方」は、段の頭の右に小さく置く（落とさない）。 */}
-            <div className="report-v8-cardHead">
-              <h2 className="report-v8-cardTitle">何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></h2>
-              <Checkbox className="report-v8-headCheck" checked={sections.includes('usage')} onCheckedChange={() => toggleSection('usage')}>使われ方も入れる</Checkbox>
-            </div>
+            <CardHeader size="stacked" title={<>何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></>}
+              action={<Checkbox checked={sections.includes('usage')} onCheckedChange={() => toggleSection('usage')}>使われ方も入れる</Checkbox>} />
             <div className="report-v8-sectionCards">
               {SECTION_CHOICES.filter((choice) => choice.id !== 'usage').map((choice) => {
                 const checked = sections.includes(choice.id)
                 const locked = Boolean(choice.unavailable) && !checked
-                return <div className="report-v8-selectionCard" key={choice.id}>
-                  <Checkbox checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)}>
-                    <span className="report-v8-choice"><strong className="report-v8-choiceTitle">{choice.title}</strong><span className="report-v8-choiceDetail" title={choice.unavailable}>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</span></span>
-                  </Checkbox>
-                </div>
+                return <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="tight" key={choice.id}>
+                  <Checkbox checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)} description={<span title={choice.unavailable}>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</span>}>{choice.title}</Checkbox>
+                </Card>
               })}
             </div>
           </Card>
           <Card variant="form" gap="normal">
-            <div className="report-v8-cardHeadStack">
-              <h2 className="report-v8-cardTitle">保存した分析を添えます</h2>
-              <p className="report-v8-cardSub">選んだ分析は、そのときの数で添えます</p>
-            </div>
+            <CardHeader size="stacked" title="保存した分析を添えます" meta="選んだ分析は、そのときの数で添えます" />
             <EntitySelect aria-label="保存した分析" noun="保存した分析" values={savedAnalysisIds} onChange={setSavedAnalysisIds} readOnly={!canManage} options={options.savedAnalyses.map((item) => ({ value: item.id, label: item.name, description: item.kind === 'cross' ? 'クロス分析' : 'ファネル' }))} />
           </Card>
           <Card variant="form" gap="normal">
-            <h2 className="report-v8-cardTitle">だれに送りますか<span className="report-v8-required">必須</span></h2>
+            <CardHeader size="stacked" title={<>だれに送りますか <RequiredBadge /></>} />
             {editing && editing.recipients.some((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)) && <Notice tone="warn" message={`前に選んでいた${editing.recipients.filter((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)).map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`} />}
             <EntitySelect aria-label="レポートを受け取る人" noun="担当者" values={staffIds} onChange={setStaffIds} readOnly={!canManage} options={options.recipients.map((person) => ({ value: person.id, label: person.name, description: `${ROLE_LABEL[person.role]}${person.lineLinked ? ' ／ LINE連携済み' : ''}` }))} />
             <div className="report-v8-chips">
@@ -1123,7 +1127,7 @@ function AnalyticsReportFormPage() {
             </div>
           </Card>
           <Card variant="form" gap="normal">
-            <h2 className="report-v8-cardTitle">いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></h2>
+            <CardHeader size="stacked" title={<>いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></>} />
             <div className="report-v8-scheduleGrid">
               <Field label="間かく" required><Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></Field>
               {cadence === 'weekly' ? <Field label="送る曜日" required><Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></Field> : <Field label="送る日" required><Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></Field>}
@@ -1133,45 +1137,26 @@ function AnalyticsReportFormPage() {
           </Card>
           <Card variant="form" gap="normal">
             {/* 全体の入り切りは段の頭の右に小さく置く（絵は条件ごとのチェックだけ）。 */}
-            <div className="report-v8-cardHead">
-              <div className="report-v8-cardHeadStack">
-                <h2 className="report-v8-cardTitle">知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></h2>
-                <p className="report-v8-cardSub">数が急に動いたときだけ、すぐに知らせます。少ない数でさわがないよう、最低件数も決めます</p>
-              </div>
-              <Checkbox id="report-alerts-enabled" invalid={!!fieldMessage('report-alerts-enabled')} aria-describedby={fieldMessage('report-alerts-enabled') ? 'report-alerts-enabled-error' : undefined} className="report-v8-headCheck" checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
-            </div>
+            <CardHeader size="stacked"
+              title={<>知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></>}
+              meta="数が急に動いたときだけ、すぐに知らせます。少ない数でさわがないよう、最低件数も決めます"
+              action={<Checkbox id="report-alerts-enabled" invalid={!!fieldMessage('report-alerts-enabled')} aria-describedby={fieldMessage('report-alerts-enabled') ? 'report-alerts-enabled-error' : undefined} checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>} />
             {fieldMessage('report-alerts-enabled') && <p id="report-alerts-enabled-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-alerts-enabled')}</p>}
             <ul className="report-v8-alerts" onChange={() => setValidation(null)}>
               {[...ALERT_RULE_DEFS].sort((a, b) => (a.id === 'friend_adds' ? -1 : b.id === 'friend_adds' ? 1 : 0)).map((def) => {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
-                return <li className="report-v8-alertCard" key={def.id}>
-                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong className="report-v8-choiceTitle">{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
+                return <li key={def.id}><Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
+                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong>{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
                   <div className="report-v8-alertGrid">
                     <Field label={def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値' : 'しきい値'} required><NumberInput unit={def.id === 'conversions' ? '日' : '%'} id={`report-alert-${def.id}-threshold`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-threshold`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-threshold`) ? `report-alert-${def.id}-threshold-error` : undefined} type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-threshold`) && <p id={`report-alert-${def.id}-threshold-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-threshold`)}</p>}</Field>
                     <Field label="判定に必要な最低件数" required help="集計できた件数が、この数以上のときだけ判定します。"><NumberInput unit="件" id={`report-alert-${def.id}-sample`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-sample`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-sample`) ? `report-alert-${def.id}-sample-error` : undefined} type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-sample`) && <p id={`report-alert-${def.id}-sample-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-sample`)}</p>}</Field>
                   </div>
-                </li>
+                </Card></li>
               })}
             </ul>
           </Card>
-        </fieldset>
-        <aside className="report-v8-rail" aria-label="届き方の見本と注意">
-          <section className="report-v8-railCard">
-            <h2 className="report-v8-railTitle">{nextLabel} に、こう届きます</h2>
-            <p className="report-v8-railSub">見本</p>
-            <div className="report-v8-preview"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日）</p>{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{PREVIEW_LABEL[id] ?? sectionTitleOf(id)} <strong>送信時に集計</strong></p>)}<p className="report-v8-previewMore">くわしくは musubo の分析で</p></div>
-          </section>
-          <section className="report-v8-railCard"><h2 className="report-v8-railTitle">レポートが見ているもの</h2><p className="report-v8-kvRow">LINE アカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></p><p className="report-v8-kvRow">保存した分析 <strong>{savedAnalysisIds.length} 件</strong></p></section>
-          <section className="report-v8-railCard"><h2 className="report-v8-railTitle">気をつけること</h2><ul className="report-v8-notes"><li>数は送る時刻の時点で集めます</li><li>宛先がブロックしていると、LINE では届きません</li></ul></section>
-        </aside>
-      </div>
-      <StickyBar status={null} actions={<>
-        <Button href="/analytics">キャンセル</Button>
-        {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
-        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
-      </>} />
+      </CreatePage>
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>

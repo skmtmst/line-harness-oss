@@ -9,7 +9,7 @@ import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
@@ -158,7 +158,7 @@ function FriendAddPublish() {
         }
         const loaded: RuleDetail = { rule: res.data.rule, staffNotification: res.data.staffNotification }
         setDetail(loaded)
-        await readChecks(selectedAccountId, loaded.rule, isCurrent)
+        if (canEdit) await readChecks(selectedAccountId, loaded.rule, isCurrent)
         if (!isCurrent()) return
         setPhase('ready')
       } catch (caught) {
@@ -178,11 +178,11 @@ function FriendAddPublish() {
       }
     })()
     return () => { alive = false }
-  }, [ruleId, selectedAccountId, reloadKey, readChecks, saveErrors])
+  }, [ruleId, selectedAccountId, reloadKey, readChecks, saveErrors, canEdit])
 
   /** テストする（送らずに判定）。本番の登録・タグ・マイルは変えない。終わったら確認を読み直す。 */
   const runTest = async () => {
-    if (!selectedAccountId || !detail || testing) return
+    if (!canEdit || !selectedAccountId || !detail || testing) return
     const at = { accountId: selectedAccountId, generation: requestRef.current.generation }
     const stillHere = () => requestRef.current.accountId === at.accountId && requestRef.current.generation === at.generation
     setTesting(true)
@@ -316,7 +316,7 @@ function FriendAddPublish() {
       title: 'テストで判定を確かめた',
       desc: testOk ? 'テストで判定が通りました' : 'テストで判定が通るまで、有効にはできません',
       href: null,
-      action: '直す',
+      action: 'テストする',
     },
     {
       ok: slack !== false,
@@ -378,6 +378,7 @@ function FriendAddPublish() {
       )}
       help={`名前：${rule.name}・いまは${statusLabel}です`}
       preview={preview}
+      notice={!canEdit ? <ReadOnlyNotice role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</ReadOnlyNotice> : undefined}
       status={busy ? '有効にしています' : undefined}
       footerActions={canEdit ? (
         <>
@@ -396,16 +397,15 @@ function FriendAddPublish() {
           </Button>
         </>
       ) : (
-        /* 閲覧のみ：変える操作（保存・有効にする）は置かない。 */
-        <></>
+        /* 閲覧のみ：一覧へ戻る道を残す。 */
+        <Button href="/friend-add-settings">一覧へ戻る</Button>
       )}
     >
-      {!canEdit ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="設定の確認">
-        <div className={styles.cardHead}><h2 className={styles.cardTitle}>設定の確認</h2></div>
+      <Card variant="form" gap="normal" className={styles.card} aria-label="設定の確認">
+        <CardHeader size="stacked" title={<>設定の確認</>} />
         <dl className={styles.confirmRows}>
           {rows.map((row) => (
             <div key={row.label} className={styles.confirmRow}>
@@ -419,13 +419,10 @@ function FriendAddPublish() {
         </dl>
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="テストする（送らずに判定）">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>テストする（送らずに判定）</h2>
-          <p className={styles.cardDesc}>本番の登録・タグ・マイルは変えません</p>
-        </div>
+      <Card variant="form" gap="normal" className={styles.card} aria-label="テストする（送らずに判定）">
+        <CardHeader size="stacked" title={<>テストする（送らずに判定）</>} meta={<>本番の登録・タグ・マイルは変えません</>} />
         <div className={styles.testRow}>
-          <span className={styles.testTarget}>
+          {canEdit ? <span className={styles.testTarget}>
             <Select
               aria-label="テストの送り先"
               size="full"
@@ -433,7 +430,7 @@ function FriendAddPublish() {
               onChange={() => {}}
               options={[{ value: 'self', label: `送り先：${me ?? 'あなた'}（自分）` }]}
             />
-          </span>
+          </span> : <p className={styles.cardDesc}>送り先：{me ?? 'あなた'}（自分）</p>}
           {canEdit ? (
             <Button type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={() => void runTest()}>
               <Send size={15} aria-hidden="true" />テストする（送らずに判定）
@@ -447,9 +444,9 @@ function FriendAddPublish() {
         </p>
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="有効にする前の確認">
-        <div className={styles.cardHead}><h2 className={styles.cardTitle}>有効にする前の確認</h2></div>
-        <ul className={styles.checkList}>
+      <Card variant="form" gap="normal" className={styles.card} aria-label="有効にする前の確認">
+        <CardHeader size="stacked" title={<>有効にする前の確認</>} />
+        {canEdit ? <ul className={styles.checkList}>
           {checks.map((check) => (
             <li key={check.title} className={styles.checkRow}>
               <span className={styles.checkMark} data-ok={check.ok || undefined} aria-hidden="true">
@@ -466,7 +463,7 @@ function FriendAddPublish() {
               ) : null}
             </li>
           ))}
-        </ul>
+        </ul> : <Notice tone="info">有効にする前の確認は、編集できる人が行います。</Notice>}
         {otherFailed.length > 0 ? (
           <Notice tone="warn" message={`${otherFailed.map((check) => check.detail || check.label).join('・')}`} />
         ) : null}

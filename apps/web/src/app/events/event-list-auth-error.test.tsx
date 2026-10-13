@@ -227,7 +227,10 @@ describe('R601 イベント一覧の権限不足と通信失敗の言い分け',
     listEvents.mockRejectedValue(new ApiError(403, 'forbidden'))
     await renderPage()
     expect(bodyText()).toContain('—')
-    expect(bodyText()).not.toContain('0件')
+    const kpis = host.querySelector('[data-kpi-strip]')!
+    expect(kpis.querySelectorAll('[data-kpi-number]')).toHaveLength(4)
+    expect(kpis.textContent).not.toContain('0件')
+    expect([...kpis.querySelectorAll('[data-kpi-number]')].every(el=>el.textContent==='—')).toBe(true)
   })
 
   it('一覧上部の件数は表示のみで、タブや操作ボタンとして扱わない', async () => {

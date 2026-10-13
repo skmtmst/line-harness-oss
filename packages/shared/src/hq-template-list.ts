@@ -1,6 +1,8 @@
 /** 統括のひな形一覧にだけ付く表示用の材料。本文や画像URLは含めない。 */
 export interface HqTemplateListDisplay {
   kind?: import('./template-definition').TemplateKind | null;
+  /** 保存したメッセージの形だけ。本文・URLは返さない。旧応答では未取得。 */
+  message_type?: import('./template-definition').MessageTemplateDefinition['template']['messageType'] | null;
   /** 配布に成功したアカウントの現在の表示名。名前順、最大3件。同じアカウントは1件。 */
   distributed_account_names: string[];
   /** 表示した3件を除いたアカウント数。 */

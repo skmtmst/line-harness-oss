@@ -13,6 +13,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 
 
 export interface AffiliateItem {
+  folderId?: string | null
   id: string
   name: string
   code: string

@@ -188,3 +188,5 @@
 
 /* B-203・B-207・B-211：10-10 に採用した共通の形。 */
 html:root .control, html:root .input { width: var(--choice-size); height: var(--choice-size); }
+/* axFrW の差し戻し：16px のチェックは絵の四角（角4）へ。 */
+html:root .box { border-radius: var(--choice-checkbox-radius); }

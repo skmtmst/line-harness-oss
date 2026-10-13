@@ -20,20 +20,6 @@
 .chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 .spacer { flex: 1 1 0; }
 
-/* 並び（絵に無い機能）：印だけの小さな箱。中の選ぶ部品は透明にして箱いっぱいに重ねる。 */
-.sortBox { position: relative; width: var(--tpl-rml-sort-w); flex-shrink: 0; }
-.sortBox :global(*) { max-width: 100%; }
-.sortBox :global(button) { width: 100%; padding: 0; color: transparent; }
-.sortBox :global(button) * { visibility: hidden; }
-.sortIcon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
 .perPageBox { flex-shrink: 0; }
 
 /* 1152 の板（Y9ASp）：案内の帯 → 1段目 → 2段目。 */
@@ -152,8 +138,6 @@
 
 .menuCell { text-align: right; }
 .menuBox { display: flex; align-items: center; justify-content: flex-end; }
-/* 行の「…」は28（絵どおり。共通の印ボタンは36）。 */
-.menuCell .menuBox .menuBtn { width: var(--tpl-rml-icon-btn); height: var(--tpl-rml-icon-btn); }
 
 /* 表の下の件数（型の pagination 枠の中。件数は左、ページ送りは右）。 */
 .pagerRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }

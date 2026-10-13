@@ -46,7 +46,7 @@ try {
   const control = await browser.newPage()
   await control.setContent('<div data-list-skeleton style="width:500px"><table><thead><tr data-shared-part="list-head" style="height:70px"><th>見出し</th></tr></thead><tbody><tr data-shared-part="list-row" style="height:90px"><td>名前</td></tr></tbody></table><div data-kpi-strip><div data-design-version style="height:30px">数</div></div><div data-list-toolbar style="width:10px"><button style="width:150px">操作</button></div><aside data-template-region="folders">フォルダ</aside><div data-list-pager style="width:500px"><nav style="width:100px">前へ・次へ</nav></div><div style="width:900px">はみ出し</div></div>')
   const negative = await control.evaluate(scanListSkeleton)
-  const expected = ['B-178 見出し40', 'B-178 行52', 'B-178 数の帯116', 'B-178 道具のはみ出し', 'B-178 フォルダの畳み忘れ', 'B-178 ページ送りの右寄せ', 'B-178 一覧のはみ出し']
+  const expected = ['B-178 見出し40', 'B-178 行52', 'B-178 数の帯の共通余白と必要高', 'B-178 道具のはみ出し', 'B-178 フォルダの畳み忘れ', 'B-178 ページ送りの右寄せ', 'B-178 一覧のはみ出し']
   if (expected.some((rule) => !negative.failures.includes(rule))) throw new Error(`対照の見逃し: ${JSON.stringify(negative)}`)
   console.log(`対照：${expected.length}種類の違反を検出`)
   await control.setContent('<div data-list-skeleton style="width:500px"><div data-table-presentation="template-list"><table><tbody><tr data-shared-part="list-row" style="height:56px"><td>テンプレート</td></tr></tbody></table></div></div>')

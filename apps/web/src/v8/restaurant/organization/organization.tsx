@@ -6,7 +6,7 @@ import { Field as SharedField } from '@/components/shared/form-controls'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { MailPlus, Plus } from 'lucide-react'
+import { Check, MailPlus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -29,6 +29,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import Card from '@/components/shared/card'
+import { GridTable, GridHeadRow, GridRow, GridCell, type GridTableDesign } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /*
  * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
@@ -52,6 +55,14 @@ const MATRIX: [string, boolean, boolean, boolean][] = [
   ['予約入力・配席', true, true, true],
   ['Google/LINE公開承認', true, true, false],
 ]
+
+const tableDesign: Omit<GridTableDesign, 'columns'> = {
+  gap: 'var(--polish-space-card)',
+  rowPadding: '0 var(--tpl-list-inset)',
+  headHeight: 'var(--polish-table-head)',
+  rowHeight: 'var(--polish-table-row)',
+  fontSize: 'var(--polish-text-body)',
+}
 
 function intakeAddressError(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) return '取り込み用ドメインが未設定です'
@@ -185,8 +196,8 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
   return (
     <Panel title="予約メール取り込みアドレス" description="予約媒体から届く通知メールの転送先として設定します。">
       <div className={styles.intakeBody}>
-      <p className={styles.intakeWarning}>このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約媒体の通知設定だけに使用してください。</p>
-      {notice ? <p className={styles.intakeNotice} role="status">{notice}</p> : null}
+      <Notice tone="warn">このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約媒体の通知設定だけに使用してください。</Notice>
+      {notice ? <Notice tone="success" role="status">{notice}</Notice> : null}
       {actionError ? <Notice tone="danger" className={styles.intakeErrorNoticePlacement} >{actionError}</Notice> : null}
       {!store ? (
         <p className={styles.muted}>上部の店舗選択から、設定する店舗を選んでください。</p>
@@ -195,10 +206,10 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       ) : error ? (
         <p className={styles.intakeError}>{error}</p>
       ) : addresses.length === 0 ? (
-        <p className={styles.intakeEmpty}>未発行</p>
+        <Notice tone="info">{emptyValue('unconfigured')}</Notice>
       ) : (
         addresses.map((item, saveFieldIndex) => (
-          <div key={item.id} className={styles.intakeCard}>
+          <Card key={item.id} surface="muted" padding="compact" layout="vertical" gap="var(--polish-space-row)">
             <div className={styles.intakeCardHead}>
               <span className={styles.intakeState}>{item.revokedAt ? `${formatStamp(item.revokedAt)}まで有効` : '現在使用中'}</span>
               <span className={styles.spacer} aria-hidden="true" />
@@ -209,7 +220,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
               <CopyTextButton value={item.address} aria-label="メールアドレスをコピー"  />
             </div>
             <p className={styles.intakeMeta}>{`発行日時：${formatStamp(item.createdAt)}`}</p>
-          </div>
+          </Card>
         ))
       )}
       {store && !error && !readOnly ? (
@@ -408,16 +419,21 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             aside={readOnly ? null : <Button onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus aria-hidden className={styles.buttonIcon} />店舗を追加する</Button>}
             flush
           >
-            {data.stores.map((s) => (
-              <div key={s.id} className={styles.storeRow}>
-                <div className={styles.storeText}>
-                  <p className={styles.storeName}><span>{s.name}</span><Status value={s.status} /></p>
-                  <p className={styles.storeSub}>{`${s.code} · ${s.area || 'エリア未設定'} · ${s.capacity}席`}</p>
-                  <p className={styles.storeLine}>{`LINE: ${s.line_account_name ? `${s.line_account_name} 公式` : emptyValue('unconfigured')}`}</p>
-                </div>
-                {readOnly ? null : <Button onClick={() => { setEditingStoreId(s.id); setShowStoreForm(false) }}>編集</Button>}
-              </div>
-            ))}
+            <GridTable label="店舗管理" framed={false} design={{ ...tableDesign, columns: 'minmax(0, 1fr) max-content max-content' }}>
+              {data.stores.map((s) => (
+                <GridRow key={s.id}>
+                  <GridCell className={styles.storeText}>
+                    <TruncatedText value={s.name} className={styles.memberName} />
+                    <TruncatedText value={`${s.code} · ${s.area || 'エリア未設定'} · ${s.capacity}席`} className={styles.sub} />
+                    <TruncatedText value={`LINE: ${s.line_account_name ? `${s.line_account_name} 公式` : emptyValue('unconfigured')}`} className={styles.sub} />
+                  </GridCell>
+                  <GridCell><Status value={s.status} /></GridCell>
+                  <GridCell align="right">
+                    {readOnly ? null : <RowActions subjectName={s.name} edit={{ onClick: () => { setEditingStoreId(s.id); setShowStoreForm(false) } }} />}
+                  </GridCell>
+                </GridRow>
+              ))}
+            </GridTable>
           </Panel>
           <Dialog
             open={showStoreForm || editingStore !== undefined}
@@ -447,29 +463,29 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             aside={readOnly ? null : <Button variant="primary" onClick={() => { setShowMemberForm(true); setEditingMemberId('') }}><Plus aria-hidden className={styles.buttonIcon} />ユーザーを追加する</Button>}
             flush
           >
-            <div role="table" aria-label="アカウント一覧" className={styles.table}>
-              <div role="row" className={styles.headRow}>
-                <span role="columnheader" className={`${styles.cell} ${styles.colName}`}>氏名</span>
-                <span role="columnheader" className={`${styles.cell} ${styles.colRole}`}>役割</span>
-                <span role="columnheader" className={`${styles.cell} ${styles.colRole}`}>担当店舗</span>
-                <span role="columnheader" className={`${styles.cell} ${styles.colLink}`}>連携（LINE・Google）</span>
-                <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>状態</span>
-                <span role="columnheader" className={`${styles.cell} ${styles.colOps}`}><span className="sr-only">操作</span></span>
-              </div>
+            <GridTable label="アカウント一覧" framed={false} design={{ ...tableDesign, columns: 'minmax(0, 2fr) var(--tpl-rt-col-100) minmax(0, 1fr) minmax(0, 1.5fr) var(--tpl-rt-col-80) var(--tpl-rt-col-130)' }}>
+              <GridHeadRow>
+                <GridCell role="columnheader">氏名</GridCell>
+                <GridCell role="columnheader">役割</GridCell>
+                <GridCell role="columnheader">担当店舗</GridCell>
+                <GridCell role="columnheader">連携（LINE・Google）</GridCell>
+                <GridCell role="columnheader">状態</GridCell>
+                <GridCell role="columnheader"><span className="sr-only">操作</span></GridCell>
+              </GridHeadRow>
               {members.map((m) => (
-                <div key={m.id} role="row" className={styles.row}>
-                  <span role="cell" className={`${styles.cell} ${styles.colName}`} title={loginSummary(m)}>
-                    <span className={styles.memberName}>{m.staff_name}</span>
-                    <span className={styles.sub}>{m.email || 'メール未設定'}</span>
-                  </span>
-                  <span role="cell" className={`${styles.cell} ${styles.colRole}`}>{roleLabel[m.role]}</span>
-                  <span role="cell" className={`${styles.cell} ${styles.colRole}`}>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</span>
-                  <span role="cell" className={`${styles.cell} ${styles.colLink}`}>
-                    <span className={styles.linkMain}>{`LINE ${m.line_uid ? '設定済' : emptyValue('unconfigured')}`}</span>
-                    <span className={styles.sub}>{m.google_email || 'Google 未設定'}</span>
-                  </span>
-                  <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={m.status} /></span>
-                  <span role="cell" className={`${styles.cell} ${styles.colOps}`}>
+                <GridRow key={m.id}>
+                  <GridCell className={styles.memberText} title={loginSummary(m)}>
+                    <TruncatedText className={styles.memberName} value={m.staff_name} />
+                    <TruncatedText className={styles.sub} value={m.email || emptyValue('unconfigured')} />
+                  </GridCell>
+                  <GridCell className={styles.shortText}>{roleLabel[m.role]}</GridCell>
+                  <GridCell><TruncatedText value={data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'} /></GridCell>
+                  <GridCell className={styles.memberText}>
+                    <span className={styles.shortText}>{`LINE ${m.line_uid ? '設定済' : emptyValue('unconfigured')}`}</span>
+                    <TruncatedText className={styles.sub} value={m.google_email || 'Google 未設定'} />
+                  </GridCell>
+                  <GridCell><Status value={m.status} /></GridCell>
+                  <GridCell align="right" data-list-action-cell="">
                     {readOnly ? null : (
                       <RowActions
                         subjectName={m.staff_name}
@@ -486,10 +502,10 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                         }]}
                       />
                     )}
-                  </span>
-                </div>
+                  </GridCell>
+                </GridRow>
               ))}
-            </div>
+            </GridTable>
           </Panel>
           <Dialog
             open={showMemberForm || editingMember !== undefined}
@@ -543,22 +559,22 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             ) : null}
           </Dialog>
           <Panel title="権限マトリクス" description="想定の役割分担です。実際の操作可否は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。" flush>
-            <div role="table" aria-label="権限マトリクス" className={styles.table}>
-              <div role="row" className={styles.headRow}>
-                <span role="columnheader" className={`${styles.cell} ${styles.colName}`}>操作</span>
-                {['SuperAdmin', 'StoreManager', 'Staff'].map((label) => <span key={label} role="columnheader" className={`${styles.cell} ${styles.colMatrix}`}>{label}</span>)}
-              </div>
+            <GridTable label="権限マトリクス" framed={false} design={{ ...tableDesign, columns: 'minmax(0, 1fr) repeat(3, var(--tpl-rt-col-110))' }}>
+              <GridHeadRow>
+                <GridCell role="columnheader">操作</GridCell>
+                {['SuperAdmin', 'StoreManager', 'Staff'].map((label) => <GridCell key={label} role="columnheader">{label}</GridCell>)}
+              </GridHeadRow>
               {MATRIX.map(([label, ...values]) => (
-                <div key={label} role="row" className={styles.row}>
-                  <span role="cell" className={`${styles.cell} ${styles.colName}`}>{label}</span>
+                <GridRow key={label}>
+                  <GridCell className={styles.shortText}>{label}</GridCell>
                   {values.map((v, i) => (
-                    <span key={i} role="cell" className={`${styles.cell} ${styles.colMatrix}`}>
-                      {v ? <span className={styles.matrixYes} aria-label="できる">✓</span> : <span className={styles.matrixNo} aria-label="できない">{emptyValue('unknown')}</span>}
-                    </span>
+                    <GridCell key={i}>
+                      {v ? <Check aria-label="できる" className={styles.buttonIcon} /> : <span aria-label="できない">{emptyValue('unknown')}</span>}
+                    </GridCell>
                   ))}
-                </div>
+                </GridRow>
               ))}
-            </div>
+            </GridTable>
           </Panel>
         </div>
       </div>

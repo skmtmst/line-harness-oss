@@ -43,7 +43,7 @@ import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
@@ -370,10 +370,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
               onClear={() => setQuery('')}
             />
           </ListToolbarSearchSlot>
-          <span className={styles.spacer} />
-          <div className={styles.projectSort}>
-            <SaveErrorField names={["sort"]}><Select aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>
-          </div>
+          <ListToolbarEnd>
+            <SaveErrorField names={["sort"]}><ListToolbarSort aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>
+          </ListToolbarEnd>
         </ListToolbarRow>
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
         {body}

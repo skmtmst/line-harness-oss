@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /*
  * 条件の足し口（m22c）。15個の札を並べっぱなしにしない。
- * 検索できる候補（Combobox）で足す。札に戻すと赤くなる。
+ * 検索できる共通の選ぶ窓で足す。札に戻すと赤くなる。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/contexts/account-context', () => ({
@@ -34,34 +34,41 @@ function renderBuilder(onChange: (value: unknown) => void = () => {}) {
 }
 
 describe('条件の足し口（m22c）', () => {
-  it('15個の札ボタンは並べない。検索できる候補が1つある', () => {
+  it('15個の札ボタンは並べず、窓への足し口が1つある', () => {
     renderBuilder()
-    // 候補つき入力が「すべて」「or条件」の2か所に1つずつあるだけ。
-    expect(screen.getAllByRole('combobox', { name: '追加する条件を選ぶ' })).toHaveLength(1)
+    // 最初は「すべて」の足し口だけ。OR追加後も、各かたまりに1つ。
+    expect(screen.getAllByRole('button', { name: '追加する条件を選ぶ' })).toHaveLength(1)
     // 札ボタンに戻っていたら赤：15種の名前がボタンとして並ぶ。
     for (const label of ['メモ', 'ステータスメッセージ', '友だち登録日', '対応マーク', '行動スコア']) {
       expect(screen.queryByRole('button', { name: label })).toBeNull()
     }
   })
 
-  it('「タグ」と打って選ぶと条件が1つ足りる。欄は空に戻る', async () => {
+  it('窓でタグを探し、確定でだけ条件を足す', async () => {
     const seen: unknown[] = []
     renderBuilder((next) => {
       seen.push(next)
     })
-    const field = screen.getByRole('combobox', { name: '追加する条件を選ぶ' })
-    fireEvent.focus(field)
-    fireEvent.change(field, { target: { value: 'タグ' } })
-    const listbox = screen.getByRole('listbox')
-    const options = within(listbox).getAllByRole('option')
-    // タグ・対応マークなど「タグ」を含む候補に絞られる。まとまり名も出る。
-    expect(options.length).toBeGreaterThan(0)
-    expect(listbox.textContent).toContain('タグ・記入欄')
-    fireEvent.keyDown(field, { key: 'ArrowDown' })
-    fireEvent.keyDown(field, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '追加する条件を選ぶ' }))
+    const dialog = screen.getByRole('dialog', { name: '条件を選ぶ' })
+    expect(dialog.textContent).toContain('タグ・記入欄')
+    fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: 'タグ' } })
+    await waitFor(() => expect(within(dialog).queryByRole('radio', { name: '名前' })).toBeNull())
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'タグ' }))
+    expect(seen).toHaveLength(0)
+    fireEvent.click(within(dialog).getByRole('button', { name: '条件を足す' }))
     expect(seen).toHaveLength(1)
     expect(JSON.stringify(seen[0])).toContain('tag_exists')
-    // 選んだ直後は欄が空に戻り、続けてもう1つ足せる。
-    expect((field as HTMLInputElement).value).toBe('')
+    // 確定後は窓を閉じ、続けてもう1つ足せる。
+    expect(screen.queryByRole('dialog', { name: '条件を選ぶ' })).toBeNull()
   })
+})
+
+it('条件の選ぶ窓を取り消すと、条件も保存口も変わらない', () => {
+  const onChange = vi.fn()
+  renderBuilder(onChange)
+  fireEvent.click(screen.getByRole('button', { name: '追加する条件を選ぶ' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: '条件を選ぶ' })).getByRole('button', { name: 'キャンセル' }))
+  expect(onChange).not.toHaveBeenCalled()
+  expect(screen.queryByRole('dialog', { name: '条件を選ぶ' })).toBeNull()
 })

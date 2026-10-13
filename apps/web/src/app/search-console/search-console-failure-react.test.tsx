@@ -141,3 +141,13 @@ describe('D020 Search Console の読み込み失敗の言い分け', () => {
     expect(text()).toContain('連携中')
   })
 })
+
+it('連携済みの対象プロパティは押せない選択欄にせず、読み取れる値を表示する', async () => {
+  mocks.performance.mockResolvedValueOnce({ success: true, data: connected })
+  await renderPage()
+  await settle()
+  const property = host.querySelector('#search-property') as HTMLInputElement
+  expect(property.value).toBe(connected.siteUrl)
+  expect(property.readOnly).toBe(true)
+  expect(property.disabled).toBe(false)
+})

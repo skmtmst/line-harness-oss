@@ -12,6 +12,7 @@ import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
 import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
+import { normalizeActionLabel } from './action-words'
 
 function hasDetail(node: ReactNode): boolean {
   return React.Children.toArray(node).some(child => {
@@ -69,6 +70,8 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
+  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
+  detailLayout?: 'qualifier'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
@@ -99,7 +102,7 @@ export type KpiCardProps = {
   badge?: string
   /** warning は「見ておくとよい」。止まっている・壊れている（danger）ほど強くない注意に使う。 */
   badgeTone?: 'accent' | 'neutral' | 'warning' | 'danger'
-  action?: { label: string; href: string }
+  action?: { label: string; href: string; onClick?: never } | { label: string; onClick: () => void; href?: never }
   loading?: boolean
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
   presentation?: 'card' | 'band' | 'cell' | 'inline'
@@ -136,6 +139,7 @@ export default function KpiCard({
   unitSpacing = 'normal',
   signed = false,
   detail,
+  detailLayout,
   description,
   descriptionLabel,
   help,
@@ -180,6 +184,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}
@@ -242,16 +247,18 @@ export default function KpiCard({
 
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
-        <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
+        <span role="note" className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}
           </button>
         ) : null}
         {action ? (
-          <Link href={action.href} className={styles.link}>
-            <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
-          </Link>
+          action.href !== undefined ? <Link href={action.href} className={styles.link}>
+            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
+          </Link> : <button type="button" className={styles.link} onClick={action.onClick}>
+            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
+          </button>
         ) : null}
       </p>
     </div>

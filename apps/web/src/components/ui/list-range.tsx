@@ -1,5 +1,5 @@
 import React from 'react'
-import { formatNumber } from '@/lib/format'
+import { paginationSummary } from '@/components/shared/pagination'
 
 /**
  * 一覧の件数表示（監査6 #667）。
@@ -44,9 +44,7 @@ export default function ListRange({
   return (
     <span className={bare ? className : ['text-ink-faint text-xs', className].filter(Boolean).join(' ')}>
       {label ? `${label} ` : null}
-      {t === 0
-        ? '0件'
-        : `${formatNumber(t)}件中 ${formatNumber(Math.max(0, first))}〜${formatNumber(Math.max(0, last))}件を表示`}
+      {paginationSummary(t, Math.max(0, first), Math.max(0, last))}
     </span>
   )
 }

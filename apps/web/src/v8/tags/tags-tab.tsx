@@ -33,7 +33,7 @@ import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-er
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -48,7 +48,7 @@ import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state';
 import { DeleteTagDialog, QUICK_FILTERS, UNGROUPED, cleanupKnown, formatDate, hasLinkedActions, isThisMonth, isUnused, usageLabel } from '@/components/friend-fields/tags-page-v4';
 import styles from './list.module.css'
-import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { ListPager } from '@/components/templates/list-page';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -604,7 +604,7 @@ export default function TagsTab({
   const usageSelect = (
     <SaveErrorField names={["usageFilter","usage_filter"]}><Select
       aria-label="使用状態で絞り込む"
-      width={145}
+      size="content"
       value={usageFilter}
       onChange={setUsageFilter}
       options={[
@@ -617,7 +617,7 @@ export default function TagsTab({
   const sourceSelect = (
     <SaveErrorField names={["sourceFilter","source_filter"]}><Select
       aria-label="付け方で絞り込む"
-      width={132}
+      size="content"
       value={sourceFilter}
       onChange={setSourceFilter}
       options={[
@@ -784,7 +784,7 @@ export default function TagsTab({
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
       <ListPager>
         <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り"
-          summary={paginationSummary(filtered.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, filtered.length))} />
+          range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filtered.length) }} />
       </ListPager>
     </DelayedSkeleton>
   )
@@ -824,20 +824,20 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" width={150} value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
+          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
         </>}
-        toolbar={narrow ? <>
+        toolbar={narrow ? <ListToolbarFrame layout="stacked"><ListToolbarRow>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
           {search}
           {usageSelect}
           {archiveChip}
-          <ListToolbarRow>
+          </ListToolbarRow><ListToolbarRow>
             {sourceSelect}
             {quickButton}
             <span className={styles.toolbarSpacer} />
             {pageSizeSelect}
           </ListToolbarRow>
-        </> : <>
+        </ListToolbarFrame> : <ListToolbarFrame><ListToolbarRow>
           {search}
           {usageSelect}
           {archiveChip}
@@ -845,7 +845,7 @@ export default function TagsTab({
           <span className={styles.toolbarSpacer} />
           {quickButton}
           {pageSizeSelect}
-        </>}
+        </ListToolbarRow></ListToolbarFrame>}
       >
         {actionError ? (
           <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>

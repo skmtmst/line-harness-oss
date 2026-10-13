@@ -4,6 +4,10 @@
 .description { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .row, .postalRow { display: flex; align-items: flex-end; gap: var(--tpl-hq-form-gap); min-width: 0; flex-wrap: wrap; }
 .row > * { flex: 1 1 0; min-width: 0; }
+.nameFolderRow { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; gap: var(--polish-space-field); min-width: 0; }
+.nameFolderRow > * { min-width: 0; }
+@media (max-width: 640px) { .nameFolderRow { grid-template-columns: minmax(0, 1fr); } }
+@container v8-page (width < 1100px) { .nameFolderRow { grid-template-columns: minmax(0, 1fr); } }
 .postalRow > :first-child { flex: 0 1 var(--tpl-rs-rsv-store-w); min-width: 0; }
 .actions { display: flex; justify-content: flex-end; }
 }

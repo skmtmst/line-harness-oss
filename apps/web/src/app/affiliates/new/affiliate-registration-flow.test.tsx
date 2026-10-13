@@ -25,7 +25,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* ------------------------------------------------------------------ 差し替え */
@@ -312,9 +312,11 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
     // 知らせは「既に始まっています」のまま、再開の送り先だけを言う。
     // 「まだ始まっていない」とは言わない（R525残部）。
-    const tracking = container.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="すぐに計測を始める"]')
-    if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
-    await act(async () => { fireEvent.click(tracking) })
+    const tracking = [...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める'))
+    expect(tracking).toBeTruthy()
+    await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' })) })
     expect(hasText('計測は既に始まっています')).toBe(true)
     expect(hasText('計測はまだ始まっていません')).toBe(false)
     expect(hasText('オフに切り替えて保存')).toBe(true)
@@ -334,9 +336,11 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
     await mount(<NewAffiliatePage />)
 
-    const tracking = container.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="すぐに計測を始める"]')
-    if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
-    await act(async () => { fireEvent.click(tracking) })
+    const tracking = [...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める'))
+    expect(tracking).toBeTruthy()
+    await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' })) })
 
     await type(byId<HTMLInputElement>('af-name'), '計測なしのパートナー')
     await click(buttonByText('登録して紹介リンクを発行する'))
@@ -350,7 +354,8 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // やり直しの前にオンへ変えても、保存済みの真実は変わらない。
     // 知らせは「まだ始まっていません」のまま、再開の送り先だけを言う。
     // 「既に始まっている」とは言わない（R525残部・逆向き）。
-    await act(async () => { fireEvent.click(tracking) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'すぐに計測を始める' })) })
     expect(hasText('計測はまだ始まっていません')).toBe(true)
     expect(hasText('計測は既に始まっています')).toBe(false)
     expect(hasText('オンに切り替えて保存')).toBe(true)

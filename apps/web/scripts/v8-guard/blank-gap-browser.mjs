@@ -320,15 +320,34 @@ export default function scanBlankGap(opts = {}) {
       let wideBottom = 0
       for (const it of leaf) if (it.x + it.w >= ref - HTH) wideBottom = Math.max(wideBottom, it.y + it.h)
       const kMax = Math.min(H, Math.floor(wideBottom / strip))
-      let run = null
+      // A blank belongs to one semantic section. Do not add a short heading
+      // gap to a short KPI gap and report them as one long empty panel.
+      // Keep the same horizontal and vertical thresholds; real empty space
+      // inside any full-width section is still measured.
+      const boundaries = [0, kMax * strip]
+      for (const section of R.querySelectorAll('[data-template-region]')) {
+        if (!visible(section)) continue
+        const b = toLocal(section.getBoundingClientRect())
+        if (b.x + b.w >= ref - 24 && b.w >= ref - 24) {
+          for (const y of [b.y, b.y + b.h]) if (y > 0 && y < kMax * strip) boundaries.push(y)
+        }
+      }
+      const edges = [...new Set(boundaries)].sort((a, b) => a - b)
       const runs = []
-      for (let k = 0; k <= kMax; k++) {
-        const empty = k < kMax && maxR[k] >= 0 && ref - maxR[k] >= HTH
-        if (empty) { if (!run) run = { k0: k, k1: k, minGap: ref - maxR[k], maxRight: maxR[k] }; else { run.k1 = k; run.minGap = Math.min(run.minGap, ref - maxR[k]); run.maxRight = Math.max(run.maxRight, maxR[k]) } }
-        else if (run) { runs.push(run); run = null }
+      for (let segment = 0; segment < edges.length - 1; segment++) {
+        const start = edges[segment], end = edges[segment + 1]
+        let run = null
+        for (let k = Math.floor(start / strip); k < Math.ceil(end / strip); k++) {
+          const empty = k < kMax && maxR[k] >= 0 && ref - maxR[k] >= HTH
+          if (empty) {
+            if (!run) run = { y1: Math.max(start, k * strip), y2: Math.min(end, (k + 1) * strip), minGap: ref - maxR[k], maxRight: maxR[k] }
+            else { run.y2 = Math.min(end, (k + 1) * strip); run.minGap = Math.min(run.minGap, ref - maxR[k]); run.maxRight = Math.max(run.maxRight, maxR[k]) }
+          } else if (run) { runs.push(run); run = null }
+        }
+        if (run) runs.push(run)
       }
       for (const r of runs) {
-        const y1 = r.k0 * strip, y2 = (r.k1 + 1) * strip
+        const { y1, y2 } = r
         if (y2 - y1 < 160) continue
         // 右端を決めている要素
         const inStrip = leaf.filter((i) => i.y < y2 && i.y + i.h > y1)
