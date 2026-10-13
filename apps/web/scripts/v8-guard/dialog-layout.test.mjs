@@ -34,6 +34,16 @@ for (const width of [1152, 1440, 1920]) {
       await page.locator('#field').evaluate(el => { el.style.width = '300px' })
       const shrunk = await page.evaluate(scanDialogAudit, { expectedWidth: 560, fullForm: true })
       assert.equal(shrunk.findings.filter(x => x.kind === 'dialog-input-width').length, 2)
+      await page.locator('#panel').evaluate(el => {
+        const header = document.createElement('div')
+        header.innerHTML = '<h2 style="margin:0">止める</h2>'
+        el.prepend(header)
+      })
+      const padded = await page.evaluate(scanDialogAudit, { compactBody: true })
+      assert.equal(padded.findings.filter(x => x.kind === 'dialog-header-body-gap').length, 1)
+      await page.locator('#content').evaluate(el => { el.style.paddingTop = '0'; el.style.marginTop = '14px' })
+      const compact = await page.evaluate(scanDialogAudit, { compactBody: true })
+      assert.equal(compact.findings.filter(x => x.kind === 'dialog-header-body-gap').length, 0)
     } finally {
       await browser.close()
     }

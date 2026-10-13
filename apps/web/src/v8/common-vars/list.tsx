@@ -33,7 +33,7 @@ import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel';
 import KpiBand from '@/components/shared/kpi-band'
@@ -1271,6 +1271,8 @@ function CommonVarsListInner() {
         open={statusTarget !== null && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
         designWidth={480}
+        designLayout="stacked"
+        footerAlign="center"
         title={statusTarget ? `「${statusTarget.name}」を${statusAction === 'stop' ? '止める' : '再開する'}` : ''}
         description={
           statusAction === 'stop'
@@ -1283,7 +1285,7 @@ function CommonVarsListInner() {
         error={statusError || undefined}
         onCancel={closeStatusDialog}
         footer={
-          <div className={styles.centerFooter}>
+          <DialogActions>
             <Button type="button" onClick={closeStatusDialog} disabled={statusBusy}>
               キャンセル
             </Button>
@@ -1302,7 +1304,7 @@ function CommonVarsListInner() {
                 </>
               ) : '再開する'}
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         {statusTarget ? (
@@ -1324,13 +1326,10 @@ function CommonVarsListInner() {
                 className={styles.dialogInput}
               /></SaveErrorField></Field>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
-              <p className={styles.dialogWarn} role="note">
-                <TriangleAlert size={14} aria-hidden="true" />
-                <span>
+              <Notice tone="warn" appearance="soft" icon={<TriangleAlert size={14} aria-hidden="true" />}>
                   予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
                   {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)} 件` : ''}
-                </span>
-              </p>
+              </Notice>
             ) : null}
           </div>
         ) : null}
