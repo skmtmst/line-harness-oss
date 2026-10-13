@@ -29,6 +29,23 @@ test('同じ面の編集本文は描いた文字の余白を測り、余白0・�
     assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
   } finally { await browser.close() }
 })
+test('本文と差し込みの一つの枠は読み込み順によらず内側の影を外し、外側のフォーカスを保つ', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const bodyCSS = readFileSync(new URL('../../src/components/shared/message-insert-row.module.css', import.meta.url), 'utf8')
+    const editorCSS = readFileSync(new URL('../../src/components/shared/insert-text-field.module.css', import.meta.url), 'utf8')
+    for (const ordered of [[bodyCSS, editorCSS], [editorCSS, bodyCSS]]) {
+      await page.setContent(shell(`<style>:root{--control-shadow:0 1px 2px #aaa;--color-canvas:white;--color-control-border:gray;--color-focus-ring:blue;--tpl-nc-body-pad:10px 12px}${ordered.join('\n')}</style><div class="body" style="height:120px;width:240px"><div class="editor editorCompact" data-insert-field contenteditable="true" style="height:100%;padding:12px">編集する本文</div></div>`))
+      assert.equal(await page.locator('[data-insert-field]').evaluate(el => getComputedStyle(el).boxShadow), 'none')
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 0)
+      await page.locator('[data-insert-field]').focus()
+      assert.equal(await page.locator('.body').evaluate(el => getComputedStyle(el).outlineWidth), '2px')
+      await page.locator('[data-insert-field]').evaluate(el => { el.style.padding = '0px' })
+      assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    }
+  } finally { await browser.close() }
+})
 test('B-245：共通の説明ボタンは青で出し、印だけの手書きや頭の外の青は検出する', async () => {
   const browser = await chromium.launch()
   try {
