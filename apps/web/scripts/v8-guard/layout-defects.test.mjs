@@ -197,6 +197,10 @@ test('同じ検出器の統合先実測だけを土台にし、新規・件数�
   assert.equal(assessAgainstBase([{...touch,measure:{gap:2}}],[touch],'/friends',1152).failures.length,1)
   const empty = {...f,kind:'empty-blank-ok',measure:{count:1}}
   assert.equal(assessAgainstBase([empty],[empty],'/friends',1152).failures.length,1, '理由なしの除外は既存でも止める')
+  const reason = {...f,kind:'form-action-reason',measure:{count:1}}
+  assert.deepEqual(assessAgainstBase([],[reason],'/friends',1152).failures,[], '本線だけの理由不足を許可へ変換しない')
+  assert.equal(assessAgainstBase([reason],[reason],'/friends',1152).failures.length,1, '押せない理由の不足は既存でも止める')
+  assert.throws(()=>validateAllowances(record([reason],'/friends',1152,'理由の不足')), '理由不足の固定許可は認めない')
 })
 
 test('旧の非表示要素の削除は同じ外枠と照合し、増殖・別の子・実寸の悪化は止める', async () => {

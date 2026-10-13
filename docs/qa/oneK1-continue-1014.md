@@ -44,3 +44,7 @@
 
 外部 `oneK1/continue/` のSUMMARY.json・BOARD-RESULTS.tsv・final-results.json・INTERACTION.json・PREDICTIONS.md・各ログ・LOCK-final.txt。
 画像と版は `oneK1/sbs/MANIFEST-continue.json`。一時チェックアウトは再現用に保持。
+
+## 07:06依頼の本線取り込み
+
+- 本線e0b86e4588を取り込み。corrections.md末尾だけ競合し、K組の前回指示と列車35bのCI指示の両方を保持。製品コードの競合なし。
