@@ -1,4 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { isWebinarSource, privateImageKey, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -1090,6 +1091,10 @@ contents.get('/media/:id/content', async (c) => {
   try {
     const media = await getMediaLiveTarget(c.env.DB, c.req.param('id'));
     if (!media) return c.json({ success: false, error: 'Not found' }, 404);
+    if (privateImageKey(media.r2_key) || !publicImageKey(media.r2_key)
+      || !publicDeliveryContentType(media.mime_type) || await isWebinarSource(c.env.DB, media.r2_key)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     // 配信の本文に埋まる公開URLも、clean の版だけ出す。
     const liveFull = await getMediaGateInfo(c.env.DB, media.id);
     if (!liveFull) return c.json({ success: false, error: 'Not found' }, 404);

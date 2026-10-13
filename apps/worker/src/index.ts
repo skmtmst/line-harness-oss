@@ -156,6 +156,7 @@ import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
+import { privateImageResponseMiddleware } from './services/image-access.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
 import { ecCommerce } from './routes/ec-commerce.js';
 import { ecOperations } from './routes/ec-operations.js';
@@ -543,6 +544,7 @@ app.use('*', tenantScopeMiddleware);
 app.use('*', timingMark('tenant'));
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
 app.use('/api/*', piiMaskMiddleware);
+app.use('/api/*', privateImageResponseMiddleware);
 app.use('/api/*', timingMark('pii'));
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。

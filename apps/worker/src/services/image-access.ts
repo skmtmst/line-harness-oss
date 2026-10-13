@@ -1,0 +1,110 @@
+import type { Context, MiddlewareHandler } from 'hono';
+import type { Env } from '../index.js';
+import { getVisibleLineAccountScope } from './account-access.js';
+import { verifyCallerLineIdentity } from './liff-auth.js';
+
+export const PRIVATE_IMAGE_TTL_SECONDS = 300;
+export function privateImageKey(key: string): boolean {
+  return /^(?:nen-pets|nen-pet-profiles|nen-photo-review|form-uploads)\//.test(key);
+}
+
+/** Explicit publishing locations, never arbitrary bucket keys or staged uploads. */
+export function publicImageKey(key: string): boolean {
+  if (!key || /[\\%\x00-\x1f]/.test(key) || key.includes('..')) return false;
+  return /^[^/]+\.(?:png|jpg|jpeg|gif|webp)$/i.test(key)
+    || /^(?:media|broadcast-media|rich-menus|imagemaps|instagram-jpeg|nen-photo-public)\//.test(key)
+    || /^banner\/.+\.(?:png|jpg|jpeg|gif|webp)$/i.test(key)
+    || /^hq-templates\/[^/]+\/uploads\//.test(key);
+}
+
+/** These objects have an enrollment-gated playback route, even in a public media namespace. */
+export async function isWebinarSource(db: D1Database, key: string): Promise<boolean> {
+  return !!await db.prepare(`SELECT id FROM webinars WHERE video_prefix IS NOT NULL AND video_prefix <> ''
+    AND (video_prefix = ? OR substr(?, 1, length(video_prefix) + 1) = video_prefix || '/') LIMIT 1`)
+    .bind(key, key).first();
+}
+
+export function publicDeliveryContentType(contentType: string): boolean {
+  return /^(?:image\/(?:png|jpeg|gif|webp)|video\/mp4|audio\/(?:mp4|mpeg|x-m4a))$/i.test(contentType);
+}
+
+async function signingKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+function signedMessage(key: string, expires: string): Uint8Array {
+  return new TextEncoder().encode(`private-image:v1\n${key}\n${expires}`);
+}
+export async function signPrivateImageUrl(url: URL, secret: string): Promise<string> {
+  if (!secret) throw new Error('image_signing_unconfigured');
+  const key = url.pathname.slice('/images/'.length);
+  if (!privateImageKey(key)) throw new Error('image_not_signable');
+  const expires = String(Math.floor(Date.now() / 1000) + PRIVATE_IMAGE_TTL_SECONDS);
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', await signingKey(secret), signedMessage(key, expires)));
+  url.search = '';
+  url.searchParams.set('expires', expires);
+  url.searchParams.set('signature', Array.from(signature, b => b.toString(16).padStart(2, '0')).join(''));
+  return url.toString();
+}
+export async function privateImageSignatureValid(url: URL, secret: string | undefined): Promise<boolean> {
+  const expires = url.searchParams.get('expires') ?? '';
+  const signature = url.searchParams.get('signature') ?? '';
+  const now = Math.floor(Date.now() / 1000);
+  if (!secret || !/^\d{10}$/.test(expires) || !/^[a-f0-9]{64}$/.test(signature)
+    || Number(expires) <= now || Number(expires) > now + PRIVATE_IMAGE_TTL_SECONDS) return false;
+  const bytes = Uint8Array.from(signature.match(/../g)!, b => parseInt(b, 16));
+  return crypto.subtle.verify('HMAC', await signingKey(secret), bytes, signedMessage(url.pathname.slice('/images/'.length), expires));
+}
+
+/** Ownership comes from the bucket and the friend ledger, never URL caller data. */
+export async function canSignPrivateImage(c: Context<Env>, key: string): Promise<boolean> {
+  if (!privateImageKey(key) || key.includes('..') || /[\\%\x00-\x1f]/.test(key)) return false;
+  const object = await c.env.IMAGES.head(key);
+  if (!object) return false;
+  const friendId = object.customMetadata?.friendId
+    ?? (key.startsWith('form-uploads/') ? key.split('/')[2] : key.split('/')[1]);
+  if (!friendId) return false;
+  const friend = await c.env.DB.prepare('SELECT line_account_id, line_user_id FROM friends WHERE id = ?')
+    .bind(friendId).first<{ line_account_id: string; line_user_id: string }>();
+  if (!friend?.line_account_id) return false;
+  const staff = c.get('staff');
+  if (staff) return (await getVisibleLineAccountScope(c.env.DB, staff)).ids.includes(friend.line_account_id);
+  const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+  return !!identity && identity.lineAccountId === friend.line_account_id && identity.lineUserId === friend.line_user_id;
+}
+
+/** Issue fresh capabilities only after each response image's owner is checked. */
+export const privateImageResponseMiddleware: MiddlewareHandler<Env> = async (c, next) => {
+  await next();
+  if (c.res.status >= 400 || !c.res.headers.get('Content-Type')?.includes('application/json')) return;
+  const body = await c.res.clone().text();
+  if (!/\/images\/(?:nen-pets|nen-pet-profiles|nen-photo-review|form-uploads)\//.test(body)) return;
+  const origin = new URL(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || c.req.url).origin;
+  const cache = new Map<string, Promise<string>>();
+  async function walk(value: unknown): Promise<unknown> {
+    if (typeof value === 'string') {
+      let url: URL;
+      try { url = new URL(value); } catch { return value; }
+      const key = url.pathname.slice('/images/'.length);
+      if (url.origin !== origin || !url.pathname.startsWith('/images/') || !privateImageKey(key)) return value;
+      let pending = cache.get(key);
+      if (!pending) {
+        pending = (async () => await canSignPrivateImage(c, key) && c.env.API_KEY
+          ? signPrivateImageUrl(url, c.env.API_KEY) : value)();
+        cache.set(key, pending);
+      }
+      return pending;
+    }
+    if (Array.isArray(value)) return Promise.all(value.map(walk));
+    if (value && typeof value === 'object') return Object.fromEntries(await Promise.all(
+      Object.entries(value).map(async ([key, entry]) => [key, await walk(entry)]),
+    ));
+    return value;
+  }
+  const updated = await walk(JSON.parse(body));
+  const headers = new Headers(c.res.headers);
+  headers.delete('Content-Length');
+  headers.delete('ETag');
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Referrer-Policy', 'no-referrer');
+  c.res = new Response(JSON.stringify(updated), { status: c.res.status, headers });
+};
