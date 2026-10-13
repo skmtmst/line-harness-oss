@@ -11,7 +11,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { AffixedTextField, TextField } from '@/components/shared/text-field';
-import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { Field } from '@/components/shared/form-controls';
 import { requiredText } from '@/lib/form-requirement';
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -404,7 +404,7 @@ export default function FieldEditor({
             /></SaveErrorField>
 {fieldError('name')}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" /></Field>
-          <div  data-field="key"><Field required={mode === 'create'} label={<span id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>}>
+          <div  data-field="key"><Field requirement={mode === 'create' ? keyRequirement : undefined} label={<span id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>}>
 
             <span className={styles.keyRow}>
               {mode === 'create' ? (

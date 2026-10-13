@@ -304,7 +304,7 @@ export default function AffiliateOfferCreateV8() {
         <SettingsFormRow>
           <Field label="報酬額（円）" htmlFor="of-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["rewardAmount","reward_amount"]}><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-amount-error">{fields.error('amount')}</FieldError></Field>
-          <Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
+          <Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>} requirement={fields.requirement('miles')}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field>
         </SettingsFormRow>
       </Card>

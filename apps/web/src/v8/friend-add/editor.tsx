@@ -59,7 +59,6 @@ import { describeFriendAddFailure } from './failure';
 import { addTimeWindow, friendAddFlowSteps, friendAddReaddLines, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow';
 import { resendSuppressionText } from './text';
 import styles from './editor.module.css'
-import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field, OptionalBadge } from '@/components/shared/form-controls';

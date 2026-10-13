@@ -384,7 +384,7 @@ function EventsCreateV8Inner() {
         <div className={styles.pair}>
           <div className={styles.field}><Field label="日付" htmlFor="ev-new-date" requirement={eventRequirements.date}><SaveErrorField names={["date"]}><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} /></SaveErrorField>
 {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}</Field></div>
-          <Field required label={<span id="ev-new-time-label">開始</span>} htmlFor="ev-new-start">
+          <Field label={<span id="ev-new-time-label">開始</span>} htmlFor="ev-new-start" requirement={eventRequirements.start} error={fieldErrors['ev-new-start'] || fieldErrors['ev-new-end']}>
 
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
               <SaveErrorField names={["startTime","start_time"]}><TimeField id="ev-new-start" aria-label="開始の時刻" invalid={Boolean(fieldErrors['ev-new-start'])} aria-describedby={fieldErrors['ev-new-start'] ? 'ev-new-time-error' : undefined} value={startTime} onChange={(value) => { setStartTime(value); clearFieldError('ev-new-start'); clearFieldError('ev-new-end') }} /></SaveErrorField>
