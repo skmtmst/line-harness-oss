@@ -138,7 +138,7 @@ export default function OpsDashboardV8() {
           </KpiBand>
 
           <DashboardColumns layout="cards">{[
-            <Card aria-label="要対応" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="alerts" aria-label="要対応" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="要対応" />
               {data ? (
                 <GridTable label="要対応" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-op-dash-count-w) var(--tpl-op-dash-open-w)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
@@ -154,7 +154,7 @@ export default function OpsDashboardV8() {
                 </GridTable>
               ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </Card>,
-            <Card aria-label="月ごとの売上" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="revenue" aria-label="月ごとの売上" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="月ごとの売上" />
               {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
               <div className={styles.chartFoot}>
@@ -169,7 +169,7 @@ export default function OpsDashboardV8() {
           ]}</DashboardColumns>
 
           <DashboardColumns layout="cards">{[
-            <Card aria-label="上限に近い契約先" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="usage" aria-label="上限に近い契約先" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="上限に近い契約先" />
               {!data ? (
                 <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
@@ -194,7 +194,7 @@ export default function OpsDashboardV8() {
                 </GridTable>
               )}
             </Card>,
-            <Card aria-label="お問い合わせ（チケット）" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="tickets" aria-label="お問い合わせ（チケット）" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="お問い合わせ（チケット）" help={data ? `解決済み ${data.tickets.closedInPeriod}件・初回返信 ${minutesLabel(data.tickets.avgFirstReplyMinutes)}` : undefined} helpLabel="お問い合わせの集計の説明" />
               {data ? (
                 <>
@@ -210,11 +210,11 @@ export default function OpsDashboardV8() {
           ]}</DashboardColumns>
 
           <DashboardColumns layout="cards">{[
-            <Card aria-label="プラン別の契約" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="plans" aria-label="プラン別の契約" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="プラン別の契約" />
               {data ? <p className={parts.line} title={data.planShare.rows.map(row => `${row.label} ${row.percent}%`).join('・')}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </Card>,
-            <Card aria-label="契約者専用LINEに未登録の権限者" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="unregistered" aria-label="契約者専用LINEに未登録の権限者" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="契約者専用LINEに未登録の権限者" />
               {data ? (
                 <div className={styles.lineRow}>

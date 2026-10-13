@@ -50,7 +50,6 @@ import { formatDay, formatNumber } from '@/lib/format'
 import {
   formatMileageChange,
   formatMileageNumber,
-  formatMileageShortDateTime,
   friendHistoryItem,
   mileageDetailHasSourceEvent,
   mileageEntryTypeLabel,
@@ -62,7 +61,6 @@ import {
   mileageStatusLabel,
   type MileageDetailHistoryItem,
 } from './display'
-import { PerPageSelect } from './parts'
 import MileageAdjustDialog from './adjust-dialog'
 import styles from './mileage.module.css'
 import { DetailLoading } from '@/components/templates/detail-page'
