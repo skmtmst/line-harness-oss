@@ -135,9 +135,9 @@ export default function Pagination({
           ›
         </span>
       </button>
-      {previousReason ? <span id={`${reasonId}-previous`} className="sr-only">{previousReason}</span> : null}
-      {nextReason ? <span id={`${reasonId}-next`} className="sr-only">{nextReason}</span> : null}
-      {pausedReason ? <span id={`${reasonId}-paused`} className="sr-only">{pausedReason}</span> : null}
+      {previousReason ? <span id={`${reasonId}-previous`} hidden>{previousReason}</span> : null}
+      {nextReason ? <span id={`${reasonId}-next`} hidden>{nextReason}</span> : null}
+      {pausedReason ? <span id={`${reasonId}-paused`} hidden>{pausedReason}</span> : null}
     </nav>
   )
 }

@@ -14,6 +14,8 @@ it('ページ境界と一時停止の理由を示し、移動できる操作か�
   const change = vi.fn()
   const { rerender } = render(<Pagination page={1} pageCount={2} onPageChange={change} />)
   expect(reason(screen.getByLabelText('前のページ'))).toBe('最初のページです。')
+  expect(screen.getByRole('button', { name: '前のページ', description: '最初のページです。' })).toBeTruthy()
+  expect(document.getElementById(screen.getByLabelText('前のページ').getAttribute('aria-describedby')!)?.hidden).toBe(true)
   expect(screen.getByLabelText('前のページ').getAttribute('title')).toBe('最初のページです。')
   expect(reason(screen.getByLabelText('次のページ'))).toBeNull()
   rerender(<Pagination page={2} pageCount={2} onPageChange={change} />)
