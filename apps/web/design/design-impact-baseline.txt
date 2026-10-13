@@ -235,7 +235,6 @@ shared-button-importer v8/mileage/adjust-dialog.tsx
 shared-button-importer v8/booking-menus/assign.tsx
 shared-button-importer v8/booking-menus/channels-tab.tsx
 shared-button-importer v8/booking-menus/menu-form.tsx
-shared-button-importer v8/booking-menus/settings.tsx
 shared-button-importer v8/booking-menus/staff-edit-dialog.tsx
 shared-button-importer v8/booking-menus/tabs/holidays-tab.tsx
 shared-button-importer v8/booking-menus/tabs/hours-tab.tsx
@@ -534,3 +533,8 @@ shared-button-importer components/shared/aggregation-status.tsx
 shared-button-importer components/shared/friend-filter-band.tsx
 shared-button-importer components/shared/save-feedback.tsx
 shared-button-importer components/shared/inbox-list.tsx
+shared-button-importer v8/booking-menus/menu-settings-page.tsx
+shared-button-importer v8/booking-menus/settings-view.tsx
+shared-button-importer v8/mileage/history-table.tsx
+shared-button-importer v8/tags/fields-table.tsx
+shared-button-importer v8/tags/fields-view.tsx

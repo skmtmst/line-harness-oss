@@ -6,8 +6,11 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import MenuSettingsPage from '@/v8/booking-menus/menu-settings-page'
+import { menuSettingsModel } from '@/v8/booking-menus/menu-settings.test.model'
 import ChannelsTabV8 from '@/v8/booking-menus/channels-tab'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
@@ -137,12 +140,12 @@ describe('V8 予約設定', () => {
     expect(LIST).not.toContain('.at(-1)!')
   })
 
-  it('C9fv7A: 閲覧のみは帯を出し作成操作を隠す', () => {
-    // 閲覧のみの帯と押せない作るボタンはメニュータブの中にある。
-    expect(SETTINGS_V8).toContain('<ReadOnlyNotice')
-    expect(SETTINGS_MENUS_TAB).toContain('{canEdit ? (')
-    expect(SETTINGS_MENUS_TAB).not.toContain('<Button variant="primary" disabled')
-    expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
+  it('閲覧では帯を出して作成操作を隠す', async () => {
+    const { container } = render(React.createElement(MenuSettingsPage, menuSettingsModel()))
+    expect(container.querySelector('[data-read-only-notice]')).toBeTruthy()
+    await screen.findByText('まだ予約メニューがありません')
+    expect(screen.queryByRole('link', { name: /予約メニューを作る/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /予約メニューを作る/ })).toBeNull()
   })
 
   it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {

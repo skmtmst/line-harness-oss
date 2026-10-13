@@ -3,7 +3,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
+import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, ShieldCheck, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
@@ -19,7 +19,9 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
-import { OpsHead } from './shell'
+import { ListPage } from '@/components/templates/list-page'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
@@ -145,27 +147,25 @@ export default function OpsTenantsV8() {
   const kpiLoading = loading && !summary
 
   return (
-    <div data-design-node="XWtYC">
-      <OpsHead
+    <ListPage
+        boardId="XWtYC"
         title="契約先アカウント"
-        description="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
+        help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
+        readOnly={readOnly}
         actions={readOnly ? null : (
           <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>
         )}
-      />
-      <div className={parts.stack}>
+        stats={
         <KpiBand>
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<CreditCard size={13} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Pause size={13} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
-        </KpiBand>
-
-        <div className={styles.tools}>
-          <div className={styles.search}>
+        </KpiBand>}
+        toolbar={<ListToolbarFrame><ListToolbarRow>
+          <ListToolbarSearchSlot>
             <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="統括名・メール・店舗名で探す" aria-label="契約先を探す" />
-          </div>
+          </ListToolbarSearchSlot>
           <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
             {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
           </FilterChip>
@@ -174,8 +174,39 @@ export default function OpsTenantsV8() {
               {f.label}
             </FilterChip>
           ))}
+        </ListToolbarRow></ListToolbarFrame>}
+        overlays={
+      <Dialog
+        open={creating}
+        designWidth={520}
+        designTop={240}
+        title="契約先を作る"
+        confirmLabel="作る"
+        cancelLabel="キャンセル"
+        confirmIcon={<Plus size={15} aria-hidden="true" />}
+        busy={createBusy}
+        error={createError || undefined}
+        designNode="i0FTN"
+        onConfirm={() => create()}
+        onCancel={closeCreate}
+      >
+        <div className={parts.dialogBody}>
+          <Field label="統括名（会社名）"><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
+          <div className={styles.field}>
+            <span className={styles.smallLabel}>飲食店機能</span>
+            <div className={styles.fullSelect}>
+              <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
+            </div>
+          </div>
+          <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>
         </div>
-
+      </Dialog>
+}
+      >
+        <Notice tone="warn">
+          <ShieldCheck aria-hidden="true" />運営コンソール：契約先のデータを扱います。操作はすべて記録されます
+          {opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL) === 'staging' ? '（検証環境）' : null}
+        </Notice>
         {loading && rows.length === 0 ? (
           <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
         ) : listLoadError && rows.length === 0 ? (
@@ -222,33 +253,6 @@ export default function OpsTenantsV8() {
             })}
           </div>
         )}
-      </div>
-
-      <Dialog
-        open={creating}
-        designWidth={520}
-        designTop={240}
-        title="契約先を作る"
-        confirmLabel="作る"
-        cancelLabel="キャンセル"
-        confirmIcon={<Plus size={15} aria-hidden="true" />}
-        busy={createBusy}
-        error={createError || undefined}
-        designNode="i0FTN"
-        onConfirm={() => create()}
-        onCancel={closeCreate}
-      >
-        <div className={parts.dialogBody}>
-          <Field label="統括名（会社名）"><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
-          <div className={styles.field}>
-            <span className={styles.smallLabel}>飲食店機能</span>
-            <div className={styles.fullSelect}>
-              <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
-            </div>
-          </div>
-          <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>
-        </div>
-      </Dialog>
-    </div>
+    </ListPage>
   )
 }
