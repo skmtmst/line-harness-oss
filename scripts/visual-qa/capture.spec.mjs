@@ -111,7 +111,7 @@ for (const width of WIDTHS) {
       await page.goto(`${BASE}${TAGS_PATH}`, { waitUntil: 'networkidle' })
       await expectLanded(page, TAGS_PATH)
       const kind = { 'tags-empty': 'empty', 'tags-error': 'error', 'tags-forbidden': 'error' }[state.name]
-      await expect(page.locator(`[data-list-state="${kind}"]`)).toBeVisible()
+      await expect(page.locator(state.name === 'tags-empty' ? '[data-empty-list="first"]' : `[data-list-state="${kind}"]`)).toBeVisible()
       const title = { 'tags-empty': 'まだタグがありません', 'tags-error': 'タグを読み込めませんでした', 'tags-forbidden': 'タグを見る権限がありません' }[state.name]
       await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
 
@@ -293,7 +293,7 @@ const DELETE_CASES = [
   {
     name: 'tags-delete-ok',
     label: '消せる',
-    tag: 'VIPタグ 1',
+    tag: 'VIPタグ 2',
     canDelete: true,
   },
 ]
@@ -314,9 +314,12 @@ for (const width of WIDTHS) {
       await expectLanded(page, TAGS_PATH)
       const row = page.getByRole('row').filter({ has: page.getByText(item.tag, { exact: true }) })
       await row.getByRole('button', { name: `タグ「${item.tag}」の操作`, exact: true }).click()
+      const loadedImpact = page.waitForResponse(response => /^\/api\/tags\/[^/]+\/dependencies$/.test(new URL(response.url()).pathname) && response.request().method() === 'GET' && response.status() === 200)
       await page.getByRole('menuitem', { name: '保管する', exact: true }).click()
-      const dialog = page.getByRole('dialog', { name: `「${item.tag}」を保管しますか？`, exact: true })
-      await expect(dialog.locator('[data-impact]')).toHaveAttribute('data-impact', 'ready')
+      const impact = await (await loadedImpact).json()
+      expect(impact.success).toBe(true)
+      const dialog = page.getByRole('alertdialog', { name: `「${item.tag}」を保管しますか？`, exact: true })
+      await expect(dialog.getByText(`${impact.data.friendCount}人`, { exact: true })).toBeVisible()
       for (const label of ['付与人数', '参照先', '参照先（自動）', '連動の停止', '積んだマイル']) await expect(dialog.getByText(label, { exact: true })).toBeVisible()
       const confirm = dialog.getByRole('button', { name: 'このタグを保管する', exact: true })
       const name = dialog.getByRole('textbox', { name: '確認のため、タグ名を入力してください', exact: true })
@@ -326,7 +329,7 @@ for (const width of WIDTHS) {
       await name.fill(item.tag); await expect(confirm).toBeEnabled()
       await confirm.click()
       await expect.poll(() => requests.length).toBe(1)
-      expect(requests[0].body).toHaveProperty('impactRevision')
+      expect(requests[0].body).toEqual({ expectedVersion: impact.data.tag.version, impactRevision: impact.data.revision })
       expect(requests[0].key).toBeTruthy()
       if (item.canDelete) await expect(dialog).not.toBeVisible()
       else {

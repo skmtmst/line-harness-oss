@@ -8,20 +8,22 @@ async function openFriends(page) {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
   })
   await page.goto(`${BASE}/friends`, { waitUntil: 'networkidle' })
-  await expect(page.getByRole('heading', { name: '友だち一覧', exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('heading', { name: '友だち', exact: true })).toBeVisible()
 }
 test('未対応の選択を絞り込み要求と表示で確認し、外すと戻る', async ({ page }) => {
   await openFriends(page)
-  const chip = page.getByRole('button', { name: '未対応', exact: true })
-  await expect(chip).toHaveAttribute('aria-pressed', 'false')
-  const initial = await chip.evaluate(el => getComputedStyle(el).backgroundColor)
+  const state = page.getByRole('group', { name: 'すばやく絞り込む' }).getByRole('button', { name: '状態', exact: true })
+  await expect(state).toHaveText('状態：すべて')
   const filtered = page.waitForRequest(request => new URL(request.url()).pathname === '/api/friends' && new URL(request.url()).searchParams.get('handled') === 'unhandled')
-  await chip.click(); await filtered
-  await expect(chip).toHaveAttribute('aria-pressed', 'true')
-  expect(await chip.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(initial)
+  await state.click()
+  await page.getByRole('option', { name: '未対応', exact: true }).getByRole('button').click()
+  await filtered
+  await expect(state).toHaveText('状態：未対応')
   const all = page.waitForRequest(request => new URL(request.url()).pathname === '/api/friends' && !new URL(request.url()).searchParams.has('handled'))
-  await chip.click(); await all
-  await expect(chip).toHaveAttribute('aria-pressed', 'false')
+  await state.click()
+  await page.getByRole('option', { name: 'すべて', exact: true }).getByRole('button').click()
+  await all
+  await expect(state).toHaveText('状態：すべて')
 })
 test('保存した検索のAPI候補を選び、画面から離れず適用する', async ({ page }) => {
   await page.route('**/api/friends/saved-views*', route => route.fulfill({ json: { success: true, data: {
@@ -55,7 +57,7 @@ test('表示項目は確定前に変わらず、保存と再読み込みで維�
   await dialog.getByRole('button', { name: '保存する', exact: true }).click()
   await expect(column).toHaveCount(0)
   await page.reload({ waitUntil: 'networkidle' })
-  await expect(page.getByRole('heading', { name: '友だち一覧', exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('heading', { name: '友だち', exact: true })).toBeVisible()
   await expect(column).toHaveCount(0)
   await page.getByRole('button', { name: '表示項目を編集', exact: true }).click()
   await page.getByRole('dialog', { name: '表示項目を編集', exact: true }).getByRole('checkbox', { name: 'シナリオ', exact: true }).check()
