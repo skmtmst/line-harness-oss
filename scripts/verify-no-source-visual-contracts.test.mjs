@@ -25,6 +25,20 @@ const positive = [
   `unknownAssertion(src)`,
 ]
 positive.forEach((body,i)=>test(`reject positive source path ${i+1}`,()=>assert.ok(analyze(body).length,body)))
+test('source match counts cannot hide a positive assertion behind length', () => {
+  assert.ok(analyze(`expect(src.match(/styles.row/g).length).toBe(1)`).length)
+  assert.ok(analyze(`expect(src.split('className').length).not.toBe(0)`).length)
+})
+test('zero forbidden match counts remain prohibition checks', () => {
+  assert.deepEqual(analyze(`expect(src.match(/window.confirm/g).length).toBe(0)`), [])
+  assert.deepEqual(analyze(`expect(src.match(/window.confirm/g).length).toBeLessThanOrEqual(0)`), [])
+})
+test('built-in collections and path classifiers do not read fixture files', () => {
+  assert.deepEqual(analyze(`const paths=new Set(['view.tsx']);expect(paths.has('view.tsx')).toBe(true);const limits=new Map([['view.tsx',400]]);expect(limits.get('view.tsx')).toBe(400);expect(Math.min(400,401)).toBe(400)`), [])
+})
+test('putting actual source in a Map retains its origin', () => {
+  assert.ok(analyze(`const sources=new Map([['view.tsx',src]]);expect(sources.get('view.tsx')).toContain('styles.row')`).length)
+})
 
 const negative = [
   `expect(src).not.toContain('window.confirm(')`,

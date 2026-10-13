@@ -41,7 +41,7 @@ const execution = new Set(['render','renderToString','renderToStaticMarkup','set
 
 class Scope {
   constructor(parent = null) { this.parent = parent; this.bindings = new Map(); this.hooks=[]; this.hookNodes=new Set() }
-  get(name) { return this.bindings.get(name) ?? this.parent?.get(name) ?? value() }
+  get(name) { return this.bindings.get(name) ?? this.parent?.get(name) ?? (['Map','Set','Object','Math'].includes(name) ? value({intrinsic:name}) : value()) }
   set(name, result) { this.bindings.set(name, result) }
   assign(name, result) { if(this.bindings.has(name)||!this.parent)this.set(name,result);else this.parent.assign(name,result) }
 }
@@ -84,7 +84,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   const matcher = (name, negated, actual, expected, ctx, node) => {
     if (!actual.reads.length) return
     let presence = !negated
-    if (actual.collection && (!expected.items?.length && expected.items || expected.strings.includes('0') && /Length/.test(name))) presence = negated
+    if (actual.readLength && expected.strings.includes('0') && /^(?:toBe|toEqual|strictEqual|equal|toBeLessThanOrEqual)$/.test(name)) presence = negated
+    else if (actual.collection && (!expected.items?.length && expected.items || expected.strings.includes('0') && /Length/.test(name))) presence = negated
     else if (actual.predicate) {
       let wantsTrue = !negated
       if (['toBe','toEqual','strictEqual','equal'].includes(name) && expected.bool !== undefined) wantsTrue = negated ? !expected.bool : expected.bool
@@ -161,7 +162,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       }
       if(receiver.localModule)return value({localModule:receiver.localModule,exportName:node.name.text})
       if(receiver.astReads?.length)return node.name.text==='text'?value({reads:receiver.astReads}):value({astReads:receiver.astReads})
-      if (node.name.text==='length') return value({strings:receiver.items?[String(receiver.items.length)]:[],reads:receiver.collection?[]:receiver.reads})
+      if (node.name.text==='length') return value({strings:receiver.items?[String(receiver.items.length)]:[],reads:receiver.reads,readLength:receiver.collection})
       return receiver
     }
     if (ts.isElementAccessExpression(node)) {
@@ -219,6 +220,10 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     const receiver=ts.isPropertyAccessExpression(call)?evaluate(call.expression,scope,ctx,depth):value()
     const callable=evaluate(call,scope,ctx,depth)
+    if(ts.isNewExpression(node)&&['Map','Set'].includes(callable.intrinsic))return value({container:callable.intrinsic,items:args[0]?.items??[],reads:union(args).reads})
+    if(receiver.container&&name==='get')return union((receiver.items??[]).filter(row=>row.items?.[0]?.strings.some(key=>args[0]?.strings.includes(key))).map(row=>row.items[1]))
+    if(receiver.container&&['has','set','add','delete','clear','keys','values','entries'].includes(name))return value({reads:union([receiver,...args]).reads})
+    if(['Object','Math'].includes(receiver.intrinsic))return union(args)
     if(ts.isNewExpression(node)&&callable.classNode){
       const instance=value({props:new Map()}),instanceScope=new Scope(callable.scope)
       instanceScope.set('this',instance)
