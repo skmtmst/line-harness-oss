@@ -48,7 +48,7 @@ export type HolidayCoverageWarning = (message: string, isoDate: string) => void;
 let warn: HolidayCoverageWarning = (message, isoDate) => {
   // 既定は console.warn。呼び出し側（Worker など）が監視に載せたい場合は
   // setHolidayCoverageWarningHandler で差し替える。
-  console.warn(`[japanese-holidays] ${message} date=${isoDate}`);
+  console.warn(JSON.stringify({"code":"src_japanese_holidays_warn"}));
 };
 
 /** 対象外の年を判定したときの通知方法を差し替える。 */

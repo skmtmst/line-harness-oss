@@ -99,12 +99,7 @@ describe('POST /api/integrations/eccube/columns の title 長さ検証（#711司
 
     expect(consoleError).toHaveBeenCalledTimes(1);
     const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
-    expect(logged).toEqual({
-      event: 'nen_eccube_column_title_rejected',
-      slug: 'boundary-121',
-      titleLength: 121,
-      maxLength: 120,
-    });
+    expect(logged).toEqual({ code: 'nen_eccube_column_title_rejected', route: 'POST /api/integrations/eccube/columns' });
     consoleError.mockRestore();
   });
 

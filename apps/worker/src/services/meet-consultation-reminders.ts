@@ -444,7 +444,7 @@ export async function registerMeetConsultation(
       writeGuard: v6Guard,
     }).catch((error) => {
       if (error instanceof Error && error.message === 'V6_WRITE_GUARDED') return;
-      console.error('meet reminder enroll (v6) failed:', error);
+      console.error(JSON.stringify({"code":"services_meet_consultation_reminders_failed"}));
     });
   }
   // V6 phase の後の最終確認。共有呼出しの間に勝者が動いていたら stale。
@@ -963,11 +963,7 @@ export async function processDueMeetConsultationReminders(
       sent++;
       // push と確定の間に取消が確定したときは送り直さず、追跡用に記録する。
       if (Number(marked.meta?.changes ?? 0) !== 1) {
-        console.error(JSON.stringify({
-          event: 'meet_reminder_sent_after_cancel',
-          consultationId: row.consultation_id,
-          reminderId: row.id,
-        }));
+        console.error(JSON.stringify({"code":"meet_reminder_sent_after_cancel"}));
       }
     } catch (error) {
       const retryCount = row.retry_count + 1;

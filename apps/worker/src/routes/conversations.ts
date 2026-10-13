@@ -186,7 +186,7 @@ conversations.get('/api/conversations', async (c) => {
 
     return c.json({ success: true, data: { total: countRow?.total ?? 0, items } });
   } catch (err) {
-    console.error('GET /api/conversations error:', err);
+    console.error(JSON.stringify({"code":"routes_conversations_failed","route":"GET /api/conversations"}));
     return c.json({ success: false, error: String(err) }, 500);
   }
 });
@@ -294,7 +294,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/conversations/:friendId error:', err);
+    console.error(JSON.stringify({"code":"routes_conversations_failed","route":"GET /api/conversations/:friendId"}));
     return c.json({ success: false, error: String(err) }, 500);
   }
 });

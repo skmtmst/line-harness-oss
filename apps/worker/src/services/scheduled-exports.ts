@@ -58,9 +58,7 @@ export async function processDueScheduledExports(
       generated += 1;
     } catch (error) {
       failed += 1;
-      console.error(JSON.stringify({
-        event: 'scheduled_export_failed', accountId: account.id, error: String(error),
-      }));
+      console.error(JSON.stringify({"code":"scheduled_export_failed"}));
     }
   }
   return { generated, skipped, failed };

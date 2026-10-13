@@ -68,7 +68,7 @@ export const businessAuditMiddleware: MiddlewareHandler<Env> = async (c, next) =
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error('business audit insert failed:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"middleware_business_audit_failed"}));
   });
 
   try {

@@ -64,7 +64,7 @@ aiLoopSlackReports.post('/api/integrations/ai-loop/reports', async (c) => {
     const result = await relayAiLoopReport(c.env, report);
     return c.json({ success: true, ...result });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'ai_loop_slack_report_failed', eventId: report.eventId, error: String(error) }));
+    console.error(JSON.stringify({"code":"ai_loop_slack_report_failed","route":"POST /api/integrations/ai-loop/reports"}));
     return c.json({ success: false, error: 'Slack report failed' }, 502);
   }
 });

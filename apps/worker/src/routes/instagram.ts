@@ -370,12 +370,7 @@ instagram.get(
         detail: e instanceof InstagramError ? (e.detail ?? null) : null,
         grantedScopes,
       });
-      console.error(
-        JSON.stringify({
-          event: 'instagram_oauth_callback_failed',
-          ...diagnostic,
-        }),
-      );
+      console.error(JSON.stringify({"code":"instagram_oauth_callback_failed","route":"GET /api/instagram/oauth/callback"}));
       // 使い切りの state は必ず捨てて、やり直せる状態に戻す。
       if (hash)
         await c.env.DB.prepare(

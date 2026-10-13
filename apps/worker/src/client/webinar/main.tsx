@@ -282,7 +282,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
       if (status === 403) setError('この配信は友だち追加後にご覧いただけます。');
       else if (status === 404) setError('この配信は見つかりませんでした。');
       else setError('読み込みに失敗しました。開き直してください。');
-      console.error(err);
+      console.error(JSON.stringify({"code":"webinar_main_failed"}));
     } finally {
       loadingRef.current = false;
     }
@@ -575,7 +575,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
         body: text,
       }, ctx);
     } catch (err) {
-      console.warn('comment post failed:', err);
+      console.warn(JSON.stringify({"code":"webinar_main_warn"}));
       setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
       setInput(current => current === '' ? text : current);
     } finally {
@@ -673,7 +673,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
       // 再生画面へ切り替える。未来回なら予約済み表示／待機ルームへ更新される。
       await load();
     } catch (err) {
-      console.warn('register failed:', err);
+      console.warn(JSON.stringify({"code":"webinar_main_warn"}));
     } finally {
       setRegistering(false);
     }

@@ -489,7 +489,7 @@ chats.get('/api/operators', requireRole('owner', 'admin', 'staff'), async (c) =>
       })),
     });
   } catch (err) {
-    console.error('GET /api/operators error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/operators"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -501,7 +501,7 @@ chats.post('/api/operators', requireRole('owner', 'admin'), inputJsonBoundary({"
     const item = await createOperator(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, email: item.email, role: item.role } }, 201);
   } catch (err) {
-    console.error('POST /api/operators error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/operators"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -515,7 +515,7 @@ chats.put('/api/operators/:id', requireRole('owner', 'admin'), inputJsonBoundary
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, email: updated.email, role: updated.role, isActive: Boolean(updated.is_active) } });
   } catch (err) {
-    console.error('PUT /api/operators/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/operators/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -525,7 +525,7 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
     await deleteOperator(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/operators/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"DELETE /api/operators/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -549,7 +549,7 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) 
     });
     return c.json({ success: true as const, data: stats });
   } catch (err) {
-    console.error('GET /api/chats/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/stats"}));
     return c.json({ success: false as const, error: '受信箱の集計を取得できませんでした' }, 500);
   }
 });
@@ -776,7 +776,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
       },
     });
   } catch (err) {
-    console.error('GET /api/chats/quick-counts error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/quick-counts"}));
     return c.json({ success: false as const, error: '件数を取得できませんでした' }, 500);
   }
 });
@@ -797,7 +797,7 @@ chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff')
     });
     return c.json({ success: true, data: failures });
   } catch (err) {
-    console.error('GET /api/chats/outbound-failures error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/outbound-failures"}));
     return c.json({ success: false, error: '送信失敗履歴を取得できませんでした' }, 500);
   }
 });
@@ -1170,7 +1170,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
 
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/chats error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1320,7 +1320,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/chats/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1349,7 +1349,7 @@ chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requir
     }
     return c.json({ success: true, data: { isUnread: false } });
   } catch (err) {
-    console.error('POST /api/chats/:id/read error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/read"}));
     return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
 });
@@ -1385,7 +1385,7 @@ chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), inputJ
       .run();
     return c.json({ success: true, data: { marked: true } });
   } catch (err) {
-    console.error('POST /api/chats/read-all error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/read-all"}));
     return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
 });
@@ -1554,7 +1554,7 @@ chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), inputJsonBounda
     }
     return c.json({ success: true, data: { id: item.id, friendId: item.friend_id, status: item.status } }, 201);
   } catch (err) {
-    console.error('POST /api/chats error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1670,7 +1670,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
           friendId: resolved.friend_id,
           eventData: { staffId: body.operatorId },
         }, undefined, assignedFriend?.line_account_id).catch((error) => {
-          console.error('staff_assigned automation error:', error);
+          console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/chats/:id"}));
         });
       }
     }
@@ -1689,7 +1689,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
       },
     });
   } catch (err) {
-    console.error('PUT /api/chats/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/chats/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1726,7 +1726,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 
     return c.json({ success: true, data: { started: true, loadingSeconds } });
   } catch (err) {
-    console.error('POST /api/chats/:id/loading error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/loading"}));
     const message = err instanceof Error ? err.message : 'Internal server error';
     return c.json({ success: false, error: message }, 500);
   }
@@ -2021,7 +2021,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      console.error('first_replied_at update error:', e);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -2031,7 +2031,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      console.error('manual_reply_sent automation error:', error);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -2054,7 +2054,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    console.error('POST /api/chats/:id/send error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2100,7 +2100,7 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
       data: { content: rendered.content, unresolved: rendered.unresolved },
     });
   } catch (err) {
-    console.error('POST /api/chats/:id/render-preview error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/render-preview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2423,7 +2423,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      console.error('first_replied_at update error:', e);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -2433,7 +2433,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      console.error('manual_reply_sent automation error:', error);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -2457,7 +2457,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    console.error('POST /api/chats/:id/send-combined error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2587,7 +2587,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
       data: { ...scheduledSendResponse(row), replayed: !created },
     });
   } catch (err) {
-    console.error('POST /api/chats/:id/schedule error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/schedule"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2605,7 +2605,7 @@ chats.get('/api/chats/:id/scheduled', requireRole('owner', 'admin', 'staff'), re
       data: { scheduled: rows.map(scheduledSendResponse) },
     });
   } catch (err) {
-    console.error('GET /api/chats/:id/scheduled error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/:id/scheduled"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2694,7 +2694,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
     }
     return c.json({ success: true, data: { updated: true } });
   } catch (err) {
-    console.error('PATCH /api/chats/:id/scheduled/:scheduleId error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PATCH /api/chats/:id/scheduled/:scheduleId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2726,7 +2726,7 @@ chats.delete('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin
     }
     return c.json({ success: true, data: { cancelled: true } });
   } catch (err) {
-    console.error('DELETE /api/chats/:id/scheduled/:scheduleId error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"DELETE /api/chats/:id/scheduled/:scheduleId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

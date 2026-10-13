@@ -1448,12 +1448,12 @@ events.post(
               });
               notified += 1;
             } catch (error) {
-              console.error('[event-change] notify failed:', error);
+              console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/change-review/apply"}));
             }
           }
         }
       } catch (error) {
-        console.error('[event-change] notify setup failed:', error);
+        console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/change-review/apply"}));
       }
       await markChangeLogNotified(c.env.DB, result.logId, notified);
     }
@@ -1758,7 +1758,7 @@ events.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/events/admin/occurrences/:id/applicants.csv error:', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"GET /api/events/admin/occurrences/:id/applicants.csv"}));
       return c.json({ error: 'applicants_export_failed' }, 500);
     }
   },
@@ -1829,7 +1829,7 @@ events.post(
       }
       return c.json({ success: true, data: { broadcastId: broadcast.id, recipientCount: friendIds.length } }, 201);
     } catch (error) {
-      console.error('POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview error:', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview"}));
       return c.json({ error: 'applicant_broadcast_preview_failed' }, 500);
     }
   },
@@ -1882,7 +1882,7 @@ events.post(
       }
       return c.json({ success: true, data: result });
     } catch (error) {
-      console.error('[event-waitlist] manual promotion failed', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/occurrences/:id/waitlist/promote"}));
       return c.json({ error: 'waitlist_notification_failed' }, 503);
     }
   },
@@ -2134,7 +2134,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
               startsAtIso: oldStartsAt,
             });
           } catch (compensationError) {
-            console.error('slot reminder compensation failed:', compensationError);
+            console.error(JSON.stringify({"code":"routes_events_failed","route":"PUT /api/events/admin/events/:id/slots/:slotId"}));
           }
         }
         throw error;
@@ -2484,7 +2484,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   try {
     return await runChangeFlow();
   } catch (e) {
-    console.error('[event-booking] change flow threw', e);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"}));
     return finalize(500, { error: 'internal_error' });
   }
 
@@ -2676,7 +2676,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         sourceEventId: newId,
         eventId: event.id,
         lineAccountId: account_id,
-      }).catch((err) => console.error('reminder enroll (event change) failed:', err));
+      }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"})));
     }
     // 空いた旧回の席を待ちへ回す（取消と同じ1回だけの起動）。
     await enqueueEventWaitlistPromotion(c.env.DB, {
@@ -2880,7 +2880,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     reminder_hours_before: result.reminderHoursBefore,
   });
   await insertRemindersForBooking(c.env.DB, result.bookingId, reminders)
-    .catch((error) => console.error('waitlist acceptance reminder creation failed', error));
+    .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
   await enrollByTrigger(c.env.DB, {
     triggerType: 'event',
     friendId: result.friendId,
@@ -2889,7 +2889,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     eventId: result.eventId,
     lineAccountId: result.lineAccountId,
-  }).catch((error) => console.error('waitlist acceptance reminder enroll failed', error));
+  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
   await awardActivityMileage(c.env.DB, {
     eventType: 'booking_created',
     source: 'event_booking',
@@ -2900,7 +2900,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
       eventId: result.eventId, slotId: result.occurrenceId,
     },
     occurredAt: new Date().toISOString(),
-  }).catch((error) => console.error('waitlist acceptance mileage failed', error));
+  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
   await applyActionScoreEvent(c.env.DB, {
     lineAccountId: result.lineAccountId,
     friendId: result.friendId,
@@ -2909,7 +2909,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     subjectKey: result.eventId,
     occurredAt: new Date().toISOString(),
-  }).catch((error) => console.error('waitlist acceptance action score failed', error));
+  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
 
   if (result.newlyConverted) {
     const automation = dispatchAutomationEventWithLogging(c.env.DB, {
@@ -2921,7 +2921,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         bookingType: 'event', bookingId: result.bookingId,
         eventId: result.eventId, slotId: result.occurrenceId,
       },
-    }).catch((error) => console.error('waitlist acceptance automation failed', error));
+    }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
     const executionCtx = optionalExecutionCtx(c);
     if (executionCtx) executionCtx.waitUntil(automation);
     else await automation;
@@ -2954,7 +2954,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         });
       }
     } catch (error) {
-      console.error('waitlist acceptance notification failed', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"}));
     }
   }
 
@@ -3024,7 +3024,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   try {
     return await runBookingFlow();
   } catch (e) {
-    console.error('[event-booking] booking flow threw', e);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
     return finalize(500, { error: 'internal_error' });
   }
 
@@ -3410,7 +3410,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     occurredAt: nowIso,
   }).catch((error) => {
     // 予約成立後の派生処理なので、スコア側の障害で予約を失敗扱いにしない。
-    console.error('event booking action score failed:', error);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
   });
   const actionScoreExecutionCtx = optionalExecutionCtx(c);
   if (actionScoreExecutionCtx) actionScoreExecutionCtx.waitUntil(actionScorePromise);
@@ -3436,7 +3436,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       sourceEventId: id,
       eventId: event.id,
       lineAccountId: account_id,
-    }).catch((err) => console.error('reminder enroll (event) failed:', err));
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"})));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
         lineAccountId: account_id,
@@ -3447,7 +3447,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
           bookingType: 'event', bookingId: id, eventId: event.id, slotId: slot.id,
         },
       })
-        .catch((error) => console.error('event booking automation event failed:', error)),
+        .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}))),
     );
   }
 
@@ -3485,7 +3485,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       });
     }
   } catch (e) {
-    console.error('[event-booking] notify failed', e);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
   }
 
   return finalize(201, { id, status });
@@ -3777,7 +3777,7 @@ async function notifyBookingFriend(
       },
     });
   } catch (e) {
-    console.error('[event-booking] notify failed', e);
+    console.error(JSON.stringify({"code":"routes_events_failed"}));
   }
 }
 
@@ -3951,7 +3951,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         sourceEventId: booking.id,
         eventId: booking.event_id,
         lineAccountId: booking.line_account_id,
-      }).catch((err) => console.error('reminder enroll (event decide) failed:', err));
+      }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/bookings/:bookingId/decide"})));
     }
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -3964,7 +3964,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
           eventId: booking.event_id, slotId: booking.slot_id,
         },
       })
-        .catch((error) => console.error('event booking automation event failed:', error)),
+        .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/bookings/:bookingId/decide"}))),
     );
   }
   if (action === 'reject') {

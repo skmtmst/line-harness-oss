@@ -653,7 +653,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', inputJ
     try {
       raw = await runGoogleAi(c, prompt, { temperature: 0.1, maxTokens: 400 });
     } catch (error) {
-      console.error('[restaurant-google] hours parse failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
+      console.error(JSON.stringify({"code":"routes_restaurant_google_profile_failed","route":"POST /api/restaurant-test/google/hours/propose"}));
       return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, '読み取りに失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });
     }
     const parsed = parseHoursResponse(raw);

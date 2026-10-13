@@ -884,7 +884,7 @@ export async function switchRichMenuLive(
         }
       }
     } catch (e) {
-      console.warn(`[switchRichMenuLive] default lookup/clear failed (non-fatal):`, e);
+      console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
     }
   }
 }
@@ -910,7 +910,7 @@ export async function restorePreSwitchLive(
         await line.deleteRichMenuAlias(aliasId);
       }
     } catch (e) {
-      console.warn(`[restorePreSwitchLive] alias restore failed (non-fatal):`, e);
+      console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
       unrestored.add(old.pageId);
     }
   }
@@ -949,7 +949,7 @@ export async function restorePreSwitchDefault(
   } catch (e) {
     // 読めない = 新メニューを指したままかもしれない。どれかも分からないので、
     // 新メニューは1つも消さない(消すと default がリンク切れになる)。
-    console.warn(`[restorePreSwitchDefault] default lookup failed (non-fatal):`, e);
+    console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
     return { state: 'failed', retainedId: null };
   }
   if (!current || !newIds.includes(current)) return { state: 'untouched' };
@@ -961,7 +961,7 @@ export async function restorePreSwitchDefault(
     }
     return { state: 'restored' };
   } catch (e) {
-    console.warn(`[restorePreSwitchDefault] default restore failed (non-fatal):`, e);
+    console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
     return { state: 'failed', retainedId: current };
   }
 }

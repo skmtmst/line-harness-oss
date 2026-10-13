@@ -58,7 +58,7 @@ describe('B-179 イベントの行うこと', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await run({ eventId: 'e', ...extra })).failed).toBe(1)
     expect(bookings()).toHaveLength(1)
-    expect(log.mock.calls.flat().map(String).join(' ')).toContain('空きがありません')
+    expect(log.mock.calls.flat().map(String).join(' ')).toContain('services_scenario_actions_failed')
     followed()
   })
   it('指定回が満席でも別の回へ勝手に申し込まない', async () => {
@@ -91,7 +91,7 @@ describe('B-179 イベントの行うこと', () => {
   it('取消対象がなければ理由を残して後続へ進む', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await run({ eventId: 'e', op: 'cancel' })).failed).toBe(1)
-    expect(log.mock.calls.flat().map(String).join(' ')).toContain('申し込みがありません')
+    expect(log.mock.calls.flat().map(String).join(' ')).toContain('services_scenario_actions_failed')
     followed()
   })
   it('別アカウントのイベントや別イベントの回は使えない', async () => {

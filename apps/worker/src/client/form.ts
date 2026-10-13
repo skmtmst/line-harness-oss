@@ -886,7 +886,7 @@ async function submitForm(): Promise<void> {
 
   try {
     const data = collectFormData();
-    console.log('Form data collected:', JSON.stringify(data));
+    console.log(JSON.stringify({"code":"client_form_log"}));
 
     // Webhook gate — pre-verified by /repliers endpoint
     if (state.formDef.hasSubmitWebhook) {
@@ -942,14 +942,14 @@ async function submitForm(): Promise<void> {
 
     const body: Record<string, unknown> = { data };
     if (state.refTrackedLinkId) body.trackedLinkId = state.refTrackedLinkId;
-    console.log('Submitting to:', `/api/forms/${state.formDef.id}/submit`);
+    console.log(JSON.stringify({"code":"client_form_log"}));
 
     const { payload } = await postFormSubmitWithResume(
       `/api/forms/${state.formDef.id}/submit`,
       body,
       idemKey,
     );
-    console.log('Response status:', payload.status);
+    console.log(JSON.stringify({"code":"client_form_log"}));
     throwOnFormSubmitError(payload, '送信に失敗しました');
 
     renderSuccess();
@@ -1394,7 +1394,7 @@ export async function initForm(formId: string | null): Promise<void> {
     }).catch(() => { /* silent */ });
   } catch (err) {
     // 内部の英語の文（通信の失敗など）はお客さまに出さない。
-    console.error(err);
+    console.error(JSON.stringify({"code":"client_form_failed"}));
     renderFormError('フォームを読み込めませんでした。時間をおいて、もう一度開いてください。');
   }
 }

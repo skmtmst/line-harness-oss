@@ -124,7 +124,7 @@ broadcastApprovals.get('/api/broadcasts/approvals/candidates', async (c) => {
       .filter((item) => item.canApprove);
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error('GET /api/broadcasts/approvals/candidates error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"GET /api/broadcasts/approvals/candidates"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -143,7 +143,7 @@ broadcastApprovals.get('/api/broadcasts/approval-threshold', async (c) => {
     const threshold = await getBroadcastApprovalThreshold(c.env.DB, fake);
     return c.json({ success: true, data: { lineAccountId, threshold } });
   } catch (err) {
-    console.error('GET /api/broadcasts/approval-threshold error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"GET /api/broadcasts/approval-threshold"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -163,7 +163,7 @@ broadcastApprovals.put('/api/broadcasts/approval-threshold', requireRole('owner'
     if (!saved.ok) return inputError(c, { success: false, error: saved.error }, 400, ["lineAccountId","threshold"]);
     return c.json({ success: true, data: { lineAccountId, threshold: saved.threshold } });
   } catch (err) {
-    console.error('PUT /api/broadcasts/approval-threshold error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"PUT /api/broadcasts/approval-threshold"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -188,7 +188,7 @@ broadcastApprovals.get('/api/broadcasts/approval-config', async (c) => {
       data: { lineAccountId, threshold, operatorCount, singleOperator: operatorCount <= 1 },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/approval-config error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"GET /api/broadcasts/approval-config"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -221,7 +221,7 @@ broadcastApprovals.get('/api/broadcasts/:id/approval', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/approval error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"GET /api/broadcasts/:id/approval"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -306,7 +306,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
     const updated = await getBroadcastById(c.env.DB, broadcast.id);
     return c.json({ success: true, data: { approval: serializeApproval(updated ?? broadcast) } }, 201);
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/approval-request error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"POST /api/broadcasts/:id/approval-request"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -358,7 +358,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundar
       },
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/approval-approve error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"POST /api/broadcasts/:id/approval-approve"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -404,7 +404,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-reject', inputJsonBoundary
     const updated = await getBroadcastById(c.env.DB, broadcast.id);
     return c.json({ success: true, data: { approval: serializeApproval(updated ?? broadcast) } });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/approval-reject error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"POST /api/broadcasts/:id/approval-reject"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -435,7 +435,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', inputJsonBoundary
     const updated = await getBroadcastById(c.env.DB, broadcast.id);
     return c.json({ success: true, data: { approval: serializeApproval(updated ?? broadcast) } });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/approval-cancel error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"POST /api/broadcasts/:id/approval-cancel"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -467,7 +467,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-remind', inputJsonBoundary
     );
     return c.json({ success: true, data: { reminded: true } });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/approval-remind error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcast_approvals_failed","route":"POST /api/broadcasts/:id/approval-remind"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

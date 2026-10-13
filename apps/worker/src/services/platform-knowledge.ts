@@ -228,7 +228,7 @@ export async function processKnowledgeJob(env: Env['Bindings'], requestId?: stri
     await finishKnowledgeJob(db, job, parseKnowledgeSuggestion(raw, ticket, messages));
   } catch (error) {
     // Provider error messages may echo the prompt. Persist only this fixed code.
-    console.error('[knowledge] generation failed', { name: error instanceof Error ? error.name : 'UnknownError' });
+    console.error(JSON.stringify({"code":"services_platform_knowledge_failed"}));
     await failKnowledgeJob(db, job, 'generation_failed');
   } finally {
     if (attempted) await recordPlatformAiCall(db, { id: callId, purpose: 'article', requestId: job.request_id, model, ok, durationMs: Date.now() - started });

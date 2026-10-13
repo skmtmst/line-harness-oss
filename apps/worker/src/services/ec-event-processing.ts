@@ -100,7 +100,7 @@ async function fireEcV6Event(
         idempotencyKey, now: input.now,
       });
     } catch (markError) {
-      console.error(`[ec-event] v6 dispatch ledger failed event=${input.externalEventId}`, markError);
+      console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
     }
     throw error;
   }
@@ -289,7 +289,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
           },
         });
       } catch (error) {
-        console.error(`[ec-event] conversion record failed event=${event.event_id}`, error);
+        console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
       }
     }
 
@@ -428,7 +428,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
             idempotencyKey: notificationKey, now,
           });
         } catch (markError) {
-          console.error(`[ec-event] notification ledger failed event=${event.event_id}`, markError);
+          console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
         }
         // N-328: 送れなかった結果も共通送信台帳へ残す。秘密値を含まない
         // 安全な分類だけ書く。
@@ -520,5 +520,5 @@ export async function markEcEventFailed(
     errorMessageSafe: 'ECの処理を完了できませんでした',
     now: input.now,
   }).catch(() => undefined);
-  console.error(`[ec-event] processing failed event=${input.externalEventId}`);
+  console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
 }

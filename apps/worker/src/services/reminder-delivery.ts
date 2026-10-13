@@ -693,13 +693,7 @@ export async function processReminderDeliveries(
         // push と確定の間に取消が確定すると成功にできない (0 件)。
         // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
         if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
-          console.error(JSON.stringify({
-            event: 'reminder_delivery_completed_after_cancel',
-            reminderId: enrollment.reminder_id,
-            friendReminderId: enrollment.id,
-            runId: run.id,
-            messageLogId: logId,
-          }));
+          console.error(JSON.stringify({"code":"reminder_delivery_completed_after_cancel"}));
         }
       } catch (error) {
         const safe = classifyReminderDeliveryError(error);
@@ -725,14 +719,7 @@ export async function processReminderDeliveries(
         if (!recorded) continue;
         if (retryAt) result.retrying++;
         else result.failed++;
-        console.error(JSON.stringify({
-          event: 'reminder_delivery_failed',
-          reminderId: enrollment.reminder_id,
-          friendReminderId: enrollment.id,
-          runId: run.id,
-          code: exhausted ? 'retry_exhausted' : safe.code,
-          retryAt,
-        }));
+        console.error(JSON.stringify({"code":"reminder_delivery_failed"}));
       }
     }
 

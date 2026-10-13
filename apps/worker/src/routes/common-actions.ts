@@ -91,11 +91,7 @@ async function endpoint<T>(
     return c.json({ success: true, data }, successStatus as 200);
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'common_action_api_failed',
-      path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
+    console.error(JSON.stringify({"code":"common_action_api_failed"}));
     return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
   }
 }
@@ -145,10 +141,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
     });
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'common_action_api_failed', path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
+    console.error(JSON.stringify({"code":"common_action_api_failed","route":"GET /api/common-actions"}));
     return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
   }
 });

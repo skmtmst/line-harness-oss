@@ -18,7 +18,7 @@ research.get('/api/liff/research/:id/form', async c => {
     return c.json({ success: true, data: { formId } });
   } catch (error) {
     if (error instanceof Error && error.message === 'RESEARCH_NOT_FOUND') return c.json({ success: false, error: 'リサーチが見つかりませんでした' }, 404);
-    console.error('research form preparation failed', error);
+    console.error(JSON.stringify({"code":"routes_research_failed","route":"GET /api/liff/research/:id/form"}));
     return c.json({ success: false, error: '回答画面を準備できませんでした。もう一度読み込んでください' }, 422);
   }
 });

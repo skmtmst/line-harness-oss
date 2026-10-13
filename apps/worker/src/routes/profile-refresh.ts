@@ -155,7 +155,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJs
           notFound += 1;
         } else {
           otherErrors += 1;
-          console.error(`refresh-profile failed friend=${row.id}:`, msg);
+          console.error(JSON.stringify({"code":"routes_profile_refresh_failed","route":"POST /api/admin/refresh-profiles"}));
         }
       } finally {
         processed += 1;
