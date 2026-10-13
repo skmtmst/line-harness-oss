@@ -1844,3 +1844,12 @@ describe('m26f: 緊急対応の失敗後回復', () => {
     ).toBe(2);
   });
 });
+
+it.each([undefined, 'short', 'fixture-encryption-key-with-more-than-thirty-two-characters'])('operation status exposes only encryption readiness (%s)', async key => {
+  const res = await app().request('/api/operations/health?account_id=account-1', {}, bindings({ TOTP_ENCRYPTION_KEY: key }));
+  expect(res.status).toBe(200);
+  const body = await res.json() as { data: { loginSecurity: { configured: boolean; notice: string | null } } };
+  expect(body.data.loginSecurity.configured).toBe(Boolean(key && key.length >= 32));
+  expect(body.data.loginSecurity.notice).toBe(key && key.length >= 32 ? null : '二段階認証の鍵が未設定のため、必須にできません');
+  if (key) expect(JSON.stringify(body)).not.toContain(key);
+});

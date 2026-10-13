@@ -1571,6 +1571,7 @@ scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'),
       item.published.status === 'published' ? '動いています' : '止めています',
     ]);
     const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(mileageCsvCell).join(',')).join('\r\n')}\r\n`;
+    c.set('outputAudit', { count: items.length, accountId });
     auditLog(c, 'mileage.rule.export', { kind: 'mileage_earning_rule_export', id: accountId });
     const day = new Date().toISOString().slice(0, 10);
     return new Response(csv, {

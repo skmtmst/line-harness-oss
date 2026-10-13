@@ -1,3 +1,4 @@
+import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { customerDeletionPending } from '../services/customer-data-deletion.js';
 import { Hono, type Context } from 'hono';
 import { setAccountSetting } from '@line-crm/db';
@@ -73,10 +74,12 @@ export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock,
   return c.json({ success: true, data: { file: documentAnswer(row, 'owner', status), scanStatus: status } }, 201);
 }
 export const formDocuments = new Hono<Env>();
+formDocuments.use('/api/form-files/:id/content', outputAuditMiddleware);
 formDocuments.get('/api/form-files/:id/content', requireRole('owner', 'admin', 'staff'), async c => {
   const row = await c.env.DB.prepare('SELECT f.*, s.status AS scan_status FROM form_submission_files f LEFT JOIN media_file_scans s ON s.id = f.scan_id WHERE f.id = ?').bind(c.req.param('id')).first<FormDocumentRow & { scan_status: string }>();
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!row || !scope.ids.includes(row.line_account_id)) return c.json({ success: false, error: '書類が見つかりません' }, 404);
+  c.set('outputAudit', { count: 1, accountId: row.line_account_id, targetId: row.id });
   if (row.file_kind === 'identity' && !['owner', 'admin'].includes(c.get('staff')?.role ?? '')) return c.json({ success: false, error: '見る権限がありません' }, 403);
   if (await customerDeletionPending(c.env.DB, row.friend_id, row.submission_id)) return c.json({ success: false, error: 'この書類は削除中です。もう一度削除を実行してください。' }, 409);
   if (row.scan_status === 'quarantined') return c.json({ success: false, error: '危ないファイルのため開けません' }, 409);

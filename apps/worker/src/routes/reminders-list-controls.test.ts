@@ -174,7 +174,7 @@ function list(query: string, apiKey = KEY_OWNER) {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

@@ -79,10 +79,10 @@ function ResetInner() {
   if (check.state === 'bad') {
     return (
       <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description={check.message}>
-        <Button href="/password/forgot" variant="primary" className="w-full">
+        <Button fullWidth href="/password/forgot" variant="primary" className="w-full">
           もう一度メールを送る
         </Button>
-        <Button href="/login" className="w-full">
+        <Button fullWidth href="/login" className="w-full">
           ログインへ
         </Button>
       </AuthCard>
@@ -91,7 +91,7 @@ function ResetInner() {
   if (check.state === 'done') {
     return (
       <AuthCard node="KN3y1" cardNode="fWkBE" title="パスワードを設定しました" description="新しいパスワードでログインしてください。ほかの端末のログインは解除されています。">
-        <Button href="/login" variant="primary" className="w-full">
+        <Button fullWidth href="/login" variant="primary" className="w-full">
           ログインへ
         </Button>
       </AuthCard>
@@ -121,7 +121,7 @@ function ResetInner() {
         <AuthField label="パスワード（確認）" htmlFor="reset-confirm" error={messages.confirm}>
           <PasswordField id="reset-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">パスワードを設定してログインへ
+        <Button fullWidth type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">パスワードを設定してログインへ
         </Button>
       </form>
     </AuthCard>

@@ -11,7 +11,7 @@ const TENANT_B = 'tenant-B';
 const KEY = '/form-submissions';
 
 function setup() {
-  const t = createTestD1();
+  const t = createTestD1({ loginPolicy: 'off' });
   const raw = t.raw;
   raw.prepare('INSERT OR IGNORE INTO tenants (id, name) VALUES (?, ?), (?, ?)')
     .run(DEFAULT_TENANT_ID, '既定', TENANT_B, '支社');

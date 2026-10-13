@@ -258,7 +258,7 @@ describe('migration 318 affiliate settlement and payout ledger', () => {
     expect(await getAffiliatePayoutDownload(db, {
       tenantId: TENANT_ID, lineAccountId: 'account-1', batchId: batchResult.batch.id,
       tokenHash: 'replacement-token-hash', now: '2026-09-01T00:30:00.000Z',
-    })).toEqual({ objectKey: 'affiliate-payouts/file.csv', fileChecksum: 'checksum' });
+    })).toEqual({ objectKey: 'affiliate-payouts/file.csv', fileChecksum: 'checksum', lineCount: batchResult.batch.lineCount });
 
     const snapshot = await prepareAffiliateStatement(db, {
       tenantId: TENANT_ID, lineAccountId: 'account-1',

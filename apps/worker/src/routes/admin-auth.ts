@@ -1,3 +1,4 @@
+import { mfaConfiguration, mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -17,11 +18,14 @@ import {
   expiredCookie,
   sha256Hex,
 } from '../middleware/auth.js';
-import { clientIp, issueSession, maskIpPrefix, randomToken } from '../services/admin-session.js';
+import { clientIp, issueSession, maskIpPrefix, randomToken, twoFactorLoginUrl, twoFactorSetupUrl } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
   activatePlatformAdminIfAwaitingTotp,
+  bumpAuthThrottle,
+  clearAuthThrottle,
+  readAuthThrottle,
   claimStaffTotpStep,
   claimTotpPendingSecret,
   clearStepUpAttempts,
@@ -39,19 +43,33 @@ import {
   getStaffByLineUserIdIncludingInactive,
   getActiveImpersonation,
   getPlatformAdminRecord,
+  getPlatformAdminByStaffId,
   getTwoFactorChallenge,
-  incrementTwoFactorChallengeAttempts,
   reserveStepUpAttempt,
   stepUpAttemptRetryAfterSeconds,
   updateStaffMember,
 } from '@line-crm/db';
-import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
+import { createTotpEnrollment, decryptTotpEnrollment, consumeTotpRecoveryCode, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import { isStepUpPurpose } from '../lib/step-up.js';
 import { verifyPassword } from '../services/password-hash.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
 import { candidateFromStaffRow, isPlatformAdmin, isPlatformAdminRow } from '../middleware/platform-admin.js';
 
+import { loginMfaChallenge, loginMfaRequired, mfaPolicyKey, mfaAudit, reserveMfaAttempt, consumeMfaChallenge } from '../services/login-mfa.js';
+import { consumeStepUpToken, stepUpRequiredResponse } from '../lib/step-up.js';
+import { auditEventStatement, getPlatformSetting } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+
 export const adminAuth = new Hono<Env>();
+adminAuth.use('/api/auth/*', async (c, next) => { c.header('Cache-Control', 'private, no-store'); await next(); });
+adminAuth.use('/api/auth/two-factor/*', async (c, next) => {
+  await next();
+  if (c.res.status < 400 || c.get('mfaAuditRecorded') || c.req.path.endsWith('/policy')) return;
+  const body = await c.req.json<{ challengeToken?: string }>().catch(() => ({} as { challengeToken?: string }));
+  const challenge = typeof body.challengeToken === 'string'
+    ? await getTwoFactorChallenge(c.env.DB, await sha256Hex(body.challengeToken)) : null;
+  await mfaAudit(c, challenge?.staff_id ?? null, c.req.path.includes('/setup') ? 'auth.mfa.setup' : 'auth.mfa.verify', c.res.status === 429 ? 'denied' : 'failed');
+});
 
 const OAUTH_STATE_COOKIE = 'lh_line_state';
 const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
@@ -63,6 +81,107 @@ const OAUTH_NEXT_COOKIE = 'lh_line_next';
 const OAUTH_REMEMBER_COOKIE = 'lh_line_remember';
 const OAUTH_MAX_AGE = 600;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
+
+adminAuth.get('/api/auth/two-factor/policy', async c => {
+  const staff = c.get('staff');
+  const member = staff.id === 'env-owner' ? null : await getStaffById(c.env.DB, staff.id);
+  const activeProxy = await getActiveImpersonation(c.env.DB, staff.id, await adminSessionTokenHashFromRequest(c));
+  const canEdit = !activeProxy && !staff.readOnly && staff.id !== 'env-owner'
+    && ((member?.role === 'owner' && member.is_active && member.account_scope !== 'accounts' && !staff.assignedLineAccountId) || Boolean(await getPlatformAdminByStaffId(c.env.DB, staff.id)));
+  const counts = await c.env.DB.prepare(`SELECT COUNT(*) total, COALESCE(SUM(CASE WHEN totp_enabled_at IS NOT NULL AND totp_secret_enc IS NOT NULL THEN 1 ELSE 0 END),0) registered FROM staff_members WHERE is_active=1 AND COALESCE(tenant_id,?)=?`).bind(DEFAULT_TENANT_ID, staff.tenantId ?? DEFAULT_TENANT_ID).first();
+  return c.json({ success: true, data: { required: await loginMfaRequired(c.env.DB, staff.tenantId, c.env.TOTP_ENCRYPTION_KEY), canEdit: Boolean(canEdit), impersonating: Boolean(activeProxy), ...mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY), ...counts } });
+});
+
+// Self-service security information contains counts only, never codes or hashes.
+adminAuth.get('/api/auth/two-factor/self', async c => {
+  const principal = c.get('staff');
+  if (c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '代理ログイン中は利用できません' }, 403);
+  const member = await getStaffById(c.env.DB, principal.id);
+  if (!member) return c.json({ success: false, error: '本人の設定を取得できません' }, 403);
+  const configuration = mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY);
+  const remaining = member.totp_enabled_at && member.totp_secret_enc && configuration.configured
+    ? (await decryptTotpEnrollment(member.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!)).recoveryHashes.length : null;
+  return c.json({ success: true, data: { staffId: member.id, enabledAt: member.totp_enabled_at, remaining,
+    total: 8, canEdit: !principal.readOnly && configuration.configured, ...configuration } });
+});
+
+adminAuth.post('/api/auth/two-factor/recovery', inputJsonBoundary(), async c => {
+  const principal = c.get('staff');
+  if (principal.readOnly || c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '本人だけが作り直せます' }, 403);
+  const member = await getStaffById(c.env.DB, principal.id);
+  if (!member?.totp_enabled_at || !member.totp_secret_enc) return c.json({ success: false, error: '先に二段階認証を登録してください' }, 400);
+  if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) return c.json({ success: false, error: MFA_KEY_NOTICE }, 400);
+  if (!await consumeStepUpToken(c, 'auth.mfa.recovery')) return stepUpRequiredResponse(c, '回復コードを作り直す前に本人確認してください');
+  const enrollment = await decryptTotpEnrollment(member.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!);
+  const next = await createTotpEnrollment(enrollment.secret, c.env.TOTP_ENCRYPTION_KEY!);
+  const changed = await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE staff_members SET totp_secret_enc=? WHERE id=? AND totp_secret_enc=? AND is_active=1')
+      .bind(next.encrypted, member.id, member.totp_secret_enc),
+    auditEventStatement(c.env.DB, { category: 'auth', action: 'auth.mfa.recovery.regenerate', tenantId: member.tenant_id,
+      actorPrincipalId: member.id, actorRole: member.role, targetKind: 'staff', targetId: member.id,
+      riskLevel: 'high', retentionClass: 'security' }, { sql: 'changes()=1', params: [] }),
+  ]);
+  if (changed[0].meta.changes !== 1) return c.json({ success: false, error: '設定が変わりました。読み直してください' }, 409);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, data: { recoveryCodes: next.recoveryCodes } });
+});
+
+adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boolean'] }), async c => {
+  const staff = c.get('staff');
+  const member = staff.id === 'env-owner' ? null : await getStaffById(c.env.DB, staff.id);
+  if (staff.readOnly || staff.id === 'env-owner' || c.get('impersonation') || await getActiveImpersonation(c.env.DB, staff.id, await adminSessionTokenHashFromRequest(c))
+    || !((member?.role === 'owner' && member.is_active && member.account_scope !== 'accounts' && !staff.assignedLineAccountId) || Boolean(await getPlatformAdminByStaffId(c.env.DB, staff.id)))) {
+    await mfaAudit(c, staff.id, 'auth.mfa.policy', 'denied');
+    return c.json({ success: false, error: 'オーナーまたは運営だけが変更できます' }, 403);
+  }
+  const body = await c.req.json<{ required?: boolean }>();
+  if (typeof body.required !== 'boolean') return inputError(c, { success: false, error: 'OnかOffを選んでください' }, 400, ['required']);
+  if (body.required && !mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) {
+    await mfaAudit(c, staff.id, 'auth.mfa.policy', 'denied');
+    return c.json({ success: false, error: MFA_KEY_NOTICE }, 400);
+  }
+  // Always a fresh one-use grant. The usual ten-minute step-up window is not sufficient.
+  if (!body.required && !await consumeStepUpToken(c, 'auth.mfa.policy')) {
+    return stepUpRequiredResponse(c, 'Offにする前に二段階認証またはパスワードで本人確認してください');
+  }
+  const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+  const policyKey = mfaPolicyKey(tenantId);
+  const previousValue = await getPlatformSetting(c.env.DB, policyKey);
+  const before = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && previousValue !== 'false';
+  const authority = `EXISTS(SELECT 1 FROM staff_members sm WHERE sm.id=? AND sm.is_active=1
+    AND COALESCE(sm.access_level,'full')<>'read_only' AND COALESCE(sm.tenant_id,?)=? AND
+    ((sm.role='owner' AND COALESCE(sm.account_scope,'all')<>'accounts' AND sm.assigned_line_account_id IS NULL)
+      OR EXISTS(SELECT 1 FROM platform_admins p WHERE p.staff_id=sm.id AND p.is_active=1 AND p.activation_state='active')))`;
+  const authorityBinds = [staff.id, DEFAULT_TENANT_ID, tenantId];
+  const update = previousValue === null
+    ? c.env.DB.prepare(`INSERT OR IGNORE INTO platform_settings(key,value,updated_by,updated_at) SELECT ?,?,?,? WHERE ${authority}`)
+        .bind(policyKey, String(body.required), staff.id, new Date().toISOString(), ...authorityBinds)
+    : c.env.DB.prepare(`UPDATE platform_settings SET value=?,updated_by=?,updated_at=? WHERE key=? AND value=? AND ${authority}`)
+        .bind(String(body.required), staff.id, new Date().toISOString(), policyKey, previousValue, ...authorityBinds);
+  const auditId = crypto.randomUUID();
+  const statements = [update,
+    auditEventStatement(c.env.DB, { id: auditId, category: 'auth', action: 'auth.mfa.policy', tenantId,
+      actorPrincipalId: staff.id, actorRole: staff.role, targetKind: 'tenant', targetId: tenantId,
+      before: { required: before }, after: { required: body.required }, riskLevel: 'high', retentionClass: 'security' },
+      { sql: 'changes()=1', params: [] }),
+  ];
+  // Existing sessions were created without the new requirement. Invalidate them
+  // atomically with enabling the policy; every person can enroll at the next login.
+  if (body.required && !before) statements.push(
+    c.env.DB.prepare(`DELETE FROM platform_settings WHERE key IN
+      (SELECT 'auth.mfa.session:'||s.token_hash FROM admin_sessions s JOIN staff_members m ON m.id=s.staff_id WHERE COALESCE(m.tenant_id,?)=?)
+      AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)`).bind(DEFAULT_TENANT_ID, tenantId, auditId),
+    c.env.DB.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE ended_at IS NULL AND staff_id IN
+      (SELECT id FROM staff_members WHERE COALESCE(tenant_id,?)=?) AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)`)
+      .bind(new Date().toISOString(), DEFAULT_TENANT_ID, tenantId, auditId),
+    c.env.DB.prepare(`DELETE FROM admin_sessions WHERE staff_id IN
+      (SELECT id FROM staff_members WHERE COALESCE(tenant_id,?)=?) AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)`)
+      .bind(DEFAULT_TENANT_ID, tenantId, auditId),
+  );
+  const changed = await c.env.DB.batch(statements);
+  if (changed[0].meta.changes !== 1) return c.json({ success: false, error: '設定が先に変わりました。読み直してください' }, 409);
+  return c.json({ success: true, data: { required: body.required, relogin: body.required && !before } });
+});
 const STEP_UP_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 /*
@@ -120,16 +239,10 @@ function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): s
   return `${base}${path}${error ? `?error=${encodeURIComponent(error)}` : ''}`;
 }
 
-function authFailureDetail(error: unknown): { name: string; message: string } {
-  return error instanceof Error
-    ? { name: error.name, message: error.message }
-    : { name: 'UnknownError', message: 'Unknown failure' };
-}
-
 function logAuthFailure(branch: string, error: unknown): void {
   console.error('[admin-auth] authentication branch failed', {
     branch,
-    ...authFailureDetail(error),
+    name: error instanceof Error ? error.name : 'UnknownError',
   });
 }
 
@@ -186,6 +299,11 @@ adminAuth.get('/api/auth/line', async (c) => {
   return c.redirect(authorize.toString());
 });
 
+async function lineLoginFailure(c: Context<Env>, reason: string, next?: string | null) {
+  await recordLoginAudit(c.env.DB, { action: 'fail', result: 'unauthorized', ip: clientIp(c) });
+  return c.redirect(adminLoginUrl(c, reason, next));
+}
+
 adminAuth.get('/api/auth/line/callback', async (c) => {
   const cookies = c.req.header('Cookie');
   const expectedState = readCookie(cookies, OAUTH_STATE_COOKIE);
@@ -202,7 +320,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   }
 
   if (!code || !state || !expectedState || state !== expectedState || !nonce || !verifier) {
-    return c.redirect(adminLoginUrl(c, 'invalid_state', next));
+    return lineLoginFailure(c, 'invalid_state', next);
   }
 
   const channel = adminLoginChannel(c.env);
@@ -220,9 +338,9 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         code_verifier: verifier,
       }),
     });
-    if (!tokenResponse.ok) return c.redirect(adminLoginUrl(c, 'line_token_failed', next));
+    if (!tokenResponse.ok) return lineLoginFailure(c, 'line_token_failed', next);
     const tokens = await tokenResponse.json<{ id_token?: string }>();
-    if (!tokens.id_token) return c.redirect(adminLoginUrl(c, 'line_id_token_missing', next));
+    if (!tokens.id_token) return lineLoginFailure(c, 'line_id_token_missing', next);
 
     const verifyResponse = await fetch('https://api.line.me/oauth2/v2.1/verify', {
       method: 'POST',
@@ -233,9 +351,9 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         nonce,
       }),
     });
-    if (!verifyResponse.ok) return c.redirect(adminLoginUrl(c, 'line_verify_failed', next));
+    if (!verifyResponse.ok) return lineLoginFailure(c, 'line_verify_failed', next);
     const profile = await verifyResponse.json<{ sub?: string }>();
-    if (!profile.sub) return c.redirect(adminLoginUrl(c, 'line_profile_missing', next));
+    if (!profile.sub) return lineLoginFailure(c, 'line_profile_missing', next);
 
     let staff = await getStaffByLineUserId(c.env.DB, profile.sub);
     if (!staff && invite) {
@@ -263,7 +381,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         if (staff) staff = await getStaffById(c.env.DB, staff.id);
       }
     }
-    if (!staff) return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+    if (!staff) return lineLoginFailure(c, 'not_authorized', next);
 
     // 運営コンソールへの LINE ログイン（★V6 37-1）。platform_admins に登録された
     // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
@@ -279,22 +397,28 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
       // 2要素認証待ちの人は通す（画面が設定へ案内する）。
       const awaitingTotp = pending?.is_active === 1 && pending.activation_state === 'awaiting_totp';
       if (invited) {
-        return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+        return lineLoginFailure(c, 'not_authorized', next);
       }
       if (!awaitingTotp && !(await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff)))) {
-        return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+        return lineLoginFailure(c, 'not_authorized', next);
       }
     }
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
-    if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
-    // 2段階認証は削除済み。LINE認証後すぐセッション発行
+    if (config.misconfigured) return lineLoginFailure(c, 'configuration_error', next);
+    const challenge = await loginMfaChallenge(c, staff, remember);
+    await mfaAudit(c, staff.id, 'auth.login.primary', 'success');
+    if (challenge) {
+      return c.redirect(challenge.twoFactorSetup
+        ? twoFactorSetupUrl(c, challenge.challengeToken, next)
+        : twoFactorLoginUrl(c, challenge.challengeToken, next));
+    }
     let session: Awaited<ReturnType<typeof issueSession>>;
     try {
       session = await issueSession(c, staff.id, config.sameSite, remember);
     } catch (error) {
       logAuthFailure('issueSession', error);
-      return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
+      return lineLoginFailure(c, 'line_login_failed', next);
     }
     const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
     if (next === 'ops') adminUrl.pathname = `${adminUrl.pathname.replace(/\/+$/, '')}/ops`;
@@ -308,7 +432,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     return c.redirect(adminUrl.toString());
   } catch (error) {
     logAuthFailure('lineCallback', error);
-    return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
+    return lineLoginFailure(c, 'line_login_failed', next);
   }
 });
 
@@ -317,7 +441,7 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
     .catch(() => ({} as { challengeToken?: string; code?: string }));
   const challengeToken = body.challengeToken?.trim() ?? '';
   const code = body.code?.trim() ?? '';
-  if (!challengeToken || !/^\d{6}$/.test(code)) {
+  if (!challengeToken || !code) {
     return inputError(c, { success: false, error: '6桁の認証コードを入力してください' }, 400, ["challengeToken","code"]);
   }
 
@@ -338,27 +462,33 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
     await deleteTwoFactorChallenge(c.env.DB, tokenHash);
     return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
   }
-  const verified = await verifyTotp(
-    await decryptTotpSecret(staff.totp_secret_enc, masterKey),
-    code,
-    Date.now(),
-    staff.totp_last_used_step,
+  if (!await reserveMfaAttempt(c, tokenHash, staff.id)) {
+    await mfaAudit(c, staff.id, 'auth.mfa.verify', 'denied');
+    return c.json({ success: false, error: '入力回数を超えました。15分ほど待ってからやり直してください' }, 429);
+  }
+  const recovery = await consumeTotpRecoveryCode(c.env.DB, staff.id, staff.totp_secret_enc, masterKey, code);
+  const verified = recovery ? { valid: true, step: null } : await verifyTotp(
+    await decryptTotpSecret(staff.totp_secret_enc, masterKey), code, Date.now(), staff.totp_last_used_step,
   );
-  if (!verified.valid || verified.step === null) {
-    await incrementTwoFactorChallengeAttempts(c.env.DB, tokenHash);
-    return inputError(c, { success: false, error: '認証コードが正しくありません' }, 400, ["challengeToken","code"]);
+  if (!verified.valid) {
+    await mfaAudit(c, staff.id, 'auth.mfa.verify', 'failed');
+    return inputError(c, { success: false, error: '認証コードが正しくありません' }, 400, ['code']);
   }
 
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
-  if (!await claimStaffTotpStep(c.env.DB, staff.id, verified.step)) {
+  if (!recovery && !await claimStaffTotpStep(c.env.DB, staff.id, verified.step!)) {
     await deleteTwoFactorChallenge(c.env.DB, tokenHash);
     return c.json({ success: false, error: 'この認証コードは使用済みです。次のコードを入力してください' }, 409);
   }
-  await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+  if (!await consumeMfaChallenge(c.env.DB, tokenHash)) return c.json({ success: false, error: '認証は使用済みです' }, 409);
+  await activatePlatformAdminIfAwaitingTotp(c.env.DB, staff.id);
+  await mfaAudit(c, staff.id, recovery ? 'auth.mfa.recovery' : 'auth.mfa.verify', 'success');
+  const { clearAuthThrottle } = await import('@line-crm/db');
+  await clearAuthThrottle(c.env.DB, `mfa:${staff.id}`);
   let session: Awaited<ReturnType<typeof issueSession>>;
   try {
-    session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
+    session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1, true);
   } catch (error) {
     logAuthFailure('issueSession', error);
     return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
@@ -434,7 +564,10 @@ async function setupPendingTotpSecret(
   const reread = await getStaffById(db, staffId);
   const winner = await readPendingTotpSecret(reread?.totp_pending_secret_enc, masterKey);
   if (winner) return winner;
-  await updateStaffMember(db, staffId, { totp_pending_secret_enc: enc });
+  const placed = await db.prepare(`UPDATE staff_members SET totp_pending_secret_enc=?,updated_at=?
+    WHERE id=? AND is_active=1 AND totp_enabled_at IS NULL AND totp_secret_enc IS NULL AND totp_pending_secret_enc IS ?`)
+    .bind(enc, new Date().toISOString(), staffId, reread?.totp_pending_secret_enc ?? null).run();
+  if (placed.meta.changes !== 1) throw new Error('TOTP enrollment changed');
   return secret;
 }
 
@@ -481,33 +614,34 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challen
   if (!staff?.is_active || !staff.totp_pending_secret_enc || !masterKey) {
     return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
   }
+  if (!await reserveMfaAttempt(c, tokenHash, staff.id)) return c.json({ success: false, error: '入力回数を超えました。15分ほど待ってからやり直してください' }, 429);
   const verified = await verifyTotp(
     await decryptTotpSecret(staff.totp_pending_secret_enc, masterKey),
     code,
     Date.now(),
   );
   if (!verified.valid || verified.step === null) {
-    await incrementTwoFactorChallengeAttempts(c.env.DB, tokenHash);
+    await mfaAudit(c, staff.id, 'auth.mfa.setup', 'failed');
     return inputError(c, { success: false, error: '認証コードが正しくありません' }, 400, ["challengeToken","code"]);
   }
 
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
 
-  const updated = await updateStaffMember(c.env.DB, staff.id, {
-    totp_secret_enc: staff.totp_pending_secret_enc,
-    totp_pending_secret_enc: null,
-    totp_enabled_at: new Date().toISOString(),
-    // 登録に使ったコードをそのまま次のログインへ使い回せないよう刻む。
-    totp_last_used_step: verified.step,
-  });
-  if (!updated) return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
+  const enrollment = await createTotpEnrollment(await decryptTotpSecret(staff.totp_pending_secret_enc, masterKey), masterKey);
+  if (!await consumeMfaChallenge(c.env.DB, tokenHash)) return c.json({ success: false, error: '認証は使用済みです' }, 409);
+  const updated = await c.env.DB.prepare(`UPDATE staff_members SET totp_secret_enc=?,totp_pending_secret_enc=NULL,
+    totp_enabled_at=?,totp_last_used_step=? WHERE id=? AND is_active=1 AND totp_enabled_at IS NULL AND totp_pending_secret_enc=?`)
+    .bind(enrollment.encrypted, new Date().toISOString(), verified.step, staff.id, staff.totp_pending_secret_enc).run();
+  if (updated.meta.changes !== 1) return c.json({ success: false, error: '二段階認証はすでに設定されています' }, 409);
   await activatePlatformAdminIfAwaitingTotp(c.env.DB, staff.id);
-  await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+  await mfaAudit(c, staff.id, 'auth.mfa.setup', 'success');
+  const { clearAuthThrottle } = await import('@line-crm/db');
+  await clearAuthThrottle(c.env.DB, `mfa:${staff.id}`);
 
   let session: Awaited<ReturnType<typeof issueSession>>;
   try {
-    session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
+    session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1, true);
   } catch (error) {
     logAuthFailure('issueSession', error);
     return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
@@ -515,7 +649,7 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challen
   await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
     success: true,
-    data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
+    data: { sessionToken: config.crossSite ? session.sessionToken : undefined, recoveryCodes: enrollment.recoveryCodes },
     csrfToken: session.csrfToken,
   });
 });
@@ -547,6 +681,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
    * 形式の検査は試行枠の確保より先に行う。形になっていない入力で
    * 試行回数を消費させないため。
    */
+  if (staff.totp_enabled_at && staff.totp_secret_enc && !mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) return c.json({ success: false, error: '二段階認証の設定を確認できません' }, 503);
   const useTotp = Boolean(staff.totp_enabled_at && staff.totp_secret_enc && c.env.TOTP_ENCRYPTION_KEY);
   const code = body.code?.trim() ?? '';
   const password = body.password ?? '';
@@ -643,9 +778,15 @@ adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
     .catch(() => ({}) as { apiKey?: string; remember?: boolean });
   const apiKey = body.apiKey?.trim() ?? '';
   const remember = body.remember === true;
+  const throttleKey = `key-login:${await sha256Hex(clientIp(c) ?? 'unknown')}`;
+  if (await readAuthThrottle(c.env.DB, throttleKey, 15 * 60_000) >= 10) {
+    await mfaAudit(c, null, 'auth.login.key', 'denied');
+    return c.json({ success: false, error: '入力回数を超えました。15分ほど待ってからやり直してください' }, 429);
+  }
   const staff = await authenticateApiToken(c, apiKey || null);
 
   if (!staff) {
+    await bumpAuthThrottle(c.env.DB, throttleKey, 15 * 60_000);
     // 失敗も残す。誰が入れたかだけでなく、誰が入ろうとしたかも
     // 分からないと、鍵が漏れたときに気づけない。
     await recordLoginAudit(c.env.DB, {
@@ -657,6 +798,8 @@ adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
+  await clearAuthThrottle(c.env.DB, throttleKey);
+  await mfaAudit(c, staff.id, 'auth.login.primary', 'success');
   let csrfToken: string;
   if (staff.id === 'env-owner') {
     // Emergency recovery only. The normal UI never asks for or exposes this key.
@@ -665,7 +808,10 @@ adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
     c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite, maxAge), { append: true });
     c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite, maxAge), { append: true });
   } else {
-    // 2段階認証は削除済み。APIキー確認後そのままセッションを発行する。
+    const row = await getStaffById(c.env.DB, staff.id);
+    if (!row) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const challenge = await loginMfaChallenge(c, row, remember);
+    if (challenge) return c.json({ success: true, data: challenge });
     csrfToken = (await issueSession(c, staff.id, config.sameSite, remember)).csrfToken;
   }
   await recordLoginAudit(c.env.DB, {
@@ -725,7 +871,7 @@ adminAuth.get('/api/auth/session', async (c) => {
   const platformAdminRecord = staff.id === 'env-owner' ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
   const platformAdminState = platformAdminRecord?.is_active === 1 ? platformAdminRecord.activation_state : null;
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
-  const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
+  const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id, await adminSessionTokenHashFromRequest(c)) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
   /*
    * いつもと違う端末・場所からのログインか（V-2 の帯）。セッション行が
@@ -762,6 +908,8 @@ adminAuth.get('/api/auth/session', async (c) => {
       impersonation,
       unfamiliarAt: currentSession?.unfamiliar_at ?? null,
       stepUpMethod,
+      recoveryCodesRemaining: staffRecord?.totp_enabled_at && staffRecord.totp_secret_enc && mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)
+        ? (await decryptTotpEnrollment(staffRecord.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!)).recoveryHashes.length : null,
     },
     csrfToken,
   });

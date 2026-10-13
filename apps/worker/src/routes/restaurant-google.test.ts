@@ -30,7 +30,8 @@ const authMocks = vi.hoisted(() => {
   }
   return {
     sessions,
-    getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
+    getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
+  getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
     getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string): Promise<unknown> => {
       for (const [token, staff] of sessions) if ((await sha256Hex(token)) === tokenHash) return staff;
       return null;
@@ -166,7 +167,7 @@ beforeEach(() => {
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
     { id: 'account-9', name: '他社', is_active: 1, channel_access_token: 'token-9' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので
   // 既定の統括には常にパックを付けておく。
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);

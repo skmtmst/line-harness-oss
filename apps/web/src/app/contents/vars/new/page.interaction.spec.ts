@@ -52,9 +52,7 @@ async function preparePage(page: Page, posted: PostedCommonVar[], accounts: Post
       return
     }
     if (url.pathname === '/api/staff/me') {
-      await route.fulfill({ status: 200, headers, body: JSON.stringify({
-        success: true, data: { id: 'staff-1', name: 'テスト担当', role: 'owner', permissionKeys: [] },
-      }) })
+      await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: { id: 'staff-1', name: 'テスト担当', role: 'owner', accessLevel: 'full', isActive: true, permissionKeys: [], permissionViewKeys: [] } }) })
       return
     }
     if (url.pathname === '/api/line-accounts') {

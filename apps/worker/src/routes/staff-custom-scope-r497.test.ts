@@ -100,7 +100,7 @@ function seedCustomTarget() {
 beforeEach(async () => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date(NOW))
-  testDb = createTestD1()
+  testDb = createTestD1({ loginPolicy: 'off' })
   mail.sendStaffInviteEmail.mockReset()
   mail.sendStaffLineLinkEmail.mockReset()
   testDb.raw.prepare(

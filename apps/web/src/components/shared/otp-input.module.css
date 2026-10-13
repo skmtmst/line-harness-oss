@@ -185,4 +185,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* Eight recovery-code slots share the OTP interaction and fit the 392px auth body. */
+.group[data-format='recovery'] { gap: var(--tpl-slot-gap); align-items: center; }
+:root .group[data-format='recovery'] .slot { width: 40px; }
+.separator { color: var(--color-ink-secondary); font-size: var(--polish-text-body); }
+
 }

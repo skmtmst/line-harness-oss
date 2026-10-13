@@ -147,3 +147,6 @@ describe('R497/R498 権限保存の画面', () => {
     expect(sent.expectedPolicyVersion).toBe(3)
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

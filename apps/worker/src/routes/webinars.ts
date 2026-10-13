@@ -2505,6 +2505,7 @@ webinarRoutes.get(
         measured: measurement.measured,
         classification,
       });
+      c.set('outputAudit', { count: participants.length, accountId: webinar.account_id ?? undefined, targetId: id });
       const rows = participants.map((participant) => [
         participant.friend_name ?? '',
         participant.first_joined_at,

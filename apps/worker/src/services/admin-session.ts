@@ -8,6 +8,7 @@ import {
   deleteExpiredTwoFactorChallenges,
   getStaffById,
   recordAuditEvent,
+  setPlatformSetting,
   type StaffMember,
   type TwoFactorChallengePurpose,
 } from '@line-crm/db';
@@ -136,7 +137,7 @@ async function notifyUnfamiliarLogin(
   }
 }
 
-export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false) {
+export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false, mfaVerified = false) {
   const sessionToken = randomToken();
   const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
   const expiresAt = new Date(Date.now() + maxAge * 1000).toISOString();
@@ -163,6 +164,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     deviceHash,
     unfamiliarAt,
   });
+  if (mfaVerified) await setPlatformSetting(c.env.DB, `auth.mfa.session:${await sha256Hex(sessionToken)}`, staffId, staffId);
   if (unfamiliarAt) {
     await notifyUnfamiliarLogin(c, staffId, { ipPrefix, userAgent });
   }

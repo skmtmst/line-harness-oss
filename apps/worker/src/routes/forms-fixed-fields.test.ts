@@ -15,7 +15,7 @@ function request(path: string, method = 'GET', body?: unknown, key = 'owner-key'
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) }, { DB: fixture.db } as Env['Bindings']);
 }
 beforeEach(() => {
-  fixture = createTestD1({ foreignKeys: true });
+  fixture = createTestD1({ loginPolicy: 'off', foreignKeys: true });
   fixture.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES ('a','ch','本店','token','secret',?)").run(DEFAULT_TENANT_ID);
   fixture.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope) VALUES ('owner','店長','owner','owner-key',?,'all'),('viewer','閲覧','staff','viewer-key',?,'all')").run(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID);
   fixture.raw.exec(`UPDATE staff_members SET view_permission_keys='["/friends","/tags"]' WHERE id='viewer'`);
