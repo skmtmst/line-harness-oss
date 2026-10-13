@@ -18,3 +18,17 @@ export default function collectFormLayouts() {
    // Nested forms/cards are regions, not two independent fields.
    if(marked.length>1 || (!marked.length&&cs.length>2))return null
    const label=child.querySelector('label,[id*="label"],[class*="label"]')?.textContent?.trim()||cs[0]?.getAttribute('aria-label')||cs[0]?.getAttribute('placeholder')||cs[0]?.id||cs[0]?.tagName||'入力欄'
+   return {label,controls:cs.map(c=>({id:c.id,name:c.getAttribute('aria-label'),width:c.getBoundingClientRect().width})),rect:child.getBoundingClientRect()}
+  })
+  if(fields.some(f=>!f))continue
+  const horizontal=fields.some((a,i)=>fields.some((b,j)=>i<j&&(a.rect.right<=b.rect.left+1||b.rect.right<=a.rect.left+1)&&Math.min(a.rect.bottom,b.rect.bottom)>Math.max(a.rect.top,b.rect.top)))
+  const frame=parent.closest('[data-page-template]')
+  rows.push({target:selector(parent),frame:frame?.getAttribute('data-page-template'),frameWidth:frame?.getBoundingClientRect().width,className:parent.className,labels:fields.map(f=>f.label),controlIds:fields.flatMap(f=>f.controls.map(c=>c.id)),children:children.length,horizontal,display:css.display,columns:css.gridTemplateColumns,rects:fields.map(f=>({x:f.rect.x,y:f.rect.y,width:f.rect.width,height:f.rect.height})),shared:parent.getAttribute('data-form-row')})
+ }
+ return rows
+}
+
+/** Use the existing narrow-page boundary; the same rule applies to every independent input layout. */
+export function formColumnFindings(rows) {
+ return rows.filter(row=>row.frame==='create'&&row.frameWidth<1100&&row.horizontal).map(row=>({kind:'form-shrink',target:row.target,text:'狭い白い板では独立した入力欄を1列へ',measure:{fields:row.children,columns:row.columns.split(' ').length}}))
+}

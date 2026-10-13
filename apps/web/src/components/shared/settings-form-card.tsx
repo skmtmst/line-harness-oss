@@ -24,3 +24,4 @@ export function SettingsFormRow({ children, postal = false, layout, columns = 2,
   columns?: 2 | 3
 } & Omit<ComponentPropsWithRef<'div'>, 'children' | 'className' | 'style'>) {
   return <div {...props} className={layout === 'name-folder' ? styles.nameFolderRow : layout === 'columns' ? styles.columnsRow : postal ? styles.postalRow : styles.row} data-form-row={layout} data-form-columns={layout === 'columns' ? columns : undefined}>{children}</div>
+}

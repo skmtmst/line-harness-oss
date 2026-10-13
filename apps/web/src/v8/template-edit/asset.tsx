@@ -47,7 +47,6 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。
@@ -432,3 +431,307 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         <h2 className={styles.cardTitle}>名前とフォルダ</h2>
       </div>
       <SettingsFormRow layout="name-folder">
+        <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor={`te-${kind}-name`} requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
+<FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError></Field></div>
+        <div className={styles.field}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+            size="full"
+            id={`te-${kind}-folder`}
+            aria-label="フォルダ"
+            value={host ? host.folder : folder}
+            onChange={host ? host.onFolderChange : setFolder}
+            folders={host ? host.folders : folders.map(folderByName)}
+            colors
+            onCreate={host
+              ? hostFolderCreate(host)
+              : canMutate && selectedAccountId
+                ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
+                : undefined}
+          /></SaveErrorField></Field></div>
+      </SettingsFormRow>
+    </Card>
+  )
+
+  return (
+    <SaveErrorScope errors={saveErrors}><>
+      <TemplateEditFrame
+        boardId={meta.board}
+        title={meta.heading}
+        description={meta.lead}
+        side={(inDialog) => (
+          <>
+            {sideCard}
+            <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">届き方</h2>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
+          </>
+        )}
+        footerActions={(
+          <>
+            {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}
+            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
+              下書きを保存
+            </Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
+              {host ? null : <Send size={15} aria-hidden="true" />}
+              {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
+            </Button>
+          </>
+        )}
+      >
+        {host?.notice}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
+        {null}
+        {nameCard}
+
+        {kind === 'coupon' ? (
+          <>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>中身</h2>
+              </div>
+              <div className={styles.couponRow}>
+                <div className={styles.couponImage}>
+                  <SaveErrorField names={["imageUrl","image_url"]}><ImageFrame
+                    title="画像を追加"
+                    previewAlt="クーポンの画像"
+                    value={imageSet ? imageUrl.trim() : null}
+                    accept="image/jpeg,image/png"
+                    help="1029 × 1029px"
+                    upload={!host && selectedAccountId ? async (file, progress) => {
+                      const result = await uploadToMediaLibrary(file, selectedAccountId, 'image', progress)
+                      setPickedMedia(result.item)
+                      return result.url
+                    } : undefined}
+                    onChange={(url) => { setImageUrl(url ?? ''); setPickedMedia(null) }}
+                    onMediaPick={host ? undefined : () => setPickerOpen(true)}
+                    urlEntry={{ value: imageUrl, onChange: (url) => { setImageUrl(url); setPickedMedia(null) }, label: 'クーポン画像のURL', placeholder: '画像URL' }}
+                  /></SaveErrorField>
+                  {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
+                </div>
+                <div className={styles.couponFields}>
+                  <div className={styles.field}><Field label="クーポン名" htmlFor="te-coupon-title"><SaveErrorField names={["couponTitle","coupon_title"]}><TextField id="te-coupon-title" value={couponTitle} onChange={(event) => setCouponTitle(event.target.value)} placeholder={name || '例：夏の20%オフ'} /></SaveErrorField></Field></div>
+                  <div className={styles.field}><Field label="使うときの説明" htmlFor="te-coupon-desc"><SaveErrorField names={["description"]}><TextField id="te-coupon-desc" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：会計時にこの画面をご提示ください。" /></SaveErrorField></Field></div>
+                </div>
+              </div>
+            </Card>
+
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>使える期間と回数</h2>
+                <p className={styles.cardNote}>この管理画面の時刻（日本時間）で入ります</p>
+              </div>
+              <SettingsFormRow layout="columns">
+                <div className={styles.field}><Field label="開始" htmlFor="te-coupon-start" requirement={fields.requirement('start')}><span {...fields.bind('start')}><SaveErrorField names={["couponStartsAt","startsAt","coupon_starts_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></SaveErrorField></span>
+<FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError></Field></div>
+
+                <div className={styles.field}><Field label="終了" htmlFor="te-coupon-end" requirement={fields.requirement('end')}><span {...fields.bind('end')}><SaveErrorField names={["couponEndsAt","endsAt","coupon_ends_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></SaveErrorField></span>
+<FieldError id="te-coupon-end-error">{fields.error('end')}</FieldError></Field></div>
+              </SettingsFormRow>
+              <div className={styles.typeRow}>
+                <span className={styles.labelSmall}>1人が使える回数</span>
+                <SaveErrorField names={["couponOnce"]}><SegmentedControl
+                  aria-label="1人が使える回数"
+                  options={[{ value: 'once' as const, label: '1人1回だけ' }, { value: 'unlimited' as const, label: '期間中なら何回でも' }]}
+                  value={couponOnce}
+                  onChange={setCouponOnce}
+                /></SaveErrorField>
+              </div>
+              <div className={styles.typeRow}>
+                <span className={styles.labelSmall}>受け取れる人</span>
+                <SaveErrorField names={["couponVisibility"]}><SegmentedControl
+                  aria-label="受け取れる人"
+                  options={[{ value: 'friends' as const, label: '友だちだけ' }, { value: 'link' as const, label: 'リンクを知っている人' }]}
+                  value={couponVisibility}
+                  onChange={setCouponVisibility}
+                /></SaveErrorField>
+              </div>
+            </Card>
+
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>抽選</h2>
+              </div>
+              <div className={styles.toggleRow}>
+                <span className={styles.toggleLabel}>抽選する</span>
+                <span className={styles.spacer} />
+                <SaveErrorField names={["lottery"]}><SettingCheckbox checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
+              </div>
+              {lottery ? (
+                <SettingsFormRow layout="columns">
+                  <div className={`${styles.field} ${styles.grow}`}><Field label="当たる確率（%）" htmlFor="te-lottery-rate" requirement={fields.requirement('rate')}><SaveErrorField names={["lotteryRate","lottery_rate"]}><NumberInput unit="%" {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} /></SaveErrorField>
+<FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError></Field></div>
+                  <div className={styles.field}><Field label="当選人数の上限（人）" htmlFor="te-winner-limit" requirement={fields.requirement('limit')}><SaveErrorField names={["winnerLimit","winner_limit"]}><NumberInput unit="人" {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} /></SaveErrorField>
+<FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError></Field></div>
+                </SettingsFormRow>
+              ) : (
+                <p className={styles.cardNote}>抽選しないときは、受け取った人全員に配ります。</p>
+              )}
+            </Card>
+
+            <div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div>
+            {host ? null : (
+              <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+                <div className={styles.cardHead}>
+                  <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
+                </div>
+                <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
+              </Card>
+            )}
+          </>
+        ) : (
+          <>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>受付</h2>
+              </div>
+              <SettingsFormRow layout="columns">
+                <div className={styles.field}><Field label="受付の開始" htmlFor="te-research-start"><SaveErrorField names={["researchStartsAt","startsAt","research_starts_at"]}><DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" /></SaveErrorField></Field></div>
+
+                <div className={styles.field}><Field label="受付の終了" htmlFor="te-research-end"><SaveErrorField names={["researchEndsAt","endsAt","research_ends_at"]}><DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" /></SaveErrorField></Field></div>
+              </SettingsFormRow>
+              <div className={styles.field}><Field label="はじめのあいさつ" htmlFor="te-research-greeting"><SaveErrorField names={["description"]}><TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" /></SaveErrorField></Field></div>
+            </Card>
+
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>質問（上から順に出ます）</h2>
+              </div>
+              {questionOrder.shown.map((question, index) => (
+                <section key={question.key} className={styles.question} aria-label={`問 ${index + 1}`} {...questionOrder.rowProps(question.key)}>
+                  <div className={styles.toggleRow}>
+                    <ReorderHandle
+                      look="bare"
+                      className={styles.grip}
+                      label={`問 ${index + 1}`}
+                      ariaLabel={`問 ${index + 1} の並びを変える。ドラッグ・上下キー・押して上へ／下へ`}
+                      aria-haspopup="menu"
+                      aria-expanded={orderMenu === question.key}
+                      onClick={(event) => { orderAnchor.current = event.currentTarget; setOrderMenu(orderMenu === question.key ? null : question.key) }}
+                      {...questionOrder.handle(question.key)}
+                      {...questionOrder.handleProps(question.key)}
+                    >
+                      <GripVertical size={14} aria-hidden="true" />
+                    </ReorderHandle>
+                    <span className={styles.questionNo}>問 {index + 1}</span>
+                    <span className={styles.spacer} />
+                    <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
+                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><SettingCheckbox checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
+                    <button
+                      type="button"
+                      className={`${styles.insertChip} ${styles.questionRemove}`}
+                      disabled={questions.length <= 1}
+                      title={questions.length <= 1 ? '質問は1つ必要です' : `問 ${index + 1} を消す`}
+                      aria-label={`問 ${index + 1} を消す`}
+                      onClick={() => setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))}
+                    >
+                      消す
+                    </button>
+                  </div>
+                  <SettingsFormRow layout="columns">
+                    <div className={`${styles.field} ${styles.grow}`}><Field label="質問文" htmlFor={`te-q-${question.key}`} requirement={fields.requirement(`q-${question.key}`)}><SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>
+<FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError></Field></div>
+                    <div className={`${styles.field} ${styles.formatField}`}><Field label="答え方" htmlFor={`te-qf-${question.key}`}><SaveErrorField names={[`shown.${index}.format`,"format","question.format"]}><Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} /></SaveErrorField></Field></div>
+                  </SettingsFormRow>
+                  {question.format !== 'free' ? (
+                    <>
+                    <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
+                      {question.choices.map((choice, choiceIndex) => (
+                        <div key={choiceIndex} className={styles.field}><div className={styles.choice}>
+                          <SaveErrorField names={["choice"]}><input
+                            className={styles.choiceInput}
+                            value={choice}
+                            placeholder={`選択肢 ${choiceIndex + 1}`}
+                            aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1}`}
+                            onChange={(event) => updateQuestion(index, { choices: question.choices.map((c, i) => (i === choiceIndex ? event.target.value : c)) })}
+                          /></SaveErrorField>
+                          {question.choices.length > 1 ? (
+                            <button
+                              type="button"
+                              className={styles.choiceRemove}
+                              aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1} を消す`}
+                              onClick={() => updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex), choiceTapExtras: question.choiceTapExtras?.filter((_, i) => i !== choiceIndex) })}
+                            >
+                              <X size={12} aria-hidden="true" />
+                            </button>
+                          ) : null}
+                          </div>
+                          <div {...fields.bind(`extra-${question.key}-${choiceIndex}`)}><TapExtrasField error={fields.error(`extra-${question.key}-${choiceIndex}`)} name={`問${index + 1}の選択肢${choiceIndex + 1}`} value={question.choiceTapExtras?.[choiceIndex]} accountId={host ? null : selectedAccountId} onChange={extra => updateQuestion(index, { choiceTapExtras: question.choices.map((_, ci) => ci === choiceIndex ? extra : question.choiceTapExtras?.[ci] ?? {}) })} /></div>
+                        </div>
+                      ))}
+                      {question.choices.length < MAX_CHOICES ? (
+                        <button type="button" className={styles.insertChip} onClick={() => updateQuestion(index, { choices: [...question.choices, ''] })}>
+                          <Plus size={15} aria-hidden="true" />
+                          選択肢を足す
+                        </button>
+                      ) : (
+                        <span className={styles.hint}>選択肢は{MAX_CHOICES}つまでです（LINEの決まり）。</span>
+                      )}
+                    </div>
+                    <FieldError id={`te-qc-${question.key}-error`}>{fields.error(`qc-${question.key}`)}</FieldError>
+                    </>
+                  ) : null}
+                </section>
+              ))}
+              <div>
+                <button
+                  type="button"
+                  className={styles.insertChip}
+                  disabled={questions.length >= MAX_QUESTIONS}
+                  title={questions.length >= MAX_QUESTIONS ? `質問は${MAX_QUESTIONS}問までです` : `あと${MAX_QUESTIONS - questions.length}問足せます`}
+                  onClick={() => setQuestions((prev) => (prev.length >= MAX_QUESTIONS ? prev : [...prev, newQuestion()]))}
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  質問を足す
+                </button>
+              </div>
+            </Card>
+
+            {host ? null : (
+            <>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
+              </div>
+              <Notice tone="warn">回答後の処理はまだ動きません。設定は保存できますが、回答を受け取る仕組みができるまで実行されません。</Notice>
+              <InlineActionRowsV8 actions={answerActions} onChange={setAnswerActions} {...actionOptions} />
+            </Card>
+
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>答えてもらう人</h2>
+                <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>
+              </div>
+              <SaveErrorField names={["targetTagId","target_tag_id"]}><EntitySelect clearable size="full" kind="tag"
+                aria-label="答えてもらう人"
+                placeholder="友だち全員"
+                value={targetTagId}
+                onChange={setTargetTagId}
+                options={actionOptions.tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
+              /></SaveErrorField>
+            </Card>
+            </>
+            )}
+          </>
+        )}
+      </TemplateEditFrame>
+
+      <ActionMenu
+        open={orderMenu !== null}
+        anchorRef={orderAnchor}
+        ariaLabel="質問の並びを変える"
+        onClose={() => setOrderMenu(null)}
+        items={orderMenu ? questionOrder.menuItems(orderMenu, () => setOrderMenu(null)).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })) : []}
+      />
+
+
+      <MediaPickerDialog
+        open={pickerOpen}
+        accountId={selectedAccountId}
+        kind="image"
+        onClose={() => setPickerOpen(false)}
+        onSelect={(item) => { setImageUrl(item.url); setPickedMedia(item); setPickerOpen(false) }}
+      />
+
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject={`${meta.title}の変更`} onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </></SaveErrorScope>
+  )
+}

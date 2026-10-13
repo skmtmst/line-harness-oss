@@ -53,7 +53,6 @@ import own from './carousel.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import InlineSettings from '@/components/shared/inline-settings'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 テンプレート「カルーセルを作る・編集」（Pencil `J60utH`）。
@@ -474,3 +473,212 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             {inline ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
               <SettingsFormRow layout="name-folder">
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="cr-name-input" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+<FieldError id="cr-name-input-error">{fields.error('name')}</FieldError></Field></div>
+                <div className={styles.field}>
+                  <span className={styles.pickLabel}>フォルダ</span>
+                  <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
+                    size="full"
+                    aria-label="フォルダ"
+                    value={host ? host.folder : folderId ?? ''}
+                    onChange={host ? host.onFolderChange : (value) => setFolderId(value || null)}
+                    folders={host ? host.folders : folders.map(folderById)}
+                    colors
+                    onCreate={host
+                      ? hostFolderCreate(host)
+                      : canMutate && folderAccountId
+                        ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                        : undefined}
+                  /></SaveErrorField>
+                </div>
+              </SettingsFormRow>
+            </Card>}
+
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-cards">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle} id="cr-cards">カード</h2>
+                <p className={styles.note}>左から順に出ます。つまんで並べ替えられます。</p>
+              </div>
+              <div className={own.chipRow}>
+                {panels.map((item, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className={own.chip} data-composer={inline || undefined}
+                    aria-pressed={index === selectedIndex}
+                    draggable={!busy}
+                    disabled={busy}
+                    title={`${item.title || `カード ${index + 1}`}（つまんで並べ替え・Alt＋← → でも動かせます）`}
+                    onClick={() => setSelected(index)}
+                    onKeyDown={(event) => onChipKey(event, index)}
+                    onDragStart={() => setDragIndex(index)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => onDrop(event, index)}
+                  >
+                    {`${index + 1} ${chipName(item.title) || `カード ${index + 1}`}`}
+                    <ErrorCountBadge count={fields.countIn(`card-${index}`)} label={`カード${index + 1}`} />
+                  </button>
+                ))}
+                <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} onClick={() => { setPanels((prev) => [...prev, emptyPanel()]); setSelected(panels.length) }}>
+                  <Plus size={15} aria-hidden="true" />カードを足す
+                </Button>
+                <span className={own.count}>{`${panels.length} / ${MAX_COLUMNS} 枚`}</span>
+              </div>
+            </Card>
+
+            {panel ? (
+              <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-panel">
+                <h2 className={styles.cardTitle} id="cr-panel">{`カード ${selectedIndex + 1} の中身`}</h2>
+                <div className={own.panelRow}>
+                  <div className={own.imageCol} {...fields.bind(`card-${selectedIndex}-image`)} aria-describedby={fields.invalid(`card-${selectedIndex}-image`) ? 'cr-image-error' : undefined}>
+                  <CarouselImage
+                    url={panel.thumbnailImageUrl} disabled={busy || loading || loadFailed || (!host && !folderAccountId)} maxMB={hqHost ? 8 : 10}
+                    scope={`${host ? 'hq' : folderAccountId}-${id ?? 'new'}-${selectedIndex}`}
+                    onBusyChange={(value) => { uploadLock.current = value; setUploading(value) }}
+                    upload={async (file) => {
+                      if (hqHost && host) {
+                        if (!host.uploadCarouselImage) throw new Error('統括の画像の受け取り口を利用できません。')
+                        const media = await host.uploadCarouselImage(file)
+                        setUploadedMedia((current) => [...current.filter((item) => item.id !== media.id), media])
+                        if (!media.publicUrl) throw new Error('登録した画像のURLを確認できませんでした。')
+                        return media.publicUrl
+                      }
+                      if (!folderAccountId) throw new Error('上のバーでLINE公式アカウントを選んでください。')
+                      return uploadCarouselImage(file, folderAccountId)
+                    }}
+                    onUploaded={(url) => update(selectedIndex, { thumbnailImageUrl: url })}
+                    onMediaPick={hqHost ? undefined : () => setPickerOpen(true)}
+                    onUrl={() => setUrlOpen((open) => !open)}
+                  />
+                  <FieldError id="cr-image-error">{fields.error(`card-${selectedIndex}-image`)}</FieldError>
+                  </div>
+                  <div className={own.textCol}>
+                    <div className={styles.field}><Field label={<>{`タイトル（${TITLE_MAX}文字まで）`}</>} htmlFor="cr-title"><SaveErrorField names={["title","panel.title"]}><input {...fields.bind(`card-${selectedIndex}-title`)} id="cr-title" className={styles.input} value={panel.title} aria-invalid={fields.invalid(`card-${selectedIndex}-title`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-title`) ? 'cr-title-error' : undefined} onChange={(event) => update(selectedIndex, { title: event.target.value })} /></SaveErrorField>
+<FieldError id="cr-title-error">{fields.error(`card-${selectedIndex}-title`)}</FieldError></Field></div>
+                    <div className={styles.field}><Field label={<>{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</>} htmlFor="cr-text"><SaveErrorField names={["text","panel.text"]}><input {...fields.bind(`card-${selectedIndex}-text`)} id="cr-text" className={styles.input} value={panel.text} aria-invalid={fields.invalid(`card-${selectedIndex}-text`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-text`) ? 'cr-text-error' : undefined} onChange={(event) => update(selectedIndex, { text: event.target.value })} /></SaveErrorField>
+<FieldError id="cr-text-error">{fields.error(`card-${selectedIndex}-text`)}</FieldError></Field></div>
+                    {[...panel.title].length > TITLE_MAX || [...panel.text].length > textMaxFor(panel) ? (
+                      <p className={own.over} role="alert">{`タイトル ${[...panel.title].length} / ${TITLE_MAX}・本文 ${[...panel.text].length} / ${textMaxFor(panel)} 文字。多すぎる分を減らしてください。`}</p>
+                    ) : null}
+                  </div>
+                </div>
+                {urlOpen ? (
+                  <Field label="画像の URL"><SaveErrorField names={["thumbnailImageUrl","panel.thumbnailImageUrl","thumbnail_image_url","panel.thumbnail_image_url"]}><input className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} /></SaveErrorField></Field>
+                ) : null}
+
+                <span className={styles.pickLabel}>{`ボタン（最大 ${MAX_ACTIONS} つ）`}</span>
+                <div className={own.buttonHead} aria-hidden="true">
+                  <span className={own.colLabel}>ボタンの文字</span>
+                  <span className={own.colKind}>押したら</span>
+                  <span>中身</span>
+                </div>
+                {panel.actions.map((action, ai) => {
+                  const setAction = (patch: Partial<typeof action>) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === ai ? { ...a, ...patch } : a)) })
+                  return (
+                    <div key={ai} className={own.buttonBlock}>
+                    <SettingsFormRow layout="columns" {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
+                      <SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField>
+                      <div className={own.colTap}>
+                      <SaveErrorField names={["action"]}><TapActionField
+                        name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
+                        kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
+                        allowExtras accountId={hqHost ? null : folderAccountId} extrasError={fields.error(`card-${selectedIndex}-button-${ai}`)}
+                        value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId, tapExtras: action.tapExtras }}
+                        onChange={(patch) => setAction({
+                          ...(patch.kind !== undefined ? { kind: patch.kind as ChoiceKind } : {}),
+                          ...(patch.uri !== undefined ? { uri: patch.uri } : {}),
+                          ...(patch.text !== undefined ? { text: patch.text } : {}),
+                          ...(patch.refId !== undefined ? { formId: patch.refId } : {}),
+                          ...(patch.tapExtras !== undefined ? { tapExtras: patch.tapExtras } : {}),
+                        })}
+                        kinds={choiceKindOptions({ host: hqHost, current: action.kind }).filter(isTapActionKind)}
+                        extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
+                        renderBody={(kind) => kind !== 'action' ? undefined : (
+                          <InlineActionList actions={action.actions} {...actionOptions}
+                            onChange={next=> update(selectedIndex, { actions: panel.actions.map((a, j) => j === ai ? { ...a, actions: next } : a) })}/>
+                        )}
+                        scope={hqHost ? 'hq' : 'shop'}
+                        hasLiff={Boolean(liffId)}
+                        liffSettingsHref={folderAccountId ? `/accounts/detail?id=${encodeURIComponent(folderAccountId)}` : '/accounts'}
+                        sources={tapSources}
+                        textMax={MESSAGE_TEXT_MAX}
+                      /></SaveErrorField>
+                      </div>
+                      {panel.actions.length > 1 ? (
+                        <button type="button" className={own.iconButton} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}>
+                          <Trash2 className={own.icon} aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </SettingsFormRow>
+                    <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
+                    </div>
+                  )
+                })}
+                <div className={own.toolRow}>
+                  <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
+                  <span className={own.spacer} />
+                  <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS} 枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={15} aria-hidden="true" />このカードを複製</Button>
+                  <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>
+                </div>
+                <p className={own.info} title="画像は横1024 × 縦678pxを推奨。本文はタイトルか画像があると60文字、両方なければ120文字までです。"><TriangleAlert className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
+              </Card>
+            ) : null}
+
+            {/* 絵に無いが今ある設定：押せる回数（「動きを実行する」ボタンだけが対象）。統括の入口は URL だけなので出さない。 */}
+            {hqHost || inline ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-limit">
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle} id="cr-limit">押せる回数</h2>
+                <p className={styles.note}>「動きを実行する」ボタンだけが対象です。URLを開くボタンはLINEの外へ出るので数えられません。</p>
+              </div>
+              <div className={styles.seg} role="radiogroup" aria-label="押せる回数">
+                <button type="button" role="radio" aria-checked={tapLimitMode === 'none'} className={styles.segButton} onClick={() => setTapLimitMode('none')}>何度でも押せる</button>
+                <button type="button" role="radio" aria-checked={tapLimitMode === 'once'} className={styles.segButton} onClick={() => setTapLimitMode('once')}>1人につき1回だけ</button>
+              </div>
+              {tapLimitMode === 'once' ? (
+                <Field label="2回目に押されたときの返事空なら何も返さない"><SaveErrorField names={["tapLimitText","tap_limit_text"]}><input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} /></SaveErrorField></Field>
+              ) : null}
+            </Card>}
+          </>
+        )}
+      </TemplateEditFrame>
+
+      <ConfirmDialog
+        open={publishCheck !== null}
+        title="この内容を公開しますか？"
+        description={`このテンプレートは ${publishCheck?.usageCount ?? 0}か所で使われています。公開すると、使っている場所へ新しい内容が届きます。`}
+        confirmLabel="公開する"
+        busy={publishing}
+        error={publishError || undefined}
+        designNode="cuR8I"
+        onConfirm={async () => {
+          if (!publishCheck) return
+          setPublishing(true)
+          setPublishError('')
+          try {
+            if (await publishNow(publishCheck.id)) { setPublishCheck(null); notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', publishCheck.id)) } }
+          } finally {
+            setPublishing(false)
+          }
+        }}
+        onCancel={() => setPublishCheck(null)}
+      />
+      <MediaPickerDialog
+        open={pickerOpen}
+        accountId={folderAccountId}
+        kind="image"
+        onClose={() => setPickerOpen(false)}
+        onSelect={(item: MediaItem) => { update(selectedIndex, { thumbnailImageUrl: item.url }); setPickerOpen(false) }}
+      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="カルーセルの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </></SaveErrorScope>
+  )
+}
+
+/** `host` を渡すと統括のテンプレートの入口から使う（template-edit/host.ts）。ボタンは URL を開く・テキストを送るだけ。 */
+export default function CarouselV8({ host }: { host?: TemplateEditHost } = {}) {
+  return (
+    <Suspense fallback={<ListState kind="loading" title="カルーセルを読み込んでいます" />}>
+      <Carousel host={host} />
+    </Suspense>
+  )
+}

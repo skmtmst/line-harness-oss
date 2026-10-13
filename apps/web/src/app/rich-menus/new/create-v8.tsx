@@ -1887,3 +1887,1033 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onReload={acceptLatestAndContinue}
             />
           </div>
+        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
+          !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
+            <>
+              <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
+              {step === 'publish' ? (
+                <>
+                  <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
+                    下書きを保存
+                  </Button>
+                  <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配るアカウントを選べます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
+                    保存する
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" disabled={busy || !host.canOperate} busy={saving} busyLabel="保存中…" onClick={() => void hostSave(false)}>
+                    下書きを保存
+                  </Button>
+                  <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
+                    <ArrowRight size={14} aria-hidden="true" />
+                    {nextLabel(step as Exclude<StepKey, 'publish'>)}
+                  </Button>
+                </>
+              )}
+            </>
+          ) : <>
+            <Button href="/rich-menus">キャンセル</Button>
+            {step === 'publish' ? (
+              done ? (
+                <Button href="/rich-menus">一覧へ戻る</Button>
+              ) : (
+                <>
+                  <Button type="button" disabled={busy || !canOperate} busy={saving} busyLabel="保存中…" onClick={() => void saveDraft()}>
+                    下書きのまま保存
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={
+                      busy ||
+                      !canOperate ||
+                      (checks !== null && publishPlan.mode === 'now' && !checksAllOk) ||
+                      (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
+                    }
+                    title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
+                    busy={publishing || saving}
+                    busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
+                    onClick={() => void handlePublishSubmit()}
+                  >
+                    {publishPlan.mode === 'now' ? <Send size={14} aria-hidden="true" /> : <CalendarClock size={14} aria-hidden="true" />}
+                    {publishPlan.mode === 'now' ? '公開する' : '予約する'}
+                  </Button>
+                </>
+              )
+            ) : (
+              <>
+                <Button type="button" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void saveDraft()}>
+                  下書きを保存
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={busy}
+                  busy={saving}
+                  busyLabel="保存中…"
+                  onClick={() => void goNext()}
+                >
+                  {/* 板 `JeINq`：絵は印→文字の順（印が左・文字は絵x894）。 */}
+                  <ArrowRight size={14} aria-hidden="true" />
+                  {NEXT_LABEL[step as Exclude<StepKey, 'publish'>]}
+                </Button>
+              </>
+            )}
+          </>
+        } status={dirty ? '未保存の変更があります' : undefined} >
+      {host?.notice}
+
+      {error ? (
+        <Notice
+          tone="danger"
+          message={error}
+          className="mb-1"
+          action={
+            loadFailedKinds.length > 0 && !isForbidden(loadError) ? (
+              <Button type="button" onClick={() => { setError(null); return load() }} busyLabel="処理中…">
+                もう一度読み込む
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : null}
+      {notice ? <Notice tone="success" message={notice} className="mb-1" onClose={() => setNotice('')} /> : null}
+      {candidatePruneNotice ? <Notice tone="warn" message={candidatePruneNotice} onClose={() => setCandidatePruneNotice('')} /> : null}
+
+
+          {step === 'shape' ? renderShape() : null}
+          {step === 'buttons' ? renderButtons() : null}
+          {step === 'audience' ? renderAudience() : null}
+          {step === 'publish' ? renderPublish() : null}
+
+      {host ? null : <MediaPickerDialog
+        open={mediaPickerOpen}
+        accountId={accountId}
+        kind="image"
+        title="リッチメニューの画像を選ぶ"
+        description={
+          tabCount > 0 || pages.length > 1
+            ? `タブ${imagePickTarget + 1}「${group ? pages[imagePickTarget]?.name ?? '' : tabNameAt(imagePickTarget)}」の画像として登録します。`
+            : group
+              ? '最初に見せるページの画像として登録します。'
+              : '作成したメニューの最初に見せるページへ登録します。'
+        }
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={handlePickedMedia}
+      />}
+
+      {/* ①でタブを減らすとき：消えるタブの画像・動きを黙って捨てない。行き先にされているタブは消せない。 */}
+      {(() => {
+        const next = pendingTabCount
+        const removed = next === null ? [] : group ? pages.slice(next + 1) : []
+        const blockers = next === null || !group ? [] : removePageBlockers(removed, pages.slice(0, next + 1))
+        const names = next === null
+          ? []
+          : group
+            ? removed.map((p, i) => `タブ${next + 2 + i}「${p.name}」`)
+            : Array.from({ length: tabCount - next }, (_, i) => `タブ${next + 2 + i}「${tabNameAt(next + 1 + i)}」`)
+        return (
+          <ConfirmDialog
+            open={next !== null}
+            title={blockers.length > 0 ? 'タブの数をいま減らせません' : `タブの数を${next === 0 ? emptyValue('none') : `${(next ?? 0) + 1}つ`}にしますか？`}
+            description={
+              blockers.length > 0
+                ? '消えるタブを行き先にしている切替ボタンがあります。理由を直してから、もう一度お試しください。'
+                : `${names.join('・')}の画像と面の動きは消えます。`
+            }
+            confirmLabel="タブを減らす"
+            destructive
+            // 減らせないときは押し口ごと出さない。
+            onConfirm={blockers.length === 0 && next !== null ? () => applyTabCount(next) : undefined}
+            onCancel={() => setPendingTabCount(null)}
+          >
+            {blockers.length > 0 ? (
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {blockers.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </ConfirmDialog>
+        )
+      })()}
+
+
+      <Dialog open={imageGuideOpen} title="画像の作り方" cancelLabel="閉じる" onCancel={() => setImageGuideOpen(false)}>
+        <div className="space-y-3 text-sm">
+          <p>大きい画像は2500×1686px、小さい画像は2500×843pxで作ります。PNGかJPEGで、1MB以下にしてください。</p>
+          <p>選んだ面の分け方に合わせて文字や絵を置きます。大切な文字や絵は面の区切りから離して、押す場所が分かるようにしてください。</p>
+          <p>手順②で画像の上から面を選び、押したときの動きを設定します。公開前に「LINEでの見え方」と実際のスマートフォンで確認してください。</p>
+        </div>
+      </Dialog>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
+      <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
+        confirmLabel="順番を変える" onConfirm={() => {
+          setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))
+          setPriorityOpen(false)
+        }} onCancel={() => setPriorityOpen(false)}>
+        <Field label="出す順番" htmlFor="rm-edit-priority"><NumberInput numericText id="rm-edit-priority" inputMode="numeric" min={1} step={1} unit="番目" value={priorityInput} onChange={event => setPriorityInput(event.target.value)} /></Field>
+      </Dialog>
+      <ConfirmDialog
+        open={publishConfirmOpen}
+        title="公開の確認"
+        description={publishConfirmNote}
+        confirmLabel="公開する"
+        busy={publishing || saving}
+        onConfirm={() => { setPublishConfirmOpen(false); void handlePublish() }}
+        onCancel={() => setPublishConfirmOpen(false)}
+      />
+
+      {/* ★V8 `r8dGXT`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
+      <Dialog
+        open={compareOpen}
+        title="違いを比べる"
+        description="ほかの人が保存した最新の内容と、あなたが直している内容を比べます。"
+        cancelLabel="閉じる"
+        onCancel={() => setCompareOpen(false)}
+        footer={
+          <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
+            最新を読み込んで続ける
+          </Button>
+        }
+      >
+        <VersionCompare before={latestSummary} after={currentSummary} />
+      </Dialog>
+    </CreatePage>
+    </fieldset></SaveErrorScope>
+  )
+
+  /* ======== 手順①：形と画像 ======== */
+  function renderShape() {
+    const dims = RICH_MENU_DIMENSIONS[size]
+    /* タブの数（ページの数）。作った後はページの数、作る前は①で選んだ数。 */
+    const slotCount = group ? pages.length : tabCount + 1
+    const hasTabs = slotCount > 1
+
+    return (
+      <>
+        <Card variant="form" gap="normal">
+          <SectionHeader title="名前とフォルダ" />
+          <SettingsFormRow layout="name-folder">
+            <Field requirement={fields.requirement('name')} label="メニュー名（友だちには見えません）" htmlFor="rm-name" error={fields.error('name')}>
+              <SaveErrorField names={["name"]}><TextInput {...fields.bind('name')} id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：通常メニュー（会員向け）" invalid={fields.invalid('name')} /></SaveErrorField>
+            </Field>
+            <Field label="フォルダ">
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
+                folders={folders.map(folderById)} size="full"
+                colors
+                onCreate={!canOperate
+                  ? undefined
+                  : host
+                    ? (host.createFolder
+                      ? folderCreator(async (name, color) => ({ success: true as const, data: await host.createFolder!(name, color) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
+                      : undefined)
+                    // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
+                    : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} /></SaveErrorField>
+            </Field>
+          </SettingsFormRow>
+          <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" requirement={fields.requirement('chatbar')} error={fields.error('chatbar')}>
+            <SaveErrorField names={["chatBarText","chat_bar_text"]}><TextInput {...fields.bind('chatbar')} id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => setChatBarText(e.target.value)} placeholder="メニュー" invalid={fields.invalid('chatbar')} /></SaveErrorField>
+          </Field>
+        </Card>
+
+        <Card variant="form" gap="normal">
+          <SectionHeader title="大きさと切替タブ" />
+          <SaveErrorField names={["rich-menu-size","value","opt.value","size"]}><RadioCardGroup legend="大きさ" className="grid grid-cols-2 gap-3">
+            {SIZE_OPTIONS.map((opt) => <RadioCard key={opt.value} name="rich-menu-size" value={opt.value}
+              title={`${opt.label} ${opt.dims}`} note={opt.hint} icon={<opt.icon size={16} aria-hidden="true" />} checked={size === opt.value}
+              disabled={locked}
+              onChange={() => {
+                setSize(opt.value)
+                const first = V8_LAYOUT_KEYS[opt.value][0]
+                if (first) setTemplateKey(first)
+              }} />)}
+          </RadioCardGroup></SaveErrorField>
+          {locked ? (
+            <p className={styles.fieldHint}>形は下書きを作ったあとは変えられません。別の形で作るときは、新しく作り直してください。</p>
+          ) : null}
+          <div className={styles.segRow}>
+            <span className={styles.segLabel}>切替タブの数</span>
+            <SaveErrorField names={["length","pages.length","tabCount","MAX_TAB_PAGES"]}><SegmentedControl
+              aria-label="切替タブの数"
+              options={TAB_COUNT_OPTIONS}
+              value={String(Math.min(group ? pages.length - 1 : tabCount, MAX_TAB_PAGES - 1))}
+              onChange={(v) => requestTabCount(Number(v))}
+              disabled={busy}
+            /></SaveErrorField>
+            <span className={styles.segHint}>タブで別のメニューへ移れます</span>
+          </div>
+          {/* 採用案 K6Ot7O：タブの数だけ名前の欄（トーク画面のタブに出る名前）。 */}
+          {hasTabs ? (
+            <div className={styles.tabNameGrid}>
+              {Array.from({ length: slotCount }, (_, i) => (
+                <Field key={i} label={`タブ${i + 1}の名前（トーク画面のタブに出ます）`} htmlFor={`rm-tab-name-${i}`}>
+                  <SaveErrorField names={[`pages.${i}.name`, `tabNames.${i}`]}><TextInput
+                    id={`rm-tab-name-${i}`}
+                    maxLength={14}
+                    value={group ? pages[i]?.name ?? '' : tabNames[i] ?? defaultTabName(i, tabCount)}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (group) {
+                        const page = pages[i]
+                        if (page) updatePage(page.id, { name: value })
+                        return
+                      }
+                      setTabNames((prev) => {
+                        const next = Array.from({ length: tabCount + 1 }, (_, k) => prev[k] ?? defaultTabName(k, tabCount))
+                        next[i] = value
+                        return next
+                      })
+                    }}
+                  /></SaveErrorField>
+                </Field>
+              ))}
+            </div>
+          ) : null}
+        </Card>
+
+        {/* 面の分け方 */}
+        <Card variant="form" gap="normal">
+          <div className={`flex flex-col ${styles.stackCompact}`}>
+            <SectionHeader title="面の分け方" />
+            <p className={styles.cardNote}>押せるところをいくつに分けるか。あとで区切り直せます</p>
+          </div>
+          <LayoutPicker
+            value={templateKey} onChange={setTemplateKey} disabled={locked}
+            preview={size === 'compact' ? 'compact-menu' : 'menu'}
+            options={shownLayouts.map((item) => ({
+              value: item.key, label: V8_LAYOUT_LABEL[item.key] ?? item.label,
+              areas: item.areas.map((area, index) => ({
+                label: String.fromCharCode(65 + index),
+                x: area.x / RICH_MENU_DIMENSIONS[size].width * 100,
+                y: area.y / RICH_MENU_DIMENSIONS[size].height * 100,
+                width: area.w / RICH_MENU_DIMENSIONS[size].width * 100,
+                height: area.h / RICH_MENU_DIMENSIONS[size].height * 100,
+              })),
+            }))}
+          />
+        </Card>
+
+        {/* 画像（採用案 K6Ot7O：タブがあるときはタブごとに1枚、枠を横に並べる）。 */}
+        <Card variant="form" gap="normal">
+          <div className={`flex flex-col ${styles.stackCompact}`}>
+            <SectionHeader title={hasTabs ? '画像（タブごとに1枚）' : '画像'} />
+            <p className={styles.cardNote}>
+              {dims.width}×{dims.height}px・PNG か JPEG・1MB まで{hasTabs ? '。タブの数だけ入れます' : ''}
+            </p>
+          </div>
+          {hasTabs ? (
+            <div className={styles.tabImageGrid}>
+              {Array.from({ length: slotCount }, (_, i) => renderTabImageSlot(i))}
+            </div>
+          ) : (
+            renderSingleImage()
+          )}
+        </Card>
+      </>
+    )
+  }
+
+  /** ①の画像の枠（タブの順）に入っている画像。作る前は選んだもの、作った後はページの画像。 */
+  function slotImage(index: number): { src: string; name: string; dims: { w: number; h: number } | null; kb: number | null; removable: boolean } | null {
+    if (!group) {
+      const image = pendingImages[index]
+      if (!image) return null
+      if (image.media && accountId) {
+        return {
+          src: api.media.contentUrl(image.media.id, accountId),
+          name: image.media.filename,
+          dims: image.media.width && image.media.height ? { w: image.media.width, h: image.media.height } : null,
+          kb: image.media.sizeBytes !== undefined ? Math.round(image.media.sizeBytes / 1024) : null,
+          removable: true,
+        }
+      }
+      if (image.url && image.file) {
+        return { src: image.url, name: image.file.name, dims: image.dims, kb: Math.round(image.file.size / 1024), removable: true }
+      }
+      return null
+    }
+    const page = pages[index]
+    if (!page?.imageR2Key) return null
+    return {
+      src: host ? host.imageUrl(page.imageR2Key) : `${api.richMenuGroups.imageUrl(page.imageR2Key)}?v=${imageVersion}`,
+      name: '登録した画像',
+      dims: null,
+      kb: null,
+      removable: false,
+    }
+  }
+
+  /*
+   * 画像の枠は共通の「画像を追加する所」（MediaSlot・Z7vd2・B-128）。
+   * 入れ方は今のまま（ファイル・登録メディア）。作る前は選んだファイルを手元に置き、作った後はページへ送る（handlePickedFile）。
+   */
+  function renderSingleImage() {
+    const dims = RICH_MENU_DIMENSIONS[size]
+    const image = slotImage(0)
+    const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null
+    const canPick = Boolean(accountId) || Boolean(host)
+    return (
+      <>
+        <div className={styles.imageRow}>
+          <div className={styles.imageSlot}>
+            <SaveErrorField names={["src","image?.src"]}><MediaSlot
+              size="compact"
+              title="画像を追加"
+              previewAlt={image ? `選択中の画像: ${image.name}` : undefined}
+              value={image?.src ?? null}
+              accept="image/png,image/jpeg"
+              maxBytes={1 * 1024 * 1024}
+              aspectRatio={`${dims.width} / ${dims.height}`}
+              disabled={!canPick || busy}
+              removable={Boolean(image?.removable)}
+              onFile={(file) => handlePickedFile(file, 0)}
+              onRemove={() => clearPendingImage(0)}
+              onMediaPick={host ? undefined : accountId ? () => { setImagePickTarget(0); setMediaPickerOpen(true) } : undefined}
+            /></SaveErrorField>
+          </div>
+          <div className={styles.imageMeta}>
+            {image ? (
+              <>
+                <span className="font-semibold text-ink">{image.name}</span>
+                <span className={imageOk === true ? styles.imageMetaOk : undefined}>
+                  {image.dims ? `${image.dims.w}×${image.dims.h}・` : ''}
+                  {image.kb !== null ? `${image.kb}KB` : ''}
+                  {imageOk === true ? '・大きさは合っています' : imageOk === false ? '・大きさが合いません' : ''}
+                </span>
+              </>
+            ) : null}
+            <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
+              <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
+            </button>
+          </div>
+        </div>
+        {imageOk === false ? (
+          <p className={styles.fieldError} role="alert">
+            画像の大きさが合いません。{dims.width}×{dims.height}px の画像を選んでください。
+          </p>
+        ) : null}
+      </>
+    )
+  }
+
+  /** タブがあるときの画像の枠（タブ〇「名前」の見出し付き）。 */
+  function renderTabImageSlot(index: number) {
+    const dims = RICH_MENU_DIMENSIONS[size]
+    const image = slotImage(index)
+    const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null
+    const tabName = group ? pages[index]?.name ?? '' : tabNameAt(index)
+    const unsaved = Boolean(group && !host && pages[index]?.id.startsWith('tmp-'))
+    const canPick = (Boolean(accountId) || Boolean(host)) && !unsaved && !busy
+    return (
+      <div key={index} className={styles.tabImageSlot}>
+        <span className={styles.tabImageHead}>{`タブ${index + 1}「${tabName}」`}</span>
+        <SaveErrorField names={["src","image?.src"]}><MediaSlot
+          size="compact"
+          title={`タブ${index + 1}の画像を追加`}
+          previewAlt={image ? `タブ${index + 1}の画像: ${image.name}` : undefined}
+          value={image?.src ?? null}
+          accept="image/png,image/jpeg"
+          maxBytes={1 * 1024 * 1024}
+          aspectRatio={`${dims.width} / ${dims.height}`}
+          disabled={!canPick}
+          removable={Boolean(image?.removable)}
+          onFile={(file) => handlePickedFile(file, index)}
+          onRemove={() => clearPendingImage(index)}
+          onMediaPick={host || !accountId ? undefined : () => { setImagePickTarget(index); setMediaPickerOpen(true) }}
+        /></SaveErrorField>
+        {unsaved ? <p className={styles.fieldHint}>下書きを保存すると、このタブの画像を入れられます。</p> : null}
+        {imageOk === false ? (
+          <p className={styles.fieldError} role="alert">
+            大きさが合いません。{dims.width}×{dims.height}px の画像を選んでください。
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+
+  /* ======== 手順②：ボタンの動き ======== */
+  function renderButtons() {
+    if (!activePage) return <div className={styles.stateCard}>ページがありません</div>
+    const activeIndex = activePage.areas.findIndex((a) => a.id === selectedAreaId)
+    const areaPages = pages
+      .filter((p) => host || !p.id.startsWith('tmp-'))
+      .map((p) => ({ id: p.id, name: p.name }))
+
+    /*
+     * 採用案 K6Ot7O：切替タブは①で決め、②は「直すタブ」の切り替えだけ（タブがないときは出さない）。
+     * 採用案 Wmch0：画像（幅 320）を左、面の一覧を右、その下に選んだ面の動き（共通部品 TapAreaEditor）。
+     */
+    const tabSwitch = pages.length > 1 ? (
+      <div className={styles.tabSwitchRow}>
+        <span className={styles.segLabel}>直すタブ</span>
+        <SaveErrorField names={["id","activePage.id","activePageId"]}><SegmentedControl
+          aria-label="直すタブ"
+          size="compact"
+          options={pages.map((p, i) => ({ value: p.id, label: `タブ${i + 1}「${p.name}」` }))}
+          value={activePage.id}
+          onChange={(id) => {
+            setActivePageId(id)
+            setSelectedAreaId(pages.find((p) => p.id === id)?.areas[0]?.id ?? null)
+          }}
+        /></SaveErrorField>
+        <Button type="button" variant="text" className={styles.tabSwitchLink} onClick={() => goToStep('shape')}>
+          タブの数・名前・画像は ①形と画像 で変えます
+        </Button>
+      </div>
+    ) : null
+
+    return (
+      <TapAreaEditor
+        head={tabSwitch}
+        description="面を押すと、下に動きを決める欄が出ます。線を動かして区切り直せます"
+        items={activePage.areas.map((area, i) => ({
+          id: area.id,
+          name: areaDisplayName(area, i),
+          summary: areaActionSummary(area) || null,
+          errorCount: fields.countIn(`area-${area.id}`),
+        }))}
+        selectedId={selectedAreaId}
+        onSelect={setSelectedAreaId}
+        emptyNote="画像の上をドラッグすると、面を足せます。"
+        canvas={
+          <CanvasEditor
+            appearance="v8"
+            showAreaList={false}
+            showTools
+            showZoom={false}
+            maxWidth={320}
+            areas={activePage.areas}
+            size={group?.size ?? size}
+            imageUrl={pageImageUrl}
+            selectedAreaId={selectedAreaId}
+            onSelectArea={setSelectedAreaId}
+            onAddArea={(area) => addArea(activePage.id, area)}
+            onUpdateArea={(id, patch) => updateArea(activePage.id, id, patch)}
+            onDeleteArea={(id) => deleteArea(activePage.id, id)}
+          />
+        }
+        detail={
+          selectedArea && activeIndex >= 0 ? (
+            <div {...fields.bind(`area-${selectedArea.id}`)}>
+            <Card padding="roomy" layout="vertical">
+              <SectionHeader title={`面 ${String.fromCharCode(65 + activeIndex)}「${areaDisplayName(selectedArea, activeIndex)}」の動き`} />
+              <AreaProperties
+                area={selectedArea}
+                pages={areaPages}
+                tags={tags}
+                templates={templates}
+                forms={forms}
+                trackedLinks={trackedLinks}
+                taps={null}
+                onUpdate={(patch) => updateArea(activePage.id, selectedArea.id, patch)}
+                onDelete={() => deleteArea(activePage.id, selectedArea.id)}
+                showManagementDetails={false}
+                allowedIntents={host ? [...HQ_RICH_MENU_INTENTS] : NEW_MENU_INTENTS_WITH_SWITCH}
+                error={fields.error(`area-${selectedArea.id}`)}
+              />
+              <div>
+                <Button type="button" variant="text" onClick={() => deleteArea(activePage.id, selectedArea.id)}>
+                  この面を消す
+                </Button>
+              </div>
+            </Card>
+            </div>
+          ) : (
+            <Card padding="roomy" layout="vertical">
+              <p className={styles.cardNote}>上の画像で面を押すと、ここで動きを決められます。</p>
+            </Card>
+          )
+        }
+      />
+    )
+  }
+
+  /* ======== 手順③：誰に出すか ======== */
+  function renderAudience() {
+    return (
+      <>
+        {/* 出す相手 */}
+        <Card variant="form" gap="normal">
+          <SectionHeader title="出す相手" />
+          <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
+            <RadioCard
+              name="audience"
+              value="all"
+              checked={audience === 'all'}
+              onChange={() => setAudience('all')}
+              title="すべての友だち"
+              icon={<Users aria-hidden="true" />}
+              note="ほかの出し分けに当てはまらない人に出る（既定）"
+            />
+            <RadioCard
+              name="audience"
+              value="targeted"
+              checked={audience === 'targeted'}
+              onChange={() => {
+                setAudience('targeted')
+                // 既定は「いちばん下」。0 は先頭の順番を意味するので、
+                // すでにある出し分けのあとに置く（編集で前に持っていける）。
+                if (targetingPriority === 0 && targetedMenus.length > 0) {
+                  setTargetingPriority(targetedMenus.length)
+                }
+              }}
+              title="条件に当てはまる友だちだけ"
+              icon={<CircleHelp aria-hidden="true" />}
+              note={host ? '条件は配った先のアカウントで決めます' : 'タグ・友だち情報などで絞る'}
+            />
+          </RadioCardGroup></SaveErrorField>
+
+          {host ? (
+            <div className={styles.infoBand}>
+              <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+              <span>
+                {audience === 'all'
+                  ? '配ると、各アカウントで既定のメニューにするかどうかを選べます。'
+                  : '配った先では下書きのまま届きます。どの友だちに出すかは、各アカウントで条件を決めます。'}
+              </span>
+            </div>
+          ) : audience === 'all' ? (
+            <div className={styles.infoBand}>
+              <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+              <span>
+                公開すると LINE の既定のメニューになります。
+                {currentDefaultMenu
+                  ? `いまの既定「${currentDefaultMenu.name}」と入れ替わります。`
+                  : 'いま既定のメニューはありません。'}
+              </span>
+            </div>
+          ) : audience === 'none' ? (
+            <p className={styles.cardNote}>このメニューはLINEへの登録だけです。出す相手は一覧の「表示先」で決めてください。</p>
+          ) : (
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>どんな人に出すか</span>
+              <fieldset disabled={aggregateOnly} className="contents">
+              <ConditionBuilder
+                value={targetingCondition}
+                onChange={setTargetingCondition}
+                label="このメニューを出す相手"
+                showCount={false}
+              />
+              </fieldset>
+              {editGroupId && !conditionEmpty ? (
+                <p className={styles.fieldHint}>{conditionUnsaved ? `条件 ${conditionCount}件（未保存）` : `保存済み条件 ${conditionCount}件`}</p>
+              ) : null}
+              {conditionEmpty ? (
+                <p className={styles.fieldHint}>条件が空のままだと、公開しても誰にも出ません。</p>
+              ) : null}
+            </div>
+          )}
+        </Card>
+
+        {/* 出す順番（統括：配った先の出す順番。小さいほど先） */}
+        {host ? (
+          <Card variant="form" gap="normal">
+            <div className={`flex flex-col ${styles.stackCompact}`}>
+              <SectionHeader title="出す順番" />
+              <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます。配った先の順番として届きます</p>
+            </div>
+            <ol className={styles.orderList}>
+              <li className={`${styles.orderRow} ${styles.orderRowSelf}`}>
+                <span className={styles.orderNum}>{targetingPriority + 1}</span>
+                <span className={styles.orderName}>{`${name || '（名前未入力）'}（このメニュー${audience === 'all' ? '・既定' : ''}）`}</span>
+              </li>
+            </ol>
+            <Field label="順番（1 がいちばん先）" htmlFor="rm-hq-order">
+              <SaveErrorField names={["targetingPriority","displayOrder","priority","targeting_priority"]}><NumberInput numericText id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
+                const next = Number(e.target.value.replace(/[^0-9]/g, ''))
+                setTargetingPriority(Number.isFinite(next) && next > 0 ? Math.min(next, 999) - 1 : 0)
+              }} /></SaveErrorField>
+            </Field>
+          </Card>
+        ) : null}
+        {host ? null : <Card variant="form" gap="normal">
+          <div className={`flex flex-col ${styles.stackCompact}`}>
+            <SectionHeader title="出す順番" actions={editGroupId && canOperate ? <Button type="button" variant="text" size="inline" onClick={() => {
+              setPriorityInput(String(targetingPriority + 1)); setPriorityOpen(true)
+            }}>順番を変える</Button> : undefined} />
+            <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます</p>
+          </div>
+          {orderRows.length > 0 ? (
+            <ol className={styles.orderList}>
+              {orderRows.map((row, i) => (
+                <li key={row.id} className={`${styles.orderRow} ${row.isSelf ? styles.orderRowSelf : ''}`}>
+                  <span className={styles.orderNum}>{i + 1}</span>
+                  <span className={styles.orderName}>{row.label}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className={styles.cardNote}>ほかの出し分けメニューはありません。</p>
+          )}
+          {audience === 'targeted' ? (
+            <p className={styles.fieldHint}>新しく作るメニューはいちばん下に置きます。前に出したいときは、あとで編集画面の「出す順番」から変えられます。</p>
+          ) : null}
+        </Card>}
+
+        {/* トークを開いたとき（統括のひな形は持たない。配った先で決める） */}
+        {host ? null : <Card variant="form" gap="normal">
+          <SectionHeader title="トークを開いたとき" />
+          <div className={styles.segRow}>
+            <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
+            <SaveErrorField names={["defaultOpen"]}><SegmentedControl
+              aria-label="トークを開いたときのメニュー"
+              options={[
+                { value: 'open', label: '開いておく' },
+                { value: 'closed', label: '閉じておく' },
+              ]}
+              value={defaultOpen ? 'open' : 'closed'}
+              onChange={(v) => setDefaultOpen(v === 'open')}
+            /></SaveErrorField>
+          </div>
+        </Card>}
+      </>
+    )
+  }
+
+  /* ======== 手順④：公開 ======== */
+  function renderPublish() {
+    if (host) {
+      return (
+        <>
+          {host.distribute}
+          <div className={styles.infoBand}>
+            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+            <span>配ると、選んだアカウントにリッチメニューが下書きとして届きます。既定のメニューにするか・LINE に出すかは、各アカウントで決めます。</span>
+          </div>
+        </>
+      )
+    }
+    const timingIsScheduled = publishPlan.mode !== 'now'
+    if (done) {
+      return (
+        <Card variant="form" gap="normal">
+          <h2 className={styles.cardTitle}>
+            {done === 'published' ? 'LINEへの登録が終わりました' : '公開予約を受け付けました'}
+          </h2>
+          <p className={styles.cardNote}>
+            {done === 'published'
+              ? '公開のようす・履歴は、リッチメニュー一覧の「公開中」から見られます。'
+              : '予約の時点の内容で公開します。予約の確認・取り消しは編集画面からできます。'}
+          </p>
+          <div className={styles.pageTools}>
+            <Button href="/rich-menus" variant="primary">一覧へ戻る</Button>
+            {group ? <Button href={`/rich-menus/edit?id=${group.id}`}>編集画面を開く</Button> : null}
+          </div>
+        </Card>
+      )
+    }
+    return (
+      <>
+        {/* いつ公開するか */}
+        <Card variant="form" gap="normal">
+          <SectionHeader title="いつ公開するか" actions={!host && group ? <RichMenuSchedules key={`${accountId}:${group.id}`} groupId={group.id} canOperate={canOperate && !aggregateOnly} restoreMenus={restoreMenus} /> : undefined} />
+          <SaveErrorField names={["timing","mode","publishPlan.mode","endEnabled","timingIsScheduled","publishPlan"]}><RadioCardGroup legend="いつ公開するか" className="grid grid-cols-2 gap-3">
+            <RadioCard
+              name="timing"
+              value="now"
+              checked={publishPlan.mode === 'now'}
+              onChange={() => {
+                // 「すぐ出す」に終わりは関係しない。選び直したら期間の設定も外す。
+                setEndEnabled(false)
+                updatePublishPlan({ ...publishPlan, mode: 'now' })
+              }}
+              title="すぐ公開する"
+              icon={<Zap aria-hidden="true" />}
+              note={<span title={nowNote}>確認が済んだらすぐLINEに出す</span>}
+            />
+            <RadioCard
+              name="timing"
+              value="scheduled"
+              checked={timingIsScheduled}
+              onChange={() => updatePublishPlan({ ...publishPlan, mode: endEnabled ? 'period' : 'scheduled' })}
+              title="日時を決めて公開する"
+              icon={<CalendarClock aria-hidden="true" />}
+              note={<span title="指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください">キャンペーンの始まりに合わせる</span>}
+            />
+          </RadioCardGroup></SaveErrorField>
+          {timingIsScheduled ? (
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>始める日時</span>
+              <SaveErrorField names={["startsAt","publishPlan.startsAt","starts_at","publish_plan.starts_at","publish_plan"]}><DateTimeField
+                value={publishPlan.startsAt}
+                onChange={(v) => updatePublishPlan({ ...publishPlan, startsAt: v })}
+                aria-label="公開を始める日時"
+              /></SaveErrorField>
+            </div>
+          ) : null}
+          {/* 板 `F4gELj`：終わりを決めるは枠の箱。上の行に題とトグル、下の行に「日時 に終わり、［戻す先］に戻す」。オフのときは入力を無効化。 */}
+          <div className={styles.endBox}>
+            <div className={styles.endHead}>
+              <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める <OptionalBadge /></span>
+              <SaveErrorField names={["endEnabled","end_enabled"]}><SettingCheckbox
+                label="終わりを決める"
+                checked={endEnabled}
+                onChange={(on) => {
+                  setEndEnabled(on)
+                  updatePublishPlan({
+                    ...publishPlan,
+                    mode: on ? 'period' : publishPlan.mode === 'now' ? 'now' : 'scheduled',
+                  })
+                }}
+              /></SaveErrorField>
+            </div>
+            <div className={styles.endRow}>
+              <span className={styles.endDate}>
+                <Field label="終わる日時" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
+                  value={publishPlan.endsAt}
+                  onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
+                  aria-label="終わる日時"
+                  disabled={!endEnabled}
+                /></SaveErrorField></Field>
+              </span>
+              <span>に終わり、</span>
+              <Field label="終わったらどうする" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
+                aria-label="終わったらどうする"
+                value={publishPlan.restoreGroupId}
+                onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
+                disabled={!endEnabled}
+                options={[
+                  { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
+                  ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
+                ]}
+              /></SaveErrorField></Field>
+              <span>に戻す</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* 公開の前の確認 */}
+        <Card variant="form" gap="normal">
+          <div className={`flex flex-col ${styles.stackCompact}`}>
+            <SectionHeader title="公開の前の確認" />
+            <p className={styles.cardNote} title={checks ? `ページ数: ${checks.pages.count} / ${checks.pages.max}${checks.pages.state === 'ng' ? '（上限を超えています）' : ''}` : undefined}>3つそろうと公開できます</p>
+          </div>
+          {checksError ? (
+            <p className={styles.fieldError}>確認の状態を読み込めませんでした。</p>
+          ) : checksLoading && !checks ? (
+            <p className={styles.cardNote}>読み込み中…</p>
+          ) : checks ? (
+            <ul className={styles.checkList}>
+              <li className={styles.checkRow}>
+                <CheckIcon state={checks.self.state} />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>自前の検査</p>
+                  <p className={styles.checkNote}>
+                    {checks.self.message ?? '未設定の面・重なり・画像・参照先・文字数・面の数'}
+                    {conditionUnsaved && !conditionEmpty ? '・人数は未保存の条件で計算しています' : ''}
+                  </p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => void loadChecks()} disabled={checksLoading} busy={checksLoading} busyLabel="確認中…">
+                    見直す
+                  </Button>
+                </span>
+              </li>
+              <li className={styles.checkRow}>
+                <CheckIcon state={checks.line.state} />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>LINE の検査</p>
+                  <p className={styles.checkNote}>
+                    {checks.line.message ?? '下の「見直す」でLINEの受付へ確かめます。'}
+                  </p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => void validateWithLine()} disabled={validating} busy={validating} busyLabel="確認中…">
+                    見直す
+                  </Button>
+                </span>
+              </li>
+              <li className={styles.checkRow}>
+                {checks.device.state === 'ok'
+                  ? <CheckIcon state="ok" />
+                  : <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />}
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>スマホの LINE で見た</p>
+                  <p className={styles.checkNote}>
+                    {checks.device.state === 'ok'
+                      ? `スマホの実機で確認済みです${checks.device.at ? `（${formatDateTime(checks.device.at)}）` : ''}。`
+                      : '管理画面の見本だけでは公開できません。スマホで見た担当者が押します'}
+                    {!host && group && (staffRole === 'owner' || staffRole === 'admin')
+                      ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} /> : null}
+                  </p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" onClick={() => void recordSeen()} disabled={recording} busy={recording} busyLabel="記録中…">
+                    <Smartphone size={15} aria-hidden /> スマホで見た
+                  </Button>
+                </span>
+              </li>
+            </ul>
+          ) : null}
+        </Card>
+        {/* 板 `F4gELj`：案内の帯は段の外（左の直下）。 */}
+        <div className={styles.infoBand}>
+            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+            <span title={publishEffectNote}>
+              {audience === 'all'
+                ? `公開すると、すべての友だちの既定のメニューが入れ替わります。`
+                : audience === 'none'
+                  ? 'LINEへの登録だけでは、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください。'
+                  : conditionEmpty
+                  ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
+                  : '公開すると、条件に当てはまる人に出来事のタイミングで順次出ます。'}
+              {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
+                ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
+                : ''}
+            </span>
+        </div>
+      </>
+    )
+  }
+
+  /* ======== 右の列 ======== */
+  /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
+  function renderLinePreview() {
+    return (
+      <LinePreview
+        accountName={host ? '公式アカウント' : selectedAccount?.name}
+        note="メニューの見え方の見本です。"
+        chatBarText={chatBarText}
+        richMenu={(
+          <MenuPreview
+            size={group?.size ?? size}
+            imageUrl={previewImageUrl}
+            areas={previewAreas}
+            pages={previewPages}
+            activePageId={previewPage?.id ?? activePage?.id ?? null}
+          />
+        )}
+      />
+    )
+  }
+
+  function renderRail(inDialog = false) {
+    return (
+      <>
+        {step === 'shape' ? (
+          <CreateSummaryCard
+            title={host ? '配る前に見ておくところ' : '公開前に見ておくところ'}
+            rows={[
+              {
+                key: 'actions',
+                label: 'ボタンの動き',
+                value: (
+                  <span className={configuredCount < totalAreaCount || totalAreaCount === 0 ? styles.summaryValueWarn : styles.summaryValueOk}>
+                    {totalAreaCount === 0
+                      ? '面がありません'
+                      : configuredCount === 0
+                        ? `${totalAreaCount}つとも未設定`
+                        : configuredCount < totalAreaCount
+                          ? `${totalAreaCount - configuredCount}つ未設定`
+                          : 'すべて設定済み'}
+                  </span>
+                ),
+              },
+              {
+                key: 'image',
+                label: '画像',
+                value: (
+                  <span className={previewImageUrl ? styles.summaryValueOk : styles.summaryValueWarn}>
+                    {previewImageUrl ? 'OK' : 'まだ選んでいません'}
+                  </span>
+                ),
+              },
+              {
+                key: 'tabs',
+                label: '切替タブ',
+                value: (group ? pages.length : tabCount + 1) > 1 ? `${group ? pages.length : tabCount + 1}ページ` : emptyValue('none'),
+              },
+            ]}
+          />
+        ) : null}
+
+        {step === 'buttons' && (!host || selectedArea) ? (
+          <CreateSummaryCard
+            title="押された回数（今月）"
+            rows={
+              selectedArea && activePage
+                ? [
+                    {
+                      key: selectedArea.id,
+                      label: `${String.fromCharCode(65 + activePage.areas.findIndex((a) => a.id === selectedArea.id))} ${areaDisplayName(selectedArea, activePage.areas.findIndex((a) => a.id === selectedArea.id))}`,
+                      value: host ? '—（配る前）' : '—（公開前）',
+                    },
+                  ]
+                : []
+            }
+          >
+            {selectedArea && activePage ? null : <p className={styles.cardNote}>面を選ぶと、ここに数が出ます。</p>}
+            <p className={styles.tapNote}>
+              「メニューを切り替える」「日時を選ぶ」などLINEの中で終わる動きは、押されたことがこちらに届きません。
+            </p>
+          </CreateSummaryCard>
+        ) : null}
+
+        {step === 'audience' && host ? (
+          <CreateSummaryCard
+            title="誰に出すか"
+            rows={[
+              { key: 'audience', label: '出す相手', value: audience === 'all' ? 'すべての友だち（既定）' : '配った先で店が決める' },
+              { key: 'order', label: '出す順番', value: `${targetingPriority + 1}番目` },
+            ]}
+          >
+            <p className={styles.cardNote}>出る人数は、配った先の友だちで決まります。</p>
+          </CreateSummaryCard>
+        ) : null}
+        {step === 'audience' && !host ? (
+          <CreateSummaryCard
+            title="出る人数"
+            rows={[
+              {
+                key: 'effective',
+                label: 'このメニューが出る人',
+                value: audience === 'targeted' && conditionEmpty ? '0人' : targetPreviewLoading ? '確認中…' : <MetricValue metric={targetPreview?.effective} />,
+              },
+              {
+                key: 'overlap',
+                label: '上の順番で別のメニューが出る人',
+                value: audience === 'targeted' && conditionEmpty ? '0人' : targetPreviewLoading ? '確認中…' : <MetricValue metric={targetPreview?.overlap} />,
+              },
+            ]}
+          >
+            {targetPreviewError ? <p className={styles.fieldError}>{targetPreviewError}</p> : null}
+            {conditionUnsaved && !conditionEmpty ? <p className={styles.cardNote}>人数はまだ保存していない条件で数えています</p> : null}
+          </CreateSummaryCard>
+        ) : null}
+
+        {step === 'publish' && host ? (
+          <CreateSummaryCard title="配ると" rows={host.distributeSummary} />
+        ) : null}
+        {step === 'publish' && !host ? (
+          <CreateSummaryCard
+            title="公開すると"
+            rows={[
+              ...(audience === 'all'
+                ? [
+                    {
+                      key: 'default',
+                      label: '既定のメニュー',
+                      value: `${currentDefaultMenu?.name ?? '（なし）'} → このメニュー`,
+                    },
+                  ]
+                : []),
+              {
+                key: 'audience',
+                label: '出る人',
+                value: audience === 'targeted' && conditionEmpty ? '0人' : targetPreviewLoading ? '確認中…' : <MetricValue metric={targetPreview?.effective} />,
+              },
+            ]}
+          >
+            {conditionUnsaved && !conditionEmpty ? <p className={styles.cardNote}>（未保存の条件）</p> : null}
+          </CreateSummaryCard>
+        ) : null}
+
+        {inDialog ? renderLinePreview() : <div className={`flex w-full min-w-0 flex-col ${styles.stackSection} ${styles.railPhone}`}>
+          {renderLinePreview()}
+        </div>}
+      </>
+    )
+  }
+}

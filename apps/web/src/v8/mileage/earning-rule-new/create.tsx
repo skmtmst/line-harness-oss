@@ -396,3 +396,103 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-amount">
         <CardHeader size="stacked" titleId="er-new-amount" title="何マイル付けるか" />
+          <div className={styles.field}>
+            <Field required label="マイル" htmlFor="er-amount" note="付け方：決まった数" error={errorOf('er-amount')}>
+              <SaveErrorField names={["amount"]}><NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} /></SaveErrorField>
+            </Field>
+          </div>
+      </Card>
+
+      <Card variant="form" aria-labelledby="er-new-who">
+        <CardHeader size="stacked" titleId="er-new-who" title="受け取る人・使えるまで" />
+        <SaveErrorField names={["beneficiary"]}><RadioCardGroup legend="受け取る人" className={styles.choiceRow}>
+          <RadioCard name="beneficiary" value="actor" checked={beneficiary === 'actor'} onChange={() => setBeneficiary('actor')}
+            icon={<User size={16} />} title="行動した本人" note="そのまま本人の残高に" />
+          <RadioCard name="beneficiary" value="referrer" checked={beneficiary === 'referrer'} onChange={() => setBeneficiary('referrer')}
+            icon={<Share2 size={16} />} title="紹介した人" note="この人を紹介した相手に" />
+        </RadioCardGroup></SaveErrorField>
+        <SaveErrorField names={["initial-status","initialStatus"]}><RadioCardGroup legend="使えるまで" className={styles.choiceRow}>
+          <RadioCard name="initial-status" value="available" checked={initialStatus === 'available'} onChange={() => setInitialStatus('available')}
+            icon={<Zap size={16} />} title="すぐ使える" note="その場で残高に入る" />
+          <RadioCard name="initial-status" value="pending" checked={initialStatus === 'pending'} onChange={() => setInitialStatus('pending')}
+            icon={<Hourglass size={16} />} title="確定待ち" note="確定するまで使えない" />
+        </RadioCardGroup></SaveErrorField>
+      </Card>
+
+      <Card variant="form" aria-labelledby="er-new-limit">
+        <CardHeader size="stacked" titleId="er-new-limit" title="付けすぎを防ぐ" />
+        <SettingsFormRow layout="columns">
+          <div className={styles.field}>
+            <span className={styles.pickLabel}>1日に数える回数</span>
+            <SaveErrorField names={["dailyCap","daily_cap"]}><Select
+              aria-label="1日に数える回数"
+              value={dailyCap}
+              onChange={(next) => setDailyCap(next)}
+              size="full"
+              options={DAILY_CAPS.map(([optionValue, label]) => ({ value: optionValue, label }))}
+            /></SaveErrorField>
+          </div>
+          <div className={styles.field}>
+            <span className={styles.pickLabel}>同じ対象の数えかた</span>
+            <SaveErrorField names={["uniqueMode","unique_mode"]}><Select
+              aria-label="同じ対象の数えかた"
+              value={uniqueMode}
+              onChange={(next) => setUniqueMode(next as typeof uniqueMode)}
+              size="full"
+              options={[
+                { value: '', label: '何度でも数える' },
+                { value: 'subject', label: '同じ対象は1回' },
+                { value: 'subjectPerDay', label: '同じ URL は1回' },
+              ]}
+            /></SaveErrorField>
+          </div>
+        </SettingsFormRow>
+        <SettingsFormRow layout="columns">
+          <div className={styles.field}>
+            <span className={styles.label}>開始日</span>
+            <SaveErrorField names={["validFrom","valid_from"]}><DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" /></SaveErrorField>
+          </div>
+          <div className={styles.field}>
+            <span className={styles.labelRow}>
+              <span className={styles.label}>終了日</span>
+              <span className={styles.optional}>任意</span>
+            </span>
+            <SaveErrorField names={["validUntil","valid_until"]}><DateField id="er-until" value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" invalid={Boolean(errorOf('er-until'))} aria-describedby={errorOf('er-until') ? 'er-until-error' : undefined} /></SaveErrorField>
+            {errorOf('er-until') ? <p id="er-until-error" className={styles.error} role="alert">{errorOf('er-until')}</p> : null}
+          </div>
+        </SettingsFormRow>
+        {/* 絵には無いが、倍率・期限・取り消し・通知・すぐ動かすの欄は落とさない（段の最後に畳んで置く）。 */}
+        <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
+          <div className={styles.detailsBody}>
+            <Field label="付いたマイルの有効期限" htmlFor="er-expiry" error={errorOf('er-expiry')}>
+              <span className={styles.inlineRow}>
+                <SaveErrorField names={["expiresAfterDays","expires_after_days"]}><NumberInput id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" /></SaveErrorField>
+                <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
+              </span>
+            </Field>
+            <SaveErrorField names={["ignoreMultiplier","ignore_multiplier"]}><Checkbox checked={ignoreMultiplier} onCheckedChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
+              会員ランクの倍率をかけない
+            </Checkbox></SaveErrorField>
+            {cancellationEvent ? (
+              <SaveErrorField names={["reverseOnCancellation","reverse_on_cancellation"]}><Checkbox
+                checked={reverseOnCancellation}
+                onCheckedChange={setReverseOnCancellation}
+                description={`${eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。`}
+              >
+                取り消されたら、付けたぶんを引く
+              </Checkbox></SaveErrorField>
+            ) : null}
+            <SaveErrorField names={["notifyFriend","enabled","notify_friend"]}><Checkbox checked={notifyFriend} onCheckedChange={setNotifyFriend}>
+              マイルが付いたら、この内容を自動で知らせる
+            </Checkbox></SaveErrorField>
+            <SaveErrorField names={["isActive","is_active"]}><Checkbox checked={isActive} onCheckedChange={setIsActive} description="オフにすると停止中で保存します。">
+              作成したらすぐ動かす
+            </Checkbox></SaveErrorField>
+          </div>
+        </Disclosure>
+      </Card>
+
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </CreatePage></SaveErrorScope>
+  )
+}

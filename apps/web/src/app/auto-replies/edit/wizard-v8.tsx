@@ -2283,3 +2283,276 @@ function AutoReplyWizardV8Inner() {
                   <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
                     id="wiz-test-friend"
                     size="full"
+                    className={styles.testGrow}
+                    aria-label="送信者"
+                    value={selectedFriendId}
+                    onChange={setSelectedFriendId}
+                    options={
+                      friendLoadState === 'error'
+                        ? [{ value: '', label: '友だちを読み込めませんでした' }]
+                        : friends.length === 0
+                          ? [{ value: '', label: '友だちがいません' }]
+                          : friends.map((f) => ({ ...entityOptionMetadata(f),
+                              value: f.id,
+                              label: f.id === selectedFriendId
+                                ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${friends.length}人）`
+                                : f.displayName || '名前なし',
+                            }))
+                    }
+                  /></SaveErrorField>
+                  <SearchField
+                    placeholder="名前で探す"
+                    value={friendQuery}
+                    onChange={(value) => {
+                      setFriendQuery(value)
+                      void searchFriends(value)
+                    }}
+                    aria-label="友だちを名前で探す"
+                  />
+                </SettingsFormRow>
+                <div className={styles.testRow}>
+                  <SaveErrorField names={["testMessage","incomingText","test_message"]}><TextField
+                    id="wiz-test-message"
+                    className={styles.testGrow}
+                    aria-label="届いたメッセージ"
+                    value={testMessage}
+                    onChange={(e) => setTestMessage(e.target.value)}
+                    placeholder={effectiveKeywords[0]?.keyword.trim() ? `${effectiveKeywords[0].keyword.trim()}したいです` : '例：予約変更したいです'}
+                  /></SaveErrorField>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => void runTest()}
+                    disabled={!selectedFriendId || !testMessage.trim() || saving}
+                    title={!selectedFriendId ? '送信者を選んでください' : !testMessage.trim() ? '届いたメッセージを入力してください' : undefined}
+                    busy={saving}
+                    busyLabel="試しています…"
+                  >
+                    <Play size={14} aria-hidden="true" />
+                    試す
+                  </Button>
+                </div>
+                {dryRun && (
+                  <div
+                    className={`${styles.testResult} ${dryRun.draftWon ? styles.testResultWin : styles.testResultLose}`}
+                    role="status"
+                  >
+                    <p className={styles.testResultTitle}>
+                      {dryRun.draftWon
+                        ? `当たったルール：このルール「${thisRuleName}」`
+                        : dryRun.winner
+                          ? `当たったルール：「${dryRun.winner.name}」`
+                          : 'どのルールにも当たりませんでした'}
+                    </p>
+                    <p className={styles.testResultNote}>
+                      {dryRun.draftWon
+                        ? 'このルールが返します。'
+                        : dryRun.winner
+                          ? `このルールは見送りです：${dryRun.winner.name}が先に動きます。動かすには、順番をそれより前にします。`
+                          : '届いたメッセージや相手の条件が、どのルールにも合いませんでした。'}
+                    </p>
+                    {dryRun.candidates.find((c) => c.autoReplyId === autoReplyId)?.reasonCodes.length ? (
+                      <p className={styles.testResultNote}>
+                        見送った理由：
+                        {dryRun.candidates
+                          .find((c) => c.autoReplyId === autoReplyId)!
+                          .reasonCodes.map((code) => REASON_WORDS[code] ?? code)
+                          .join('・')}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
+
+          {step === 'confirm' && (
+            <>
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>設定の確認</>} />
+                <div className={styles.summaryList}>
+                  <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
+                    {thisRuleName}
+                    {form.folderId
+                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '分けない'}`
+                      : '・分けない'}
+                  </SummaryRow>
+                  <SummaryRow label="反応する言葉" onEdit={() => goToStep('trigger')}>
+                    {form.respondToAll
+                      ? 'すべてのメッセージ'
+                      : effectiveKeywords.length > 0
+                        ? `${effectiveKeywords.map((r) => `「${r.keyword.trim()}」`).join('')}（${matchTypeWord(form.matchType)}）`
+                        : emptyValue('unconfigured')}
+                  </SummaryRow>
+                  <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
+                    {[
+                      // 絵 XJUqs「月〜金・いつでも」：手順②の「まとめて」と同じ言い方
+                      weekdaySummary(form.weekdays).replace(/に反応$/, ''),
+                      form.timeMode === 'custom' && (form.activeFrom || form.activeUntil)
+                        ? `${form.activeFrom || '00:00'}〜${form.activeUntil || '24:00'}`
+                        : 'いつでも',
+                    ].join('・')}
+                  </SummaryRow>
+                  <SummaryRow label="誰に" onEdit={() => goToStep('trigger')}>
+                    {form.friendTarget === 'filtered' ? '条件に合う友だち' : 'すべての友だち'}
+                  </SummaryRow>
+                  <SummaryRow label="返すもの" onEdit={() => goToStep('response')}>
+                    {form.mode === 'silent'
+                      ? '返信しない（後の処理だけ）'
+                      : form.mode === 'template'
+                        ? selectedTemplate
+                          ? `テンプレート「${selectedTemplate.name}」`
+                          : 'テンプレート（未選択）'
+                        : form.mode === 'inline-flex'
+                          ? 'カード'
+                          : form.mode === 'inline-image'
+                            ? '画像'
+                            : `テキスト ${formatNumber(form.responseContent.length)}字`}
+                  </SummaryRow>
+                  <SummaryRow label="返したあと" onEdit={() => goToStep('response')}>
+                    {form.actions.length > 0
+                      ? form.actions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
+                      : emptyValue('none')}
+                  </SummaryRow>
+                  <SummaryRow label="細かい決まり" onEdit={() => goToStep('response')}>
+                    {[
+                      Number(form.replyDelaySeconds) > 0 ? `${form.replyDelaySeconds}秒待つ` : 'すぐ返す',
+                      form.cooldownOn ? `同じ人へは${form.cooldownMinutes}分あける` : null,
+                      form.skipWhenOperatorActive ? '対応中のトークには返さない' : null,
+                      form.oncePerFriend ? '1人1回' : null,
+                      form.unmatchedMode === 'notify_operator' ? '外れたら担当者へ' : null,
+                    ]
+                      .filter(Boolean)
+                      .join('・')}
+                  </SummaryRow>
+                  <SummaryRow label="動く順番" onEdit={() => goToStep('priority')}>
+                    {myPositionLabel}
+                  </SummaryRow>
+                </div>
+              </Card>
+
+              <Card variant="form" gap="normal" className={styles.cardContent}>
+                <CardHeader size="stacked" title={<>有効にする前の確認</>} />
+                {confirmState === 'loading' && <p className={styles.hint}>確かめています…</p>}
+                {confirmState === 'error' && (
+                  <p className={styles.hint}>
+                    確認を読み込めませんでした。
+                    <button
+                      type="button"
+                      className={styles.weekdayPreset}
+                      onClick={() => autoReplyId && void loadValidation(autoReplyId)}
+                    >
+                      読み直す
+                    </button>
+                  </p>
+                )}
+                {confirmState === 'ready' &&
+                  v8Checks.map((gate) => {
+                    const backTo = gate.back
+                    return (
+                      <div key={gate.label} className={styles.checkRow}>
+                        <span
+                          className={`${styles.checkIcon} ${gate.state === 'ok' ? styles.checkIconOk : gate.state === 'blocked' ? styles.checkIconWarn : ''}`}
+                          aria-hidden="true"
+                        >
+                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : emptyValue('unknown')}
+                        </span>
+                        <div className={styles.checkBody}>
+                          <p className={styles.checkTitle}>{gate.label}</p>
+                          <p className={styles.checkNote}>{gate.detail}</p>
+                        </div>
+                        <Button type="button" variant="text" onClick={() => goToStep(backTo)}>
+                          見直す
+                        </Button>
+                      </div>
+                    )
+                  })}
+              </Card>
+            </>
+          )}
+
+      {/* ===== 下の帯 ===== */}
+
+      <SaveConflictCompareDialog
+        open={compareTarget !== null || compareError !== ''}
+        busy={compareBusy}
+        error={compareError || undefined}
+        lines={compareTarget ? describeAutoReplyDiff(form, compareTarget).map((text) => ({ text })) : null}
+        onReload={() => void reloadAfterConflict()}
+        onCancel={() => {
+          setCompareTarget(null)
+          setCompareError('')
+        }}
+      />
+
+      <UnsavedLeaveDialog
+        open={leaveTarget !== null}
+        subject="自動応答の変更"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+        busy={saving}
+        onSave={async () => {
+          const saved = await saveDraftNow()
+          return saved !== null
+        }}
+      />
+    </CreatePage></SaveErrorScope>
+  )
+}
+
+function SummaryRow({
+  label,
+  onEdit,
+  children,
+}: {
+  label: string
+  onEdit: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className={styles.summaryRow}>
+      <span className={styles.summaryKey}>{label}</span>
+      <span className={styles.summaryVal} title={typeof children === 'string' ? children : undefined}>{children}</span>
+      <Button type="button" variant="text" onClick={onEdit}>
+        変える
+      </Button>
+    </div>
+  )
+}
+
+/** 反応する言葉の追加入力。Enter・カンマ・離れると確定する。 */
+function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?: string }) {
+  const [value, setValue] = useState('')
+  const commit = () => {
+    if (value.trim()) {
+      onAdd(value)
+      setValue('')
+    }
+  }
+  return (
+    <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["value"]}><input
+        id="wiz-keywords"
+        aria-invalid={!!error || undefined}
+        aria-describedby={error ? 'wiz-keywords-error' : undefined}
+        value={value}
+        placeholder="言葉を入れて Enter"
+        aria-label="反応する言葉を足す"
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault()
+            commit()
+          }
+        }}
+        onBlur={commit}
+      /></SaveErrorField></Field>
+  )
+}
+
+export default function AutoReplyWizardV8() {
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <AutoReplyWizardV8Inner />
+    </Suspense>
+  )
+}
