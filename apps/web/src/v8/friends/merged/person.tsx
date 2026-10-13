@@ -1,9 +1,11 @@
 'use client'
+import { useState } from 'react'
 import { Unlink } from 'lucide-react'
 import { formatDateTime, formatDate as polishFormatDate } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -42,6 +44,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const [valuesExpanded, setValuesExpanded] = useState(false)
 
   const head = (title: string, description: string) => (
     <PageHeading title={title}
@@ -74,7 +77,29 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
     <PageFrame kind="detail" boardId="Hn9eE">
       {head(person.primaryDisplayName, `統合ユーザー・結び付いた友だち ${person.linkedFriends.length}${earliestLink ? `・${shortDate(earliestLink)} に結び付けた` : ''}`)}
 
-      <div className={styles.split}>
+      <PageContent><DetailColumns asideLabel="使っている値" expanded={valuesExpanded} onExpandedChange={setValuesExpanded} aside={
+        <div className={styles.rail}>
+          {canManage ? (
+            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile">使う値を直す</Button>
+          ) : null}
+          <section className={styles.valuesCard} aria-labelledby="mp-values">
+            <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>
+            <ul className={styles.values}>
+              {person.profileValues.length === 0 ? <li className={styles.cardSub}>まだ値はありません。</li> : null}
+              <li className={styles.value}>
+                <span className={styles.valueLabel}>LINE表示名</span>
+                <span className={styles.valueText}>{person.primaryDisplayName}</span>
+              </li>
+              {person.profileValues.map((value) => (
+                  <li key={value.fieldKey} className={styles.value} title={profileValueDetails(value)}>
+                    <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
+                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
+                  </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      }>
         <div className={styles.main}>
           {m.saveError ? (
             <Notice tone="danger" >{m.saveError}<button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button></Notice>
@@ -168,28 +193,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
           </section>
         </div>
 
-        <aside className={styles.rail} aria-label="使っている値">
-          {canManage ? (
-            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile">使う値を直す</Button>
-          ) : null}
-          <section className={styles.valuesCard} aria-labelledby="mp-values">
-            <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>
-            <ul className={styles.values}>
-              {person.profileValues.length === 0 ? <li className={styles.cardSub}>まだ値はありません。</li> : null}
-              <li className={styles.value}>
-                <span className={styles.valueLabel}>LINE表示名</span>
-                <span className={styles.valueText}>{person.primaryDisplayName}</span>
-              </li>
-              {person.profileValues.map((value) => (
-                  <li key={value.fieldKey} className={styles.value} title={profileValueDetails(value)}>
-                    <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
-                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
-                  </li>
-              ))}
-            </ul>
-          </section>
-        </aside>
-      </div>
+      </DetailColumns></PageContent>
 
       <MergedDeliveryDialog
         open={m.editing}

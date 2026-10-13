@@ -6,9 +6,8 @@
 .description { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
 .state { padding: var(--tpl-fr-area-pad); }
 
-.split { display: flex; flex: 1; min-width: 0; }
-.main { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); flex: 1; min-width: 0; padding: var(--tpl-fr-area-pad); }
-.rail { display: flex; flex-direction: column; gap: var(--tpl-fr-mp-rail-gap); width: var(--tpl-fr-mp-rail-w); flex-shrink: 0; padding: var(--tpl-fr-mp-rail-pad); border-left: 1px solid var(--color-hairline); }
+.main { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); flex: 1; min-width: 0; }
+.rail { display: flex; flex-direction: column; gap: var(--tpl-fr-mp-rail-gap); min-width: 0; }
 
 .card {
   display: flex;
