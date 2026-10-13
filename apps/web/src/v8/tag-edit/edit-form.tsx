@@ -1,4 +1,5 @@
 'use client'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
 import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band'
@@ -311,7 +312,7 @@ export function TagEditForm({
               )}
               {mileageOpen ? (
                 <>
-                  <div className={styles.pair}>
+                  <SettingsFormRow layout="columns">
                     <div className={styles.field}>
                       <span className={styles.label}>今後のマイル倍率</span>
                       {readOnly
@@ -324,7 +325,7 @@ export function TagEditForm({
                         ? <span className={styles.roValue}>{PRIORITIES.find((option) => option.value === priority)?.label ?? '標準'}</span>
                         : <div className={styles.selectBox}><SaveErrorField names={["priority", "multiplierPriority", "mileageMultiplierPriority", "mileage.priority", "tag.mileage.priority", "definition.tag.mileage.priority"]}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={PRIORITIES} size="full" /></SaveErrorField></div>}
                     </div>
-                  </div>
+                  </SettingsFormRow>
                   {host ? null : <div className={styles.switchRow}>
                     <div className={styles.switchText}>
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
@@ -346,12 +347,12 @@ export function TagEditForm({
                   <div className={styles.subHead}>
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
                   </div>
-                  <div className={styles.pair}>
+                  <SettingsFormRow layout="columns">
                     <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <SaveErrorField names={["reward", "rewardMiles", "mileageReward", "mileage.self", "tag.mileage.self", "definition.tag.mileage.self"]}><NumberInput unit="mile" type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} /></SaveErrorField>}{readOnly ? <span className={styles.unit}>mile</span> : null}</span>
 </Field>
                     <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <SaveErrorField names={["referralReward", "referral_reward", "referralRewardMiles", "referralMileageReward", "mileage.referrer", "tag.mileage.referrer", "definition.tag.mileage.referrer"]}><NumberInput unit="mile" type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} /></SaveErrorField>}{readOnly ? <span className={styles.unit}>mile</span> : null}</span>
 </Field>
-                  </div>
+                  </SettingsFormRow>
                   {readOnly ? (
                     <div className={styles.field}>
                       <span className={styles.label}>タグを外して付け直したときの扱い</span>
