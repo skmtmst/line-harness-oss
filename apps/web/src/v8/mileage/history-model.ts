@@ -27,4 +27,3 @@ export function monthStart(): string {
 export function daysAgo(days: number) {
   return jstDateOffset(-days)
 }
-
