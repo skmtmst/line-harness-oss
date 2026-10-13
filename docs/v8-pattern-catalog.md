@@ -333,6 +333,7 @@
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - 作る種類を選ぶ窓：`shared/dialog-choice-cards.tsx` の `DialogChoiceCards` へ名前・説明・行き先を渡す。3列のカードの説明は安全に折り返し、名前は1行、クリック・キーボード・別タブで行き先を開ける。選択を保存するラジオとは分ける。
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
