@@ -15,13 +15,13 @@ describe('飲食店向け予約メール取り込みアドレス画面', () => {
   test('未発行・コピー・再発行確認・ドメイン未設定を運用者へ表示する', () => {
     for (const label of [
       '予約メール取り込みアドレス',
-      '未発行',
       'アドレスを発行',
       '旧アドレスは90日後に失効します',
       '取り込み用ドメインが未設定です',
     ]) {
       expect(consoleSource).toContain(label)
     }
+    expect(consoleSource).toContain("emptyValue('unconfigured')")
     expect(consoleSource).toContain('CopyTextButton value={item.address}')
     expect(copySource).toContain('navigator.clipboard.writeText(text)')
     expect(copySource).toContain('コピーしました')

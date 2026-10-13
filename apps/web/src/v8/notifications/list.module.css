@@ -17,17 +17,6 @@
   flex-shrink: 0;
 }
 
-.retry {
-  flex-shrink: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  font-weight: 500;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 /* 一覧の箱：角丸12・細い枠。 */
 
 .list {
@@ -163,14 +152,6 @@
   margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  line-height: var(--tpl-nt-small-lh);
-}
-
-.settingsLink {
-  flex-shrink: 0;
-  color: var(--color-action);
-  font-size: var(--text-micro);
-  font-weight: 600;
   line-height: var(--tpl-nt-small-lh);
 }
 

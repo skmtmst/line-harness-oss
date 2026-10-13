@@ -1200,7 +1200,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             onValueChange={(next) => setDefinition((current) => ({ ...current, messageText: next }))}
           /></SaveErrorField>
           <MessageInsertRow readOnly={!canEdit} count={`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}>
-            <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} />
+            {canEdit ? <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} /> : null}
           </MessageInsertRow>
         </MessageBody>
         {scenarioError && canEdit ? (

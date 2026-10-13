@@ -26,7 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { ListPager } from '@/components/templates/list-page'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -471,7 +471,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
 
       <ListPager>
         <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り"
-          summary={paginationSummary(visible.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, visible.length))} />
+          range={{ total: visible.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, visible.length) }} />
       </ListPager>
 
     </DelayedSkeleton>

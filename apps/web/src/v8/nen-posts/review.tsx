@@ -9,6 +9,7 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
 import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import { RowMenu } from '@/components/shared/row-actions'
 import { collectUncountedListRows } from '@/components/shared/collect-list-rows'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -21,6 +22,7 @@ import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { ListPage } from '@/components/templates'
+import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
@@ -819,6 +821,7 @@ function ReviewListV8(props: ReviewListV8Props) {
         />
       </form>
       <span className={styles.toolsSpace} aria-hidden="true" />
+      {!adopted && status === 'pending' ? <HelpTip label="写真の見え方の説明">「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</HelpTip> : null}
       {adopted ? (
         <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
       ) : (
@@ -859,13 +862,12 @@ function ReviewListV8(props: ReviewListV8Props) {
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {props.searchQuery ? <p className={styles.toolsNote}>{`「${props.searchQuery}」で絞り込んでいます`}</p> : null}
       {state ?? cards}
-      {!state && status === 'pending' ? <p className={styles.listHint}>「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</p> : null}
       {more}
     </div>
   )
 
   return (
-    <div className={styles.body}>
+    <PageContent>
       {showRail ? (
         <div className={styles.reviewGrid}>
           {leftColumn}
@@ -898,8 +900,7 @@ function ReviewListV8(props: ReviewListV8Props) {
       ) : leftColumn}
 
       {status === 'pending' && canEdit ? (
-        <div className={styles.bulkRow}>
-          <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
+        <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
             <Button variant="secondary" disabled={props.bulkReviewing} onClick={props.onBulkReturn}>
               まとめて見送り
             </Button>
@@ -914,10 +915,9 @@ function ReviewListV8(props: ReviewListV8Props) {
               <Check size={15} aria-hidden="true" />まとめて採用
             </Button>
             <IconButton aria-label="選ぶのをやめる" title="選ぶのをやめる" onClick={props.onClearSelection}><X size={16} aria-hidden="true" /></IconButton>
-          </BulkBar>
-        </div>
+        </BulkBar>
       ) : null}
-    </div>
+    </PageContent>
   )
 }
 

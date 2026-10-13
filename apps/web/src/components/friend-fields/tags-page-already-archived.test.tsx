@@ -204,6 +204,6 @@ describe('R190 保管済みの行に同じ確認を繰り返さない', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'タグ「旧キャンペーン」の操作' })[0])
     expect(screen.queryByRole('menuitem', { name: '保管する' })).toBeNull()
     // 編集への道は残す。保管済みでも名前・説明の訂正はできる（#710）。
-    expect(screen.getByRole('menuitem', { name: '編集' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
   })
 })

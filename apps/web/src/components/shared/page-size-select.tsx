@@ -2,10 +2,10 @@
 
 import type { SelectHTMLAttributes } from 'react'
 import Select from '@/components/shared/select'
-import { PAGE_SIZES } from './page-size-options'
+import { PAGE_SIZES, pageSizeOptions } from './page-size-options'
 export { PAGE_SIZES, DEFAULT_PAGE_SIZE, EXTENDED_PAGE_SIZES } from './page-size-options'
 
-export const PAGE_SIZE_SELECT_OPTIONS = PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))
+export const PAGE_SIZE_SELECT_OPTIONS = pageSizeOptions(PAGE_SIZES)
 
 /**
  * 一覧ツールバーの表示件数（監査 #668）。
@@ -43,7 +43,7 @@ export default function PageSizeSelect({
         value={String(value)}
         onChange={(next) => onChange(Number(next))}
         aria-label="表示件数"
-        options={options.map((n) => ({ value: String(n), label: `${n}件表示` }))}
+        options={pageSizeOptions(options)}
         id={id}
         name={name}
         disabled={disabled}

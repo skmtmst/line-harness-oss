@@ -22,6 +22,12 @@
 
 実際に使われる経路の76ファイルの帯、15ファイル26か所の状態カード、一覧の件数定数、欄に結び付かない失敗の知らせを共通部品へ寄せた。同じ表での候補数は (a) 7032→6767、(b) 1435→1416、(c) 2497→2493。正規表現の全体一覧には未使用コードと要確認候補が残る。新しい候補0は、残りの候補が全部違反なしという意味ではない。Penの部品IDと見た目の合格は司令塔が記録する。
 
+## 列車31b：既存の型の小さい口（2026-10-13）
+
+- 作成の2列：`templates/create-page.tsx` の `CreateColumns`。見え方は入力の高さに収め、長い見本はその欄で送る。380幅と1100未満の畳み方は型が持つ。保存・プレビューの内容は画面が渡す。
+- 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。
+- 履歴の表：既存の `shared/table.tsx` の `DataTable.grid`。列・端の余白と本文／見出しの文字の大きさを共通の口へ渡す。画面で表の子を上書きしない。
+
 ## 使い方（必ず守る）
 
 1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
@@ -121,6 +127,7 @@
 ## kpi-band 数の帯
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
+- **補足**：L5差し戻しU6/V3では全文を自然に折り返し、行き先を次の行に置く。説明と括弧の補足を分ける形（wjfLe）は KpiCard の `detailLayout="qualifier"` を使う。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
   - 読む変数：`--color-hairline`
 - **持ち主（Pen）**：`Pp3nS`「数のマス」
@@ -273,11 +280,12 @@
 ## pagination ページ送り
 
 - **役目**：ページを送り、10・20・50件を切り替える
-- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`ListPagePagination`）
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
 - **持ち主（Pen）**：`jX2Uw`「ページ送り」
   - 注：PageSizeSelect は shared が持つ（B-172）。
 - **見つけ方（コード）**：
   - own-size：`\b(const|let)\s+\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\w*\s*=` — 件数の定数を画面ごとに持つ
+  - own-range-text：`summary`／`pagerSummary` で件数文を組む — `Pagination.range` へ総数・先頭・末尾・単位だけを渡す（L組差し戻しB）。
   - size-100：`\[\s*20\s*,\s*50\s*,\s*100\s*\]` — 件数が 20・50・100（決まりは 10・20・50）
   - more：`(?:>|['"'])[^<'"']{0,40}(?:もっと読む|さらに読み込む|もっと見る)` — 「もっと読む」（ページ送りにする）
   - prev-next：`(?:>|['"'])[^<'"']{0,40}(?:前へ|次へ)`（持ち主の部品を読んでいないファイルだけ） — 前へ・次へを手で置く
@@ -809,8 +817,10 @@
 <a id="toggle"></a>
 ## toggle オン・オフ・選ぶ部品
 
+- **10-12の差し戻し（axFrW）**：一覧の選択は共通Checkboxの16px・角4（`--choice-checkbox-radius`）。画面のCSSで丸みを上書きせず、クリック・Space・一部選択・権限の動きは維持。絵の16px・角4と司令塔の16:47 JST判定に従う。
+
 - **役目**：その場で効く＝Toggle、保存して効く＝Checkbox、3つ以上＝SegmentedControl か RadioCard
-- **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
+- **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`UnavailableSelection`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
   - 読む変数：`--shadow-controls-toggle`
 - **持ち主（Pen）**：`bkjTv`「トグル/オン」・`LxHpj`「トグル/オフ」・`dQCCN`「チェック/オン」・`S9U7v`「チェック/オフ」・`dtJVi`「切り替え（3つ）」・`fNPdg`「選ぶカード/オン」・`r3xz1W`「選ぶカード/オフ」
 - **見つけ方（コード）**：
@@ -824,6 +834,8 @@
 - **決まり**：[§6.12-14](v8-design-rules.md)・B-158
 - **見張り**：`apps/web/src/components/shared/checkbox.test.tsx`・`apps/web/src/components/shared/segmented-size.test.tsx`・`apps/web/src/components/shared/radio-card-contract.test.tsx`／**要る試験**：aria-pressed を画面で書くと落ちる試験
 - **10-09 の数**：(a) 247（v8 162）・(b) 26・(c) 18・(d) 手描き 0（0 板）／写し 0・効く範囲 265 ファイル／98 機能／Pen 87 板
+
+- **L4 差し戻しH**：一覧のまとめて操作がある場合、全行で選択枠をそろえる。対象外・閲覧のみは `UnavailableSelection` の枠と理由を使い、変更処理を持たせない。まとめて操作が無い一覧に列・機能を足さない。
 
 <a id="copy"></a>
 ## copy コピー
@@ -944,6 +956,27 @@
 - **見つけ方**：固定7つ・1152で5列・仮の「お店の情報欄」の固定候補・一覧に無制限の列・横送り・アレルギー1行テキストを探す。
 - **見張り**：`customer-info-panel.test.tsx`・`display-items-dialog.test.tsx`、V8の列数・はみ出し検査。**要る動作確認**：追加・削除した項目、列上限、並べ替え、値の出どころ、複数アレルギー、店と統括のフォームの継承。文書の掲載だけで実装合格とはしない。
 
+<a id="list-date-time"></a>
+## list-date-time 一覧の日時
+
+- **役目**：時刻を持つ記録を今年 `MM/DD HH:mm`、別年 `YYYY/MM/DD HH:mm` で1行に出す。日時の列は文字の実寸を確保し、日付と時刻の間は共通の4pxにそろえる（L5差し戻しU1）。期限・年月日型の業務値・繰返しの曜日はこの役目ではない。
+- **持ち主（コード）**：`apps/web/src/lib/format.ts` の `formatListTimestamp`、`apps/web/src/components/shared/list-date-time.tsx`・同 CSS。年・時間帯・無効な値の扱いは日付の正本、段分けは `ListDateTime` が持つ。
+- **決まり**：B-260・B-262 差し戻し E。保存値・CSV は変えない。
+- **見つけ方・増殖の見張り**：`formatListTimestamp(...).split(...)` を画面で書かず、共通部品へ日時を渡す。
+- **見張り**：共通の書式と部品の試験（別年の時刻、SQL UTC、店舗時間帯、無効値）と一覧の実幅測定。Pen の変更は司令塔へ渡す。
+
+- **F4 一覧型の既定**：PageFrame(kind=list)は一覧の標準寸法と検査対象を既定で持つ。画面側の任意のskeleton指定に依存しない。一般の表を持つ作成・詳細の型には適用しない。
+
+## list-status-cell 一覧の状態の列
+
+- **役目**：公開状態と後処理の未完など、同じ記録の状態を名前と分けて表示する。複数の札は縦に並べ、共通4pxを挟む。余分な上下のセル余白を重ねず、行の52/60を守る。
+- **持ち主**：`components/shared/table.tsx` の `StatusCell` と `data-table.module.css`。札の正本はStatusBadge。文字の実寸はDataTableの内容による列配分が確保する。
+- **見張り**：状態の列と名前の列の動作試験、実物CSSの複数札60px・切れ0・余分padding故障注入。
+
+- **L4 差し戻しI**：操作の「直す／編集」は `shared/action-words.ts` が「編集する」へ統一し、Button（actionWording）・ActionMenu・FolderEditorDialog・KpiCard が読む。任意の値・名前を出すボタンや窓の題はそのまま保つ。「読み直す／作り直す／最新を取り込んで直す」は別の動きのため保つ。KPIの操作は共通 `action` へ渡す（リンク・既存の処理の両方を受ける）。
+
+- **L4 差し戻しJ**：数の帯に行メニューを置かず、絞り込みと行き先は `KpiCard.action`／`valueAction` へ。別の行き先の入口は残す。行の登録は共通 `Button` の `size="compact"` を使い、表の52/60を変更しない。CIの `pendec2-rules` が帯の中の行メニューを検出する（故障注入あり）。
+
 ## 認証の画面（B-263）
 
 - 持ち主：`components/templates/auth-page.tsx`。ログインの確認・初回登録・回復コードを同じ型で組む。
@@ -1008,3 +1041,15 @@
 
 - 行うことの種類データは `ActionList.choices` / `FixedActionList.options` へ渡す。型監査は、実在する持ち主へのimportとJSXのデータの口を確かめ、同じ語を自前のボタンへ描いた場合は引き続き検出する。
 - 作成・編集の横並びの入力は `SettingsFormRow`。2列以上の格子も同じ部品が持ち、白い板が1100未満なら1列へ戻す。名前＋フォルダは既存の `name-folder`、4欄以上の2列は `columns`、3欄の期間は列数3の口で広い時の並びを保つ。日時1欄の内部の時・分や、ラジオの選択肢の並びは独立した入力欄の格子と区別する。
+
+- **B-266 道具の2段**：ListToolbarFrameは狭い白い板で先頭と検索を同じ段へ、残りを次の段へそろえる。左列の作るボタンの全幅指定は先頭の口へ持ち込まない。ListToolbarOptional(collapse=overflow)は入りきらない組だけを操作名つきの入口に畳み、元の操作と入力は保持する。文字だけを小さくしたり無名の「…」へ消したりしない。
+### 下の帯の左端の操作（F組4回目・Q）
+- 持ち主：`components/shared/sticky-bar-action.tsx` の `StickyBarAction`（`sticky-bar.tsx` からも公開）。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。帯自身は配置だけを持ち、実際の削除・保管の処理と確認窓は呼び出す画面が保つ。
+
+- 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。
+
+- 名前とフォルダの2列は `SettingsFormRow layout="name-folder"`。名前2・フォルダ1の比率で行の幅を埋め、間は共通12。フォルダは既存 `FolderSelect size="full"`。文字数・再試行・社内メモは各入力の共通部品へ渡す。
+
+- 固定の保存項目しか持たない行うことは `FixedActionList` から既存 `ActionList` へ渡す。種類は保存できる物だけ、順序は固定。対象の選択を確定するまで行を作らず、保存形式は画面の既存の口へ戻す。
+
+- 条件を足す種類も `ConditionBuilder` の `EntityPickerDialog` で選ぶ。種類の制限・AND/ORの保存形を保ち、取消では条件を追加しない。条件のかたまりの箱と頭は共通 `Card` / `CardHeader`。

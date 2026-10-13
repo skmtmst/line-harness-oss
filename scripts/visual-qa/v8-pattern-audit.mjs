@@ -287,6 +287,10 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       // 必須・エラーのFieldで正の押したらの欄を包んでも、手書きの選択肢にはならない。
       if (signal.id === 'more' && pattern.owner?.code?.components?.includes(proof?.tag) && proof.imports?.[proof.tag]?.path.startsWith('@/components/shared/') && p.ownerFiles.some(re => re.test('apps/web/src/' + proof.imports[proof.tag].path.slice(2) + '.tsx'))) continue
       if (signal.id === 'own-label' && proof?.imports?.[proof.tag]?.path === '@/components/shared/form-controls' && proof.descendantTags?.some(tag => pattern.owner?.code?.components?.includes(tag) && proof.imports?.[tag]?.path.startsWith('@/components/shared/'))) continue
+      // 固定の行うことの選択肢は、shared ActionListへ渡す設定。隣の手書きやeditor内のJSXは別に検査する。
+      if (signal.id === 'own-extra' && proof?.tag && proof.attribute === 'options'
+        && proof.imports?.[proof.tag]?.path === '@/components/shared/fixed-action-list' && codeRoot
+        && existsSync(join(codeRoot, 'apps/web/src/components/shared/fixed-action-list.tsx'))) continue
       if (proof?.searchString && ['raw-grid', 'raw-dialog', 'raw-alert', 'raw-check', 'own-listbox'].includes(signal.id)) continue
       if (signal.id === 'own-phone' && proof && !proof.returnsJsx) continue
       if (signal.id === 'own-phone' && ownedReturn(proof, pattern)) continue

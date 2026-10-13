@@ -16,4 +16,3 @@ export default function StickyBarAction({ label, icon: Icon, disabledReason, dis
     {disabledReason ? <span className={styles.leadReason} role="note">{disabledReason}</span> : null}
   </div>
 }
-

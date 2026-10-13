@@ -1,7 +1,7 @@
 'use client'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -15,7 +15,7 @@ import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag,
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bookmark, CalendarPlus, CircleCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
+import { Bookmark, CalendarPlus, CheckCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
 
 
 import Link from '@/components/shared/list-navigation'
@@ -43,7 +43,7 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
@@ -59,7 +59,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import { TextField } from '@/components/shared/text-field';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
@@ -706,7 +706,7 @@ export default function ScenariosListV8() {
     },
     {
       title: '読み終えた人',
-      icon: CircleCheck,
+      icon: CheckCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
       detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
@@ -865,18 +865,18 @@ export default function ScenariosListV8() {
         <span className="sr-only" role="status" aria-live="polite">
           {moveNotice}
         </span>
-        <div className={narrow ? `${styles.tableWrap} ${styles.narrowTable}` : styles.tableWrap} data-content-in="">
+        <div className={styles.tableWrap} data-content-in="">
           <DataTable>
             {colgroup}
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {canEdit ? <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                  /></SaveErrorField>}
+                  /></SaveErrorField> : <UnavailableSelection label="このページのシナリオをすべて選択" />}
                 </Th>
                 {tableHeadCells}
               </TableHeadRow>
@@ -911,11 +911,11 @@ export default function ScenariosListV8() {
                      data-row-id={s.id}
                   >
                     <Td className={styles.selectCell}>
-                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
+                      {canEdit ? <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
                         aria-label={`${s.name}を選択`}
-                      /></SaveErrorField>}
+                      /></SaveErrorField> : <UnavailableSelection label={`${s.name}を選択`} />}
                     </Td>
                     <Td
                       className={styles.gripCell}
@@ -1024,7 +1024,7 @@ export default function ScenariosListV8() {
   const listPager = scenarioList.loaded && !scenarioList.error ? (
     <ListPagePagination>
       <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage}
-        summary={paginationSummary(scenarioList.total, (scenarioList.page - 1) * scenarioList.limit + 1, Math.min(scenarioList.page * scenarioList.limit, scenarioList.total))} />
+        range={{ total: scenarioList.total, first: (scenarioList.page - 1) * scenarioList.limit + 1, last: Math.min(scenarioList.page * scenarioList.limit, scenarioList.total) }} />
     </ListPagePagination>
   ) : null
 
@@ -1060,24 +1060,24 @@ export default function ScenariosListV8() {
     </div>
   )
 
-  const savedBox = (
-    <div className={styles.savedBox}>
-      <SaveErrorField names={["savedFilter","saved_filter"]}><Select
-        aria-label="よく使う絞り込み"
-        size="full"
-        icon={<Bookmark aria-hidden="true" />}
-        valueAlign="start"
-        showChevron={false}
-        iconOnly={narrow}
-        value={savedFilter}
-        onChange={(value) => {
-          setSavedFilter(value)
-          if (value === 'active') setStoppedOnly(false)
-        }}
-        options={SAVED_FILTER_OPTIONS}
-      /></SaveErrorField>
-    </div>
+  const savedFilterControl = (
+    <SaveErrorField names={["savedFilter","saved_filter"]}><Select
+      aria-label="よく使う絞り込み"
+      size="full"
+      icon={<Bookmark aria-hidden="true" />}
+      valueAlign="start"
+      showChevron={false}
+      iconOnly={narrow}
+      width={narrow ? 56 : undefined}
+      value={savedFilter}
+      onChange={(value) => {
+        setSavedFilter(value)
+        if (value === 'active') setStoppedOnly(false)
+      }}
+      options={SAVED_FILTER_OPTIONS}
+    /></SaveErrorField>
   )
+  const savedBox = narrow ? savedFilterControl : <div className={styles.savedBox}>{savedFilterControl}</div>
 
   const perPageBox = (
     <div data-per-page-select>
@@ -1086,7 +1086,7 @@ export default function ScenariosListV8() {
   )
 
   const folderSelect = (
-    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
+    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select width={narrow ? 152 : undefined} aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
   )
 
   const filteredCount =
@@ -1136,7 +1136,7 @@ export default function ScenariosListV8() {
   return (
     <PageExplanationProvider pageKey="scenarios"><SaveErrorScope errors={saveErrors}><ListPage
       heightMode="content"
-      toolbarSpacing="section"
+      toolbarSpacing={narrow ? undefined : 'section'}
       noticeSpacing="section"
       skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
@@ -1160,6 +1160,7 @@ export default function ScenariosListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              detailLayout={narrow ? 'qualifier' : undefined}
             />
           ))}
         </KpiBand>

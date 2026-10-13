@@ -26,6 +26,7 @@ import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CreateColumns } from '@/components/templates/create-page'
 import { useFormErrors } from '@/lib/use-form-errors'
 import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
@@ -2151,7 +2152,7 @@ export default function BroadcastForm({
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
-    <div className={styles.body}>
+    <CreateColumns>
       <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
@@ -2573,7 +2574,7 @@ export default function BroadcastForm({
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>
-    </div>
+    </CreateColumns>
 
     <StickyBar className={styles.footer} actions={(
       <>

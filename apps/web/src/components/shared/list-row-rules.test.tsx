@@ -73,6 +73,11 @@ describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
     expect(auditListSource('<Tr><NameCell name="フォーム" annotation={<StatusBadge tone="danger">後処理の未完 2</StatusBadge>} /></Tr>')).toEqual([])
     expect(auditListSource('<Tr><NameCell name={<StatusBadge>公開中</StatusBadge>} /></Tr>')).toHaveLength(1)
   })
+  it.each(['重なり 1', '失敗 2'])('状態欄の「%s」は残し、名前へ状態を戻すと見張りが止める', (note) => {
+    expect(auditListSource(`<Tr><NameCell name="名前" /><Td><StatusBadge>有効</StatusBadge><StatusBadge>${note}</StatusBadge></Td></Tr>`)).toEqual([])
+    const broken = `<Tr><Td className={styles.colName}><FolderDotName>名前</FolderDotName><StatusBadge>有効</StatusBadge><StatusBadge>${note}</StatusBadge></Td></Tr>`
+    expect(auditListSource(broken).some(rule => rule.includes('B-194'))).toBe(true)
+  })
   it('全画面のソースに違反がない', () => {
     expect(auditListSources(resolve(process.cwd(), 'src'))).toEqual([])
   }, 30_000)

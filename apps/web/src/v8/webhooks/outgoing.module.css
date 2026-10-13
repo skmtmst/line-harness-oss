@@ -3,18 +3,12 @@
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  */
 
-/* 左の列の作るボタン（列いっぱい）と、閲覧のみで隠したときの場所。 */
-.createButton {
-  width: 100%;
-}
+/* 作成の幅は共通Buttonと一覧型が持つ。 */
 .createSpace {
   display: block;
   flex-shrink: 0;
   height: var(--tpl-chip-h);
   margin-bottom: var(--tpl-wh-create-after);
-}
-.narrowRow .createButton {
-  width: auto;
 }
 .narrowRow .createSpace {
   width: var(--tpl-wh-create-w);
@@ -55,7 +49,7 @@
 .colPayload { width: var(--tpl-wh-col-payload); min-width: 0; }
 .colCount { width: var(--tpl-wh-col-count); }
 .colState { width: var(--tpl-wh-col-state); min-width: 0; }
-.colOps { width: var(--tpl-wh-col-ops); }
+.colOps { width: calc(var(--row-action-width) + var(--tpl-icon-btn-row-hit) + var(--tpl-wh-ops-gap)); }
 
 /* 1152 の4列（絵 AsfFB）。列の頭の位置は絵の x に合わせ、列の間は幅で持つ。 */
 .colMonth { width: var(--tpl-af2-wh-col-month); display: flex; flex-direction: column; gap: var(--tpl-row-sub-gap); }
@@ -101,15 +95,6 @@ a.name:hover {
 }
 /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 ZSbFY の説明の行）。 */
 .nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
-.cellText {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-wh-cell-lh);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
 .num {
   display: block;
   color: var(--color-ink);

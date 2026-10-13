@@ -2,6 +2,7 @@ import React from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
+export type PaginationRange = { total: number | null | undefined; first: number; last: number; unit?: string }
 
 export type PaginationProps = {
   page: number
@@ -15,6 +16,8 @@ export type PaginationProps = {
    * 表示があるので、この中身は v8 のときだけ出る。
    */
   summary?: React.ReactNode
+  /** 件数の書き方は共通部品が持つ。画面からは数値と単位だけ渡す。 */
+  range?: PaginationRange
   /** 予約台帳の枠内で、絵の広めの件数帯を描く。 */
   spacing?: 'roomy' | 'restaurant'
   /** カーソル式は前・現在・次だけ。任意の番号へは移動しない。 */
@@ -65,6 +68,7 @@ export default function Pagination({
   disabled = false,
   className,
   summary,
+  range,
   spacing,
   mode = 'numbered',
 }: PaginationProps) {
@@ -76,7 +80,8 @@ export default function Pagination({
 
   return (
     <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
-      {summary ? <span className={styles.summary}>{summary}</span> : null}
+      {range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
+        : summary ? <span className={styles.summary}>{summary}</span> : null}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
@@ -126,6 +131,7 @@ export default function Pagination({
 
 /** 固定版jX2Uwの件数。人数の一覧も同じ配置で単位だけ渡す。 */
 export function paginationSummary(total: number | null | undefined, from: number, to: number, unit = '件'): string {
+  if (total === 0) return `0${unit}`
   const count = total != null && Number.isFinite(total) ? total.toLocaleString('ja-JP') : '—'
   const first = to > 0 ? from : 0
   return `${count}${unit}中 ${first.toLocaleString('ja-JP')}〜${to.toLocaleString('ja-JP')}${unit}`

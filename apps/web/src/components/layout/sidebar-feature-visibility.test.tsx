@@ -2,7 +2,7 @@
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, render, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -50,6 +50,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import Sidebar from './sidebar'
+import SettingsInnerNav from './settings-inner-nav'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 describe('Sidebarのstaff向け機能表示read-model', () => {
@@ -95,7 +96,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(fixture.get).not.toHaveBeenCalled()
   })
 
-  it('multi_store_hierarchy: offと応答欠落では「プール管理」を出さず、onで出す(#860)', async () => {
+  it('multi_store_hierarchy: 設定内でoffと応答欠落では「プール管理」を出さず、onで出す(#860・B-261)', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
     rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts', '/pools']))
@@ -103,7 +104,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
       success: true,
       data: { features: { multi_store_hierarchy: false, broadcasts: true } },
     })
-    const view = render(<Sidebar />)
+    const view = render(<><Sidebar /><SettingsInnerNav /></>)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
     act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
     await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
@@ -112,25 +113,28 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(view.getAllByText('ダッシュボード')).not.toHaveLength(0)
     cleanup()
 
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { broadcasts: true } },
     })
-    const missing = render(<Sidebar />)
+    const missing = render(<><Sidebar /><SettingsInnerNav /></>)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalledTimes(2))
     act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
     await waitFor(() => expect(missing.getAllByText('一斉配信')).not.toHaveLength(0))
     expect(missing.queryAllByText('プール管理')).toHaveLength(0)
     cleanup()
 
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { multi_store_hierarchy: true, broadcasts: true } },
     })
-    const enabled = render(<Sidebar />)
+    const enabled = render(<><Sidebar /><SettingsInnerNav /></>)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
     await waitFor(() => expect(enabled.getAllByText('プール管理')).not.toHaveLength(0))
+    expect(within(enabled.container.querySelector('aside')!).queryAllByText('プール管理')).toHaveLength(0)
     expect(enabled.getAllByText('一斉配信')).not.toHaveLength(0)
   })
 

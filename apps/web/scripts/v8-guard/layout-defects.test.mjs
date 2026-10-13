@@ -9,7 +9,20 @@ import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 import { assess, assessAgainstBase, record, measurePage, identifyStableTargets, validateAllowances } from './layout-defects.mjs'
 import scanPanelBlank from './panel-blank-browser.mjs'
+import scanBlankGap from './blank-gap-browser.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
+
+test('horizontal blank runs stay inside a semantic section; a real tall blank in that section still fails', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const section = (name, height) => `<section data-template-region="${name}" style="height:${height}px;width:1000px"><span style="display:block;width:760px;height:${height}px;background:#fafafa">内容</span></section>`
+    await page.setContent(shell(section('heading',80)+section('stats',116)+'<footer style="height:40px;width:1000px;background:#eee">続き</footer>'))
+    assert.ok(!(await page.evaluate(scanBlankGap)).findings.some(f => f.kind === 'horizontal' && !f.excluded))
+    await page.setContent(shell(section('stats',320)+'<footer style="height:40px;width:1000px;background:#eee">続き</footer>'))
+    assert.ok((await page.evaluate(scanBlankGap)).findings.some(f => f.kind === 'horizontal' && f.excess >= 96 && !f.excluded))
+  } finally { await browser.close() }
+})
 const cases = {
   'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
   'control-blocked': '<div data-list-row style="position:relative"><button style="width:80px;height:36px">…</button><span style="position:absolute;left:20px;top:0;width:36px;height:36px;background:#fff"></span></div>',

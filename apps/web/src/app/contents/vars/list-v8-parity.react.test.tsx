@@ -97,13 +97,13 @@ describe('共通情報V8一覧の戻した表示', () => {
     await rendered.findByText('ふつう')
     const cell = rendered.getByTitle(/最終更新/)
     expect(cell.getAttribute('title')).toContain('予定なし')
-    expect(cell.getAttribute('title')).toContain('9月20日（日）')
+    expect(cell.getAttribute('title')).toContain('09/20 09:00')
   })
 
   test('件数は範囲で出す', async () => {
     fixture.items = [varItem('v1', 'ひとつ'), varItem('v2', 'ふたつ')]
     const rendered = await renderList()
     await rendered.findByText('ひとつ')
-    expect(rendered.getByText(/^2 件$/)).toBeTruthy()
+    expect(rendered.getByText(/^2件中 1〜2件$/)).toBeTruthy()
   })
 })

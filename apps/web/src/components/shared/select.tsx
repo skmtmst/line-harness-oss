@@ -1,5 +1,6 @@
 'use client'
 
+import { pageSizeLabel } from './page-size-options'
 import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
@@ -9,6 +10,7 @@ import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption,
 import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
 import type { StatusBadgeTone } from './status-badge'
+import { fitSelectContent } from './select-content-size.mjs'
 
 export interface SelectOption {
   value: string
@@ -50,7 +52,9 @@ export interface SelectProps {
   name?: string
   onChange: (value: string) => void
   options: SelectOption[]
-  size?: 'standard' | 'page-size' | 'full'
+  size?: 'standard' | 'page-size' | 'full' | 'content'
+  /** 表示の幅をcontentへ変えても、一覧の表示件数の役目は保つ。 */
+  pageSizeControl?: boolean
   value: string
   /**
    * 箱の幅（px）。渡すと size の幅を上書きする
@@ -113,14 +117,21 @@ export default function Select({
   valueAlign,
   showChevron = true,
   iconOnly = false,
-  options,
+  options: suppliedOptions,
   size = 'standard',
+  pageSizeControl = false,
   value,
   width,
   treatment = 'box',
   createAction,
   menuHeading,
 }: SelectProps) {
+  // Width is a visual preset; a duration selector may use it too. The role
+  // comes from the explicit flag or the control's accessible page-size name.
+  const isPageSizeControl = pageSizeControl || /表示件数|1ページ|件表示/.test(ariaLabel ?? label ?? '')
+  const options = useMemo(() => isPageSizeControl
+    ? suppliedOptions.map(option => /^\d+$/.test(option.value) ? { ...option, label: pageSizeLabel(Number(option.value)) } : option)
+    : suppliedOptions, [suppliedOptions, isPageSizeControl])
   // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
   const field = useFieldContext()
   const invalid = Boolean(error) || invalidProp || Boolean(field?.invalid)
@@ -153,6 +164,19 @@ export default function Select({
 
   const OPTION_HEIGHT = SELECT_MENU_ROW_STRIDE
   const heads = useMemo(() => splitOptionHeads(options, label), [options, label])
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (size !== 'content' || !root || iconOnly) return
+    let active = true
+    const measure = () => { if (active) fitSelectContent(root) }
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(queue)
+    observer?.observe(root)
+    measure()
+    void document.fonts?.ready.then(measure)
+    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); root.style.removeProperty('--list-select-content-width') }
+  }, [size, selected?.label, label, treatment, showChevron, iconOnly, icon])
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
   const [scrollWindow, setScrollWindow] = useState({ top: 0, height: 0 })
@@ -304,6 +328,7 @@ export default function Select({
         setOpen(false)
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
+      data-list-page-size={isPageSizeControl || undefined}
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <button
@@ -335,8 +360,8 @@ export default function Select({
           </span>
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
-        <span className={styles.value} title={selected?.label ?? undefined}>
-          {label ? `${label}：${selected?.label ?? ''}` : selected?.label ?? ''}
+        <span className={styles.value} data-select-value title={selected?.label ?? undefined}>
+          {label ? `${label}：${selected ? heads.labelOf(selected) : ''}` : selected?.label ?? ''}
         </span>
         {showChevron && !iconOnly && (open ? (
           <ChevronUp className={styles.chevron} aria-hidden="true" />

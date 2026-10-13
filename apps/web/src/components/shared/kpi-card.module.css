@@ -168,7 +168,7 @@
   color: var(--color-ink-faint); font-size: 12px; font-weight: 400; line-height: 18px;
 }
 :root .detailText { min-width: 0; flex: 1; }
-:root .link { font-size: 12px; font-weight: 500; line-height: 18px; }
+:root .link { min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
 :root .card[data-kpi-presentation='band'] {
   border-radius: 0; outline-color: transparent; box-shadow: none;
 }

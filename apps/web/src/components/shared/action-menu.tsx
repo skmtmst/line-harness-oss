@@ -1,4 +1,5 @@
 'use client'
+import { normalizeActionLabel } from './action-words'
 
 import Link, { useListNavigationHref } from './list-navigation'
 import { ArrowUpRight, Eye, Pencil, Pause, Trash2 } from 'lucide-react'
@@ -209,6 +210,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
       data-design-node="xifuV"
     >
       {orderActionMenuItems(items).map((item) => {
+        const itemLabel = normalizeActionLabel(item.label)
         const Item = item.href && !item.disabled ? 'a' : 'button'
         return (
         <div key={item.id} data-menu-group={item.group}>
@@ -225,7 +227,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
             disabled={item.disabled}
-            title={item.label}
+            title={itemLabel}
             data-qa-open={item.qaOpen}
             onClick={(event) => {
               event.stopPropagation()
@@ -238,7 +240,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>
-              <span className={styles.label}>{item.emphasis ? <strong>{item.label}</strong> : item.label}</span>
+              <span className={styles.label}>{item.emphasis ? <strong>{itemLabel}</strong> : itemLabel}</span>
               {item.description ? (
                 <span className={styles.description}>{item.description}</span>
               ) : null}

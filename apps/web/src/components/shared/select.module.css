@@ -202,3 +202,7 @@
 
 /* B-152・仕上げ7 */
 :root .trigger:disabled { opacity: var(--polish-disabled-opacity); }
+
+/* List controls reserve the whole selected label, icon and existing inset. */
+html:root .content { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); flex: none; }
+html:root .content .trigger { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); max-width: none; }

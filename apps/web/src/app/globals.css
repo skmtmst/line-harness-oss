@@ -1170,7 +1170,7 @@
   /* 回答フォームの一覧（I3L41O・GrnO4・JV2oR・GVizd）。 */
   --tpl-fm-note-lh: 17px; --tpl-fm-text-button-gap: 6px; --tpl-fm-band-gap: 10px; --tpl-fm-band-pad: 10px 14px; --tpl-fm-band-lh: 20px;
   --tpl-fm-search-w: 200px; --tpl-fm-sort-w: 160px; --tpl-fm-narrow-row-gap: 8px; --tpl-fm-folder-w: 150px;
-  --tpl-fm-col-dest: 136px; --tpl-fm-col-status: 96px; --tpl-fm-col-answers: 126px; --tpl-fm-col-url: 100px; --tpl-fm-col-menu: 60px;
+  --tpl-fm-col-dest: 136px; --tpl-fm-col-status: 96px; --tpl-fm-col-answers: 126px; --tpl-fm-col-url: calc(var(--copy-feedback-min-w) + 2 * var(--tpl-row-pad-side)); --tpl-fm-col-menu: 60px;
   --tpl-fm-name-gap: 8px; --tpl-fm-cell-lh: 17px; --tpl-fm-dot: 6px; --tpl-fm-pill-gap: 5px; --tpl-fm-badge-pad: 2px 8px; --tpl-fm-badge-lh: 18px;
   --tpl-fm-answer-lh: 19px; --tpl-fm-answer-gap: 2px; --tpl-fm-answer-sub-lh: 16px; --tpl-fm-url-gap: 6px; --tpl-fm-control-h: 36px; --tpl-fm-url-pad: 0 14px; --tpl-fm-url-lh: 20px;
   --tpl-fm-skeleton-bar: 12px; --tpl-fm-pager-pad: 10px 20px; --tpl-fm-pager-lh: 21px; --tpl-fm-state-pad: 28px 24px; --tpl-fm-state-icon: 32px;
@@ -1180,7 +1180,7 @@
   /* マイルの V8（OC0gy・ZJIyl・E2Any・S35pO・CJlf4・oRbJi・IRPw8）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。 */
   --tpl-ml-col-gap: 16px; --tpl-ml-head-h: var(--polish-table-head); --tpl-ml-head-pad: 13px 20px; --tpl-ml-row-h: var(--polish-table-row); --tpl-ml-row-pad: 9px 20px;
   --tpl-ml-viewer-create-h: 55px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
-  --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: 92px; --tpl-ml-col-ops: 108px;
+  --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: calc(6 * var(--text-caption) + var(--tpl-badge-dot) + var(--polish-status-gap) + 2 * var(--space-8)); --tpl-ml-col-ops: 108px;
   --tpl-ml-col-need: 88px; --tpl-ml-col-gives: 150px; --tpl-ml-col-month: 92px; --tpl-ml-col-state-wide: 96px; --tpl-ml-col-ops-wide: 160px;
   --tpl-ml-col-rank: 72px; --tpl-ml-col-balance: 76px; --tpl-ml-col-change: 72px; --tpl-ml-col-last: 140px; --tpl-ml-col-ops-balance: 150px;
   --tpl-ml-col-delta: 56px; --tpl-ml-col-why: 180px; --tpl-ml-col-after: 62px; --tpl-ml-col-who: 90px; --tpl-ml-col-ops-history: 140px;
@@ -1247,7 +1247,7 @@
   --tpl-am-tab-h: 28.5px; --tpl-am-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-am-ro-row-pad: 12px 24px;
   --tpl-am-create-after: 14px; --tpl-am-create-w: 135px; --tpl-am-add-space: 31px; --tpl-am-note-lh: 17px; --tpl-am-notice-after: 5px;
   --tpl-am-col-gap: 16px; --tpl-am-head-h: var(--polish-table-head); --tpl-am-head-pad: 13px 20px; --tpl-am-row-h: var(--polish-table-row); --tpl-am-narrow-row-h: var(--polish-table-row); --tpl-am-row-pad: 9px 20px; --tpl-am-cell-gap: 3px; --tpl-am-num-pad-end: 8px;
-  --tpl-am-col-trigger: 130px; --tpl-am-col-who: 110px; --tpl-am-col-do: 140px; --tpl-am-col-runs: 80px; --tpl-am-col-state: 92px; --tpl-am-col-ops: 110px;
+  --tpl-am-col-trigger: 130px; --tpl-am-col-who: 110px; --tpl-am-col-do: 140px; --tpl-am-col-runs: 80px; --tpl-am-col-state: calc(6 * var(--text-caption) + var(--tpl-badge-dot) + var(--polish-status-gap) + 2 * var(--space-8)); --tpl-am-col-ops: 110px;
   --tpl-am-pill-gap: 5px; --tpl-am-pill-pad: 2px 8px; --tpl-am-pill-lh: 18px; --tpl-am-ops-gap: 6px; --tpl-am-edit-w: 81px; --tpl-am-foot-pad: 12px 24px;
   --tpl-am-run-row-h: var(--polish-table-row); --tpl-am-run-col-rule: 170px; --tpl-am-run-col-result: 110px; --tpl-am-run-col-done: 150px; --tpl-am-run-col-time: 84px; --tpl-am-run-col-ops: 120px; --tpl-am-pager-h: 32px; --tpl-am-pager-pad: 12px 20px; --tpl-am-run-foot-pad: 34px 0 0;
   --tpl-am-ca-row-h: var(--polish-table-row); --tpl-am-ca-col-steps: 200px; --tpl-am-ca-col-used: 96px; --tpl-am-ca-col-version: 90px;
@@ -1513,7 +1513,7 @@
   --tpl-tg2-info-pad: 14px 24px 0; --tpl-tg2-pill-pad: 2px 8px; --tpl-tg2-pill-gap: 5px; --tpl-tg2-pill-dot: 6px; --tpl-tg2-pill-lh: 18px;
   --tpl-tg2-safety-pad: 16px 24px; --tpl-tg2-safety-gap: 6px; --tpl-tg2-safety-body-size: var(--polish-text-body);
   --tpl-tg2-reason-w: 150px; --tpl-tg2-dialog-pull: -10px; --tpl-tg2-dialog-pull-top: -18px; --tpl-tg2-choice-gap: 10px; --tpl-tg2-usage-lh: 17px; --tpl-tg2-dialog-gap: 14px;
-  --tpl-preview-pad: 24px; --tpl-preview-narrow-width: 280px;
+  --tpl-preview-width: 380px; --tpl-preview-pad: 24px; --tpl-preview-narrow-width: 280px;
   --tpl-preview-content-width: 331px; --tpl-preview-narrow-content-width: 231px;
   --tpl-detail-content-gap: 20px;
   /* 戻るリンク（13px・高さ19）と題の間：作る8・詳細6。詳細の説明は 12px/17（X4STXS）。表の見出しは高さ40（H1O0a）。 */
@@ -3065,11 +3065,13 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-code-bg: #f5f6f8;
   --color-code-border: #e5e7eb;
   --color-choice-border: #c9ced6;
-  --choice-size: 16px;
+  --choice-size: 16px; --choice-checkbox-radius: 4px;
   --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;
   --space-8: 8px;
+  /* コピー成功の7文字・印・間隔。表の操作列も同じ予約幅を読む。 */
+  --copy-feedback-min-w: calc(7 * var(--text-caption) + var(--polish-icon-control) + var(--space-8) + var(--tpl-slot-gap));
   --space-16: 16px;
   --tpl-list-inset: 24px;
   --tpl-list-name-min: 12em;
