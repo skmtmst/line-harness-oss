@@ -30,6 +30,8 @@ const SCOPED_ADMIN_KEY = 'test-scoped-admin-key';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
+  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
      VALUES ('acc-1', 'アカウント', 'ch-1', 'token', 'secret'),

@@ -755,6 +755,7 @@ automations.get(
       (row) => mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
     );
     if (wantsCsv) {
+      c.set('outputAudit', { count: items.length, accountIds: allowedAccountIds, accountCounts: Object.fromEntries(allowedAccountIds.map(id => [id, items.filter(item => item.lineAccountId === id).length])) });
       /*
        * R495: 上限5,000件で切れたことを黙らせない。総件数と出力件数を
        * 応答の頭に載せ、切れたかどうかを使い手へ知らせる（画面が読む）。

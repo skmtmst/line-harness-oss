@@ -88,7 +88,7 @@ function deliveredHistoryCount() {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed();
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

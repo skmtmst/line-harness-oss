@@ -38,6 +38,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => fixture.tab,
 }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
+vi.mock('@/v8/settings/staff/mfa-policy', () => ({ default: () => null })) // This suite tests invitations, independently of security policy loading.
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -235,3 +236,6 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     expect(resendButtons()).toHaveLength(0)
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

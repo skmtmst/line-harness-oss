@@ -159,3 +159,6 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
     expect(screen.getByRole('link', { name: '→ 予約設定' }).getAttribute('href')).toBe('/booking/menus')
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

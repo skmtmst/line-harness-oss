@@ -4,6 +4,7 @@ import { activatePlatformAdminIfAwaitingTotp } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { sha256Hex } from '../middleware/auth.js';
 import { maskPiiDeep, isForbiddenWhileImpersonating } from '../middleware/impersonation.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -40,7 +41,7 @@ function app(staff: AuthenticatedStaff) {
 }
 
 function environment(): Env['Bindings'] {
-  return { DB: testDb.db, ADMIN_ORIGIN: 'https://admin.example.com', ADMIN_PUBLIC_URL: 'https://admin.example.com', WORKER_URL: 'https://admin.example.com' } as Env['Bindings'];
+  return { TOTP_ENCRYPTION_KEY: 'fixture-encryption-key-longer-than-thirty-two-characters', DB: testDb.db, ADMIN_ORIGIN: 'https://admin.example.com', ADMIN_PUBLIC_URL: 'https://admin.example.com', WORKER_URL: 'https://admin.example.com' } as Env['Bindings'];
 }
 
 const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
@@ -48,10 +49,10 @@ const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', 
 const readOnlyMaster: AuthenticatedStaff = { ...master, id: 'master-ro', readOnly: true };
 
 function json(body: unknown) {
-  return { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+  return { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer lh_session:ops-fixture' }, body: JSON.stringify(body) };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   testDb = createTestD1();
   mail.sendPlainMail.mockClear();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES (?, ?, 'active')`).run('tenant-a', '株式会社サンプル');
@@ -65,6 +66,7 @@ beforeEach(() => {
     testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES (?, ?, 'owner', ?, ?)`)
       .run(id, name, `${id}-key`, tenant);
   }
+  testDb.raw.prepare('INSERT INTO admin_sessions(token_hash,staff_id,expires_at) VALUES (?,?,?)').run(await sha256Hex('ops-fixture'), 'master-1', new Date(Date.now()+3600000).toISOString());
   for (const id of ['master-1', 'master-2', 'master-ro']) {
     testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES (?, 1)`).run(id);
   }
@@ -280,7 +282,10 @@ describe('運営メンバー', () => {
     expect((await check.json() as { data: { needsPassword: boolean; email: string } }).data).toMatchObject({ needsPassword: true, email: 'hanako@example.jp' });
     const accepted = await publicApp().request('/api/auth/ops-invite/accept', json({ token, name: '山田 花子', password: 'Str0ng-Passw0rd!' }), environment());
     expect(accepted.status, await accepted.clone().text()).toBe(200);
-    expect((await accepted.json() as { data: { next: string } }).data.next).toBe('two-factor-setup');
+    const acceptance = await accepted.json() as { data: { next: string; challengeToken: string } };
+    expect(acceptance.data.next).toBe('two-factor-setup');
+    expect(acceptance.data.challengeToken).toBeTruthy();
+    expect(accepted.headers.get('set-cookie')).toBeNull();
     const afterAccept = testDb.raw.prepare('SELECT activation_state FROM platform_admins WHERE staff_id = ?').get(body.data.staffId) as { activation_state: string };
     expect(afterAccept.activation_state).toBe('awaiting_totp');
     expect((await app(pending).request('/api/ops/me', {}, environment())).status).toBe(403);

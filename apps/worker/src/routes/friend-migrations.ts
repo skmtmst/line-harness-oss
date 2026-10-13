@@ -841,6 +841,7 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inp
       id, accountId, JSON.stringify({ accountId }), JSON.stringify(columns), body.encoding ?? 'utf-8',
       count?.count ?? 0, staff.id, staff.name, now.toISOString(), new Date(now.getTime() + 7 * 86_400_000).toISOString(),
     ).run();
+    c.set('outputAudit', { count: count?.count ?? null, accountId, targetId: id, phase: 'requested' });
     return c.json({ success: true, data: { id, rowCount: count?.count ?? null, status: 'completed', downloadUrl: `/api/friends/exports/${id}/download` } }, 201);
   } catch (error) {
     console.error(JSON.stringify({ event: 'friend_export_create_failed', error: String(error) }));
@@ -859,6 +860,8 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
   const fields = (JSON.parse(job.columns_json) as ExportColumn[]).includes('friend_fields')
     ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }, { status: 'active' })
     : [];
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM friends WHERE line_account_id=?').bind(job.line_account_id).first<{ n: number }>();
+  c.set('outputAudit', { count: count?.n ?? 0, accountId: job.line_account_id, targetId: c.req.param('id') });
   const encoder = new TextEncoder();
   let offset = 0;
   let started = false;

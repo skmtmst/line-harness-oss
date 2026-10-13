@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const dbMocks = {
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getFriendById: vi.fn(),
   getMileageSummaryForFriend: vi.fn(),

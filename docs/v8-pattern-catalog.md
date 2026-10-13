@@ -960,6 +960,12 @@
 
 - **L4 差し戻しJ**：数の帯に行メニューを置かず、絞り込みと行き先は `KpiCard.action`／`valueAction` へ。別の行き先の入口は残す。行の登録は共通 `Button` の `size="compact"` を使い、表の52/60を変更しない。CIの `pendec2-rules` が帯の中の行メニューを検出する（故障注入あり）。
 
+## 認証の画面（B-263）
+
+- 持ち主：`components/templates/auth-page.tsx`。ログインの確認・初回登録・回復コードを同じ型で組む。
+- 形と値：BOj1aと修正案A〜E（2FA-PEN-1012）を使う。欄・トグル・確認は共通部品。回復コードは共有 `OtpInput` の recovery（8マス・4-4）と `RecoveryCodeList`（8個・2列）で組む。幅いっぱいの主ボタンは `Button.fullWidth` で中央文字（B-264）。
+- 見張り：`v8-pattern-audit.mjs` と二段階認証の操作試験。
+
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。

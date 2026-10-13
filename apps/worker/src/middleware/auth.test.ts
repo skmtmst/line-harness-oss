@@ -1,3 +1,4 @@
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -14,13 +15,19 @@ import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import type { Env } from '../index.js';
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async original => ({
+  ...await original<typeof import('@line-crm/db')>(),
   // 代理ログイン（★V6 37-5）。ここでは常に「無し」。
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async (_db: unknown, staffId: string) => staffId === 'ops-staff-1'
     ? { staff_id: staffId, is_active: 1, activation_state: 'active' }
     : null),
   getPlatformAdminRecord: vi.fn(async () => null),
+  getPlatformSetting: vi.fn(async () => 'false'),
+  recordAuditEvent: vi.fn(async () => undefined),
+  readAuthThrottle: vi.fn(async () => 0),
+  bumpAuthThrottle: vi.fn(async () => 1),
+  clearAuthThrottle: vi.fn(async () => undefined),
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token === 'suspended-key') return { id: 'suspended-owner', name: 'Stopped Owner', role: 'owner', tenant_id: 'tenant-stopped', tenant_status: 'suspended' };
     if (token === 'archived-key') return { id: 'archived-owner', name: 'Archived Owner', role: 'owner', tenant_id: 'tenant-archived', tenant_status: 'archived' };
@@ -72,7 +79,7 @@ vi.mock('@line-crm/db', () => ({
   activatePlatformAdminIfAwaitingTotp: vi.fn(async () => false),
   deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
   getTwoFactorChallenge: vi.fn(async () => null),
-  getStaffById: vi.fn(async () => null),
+  getStaffById: vi.fn(async (_db: unknown, id: string) => id === 'staff-1' ? { id, name: 'Staff One', role: 'admin', is_active: 1, totp_enabled_at: null, totp_secret_enc: null } : null),
   // V: セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
   getAdminSessionByTokenHash: vi.fn(async () => null),
   adminSessionFamiliarity: vi.fn(async () => ({
@@ -342,10 +349,15 @@ describe('Authenticator verification', () => {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
     const step = Math.floor(Date.now() / 30_000);
+    const testDb = createTestD1();
+    const { sha256Hex } = await import('./auth.js');
+    testDb.raw.prepare("INSERT INTO staff_members(id,name,role,api_key) VALUES ('staff-1','Fixture','admin','fixture-key')").run();
+    testDb.raw.prepare('INSERT INTO admin_two_factor_challenges(token_hash,staff_id,expires_at,purpose) VALUES (?,?,?,?)')
+      .run(await sha256Hex('challenge'), 'staff-1', new Date(Date.now()+60000).toISOString(), 'verify');
     const response = await app().request('/api/auth/two-factor/verify', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ challengeToken: 'challenge', code: await totpAtStep(secret, step) }),
-    }, { ...crossSiteEnv(), TOTP_ENCRYPTION_KEY: masterKey });
+    }, { ...crossSiteEnv(), DB: testDb.db, TOTP_ENCRYPTION_KEY: masterKey });
     expect(response.status).toBe(200);
     const body = await response.json() as { success: boolean; data: { sessionToken?: string }; csrfToken: string };
     expect(body.success).toBe(true);
@@ -353,6 +365,7 @@ describe('Authenticator verification', () => {
     expect(body.csrfToken).toBeTruthy();
     expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
+    testDb.raw.close();
   });
 
   test.each(['operations.control', 'photo.original.download'])(
@@ -1149,7 +1162,8 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ended_at: null,
       reason: null,
     } as never);
-    const res = await app().request('/api/friends', staffBearer('ops-staff-key'), crossSiteEnv());
+    vi.mocked(db.getStaffByAdminSession).mockResolvedValueOnce({ id: 'ops-staff-1', name: 'Fixture operator', role: 'staff', is_active: 1 } as never);
+    const res = await app().request('/api/friends', staffBearer('lh_session:ops-session-fixture'), crossSiteEnv());
     expect(res.status).toBe(200);
   });
 });
