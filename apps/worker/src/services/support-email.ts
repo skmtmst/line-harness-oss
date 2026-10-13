@@ -182,7 +182,7 @@ export async function storeSupportEmail(
     return {threadId:saved.thread_id,duplicate:true};
   }
 
-  console.log(JSON.stringify({ event: 'support_email_received', threadId, from: customerEmail }));
+  console.log(JSON.stringify({"code":"support_email_received"}));
   return { threadId, duplicate: false };
 }
 
@@ -353,6 +353,6 @@ export async function sendSupportEmailReply(
     }),
   ]);
 
-  console.log(JSON.stringify({ event: 'support_email_replied', threadId, staffId }));
+  console.log(JSON.stringify({"code":"support_email_replied"}));
   return { messageId: sentMessageId };
 }

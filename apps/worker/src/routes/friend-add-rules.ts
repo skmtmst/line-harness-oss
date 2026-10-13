@@ -921,7 +921,7 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch (error) {
-    console.error('GET /api/friend-add-runs error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-runs"}));
     return c.json({ success: false, error: '実行結果を取得できませんでした' }, 500);
   }
 });
@@ -1002,7 +1002,7 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
       },
     });
   } catch (error) {
-    console.error('GET /api/friend-add-runs/:id error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-runs/:id"}));
     return c.json({ success: false, error: '実行結果の詳細を取得できませんでした' }, 500);
   }
 });
@@ -1027,7 +1027,7 @@ friendAddRules.post('/api/friend-add-runs/:id/retry', requireDeliveryAccess('fri
       data: { status: result.status, retried: result.retried ?? 0 },
     });
   } catch (error) {
-    console.error('POST /api/friend-add-runs/:id/retry error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-runs/:id/retry"}));
     return c.json({ success: false, error: '失敗した処理を再試行できませんでした' }, 500);
   }
 });
@@ -1071,7 +1071,7 @@ friendAddRules.post('/api/friend-add-rules/folders', requireDeliveryAccess('frie
     if (error instanceof Error && /unique/i.test(error.message)) {
       return c.json({ success: false, code: 'DUPLICATE_FOLDER_NAME', error: '同じ名前のフォルダがあります' }, 409);
     }
-    console.error('POST /api/friend-add-rules/folders error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-rules/folders"}));
     return c.json({ success: false, error: 'フォルダを作成できませんでした' }, 500);
   }
 });
@@ -1119,7 +1119,7 @@ friendAddRules.delete('/api/friend-add-rules/folders/:id', requireDeliveryAccess
     if (result === 'conflict') return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'フォルダが更新されました。読み直してください' }, 409);
     return c.json({ success: true, data: { id, deleted: true } satisfies import('@line-crm/shared').FriendAddRuleFolderDeleteResult });
   } catch (error) {
-    console.error('DELETE /api/friend-add-rules/folders/:id error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"DELETE /api/friend-add-rules/folders/:id"}));
     return c.json({ success: false, error: 'フォルダを削除できませんでした' }, 500);
   }
 });
@@ -1218,7 +1218,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
     if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_CURSOR_INVALID') {
       return c.json({ success: false, error: 'cursor が正しくありません' }, 400);
     }
-    console.error('GET /api/friend-add-rules error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-rules"}));
     return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
   }
 });
@@ -1275,7 +1275,7 @@ friendAddRules.patch('/api/friend-add-rules/reorder', requireDeliveryAccess('fri
     await reorderFriendAddRulePriorities(c.env.DB, { lineAccountId: accountId, friendKind: kind, ids });
     return c.json({ success: true, data: { updated: ids.length } });
   } catch (error) {
-    console.error('PATCH /api/friend-add-rules/reorder error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"PATCH /api/friend-add-rules/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1351,7 +1351,7 @@ friendAddRules.put('/api/friend-add-rules/order', requireDeliveryAccess('friendA
     const orderVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
     return c.json({ success: true, data: { updated: ids.length, orderVersion } });
   } catch (error) {
-    console.error('PUT /api/friend-add-rules/order error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"PUT /api/friend-add-rules/order"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1433,7 +1433,7 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
       },
     });
   } catch (error) {
-    console.error('GET /api/friend-add-rules/conflicts error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-rules/conflicts"}));
     return c.json({ success: false, error: '競合と優先順位を取得できませんでした' }, 500);
   }
 });
@@ -1714,7 +1714,7 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
       await new LineClient(account.channel_access_token)
         .pushMessage(friend.line_user_id, [{ type: 'text', text }], idempotencyKey);
     } catch (error) {
-      console.error('POST /api/friend-add-rules/:id/test-send push failed:', error);
+      console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-rules/:id/test-send"}));
       return c.json({ success: false, error: 'LINEへ送信できませんでした' }, 502);
     }
     await c.env.DB.prepare(
@@ -1732,7 +1732,7 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
       },
     });
   } catch (error) {
-    console.error('POST /api/friend-add-rules/:id/test-send error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-rules/:id/test-send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

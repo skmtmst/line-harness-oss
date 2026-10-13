@@ -95,7 +95,7 @@ export async function processSegmentSend(
         );
         await db.batch(logStmts);
       } catch (err) {
-        console.error(`Segment multicast batch ${batchIndex} failed:`, err);
+        console.error(JSON.stringify({"code":"services_segment_send_failed"}));
         // Continue with next batch; failed batch is not logged
       }
     }

@@ -1487,6 +1487,11 @@ const spec = {
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['required'], properties: { required: { type: 'boolean' } } } } } },
         responses: { '200': { description: '監査へ保存。Onへの変更時は既存セッションを失効' }, '401': { description: '再確認が必要' }, '400': { description: '鍵が未設定のため必須にできない' }, '403': { description: '変更権限なし' }, '409': { description: '他の操作と競合' } } },
     },
+    '/api/auth/api-key': {
+      get: { summary: '本人のAPI鍵の発行・最終利用・失効日時（秘密値なし）', tags: ['Auth'], responses: { '200': { description: '日時のみ' }, '403': { description: '本人セッションが必要' } } },
+      post: { summary: '本人確認後に鍵を交換し、この応答で一度だけ表示', tags: ['Auth'], parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.api_key用の一回限りの確認票' }], responses: { '200': { description: '新しい鍵。古い鍵と本人の全セッションは失効。再ログインが必要' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
+      delete: { summary: '本人確認後にAPI鍵と本人の全セッションを失効', tags: ['Auth'], parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.api_key用の一回限りの確認票' }], responses: { '200': { description: '失効済み。秘密値は返さない' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
+    },
     '/api/auth/two-factor/self': {
       get: { summary: '本人の認証アプリ登録日と回復コードの残数', tags: ['Auth'],
         responses: { '200': { description: '本人だけの登録日・残数・鍵の準備状態。コードとハッシュは返さない' }, '401': { description: '未ログイン' }, '403': { description: '代理ログイン中または本人設定なし' } } },

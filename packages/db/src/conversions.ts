@@ -610,9 +610,7 @@ export async function trackConversion(
     }
     const exclusion = readConversionExclusion(parsed);
     if (exclusion.invalid) {
-      console.error('conversion exclusion unreadable:', {
-        conversionPointId: input.conversionPointId,
-      });
+      console.error(JSON.stringify({"code":"src_conversions_failed"}));
     } else if (await isFriendExcludedByConversion(db, input.friendId, exclusion.condition)) {
       throw new Error('conversion_excluded');
     }
@@ -837,10 +835,7 @@ export async function trackConversion(
   try {
     await recordAttributionDecision(db, id, input.friendId, input.conversionPointId, explanation);
   } catch (err) {
-    console.error('attribution decision unreadable:', {
-      conversionEventId: id,
-      err: err instanceof Error ? err.message : String(err),
-    });
+    console.error(JSON.stringify({"code":"src_conversions_failed"}));
   }
   await queueMappedAdConversion(db, created.id);
   return created;

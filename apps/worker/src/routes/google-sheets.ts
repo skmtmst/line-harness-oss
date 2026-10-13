@@ -203,7 +203,7 @@ function sheetsErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  console.error('[google-sheets] unexpected failure', { name: error instanceof Error ? error.name : 'UnknownError' });
+  console.error(JSON.stringify({"code":"routes_google_sheets_failed"}));
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
@@ -432,7 +432,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
     return c.redirect(adminReturnUrl(c, lineAccountId, stateRow.mode === 'reconnect' ? 'reconnected' : 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    console.error('[google-sheets] oauth callback failed', { code });
+    console.error(JSON.stringify({"code":"routes_google_sheets_failed","route":"GET /api/integrations/google-sheets/oauth/callback"}));
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
 });

@@ -329,12 +329,7 @@ export async function dispatchAutomationEventWithLogging(
   const results = await dispatchAutomationEvent(db, input, options);
   for (const result of results) {
     if (result.kind === 'configuration_error') {
-      console.error(JSON.stringify({
-        event: 'automation_v6_trigger_failed',
-        automationId: result.automationId,
-        eventType: input.eventType,
-        reason: result.error,
-      }));
+      console.error(JSON.stringify({"code":"automation_v6_trigger_failed"}));
     }
   }
   return results;

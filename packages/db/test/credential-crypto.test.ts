@@ -90,7 +90,7 @@ describe('LINE credential AES-GCM encryption', () => {
     warn.mockRestore();
   });
 
-  it('warns with safe structured fields and falls back when decrypt fails', async () => {
+  it('warns with a fixed code without identifiers and falls back when decrypt fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const encryptedToken = await encryptCredential('new-token', KEY);
     const encryptedSecret = await encryptCredential('new-secret', KEY);
@@ -106,12 +106,7 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(resolved.channel_access_token_last4).toBeNull();
     expect(resolved.channel_secret_last4).toBeNull();
     expect(warn).toHaveBeenCalledTimes(2);
-    expect(warn.mock.calls[0]).toEqual([{
-      event: 'line_credential_plaintext_fallback',
-      line_account_id: 'acc-1',
-      field: 'channel_access_token',
-      reason: 'decrypt_failed',
-    }]);
+    expect(warn.mock.calls[0]).toEqual([JSON.stringify({ code: 'line_credential_plaintext_fallback' })]);
     const output = JSON.stringify(warn.mock.calls);
     for (const value of [
       KEY,
@@ -122,6 +117,7 @@ describe('LINE credential AES-GCM encryption', () => {
       'new-secret',
       'legacy-token',
       'legacy-secret',
+      'acc-1',
     ]) {
       expect(output).not.toContain(value);
     }
@@ -156,7 +152,7 @@ describe('LINE credential AES-GCM encryption', () => {
     warn.mockRestore();
   });
 
-  it('logs a missing-key classification when a joined credential falls back', async () => {
+  it('logs a fixed fallback code without joined identifiers when the key is missing', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const encryptedToken = await encryptCredential('new-token', KEY);
 
@@ -168,12 +164,9 @@ describe('LINE credential AES-GCM encryption', () => {
         undefined,
       ),
     ).resolves.toBe('legacy-token');
-    expect(warn).toHaveBeenCalledWith({
-      event: 'line_credential_plaintext_fallback',
-      line_account_id: 'acc-joined',
-      field: 'channel_access_token',
-      reason: 'key_unavailable_or_invalid',
-    });
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'line_credential_plaintext_fallback' }));
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('acc-joined');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('legacy-token');
     warn.mockRestore();
   });
 

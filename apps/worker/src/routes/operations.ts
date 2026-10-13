@@ -110,7 +110,7 @@ async function queueOperationNotifications(
   try {
     return await enqueueOperationNotifications(c.env.DB, input);
   } catch (error) {
-    console.error(`operation ${input.eventKind} notification enqueue error:`, error);
+    console.error(JSON.stringify({"code":"routes_operations_failed"}));
     return { failed: ['line', 'email'] };
   }
 }
@@ -323,7 +323,7 @@ operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c
   try {
     return c.json({ success: true, data: { ...staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)), loginSecurity: mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY) } });
   } catch (error) {
-    console.error('GET /api/operations/health error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/health"}));
     return c.json({ success: false, error: '運用状態を取得できませんでした' }, 500);
   }
 });
@@ -347,7 +347,7 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), in
     });
     return c.json({ success: true, duplicate: checked.duplicate, data: { ...staleHealth(checked.run), loginSecurity: mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY) } }, checked.duplicate ? 200 : 201);
   } catch (error) {
-    console.error('POST /api/operations/health/runs error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"POST /api/operations/health/runs"}));
     return c.json({ success: false, error: '運用状態を確認できませんでした' }, 500);
   }
 });
@@ -367,7 +367,7 @@ operations.get('/api/operations/alerts', requireRole('owner', 'admin'), async (c
       }),
     });
   } catch (error) {
-    console.error('GET /api/operations/alerts error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/alerts"}));
     return c.json({ success: false, error: '異常の一覧を取得できませんでした' }, 500);
   }
 });
@@ -403,7 +403,7 @@ operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', '
     });
     return c.json({ success: true, duplicate: saved.status === 'duplicate', data: saved.alert });
   } catch (error) {
-    console.error('POST /api/operations/alerts/:id/acknowledge error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"POST /api/operations/alerts/:id/acknowledge"}));
     return c.json({ success: false, error: '異常の受領を保存できませんでした' }, 500);
   }
 });
@@ -428,7 +428,7 @@ operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('o
     });
     return c.json({ success: true, data: { retried } });
   } catch (error) {
-    console.error('POST /api/operations/alerts/:id/notifications/retry error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"POST /api/operations/alerts/:id/notifications/retry"}));
     return c.json({ success: false, error: '通知の再送を受け付けられませんでした' }, 500);
   }
 });
@@ -441,7 +441,7 @@ operations.get('/api/operations/control', requireRole('owner', 'admin'), async (
   try {
     return c.json({ success: true, data: await getOperationControlSet(c.env.DB, accountId) });
   } catch (error) {
-    console.error('GET /api/operations/control error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/control"}));
     return c.json({ success: false, error: '緊急停止状態を取得できませんでした' }, 500);
   }
 });
@@ -491,7 +491,7 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
       },
     });
   } catch (error) {
-    console.error('GET /api/operations/control/preview error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/control/preview"}));
     return c.json({ success: false, error: '緊急停止の影響人数を取得できませんでした' }, 500);
   }
 });
@@ -533,7 +533,7 @@ operations.get('/api/operations/send-paths', requireRole('owner', 'admin'), asyn
       },
     });
   } catch (error) {
-    console.error('GET /api/operations/send-paths error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/send-paths"}));
     return c.json({ success: false, error: '送信経路の一覧を取得できませんでした' }, 500);
   }
 });
@@ -578,7 +578,7 @@ operations.get('/api/operations/history', requireRole('owner', 'admin'), async (
     ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).slice(0, limit);
     return c.json({ success: true, data: history });
   } catch (error) {
-    console.error('GET /api/operations/history error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/history"}));
     return c.json({ success: false, error: '緊急操作の履歴を取得できませんでした' }, 500);
   }
 });
@@ -592,7 +592,7 @@ operations.get('/api/operations/incidents/:id', requireRole('owner', 'admin'), a
     }
     return c.json({ success: true, data: incident });
   } catch (error) {
-    console.error('GET /api/operations/incidents/:id error:', error);
+    console.error(JSON.stringify({"code":"routes_operations_failed","route":"GET /api/operations/incidents/:id"}));
     return c.json({ success: false, error: '緊急操作の記録を取得できませんでした' }, 500);
   }
 });
@@ -706,7 +706,7 @@ operations.post(
       });
       return c.json({ success: true, data: { ...result, notifications } }, 201);
     } catch (error) {
-      console.error('POST /api/operations/incidents error:', error);
+      console.error(JSON.stringify({"code":"routes_operations_failed","route":"POST /api/operations/incidents"}));
       return c.json({ success: false, error: '緊急停止状態を保存できませんでした' }, 500);
     }
   },
@@ -742,7 +742,7 @@ operations.post(
         },
       });
     } catch (error) {
-      console.error('POST /api/operations/incidents/:id/restore-preview error:', error);
+      console.error(JSON.stringify({"code":"routes_operations_failed","route":"POST /api/operations/incidents/:id/restore-preview"}));
       return c.json({ success: false, error: '復旧前の検査に失敗しました' }, 500);
     }
   },
@@ -875,7 +875,7 @@ operations.post(
       });
       return c.json({ success: true, data: { ...result, notifications } });
     } catch (error) {
-      console.error('POST /api/operations/incidents/:id/restore error:', error);
+      console.error(JSON.stringify({"code":"routes_operations_failed","route":"POST /api/operations/incidents/:id/restore"}));
       return c.json({ success: false, error: '復旧後の状態を保存できませんでした' }, 500);
     }
   },

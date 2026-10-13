@@ -33,6 +33,7 @@ class MockMediaUsageReferenceError extends Error {
 }
 
 const mocks = {
+  recordAuditEvent: vi.fn(async () => undefined),
   getStaffNameMap: vi.fn(async () => new Map()),
   getMedia: vi.fn(),
   countMedia: vi.fn(),
@@ -171,7 +172,7 @@ const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
 const get = vi.fn();
 const env = {
-  DB: {} as D1Database,
+  DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } as unknown as D1Database,
   IMAGES: { put, delete: del, head, get } as unknown as R2Bucket,
   WORKER_URL: 'https://api.example.com',
   CF_ACCOUNT_ID: 'cf-account',
@@ -1469,13 +1470,8 @@ describe('メディア使用先の一括差し替え', () => {
         expectedRevision: revision,
       });
       expect(response.status).toBe(200);
-      const audited = logSpy.mock.calls
-        .map((call) => String(call[0]))
-        .filter((line) => line.includes('"tag":"audit"'))
-        .map((line) => JSON.parse(line) as { action: string; targetId: string });
-      expect(audited).toEqual(expect.arrayContaining([
-        expect.objectContaining({ action: 'media.replace_usages', targetId: 'md-1' }),
-      ]));
+      expect(mocks.recordAuditEvent).toHaveBeenCalledWith(env.DB, expect.objectContaining({ action: 'media.replace_usages', targetId: 'md-1' }));
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain('md-1');
     } finally {
       logSpy.mockRestore();
     }

@@ -139,7 +139,7 @@ async function saveFriendAddCandidate(
     });
   } catch (err) {
     // 既存のLIFF連携を止めない。台帳だけ監視ログへ残して再調査できるようにする。
-    console.error({ event: 'friend_add_candidate_record_failed', reason: String(err) });
+    console.error(JSON.stringify({"code":"friend_add_candidate_record_failed"}));
   }
 }
 
@@ -179,14 +179,12 @@ async function linkIgIgsid(
       linked = row?.ig_igsid === igParam;
     }
   } catch (err) {
-    console.error('Failed to write friends.ig_igsid:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed"}));
     return false;
   }
 
   if (!linked) {
-    console.warn(
-      `Skipping IG Harness notify: friend ${friendId} is already linked to a different IGSID`,
-    );
+    console.warn(JSON.stringify({"code":"routes_liff_warn"}));
     return false;
   }
 
@@ -213,14 +211,11 @@ async function linkIgIgsid(
       })
         .then(async (res) => {
           if (!res.ok) {
-            console.error(
-              'IG Harness link-line failed:',
-              res.status,
-              await res.text().catch(() => ''),
-            );
+            console.error(JSON.stringify({"code":"routes_liff_failed"}));
           }
+          await res.body?.cancel().catch(() => undefined);
         })
-        .catch((err) => console.error('IG Harness link-line error:', err)),
+        .catch((err) => console.error(JSON.stringify({"code":"routes_liff_failed"}))),
     );
   }
   return true;
@@ -246,7 +241,7 @@ async function saveIgAccountMeta(
     if (igAccountUsername) patch.ig_account_username = igAccountUsername.replace(/^@/, '');
     await patchFriendMetadata(db, friendId, patch, { firstTouchKeys: ['ig_account_id','ig_account_username'] });
   } catch (err) {
-    console.error('Failed to save IG account metadata:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed"}));
   }
 }
 
@@ -318,7 +313,7 @@ async function applyRefAttribution(
             await notifyAffiliateFriendAdd(db, c.env, affiliate.id, offerName);
           }
         } catch (err) {
-          console.error('Affiliate friend-add notify failed (non-blocking):', err);
+          console.error(JSON.stringify({"code":"routes_liff_failed"}));
         }
       }
 
@@ -370,7 +365,7 @@ async function applyRefAttribution(
         { mode: 'every-click', targetLineUserId: lineUserId },
       );
     } catch (err) {
-      console.error('Ref scenario enrollment error:', err);
+      console.error(JSON.stringify({"code":"routes_liff_failed"}));
     }
   }
 }
@@ -795,7 +790,7 @@ liffRoutes.get('/auth/callback', async (c) => {
 
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
-      console.error('Token exchange failed:', errText);
+      console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
       return c.html(errorPage('Token exchange failed'));
     }
 
@@ -890,7 +885,7 @@ liffRoutes.get('/auth/callback', async (c) => {
           source: 'line_login',
         });
       } catch (err) {
-        console.error('Stop suppression record failed (fail-closed):', err);
+        console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
         return c.html(errorPage('Internal error'), 500);
       }
     }
@@ -994,14 +989,14 @@ liffRoutes.get('/auth/callback', async (c) => {
         const xhResult = await resolveXHarnessToken(xhToken, c.env);
         if (xhResult?.xUsername) {
           await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
-          console.log(`X Harness: linked @${xhResult.xUsername} to friend ${friend.id}`);
+          console.log(JSON.stringify({"code":"routes_liff_log","route":"GET /auth/callback"}));
         }
         // Apply gate actions (tag + scenario) from X Harness
         if (xhResult) {
           await applyXHarnessActions(db, friend.id, xhResult);
         }
       } catch (err) {
-        console.error('X Harness token resolution error (non-blocking):', err);
+        console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
       }
     }
 
@@ -1068,11 +1063,11 @@ liffRoutes.get('/auth/callback', async (c) => {
             );
           }
         } catch (err) {
-          console.error(`OAuth friend_add enrollment failed scenario=${scenario.id}:`, err);
+          console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
         }
       }
     } catch (err) {
-      console.error('OAuth scenario enrollment error:', err);
+      console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
     }
 
     // Redirect or show completion. Guard against open-redirect abuse: only
@@ -1143,7 +1138,7 @@ liffRoutes.get('/auth/callback', async (c) => {
               const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
               await setFriendFirstTrackedLinkIfNull(db, friend.id, trackedLink.id);
             } catch (e) {
-              console.error('setFriendFirstTrackedLinkIfNull failed (non-blocking):', e);
+              console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
             }
             if (trackedLink.intro_template_id) {
               introTemplate = await getMessageTemplateById(db, trackedLink.intro_template_id);
@@ -1168,7 +1163,7 @@ liffRoutes.get('/auth/callback', async (c) => {
         const lineClient = new LineClient(accessToken);
         await lineClient.pushMessage(friend.line_user_id, [introMessage as any]);
       } catch (err) {
-        console.error('Form link push error (non-blocking):', err);
+        console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
       }
     }
 
@@ -1210,7 +1205,7 @@ liffRoutes.get('/auth/callback', async (c) => {
     return c.html(completionPage(displayName, pictureUrl, ref));
 
   } catch (err) {
-    console.error('Auth callback error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
     return c.html(errorPage('Internal error'));
   }
 });
@@ -1273,7 +1268,7 @@ liffRoutes.get('/api/liff/config', async (c) => {
       data: { botBasicId, accountName, accountId, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
     });
   } catch (err) {
-    console.error('GET /api/liff/config error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/liff/config"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1309,7 +1304,7 @@ liffRoutes.post('/api/liff/profile', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (err) {
-    console.error('POST /api/liff/profile error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/profile"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1335,7 +1330,7 @@ liffRoutes.post('/api/liff/entry-route-coupon', async (c) => {
     if (!coupon) return c.json({ success: false, error: 'このクーポンは現在受け取れません', code: 'ENTRY_COUPON_UNAVAILABLE' }, 409);
     return c.json({ success: true, data: coupon });
   } catch (error) {
-    console.error('POST /api/liff/entry-route-coupon error:', error);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/entry-route-coupon"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1362,7 +1357,7 @@ liffRoutes.post('/api/liff/entry-route-coupon/use', async (c) => {
     if (!result.ok) return c.json({ success: false, error: result.message }, 409);
     return c.json({ success: true, data: { message: result.message, replayed: result.replayed ?? false } });
   } catch (error) {
-    console.error('POST /api/liff/entry-route-coupon/use error:', error);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/entry-route-coupon/use"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1435,7 +1430,7 @@ liffRoutes.post('/api/liff/friend-add-intent', inputJsonBoundary({"ref":["string
       },
     });
   } catch (err) {
-    console.error('POST /api/liff/friend-add-intent error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/friend-add-intent"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1601,13 +1596,13 @@ liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displ
           const xhResult = await resolveXHarnessToken(xhToken, c.env);
           if (xhResult?.xUsername) {
             await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
-            console.log(`X Harness: linked @${xhResult.xUsername} to friend ${friend.id}`);
+            console.log(JSON.stringify({"code":"routes_liff_log","route":"POST /api/liff/link"}));
           }
           if (xhResult) {
             await applyXHarnessActions(db, friend.id, xhResult);
           }
         } catch (err) {
-          console.error('X Harness token resolution error (non-blocking):', err);
+          console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/link"}));
         }
       }
       return c.json({
@@ -1682,13 +1677,13 @@ liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displ
         const xhResult = await resolveXHarnessToken(xhToken, c.env);
         if (xhResult?.xUsername) {
           await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
-          console.log(`X Harness: linked @${xhResult.xUsername} to friend ${friend.id}`);
+          console.log(JSON.stringify({"code":"routes_liff_log","route":"POST /api/liff/link"}));
         }
         if (xhResult) {
           await applyXHarnessActions(db, friend.id, xhResult);
         }
       } catch (err) {
-        console.error('X Harness token resolution error (non-blocking):', err);
+        console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/link"}));
       }
     }
 
@@ -1697,7 +1692,7 @@ liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displ
       data: { userId, alreadyLinked: false },
     });
   } catch (err) {
-    console.error('POST /api/liff/link error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/link"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1839,7 +1834,7 @@ liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staf
       },
     });
   } catch (err) {
-    console.error('GET /api/analytics/ref-summary error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/analytics/ref-summary"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1908,7 +1903,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'sta
       },
     });
   } catch (err) {
-    console.error('GET /api/analytics/ref/:refCode error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/analytics/ref/:refCode"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2025,7 +2020,7 @@ liffRoutes.get('/api/analytics/ref/:refCode/orders', requireRole('owner', 'admin
       },
     });
   } catch (err) {
-    console.error('GET /api/analytics/ref/:refCode/orders error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/analytics/ref/:refCode/orders"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2051,7 +2046,7 @@ liffRoutes.post('/api/links/wrap', requireRole('owner', 'admin'), inputJsonBound
     const wrappedUrl = `${liffUrl}?${params.toString()}`;
     return c.json({ success: true, data: { url: wrappedUrl } });
   } catch (err) {
-    console.error('POST /api/links/wrap error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/links/wrap"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2214,10 +2209,10 @@ async function applyXHarnessActions(
       if (tagRow) {
         const { addTagToFriend } = await import('@line-crm/db');
         await addTagToFriend(db, friendId, tagRow.id);
-        console.log(`X Harness: added tag "${result.tag}" to friend ${friendId}`);
+        console.log(JSON.stringify({"code":"routes_liff_log"}));
       }
     } catch (err) {
-      console.error(`X Harness: failed to add tag "${result.tag}":`, err);
+      console.error(JSON.stringify({"code":"routes_liff_failed"}));
     }
   }
 
@@ -2226,9 +2221,9 @@ async function applyXHarnessActions(
     try {
       const { enrollFriendInScenario } = await import('@line-crm/db');
       await enrollFriendInScenario(db, friendId, result.scenarioId);
-      console.log(`X Harness: enrolled friend ${friendId} in scenario ${result.scenarioId}`);
+      console.log(JSON.stringify({"code":"routes_liff_log"}));
     } catch (err) {
-      console.error(`X Harness: failed to enroll in scenario:`, err);
+      console.error(JSON.stringify({"code":"routes_liff_failed"}));
     }
   }
 }
@@ -2398,7 +2393,7 @@ liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["st
           const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
           await setFriendFirstTrackedLinkIfNull(c.env.DB, friend.id, trackedLink.id);
         } catch (e) {
-          console.error('setFriendFirstTrackedLinkIfNull failed (non-blocking):', e);
+          console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/send-form-link"}));
         }
       }
       if (trackedLink?.intro_template_id) {
@@ -2425,7 +2420,7 @@ liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["st
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/liff/send-form-link error:', err);
+    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/send-form-link"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

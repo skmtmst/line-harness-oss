@@ -842,7 +842,7 @@ async function loadAvailabilityData(
     } catch (error) {
       // Configured calendar must fail closed. Showing slots while Google is
       // unreachable can create double bookings.
-      console.error(`Google Calendar availability failed for staff=${staff.id}`, error);
+      console.error(JSON.stringify({"code":"services_availability_failed"}));
       googleBusyByStaff.set(staff.id, []);
       calendarSync.push({ staff_id: staff.id, configured: true, ok: false, error: 'unavailable' });
     }

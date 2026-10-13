@@ -371,6 +371,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
         run: node scripts/codex/revfix-c-liff-browser.mjs
+      - name: Verify LIFF security headers and public SDK compatibility
+        run: node scripts/codex/train32-security-browser.mjs worker
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -546,6 +548,8 @@ jobs:
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
         run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+      - name: Verify admin security headers and auth interactions
+        run: node scripts/codex/train32-security-browser.mjs web
       - name: Upload MFA browser failure context
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

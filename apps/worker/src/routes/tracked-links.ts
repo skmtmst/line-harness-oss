@@ -128,7 +128,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: items.map((item) => serializeTrackedLink(item, base)) });
   } catch (err) {
-    console.error('GET /api/tracked-links error:', err);
+    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"GET /api/tracked-links"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -156,7 +156,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
       },
     });
   } catch (err) {
-    console.error('GET /api/tracked-links/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"GET /api/tracked-links/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -200,7 +200,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJson
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) }, 201);
   } catch (err) {
-    console.error('POST /api/tracked-links error:', err);
+    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"POST /api/tracked-links"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -234,7 +234,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) });
   } catch (err) {
-    console.error('PATCH /api/tracked-links/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"PATCH /api/tracked-links/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -250,7 +250,7 @@ trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), req
     await deleteTrackedLink(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/tracked-links/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"DELETE /api/tracked-links/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

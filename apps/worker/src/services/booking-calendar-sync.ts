@@ -308,7 +308,7 @@ export async function runCalendarDeleteOperation(
         errorCode: error instanceof Error ? error.name : 'calendar_delete_failed',
         result: { direction: 'delete' },
       });
-      console.error('Google Calendar delete (cancel) failed:', error);
+      console.error(JSON.stringify({"code":"services_booking_calendar_sync_failed"}));
       return 'retry_wait';
     }
     await finishBookingOperation(db, {
@@ -319,7 +319,7 @@ export async function runCalendarDeleteOperation(
     });
     return 'succeeded';
   } catch (error) {
-    console.error('Google Calendar delete operation failed:', error);
+    console.error(JSON.stringify({"code":"services_booking_calendar_sync_failed"}));
     return 'retry_wait';
   }
 }
@@ -587,7 +587,7 @@ export async function runBookingGoogleSync(
       errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
       result: { direction: 'sync' },
     }).catch(() => undefined);
-    console.error('Google Calendar sync failed:', error);
+    console.error(JSON.stringify({"code":"services_booking_calendar_sync_failed"}));
     return 'retry_wait';
   }
 }

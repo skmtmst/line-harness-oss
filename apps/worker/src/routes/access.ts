@@ -125,7 +125,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/access/users error:', error instanceof Error ? error.name : 'unknown');
+      console.error(JSON.stringify({"code":"routes_access_failed","route":"GET /api/access/users"}));
       return c.json({ success: false, error: 'ログインユーザーを取得できませんでした' }, 500);
     }
   },
@@ -157,7 +157,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/access/roles error:', error instanceof Error ? error.name : 'unknown');
+      console.error(JSON.stringify({"code":"routes_access_failed","route":"GET /api/access/roles"}));
       return c.json({ success: false, error: '権限のかたまりを取得できませんでした' }, 500);
     }
   },
@@ -213,7 +213,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/audit/events error:', error instanceof Error ? error.name : 'unknown');
+      console.error(JSON.stringify({"code":"routes_access_failed","route":"GET /api/audit/events"}));
       return c.json({ success: false, error: '操作記録を取得できませんでした' }, 500);
     }
   },
