@@ -1294,7 +1294,7 @@ function AutoReplyWizardV8Inner() {
             <span className={styles.doneIcon} aria-hidden="true">
               <Check size={24} />
             </span>
-            <PageHeading title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" help={<>
+            <CardHeader size="content" title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" meta={<>
               これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
             </>} />
 
@@ -2119,23 +2119,18 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.toggleExtra}>
                     {form.cooldownOn ? (
-                      <>
-                      <span className={styles.toggleUnit}>
                         <SaveErrorField names={["cooldownMinutes","form.cooldownMinutes","cooldown_minutes","form.cooldown_minutes"]}><NumberInput
                           id="wiz-cooldown"
                           aria-invalid={!!fieldError('wiz-cooldown') || undefined}
                           aria-describedby={fieldError('wiz-cooldown') ? 'wiz-cooldown-error' : undefined}
                           type="number"
-                          className={styles.toggleNum}
+                          unit="分あける"
                           aria-label="あける時間（分）"
                           min={1}
                           max={10080}
                           value={form.cooldownMinutes}
                           onChange={(e) => patch({ cooldownMinutes: e.target.value })}
-                        /></SaveErrorField>{' '}
-                        分あける
-                      </span>
-                      </>
+                        /></SaveErrorField>
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}

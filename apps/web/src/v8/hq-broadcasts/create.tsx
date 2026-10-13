@@ -69,6 +69,7 @@ import MessageComposer, { MessageComposerPage } from '@/components/shared/messag
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Field } from '@/components/shared/form-controls'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -873,6 +874,7 @@ export default function HqBroadcastCreate() {
         previewToggle={<PreviewLauncher>{previewContent}</PreviewLauncher>}
         status={draftLabel}
          title={<>一括配信を作る</>} headingSize="compact"
+        help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
         steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
         >
         {error ? (
@@ -918,10 +920,10 @@ export default function HqBroadcastCreate() {
                 <Field label="配信名" requirement={fields.requirement('title')} count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><input {...fields.bind('title')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
 <small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
-                <div className={formStyles.basicFields}>
+                <SettingsFormRow layout="columns">
                   <Field label="フォルダ"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></SaveErrorField></Field>
                   <Field label="社内メモ" help={<>友だちには表示されません。各アカウントの配信にも同じメモが残ります</>}><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></SaveErrorField></Field>
-                </div>
+                </SettingsFormRow>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
                 <div className={formStyles.recentList}>
                   {recent.length ? recent.map((item) => {
