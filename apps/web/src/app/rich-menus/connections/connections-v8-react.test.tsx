@@ -90,4 +90,17 @@ describe('切替のつながりV8（wxIQ7）', () => {
     expect(host.textContent).toContain('切替先のメニューを足す')
   })
 
+  it('狭い板の入口は画像でなく状態と操作を同じ窓から読める', async () => {
+    await render()
+    const open = [...host.querySelectorAll('button')].find(node => node.textContent?.includes('状態と操作を見る'))!
+    expect(open).toBeTruthy()
+    await act(async () => { open.click() })
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('いまの状態と操作')
+    expect(dialog.textContent).toContain('いまの状態')
+    expect(dialog.textContent).toContain('公開中')
+    expect(dialog.textContent).toContain('編集する')
+    expect(dialog.textContent).not.toContain('LINEの見え方')
+  })
+
 })

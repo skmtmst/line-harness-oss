@@ -9,6 +9,7 @@ import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { CreatePage } from '@/components/templates';
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
@@ -203,6 +204,7 @@ function Connections() {
       help="タブで行き来できるメニューの関係"
 
       preview={aside}
+      previewToggle={<PreviewLauncher label="状態と操作を見る" title="いまの状態と操作">{aside}</PreviewLauncher>}
       previewSurface="plain"
       readOnly={!canEdit}
       footerActions={<>

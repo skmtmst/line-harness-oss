@@ -28,7 +28,7 @@ export function DetailPage({ readOnly, boardId, layout, heightMode, standalone, 
   const summaryColumn = summary ? <aside className={summaryPreview ? styles.preview : styles.detailSummary} data-template-region={summaryPreview ? "preview" : "summary"} data-preview-narrow={summaryPreview ? "hidden" : undefined} data-preview-surface={summaryPreview ? "plain" : undefined} aria-label={summaryLabel}>{summary}</aside> : null
   return <PageFrame kind="detail" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone}>
     <PageHeading {...heading} bottomSpacing={tabSpacing} />
-    {readOnly ? <ReadOnlyNotice /> : null}
+    {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     {summary && summaryPreview ? <div className={styles.asideToggle}><PreviewLauncher {...summaryPreview}>{summary}</PreviewLauncher></div> : null}
