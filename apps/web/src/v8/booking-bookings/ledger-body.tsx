@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { ListPageBody, type ListFolderNav } from '@/components/templates/list-page'
+import { ListToolbarFrame } from '@/components/shared/list-toolbar'
 import { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 
 export default function BookingLedgerBody({ view, readOnly, stats, folders, folderNav, toolbar, pagination, children }: {
@@ -15,7 +16,7 @@ export default function BookingLedgerBody({ view, readOnly, stats, folders, fold
   children: ReactNode
 }) {
   if (view === 'month') return <ListPageBody skeleton readOnly={readOnly} stats={stats}
-    folders={folders} folderNav={folderNav} toolbar={toolbar} pagination={pagination}>
+    folders={folders} folderNav={folderNav} toolbar={<ListToolbarFrame>{toolbar}</ListToolbarFrame>} pagination={pagination}>
     {children}
   </ListPageBody>
 
