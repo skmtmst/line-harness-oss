@@ -69,6 +69,27 @@ afterEach(() => {
 })
 
 describe('質問を作る：保存で欄に知らせる（B-139）', () => {
+  it('答え方を矢印で変えても名前を保ち、選択肢の上限と最後の1つの理由を出す', async () => {
+    const name = screen.getByLabelText('テンプレート名') as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: '継続を確認する' } }) })
+    const single = screen.getByRole('button', { name: '1つだけ選ぶ' })
+    await act(async () => { single.focus(); fireEvent.keyDown(single, { key: 'ArrowRight' }) })
+    expect(screen.getByRole('button', { name: 'いくつでも選ぶ' }).getAttribute('aria-pressed')).toBe('true')
+    expect(name.value).toBe('継続を確認する')
+    const add = screen.getByRole('button', { name: '選択肢を足す（最大 4 つ）' }) as HTMLButtonElement
+    await act(async () => { fireEvent.click(add); fireEvent.click(add) })
+    expect(add.disabled).toBe(true)
+    expect(add.title).toBe('選択肢は4つまでです。')
+    for (const number of [4, 3, 2]) await act(async () => { fireEvent.click(screen.getByRole('button', { name: `選択肢 ${number} を消す` })) })
+    const last = screen.getByRole('button', { name: '選択肢 1 を消す' }) as HTMLButtonElement
+    expect(last.disabled).toBe(true)
+    expect(last.title).toBe('選択肢は1つ以上必要です。')
+    await act(async () => { fireEvent.click(last) })
+    expect(screen.getAllByLabelText('ボタンの文字（20文字まで）')).toHaveLength(1)
+    expect(name.value).toBe('継続を確認する')
+    expect(templatesApi.create).not.toHaveBeenCalled()
+  })
+
   it('空のまま保存すると、名前・質問文・選択肢の欄が赤くなり理由が出て、名前の欄へ移る。直すと消える', async () => {
     // 2つ目の選択肢の文字を消しておく（はい・いいえ が最初から入っている）。
     const choiceInputs = Array.from(document.querySelectorAll('input[maxlength="20"]')) as HTMLInputElement[]
