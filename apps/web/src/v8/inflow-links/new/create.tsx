@@ -44,6 +44,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
@@ -405,7 +406,7 @@ function InflowCreate() {
 
       <Card variant="form" gap="normal" aria-labelledby="ir-new-where">
         <CardHeader size="stacked" titleId="ir-new-where" title={<>どこに置くリンクですか</>} meta={<>名前は一覧で見分けるため。お客さまには見えません</>} />
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
@@ -436,7 +437,7 @@ function InflowCreate() {
               ]}
             /></SaveErrorField></Field>
           </div>
-        </div>
+        </SettingsFormRow>
         {genre === '__new' ? (
           <SaveErrorField names={["newGenre","new_genre"]}><TextField
             type="text"

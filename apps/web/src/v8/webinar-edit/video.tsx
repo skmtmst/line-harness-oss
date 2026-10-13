@@ -38,6 +38,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
@@ -338,13 +339,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       {scheduled ? null : (
         <Card variant="form" gap="normal" aria-labelledby="webinar-period-title">
           <div className={form.cardHead}><h2 id="webinar-period-title" className={form.cardTitle}>公開期間</h2></div>
-          <div className={form.pair}>
+          <SettingsFormRow layout="columns">
             <div className={form.field}><Field label="公開の開始" htmlFor="webinar-period-start"><SaveErrorField names={["startsAt","starts_at"]}><DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} /></SaveErrorField></Field></div>
             <div className={form.field}><Field label="公開の終了" htmlFor="webinar-period-end">{noEnd
                 ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
                 : <SaveErrorField names={["endsAt","ends_at"]}><DateTimeField id="webinar-period-end" value={endsAt} readOnly={readOnly} onChange={setEndsAt} /></SaveErrorField>}
 {!readOnly && !noEnd ? <SaveErrorField names={["noEnd","publicationEndsAt","no_end"]}><Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox></SaveErrorField> : null}</Field></div>
-          </div>
+          </SettingsFormRow>
           {periodError ? <Notice tone="danger">{periodError}</Notice> : null}
         </Card>
       )}
@@ -390,13 +391,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
 
       <Card variant="form" gap="normal" aria-labelledby="webinar-count-title">
         <div className={form.cardHead}><h2 id="webinar-count-title" className={form.cardTitle}>視聴の数え方</h2></div>
-        <div className={form.pair}>
+        <SettingsFormRow layout="columns">
           <div className={form.field}><Field label="視聴完了とみなす" htmlFor="webinar-completion"><TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" /></Field></div>
           <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-policy">{readOnly
               ? <ReadValue label="結果が取れないとき">{policy === 'escalate' ? '担当へ上げる' : '翌日に取り直す'}</ReadValue>
               : <SaveErrorField names={["policy"]}><Select id="webinar-policy" aria-label="結果が取れないとき" size="full" value={policy} disabled={policyBusy} onChange={(value) => void savePolicy(value as 'escalate' | 'retry_next_day')} options={[{ value: 'retry_next_day', label: '翌日に取り直す' }, { value: 'escalate', label: '担当へ上げる' }]} /></SaveErrorField>}
 {policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}</Field></div>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       {adding ? <AddRuleDialog mode={adding} busy={busy} error={error} onCancel={() => { if (!busy) { setAdding(null); setError('') } }} onAdd={async (rules) => { if (await saveSchedule([...webinar.schedule, ...rules])) setAdding(null) }} /> : null}

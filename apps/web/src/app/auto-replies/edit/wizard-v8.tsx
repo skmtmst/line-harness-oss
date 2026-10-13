@@ -2290,10 +2290,10 @@ function AutoReplyWizardV8Inner() {
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>試しに送ってみる</>} meta={<>本番には影響しません。友だちには届きません。</>} />
                 {/* 絵 Guoye：送信者の行 → 届いたメッセージと「試す」の行。友だちを名前で探す欄は機能なので送信者の行の右に残す。 */}
-                <div className={styles.testRow}>
+                <SettingsFormRow layout="columns">
                   <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
                     id="wiz-test-friend"
-                    className={styles.testGrow}
+                    size="full"
                     aria-label="送信者"
                     value={selectedFriendId}
                     onChange={setSelectedFriendId}
@@ -2319,7 +2319,7 @@ function AutoReplyWizardV8Inner() {
                     }}
                     aria-label="友だちを名前で探す"
                   />
-                </div>
+                </SettingsFormRow>
                 <div className={styles.testRow}>
                   <SaveErrorField names={["testMessage","incomingText","test_message"]}><TextField
                     id="wiz-test-message"

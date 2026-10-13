@@ -17,6 +17,7 @@ import scanBlankGap from './blank-gap-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
+import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
@@ -111,6 +112,7 @@ export async function measurePage(page) {
   }
   for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
   const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanB244Rules), ...await page.evaluate(scanFormRules)]
+  findings.push(...formColumnFindings(await page.evaluate(collectFormLayouts)))
   return await page.evaluate(identifyStableTargets, findings)
 }
 async function measureRoute(browser, baseUrl, route, width) {

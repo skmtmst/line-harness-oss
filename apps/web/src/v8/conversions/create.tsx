@@ -45,6 +45,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
@@ -655,7 +656,7 @@ function ConversionCreate() {
 
       <Card variant="form" aria-labelledby="cv-new-value">
         <CardHeader size="stacked" titleId="cv-new-value" title="金額をどう出すか" meta="アフィリエイトの報酬や、配信ごとの売上の計算に使います" />
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.pickLabel}>金額の出し方</span>
             <div className={styles.selectBox}>
@@ -686,7 +687,7 @@ function ConversionCreate() {
               /></SaveErrorField>
             </div>
           </div>
-        </div>
+        </SettingsFormRow>
         {valueModeNotice ? <p className={styles.fieldNote} role="status">{valueModeNotice}</p> : null}
         {valueMode === 'fixed' ? (
           <Field density="input" required label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
@@ -733,7 +734,7 @@ function ConversionCreate() {
           description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
         >まだ計測せず、下書きとして保存する</Checkbox></SaveErrorField>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
-          <div className={styles.fieldRow}>
+          <SettingsFormRow layout="columns">
             <Field density="input" note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
               <SaveErrorField names={["attributionDays","fieldIssue","attribution_days","field_issue"]}><NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
@@ -748,7 +749,7 @@ function ConversionCreate() {
               <span className={styles.label}>集計対象アカウント</span>
               <p id="cv-account" className={styles.fixedBox} title="画面上部で選んでいるLINEアカウントに固定されます">{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
             </div>
-          </div>
+          </SettingsFormRow>
         </Disclosure>
       </Card>
       </>)}
