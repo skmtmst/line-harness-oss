@@ -31,7 +31,6 @@ import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared';
 import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
-import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -50,8 +49,8 @@ import { useCursorStack } from './use-cursor-stack';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar';
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ListToolbar from '@/components/shared/list-toolbar';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -601,20 +600,6 @@ function FriendAddList() {
       <Plus size={15} aria-hidden="true" />初回案内を作る
     </Button>
   ) : null
-  const folderSelect = (
-    <div className={styles.folderSelect}>
-      <SaveErrorField names={["folder","activeId"]}><Select
-        size="standard"
-        aria-label="フォルダで絞り込む"
-        value={folder ?? ''}
-        onChange={(next) => selectFolder(next || null)}
-        options={[
-          { value: '', label: 'フォルダ：すべて' },
-          ...folders.map((entry) => ({ value: entry.key, label: `フォルダ：${entry.name}` })),
-        ]}
-      /></SaveErrorField>
-    </div>
-  )
   const searchBox = (
     <div className={styles.searchBox}>
       <SearchField
@@ -647,29 +632,11 @@ function FriendAddList() {
   const errorBand = actionError ? (
     <Notice tone="danger" >{actionError}<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></Notice>
   ) : null
-  /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
-  const toolbar = narrow ? (
-    <ListToolbarFrame layout="stacked">
-      {errorBand}
-      <ListToolbarRow>
-        {createButton}
-        {folderSelect}
-        {searchBox}
-        <span className={styles.spacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>{statusChips}</ListToolbarRow>
-    </ListToolbarFrame>
-  ) : (
-    <>
-
-      {errorBand}
-      {searchBox}
-      {statusChips}
-      <span className={styles.spacer} aria-hidden="true" />
-      {perPageBox}
-    </>
-  )
+  // 作る・フォルダは ListPage.folderNav だけが持つ。検索・状態・件数は共通の役目へ。
+  const toolbar = <>
+    {errorBand}
+    <ListToolbar searchSlot={searchBox} filters={statusChips} trailing={perPageBox} />
+  </>
 
   /* ===== 表の行 ===== */
   const menuCell = (rule: FriendAddRule) => {
@@ -679,7 +646,8 @@ function FriendAddList() {
         <div className={styles.menuBox} data-design-node={rule.isFallback && openMenuId === rule.id ? 'C0lfUP' : undefined}>
           <RowMenu
             label={label}
-            className={styles.menuButton}
+            appearance="box"
+            size="row"
             note={rule.isFallback && canEdit ? 'この設定は消せません（いちばん最後の受け皿）' : undefined}
             items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
             open={openMenuId === rule.id}

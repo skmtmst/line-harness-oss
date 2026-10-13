@@ -1,13 +1,14 @@
 'use client'
+import PageSizeSelect from '@/components/shared/page-size-select'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarLeading, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
-import { FolderDotName } from '@/components/shared/folder-dot';
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
-import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import StatusBadge from '@/components/shared/status-badge'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react';
@@ -647,7 +648,14 @@ export default function FriendsListV8() {
     </>
   )
 
+  const primaryFilter = (
+    <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
+          onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
+          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
+  )
+
   const toolbar = (
+    <ListToolbarLeading leading={primaryFilter}>
     <ListToolbarFrame data-design="V8SearchPanel">
       <ListToolbarRow as="form"
         onSubmit={(event) => {
@@ -672,9 +680,8 @@ export default function FriendsListV8() {
           />
         </ListToolbarSearchSlot>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
-        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
-          onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
-          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
+
+        <ListToolbarOptional collapse="overflow" label="ほかの絞り込み・操作">
         <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
           options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
@@ -684,15 +691,13 @@ export default function FriendsListV8() {
         <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" width={147} value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
           options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
-        <button
-          type="button"
-          aria-pressed={advanced !== null}
-          onClick={() => setAdvancedOpen(true)}
-          className={advanced ? `${styles.textButton} ${styles.textButtonOn}` : styles.textButton}
+        <FilterChip
+          selected={advanced !== null}
+          onChange={() => setAdvancedOpen(true)}
         >
           <SlidersHorizontal size={16} aria-hidden="true" />
           詳細条件
-        </button>
+        </FilterChip>
         <span className={styles.spacer} />
         {savedSearchEnabled ? (
           <Button type="button" variant="secondary" onClick={() => setSavedOpen(true)}>
@@ -700,6 +705,14 @@ export default function FriendsListV8() {
             保存した検索
           </Button>
         ) : null}
+        {broadcastHandoffHref ? (
+          <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
+            <Megaphone size={14} aria-hidden="true" />
+            この条件で配信を作成
+          </Link>
+        ) : null}
+        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
+        </ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         <div role="group" aria-label="すばやく絞り込む" className={styles.chips}>
@@ -711,23 +724,11 @@ export default function FriendsListV8() {
           </FilterChip>
         </div>
         <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
-        {broadcastHandoffHref ? (
-          <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
-            <Megaphone size={14} aria-hidden="true" />
-            この条件で配信を作成
-          </Link>
-        ) : null}
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
-        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
-        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
-          aria-label="表示件数"
-          size="page-size"
-          value={String(pageSize)}
-          onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
-          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
-        /></SaveErrorField>
+        <ListToolbarEnd>
+        <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
           aria-label="並び順"
           treatment="text"
@@ -736,6 +737,7 @@ export default function FriendsListV8() {
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
         /></SaveErrorField>
+        </ListToolbarEnd>
       </ListToolbarRow>
       {advanced?.summary.length ? (
         <div className={styles.applied}>
@@ -762,6 +764,7 @@ export default function FriendsListV8() {
         </p>
       ) : null}
     </ListToolbarFrame>
+    </ListToolbarLeading>
   )
 
   const colCount = 4 + displayColumns.length
@@ -828,14 +831,14 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <FolderDotName><RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink></FolderDotName>
+                  <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
                 </Td>
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (
                   <Td key={column.key} className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
-                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
+                        <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusBadge>
                         {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
                       </span>
                       <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
@@ -865,7 +868,7 @@ export default function FriendsListV8() {
                   </Td>
                   )
                   if (column.key === 'source') return (
-                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || emptyValue('unknown')}>{friend.firstTrackedLinkName || emptyValue('unknown')}</span></Td>
                   )
                   if (column.key === 'last') return (
                   <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>

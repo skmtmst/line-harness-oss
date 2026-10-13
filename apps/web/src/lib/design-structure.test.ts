@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, selectedAccount: null }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/v8/booking-menus/lib/edit-permission', () => ({ useBookingEdit: () => false }))
 import { readUiSource } from '../../scripts/test-ui-source.mjs'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -89,7 +96,17 @@ describe('current page entries and V8 components', () => {
     expect(entry).toContain(`<${imported![2] ?? imported![1] ?? imported![3]}`);
   });
 
-  it.each(MAINB_V8_SCREENS)('%s のV8本体は共通の型を使う', (_route, _module, file, template) => {
+  it.each(MAINB_V8_SCREENS)('%s のV8本体は共通の型を使う', async (route, _module, file, template) => {
+    if (route === '/booking/menus' || route === '/booking/menus/new' || route === '/booking/menus/staff') {
+      // B-273: the old heading's source spelling cannot prove the page frame exists.
+      const screenModule = route === '/booking/menus' ? await import('@/v8/booking-menus/settings')
+        : route === '/booking/menus/new' ? await import('@/v8/booking-menus/menu-form')
+          : await import('@/v8/booking-menus/assign')
+      const html = renderToStaticMarkup(createElement(screenModule.default as import('react').ComponentType<{ accountId: null }>, { accountId: null }))
+      expect(html).toContain('data-page-template="create"')
+      expect(html).toContain('data-template-region="content"')
+      return
+    }
     const body = readUiSource(join(SRC, file), 'utf8');
     expect(body).toContain(template);
   });

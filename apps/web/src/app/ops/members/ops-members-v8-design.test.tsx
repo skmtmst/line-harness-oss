@@ -90,6 +90,9 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     expect(body).toContain('10/01 22:40')
     expect(body).toContain('2要素認証待ち')
     expect(body).toContain('招待中')
-    expect(body).toContain('停止')
+    const menu = host.querySelector<HTMLButtonElement>('button[aria-label="検証 次郎のその他操作"]') ?? Array.from(host.querySelectorAll<HTMLButtonElement>('button[data-row-menu]')).find(button => !button.disabled)!
+    expect(menu).toBeTruthy()
+    await act(async () => { menu.click() })
+    expect(document.body.textContent).toContain('停止する')
   })
 })

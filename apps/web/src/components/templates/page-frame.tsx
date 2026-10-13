@@ -1,8 +1,8 @@
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import HelpTip from '@/components/shared/help-tip'
 import ScreenExplanation from '@/components/shared/screen-explanation'
-import StickyBar from '@/components/shared/sticky-bar'
 import styles from './page-templates.module.css'
+export { PageFooter } from './page-footer'
 
 export interface PageHeadingProps {
   title: ReactNode
@@ -102,11 +102,6 @@ export function PageFrame({ kind, children, boardId, layout, heightMode, standal
 }) {
   const resolvedHeight = heightMode ?? (kind === 'list' && !standalone ? 'content' : undefined)
   return <div ref={elementRef} className={styles.frame} data-frame-height={resolvedHeight} data-height-mode={resolvedHeight} data-list-skeleton={skeleton || kind === 'list' ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
-}
-
-/** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */
-export function PageFooter({ actions, status, presentation }: { actions: ReactNode; status?: ReactNode; presentation?: 'distribution' }) {
-  return <div className={styles.footer} data-template-region="footer"><StickyBar actions={actions} status={status} presentation={presentation} /></div>
 }
 
 /** 内容で終わる板の本文。下の24はPageFrameが持ち、本文と二重にしない。 */
