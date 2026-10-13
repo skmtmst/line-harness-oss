@@ -245,3 +245,6 @@ describe('R497b 一部だけ許可の表示と保存', () => {
     expect(screen.getByText(/行を選び直すとその行だけ置き換わり/)).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

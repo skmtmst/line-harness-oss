@@ -19,7 +19,7 @@ const { richMenuGroups } = await import('./rich-menu-groups.js');
 const OWNER_KEY = 'test-owner-key';
 
 function setupSqlite() {
-  const { db, raw } = createTestD1();
+  const { db, raw } = createTestD1({ loginPolicy: 'off' });
   raw.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
      VALUES ('acc-1', 'アカウント', 'ch-1', 'token', 'secret')`,

@@ -74,7 +74,7 @@ describe('N-032 friend stats account scope integration (#664)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seedScopeFixture(testDb);
     target = createApp(testDb.db);
   });

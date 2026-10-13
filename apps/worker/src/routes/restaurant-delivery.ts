@@ -169,6 +169,15 @@ function isoOrNull(seconds: number | null | undefined): string | null {
   return new Date(seconds * 1000).toISOString();
 }
 
+/**
+ * Uber 接続（636 の表）だけは時刻をミリ秒で持つ。書き込み側が `Date.now()` のため、
+ * 秒を前提にした上の `isoOrNull` と混ぜると1970年になる。読み取り口はこちらを使う。
+ */
+function isoFromMs(ms: number | null | undefined): string | null {
+  if (ms === null || ms === undefined) return null;
+  return new Date(ms).toISOString();
+}
+
 // ---------- 入口の検査（restaurant-google.ts と同じ3点検査） ----------
 
 export const deliveryAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
@@ -1154,6 +1163,7 @@ restaurantDelivery.get(
       { id: store.id, kind: 'rt_store' },
       { lineAccountId: store.lineAccountId },
     );
+    c.set('outputAudit', { count: orders.length, accountId: store.lineAccountId, targetId: store.id });
     const fileName = `delivery-orders_${filter.fromText}_${filter.toText}.csv`;
     const headers: Record<string, string> = {
       'Content-Type': 'text/csv; charset=utf-8',
@@ -1959,6 +1969,9 @@ interface UberConnectionRow {
   access_token_expires_at: number | null;
   granted_scope: string | null;
   status: 'pending_store' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
+  connected_at: number | null;
+  provisioned_at: number | null;
+  updated_at: number | null;
   last_error: string | null;
   version: number;
 }
@@ -1995,12 +2008,44 @@ async function uberConnectionFor(c: Context<Env>, storeId: string): Promise<Uber
   return dbFor(c.env, storeId)
     .prepare(
       `SELECT store_id, account_id, uber_store_id, uber_store_name, access_token_expires_at,
-              granted_scope, status, last_error, version
+              granted_scope, status, connected_at, provisioned_at, updated_at, last_error, version
          FROM rt_delivery_uber_connections WHERE store_id = ? LIMIT 1`,
     )
     .bind(storeId)
     .first<UberConnectionRow>();
 }
+
+/**
+ * いまの接続の状態。画面を開き直したときに本当の状態を出すための読み取り口。
+ *
+ * 見るのはD1だけで、Uber へは問い合わせない。トークンの口は1時間100回までの制限があり、
+ * 画面を表示するたびに使うものではない（docs/integrations/uber-eats-connection.md 5節）。
+ * 返すのは状態・日時・分類済みの符号だけ。トークン・鍵・Uber が返した自由文は返さない。
+ */
+restaurantDelivery.get(
+  '/api/restaurant-test/delivery/ubereats/connection',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const store = await deliveryStore(c);
+    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+    const row = await uberConnectionFor(c, store.id);
+    return c.json({
+      success: true,
+      store: { id: store.id, name: store.name },
+      // 接続の設定がこの環境にあるか。無ければ画面はつなぐボタンを押させない。
+      oauthConfigured: uberOAuthClient(c.env) !== null,
+      connection: {
+        status: row?.status ?? 'disconnected',
+        storeName: row?.uber_store_name ?? null,
+        connectedAt: isoFromMs(row?.connected_at),
+        // POST /pos_data が通った時刻。ここが入って初めて Uber 側で連携が有効。
+        provisionedAt: isoFromMs(row?.provisioned_at),
+        checkedAt: isoFromMs(row?.updated_at),
+        lastError: row?.last_error ?? null,
+      },
+    });
+  },
+);
 
 /**
  * 認可画面へ渡す入口。店舗管理者以上だけが押せる。

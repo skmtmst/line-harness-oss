@@ -131,6 +131,7 @@ hqBroadcasts.get('/api/hq/broadcasts/:id/activity',async c=>{
 });
 hqBroadcasts.get('/api/hq/broadcasts/:id/export.csv',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true),run=await readHqBroadcastResult(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')));
+ c.set('outputAudit', { count: run.targets.length, accountIds: run.targets.map(t => t.accountId), accountCounts: Object.fromEntries(run.targets.map(t => [t.accountId, 1])), targetId: c.req.param('id') });
  const cell=(v:unknown)=>{let s=v==null?'':String(v);if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
  const lines=[['アカウント','状態','送った数','開いた数','押した数','反応した人数'],...run.targets.map(t=>[t.accountName,t.status,t.successCount,t.openedCount,t.clickedCount,t.reactionCount])];
  return new Response('\uFEFF'+lines.map(r=>r.map(cell).join(',')).join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="hq-broadcast.csv"','Cache-Control':'no-store'}});

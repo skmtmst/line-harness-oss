@@ -162,6 +162,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         // 代理ログイン帯はこの結果を読む。同じ応答をもう一度取りに行かせない（V6R-S0-a）。
         const snapshot: SessionSnapshot = {
           impersonation: (data.data.impersonation as OpsImpersonation | null | undefined) ?? null,
+          recoveryCodesRemaining: typeof data.data.recoveryCodesRemaining === 'number' ? data.data.recoveryCodesRemaining : null,
           unfamiliarAt: typeof data.data.unfamiliarAt === 'string' ? data.data.unfamiliarAt : null,
           stepUpMethod: data.data.stepUpMethod === 'totp' || data.data.stepUpMethod === 'password'
             ? data.data.stepUpMethod

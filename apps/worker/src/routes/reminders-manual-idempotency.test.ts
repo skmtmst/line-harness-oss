@@ -128,6 +128,9 @@ beforeEach(async () => {
   sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
   sqlite.pragma('foreign_keys = OFF');
   seed(sqlite);
+  // Explicit Off fixture for resource authorization and idempotency.
+  sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
+
   db = asD1(sqlite);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

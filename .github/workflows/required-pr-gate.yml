@@ -544,6 +544,15 @@ jobs:
         run: >-
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
+      - name: MFA auth input and button behavior at three widths
+        run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+      - name: Upload MFA browser failure context
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: train30-mfa-browser-failure
+          path: apps/web/test-results/train30-mfa/
+          retention-days: 7
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。

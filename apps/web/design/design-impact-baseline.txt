@@ -50,7 +50,6 @@ shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/login/page.tsx
-shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer v8/mileage/score-rules.tsx
 shared-button-importer v8/nen-campaigns/column-intros.tsx
@@ -368,6 +367,8 @@ shared-button-importer v8/restaurant/tables/tables.tsx
 shared-button-importer v8/settings/getting-started/getting-started.tsx
 shared-button-importer v8/settings/pools/pools.tsx
 shared-button-importer v8/settings/accounts/accounts.tsx
+shared-button-importer v8/settings/staff/mfa-policy.tsx
+shared-button-importer v8/settings/staff/self-mfa.tsx
 shared-button-importer v8/settings/staff/staff.tsx
 shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
@@ -524,6 +525,8 @@ shared-button-importer v8/restaurant/google/profile-hours.tsx
 shared-button-importer components/shared/allergy-field.tsx
 shared-button-importer v8/settings/customer-look/screen.tsx
 shared-button-importer components/shared/selection-button.tsx
+shared-button-importer v8/login/recovery-codes.tsx
+shared-button-importer v8/login/two-factor-setup.tsx
 
 shared-button-importer components/shared/inbox-composer.tsx
 # B-244〜B-247: 新しい共通の知らせの持ち主

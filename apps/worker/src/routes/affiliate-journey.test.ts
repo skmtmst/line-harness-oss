@@ -12,6 +12,7 @@ const dbMocks = {
     version: 1,
     data: { features: { affiliates: true } },
   }),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),

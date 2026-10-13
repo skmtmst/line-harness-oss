@@ -18,7 +18,7 @@ function request(path: string, method = 'GET', body?: unknown, key?: string) {
   }, { DB: sqlite.db } as Env['Bindings']);
 }
 beforeEach(() => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   sqlite.raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
     VALUES ('acc-1', 'channel-1', '本店', 'token', 'secret', ?)`).run(DEFAULT_TENANT_ID);
   sqlite.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)

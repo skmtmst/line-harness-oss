@@ -93,7 +93,7 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
   let testDb: SqliteD1;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     testDb.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
     testDb.raw.prepare(
       `INSERT INTO line_accounts

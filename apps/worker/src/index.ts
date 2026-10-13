@@ -190,6 +190,7 @@ import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
 import { hqBilling } from './routes/hq-billing.js';
@@ -466,6 +467,9 @@ export type Env = {
     staff: AuthenticatedStaff;
     /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
     auditRecorded?: boolean;
+    mfaAuditRecorded?: boolean;
+    outputAuditRecorded?: boolean;
+    outputAudit?: { count: number | null; accountId?: string; accountIds?: string[]; accountCounts?: Record<string, number>; targetId?: string; phase?: 'requested' | 'download' };
     /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
     /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
@@ -530,6 +534,7 @@ app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
 app.use('*', authenticatedRateLimitMiddleware);
+app.use('/api/*', outputAuditMiddleware);
 app.use('*', timingMark('auth'));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts

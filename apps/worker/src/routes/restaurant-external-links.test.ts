@@ -7,7 +7,8 @@ import { DEFAULT_TENANT_ID, type RestaurantExternalLink } from '@line-crm/shared
 const auth = vi.hoisted(() => ({ member: null as Record<string, unknown> | null }));
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
-  return { ...actual, getStaffByApiKey: vi.fn(async () => auth.member), getStaffByAdminSession: vi.fn(async () => auth.member) };
+  return { ...actual, getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
+  getStaffByApiKey: vi.fn(async () => auth.member), getStaffByAdminSession: vi.fn(async () => auth.member) };
 });
 import type { Env } from '../index.js';
 import { authMiddleware, sha256Hex } from '../middleware/auth.js';
@@ -35,7 +36,7 @@ function member(role = 'staff', readOnly = false, tenant = DEFAULT_TENANT_ID) {
   auth.member = { id: 'operator', name: '担当者', role, access_level: readOnly ? 'read_only' : 'full', tenant_id: tenant, permission_keys: '[]' };
 }
 beforeEach(() => {
-  testDb = createTestD1({ foreignKeys: true });
+  testDb = createTestD1({ loginPolicy: 'off', foreignKeys: true });
   // bootstrapは初期データのINSERTを省くため、633そのものも流して確認する。
   testDb.raw.exec('DROP TABLE rt_reservation_external_links');
   testDb.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/633_restaurant_external_links.sql', import.meta.url), 'utf8'));

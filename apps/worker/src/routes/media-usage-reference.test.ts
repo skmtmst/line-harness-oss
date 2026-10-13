@@ -210,7 +210,7 @@ function mediaMetadata(id = 'md-1'): { filename: string; folder_id: string | nul
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   enforceD1BindLimit = false;
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');

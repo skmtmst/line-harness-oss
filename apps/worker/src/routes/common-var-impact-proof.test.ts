@@ -8,7 +8,7 @@ const { contents } = await import('./contents.js');
 const { authMiddleware } = await import('../middleware/auth.js');
 
 function setup() {
-  const t = createTestD1();
+  const t = createTestD1({ loginPolicy: 'off' });
   const raw = t.raw;
   raw.prepare('INSERT OR IGNORE INTO tenants (id, name) VALUES (?, ?)').run(DEFAULT_TENANT_ID, 'T');
   raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)

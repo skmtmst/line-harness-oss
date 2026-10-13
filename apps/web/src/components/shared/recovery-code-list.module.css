@@ -1,0 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8) var(--space-16); margin: 0; padding: 0; list-style: none; }
+.list li { text-align: center; white-space: nowrap; font-family: var(--font-inter), monospace; font-size: var(--polish-text-section); font-weight: 600; color: var(--color-ink); }
+}

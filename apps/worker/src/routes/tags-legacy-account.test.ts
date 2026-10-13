@@ -48,7 +48,7 @@ describe('N-048 旧タグ作成・CSV一括の所属確定 (#803)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    const fixture = createTestD1();
+    const fixture = createTestD1({ loginPolicy: 'off' });
     testDb = fixture;
     seed(testDb);
     // D1 run()はINSERT RETURNINGの行を返す。汎用fixtureはchangesだけなので、

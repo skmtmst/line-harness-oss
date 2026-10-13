@@ -8,9 +8,13 @@ const authState = vi.hoisted(() => ({ readOnly: false }));
 vi.mock('@line-crm/db', async (original) => ({
   ...await original<typeof import('@line-crm/db')>(),
   getStaffByAdminSession: async () => null,
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: async () => ({ id: 'coverage-staff', name: 'Coverage', role: 'staff',
     access_level: authState.readOnly ? 'read_only' : 'full', permission_keys: '[]', tenant_status: 'active' }),
   getActiveImpersonation: async () => null,
+  getPlatformAdminByStaffId: async () => null,
+  getStaffById: async () => null,
+  recordAuditEvent: async () => undefined,
 }));
 import { app } from '../index.js';
 
@@ -329,6 +333,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/recipes',
     'GET /api/recipes/:id',
     'GET /api/recipes/clone-runs/:runId',
+    'GET /api/restaurant-test/delivery/ubereats/connection',
     'GET /api/restaurant-test/google/oauth/callback',
     'GET /api/restaurant-test/inbound-emails',
     'GET /api/restaurant-test/intake-addresses',

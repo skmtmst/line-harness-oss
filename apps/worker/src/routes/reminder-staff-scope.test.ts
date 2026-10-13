@@ -126,7 +126,7 @@ function enrollmentCount(): number {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

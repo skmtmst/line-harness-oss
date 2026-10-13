@@ -168,7 +168,7 @@ beforeEach(async () => {
   installWebStorage()
   globalThis.localStorage.setItem('lh_selected_account', ACC_A)
   const { createTestD1 } = await import(/* @vite-ignore */ join(WORKER_SRC, 'test-utils/d1-sqlite.ts'))
-  const testD1 = createTestD1()
+  const testD1 = createTestD1({ loginPolicy: 'off' })
   sqlite = testD1.raw as unknown as typeof sqlite
   db = testD1.db
   sqlite.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run()
