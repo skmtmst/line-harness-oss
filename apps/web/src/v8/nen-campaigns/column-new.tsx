@@ -214,9 +214,10 @@ export default function ColumnNew() {
         <CardHeader size="stacked" titleId="nen-col-link" title={<>記事のリンク</>} />
         <Field label="記事の URL" required><SaveErrorField names={["articleUrl","draft.articleUrl","article_url","draft.article_url"]}><TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-articleUrl-error">{errorFor('articleUrl')}</FieldError></Field>
-        <div className={styles.field} id="nen-col-imageUrl" tabIndex={-1}>
-          <span className={styles.label}>画像</span>
+        <div id="nen-col-imageUrl" tabIndex={-1}>
+          <Field label="画像">
           <SaveErrorField names={["imageUrl","draft.imageUrl","image_url","draft.image_url"]}><MediaSlot
+            size="compact"
             title="画像を追加"
             previewAlt="コラムの画像"
             value={draft.imageUrl || null}
@@ -228,6 +229,7 @@ export default function ColumnNew() {
             onChange={(url) => set({ imageUrl: url ?? '' })}
             urlEntry={{ value: draft.imageUrl, onChange: (url) => set({ imageUrl: url }), label: '画像の URL', placeholder: 'https://cdn.example.com/...' }}
           /></SaveErrorField>
+          </Field>
         </div>
       </Card>
 

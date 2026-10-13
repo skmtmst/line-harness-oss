@@ -12,6 +12,23 @@ import './list-row-height.test.mjs'
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
 const table = body => `<div role="table" data-shared-part="list-table" style="width:600px">${body}</div>`
+test('同じ面の編集本文は描いた文字の余白を測り、余白0・別枠の端接触は止める', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const content = (padding, ownFrame = '') => shell(`<section style="width:240px;height:120px;background:white;border:1px solid gray"><div contenteditable="true" role="textbox" style="height:100%;padding:${padding}px;background:white;${ownFrame}">編集する本文</div></section>`)
+    for (const editable of ['true', 'false']) {
+      await page.setContent(content(12).replace('contenteditable="true"', `contenteditable="${editable}"`))
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 0)
+    }
+    await page.setContent(content(0))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    await page.setContent(content(12, 'border:1px solid black;'))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    await page.setContent(content(12, 'background:#ddd;'))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+  } finally { await browser.close() }
+})
 test('B-245：共通の説明ボタンは青で出し、印だけの手書きや頭の外の青は検出する', async () => {
   const browser = await chromium.launch()
   try {
