@@ -230,3 +230,36 @@ describe('V8 投稿（審査）', () => {
     expect(dialog()?.textContent).not.toContain('新しい版を作る')
   })
 })
+
+
+it('掲載順の端の操作は理由を示し、並びを変えても取消で保存しない', async () => {
+  const items = [
+    { id: 'publication-a', version: 3, pet_name: 'こむぎ', hide_owner_name: 1, placements: [], view_count_30_days: null },
+    { id: 'publication-b', version: 5, pet_name: 'そら', hide_owner_name: 1, placements: [], view_count_30_days: null },
+  ]
+  const originalFetch = globalThis.fetch
+  const writes: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://worker.test')
+    if (init?.method && init.method !== 'GET') writes.push(url.pathname)
+    if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 2 }, items, pendingWithdrawals: [], withdrawnItems: [] } })
+    if (url.pathname === '/api/nen-members/photos/publications/order') return json({ success: true, data: { items } })
+    return originalFetch(input, init)
+  })
+  await render()
+  await click(buttons('公式サイト掲載')[0])
+  await click(buttons('並び順を変える')[0])
+  const dialog = document.querySelector('[role="dialog"]')!
+  const orderButtons = () => [...dialog.querySelectorAll<HTMLButtonElement>('button')]
+  const up = orderButtons().find(button => button.getAttribute('aria-label') === 'こむぎを上へ')!
+  const down = orderButtons().find(button => button.getAttribute('aria-label') === 'そらを下へ')!
+  expect(up.disabled).toBe(true)
+  expect(up.title).toBe('これより上には移動できません')
+  expect(down.disabled).toBe(true)
+  expect(down.title).toBe('これより下には移動できません')
+  await click(orderButtons().find(button => button.getAttribute('aria-label') === 'こむぎを下へ'))
+  expect(dialog.querySelector('li')?.textContent).toContain('そら')
+  await click(orderButtons().find(button => button.textContent === 'キャンセル'))
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  expect(writes).toEqual([])
+})

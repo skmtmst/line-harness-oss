@@ -1274,8 +1274,8 @@ function PublicationsV8({
         onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
         <ol>{orderItems?.map((item, index) => <li key={text(item.id)} className={styles.orderRow}>
           <span className={styles.orderName}>{index+1}・{photoPetDisplayName(item.pet_name, { honorific: false })}</span>
-          <span className={styles.orderButtons}><Button disabled={index === 0 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
-          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
+          <span className={styles.orderButtons}><Button disabled={index === 0 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === 0 ? 'これより上には移動できません' : undefined} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
+          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === orderItems.length-1 ? 'これより下には移動できません' : undefined} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
         </li>)}</ol>
       </Dialog>
       {notice && !withdrawTarget ? <Notice tone="danger" message={notice} /> : null}
