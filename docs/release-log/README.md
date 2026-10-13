@@ -42,6 +42,10 @@ released: 2026-08-19 15:00
 1. `<version>.md` を作り、front-matter に `version: <版>` と `released: YYYY-MM-DD HH:MM` を入れる（配布した日時。日本時間）
 2. 移した行は `unreleased.md` と `unreleased/` の各PRファイルから取り除く
 
+過去の未公開行を保管用の版へまとめ、要約の行を変えたくない場合だけ、front-matter に
+`summary: false` を付けます。全文と版ごとの件数は残り、その版の行は要約の候補から外れます。
+通常のリリースには付けません。まとめる前後で、全文の各行と要約の行・順番を比べてください。
+
 組み立て（`apps/web/scripts/build-release-log.mjs`）は `unreleased.md` と `unreleased/` の両方から拾い、画面上「次回反映予定」として反映済みとは分けて出します。
 
 ## PR番号は必須です
