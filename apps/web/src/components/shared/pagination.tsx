@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
@@ -72,9 +72,13 @@ export default function Pagination({
   spacing,
   mode = 'numbered',
 }: PaginationProps) {
+  const reasonId = useId()
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
+  const pausedReason = disabled ? '現在、ページを移動できません。' : undefined
+  const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)
+  const nextReason = pausedReason ?? (current >= total ? '最後のページです。' : undefined)
 
   if (!Number.isFinite(pageCount) || pageCount <= 0) return null
 
@@ -88,6 +92,8 @@ export default function Pagination({
         onClick={() => onPageChange(current - 1)}
         disabled={disabled || current <= 1}
         aria-label="前のページ"
+        title={previousReason}
+        aria-describedby={previousReason ? `${reasonId}-previous` : undefined}
       >
         <span className={styles.controlLabel}>前へ</span>
         <span className={styles.controlGlyph} aria-hidden="true">
@@ -106,6 +112,8 @@ export default function Pagination({
               .join(' ')}
             onClick={() => onPageChange(item)}
             disabled={disabled}
+            title={pausedReason}
+            aria-describedby={pausedReason ? `${reasonId}-paused` : undefined}
             aria-label={`${item}ページ目へ`}
             aria-current={item === current ? 'page' : undefined}
           >
@@ -119,12 +127,17 @@ export default function Pagination({
         onClick={() => onPageChange(current + 1)}
         disabled={disabled || current >= total}
         aria-label="次のページ"
+        title={nextReason}
+        aria-describedby={nextReason ? `${reasonId}-next` : undefined}
       >
         <span className={styles.controlLabel}>次へ</span>
         <span className={styles.controlGlyph} aria-hidden="true">
           ›
         </span>
       </button>
+      {previousReason ? <span id={`${reasonId}-previous`} className="sr-only">{previousReason}</span> : null}
+      {nextReason ? <span id={`${reasonId}-next`} className="sr-only">{nextReason}</span> : null}
+      {pausedReason ? <span id={`${reasonId}-paused`} className="sr-only">{pausedReason}</span> : null}
     </nav>
   )
 }
