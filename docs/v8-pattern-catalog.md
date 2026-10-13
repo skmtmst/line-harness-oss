@@ -99,6 +99,8 @@
 <a id="card"></a>
 ## card カード（中身のまとまりの箱）
 
+- 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
+
 - **役目**：中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる
 - **持ち主（コード）**：`apps/web/src/components/shared/card.tsx`・`apps/web/src/components/shared/card.module.css`（部品 `Card`・`CardHeader`）
   - 読む変数：`--card-shadow`・`--card-edge`・`--radius-card`
@@ -202,6 +204,10 @@
 
 <a id="folder-column"></a>
 ## folder-column フォルダの列
+
+
+
+- L6判定X1・X2（2026-10-13）：ListPageがフォルダ機能の無い一覧の作成を題右へ移し、ListPageBodyのListFolderContextがFolderDotNameへ丸の要否を伝える。畳まれたフォルダ列は機能ありのまま。持ち主は `apps/web/src/components/shared/list-folder-context.tsx` と既存の一覧型・名前部品。見張りは `fix-patterns-browser.mjs` のF9と故障対照。
 
 - **役目**：一覧の左でフォルダを選び・作り・並べ替える
 - **持ち主（コード）**：`apps/web/src/components/shared/managed-folder-panel.tsx`・`apps/web/src/components/shared/managed-folder-panel.module.css`・`apps/web/src/components/shared/folder-panel.tsx`・`apps/web/src/components/shared/folder-panel.module.css`・`apps/web/src/components/shared/folder-row-actions.tsx`・`apps/web/src/components/shared/folder-add-dialog.tsx`・`apps/web/src/components/shared/folder-editor-dialog.tsx`・`apps/web/src/components/shared/folder-dot.tsx`（部品 `ManagedFolderPanel`・`FolderPanel`・`FolderDot`）
@@ -801,6 +807,8 @@
 
 <a id="toggle"></a>
 ## toggle オン・オフ・選ぶ部品
+
+- 星のような印の選択操作は共通 `IconButton` の `pressed` へ状態を渡し、画面は取得済みの真偽値と操作だけを持つ。新しいトグル形を描かない。従来の直接ARIA指定も受け付ける（L7バナー）。
 
 - **10-12の差し戻し（axFrW）**：一覧の選択は共通Checkboxの16px・角4（`--choice-checkbox-radius`）。画面のCSSで丸みを上書きせず、クリック・Space・一部選択・権限の動きは維持。絵の16px・角4と司令塔の16:47 JST判定に従う。
 

@@ -34,12 +34,29 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     const isList = root.dataset.pageTemplate === 'list'
     if (isList && !root.hasAttribute('data-list-skeleton') && !root.querySelector('[data-list-skeleton]')) add('F4', root, 'list template is missing its shared standard and audit scope')
     const heading = root.querySelector('[data-template-region="heading"],[data-template-region="header"]')
+    const body = root.querySelector('[data-list-folders]')
+    const hasFolders = body ? body.dataset.listFolders === 'true' : !!root.querySelector('[data-template-region="folders"], [data-toolbar-leading] [aria-label="フォルダ"]')
+    if (isList && !hasFolders) {
+      for (const el of all('[data-template-region="toolbar"] a[href], [data-template-region="toolbar"] button')) {
+        if (/作る|登録する|追加する/.test(el.textContent) && !el.hasAttribute('aria-haspopup')) add('F9',el,'folderless list creation belongs in heading actions')
+      }
+      for (const el of all('[data-list-name] [data-folder-dot]')) add('F9',el,'folderless list name has a folder dot')
+    }
+    if (heading) {
+      const controls = [...heading.querySelectorAll('button')].filter(visible)
+      const explanation = controls.find(el => /この画面の説明/.test(el.textContent))
+      const help = controls.find(el => /^[?？]$/.test(el.textContent.trim()))
+      if (help && explanation && (help.compareDocumentPosition(explanation) & Node.DOCUMENT_POSITION_PRECEDING)) add('F3',heading,'heading help must precede screen explanation')
+    }
     if (heading) for (const chip of [...heading.querySelectorAll('button.v6-filter-chip')].filter(visible)) add('F5',chip,'heading action uses a filter chip instead of a shared button')
     for (const chip of all('button.v6-filter-chip')) if (/^アーカイブ済み(?:\s*\d+)?$/.test(chip.textContent.trim()) && !chip.querySelector('svg')) add('F4',chip,'archive filter is missing its shared icon')
     inventory.push({
       board: root.dataset.designNode, template: root.dataset.pageTemplate, frame: root.dataset.heightMode,
       help: heading ? [...heading.querySelectorAll('button')].filter(visible).map(el => el.getAttribute('aria-label') || el.textContent.trim()) : [],
       folders: all('[data-template-region="folders"]').length,
+      folderCapability: isList ? hasFolders : null,
+      folderDots: all('[data-list-name] [data-folder-dot]').length,
+      headingCreates: heading ? [...heading.querySelectorAll('a[href],button')].filter(el => visible(el) && /作る|登録する|追加する/.test(el.textContent)).length : 0,
       folderSelect: all('[data-toolbar-leading] button[aria-haspopup="listbox"]').filter(el => /フォルダ/.test(el.getAttribute('aria-label') ?? el.textContent)).length,
       folderCreate: all('[data-template-region="folders"] button').filter(el => /フォルダ.*追加/.test(el.textContent)).length,
       checks: all('tbody input[type="checkbox"]').length,

@@ -4,6 +4,36 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('X1/X2 use folder capability across widths; X3 checks all heading types', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    await page.setContent(`<section data-page-template="list" data-list-skeleton="templates"><header data-template-region="heading"><h2>一覧</h2><button>この画面の説明</button><button aria-label="一覧の説明">？</button><div data-heading-actions></div></header><div data-list-folders="false"><div data-template-region="toolbar"><a href="/new">決めごとを作る</a></div><span data-list-name><span data-folder-dot>○</span>名前</span></div></section>`)
+    const before=await page.evaluate(scanFixPatterns)
+    assert.equal(before.counts.F9,2)
+    assert.equal(before.counts.F3,1)
+    await page.evaluate(() => {
+      const heading=document.querySelector('header')
+      heading.querySelector('[data-heading-actions]').append(document.querySelector('a'))
+      document.querySelector('[data-folder-dot]').remove()
+      const help=heading.querySelector('[aria-label]');heading.insertBefore(help,heading.querySelector('button'))
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3,0)
+    await page.evaluate(() => {
+      document.querySelector('[data-list-folders]').dataset.listFolders='true'
+      document.querySelector('[data-template-region="toolbar"]').append(document.querySelector('a'))
+      document.querySelector('[data-list-name]').insertAdjacentHTML('afterbegin','<span data-folder-dot>○</span>')
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0, 'collapsed folder-capable lists retain tools and dots')
+    await page.evaluate(() => {
+      document.querySelector('section').dataset.pageTemplate='create'
+      const heading=document.querySelector('header');heading.append(heading.querySelector('[aria-label]'))
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3,1,'all templates check help order')
+  } finally {await browser.close()}
+})
+
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
   try {

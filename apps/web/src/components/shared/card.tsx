@@ -87,6 +87,11 @@ export default function Card({
   )
 }
 
+/** Content between edge-to-edge media and the card's end. */
+export function CardContent({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={[styles.content, className].filter(Boolean).join(' ')}>{children}</div>
+}
+
 export function CardHeader({
   title,
   meta,

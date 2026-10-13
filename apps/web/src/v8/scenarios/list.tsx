@@ -1142,7 +1142,7 @@ export default function ScenariosListV8() {
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
-      titleAccessory={<PageExplanationToggle />}
+      explanationToggle={<PageExplanationToggle />}
 
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
