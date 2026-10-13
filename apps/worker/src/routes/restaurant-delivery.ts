@@ -1163,6 +1163,7 @@ restaurantDelivery.get(
       { id: store.id, kind: 'rt_store' },
       { lineAccountId: store.lineAccountId },
     );
+    c.set('outputAudit', { count: orders.length, accountId: store.lineAccountId, targetId: store.id });
     const fileName = `delivery-orders_${filter.fromText}_${filter.toText}.csv`;
     const headers: Record<string, string> = {
       'Content-Type': 'text/csv; charset=utf-8',

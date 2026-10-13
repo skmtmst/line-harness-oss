@@ -202,3 +202,6 @@ describe('「項目ごとに決める」の説明文と読み上げ名 (STAFF-01
     expect(payload.permissionScope?.delivery).toBe('view')
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

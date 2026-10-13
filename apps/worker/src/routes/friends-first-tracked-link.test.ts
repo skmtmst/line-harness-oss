@@ -101,7 +101,7 @@ describe('N-036 友だち詳細の流入元（firstTrackedLinkName）', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seedFixture(testDb);
     target = createApp(testDb.db);
   });

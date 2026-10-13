@@ -159,7 +159,7 @@ function seed(): void {
 }
 
 beforeEach(() => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed();
 });
 

@@ -229,7 +229,7 @@ function testSend(reminderId: string, apiKey: string, key = IDEMPOTENCY_KEY) {
 
 beforeEach(async () => {
   line.pushMessageWithRequestId.mockReset().mockResolvedValue({ requestId: 'req-1' });
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

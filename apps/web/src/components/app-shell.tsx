@@ -14,6 +14,7 @@ import styles from './app-shell.module.css'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import OpsShell from './ops/ops-shell'
 import ImpersonationNotice from './ops/impersonation-notice'
+import RecoveryCodeNotice from './recovery-code-notice'
 import UnfamiliarLoginNotice from './unfamiliar-login-notice'
 import SuspendedSidebar from './layout/suspended-sidebar'
 import CommandPalette from './shared/command-palette'
@@ -196,6 +197,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
             （settingsNavInline）が出る・消えるを繰り返し、画面が落ちる。外のメニューだけを出し入れし、
             出さないときの包みは display: contents で並びに影響させない。
           */}
+          <RecoveryCodeNotice />
           {settingsArea ? (
             <div className={withSettingsNav ? styles.settingsSplit : styles.settingsPass} data-settings-split={withSettingsNav ? '' : undefined}>
               {withSettingsNav ? <SettingsInnerNav /> : null}

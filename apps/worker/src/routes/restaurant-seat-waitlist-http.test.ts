@@ -20,6 +20,7 @@ const commonSender=vi.hoisted(()=>vi.fn(async(..._args:unknown[])=>({requestId:n
 vi.mock('../services/line-proxy-send.js',()=>({pushViaHarnessProxy:commonSender}));
 
 const authMocks = vi.hoisted(() => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async () => null),
   getStaffByAdminSession: vi.fn(async () => null),
   lineAccounts: [] as Array<Record<string, unknown>>,
@@ -133,7 +134,7 @@ beforeEach(() => {
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-9', name: 'S店', is_active: 1, channel_access_token: 'token-s' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
     endpoint: 'https://worker.example.test/webhook',
     active: true,

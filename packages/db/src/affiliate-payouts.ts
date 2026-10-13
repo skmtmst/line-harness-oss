@@ -844,16 +844,16 @@ export async function markAffiliatePayoutExported(
 export async function getAffiliatePayoutDownload(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; batchId: string; tokenHash: string; now?: string },
-): Promise<{ objectKey: string; fileChecksum: string | null } | null> {
+): Promise<{ objectKey: string; fileChecksum: string | null; lineCount: number } | null> {
   const row = await db.prepare(
-    `SELECT export_object_key, file_checksum FROM affiliate_payout_batches
+    `SELECT export_object_key, file_checksum, line_count FROM affiliate_payout_batches
       WHERE id = ? AND organization_id = ? AND line_account_id = ?
         AND state = 'exported' AND download_token_hash = ? AND export_expires_at > ?`,
   ).bind(
     input.batchId, input.tenantId, input.lineAccountId, input.tokenHash,
     input.now ?? new Date().toISOString(),
-  ).first<{ export_object_key: string; file_checksum: string | null }>();
-  return row ? { objectKey: row.export_object_key, fileChecksum: row.file_checksum } : null;
+  ).first<{ export_object_key: string; file_checksum: string | null; line_count: number }>();
+  return row ? { objectKey: row.export_object_key, fileChecksum: row.file_checksum, lineCount: row.line_count } : null;
 }
 
 export interface AffiliateStatementSnapshot {

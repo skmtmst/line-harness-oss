@@ -112,7 +112,7 @@ async function createDefinition(over: Record<string, unknown> = {}): Promise<str
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ conversions: conversionsRoute } = await import('./conversions.js'));
 });

@@ -160,3 +160,6 @@ describe('R497-SAVE-WORDING 保存503の配線', () => {
     expect((fixture.helperCalls[0] as { status?: number }).status).toBe(503)
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

@@ -155,3 +155,6 @@ describe('R500 無効にした人の再有効化', () => {
     expect(fixture.updated[0].data).toMatchObject({ isActive: true })
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

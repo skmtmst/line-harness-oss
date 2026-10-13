@@ -27,6 +27,8 @@ const SCOPED_KEY = 'mig-scoped';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
+  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
      VALUES ('acc-1', 'アカウント1', 'ch-1', 'token', 'secret'),

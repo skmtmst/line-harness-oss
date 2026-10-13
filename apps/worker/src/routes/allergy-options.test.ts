@@ -8,7 +8,7 @@ import { applyAccountAllergyOptions } from '../services/allergy-options';
 import type { Env } from '../index';
 let f: SqliteD1, app: Hono<Env>;
 beforeEach(()=>{
-  f=createTestD1({foreignKeys:true});
+  f=createTestD1({ loginPolicy: 'off',foreignKeys:true});
   for (const id of ['a','b']) f.raw.prepare('INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES(?,?,?,\'token\',\'secret\',?)').run(id,id,id,DEFAULT_TENANT_ID);
   f.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope,permission_keys) VALUES('owner','店長','owner','owner-key',?,'all','[]'),('staff','担当','admin','staff-key',?,'accounts','[]'),('viewer','閲覧','staff','viewer-key',?,'all','[]')").run(DEFAULT_TENANT_ID,DEFAULT_TENANT_ID,DEFAULT_TENANT_ID);
   f.raw.exec("INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('staff','a','2026-10-11')");

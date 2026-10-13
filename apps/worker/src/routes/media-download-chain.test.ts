@@ -98,7 +98,7 @@ function mediaDownloadAudits(): AuditRow[] {
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');
   insertStaff('staff-contents', CONTENTS_KEY, '["/contents"]');
