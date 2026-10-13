@@ -1,5 +1,6 @@
 'use client'
 
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
@@ -85,11 +86,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'name', label: '名前順' },
 ]
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /* 道具の段の札（絵 `rZEGN`：公開中・予約・下書き・出し分け）。もう一度押すと外れる（排他）。 */
 const FILTER_CHIPS = [

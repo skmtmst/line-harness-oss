@@ -43,9 +43,9 @@ function useToolbarFit() {
 
 
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
-const LeadingContext = createContext<ReactNode>(null)
+const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean }>({ leading: null })
 const FrameContext = createContext(false)
-export function ListToolbarLeading({ children, leading }: { children: ReactNode; leading: ReactNode }) {
+export function ListToolbarLeading({ children, leading, persistent }: { children: ReactNode; leading: ReactNode; persistent?: boolean }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
   const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? Children.toArray(children.props.children) : null
   const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
@@ -53,7 +53,7 @@ export function ListToolbarLeading({ children, leading }: { children: ReactNode;
   const needsFrame = nodes && nodes.some(node => isValidElement(node) && node.type === ListToolbarRow) && !containsLayout(nodes)
   const tools = needsFrame ? <ListToolbarFrame>{nodes.map((node, index) => isValidElement(node) && node.type === ListToolbarRow
     ? node : <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>)}</ListToolbarFrame> : children
-  return <LeadingContext.Provider value={leading}>{tools}</LeadingContext.Provider>
+  return <LeadingContext.Provider value={{ leading, persistent }}>{tools}</LeadingContext.Provider>
 }
 
 export type ListToolbarSearch = {
@@ -118,11 +118,11 @@ export default function ListToolbar({
   layout?: 'band' | 'stacked'
 }) {
   const ref = useToolbarFit()
-  const leading = useContext(LeadingContext)
+  const { leading, persistent } = useContext(LeadingContext)
   return (
     <div ref={ref} className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1} data-toolbar-tools data-toolbar-row>
-        {leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
+        {leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
         {search ? <div className={styles.search} data-toolbar-search><SearchField
           placeholder={search.placeholder}
           aria-label={search.label ?? search.placeholder}
@@ -147,21 +147,21 @@ export default function ListToolbar({
 /** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
 export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked' }) {
   const ref = useToolbarFit()
-  const leading = useContext(LeadingContext)
+  const { leading, persistent } = useContext(LeadingContext)
   const containsToolbar = (nodes: ReactNode): boolean => Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
     && (node.type === ListToolbar || node.props.children && containsToolbar(node.props.children)))
   const ownsLeading = !containsToolbar(children)
   return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>
-    {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
+    {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {ownsLeading ? <span className={styles.rowBreak} aria-hidden="true" /> : null}{children}
   </div></FrameContext.Provider>
 }
 
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {
-  const leading = useContext(LeadingContext)
+  const { leading, persistent } = useContext(LeadingContext)
   const inFrame = useContext(FrameContext)
   return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools data-toolbar-row>
-    {!inFrame && leading ? <span className={styles.leading} data-toolbar-leading>{leading}</span> : null}
+    {!inFrame && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {!inFrame ? <span className={styles.rowBreak} aria-hidden="true" /> : null}
     {Children.toArray(compactFilterGroups(children)).map((child, index) => <span key={isValidElement(child) ? child.key ?? index : index} className={styles.slotTool} data-toolbar-role={toolbarRole(child)}>{child}</span>)}
   </Tag>
@@ -256,7 +256,7 @@ function compactFilterGroups(node: ReactNode): ReactNode {
     return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
   return children.map(child => {
     if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
-      return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || child.props.size === 'page-size' })
+      return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || toolbarRole(child) === 'count' })
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
       const nested = compactFilterGroups(child.props.children)
       // Field wrappers receive one control, not a one-element children array.

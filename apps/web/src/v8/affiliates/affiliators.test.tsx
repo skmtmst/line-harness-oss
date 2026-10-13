@@ -12,6 +12,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const folderList = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ manage: true }))
 const updateAffiliate = vi.hoisted(() => vi.fn())
 const affiliatesList = vi.hoisted(() => vi.fn())
@@ -26,6 +27,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      folders: { ...actual.api.folders, list: folderList },
       affiliates: { ...actual.api.affiliates, list: affiliatesList, allReport, settlementPreview, update: updateAffiliate },
       affiliateOffers: { ...actual.api.affiliateOffers, list: offersList },
       conversionApprovals: { ...actual.api.conversionApprovals, list: approvalsList },
@@ -54,6 +56,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
   return { ...actual, useStaffRole: () => (role.manage ? 'owner' : 'staff'), canManageRole: () => role.manage }
 })
 
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import AffiliatesV8 from './affiliates'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -76,7 +79,10 @@ async function render() {
 }
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null,'','/affiliates')
   updateAffiliate.mockReset().mockResolvedValue({ success: true })
+  folderList.mockResolvedValue({success:true,data:[{id:'f1',name:'紹介の仲間',color:'#228b22',kind:'affiliate',accountId:'account-a',displayOrder:0}]})
   role.manage = true
   affiliatesList.mockResolvedValue({ success: true, data: affiliates })
   allReport.mockResolvedValue({ success: true, data: report })
@@ -130,4 +136,34 @@ it('止めた紹介者は確認後に再開し、失敗した理由を窓に残�
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '紹介を再開する', exact: true }))
   await waitFor(() => expect(updateAffiliate).toHaveBeenCalledWith('af-1', { isActive: true }))
   await waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('紹介を再開できませんでした'))
+})
+
+
+it('W2: managed folders offer creation, filtering and each row uses its actual folder', async () => {
+  affiliatesList.mockResolvedValue({success:true,data:[{...affiliates[0],folderId:'f1'},affiliates[1]]})
+  await render()
+  expect(folderList).toHaveBeenCalledWith('affiliate','account-a')
+  expect(screen.getByRole('button',{name:'フォルダを追加',exact:true})).toBeTruthy()
+  expect(host.querySelector('[data-folder-dot="filed"]')?.getAttribute('title')).toBe('フォルダ：紹介の仲間')
+  const rail = host.querySelector('[data-template-region="folders"]')!
+  fireEvent.click(rail.querySelector('button[title="紹介の仲間"]')!)
+  await waitFor(()=>expect(host.querySelectorAll('tbody tr')).toHaveLength(1))
+  expect(host.querySelector('tbody')?.textContent).toContain('少ない人')
+  fireEvent.click(screen.getByRole('button',{name:'少ない人の操作'}))
+  expect(screen.getByRole('menuitem',{name:'フォルダへ移す'})).toBeTruthy()
+  fireEvent.click(screen.getByRole('menuitem',{name:'フォルダへ移す'}))
+  const picker=screen.getByRole('dialog',{name:'移すフォルダを選ぶ'})
+  fireEvent.click(within(picker).getByRole('radio',{name:'未分類'}))
+  fireEvent.click(within(picker).getByRole('button',{name:'フォルダへ移す',exact:true}))
+  await waitFor(()=>expect(updateAffiliate).toHaveBeenCalledWith('af-1',{folderId:null}))
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'移すフォルダを選ぶ'})).toBeNull())
+})
+
+it('W2: readonly users retain folder filtering without adding or moving folders', async () => {
+  role.manage=false
+  await render()
+  expect(screen.queryByRole('button',{name:'フォルダを追加',exact:true})).toBeNull()
+  const menu=host.querySelector('[aria-label="多い人の操作"]')!
+  fireEvent.click(menu)
+  expect(screen.queryByRole('menuitem',{name:'フォルダへ移す'})).toBeNull()
 })

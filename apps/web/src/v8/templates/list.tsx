@@ -1,5 +1,6 @@
 'use client'
 
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import ListDateTime from '@/components/shared/list-date-time'
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
@@ -121,11 +122,7 @@ const SAVED_FILTER_OPTIONS = [
 ]
 
 /** 表示件数（決まり：ページ送りのある一覧は 10・20・50 件）。 */
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 削除できない窓に並べる行の数（残りは「ほか N か所」）。 */
 const BLOCKED_ROWS_SHOWN = 2

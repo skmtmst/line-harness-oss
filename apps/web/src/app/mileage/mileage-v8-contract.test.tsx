@@ -300,28 +300,24 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('100マイル')
 })
 
-test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。左のフォルダの列は「すべて」だけで押せない口を置かない（B-136）', async () => {
+test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。所属先の受け口がないフォルダ列を出さず、作成と絞り込みを保つ（W2）', async () => {
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('友だち追加'))
-  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-  const rows = [...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))
-  expect(rows).toEqual(['すべて'])
-  expect(nav.textContent).not.toContain('購入')
+  expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(host.querySelector('a[href="/mileage/earning-rules/new"]')).toBeTruthy()
   expect(host.textContent).not.toContain('フォルダを追加')
   expect(host.querySelector('button[aria-label="きっかけ"], [aria-label="きっかけ"]')).toBeTruthy()
 })
 
-test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。左のフォルダの列は「すべて」だけ（B-136）', async () => {
+test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。選ぶ物がない列を出さず、種類の絞り込みを保つ（W2）', async () => {
   document.documentElement.dataset.theme = 'v8'
   query = 'tab=rewards'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('送料無料クーポン'))
-  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-  expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
-  expect(nav.textContent).not.toContain('クーポン')
+  expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
   expect(host.querySelector('[aria-label="種類"]')).toBeTruthy()
   query = ''
 })

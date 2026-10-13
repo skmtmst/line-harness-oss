@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import ListToolbar from '@/components/shared/list-toolbar'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -140,4 +141,23 @@ describe('左の列を持つ一覧は、畳んだときの行き先も持つ', (
     const source = readFileSync(file, 'utf8')
     expect(folderLists(source).every((list) => list.fallback)).toBe(true)
   })
+})
+
+
+it('W2: a one-choice rail is omitted and creation remains reachable in shared tools', () => {
+  const { container } = render(<ListPage title="決めごと" folders={<nav>すべて</nav>}
+    folderNav={{rows:[{id:'all',label:'すべて'}],activeId:'all',onSelect:()=>{},createAction:<a href="/new">作る</a>}}
+    toolbar={<ListToolbar search={{placeholder:'名前で探す',value:'',onChange:()=>{}}} />}>本文</ListPage>)
+  expect(container.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(screen.queryByRole('button',{name:'フォルダ'})).toBeNull()
+  expect(container.querySelector('[data-toolbar-persistent] a')?.getAttribute('href')).toBe('/new')
+})
+
+
+it('W2: a readonly no-choice list leaves no empty leading slot', () => {
+  const { container } = render(<ListPage title="決めごと" readOnly folders={<nav>すべて</nav>}
+    folderNav={{rows:[{id:'all',label:'すべて'}],activeId:'all',onSelect:()=>{}}}
+    toolbar={<ListToolbar search={{placeholder:'名前で探す',value:'',onChange:()=>{}}} />}>本文</ListPage>)
+  expect(container.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(container.querySelector('[data-toolbar-leading]')).toBeNull()
 })

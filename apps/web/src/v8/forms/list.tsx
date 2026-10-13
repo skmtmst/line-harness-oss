@@ -1,4 +1,5 @@
 'use client'
+import { pageSizeOptions } from '@/components/shared/page-size-options'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import ListToolbar, { ListToolbarEnd, ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
@@ -990,7 +991,7 @@ export default function FormsListV8() {
       >
         情報欄に保存
       </FilterChip>
-      <FilterChip selected={formFilter === 'archived'} onChange={(next) => updateListState({ filter: next ? 'archived' : 'all', page: 1 })}>
+      <FilterChip icon={<Archive size={13} aria-hidden="true" />} selected={formFilter === 'archived'} onChange={(next) => updateListState({ filter: next ? 'archived' : 'all', page: 1 })}>
         アーカイブ済み
       </FilterChip>
       {/* 「後処理未完」は数の帯の「未完を見る」から入る絞り込み。選んでいる間だけ札を出す。 */}
@@ -1018,7 +1019,7 @@ export default function FormsListV8() {
         aria-label="表示件数"
         size="page-size"
         value={String(pageSize)}
-        options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
+        options={pageSizeOptions(FORM_PAGE_SIZES)}
         onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
       /></SaveErrorField>
     </div>
@@ -1565,9 +1566,9 @@ export default function FormsListV8() {
         help="LINEの中で開くアンケート・申し込みフォームです。答えは友だち情報に保存できます。"
         /* 絵に無い機能（管理者確認）は見出しの右に小さく残す。 */
         actions={canManageFolders ? (
-          <FilterChip selected={reviewMode} onChange={(next) => { setReviewMode(next); setPage(1) }}>
+          <Button variant="secondary" onClick={() => { setReviewMode(!reviewMode); setPage(1) }}>
             {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
-          </FilterChip>
+          </Button>
         ) : undefined}
         tabs={viewerBand}
         stats={reviewMode ? undefined : (

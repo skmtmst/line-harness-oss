@@ -337,6 +337,7 @@ test('SL-C03: 毎週の休憩が409でも入力を残し、本人が最新を読
   render(<StaffShiftsV8 staffId="bs-1"/>)
   await screen.findByRole('combobox',{name:'休憩の始まり'})
   setTime('休憩の始まり','12:00')
+  await waitFor(()=>expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('12:00'))
   await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
   expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('12:00')
   expect(fixture.getBreaks).toHaveBeenCalledTimes(1)

@@ -721,6 +721,7 @@
             "apps/web/src/components/ui/page-size-select.tsx",
             "apps/web/src/components/ui/list-range.tsx",
             "apps/web/src/components/shared/page-size-select.tsx",
+            "apps/web/src/components/shared/page-size-options.ts",
             "apps/web/src/components/shared/inbox-list.tsx",
             "apps/web/src/components/shared/inbox-list.module.css"
           ],
@@ -728,7 +729,9 @@
             "Pagination",
             "PageSizeSelect",
             "ListPagePagination",
-            "InboxHistoryButton"
+            "InboxHistoryButton",
+            "pageSizeOptions",
+            "pageSizeLabel"
           ],
           "vars": []
         },
@@ -738,7 +741,7 @@
             "name": "ページ送り"
           }
         ],
-        "status": "PageSizeSelect は components/ui にあり shared に無い（B-143）"
+        "status": "Pagination・PageSizeSelect・pageSizeOptionsが共通の件数とページ送りの正本"
       },
       "code": {
         "selectorHint": "pagination|pager|pageSize|perPage",

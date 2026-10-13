@@ -271,7 +271,7 @@
 ## pagination ページ送り
 
 - **役目**：ページを送り、10・20・50件を切り替える
-- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`ListPagePagination`）
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
 - **持ち主（Pen）**：`jX2Uw`「ページ送り」
   - 注：PageSizeSelect は shared が持つ（B-172）。
 - **見つけ方（コード）**：

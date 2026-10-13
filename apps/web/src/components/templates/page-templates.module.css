@@ -468,3 +468,6 @@
 
 /* 受信箱も白い板の下に24を残し、本文だけを送る。 */
 :global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }
+
+/* No-choice lists retain their create action even without other tools. */
+:global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
