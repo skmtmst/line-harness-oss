@@ -176,3 +176,8 @@
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
+
+/* 予約などの完了を示す印。指定しない設定内容の箱は変えない。 */
+.summaryCompletion { display: flex; align-items: center; gap: var(--polish-space-field); }
+.completionIcon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
+.completionIcon > svg { width: var(--polish-space-section); height: var(--polish-space-section); }
