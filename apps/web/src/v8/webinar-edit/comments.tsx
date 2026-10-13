@@ -173,7 +173,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   const firstBefore = chronological.find((comment) => comment.atSeconds < 0)
   const preview = firstDuring && firstBefore ? [firstDuring, firstBefore] : chronological.slice(0, 2)
   const previewContent = <>
-    <div className={styles.screen}>
+    <div className={styles.screen} data-video-player>
       {preview.map((comment, index) => (
         <p key={index} className={styles.screenLine} data-dim={index > 0 || undefined}>{`${comment.authorName}：${comment.body}`}</p>
       ))}
