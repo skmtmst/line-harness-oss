@@ -200,7 +200,7 @@ export default function KpiCard({
           title={title || undefined}
         >
           {icon === null ? null : (
-            <span className={styles.icon} aria-hidden="true">
+            <span data-kpi-icon className={styles.icon} aria-hidden="true">
               {icon ?? <ChartNoAxesColumn size={14} />}
             </span>
           )}

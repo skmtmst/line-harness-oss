@@ -839,7 +839,7 @@ export default function FriendsListV8() {
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
                         <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusBadge>
-                        {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
+                        {friend.supportMark ? <StatusBadge distinctFrom={status.label} dot={false} size="annotation" title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</StatusBadge> : null}
                       </span>
                       <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
                     </div>

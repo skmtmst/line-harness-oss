@@ -16,7 +16,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { FriendAddEventAttributionStatus, FriendAddEventKind, FriendAddEventRoutingStatus } from '@line-crm/shared';
-import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
+import { UserPlus, Send, Play, Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -476,12 +476,12 @@ function FriendAddRunsInner() {
 
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
-          <KpiCard presentation="band" icon={null} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
+          <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
             detail={`追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
-          <KpiCard presentation="band" icon={null} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
-          <KpiCard presentation="band" icon={null} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
+          <KpiCard presentation="band" icon={<Send size={14} aria-hidden="true" />} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
+          <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
             detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
-          <KpiCard presentation="band" icon={null} title="シナリオを始めた" value={summary ? summary.scenarioStarts : null} unit="件" detail="直近28日" />
+          <KpiCard presentation="band" icon={<Play size={14} aria-hidden="true" />} title="シナリオを始めた" value={summary ? summary.scenarioStarts : null} unit="件" detail="直近28日" />
         </KpiBand>
       </div>
 
