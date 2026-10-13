@@ -3,6 +3,15 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 import scanFormRules from './form-rules-browser.mjs'
+import { assessAgainstBase } from './layout-defects.mjs'
+
+test('既存の伸びた必須札も検出し、基準版へ同じ崩れを置いて許可にしない', () => {
+  const finding = { kind: 'form-required-badge', target: 'main > span', text: '必須', measure: { excess: 100 } }
+  const result = assessAgainstBase([finding], [finding], '/example', 1440)
+  assert.deepEqual(result.failures, [finding])
+  assert.deepEqual(result.existing, [])
+  assert.deepEqual(result.allowed, [])
+})
 
 test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯を3幅で検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/form-controls.module.css', import.meta.url), 'utf8')
