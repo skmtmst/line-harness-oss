@@ -88,8 +88,9 @@ export default function Checkbox({
   )
 }
 
-/** Preserve the selection column's outline for a row that cannot be included. */
+/** 閲覧のみの選ぶ操作は描かない。対象外の行は、理由と枠を保つ。 */
 export function UnavailableSelection({ label, reason = '閲覧のみのため選べません' }: { label: string; reason?: string }) {
+  if (reason === '閲覧のみのため選べません') return null
   return <Checkbox checked={false} disabled aria-label={label} aria-description={reason} title={reason}
     onClick={(event) => event.stopPropagation()} onCheckedChange={() => {}} />
 }
