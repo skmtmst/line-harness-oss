@@ -14,7 +14,7 @@ import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowNameButton } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import KpiBand from '@/components/shared/kpi-band'
 import { formatNumber } from '@/lib/format'
 import KpiCard from '@/components/shared/kpi-card'
@@ -693,10 +693,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       pagination={images.length > 0 && status === 'ready' ? pager : undefined}
       toolbar={<>
         <ListToolbar search={{placeholder:'テキスト・指示で探す',label:'テキスト・指示で探す',value:query,onChange:(value)=>{setQuery(value);resetPage()}}}
-          filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><div role="group" aria-label="用途で絞り込む" className={styles.chips}>
+          filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><ResponsiveFilterChips label="用途">
             <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={()=>{setShape(null);resetPage()}}>すべて</FilterChip>
             {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
-          </div></>}
+          </ResponsiveFilterChips></>}
           trailing={<span>並び：作成が新しい順</span>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
       </>}
