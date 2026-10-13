@@ -27,6 +27,19 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     }
     return bands.length
   }
+  const shortTextTargets = el => {
+    if (!el.matches('button') && [...el.children].some(child => child.matches('br'))) return []
+    const css = getComputedStyle(el)
+    const column = css.display.includes('flex') && css.flexDirection === 'column'
+    const children = [...el.children].filter(child => visible(child) && child.textContent.trim() && !child.matches('svg'))
+    if (!children.length || [...el.childNodes].some(node => node.nodeType === 3 && node.textContent.trim())) return [el]
+    const nestedColumn = css.display.includes('flex') && children.some(child => {
+      const style = getComputedStyle(child)
+      return style.display.includes('flex') && style.flexDirection === 'column'
+    })
+    if (!column && !nestedColumn) return [el]
+    return children.flatMap(shortTextTargets)
+  }
   const canvas = document.createElement('canvas').getContext('2d')
   const roots = [...document.querySelectorAll('[data-page-template]')].filter(visible)
   for (const root of roots) {
@@ -66,9 +79,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button')) {
       // A column of title/instructions is a composite control. Audit each
       // short label; explicit line breaks in instructions are intentional.
-      const css = getComputedStyle(el)
-      const composite = el.matches('button') && css.display.includes('flex') && css.flexDirection === 'column'
-      const targets = composite ? [...el.children].filter(child => visible(child) && child.textContent.trim() && !child.matches('svg') && !child.querySelector('br')) : [el]
+      const targets = el.matches('button') ? shortTextTargets(el) : [el]
       for (const target of targets) if (lines(target) > 1) add('F2', target, 'short text wraps')
     }
     for (const el of all('button,a[role="button"],[data-page-title]')) {

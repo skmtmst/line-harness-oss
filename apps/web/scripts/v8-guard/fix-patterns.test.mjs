@@ -160,3 +160,27 @@ test('W4 distinguishes heading actions and archive filters without board IDs',as
  assert.equal(after.counts.F5,0);assert.equal(after.counts.F4,0)
  }finally{await browser.close()}
 })
+
+test('F2 measures each short title in a compound choice and catches wrapped children', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>button{display:flex;align-items:center;width:260px}.text{display:flex;flex-direction:column}span{font:14px/20px Arial}</style>
+      <main data-page-template="create"><button><svg width="16" height="16"></svg><span class="text"><span>Question title</span><span>Input kind</span></span></button></main>`)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F2, 0)
+    await page.locator('.text > span').first().evaluate(el => { el.style.width = '35px' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+    await page.locator('.text > span').first().evaluate(el => { el.style.width = '' })
+    await page.locator('.text > span').last().evaluate(el => { el.style.width = '20px' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+    await page.setContent(`<style>button{display:flex;width:260px}.text{display:flex;flex-direction:column}span{font:14px/20px Arial}</style>
+      <main data-page-template="create"><button><svg width="16" height="16"></svg><span class="text"><span>File title</span><span>First instruction<br>Second instruction</span></span></button></main>`)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F2, 0)
+    await page.locator('.text > span').first().evaluate(el => { el.style.width = '25px' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0, '題は改行付きの説明と一緒でも数える')
+    await page.setContent('<main data-page-template="create"><button style="display:flex;flex-direction:column;width:35px">Question title</button></main>')
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+    await page.setContent('<main data-page-template="create"><button>Question<br>title</button></main>')
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+  } finally { await browser.close() }
+})
