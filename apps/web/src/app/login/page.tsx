@@ -109,7 +109,7 @@ export default function LoginPage() {
       node="UufG8"
       cardNode="m3tWJ"
       title="ログイン"
-      description="メールアドレスとパスワードでログインします。LINE で登録した権限者は LINE でログインしてください。"
+      description="メールアドレスとパスワードでログインします。LINE で登録した人は「LINE でログイン」を使ってください。"
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
@@ -140,7 +140,7 @@ export default function LoginPage() {
             パスワードを忘れた方はこちら
           </Link>
         </div>
-        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
+        <Button fullWidth type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
@@ -150,7 +150,7 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+      <Button fullWidth onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
         <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
       </Button>
 

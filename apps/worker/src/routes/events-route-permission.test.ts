@@ -99,7 +99,7 @@ function post(path: string, key?: string) {
 
 describe('本番 events ルートの権限 (実認証)', () => {
   it('cancel: 権限なしstaff・閲覧専用・無認証は止まり、状態を変えない', async () => {
-    const { db, raw } = createTestD1();
+    const { db, raw } = createTestD1({ loginPolicy: 'off' });
     seed(raw);
     const { app, env } = makeApp(db);
     const cancel = (id: string, account: string, key?: string) =>
@@ -121,7 +121,7 @@ describe('本番 events ルートの権限 (実認証)', () => {
   });
 
   it('cancel: /events権限つきstaff と owner は通る', async () => {
-    const { db, raw } = createTestD1();
+    const { db, raw } = createTestD1({ loginPolicy: 'off' });
     seed(raw);
     const { app, env } = makeApp(db);
     const cancel = (id: string, key: string) =>
@@ -141,7 +141,7 @@ describe('本番 events ルートの権限 (実認証)', () => {
   });
 
   it('decide: 権限なしstaff は 403、owner と /events権限つきstaff は落選できる', async () => {
-    const { db, raw } = createTestD1();
+    const { db, raw } = createTestD1({ loginPolicy: 'off' });
     seed(raw);
     const { app, env } = makeApp(db);
     const decide = (id: string, key?: string) =>

@@ -51,11 +51,6 @@ beforeEach(async () => {
   ).run();
 });
 
-/*
- * 二段階認証は一時解除中（利用者指示 2026-10-03）。運営ログインもパスワードが
- * 合えばその場でセッションが出る。再有効化したら合言葉→/api/auth/two-factor/verify
- * →セッションの順に戻す（`totpAtStep` と `SECRET` はそのために残している）。
- */
 describe('運営コンソールのメールログイン', () => {
   it('パスワードでsessionを受け取り、そのBearerでsession確認とops認可まで通る', async () => {
     const login = await app().request(`${WORKER}/api/auth/password/login`, {
@@ -64,8 +59,15 @@ describe('運営コンソールのメールログイン', () => {
       body: JSON.stringify({ email: 'ops-e2e@example.com', password: 'Abcdefg1', next: 'ops' }),
     }, environment());
     expect(login.status, await login.clone().text()).toBe(200);
-    const loginBody = await login.json() as { data: { twoFactor: boolean; sessionToken: string }; csrfToken: string };
-    expect(loginBody.data.twoFactor).toBe(false);
+    const challenge = await login.json() as { data: { twoFactor: boolean; challengeToken: string } };
+    expect(challenge.data.twoFactor).toBe(true);
+    expect(login.headers.get('set-cookie')).toBeNull();
+    const verified = await app().request(`${WORKER}/api/auth/two-factor/verify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: PAGES },
+      body: JSON.stringify({ challengeToken: challenge.data.challengeToken, code: await totpAtStep(SECRET, Math.floor(Date.now()/30000)) }),
+    }, environment());
+    expect(verified.status).toBe(200);
+    const loginBody = await verified.json() as { data: { sessionToken: string }; csrfToken: string };
     expect(loginBody.data.sessionToken).toBeTruthy();
     expect(loginBody.csrfToken).toBeTruthy();
 

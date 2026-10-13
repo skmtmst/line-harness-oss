@@ -135,3 +135,6 @@ describe('個人情報行の注記は選択肢の一般説明と区別できる 
     expect(screen.getByText(/電話番号・住所・メールは伏せて表示します/)).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

@@ -1,4 +1,8 @@
 'use client'
+import SelfMfa from './self-mfa'
+import MfaPolicy from './mfa-policy'
+import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import TotpQr from '@/components/shared/totp-qr'
 
 import { useOverlayFocus } from '@/components/shared/overlay-utils';
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
@@ -684,6 +688,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
 
 function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onClose: () => void; onSaved: () => Promise<void> }) {
   const saveErrors = useSaveFormErrors()
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
 
   const [uri, setUri] = useState(''), [manualKey, setManualKey] = useState(''), [qr, setQr] = useState(''), [code, setCode] = useState(''), [error, setError] = useState(''), [saving, setSaving] = useState(false)
   useEffect(() => { void (async () => { try { const res = await api.staff.beginTwoFactorSetup(member.id); if (res.success) { setUri(res.data.provisioningUri); setManualKey(res.data.manualKey) } } catch (caught) {
@@ -693,17 +698,19 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 
  setError(messageOf(caught)) } } })() }, [member.id, saveErrors])
   useEffect(() => { if (uri) void qrToDataURL(uri, { width: 240, margin: 1, color: qrColors() }).then(setQr) }, [uri])
-  const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { await api.staff.confirmTwoFactorSetup(member.id, value); await onSaved(); onClose() } catch (caught) {
+  const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { const res = await api.staff.confirmTwoFactorSetup(member.id, value); if (!res.success) throw new Error(res.error); if (res.data.recoveryCodes?.length) setRecoveryCodes(res.data.recoveryCodes); else { await onSaved(); onClose() } } catch (caught) {
     const fieldFailure = saveErrors.capture(caught)
  { if (!fieldFailure)
 
 
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><Modal title="二段階認証を設定" onClose={onClose} wide><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
-    <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-    <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || emptyValue('unknown')}</p></div></div></div>
-    <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></SaveErrorField></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
-    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri} busy={Boolean(saving)} busyLabel="確認中…">✓ 設定を完了</Button></div></Modal></SaveErrorScope>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => void save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
+    {recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => window.location.assign('/login')} /> : <>
+      {error ? <Notice tone="danger" message={error} /> : null}
+      <TotpQr qr={qr} manualKey={manualKey} />
+      <Field label="認証アプリに表示された6桁コード"><SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={entered => void save(entered)} label="認証アプリに表示された6桁コード" invalid={Boolean(error)} busy={saving} /></SaveErrorField></Field>
+    </>}
+  </Dialog></SaveErrorScope>
 }
 
 /*
@@ -1136,6 +1143,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       <div className={styles.body}>
         <SettingsInnerNav inline />
         <div className={styles.main}>
+          {administrator ? <MfaPolicy /> : null}
+          <SelfMfa />
           {tab === 'audit' ? (
             <>
               {tabAction ? <div className={styles.toolbar}><span className={styles.spacer} />{tabAction}</div> : null}

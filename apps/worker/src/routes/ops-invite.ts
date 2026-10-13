@@ -1,3 +1,4 @@
+import { loginMfaChallenge, mfaAudit } from '../services/login-mfa.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -14,7 +15,7 @@ import {
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
-import { clientIp, issueSession } from '../services/admin-session.js';
+import { clientIp } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy } from '../services/password-hash.js';
 
 /**
@@ -110,19 +111,8 @@ opsInvite.post('/api/auth/ops-invite/accept', inputJsonBoundary(), async (c) => 
   if (!updated) return c.json({ success: false, error: '登録を進められませんでした' }, 500);
   await setPlatformAdminActivationState(c.env.DB, staff.id, 'awaiting_totp');
 
-  const session = await issueSession(c, staff.id, config.sameSite);
-  await recordLoginAudit(c.env.DB, {
-    adminUserId: staff.id,
-    action: 'login',
-    ip: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-  });
-  return c.json({
-    success: true,
-    data: {
-      next: 'two-factor-setup',
-      sessionToken: config.crossSite ? session.sessionToken : undefined,
-    },
-    csrfToken: session.csrfToken,
-  });
+  const challenge = await loginMfaChallenge(c, updated, false, true);
+  await mfaAudit(c, staff.id, 'auth.invite.accept', 'success');
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, data: { next: 'two-factor-setup', ...challenge } });
 });

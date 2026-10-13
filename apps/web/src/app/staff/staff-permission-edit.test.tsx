@@ -175,3 +175,6 @@ describe('既存スタッフの成果承認権限', () => {
     expect(payload.permissionKeys).toBeUndefined()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

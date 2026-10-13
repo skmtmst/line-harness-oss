@@ -1104,6 +1104,7 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
       '期間開始', '期間終了', 'タイムゾーン', '純額定義', '成果地点ID', '成果地点名',
       '起点', '状態', '状態詳細', '成果件数', '純成果件数', '取消件数', '純金額', '利用先数', '更新日時',
     ];
+    c.set('outputAudit', { count: items.length, accountId: filters.value.lineAccountId ?? undefined, accountIds: [...scope.value.allowedAccountIds], accountCounts: Object.fromEntries(scope.value.allowedAccountIds.map(id => [id, items.filter(item => item.lineAccountId === id).length])) });
     const rows = items.map((item) => [
       range.range.from,
       range.range.to,

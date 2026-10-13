@@ -1734,6 +1734,7 @@ events.get(
       if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
       if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
       if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+      c.set('outputAudit', { count: loaded.snapshot.data.applicants.length, accountId, targetId: occurrenceId });
       const rows = loaded.snapshot.data.applicants.map((applicant) => [
         applicant.displayName,
         applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',

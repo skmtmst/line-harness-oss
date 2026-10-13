@@ -173,3 +173,6 @@ describe('ログインユーザー検索 (#620)', () => {
     expect(list().getByText('佐藤 花子')).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

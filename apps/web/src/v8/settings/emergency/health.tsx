@@ -282,6 +282,7 @@ export function HealthPanelV8({
   const [loading, setLoading] = useState(true)
   const hasLoaded = useRef(false)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
+  const [loginSecurityNotice, setLoginSecurityNotice] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
   const [alerts, setAlerts] = useState<OperationAlert[]>([])
   const [stats, setStats] = useState<{ stops: number; longest: string; version: string } | null>(null)
@@ -342,6 +343,7 @@ export function HealthPanelV8({
   }
 
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
+    setLoginSecurityNotice(snapshot.loginSecurity?.notice ?? null)
     const results = snapshot.latestRun?.results ?? []
     const snapshotStale = snapshot.overallStatus === 'stale'
     setChecks(CHECK_DEFINITIONS.map((definition) => {
@@ -524,6 +526,7 @@ export function HealthPanelV8({
 
   return (
     <>
+      {loginSecurityNotice ? <Notice tone="warn" message={loginSecurityNotice} /> : null}
       <div className={styles.banner} data-tone={banner.tone} role="status">
         <BannerIcon className={styles.bannerIcon} aria-hidden="true" />
         <div className={styles.bannerText}>
