@@ -95,7 +95,7 @@
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
-:global(:root) .frame[data-page-template='create'] [data-template-region='preview'][data-preview-surface='plain'] { background: transparent; }
+:global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
 :global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
 :global(:root) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
 /*

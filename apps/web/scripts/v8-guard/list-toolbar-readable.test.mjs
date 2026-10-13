@@ -24,9 +24,32 @@ test('numeric support columns reserve the full note instead of the old truncatio
   } finally { await browser.close() }
 })
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import scanVisualState from './visual-state-browser.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
+
+test('an explicit plain preview keeps the reading detail ground through creation-only CSS changes', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const styles = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
+    const html = sheet => `<html data-theme="v8"><style>${read('../../src/app/globals.css')}${sheet}</style><main><section class="frame" data-page-template="detail"><aside class="preview" data-template-region="preview" data-preview-surface="plain">状態と操作</aside></section></main></html>`
+    await page.setContent(html(styles))
+    assert.equal((await page.evaluate(scanVisualState)).findings.length, 0)
+    const broken = styles.replace(".preview[data-preview-surface='plain']", ".frame[data-page-template='create'] [data-template-region='preview'][data-preview-surface='plain']")
+    assert.notEqual(broken, styles)
+    await page.setContent(html(broken))
+    assert.equal((await page.evaluate(scanVisualState)).findings[0].kind, 'preview-background')
+    await page.setContent(html(styles))
+    assert.equal((await page.evaluate(scanVisualState)).findings.length, 0)
+    await page.locator('section').evaluate(el => {
+      el.dataset.pageTemplate = 'create'
+      el.querySelector('aside').removeAttribute('data-preview-surface')
+    })
+    assert.equal((await page.evaluate(scanVisualState)).findings.length, 0, 'the creation ground remains white without the plain option')
+  } finally { await browser.close() }
+})
 
 test('a compact listbox control keeps its shared square while text selects fit their label', async () => {
   const browser = await chromium.launch()
