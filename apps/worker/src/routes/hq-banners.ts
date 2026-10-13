@@ -695,7 +695,7 @@ hqBanners.delete('/api/hq/banners/images/:id', async (c) => {
 });
 
 /** 統括が手持ちの画像をプロジェクトへ取り込む。生成画像と同じように店舗へ渡せる。 */
-hqBanners.post('/api/hq/banners/projects/:id/uploads', inputJsonBoundary(), async (c) => {
+hqBanners.post('/api/hq/banners/projects/:id/uploads', inputJsonBoundary({}, { maxBytes: Math.ceil((10 * 1024 * 1024) / 3) * 4 + 4096 }), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const project = await getBannerProject(c.env.DB, c.req.param('id'), tenantId);

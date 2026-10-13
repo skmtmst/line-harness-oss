@@ -2,7 +2,7 @@ import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
-import { inputError, inputJsonBoundary, validatedInputBody } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes, validatedInputBody } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
@@ -2305,7 +2305,8 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     }
 
-    const data = await c.req.arrayBuffer();
+    const data = await readBoundedBytes(c.req.raw, FORM_UPLOAD_MAX_BYTES);
+    if (data === null) return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     if (data.byteLength === 0) {
       return inputError(c, { success: false, error: 'ファイルが空です' }, 400, []);
     }

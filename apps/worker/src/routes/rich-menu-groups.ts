@@ -1,4 +1,4 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -1956,7 +1956,8 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
     return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
   }
 
-  const buf = new Uint8Array(await c.req.arrayBuffer());
+  const buf = await readBoundedBytes(c.req.raw, 1024 * 1024);
+  if (buf === null) return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
   const validation = validateRichMenuImage(buf, buf.byteLength);
   if (!validation.ok) return inputError(c, { success: false, error: validation.error }, 400, ["pages"]);
 

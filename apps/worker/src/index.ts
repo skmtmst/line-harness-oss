@@ -68,6 +68,7 @@ import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
+import { pruneSensitiveRateLimits } from './middleware/sensitive-rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
@@ -1485,6 +1486,8 @@ async function runFrequentHeavyJobs(
   event: ScheduledEvent,
   env: Env['Bindings'],
 ): Promise<void> {
+  try { await pruneSensitiveRateLimits(env.DB, new Date(event.scheduledTime)); }
+  catch { console.error('sensitive_rate_limit_cleanup_failed'); }
   const dbAccounts = await getLineAccounts(env.DB);
   const lineClients = new Map<string, LineClient>();
   for (const account of dbAccounts) {

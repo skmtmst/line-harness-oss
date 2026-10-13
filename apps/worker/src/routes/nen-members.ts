@@ -786,7 +786,7 @@ nenMembers.get('/api/public/nen/gallery-preview', async (c) => {
   }
 });
 
-nenMembers.post('/api/liff/nen/pets', inputJsonBoundary(), async (c) => {
+nenMembers.post('/api/liff/nen/pets', inputJsonBoundary({}, { maxBytes: Math.ceil(1_500_000 / 3) * 4 + 4096 }), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -943,7 +943,7 @@ nenMembers.put('/api/liff/nen/pets/:id', inputJsonBoundary(), async (c) => {
   return c.json({ success: true, data: mapPet(saved || updated, products, catalog.treatLimitPercent) });
 });
 
-nenMembers.post('/api/liff/nen/pets/:id/photo', inputJsonBoundary({"data":["string"]}), async (c) => {
+nenMembers.post('/api/liff/nen/pets/:id/photo', inputJsonBoundary({"data":["string"]}, { maxBytes: Math.ceil(1_500_000 / 3) * 4 + 4096 }), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const pet = await c.env.DB.prepare(`SELECT id, image_r2_key FROM nen_pet_profiles WHERE id=? AND friend_id=?`)
@@ -1075,7 +1075,7 @@ nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
   } });
 });
 
-nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"data":["string"],"mimeType":["string"],"caption":["string"]}), async (c) => {
+nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"data":["string"],"mimeType":["string"],"caption":["string"]}, { maxBytes: Math.ceil((8 * 1024 * 1024) / 3) * 4 + 4096 }), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<{ petId?: string; data?: string; mimeType?: string; caption?: string }>().catch(() => null);

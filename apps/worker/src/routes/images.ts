@@ -1,4 +1,4 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -28,7 +28,15 @@ async function ownedImage(c: Context<Env>, key: string) {
 
 
 // POST /api/images — upload image (base64 or binary)
-images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
+images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, next) => {
+  const json = /^application\/json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '');
+  // Base64 expands three bytes into four, with a small allowance for JSON fields.
+  const max = json ? Math.ceil((10 * 1024 * 1024) / 3) * 4 + 4096 : 10 * 1024 * 1024;
+  const bytes = await readBoundedBytes(c.req.raw, max);
+  if (bytes === null) return c.json({ success: false, code: 'image_too_large', error: 'Image too large (max 10MB)' }, 413);
+  c.req.raw = new Request(c.req.raw, { body: bytes });
+  await next();
+}, inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
   try {
     const staff = c.get('staff');
     const scope = await getVisibleLineAccountScope(c.env.DB, staff);

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { readBoundedBytes, readBoundedText } from '../lib/input-errors.js';
 import type { Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
@@ -565,15 +566,17 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         return c.json({ message: 'Payload too large' }, 413);
       }
       if (isMessageSend) {
-        rawBody = await c.req.text();
-        if (new TextEncoder().encode(rawBody).byteLength > cap) {
+        const text = await readBoundedText(c.req.raw, cap);
+        if (text === null) {
           return c.json({ message: 'Payload too large' }, 413);
         }
+        rawBody = text;
       } else {
-        binaryBody = await c.req.arrayBuffer();
-        if (binaryBody.byteLength > cap) {
+        const bytes = await readBoundedBytes(c.req.raw, cap);
+        if (bytes === null) {
           return c.json({ message: 'Payload too large' }, 413);
         }
+        binaryBody = bytes.buffer as ArrayBuffer;
       }
     }
 

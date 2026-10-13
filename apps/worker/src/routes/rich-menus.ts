@@ -1,4 +1,4 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { boundedUploadBody, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import { getFriendById, getLineAccountById, recordRichMenuAssignment } from '@line-crm/db';
@@ -271,7 +271,7 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
 export { richMenus };
 
 // POST /api/rich-menus/:id/image — upload rich menu image (accepts base64 body or binary)
-richMenus.post('/api/rich-menus/:id/image', requireDeliveryAccess('richMenus'), inputJsonBoundary({"image":["string"],"imageData":["string"],"contentType":["string"]}), async (c) => {
+richMenus.post('/api/rich-menus/:id/image', requireDeliveryAccess('richMenus'), boundedUploadBody(1024 * 1024), inputJsonBoundary({"image":["string"],"imageData":["string"],"contentType":["string"]}), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const contentType = c.req.header('content-type') ?? '';
