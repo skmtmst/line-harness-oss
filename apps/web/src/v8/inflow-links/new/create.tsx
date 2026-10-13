@@ -384,6 +384,7 @@ function InflowCreate() {
       hidePreviewWhenNarrow
       boardId="KMaMk"
       title="流入リンクを作る"
+      help="友だち追加の入口を作り、どこから来たかと、追加後に行うことを決めます。"
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}

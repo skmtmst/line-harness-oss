@@ -42,6 +42,17 @@ export default function scanFormRules() {
   for (const heading of root.querySelectorAll('h2,h3,label')) {
     if (visible(heading) && /[（(]任意[）)]/.test(heading.textContent)) add('form-optional', heading, '任意は題と分けて札で表示する', { count: 1 })
   }
+  for (const element of root.querySelectorAll('h2,h3,label,button')) {
+    if (visible(element) && /[（(]\s*(?:and|or)\s*条件\s*[）)]/i.test(element.textContent)) add('form-copy', element, '条件の意味は日本語で表示する', { count: 1 })
+  }
+  for (const frame of root.querySelectorAll('[data-page-template="create"]')) {
+    const heading = frame.querySelector('[data-template-region="heading"]')
+    const title = heading?.querySelector('h1,h2')
+    if (!title || !visible(title)) continue
+    const helpNames = [`${title.textContent.trim()}の説明`, '画面の説明', 'この画面の説明']
+    const hasHelp = [...heading.querySelectorAll('button')].some(button => visible(button) && (helpNames.includes(button.getAttribute('aria-label')) || button.textContent.includes('この画面の説明')) && (button.hasAttribute('aria-expanded') || button.hasAttribute('aria-describedby')))
+    if (!hasHelp) add('form-help', title, '作成・編集の題から画面の説明を開く', { count: 1 })
+  }
   for (const row of root.querySelectorAll('[data-form-row="name-folder"]')) {
     if (!visible(row)) continue
     const last = row.lastElementChild

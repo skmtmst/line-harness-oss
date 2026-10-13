@@ -276,6 +276,19 @@ test('空白検査はCIで一度だけ実行し、既存V8 guardと同じ必須�
 
 // P〜Sは実際のCSSの故障を検出する。許可や上限では通さない。
 import scanFormRules from './form-rules-browser.mjs'
+test('作成の題の説明と条件の日本語を、欠け・旧表記の故障で見張る', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const good = '<main><div data-page-template="create"><div data-template-region="heading"><h1>タグを作る</h1><button aria-label="タグを作るの説明" aria-expanded="false">？</button></div><button>いずれか1つ以上を満たす条件を足す</button></div></main>'
+    await page.setContent(good)
+    assert.deepEqual(await page.evaluate(scanFormRules), [])
+    await page.setContent(good.replace('<button aria-label="タグを作るの説明" aria-expanded="false">？</button>', '').replace('いずれか1つ以上を満たす条件', 'いずれか1つ以上を満たす条件（or 条件）'))
+    const findings = await page.evaluate(scanFormRules)
+    assert.ok(findings.some(f => f.kind === 'form-help'))
+    assert.ok(findings.some(f => f.kind === 'form-copy'))
+  } finally { await browser.close() }
+})
 test('F組の色・左操作・任意・欄の右端を、正しい形と故障注入で守る', async () => {
   const browser = await chromium.launch()
   try {

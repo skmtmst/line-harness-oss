@@ -2713,7 +2713,7 @@ export function NewAutomationV8({
               </button>
             </div>
             <button type="button" className={styles.linkButton} onClick={() => setConditionOpen(true)}>
-              ＋「いずれか1つ以上を満たす」条件（or 条件）を足す
+              ＋「いずれか1つ以上を満たす」条件を足す
             </button>
           </>
         )}
