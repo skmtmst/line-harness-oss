@@ -82,8 +82,8 @@ describe('メンバー管理（36-5）', () => {
     expect(members).toContain("managementContext: 'hq'")
   })
 
-  it('表は共通の DataTable で、最終ログインと再送を出す', () => {
-    expect(members).toContain('role="table"')
+  it('表は共通の GridTable で、最終ログインと再送を出す', () => {
+    expect(members).toContain('<GridTable label="権限者の一覧"')
     expect(members).toContain('api.staff.lastLogins()')
     expect(members).toContain('api.staff.resendInvite(member.id)')
     expect(members).toContain('（あなた）')

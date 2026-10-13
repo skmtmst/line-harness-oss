@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import Card from '@/components/shared/card'
 
 import { requiredText } from '@/lib/form-requirement'
@@ -39,7 +41,6 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。

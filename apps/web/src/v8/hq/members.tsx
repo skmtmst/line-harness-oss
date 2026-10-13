@@ -1,5 +1,7 @@
 'use client'
-import { Plus } from 'lucide-react'
+
+import { PageContent } from '@/components/templates/page-frame'
+import { Plus, Users, UserPlus, Eye, Building2 } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
@@ -20,6 +22,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { RowActions } from '@/components/shared/row-actions'
 
 /*
  * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
@@ -222,7 +227,7 @@ function MembersInner() {
       ) : undefined}
       folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
-      <div className={styles.body}>
+      <PageContent>
         {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
@@ -238,22 +243,22 @@ function MembersInner() {
         ) : (
           <>
             <KpiBand aria-label="権限者の数">
-              <KpiCard title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
-              <KpiCard title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
-              <KpiCard title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
-              <KpiCard title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
+              <KpiCard icon={<Users />} title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
+              <KpiCard icon={<UserPlus />} title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
+              <KpiCard icon={<Eye />} title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
+              <KpiCard icon={<Building2 />} title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
             </KpiBand>
 
-            <div className={styles.table} role="table" aria-label="権限者の一覧" data-design="Table">
-              <div className={styles.head} role="row">
-                <span role="columnheader">名前</span>
-                <span role="columnheader">メールアドレス</span>
-                <span role="columnheader">役割</span>
-                <span role="columnheader">担当範囲</span>
-                <span role="columnheader">状態</span>
-                <span role="columnheader">最終ログイン</span>
-                <span role="columnheader" className={styles.srOnly}>操作</span>
-              </div>
+            <GridTable label="権限者の一覧" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
+              <GridHeadRow>
+                <GridCell role="columnheader">名前</GridCell>
+                <GridCell role="columnheader">メールアドレス</GridCell>
+                <GridCell role="columnheader">役割</GridCell>
+                <GridCell role="columnheader">担当範囲</GridCell>
+                <GridCell role="columnheader">状態</GridCell>
+                <GridCell role="columnheader">最終ログイン</GridCell>
+                <GridCell role="columnheader">操作</GridCell>
+              </GridHeadRow>
               {rows.map((member) => {
                 const state = memberStatus(member)
                 const isSelf = member.id === me?.id
@@ -261,37 +266,25 @@ function MembersInner() {
                   ? 'すべて'
                   : (member.scopedLineAccountIds ?? []).map((id) => accountNames.get(id) ?? '不明なアカウント').join('、') || 'アカウントなし'
                 return (
-                  <div key={member.id} className={styles.row} role="row">
-                    <span role="cell" className={styles.cell} title={member.name}>{member.name}{isSelf ? '（あなた）' : ''}</span>
-                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? emptyValue('unknown')}</span>
-                    <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
-                    <span role="cell" className={styles.cell} title={scope}>{scope}</span>
-                    <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>
-                    <span role="cell" className={styles.cell}>{lastLoginShort(lastLogins[member.id])}</span>
-                    <span role="cell" className={styles.actions}>
-                      {canManage && canResendInvite(member) ? (
-                        <Button
-                          type="button"
-                          variant="text" size="inline"
-                          disabled={resendingId === member.id}
-                          onClick={() => void resend(member)}
-                         busy={resendingId === member.id} busyLabel="送信中…">
-                          再送
-                        </Button>
-                      ) : null}
-                      {canManage ? (
-                        <Button onClick={() => openChange(member)} aria-label={`${member.name}さんの権限を変更`}>変更</Button>
-                      ) : null}
-                    </span>
-                  </div>
+                  <GridRow key={member.id}>
+                    <GridNameCell folder={false} name={<TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} />} />
+                    <GridCell><TruncatedText value={member.email ?? emptyValue('unknown')} /></GridCell>
+                    <GridCell>{ROLE_WORDS[member.role] ?? member.role}</GridCell>
+                    <GridCell><TruncatedText value={scope} /></GridCell>
+                    <GridCell><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></GridCell>
+                    <GridCell><span className={styles.shortText}>{lastLoginShort(lastLogins[member.id])}</span></GridCell>
+                    <GridCell align="right">
+                      {canManage ? <RowActions subjectName={member.name} edit={{ label: '権限を変更する', onClick: () => openChange(member) }} menuItems={canResendInvite(member) ? [{ id: 'resend', label: '招待を再送する', disabled: resendingId === member.id, disabledReason: resendingId === member.id ? '招待を送信しています' : undefined, onSelect: () => { void resend(member) } }] : []} /> : null}
+                    </GridCell>
+                  </GridRow>
                 )
               })}
-            </div>
+            </GridTable>
 
             <p className={styles.legend}>役割：オーナー（請求・メンバーまで全部）／管理者／担当者（担当範囲のアカウントだけ）／閲覧のみ（見るだけ）</p>
           </>
         )}
-      </div>
+      </PageContent>
 
       <MemberDialogV8
         /* 確認（M4jS9）を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */

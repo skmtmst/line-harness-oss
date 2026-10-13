@@ -54,8 +54,9 @@ export function GridCell({ children, className, align, ...props }: HTMLAttribute
 /** B-194: grid で描く一覧にも表と同じ名前のセルを使う。 */
 export function GridNameCell({ name, folder, className }: {
   name: ReactNode
-  folder?: FolderDotFolder | null
+  /** フォルダ分けの無い名簿は false。未分類の一覧は null/省略。 */
+  folder?: FolderDotFolder | null | false
   className?: string
 }) {
-  return <GridCell className={className} data-list-name-cell=""><FolderDotName folder={folder}>{name}</FolderDotName></GridCell>
+  return <GridCell className={className} data-list-name-cell="">{folder === false ? name : <FolderDotName folder={folder}>{name}</FolderDotName>}</GridCell>
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import Toggle from '@/components/shared/toggle'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -46,7 +48,6 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。

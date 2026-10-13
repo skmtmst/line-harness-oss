@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 
 
 import Card from '@/components/shared/card'
@@ -52,7 +54,6 @@ import own from './carousel.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import InlineSettings from '@/components/shared/inline-settings'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 テンプレート「カルーセルを作る・編集」（Pencil `J60utH`）。

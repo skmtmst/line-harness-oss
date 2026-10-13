@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -38,7 +40,6 @@ import styles from './edit.module.css'
 import rich from './rich.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8「リッチメッセージを作る」（絵 EFV8l・機能追加 F-4）。

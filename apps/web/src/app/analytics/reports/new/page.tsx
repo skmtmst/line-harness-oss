@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import EntitySelect from '@/components/shared/entity-select'
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
@@ -43,7 +45,6 @@ import {
   runErrorLabel,
   runStateLabel,
 } from '../../report-run-state'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },

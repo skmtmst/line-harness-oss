@@ -609,7 +609,7 @@ export default function WebhooksOutgoingV8() {
                     {canManage ? (
                       <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                     ) : (
-                      <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
+                      <TruncatedText value={String(item.name ?? '')} />
                     )}
                   </FolderDotName>
                 )
@@ -658,7 +658,7 @@ export default function WebhooksOutgoingV8() {
                         {canManage ? (
                           <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                         ) : (
-                          <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
+                          <TruncatedText value={String(item.name ?? '')} />
                         )}
                       </FolderDotName>
 
