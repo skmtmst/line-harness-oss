@@ -631,7 +631,7 @@ function InflowDetailContent() {
               <thead>
                 <TableHeadRow data-table-layout="columns">
                   <Th className={styles.colWhen}>日時</Th>
-                  <Th className={styles.colFriend}>友だち</Th>
+                  <Th grow className={styles.colFriend}>友だち</Th>
                   <Th className={styles.colAccount} collapseAt="narrow">入った LINE アカウント</Th>
                   <Th className={styles.colState}>今の状態</Th>
                   <Th grow collapseAt="narrow">付いたタグ・その後</Th>
@@ -649,7 +649,7 @@ function InflowDetailContent() {
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
                         </span>
                       </Td>
-                      <PersonCell className={styles.colFriend} avatarName={friend.displayName} name={
+                      <PersonCell grow className={styles.colFriend} avatarName={friend.displayName} name={
                         <RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>{friend.displayName}</RowNameLink>
                       } />
                       <Td className={styles.colAccount} collapseAt="narrow"><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
