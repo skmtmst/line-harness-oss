@@ -292,7 +292,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
         <Card variant="form" gap="normal" aria-labelledby="q-name">
-          <CardHeader title="名前とフォルダ" titleId="q-name" />
+          <CardHeader size="stacked" title="名前とフォルダ" titleId="q-name" />
           <SettingsFormRow layout="name-folder">
             <Field label="テンプレート名" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField><FieldError id="q-name-error">{fields.error('name')}</FieldError></Field>
             <Field label="フォルダ">
@@ -319,7 +319,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         </Card>
 
         <Card variant="form" gap="normal" aria-labelledby="q-question">
-          <CardHeader title="質問" titleId="q-question" />
+          <CardHeader size="stacked" title="質問" titleId="q-question" />
           <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><TextField value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
           <Field label="質問文（160文字まで）" requirement={fields.requirement('text')}><SaveErrorField names={["text","question.text"]}><TextField {...fields.bind('text')} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
           <FieldError id="q-text-error">{fields.error('text')}</FieldError>

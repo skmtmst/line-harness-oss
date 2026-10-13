@@ -467,7 +467,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         {loading ? <ListState kind="loading" title="カルーセルを読み込んでいます" /> : (
           <>
             {inline ? null : <Card variant="form" gap="normal" aria-labelledby="cr-name">
-              <CardHeader title="名前とフォルダ" titleId="cr-name" />
+              <CardHeader size="stacked" title="名前とフォルダ" titleId="cr-name" />
               <SettingsFormRow layout="name-folder">
                 <Field label="テンプレート名" htmlFor="cr-name-input" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="cr-name-input" value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField><FieldError id="cr-name-input-error">{fields.error('name')}</FieldError></Field>
                 <Field label="フォルダ">
@@ -519,7 +519,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
 
             {panel ? (
               <Card variant="form" gap="normal" aria-labelledby="cr-panel">
-                <CardHeader title={`カード ${selectedIndex + 1} の中身`} titleId="cr-panel" />
+                <CardHeader size="stacked" title={`カード ${selectedIndex + 1} の中身`} titleId="cr-panel" />
                 <div className={own.panelRow}>
                   <div className={own.imageCol} {...fields.bind(`card-${selectedIndex}-image`)} aria-describedby={fields.invalid(`card-${selectedIndex}-image`) ? 'cr-image-error' : undefined}>
                   <CarouselImage
@@ -562,7 +562,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   const setAction = (patch: Partial<typeof action>) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === ai ? { ...a, ...patch } : a)) })
                   return (
                     <Fragment key={ai}>
-                    <CardHeader headingLevel={3} title={`ボタン ${ai + 1}`} action={panel.actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}><Trash2 size={14} aria-hidden="true" /></IconButton> : undefined} />
+                    <CardHeader size="stacked" headingLevel={3} title={`ボタン ${ai + 1}`} action={panel.actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}><Trash2 size={14} aria-hidden="true" /></IconButton> : undefined} />
                     <div {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
                       <SettingsFormRow layout="columns">
                       <Field label="ボタンの文字"><SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><TextField value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField></Field>
@@ -599,7 +599,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   )
                 })}
                 <div className={own.toolRow}>
-                  <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
+                  <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} title={panel.actions.length >= MAX_ACTIONS ? `ボタンは${MAX_ACTIONS}つまでです。` : undefined} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
                   <span className={own.spacer} />
                   <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS} 枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={15} aria-hidden="true" />このカードを複製</Button>
                   <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>

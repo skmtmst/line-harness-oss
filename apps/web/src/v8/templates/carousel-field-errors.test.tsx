@@ -43,6 +43,13 @@ describe('カルーセルの欄ごとの誤り（B-139）', () => {
     expect(labels.length).toBe(2)
     for (const label of labels) expect(label.closest('[data-form-row="columns"]')?.children.length).toBe(2)
     fireEvent.change(screen.getByLabelText('カード1のボタン2の文字'), { target: { value: '残すボタン' } })
+    const add = screen.getByRole('button', { name: 'ボタンを足す' }) as HTMLButtonElement
+    fireEvent.click(add)
+    expect(add.disabled).toBe(true)
+    expect(add.title).toBe('ボタンは3つまでです。')
+    fireEvent.click(screen.getByRole('button', { name: 'カード1のボタン3を外す' }))
+    expect(add.disabled).toBe(false)
+    expect(add.title).toBe('')
     fireEvent.click(screen.getByRole('button', { name: 'カード1のボタン1を外す' }))
     expect((screen.getByLabelText('カード1のボタン1の文字') as HTMLInputElement).value).toBe('残すボタン')
     expect(screen.queryByRole('button', { name: 'カード1のボタン1を外す' })).toBeNull()
