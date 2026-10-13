@@ -45,7 +45,6 @@ import {
   RowMenu,
   SavedSelect,
   StateCard,
-  ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -478,7 +477,7 @@ export default function OffersTab() {
   const toolbar = (
     <AffiliateToolbar
       narrow={narrow}
-      notices={<ToolbarNotices info="アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。" />}
+      notices={null}
       search={{ placeholder: '案件名・説明で探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
       chips={<><ListToolbarOptional compact label="成果のときの動き">{folderSelect}</ListToolbarOptional>{chips}</>}
       trailing={trailing}
@@ -581,15 +580,15 @@ export default function OffersTab() {
     </>
   )
 
-  const pager = ready && shown.length > 0 && pageCount > 1 ? (
+  const pager = ready && shown.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)} 件`}</span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} range={{ total: shown.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + paged.length }} />
     </ListPagePagination>
   ) : undefined
 
   return (
     <SaveErrorScope errors={saveErrors}><AffiliateFrame
+      explanation="アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。"
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}

@@ -399,7 +399,6 @@ export default function ApprovalsTab() {
 
   const notices = (
     <ToolbarNotices
-      info={`認めた成果は、保留期間${holdDays == null ? '' : `（${formatNumber(holdDays)}日）`}を過ぎると次の締めで報酬に入ります。締める前なら「認めない」に変えると、今回の支払いから外れます。`}
       error={actionError ?? undefined}
     />
   )
@@ -575,15 +574,15 @@ export default function ApprovalsTab() {
     </>
   )
 
-  const pager = ready && shownItems.length > 0 && pageCount > 1 ? (
+  const pager = ready && shownItems.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shownItems.length)} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownItems.length)} 件`}</span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={(value) => { setPage(value); clearSelections() }} />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={(value) => { setPage(value); clearSelections() }} range={{ total: shownItems.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + pagedItems.length }} />
     </ListPagePagination>
   ) : undefined
 
   return (
     <AffiliateFrame
+      explanation={`認めた成果は、保留期間${holdDays == null ? '' : `（${formatNumber(holdDays)}日）`}を過ぎると次の締めで報酬に入ります。締める前なら「認めない」に変えると、今回の支払いから外れます。`}
       help={readonly
           ? '行の「…」から 詳細と成果の付け方を見る。'
           : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
