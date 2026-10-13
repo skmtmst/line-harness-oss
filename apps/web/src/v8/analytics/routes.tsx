@@ -13,6 +13,8 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 import { api, type AnalyticsMetric, type AnalyticsRoutesOverview } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { RangePickerV8, dataRangeCaption } from './common'
@@ -130,28 +132,32 @@ function RoutesTable({ overview, clicks }: { overview: AnalyticsRoutesOverview['
       })}
     </section>
     <div className={styles.routesMain}>
-      <div className={styles.table} role="table" aria-label="経路ごとの成果">
-        <div className={styles.thead} role="row">
-          <span role="columnheader" className={styles.colMain}>経路</span>
-          <span role="columnheader" className={styles.num} data-w="70">友だち</span>
-          <span role="columnheader" className={styles.num} data-w="70">反応</span>
-          <span role="columnheader" className={styles.num} data-w="70">成果</span>
-          <span role="columnheader" className={styles.num} data-w="100">売上</span>
-          <span role="columnheader" className={styles.num} data-w="100">かかった費用</span>
-          <span role="columnheader" className={styles.num} data-w="100">差し引き</span>
-        </div>
+      <DataTable label="経路ごとの成果" columnSizing="content">
+        <thead>
+        <TableHeadRow>
+          <Th grow>経路</Th>
+          <Th align="right">友だち</Th>
+          <Th align="right">反応</Th>
+          <Th align="right">成果</Th>
+          <Th align="right">売上</Th>
+          <Th align="right">かかった費用</Th>
+          <Th align="right">差し引き</Th>
+        </TableHeadRow>
+        </thead>
+        <tbody>
         {overview.routes.length === 0
-          ? <div className={styles.emptyRow} role="row"><span role="cell">この期間に集計できる経路はありません</span></div>
-          : overview.routes.map((item) => <div key={item.id} className={styles.trow} role="row" data-h="one">
-            <span role="cell" className={styles.colMain} title={`${item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック ${metricText(item.clicks)}`}><span className={styles.cellText}>{item.name}</span></span>
-            <span role="cell" className={styles.num} data-w="70" title={`現在 ${metricText(item.currentFriends)}`}><MetricText metric={item.friendAdds} /></span>
-            <span role="cell" className={styles.num} data-w="70"><MetricText metric={item.reactionPeople} /></span>
-            <span role="cell" className={styles.num} data-w="70" title={`保留 ${metricText(item.conversions.pending)}・却下 ${metricText(item.conversions.rejected)}`}><MetricText metric={item.conversions.approved} /></span>
-            <span role="cell" className={styles.num} data-w="100">{shownValue(item.conversions.revenue) === null ? <span className={styles.faint} title={item.conversions.revenue.reason ?? undefined}>売上は未取得</span> : <span>{yen(shownValue(item.conversions.revenue))}</span>}</span>
-            <span role="cell" className={styles.num} data-w="100" title={`友だち1人 ${metricText(item.costPerFriend, { currency: true })}・成果1件 ${metricText(item.costPerConversion, { currency: true })}`}>{shownValue(item.adCost) === null ? <span className={styles.faint} title={item.adCost.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{yen(shownValue(item.adCost))}</span>}</span>
-            <span role="cell" className={styles.num} data-w="100">{shownValue(item.profitAfterAdCost) === null ? <span className={styles.faint} title={item.profitAfterAdCost.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{yen(shownValue(item.profitAfterAdCost), true)}</span>}</span>
-          </div>)}
-      </div>
+          ? <Tr><Td colSpan={7}>この期間に集計できる経路はありません</Td></Tr>
+          : overview.routes.map((item) => <Tr key={item.id}>
+            <Td grow title={`${item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック ${metricText(item.clicks)}`}><TruncatedText value={item.name} /></Td>
+            <Td align="right" title={`現在 ${metricText(item.currentFriends)}`}><MetricText metric={item.friendAdds} /></Td>
+            <Td align="right"><MetricText metric={item.reactionPeople} /></Td>
+            <Td align="right" title={`保留 ${metricText(item.conversions.pending)}・却下 ${metricText(item.conversions.rejected)}`}><MetricText metric={item.conversions.approved} /></Td>
+            <Td align="right">{shownValue(item.conversions.revenue) === null ? <span className={styles.faint} title={item.conversions.revenue.reason ?? undefined}>売上は未取得</span> : <span>{yen(shownValue(item.conversions.revenue))}</span>}</Td>
+            <Td align="right" title={`友だち1人 ${metricText(item.costPerFriend, { currency: true })}・成果1件 ${metricText(item.costPerConversion, { currency: true })}`}>{shownValue(item.adCost) === null ? <span className={styles.faint} title={item.adCost.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{yen(shownValue(item.adCost))}</span>}</Td>
+            <Td align="right">{shownValue(item.profitAfterAdCost) === null ? <span className={styles.faint} title={item.profitAfterAdCost.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{yen(shownValue(item.profitAfterAdCost), true)}</span>}</Td>
+          </Tr>)}
+        </tbody>
+      </DataTable>
       <p className={styles.caption}>{`「—」は費用を取得できない経路です。広告とのつなぎで費用を取り込むと出ます。0として差し引きを計算していません（帰属は「${overview.attributionLabel}」）。`}</p>
     </div>
   </div>

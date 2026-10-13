@@ -7,12 +7,14 @@
  * 呼ぶ口・判定・CSV は今の画面（UsageOverviewTab・app/analytics/analytics-usage.ts）と同じ。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Boxes, Clock, LayoutGrid, RefreshCw, Zap } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -52,15 +54,9 @@ function referenceHealthText(metric: AnalyticsMetric<number>): string {
 }
 const canTidyUsage = (item: Category) => item.unused.value !== null && item.unused.value > 0
 
-function TidyMenu({ item }: { item: Category }) {
-  const router = useRouter()
-  return <span className={styles.rowMenu}>
-    <RowMenu appearance="box" label={`${item.label}の操作`} items={[{ id: 'tidy', label: '片づける', onSelect: () => router.push(item.href) }]} />
-  </span>
-}
-
 export default function UsageV8({ accountId }: { accountId: string }) {
   const { days, setDays, range, customRange, setRange } = useReportPeriod()
+  const [observationsExpanded, setObservationsExpanded] = useState(false)
   const [menuFeatures, setMenuFeatures] = useState<{ enabled: number; total: number } | null>(null)
   const [menuFeaturesError, setMenuFeaturesError] = useState('')
   const [menuReload, setMenuReload] = useState(0)
@@ -112,36 +108,41 @@ export default function UsageV8({ accountId }: { accountId: string }) {
         ? <Notice tone="warn">{overview.stateReason}</Notice>
         : <p className={styles.noteBox}>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、「片づける」で整理できます。未使用の項目は自動で削除しません。</p>}
       {menuFeaturesError ? <Notice tone="danger" action={<Button variant="secondary" onClick={() => setMenuReload((n) => n + 1)}>もう一度確認</Button>}>{menuFeaturesError}</Notice> : null}
-      <div className={styles.routesSplit}>
-        <div className={styles.routesMain}>
-          <div className={styles.table} role="table" aria-label="機能ごとの使われ方" id="usage-items">
-            <div className={styles.thead} role="row">
-              <span role="columnheader" className={styles.colMain}>機能</span>
-              <span role="columnheader" className={styles.num} data-w="70">作成</span>
-              <span role="columnheader" className={styles.num} data-w="70">利用中</span>
-              <span role="columnheader" className={styles.num} data-w="70">未使用</span>
-              <span role="columnheader" className={styles.colType} data-w="110">最終利用</span>
-              <span role="columnheader" className={styles.colType} data-w="150">操作</span>
-            </div>
-            {overview.categories.map((item) => <div key={item.key} className={styles.trow} role="row" data-h="button">
-              <span role="cell" className={styles.colMain} title={`${usageObservation(item).text} ／ ${referenceHealthText(item.brokenReferences)}`}><span className={styles.cellText}>{item.label}</span></span>
-              <span role="cell" className={styles.num} data-w="70"><MetricText metric={item.created} /></span>
-              <span role="cell" className={styles.num} data-w="70"><MetricText metric={item.inUse} /></span>
-              <span role="cell" className={styles.num} data-w="70"><MetricText metric={item.unused} /></span>
-              <span role="cell" className={styles.colType} data-w="110"><span className={item.lastUsedAt.value === null ? styles.faint : undefined} title={item.lastUsedAt.reason ?? undefined}>{shortWhen(item.lastUsedAt.value)}</span></span>
-              <span role="cell" className={styles.colType} data-w="150"><span className={styles.rowActions}><Button variant="secondary" href={item.href}>中身を見る</Button>{canTidyUsage(item) ? <TidyMenu item={item} /> : null}</span></span>
-            </div>)}
-          </div>
-          <p className={styles.caption}>{`${periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)} ／ 利用関係を最後に確認: ${formatAnalyticsDateTime(overview.checkedAt)}`}</p>
-          <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
-        </div>
-        <aside className={styles.flowCard} aria-labelledby="usage-observations-title">
+      <DetailColumns presentation="card" asideLabel="気づいたこと" expanded={observationsExpanded} onExpandedChange={setObservationsExpanded} aside={
+        <section className={styles.flowCard} aria-labelledby="usage-observations-title">
           <h2 id="usage-observations-title" className={styles.hoursTitle}>気づいたこと</h2>
           {observations.length === 0 ? <p className={styles.observation}>気になる項目はありません</p> : observations.map((item) => <p key={item.key} className={styles.observation}>{`・${item.label}：${usageObservation(item).text}`}</p>)}
           <span><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}><RefreshCw size={15} aria-hidden="true" />もう一度確認</Button></span>
           <Disclosure title="機能ごとの確認結果" size="compact"><ul className={styles.plainList}>{overview.categories.map((item) => <li key={item.key}><span>{`${item.label}：${usageObservation(item).text}`}</span><span title={item.brokenReferences.reason ?? undefined}>{` ／ ${referenceHealthText(item.brokenReferences)}`}</span></li>)}</ul></Disclosure>
-        </aside>
-      </div>
+        </section>
+      }>
+        <div className={styles.routesMain}>
+          <DataTable label="機能ごとの使われ方" columnSizing="content">
+            <thead>
+            <TableHeadRow>
+              <Th grow>機能</Th>
+              <Th align="right">作成</Th>
+              <Th align="right">利用中</Th>
+              <Th align="right">未使用</Th>
+              <Th>最終利用</Th>
+              <Th>操作</Th>
+            </TableHeadRow>
+            </thead>
+            <tbody>
+            {overview.categories.map((item) => <Tr key={item.key}>
+              <Td grow title={`${usageObservation(item).text} ／ ${referenceHealthText(item.brokenReferences)}`}><TruncatedText value={item.label} /></Td>
+              <Td align="right"><MetricText metric={item.created} /></Td>
+              <Td align="right"><MetricText metric={item.inUse} /></Td>
+              <Td align="right"><MetricText metric={item.unused} /></Td>
+              <Td><span className={item.lastUsedAt.value === null ? styles.faint : undefined} title={item.lastUsedAt.reason ?? undefined}>{shortWhen(item.lastUsedAt.value)}</span></Td>
+              <Td data-list-action-cell><RowActions subjectName={item.label} detail={{ href: item.href, label: '中身を見る' }} menuAppearance="box" menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', href: item.href }] : []} /></Td>
+            </Tr>)}
+            </tbody>
+          </DataTable>
+          <p className={styles.caption}>{`${periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)} ／ 利用関係を最後に確認: ${formatAnalyticsDateTime(overview.checkedAt)}`}</p>
+          <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
+        </div>
+      </DetailColumns>
     </div>
   </>
 }
