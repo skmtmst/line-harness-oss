@@ -271,8 +271,8 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
           status={dirty ? '保存していない変更があります' : undefined}
           actions={(
             <>
-              <Button onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-              <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={busy} busyLabel="保存しています…"><Check size={15} aria-hidden="true" />保存する</Button>
+              <Button onClick={cancel} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
+              <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? 'ごはんの目安を変更すると保存できます' : undefined} busy={busy} busyLabel="保存しています…"><Check size={15} aria-hidden="true" />保存する</Button>
             </>
           )}
         />

@@ -69,7 +69,7 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
         picker: { title: `${kind.label}対象を選ぶ`, items: items(kind.id), apply: targetFromIds } }))}
       renderEditor={(action, update, index) => <SaveErrorField names={[`actions.${index}.refId`, "refId", "actions"]}><EntityPickerField label="操作の対象" noun="対象" items={items(action.refKind)} value={action.refId} onChange={id => update(target(action, id))} /></SaveErrorField>} />
     {error ? <Notice tone="danger" action={<Button onClick={() => guard.guarded(onSaved)}>最新の内容を読み込む</Button>}>{error}</Notice> : null}
-    {readOnly ? null : <Button disabled={!dirty || busy} busy={busy} onClick={() => void save()}>行うことを保存する</Button>}
+    {readOnly ? null : <Button disabled={!dirty || busy} title={busy ? '保存しています' : !dirty ? '行うことを変更すると保存できます' : undefined} busy={busy} onClick={() => void save()}>行うことを保存する</Button>}
   </SaveErrorScope>
   function targetFromIds(action: Ref, ids: string[]) { return target(action, ids[0]) }
 }
