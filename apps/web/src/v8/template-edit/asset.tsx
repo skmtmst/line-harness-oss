@@ -434,6 +434,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor={`te-${kind}-name`} requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
 <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError></Field></div>
         <div className={styles.field}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+            size="full"
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}

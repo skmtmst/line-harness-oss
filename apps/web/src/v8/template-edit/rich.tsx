@@ -481,6 +481,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError></Field></div>
             <div className={styles.field}><Field label="フォルダ" htmlFor="te-rich-folder"><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+                size="full"
                 id="te-rich-folder"
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}

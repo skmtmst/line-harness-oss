@@ -2282,6 +2282,7 @@ function AutoReplyWizardV8Inner() {
                 <SettingsFormRow layout="columns">
                   <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
                     id="wiz-test-friend"
+                    size="full"
                     className={styles.testGrow}
                     aria-label="送信者"
                     value={selectedFriendId}

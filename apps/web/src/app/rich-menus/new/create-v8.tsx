@@ -2661,7 +2661,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             </div>
             <div className={styles.endRow}>
               <span className={styles.endDate}>
-                <Field label="終わる日時" labelHidden optional={false} note={!endEnabled ? '「終わりを決める」をオンにすると設定できます' : undefined}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
+                <Field label="終わる日時" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
                   value={publishPlan.endsAt}
                   onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
@@ -2669,7 +2669,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 /></SaveErrorField></Field>
               </span>
               <span>に終わり、</span>
-              <Field label="終わったらどうする" labelHidden optional={false} note={!endEnabled ? '「終わりを決める」をオンにすると設定できます' : undefined}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
+              <Field label="終わったらどうする" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
