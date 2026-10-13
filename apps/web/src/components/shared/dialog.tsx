@@ -273,6 +273,7 @@ export default function Dialog({
       data-design-layout={designLayout}
       data-confirm-first={confirmFirst || undefined}
       data-layout={layout}
+      data-description-band={descriptionBand}
       data-footer-align={footerAlign}
       data-design-footer-gap={designFooterGap !== undefined || undefined}
       data-footer-divider={footerDivider ? undefined : 'none'}

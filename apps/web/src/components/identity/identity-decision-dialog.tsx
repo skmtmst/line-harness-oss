@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import type {
   IdentityCandidateDecision,
   IdentityCandidateDetail,
@@ -69,6 +69,7 @@ export default function IdentityDecisionDialog({
   const [mode, setMode] = useState<IdentityReprocessMode>('future_only')
   const [profileSelections, setProfileSelections] = useState<Record<string, string>>({})
   const [consents, setConsents] = useState([false, false, false])
+  const disabledReasonId = useId()
 
   // 別の候補を開いたら、前の候補の入力を持ち越さない。
   useEffect(() => {
@@ -120,7 +121,7 @@ export default function IdentityDecisionDialog({
             キャンセル
           </Button>
           {/* 理由が空のまま押せると、履歴に「なぜそう決めたか」が残らない。 */}
-          <Button type="button" variant="primary" onClick={submit} disabled={!ready} busy={busy} busyLabel="処理中…">
+          <Button type="button" variant="primary" onClick={submit} disabled={!ready} aria-describedby={!ready ? disabledReasonId : undefined} busy={busy} busyLabel="処理中…">
             {decisionText(decision)}
           </Button>
         </div>
@@ -212,7 +213,7 @@ export default function IdentityDecisionDialog({
         <p className={styles.confirmNote}>{UNDO_NOTE}</p>
 
         {ready ? null : (
-          <p className={styles.confirmNote} role="status">
+          <p id={disabledReasonId} className={styles.confirmNote} role="status">
             {candidate.canDecide
               ? decision === 'linked' && !linkedReady
                 ? '理由を書くと判定できます。統合する場合は、採用する値と3つの確認もそろえてください。'

@@ -42,6 +42,7 @@ import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/compo
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import DialogChoiceCards from '@/components/shared/dialog-choice-cards'
 import { exampleHref, loadTemplateExamples, type TemplateExample } from './examples';
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import Pagination from '@/components/shared/pagination'
@@ -127,7 +128,7 @@ const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 /** 削除できない窓に並べる行の数（残りは「ほか N か所」）。 */
 const BLOCKED_ROWS_SHOWN = 2
 
-/** 種類を選ぶ窓（`R9XUMr`）の6枚のカード。行き先は今ある作る画面のまま。 */
+/** 作る種類と、それぞれの作成先。 */
 const KIND_CARDS: Array<{
   key: string
   title: string
@@ -1247,10 +1248,6 @@ export default function TemplatesListV8() {
   const overlays = (
     <>
       {savedMenu}
-      {/*
-        種類を選ぶ窓（`R9XUMr`）：6つの種類（3つずつ2段）と「見本から作る」（F-5）、下に真ん中のキャンセル。
-        窓の頭は絵の値（上と左右 24・題の行 24）、キャンセルは本文の続きに置く（絵は線なし・間 20）。
-      */}
       <Dialog
         open={pickerOpen}
         title="どの種類を作りますか"
@@ -1263,30 +1260,10 @@ export default function TemplatesListV8() {
         footer={<></>}
       >
         <div className={styles.picker}>
-          <div className={styles.pickerGrid}>
-            {KIND_CARDS.map((card) => (
-              <button
-                key={card.key}
-                type="button"
-                className={styles.kindCard}
-                onClick={() => {
-                  setPickerOpen(false)
-                  router.push(card.href)
-                }}
-              >
-                <span className={styles.kindIcon}>
-                  <card.icon size={16} aria-hidden="true" />
-                </span>
-                <span className={styles.kindTitle}>{card.title}</span>
-                <span className={styles.kindDesc}>{card.desc}</span>
-                <span className={styles.kindSpacer} aria-hidden="true" />
-                <span className={styles.kindMeta}>
-                  <span>{card.useFor}</span>
-                  <span>{card.cannot}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <DialogChoiceCards choices={KIND_CARDS.map(card => ({
+            key: card.key, title: card.title, icon: <card.icon size={16} />,
+            description: card.desc, notes: [card.useFor, card.cannot], href: card.href,
+          }))} onChoose={href => { setPickerOpen(false); router.push(href) }} />
           {examplesError?<ListState kind="error" title="見本を読み込めませんでした" onRetry={()=>setExamplesRetry(value=>value+1)}/>:null}
           {examples && examples.length > 0 ? (
             <section className={styles.examples} aria-label="見本から作る">

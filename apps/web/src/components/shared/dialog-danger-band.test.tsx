@@ -30,6 +30,7 @@ describe('ダイアログの桃箱', () => {
       />,
     )
     expect(html).toContain('data-qa-dialog-callout')
+    expect(html).toContain('data-description-band="danger"')
     const titleAt = html.indexOf('接続を解除しますか？')
     const boxAt = html.indexOf('data-qa-dialog-callout')
     const descAt = html.indexOf('書き出しが止まります。')
@@ -51,6 +52,7 @@ describe('ダイアログの桃箱', () => {
       />,
     )
     expect(html).not.toContain('data-qa-dialog-callout')
+    expect(html).not.toContain('data-description-band=')
   })
 
   it('ConfirmDialog の dangerBand が桃箱へ素通しされる', () => {
