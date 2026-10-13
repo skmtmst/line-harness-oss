@@ -14,7 +14,9 @@ export function scanDialogAudit({ expectedWidth, fullForm = false, requiredActio
     const header = [...panel.children].find(el => el.querySelector('h2'))
     const body = [...panel.children].find(el => el !== header && el.querySelector('input:not([type="hidden"]),textarea'))
     if (header && body) {
-      const gap = body.getBoundingClientRect().top + parseFloat(getComputedStyle(body).paddingTop) - header.getBoundingClientRect().bottom
+      const description = (panel.getAttribute('aria-describedby') ?? '').split(/\s+/).map(id => document.getElementById(id)).find(el => el && panel.contains(el))
+      const lead = description ?? header
+      const gap = body.getBoundingClientRect().top + parseFloat(getComputedStyle(body).paddingTop) - lead.getBoundingClientRect().bottom
       inventory.push({ kind: 'header-body-gap', gap })
       if (gap > 17) findings.push({ pattern: 'F6', kind: 'dialog-header-body-gap', gap, maximum: 16 })
     }

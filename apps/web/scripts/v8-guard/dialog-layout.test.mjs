@@ -38,6 +38,12 @@ for (const width of [1152, 1440, 1920]) {
         const header = document.createElement('div')
         header.innerHTML = '<h2 style="margin:0">止める</h2>'
         el.prepend(header)
+        const description = document.createElement('p')
+        description.id = 'dialog-description'
+        description.style.margin = '0'
+        description.textContent = '止めているあいだ配信されません。あとで再開できます。'
+        header.after(description)
+        el.setAttribute('aria-describedby', description.id)
       })
       const padded = await page.evaluate(scanDialogAudit, { compactBody: true })
       assert.equal(padded.findings.filter(x => x.kind === 'dialog-header-body-gap').length, 1)
