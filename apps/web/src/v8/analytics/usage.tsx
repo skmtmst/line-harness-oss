@@ -135,7 +135,9 @@ export default function UsageV8({ accountId }: { accountId: string }) {
               <Td align="right"><MetricText metric={item.inUse} /></Td>
               <Td align="right"><MetricText metric={item.unused} /></Td>
               <Td><span className={item.lastUsedAt.value === null ? styles.faint : undefined} title={item.lastUsedAt.reason ?? undefined}>{shortWhen(item.lastUsedAt.value)}</span></Td>
-              <Td data-list-action-cell><RowActions subjectName={item.label} detail={{ href: item.href, label: '中身を見る' }} menuAppearance="box" menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', href: item.href }] : []} /></Td>
+              <Td data-list-action-cell>{canTidyUsage(item)
+                ? <RowActions subjectName={item.label} detail={{ href: item.href, label: '中身を見る' }} menuAppearance="box" menuItems={[{ id: 'tidy', label: '片づける', href: item.href }]} />
+                : <Button variant="secondary" href={item.href}>中身を見る</Button>}</Td>
             </Tr>)}
             </tbody>
           </DataTable>
