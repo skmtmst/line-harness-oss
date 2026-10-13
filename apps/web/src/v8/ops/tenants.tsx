@@ -1,7 +1,6 @@
 'use client'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
-import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -15,7 +14,10 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { ListPageBody } from '@/components/templates'
+import { PageFrame } from '@/components/templates/page-frame'
+import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameLink } from '@/components/shared/table'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
@@ -145,7 +147,7 @@ export default function OpsTenantsV8() {
   const kpiLoading = loading && !summary
 
   return (
-    <div data-design-node="XWtYC">
+    <PageFrame kind="list" boardId="XWtYC">
       <OpsHead
         title="契約先アカウント"
         description="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
@@ -154,75 +156,49 @@ export default function OpsTenantsV8() {
           <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>
         )}
       />
-      <div className={parts.stack}>
-        <KpiBand>
+      <ListPageBody
+        stats={<KpiBand>
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<CreditCard size={13} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Pause size={13} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
-        </KpiBand>
-
-        <div className={styles.tools}>
-          <div className={styles.search}>
-            <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="統括名・メール・店舗名で探す" aria-label="契約先を探す" />
-          </div>
-          <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
-            {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
-          </FilterChip>
-          {STATUS_FILTERS.map((f) => (
-            <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>
-              {f.label}
+        </KpiBand>}
+        toolbar={<ListToolbar
+          search={{ value: q, onChange: setQ, placeholder: '統括名・メール・店舗名で探す', label: '契約先を探す' }}
+          filters={<>
+            <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
+              {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
             </FilterChip>
-          ))}
-        </div>
-
-        {loading && rows.length === 0 ? (
-          <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
-        ) : listLoadError && rows.length === 0 ? (
-          <div className={parts.panel}>
-            <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
-          </div>
-        ) : visible.length === 0 ? (
-          <div className={parts.panel}>
-            <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
-          </div>
-        ) : (
-          <div className={parts.mini} role="table" aria-label="契約先">
-            <div className={parts.miniHead} role="row">
-              <span className={parts.grow} role="columnheader">統括名</span>
-              <span className={`${parts.fixed} ${styles.col90}`} role="columnheader">プラン</span>
-              <span className={`${parts.fixed} ${styles.col90}`} role="columnheader">状態</span>
-              <span className={`${parts.num} ${styles.colStores}`} role="columnheader">店舗</span>
-              <span className={`${parts.num} ${styles.colStaff}`} role="columnheader">権限者</span>
-              <span className={`${parts.fixed} ${styles.colBilling}`} role="columnheader">利用 / 請求</span>
-              <span className={`${parts.fixed} ${styles.col90}`} role="columnheader">契約日</span>
-              <span className={`${parts.fixed} ${styles.col90}`} role="columnheader">最終ログイン</span>
-              <span className={`${parts.fixed} ${styles.colFeature}`} role="columnheader">飲食店機能</span>
-            </div>
-            {visible.map((row) => {
+            {STATUS_FILTERS.map((f) => <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>{f.label}</FilterChip>)}
+          </>}
+        />}
+      >
+        {loading && rows.length === 0 ? <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
+          : listLoadError && rows.length === 0 ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
+          : visible.length === 0 ? <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
+          : <DataTable aria-label="契約先" columnSizing="content">
+            <thead><TableHeadRow>
+              <Th grow>統括名</Th><Th>プラン</Th><Th>状態</Th><Th align="right" collapseAt="narrow">店舗</Th><Th align="right" collapseAt="narrow">権限者</Th><Th>利用 / 請求</Th><Th collapseAt="narrow">契約日</Th><Th>最終ログイン</Th><Th collapseAt="narrow">飲食店機能</Th>
+            </TableHeadRow></thead>
+            <tbody>{visible.map((row) => {
               const state = tenantState(row)
-              return (
-                <div key={row.id} className={`${parts.miniRow} ${styles.row}`} role="row">
-                  <span className={parts.grow} role="cell">
-                    <Link href={tenantDetailHref(row.id)} className={parts.link} ><TruncatedText value={String(row.name ?? '')} /></Link>
-                  </span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell">{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell" title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${PLAN_STATUS_LABEL[row.plan_status] ?? row.plan_status}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>
-                  <span className={`${parts.num} ${styles.colStores}`} role="cell">{row.account_count}</span>
-                  <span className={`${parts.num} ${styles.colStaff}`} role="cell">{row.staff_count}</span>
-                  <span className={`${parts.fixed} ${styles.colBilling} ${styles.billing}`} role="cell">
-                    <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
-                    <span className={styles.billingSub} title={`トライアル期限 ${formatDateTime(row.trial_ends_at)}・次回請求 ${formatDateTime(row.current_period_ends_at)}`}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
-                  </span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell">{formatDate(row.created_at).replace(/-/g, '/')}</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell" title={formatDateTime(row.last_login_at)}>{monthDay(row.last_login_at)}</span>
-                  <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+              return <Tr key={row.id} href={tenantDetailHref(row.id)}>
+                <NameCell grow name={<RowNameLink href={tenantDetailHref(row.id)} title={row.name}><TruncatedText value={String(row.name ?? '')} /></RowNameLink>} />
+                <Td>{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</Td>
+                <Td title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${PLAN_STATUS_LABEL[row.plan_status] ?? row.plan_status}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></Td>
+                <Td align="right" data-list-number collapseAt="narrow">{row.account_count}</Td>
+                <Td align="right" data-list-number collapseAt="narrow">{row.staff_count}</Td>
+                <Td><span className={styles.billing}>
+                  <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
+                  <span className={styles.billingSub} title={`トライアル期限 ${formatDateTime(row.trial_ends_at)}・次回請求 ${formatDateTime(row.current_period_ends_at)}`}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
+                </span></Td>
+                <Td data-list-date-time collapseAt="narrow">{formatDate(row.created_at).replace(/-/g, '/')}</Td>
+                <Td data-list-date-time title={formatDateTime(row.last_login_at)}>{monthDay(row.last_login_at)}</Td>
+                <Td collapseAt="narrow">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</Td>
+              </Tr>
+            })}</tbody>
+          </DataTable>}
+      </ListPageBody>
 
       <Dialog
         open={creating}
@@ -249,6 +225,6 @@ export default function OpsTenantsV8() {
           <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>
         </div>
       </Dialog>
-    </div>
+    </PageFrame>
   )
 }
