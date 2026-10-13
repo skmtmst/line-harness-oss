@@ -10,7 +10,13 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import HqCreate from '@/v8/hq-broadcasts/create'
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/hq/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, selectedAccount: null }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useTenantWideAccess: () => true }))
 import { CreatePage } from './index'
 
 const WEB = process.cwd()
@@ -48,12 +54,13 @@ describe('作成の型の余白の口', () => {
     expect(globals).toMatch(/--tpl-create-flush-gap:\s*var\(--polish-space-section\);/)
   })
 
-  it('統括の一括配信を作るは店の一斉配信を作る画面と同じ枠（店の CSS）を使い、画面の CSS で型の余白を上書きしない', () => {
-    expect(read('src/v8/hq-broadcasts/create.module.css')).not.toContain('data-template-region')
-    const tsx = read('src/v8/hq-broadcasts/create.tsx')
-    /* B-37（10-08）：店の一斉配信と同じ5段。枠・段の帯・右の列・下の帯は店の作る画面の CSS をそのまま読む（写さない）。 */
-    expect(tsx).toContain("import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css'")
-    expect(tsx).toMatch(/<StickyBar className=\{formStyles\.footer\}/)
+  it('統括の一括配信は共通型の入力・右欄・下帯で操作を描く', () => {
+    const { container } = render(<HqCreate />)
+    const frame = container.querySelector('[data-page-template="create"][data-design-node="BBRDb"]')!
+    expect(frame).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="content"] input[aria-label="配信名"]')).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="preview"][aria-label="LINEの見え方"]')).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('下書きを保存する')
   })
 })
 
