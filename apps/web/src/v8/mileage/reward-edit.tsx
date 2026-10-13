@@ -5,7 +5,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, FlaskConical, Plus } from 'lucide-react'
@@ -36,11 +36,12 @@ import { formatNumber } from '@/lib/format'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
+import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, rewardNameRequirement, rewardMilesRequirement, rewardActionRequirement, type FormState } from './reward-form'
 import { focusMileageField } from './form-validation'
 import styles from './reward-edit.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -141,12 +142,15 @@ function draftOf(form: FormState): MileageRewardDraftInput {
 }
 
 /** 選ぶ欄（絵：ラベルは 12px・入れ物との間 6）。説明は「？」へ。 */
-function SelectField({ label, htmlFor, help, error, children }: { label: string; htmlFor: string; help?: string; error?: string; children: ReactNode }) {
-  return <SharedField label={label} htmlFor={htmlFor} help={help} error={error}>{children}</SharedField>
+function SelectField({ label, htmlFor, help, error, requirement, children }: { label: string; htmlFor: string; help?: string; error?: string; requirement?: { required: boolean }; children: ReactNode }) {
+  return <SharedField label={label} htmlFor={htmlFor} help={help} error={error} requirement={requirement}>{children}</SharedField>
 }
 
 function RewardEditorInner() {
   const saveErrors = useSaveFormErrors()
+  const feedback = useSaveFeedback()
+  const retryPublish = useRef(false)
+  const completedDraft = useRef<{ accountId: string; form: string; reward: MileageRewardSummary } | null>(null)
   usePageTitle('使い道を作る')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
   usePageCrumbs([{ label: 'マイル', href: '/mileage?tab=rewards' }])
@@ -250,15 +254,20 @@ function RewardEditorInner() {
 
   const persistDraft = async () => {
     if (!selectedAccountId) throw new Error('account-required')
+    const formKey = JSON.stringify(form)
+    if (completedDraft.current?.accountId === selectedAccountId && completedDraft.current.form === formKey) return completedDraft.current.reward
     const draft = draftOf(form)
     let saved
-    const savedId = reward?.id ?? rewardId
+    const savedId = (completedDraft.current?.accountId === selectedAccountId ? completedDraft.current.reward.id : null) ?? reward?.id ?? rewardId
     if (savedId) {
-      let expectedVersionId = reward?.currentDraftVersionId
-      let expectedRevision = reward?.currentVersion?.revision
+      const currentReward = completedDraft.current?.accountId === selectedAccountId ? completedDraft.current.reward : reward
+      let expectedVersionId = currentReward?.currentDraftVersionId
+      let expectedRevision = currentReward?.currentVersion?.revision
       if (!expectedVersionId || expectedRevision == null) {
         const createdDraft = await api.mileage.createRewardDraft(savedId, selectedAccountId)
         if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
+        completedDraft.current = { accountId: selectedAccountId, form: "", reward: createdDraft.data }
+        setReward(createdDraft.data)
         expectedVersionId = createdDraft.data.currentDraftVersionId
         expectedRevision = createdDraft.data.currentVersion?.revision
       }
@@ -268,6 +277,7 @@ function RewardEditorInner() {
       saved = await api.mileage.createReward(selectedAccountId, draft)
     }
     if (!saved.success) throw new Error('failed')
+    completedDraft.current = { accountId: selectedAccountId, form: formKey, reward: saved.data }
     setReward(saved.data)
     setBaseline(JSON.stringify(form))
 
@@ -276,10 +286,14 @@ function RewardEditorInner() {
 
   const save = async (thenPublish: boolean) => {
     if (!validateInputs() || !selectedAccountId) return
+    if (!feedback.begin('マイルの使い道')) return
+    retryPublish.current = thenPublish
     setSaving(true)
     setFailure('')
+    let savedDraft = false
     try {
       const saved = await persistDraft()
+      savedDraft = true
       if (thenPublish) {
         const published = await api.mileage.publishReward(
           saved.id,
@@ -288,12 +302,15 @@ function RewardEditorInner() {
           saved.currentVersion?.revision,
         )
         if (!published.success) throw new Error('failed')
+        completedDraft.current = { accountId: selectedAccountId, form: "", reward: published.data }
         setReward(published.data)
       }
+      feedback.success(thenPublish ? 'マイルの使い道と公開設定' : 'マイルの使い道の下書き')
       setPublishOpen(false)
       notifySaved(thenPublish ? '公開しました' : '下書きを保存しました')
       if (!editing) router.push(createPageReturnHref('/mileage?tab=rewards', saved.id))
     } catch (err) {
+      feedback.failure(err instanceof ApiError && err.message && !/^API error/.test(err.message) ? err.message : '保存できませんでした。時間をおいてもう一度お試しください。', savedDraft ? ['マイルの使い道の下書き'] : [], savedDraft ? ['公開'] : ['マイルの使い道の保存'])
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
@@ -309,6 +326,7 @@ function RewardEditorInner() {
 
   const testExchange = async () => {
     if (!validateInputs() || !selectedAccountId) return
+    feedback.reset()
     setTesting(true)
     setFailure('')
     setTestResult(null)
@@ -396,7 +414,7 @@ function RewardEditorInner() {
       hidePreviewWhenNarrow
       footerActions={<>
         <Button variant="secondary" href="/mileage?tab=rewards">キャンセル</Button>
-        <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">
+        <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存しています…">
           下書きを保存
         </Button>
         <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
@@ -404,7 +422,8 @@ function RewardEditorInner() {
         </Button>
       </>} dirty={false}
     >
-      {failure ? <Notice tone="danger" message={failure} /> : null}
+      {failure && feedback.state.kind === 'idle' ? <Notice tone="danger" message={failure} /> : null}
+      <SaveFeedback state={feedback.state} onRetry={() => save(retryPublish.current)} />
       {testResult ? (
         <Notice tone={testResult.canDeliver ? 'success' : 'warn'}>
           {testResult.canDeliver
@@ -419,10 +438,10 @@ function RewardEditorInner() {
       <Card variant="form" aria-label="基本">
         <CardHeader size="stacked" title="基本" />
         <div className={styles.grid2}>
-          <Field required label="名前" htmlFor="reward-name" error={touched && !form.name.trim() ? '使い道の名前を入力してください' : undefined}>
+          <Field requirement={rewardNameRequirement} label="名前" htmlFor="reward-name" error={touched ? rewardNameRequirement.check(form.name) : undefined}>
             <SaveErrorField names={["name","form.name"]}><TextField id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" /></SaveErrorField>
           </Field>
-          <Field required label="必要マイル" htmlFor="reward-miles" error={errorOf('必要マイルは1以上の整数で入力してください')}>
+          <Field requirement={rewardMilesRequirement} label="必要マイル" htmlFor="reward-miles" error={errorOf('必要マイルは1以上の整数で入力してください')}>
             <SaveErrorField names={["requiredMiles","form.requiredMiles","required_miles","form.required_miles"]}><NumberInput numericText id="reward-miles" inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" /></SaveErrorField>
           </Field>
         </div>
@@ -431,7 +450,7 @@ function RewardEditorInner() {
       <Card variant="form" aria-label="渡すもの">
         <CardHeader size="stacked" title="渡すもの" />
         <div className={styles.grid2}>
-          <SelectField label="交換後に渡すもの" htmlFor="reward-action"
+          <SelectField label="交換後に渡すもの" htmlFor="reward-action" requirement={rewardActionRequirement(form.rewardKind)}
             help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
           >
             <SaveErrorField names={["commonActionVersionId","form.commonActionVersionId","common_action_version_id","form.common_action_version_id"]}><EntitySelect kind="common_action"

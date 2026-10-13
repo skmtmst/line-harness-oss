@@ -154,3 +154,12 @@ html:root .current {
 :root :global([data-list-skeleton]) .summary { flex: none; margin-right: var(--space-16); }
 :root :global([data-list-skeleton]) .pagination:has(> .summary) { flex: 1; min-width: 0; }
 :root :global([data-list-skeleton]) .pagination:has(> .summary) .summary { margin-right: auto; }
+
+/* 前後に進めない時も、送り先の枠を残し、矢印だけを薄くする。 */
+html:root button.control:disabled {
+  opacity: 1;
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  box-shadow: var(--control-shadow);
+}
+html:root button.control:disabled .controlGlyph { opacity: .5; }

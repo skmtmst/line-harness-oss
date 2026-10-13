@@ -38,8 +38,8 @@ describe("inflow-links 広告費の表の1152幅（板 y1ztx の横展開）", (
   const ADS = readFileSync(resolve(__dirname, "../../v8/inflow-links/ads.tsx"), "utf-8");
 
   it("費用の表も幅の中に収める", () => {
-    expect(ADS).toContain('<DataTable')
-    expect(ADS).toContain('<TableHeadRow');
+    expect(ADS).toContain('columnLayout={INFLOW_TABLE_LAYOUT}')
+    expect(ADS).toContain('<DataTable label=');
     expect(ADS).not.toContain("data-scroll-x");
     const css = readFileSync(resolve(__dirname, "../../v8/inflow-links/ads.module.css"), "utf8");
     expect(css).toContain("min-width: 0");

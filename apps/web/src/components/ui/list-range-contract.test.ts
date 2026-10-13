@@ -69,12 +69,14 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('title={`${total}件中')
         expect(source).toContain('(page - 1) * PAGE + 1')
         expect(source).toContain('Math.min(page * PAGE, total)')
-        expect(source).toContain('<Pagination')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../app/rich-menus/page.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + 1')
         expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
         expect(source).toContain('formatNumber(groupTotal)')
-        expect(source).toContain('<Pagination')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webhooks/interactions.tsx') {
         expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
         expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
@@ -85,12 +87,13 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('<Pagination')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
-        expect(source).toContain('total={shown.length}')
-        expect(source).toContain('<Pagination')
+        expect(source).toContain('<ListRange total={shown.length}')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webinars/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + visibleItems.length')
         expect(source).toContain('paginationSummary(visibleTotal,')
-        expect(source).toContain('<Pagination')
+        expect(source).toContain('const pager = hasListData ?')
       } else if (path === '../../v8/nen-campaigns/list.tsx') {
         expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
         expect(source).toContain('<Pagination')

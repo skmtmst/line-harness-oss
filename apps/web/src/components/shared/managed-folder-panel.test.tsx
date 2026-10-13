@@ -87,7 +87,8 @@ describe('一覧の左のフォルダの列（共通）', () => {
     const text = host.textContent ?? ''
     expect(text.indexOf('シナリオを作る')).toBeLessThan(text.indexOf('すべて'))
     expect(text).toContain('フォルダを追加')
-    expect(text).toContain('フォルダを消しても、中のシナリオは未分類に残ります')
+    // B-245：削除の影響は操作直前の確認窓へ。下の削除試験で説明とAPIを守る。
+    expect(text).not.toContain('フォルダを消しても、中のシナリオは未分類に残ります')
     // 未分類の数はサーバーの同じ母集団の数
     expect(host.querySelector('button[title="未分類"]')?.textContent).toContain('4')
   })

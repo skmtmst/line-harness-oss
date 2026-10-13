@@ -118,3 +118,11 @@
 /* B-152・仕上げ7 */
 :root .button:disabled { opacity: var(--polish-disabled-opacity); }
 :root .button:is(:hover, :active):not(:disabled) { filter: none; }
+
+/* 行の「…」はplainの操作にも枠を付ける。寸法と動きは既存の口のまま。 */
+html:root .button[data-row-menu]:not(:focus-visible) {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--control-shadow);
+}

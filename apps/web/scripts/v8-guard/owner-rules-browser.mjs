@@ -52,9 +52,12 @@ export default function scanOwnerRules() {
       if (width < 56 && !/^[…·]+$/.test(fullText)) add('short',trunc,{deficit:Math.ceil(56-width)},fullText)
     }
     if (['rgb(37, 99, 235)','rgb(29, 78, 216)'].includes(c.color)) {
+      // B-245：題の横の共通説明ボタンは青。手書きの青い操作へ広げない。
+      const explanation = el.closest('button[type="button"][data-shared-part="page-explanation-toggle"][aria-controls][aria-expanded]')
+      const sharedExplanation = explanation && [...explanation.classList].some(name => /^page-explanation_toggle(?:__|$)/.test(name)) && explanation.closest('[data-template-region="heading"]')
       let pill = false
       for (let p = el, i = 0; p && i < 4; p = p.parentElement,i++) if (tinted(css(p))) { pill = true; break }
-      if (!pill) add('blue',el,{count:1},text)
+      if (!pill && !sharedExplanation) add('blue',el,{count:1},text)
     }
   }
   // 同じ列の主操作・メニュー・状態。幅とxを別々に見張る。

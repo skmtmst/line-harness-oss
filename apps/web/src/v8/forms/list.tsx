@@ -1026,33 +1026,7 @@ export default function FormsListV8() {
   )
 
   /* 1152 の板（GrnO4）：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <ListToolbarRow>
-        {reviewMode ? null : createButton(false)}
-        {reviewMode ? null : (
-          <div className={styles.narrowFolder}>
-            <SaveErrorField names={["activeFolderId","activeId","active_folder_id"]}><Select aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} /></SaveErrorField>
-          </div>
-        )}
-        <ListToolbarSearchSlot>
-          <SearchField
-            aria-label="フォーム名・質問文で探す"
-            placeholder="フォーム名・質問文"
-            value={query}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.spacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {sortBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1204,9 +1178,7 @@ export default function FormsListV8() {
               )
               const row = (
                 <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} detailKey={reviewMode ? undefined : "form"} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
-                  <NameCell name={nameNode} folder={folderDotOf(form.folderId)}
-                    annotation={pendingCount > 0 ? <StatusBadge tone="danger" size="compact">{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
-                  />
+                  <NameCell name={nameNode} folder={folderDotOf(form.folderId)} />
                   {!narrow && (
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
                   )}
@@ -1215,6 +1187,7 @@ export default function FormsListV8() {
                       <span className={styles.dot} aria-hidden="true" />
                       {form.isActive ? '公開中' : '下書き'}
                     </span>
+                    {pendingCount > 0 ? <StatusBadge tone="danger" size="compact">{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
                     {reviewMode && form.accountScopeReviewRequired ? <span className={styles.reviewBadge}>管理者確認</span> : null}
                   </Td>
                   <Td className={styles.answerCell}>
@@ -1596,6 +1569,7 @@ export default function FormsListV8() {
       skeleton
         boardId={narrow ? 'GrnO4' : 'I3L41O'}
         headingSize="regular"
+        bottomSpacing="compact"
         title="回答フォーム"
         help="LINEの中で開くアンケート・申し込みフォームです。答えは友だち情報に保存できます。"
         /* 絵に無い機能（管理者確認）は見出しの右に小さく残す。 */
@@ -1622,11 +1596,11 @@ export default function FormsListV8() {
             ))}
           </KpiBand>
         )}
-        folderNav={narrow ? undefined : { rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
+        folderNav={{ rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
         folders={reviewMode ? undefined : folderPanel}
         toolbar={(
           <>
-            {narrow ? narrowToolbar : wideToolbar}
+            {wideToolbar}
             {reviewMode ? (
               <div className={styles.reviewNote}>
                 <p><strong>管理者確認中のフォーム</strong> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>

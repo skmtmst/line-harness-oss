@@ -69,8 +69,8 @@
  */
 :root .v6-filter-chip {
   height: 36px;
-  gap: 5px;
-  padding: 0 10px;
+  gap: calc(var(--tpl-toolbar-gap) / 2);
+  padding: 0 var(--polish-space-field);
   font-size: var(--text-caption);
   font-weight: 500;
 }

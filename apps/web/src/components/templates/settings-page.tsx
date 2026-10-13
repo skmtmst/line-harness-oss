@@ -1,3 +1,6 @@
+'use client'
+
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
 import type { ReactNode } from 'react'
 import PreviewLauncher from './preview-launcher'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -18,14 +21,15 @@ export interface SettingsPageProps extends PageHeadingProps {
   /** 保存の帯を本文幅に置く。省略時は板全体の下。 */
   savePlacement?: 'content'
 }
-export function SettingsPage({ boardId, heightMode, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, previewLayout, ...heading }: SettingsPageProps) {
+export function SettingsPage({ boardId, heightMode, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, previewLayout, explanation, explanationKey, titleAccessory, ...heading }: SettingsPageProps) {
   const footer = saveActions ? <div className={styles.footer} style={savePlacement === 'content' ? { marginBlock: 0 } : undefined} data-template-region="footer"><StickyBar actions={saveActions} status={saveStatus} /></div> : null
-  return <PageFrame kind="settings" heightMode={heightMode} layout={layout} boardId={boardId} standalone={standalone} hasFooter={!!saveActions}>
-    <PageHeading {...heading} />
+  const page = <PageFrame kind="settings" heightMode={heightMode} layout={layout} boardId={boardId} standalone={standalone} hasFooter={!!saveActions}>
+    <PageHeading {...heading} titleAccessory={explanation ? <>{titleAccessory}<PageExplanationToggle /></> : titleAccessory} />
     <div className={styles.settings} data-template-region="body" data-content-layout={contentLayout}>
       <nav aria-label="この設定の目次" className={styles.settingsNav} data-template-region="navigation">{navigation}</nav>
-      <div className={styles.settingsContent} data-template-region="content" data-content-layout={contentLayout}>{preview && previewLayout === 'cards' ? <div className={styles.asideToggle}><PreviewLauncher title="プレビュー" label="プレビューを開く">{preview}</PreviewLauncher></div> : null}{preview ? <div className={styles.customerLookSplit} data-preview-layout={previewLayout}><div className={styles.customerLookMain}>{children}</div><aside className={styles.customerLookPreview} aria-label="プレビュー">{preview}</aside></div> : children}{savePlacement === 'content' ? footer : null}</div>
+      <div className={styles.settingsContent} data-template-region="content" data-content-layout={contentLayout}>{explanation ? <PageExplanationBody keepMounted>{explanation}</PageExplanationBody> : null}{preview && previewLayout === 'cards' ? <div className={styles.asideToggle}><PreviewLauncher title="プレビュー" label="プレビューを開く">{preview}</PreviewLauncher></div> : null}{preview ? <div className={styles.customerLookSplit} data-preview-layout={previewLayout}><div className={styles.customerLookMain}>{children}</div><aside className={styles.customerLookPreview} aria-label="プレビュー">{preview}</aside></div> : children}{savePlacement === 'content' ? footer : null}</div>
     </div>
     {savePlacement === 'content' ? null : footer}
   </PageFrame>
+  return explanation ? <PageExplanationProvider pageKey={explanationKey ?? `settings:${typeof heading.title === 'string' ? heading.title : boardId ?? 'screen'}`}>{page}</PageExplanationProvider> : page
 }

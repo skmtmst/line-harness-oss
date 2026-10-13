@@ -110,12 +110,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const { name, folderId, messageType, messageContent } = editor.draft
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
   fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
     if (!messageContent.trim()) return '本文を入力してください。'
     if (messageType === 'flex' && validateFlexContent('flex', messageContent)) return 'カードの形を直してから保存してください。'
     return null
-  })
+  }, { required: true })
   const updateDraft = (patch: Partial<TemplateDraft>) => setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
 
   const binding = { templateId: id, templateStatus: editor.status, templateAccountId: editor.templateAccountId, selectedAccountId }
@@ -546,7 +546,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             <Card variant="form" gap="normal">
               <CardHeader size="stacked" title="名前とフォルダ" meta="一覧に出る名前です。友だちには見えません。" />
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name" required><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
+                <div className={`${styles.field} ${styles.grow}`}><Field requirement={fields.requirement('name')} label="テンプレート名" htmlFor="te-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
                 <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                     id="te-folder"

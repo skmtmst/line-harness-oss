@@ -45,7 +45,7 @@ describe('V8 NEN配信の取得と操作の契約', () => {
     expect(OVERVIEW).toContain('停止中</Pill>')
     // 編集は専用画面へ。その他は 中身を見る／テスト送信／止める・動かす。
     expect(OVERVIEW).toContain('/nen-campaigns/edit?key=')
-    expect(OVERVIEW).toContain("label: '中身を見る'")
+    expect(OVERVIEW).toContain(`label: "配信の文面を見る"`)
     expect(OVERVIEW).toContain("label: '止める'")
     // 停止・再開は専用の口（#659）。
     expect(PAGE).toContain('api.nenCampaigns.setEnabled(')

@@ -83,11 +83,19 @@ https://developer.uber.com/docs/eats/api/webhooks
 | 店舗一覧 | `GET /v1/eats/stores`（外部店舗IDは変わりうるので単独の照合キーにしない） |
 | 連携の操作 | `POST`（有効化・本文なしの200）／`GET`（状態）／`PATCH`（一時停止）／`DELETE`（解除）`/v1/eats/stores/{store_id}/pos_data` |
 
-### Uber へ確認が必要な2点（コードでは解けない）
+### 以前の未確認2点（2026-10-13 解決・Uber への問い合わせは不要）
 
-1. 認可画面のURLが、資料によって `auth.uber.com` と `login.uber.com` で食い違っています。どちらが正か。
-2. 戻り先URL（`redirect_uri`）の事前登録の手順が公式資料に書かれていません。
-   アプリ登録側に登録が必要か、申請が必要か。
+1. **認可画面のURLは `auth.uber.com` です。** 公式の OAuth 資料がこちらで、
+   `login.uber.com` は乗り手側の案内に出てくる別のホストでした。
+   実装 `apps/worker/src/services/uber-eats.ts` はすでに `auth.uber.com` を使っており、
+   **コードの変更は不要**です。問い合わせも立てていません。
+2. **戻り先URL（`redirect_uri`）は Uber の開発者画面に自分で登録します。** 申請は不要でした。
+   利用者が開発者画面で該当欄を見つけて設定済みです（2026-10-13）。
+   登録した文字列は上の組み立て結果と同じ
+   `https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback` のため、
+   上書き用の `RT_DELIVERY_UBEREATS_REDIRECT_URI` は**使いません**（未設定のままにします）。
+
+開発者画面で残っているのは **Integration Verification Result**（§7）だけです。
 
 ## 6. いまの実装状況
 
@@ -186,11 +194,11 @@ Application ID はこの文書にも会話にも書きません。
    `x-nen-*` 方式は変えない）→ **残り。1操作ずつの原則に従い、実接続のあとで行う**。
    さらに先は、つなぐ店舗を選ぶ画面（`GET /v1/eats/stores` の一覧→選択→`POST /pos_data`）と、
    30日で切れるトークンの取り直し。
-5. 利用者が Cloudflare の画面で秘密設定**2件**を自分で登録する（値はエージェントを通しません）。
-   Workers → `nen-line-stg` → Settings → Variables and Secrets → **Encrypted**。
-   あわせて Uber のアプリ登録側の戻り先URLを上の1行に合わせる
-   （2026-10-12：利用者がダッシュボードに戻り先URLの欄があることを確認済み。
-   したがって上書きの変数 `RT_DELIVERY_UBEREATS_REDIRECT_URI` は使いません）。
+5. ~~利用者が Cloudflare の画面で秘密設定**2件**を自分で登録する~~ → **済み**。
+   `nen-line-stg` の Settings → Variables and Secrets に **Encrypted** で2件登録済み
+   （値はエージェントを通していません。暗号化で入れているので再配備で消えません）。
+   Uber のアプリ登録側の戻り先URLも利用者が設定済みで、上の1行と同じ文字列です。
+   したがって上書きの変数 `RT_DELIVERY_UBEREATS_REDIRECT_URI` は使いません。
 6. 最小の実接続（トークンを1回取得する）→ アプリ連携 → 異常系 → 検証環境での配備後確認、
    の順に1操作ずつ確認する。
 

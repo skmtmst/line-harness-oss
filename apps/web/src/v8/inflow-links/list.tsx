@@ -881,19 +881,18 @@ export default function InflowListV8({
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
             detail="友だちになっても何も起きない"
-            menu={<TileMenu
-              id="unconfigured"
-              title="動きが未設定"
-              openId={openTileMenu}
-              onOpenChange={setOpenTileMenu}
-              items={[{
+            valueMenu={{
+              label: "動きが未設定の経路の操作",
+              open: openTileMenu === "unconfigured",
+              onOpenChange: open => setOpenTileMenu(open ? "unconfigured" : null),
+              items: [{
                 id: 'filter',
                 label: '動きが未設定の経路だけに絞る',
                 disabled: !routeCountAvailable || unconfiguredCount === 0,
                 disabledReason: !routeCountAvailable || unconfiguredCount === 0 ? '動きが未設定の経路はありません' : undefined,
                 onSelect: () => { setFilter('unconfigured'); setPage(1) },
-              }]}
-            />}
+              }],
+            }}
           />
           <KpiCard
             presentation="band"
@@ -902,16 +901,15 @@ export default function InflowListV8({
             value={adConnected ? adConnected.total : null}
             unit={adConnected ? '件' : ''}
             detail={adNamesSub}
-            menu={<TileMenu
-              id="ads"
-              title="広告とつないだ"
-              openId={openTileMenu}
-              onOpenChange={setOpenTileMenu}
-              items={[
+            valueMenu={{
+              label: "広告とつないだ経路の操作",
+              open: openTileMenu === "ads",
+              onOpenChange: open => setOpenTileMenu(open ? "ads" : null),
+              items: [
                 { id: 'ads', label: '広告連携を開く', external: false, href: '/inflow-links?tab=ads', onSelect: () => router.push('/inflow-links?tab=ads') },
                 { id: 'connections', label: '広告とのつなぎを開く', external: false, href: '/inflow-links?tab=connections', onSelect: () => router.push('/inflow-links?tab=connections') },
-              ]}
-            />}
+              ],
+            }}
           />
         </KpiBand>
       </>}
@@ -929,8 +927,7 @@ export default function InflowListV8({
         </FolderPanel>
       </>}
       collapsedFolders={<>{createButton}{folderSelect}</>}
-      toolbar={<>{auxiliaryError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setAuxiliaryRetry(value=>value+1)}/>:null}{toolbar}</>}
-
+      toolbar={<>{auxiliaryError ? <ListState kind="error" title="候補を読み込めませんでした" onRetry={() => setAuxiliaryRetry(value => value + 1)} /> : null}{toolbar}</>}
       pagination={pager}
       overlays={<>
         <ConfirmDialog
@@ -984,30 +981,3 @@ export default function InflowListV8({
 }
 
 /** 数の帯のマスの右上の「…」（絵のマスの「…」）。押すとそのマスから行ける操作を出す。 */
-function TileMenu({
-  id,
-  title,
-  items,
-  openId,
-  onOpenChange,
-}: {
-  id: string
-  title: string
-  items: ActionMenuItem[]
-  openId: string | null
-  onOpenChange: (id: string | null) => void
-}) {
-  const open = openId === id
-  const label = `「${title}」のほかの操作`
-  return (
-    <span className={styles.tileMenu}>
-      <RowMenu
-        className={styles.tileMenuButton}
-        label={label}
-        open={open}
-        onOpenChange={(next) => onOpenChange(next ? id : null)}
-        items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect?.() } }))}
-      />
-    </span>
-  )
-}

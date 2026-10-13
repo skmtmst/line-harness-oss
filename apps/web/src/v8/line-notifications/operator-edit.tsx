@@ -285,7 +285,7 @@ function OperatorEditInner() {
 
   /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。受け取る人の読み込みの失敗は帯のまま。 */
   const fields = useFormErrors()
-  fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'))
+  fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'), { required: true })
   /* 受け取るスタッフは、宛先のチームの欄（operator-recipient-team）が赤くなって理由を出す（列車9 の形のまま）。 */
 
   const saveDraft = async (quiet = false): Promise<string | null> => {

@@ -1,6 +1,7 @@
 'use client'
 import Card, { CardHeader } from '@/components/shared/card'
 import FolderColorButton from '@/components/shared/folder-color-button'
+import { markNameRequirement } from './mark-requirement'
 import type { Ref } from 'react'
 import { TextField } from '@/components/shared/text-field'
 import { DuplicateNameNote } from '@/components/friend-fields/attribute-kind-guide'
@@ -21,8 +22,7 @@ export default function MarkBasicFields({ name, color, onName, onColor, nameDupl
   return (
             <Card variant="form" gap="normal" aria-labelledby="mark-basic">
               <CardHeader size="stacked" titleId="mark-basic" title="基本" />
-              <Field required label="マーク名"><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
-{error ? <p role="alert" className={styles.fieldError}>{error}</p> : null}
+              <Field requirement={markNameRequirement} error={error} label="マーク名"><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" /></Field>
               <div className={styles.colorField} role="group" aria-labelledby="mark-color">
                 <span className={styles.labelStrong} id="mark-color">色</span>

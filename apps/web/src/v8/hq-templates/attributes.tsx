@@ -1,4 +1,5 @@
 'use client'
+import { markNameRequirement } from '@/v8/tags/mark-requirement'
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
@@ -243,7 +244,7 @@ function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onS
   const dirty = name !== definition.mark.name || color !== (definition.mark.color ?? '#3B82F6') || isDefault !== (definition.mark.isDefault ?? false) || autoOnInbound !== (definition.mark.autoOnInbound ?? false)
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: busy || locked })
   const submit = () => {
-    if (!name.trim()) { setError('マーク名を入力してください'); requestAnimationFrame(() => { const input = document.querySelector<HTMLElement>('[aria-labelledby="mark-basic"] input'); input?.focus(); input?.scrollIntoView({ block: 'center' }) }); return }
+    if (markNameRequirement.check(name)) { setError('マーク名を入力してください'); requestAnimationFrame(() => { const input = document.querySelector<HTMLElement>('[aria-labelledby="mark-basic"] input'); input?.focus(); input?.scrollIntoView({ block: 'center' }) }); return }
     onSave({ ...definition, mark: { ...definition.mark, name: name.trim(), color, isDefault, autoOnInbound } })
   }
   return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))} dirty={false}>

@@ -230,7 +230,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(disabled.map((button) => button.getAttribute('aria-label'))).toEqual(['前のページ', '次のページ'])
     fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
     await flush()
-    expect(screen.getByRole('menuitem', { name: '中身を見る' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '成果地点の詳細を見る' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '使う場所を見る' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '編集する' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '止める' })).toBeNull()

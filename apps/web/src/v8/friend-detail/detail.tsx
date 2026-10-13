@@ -32,6 +32,7 @@ import FormsTab from './forms-tab'
 import ScenarioTab from './scenario-tab'
 import BookingsTab from './bookings-tab'
 import RemindersTab from './reminders-tab'
+import { friendFilterHref } from '@/components/shared/friend-filter-band'
 import ActionsTab from './actions-tab'
 import MilesTab from './miles-tab'
 import RichMenuTab from './rich-menu-tab'
@@ -123,7 +124,7 @@ function FriendDetailV8Inner() {
   const secondaryActions: ActionMenuItem[] = [
     { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: false, href: '/templates', onSelect: () => router.push('/templates') },
     { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: false, href: '/scenarios', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: false, href: '/reminders', onSelect: () => router.push('/reminders') },
+    { id: 'reminders', label: 'この友だちのリマインダを見る', icon: <List size={16} />, external: false, href: friendFilterHref('/reminders', friendId), onSelect: () => router.push(friendFilterHref('/reminders', friendId)) },
     { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, href: '/mileage', onSelect: () => router.push('/mileage') },
     { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, href: '/duplicates', onSelect: () => router.push('/duplicates') },
     ...(perms.manage ? [{ id: 'delete-friend-data', label: '友だちのデータを削除する', tone: 'danger' as const, onSelect: () => deletion.open({ id: friendId, name: 'この友だちのデータ', kind: 'friend_data', path: `/api/friends/${encodeURIComponent(friendId)}/data` }) }] : []),
@@ -229,7 +230,7 @@ function FriendDetailV8Inner() {
       ) : tab === 'orders' ? (
         <BookingsTab />
       ) : tab === 'reminders' ? (
-        <RemindersTab />
+        <RemindersTab friendId={friendId} />
       ) : tab === 'actions' ? (
         <ActionsTab friendId={friendId} />
       ) : tab === 'miles' ? (

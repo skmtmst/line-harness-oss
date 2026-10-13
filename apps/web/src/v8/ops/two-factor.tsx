@@ -128,7 +128,7 @@ export default function OpsTwoFactorV8() {
         </span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-totp-title">
-        <PageHeading inset="none" title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
+        <PageHeading inset="none" title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" subtitleSize="body" subtitle={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
 
         {state === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="準備しています" />

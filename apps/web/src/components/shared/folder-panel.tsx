@@ -231,7 +231,7 @@ export default function FolderPanel({
               >
                 {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                     色が面で乗って名前より目立ってしまう。 */}
-                <span className={`${styles.folderIcon}`} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={15} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
+                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={15} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0`}>{row.count}</span>}
               </button>

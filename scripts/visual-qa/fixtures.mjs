@@ -138,7 +138,7 @@ const DESIGN_ROWS = [
   // 名前, フォルダ, 付与人数, 本人マイル, 紹介マイル, 倍率, ★, 登録日, 付与元, 使用先, 他N
   ['EC顧客連携済み', 'g-vip', 64, 10, 0, 12000, true, '2026-01-13T00:00:00.000Z', 'ec', { broadcasts: 3, forms: 1 }, 1],
   ['LINEログイン連携済み', 'g-member', 198, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'line_login', { scenarios: 2 }, 0],
-  ['NEN会員', 'g-member', 128, 10, 5, 15000, false, '2026-01-13T00:00:00.000Z', 'form', { broadcasts: 4 }, 3],
+  ['NEN会員', 'g-member', 128, 10, 5, null, false, '2026-01-13T00:00:00.000Z', 'form', { broadcasts: 4 }, 3],
   ['商品到着確認対象', 'g-vip', 41, 3, 0, null, false, '2026-01-13T00:00:00.000Z', 'ec_purchase', { autoReplies: 1 }, 1],
   ['未契約', '', 37, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'manual', { savedSearches: 2 }, 0],
   ['誕生日クーポン対象', 'g-vip', 0, 20, 0, null, false, '2026-01-13T00:00:00.000Z', 'birthday', { broadcasts: 1 }, 2],
@@ -5421,12 +5421,20 @@ const CONVERSION_USAGE_COUNTS = new Map([
 const CONVERSION_CURRENT_BY_ID = new Map(CONVERSION_REPORT_CURRENT.map((row) => [row.conversionPointId, row]))
 const CONVERSION_PREVIOUS_BY_ID = new Map(CONVERSION_REPORT_PREVIOUS.map((row) => [row.conversionPointId, row]))
 
+/** 成果地点一覧の3分類。名前と色と件数は、同じ一覧の見本に合わせる。 */
+export const CONVERSION_FOLDERS = [
+  ['conversion-purchase', '購入', '#2563EB'],
+  ['conversion-booking', '予約・申込', '#10B981'],
+  ['conversion-material', '資料・視聴', '#F59E0B'],
+].map(([id, name, color], index) => ({ id, name, color, kind: 'conversion', parentId: null, displayOrder: index, itemCount: 2, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }))
+
 export const CONVERSION_DEFINITIONS = {
   items: CONVERSION_POINTS.map((point) => {
     const current = CONVERSION_CURRENT_BY_ID.get(point.id)
     return {
       id: point.id,
       name: point.name,
+      folderId: ['cp-1', 'cp-4'].includes(point.id) ? 'conversion-purchase' : ['cp-3', 'cp-2'].includes(point.id) ? 'conversion-booking' : 'conversion-material',
       sourceType: point.eventType,
       value: point.value,
       measureMethod: point.measureMethod,

@@ -72,9 +72,9 @@ describe('固定HTMLとV8の選択状態の照合', () => {
     expect(selected).toContain('outline:2px solid green')
     expect(selected).not.toContain('5px')
   })
-  it('html:rootの指定を読み、親のある別状態と暗色状態は読み込まない', () => {
-    const css = '.selected{color:black}html:root .selected{color:green}.parent html:root .selected{color:red}html[data-mode="dark"] .selected{color:blue}html .selected{color:purple}html:root.selected{color:orange}'
-    const body = frozenSelectorBody(css, ':root .selected')
+  it.each(['html[data-theme="v8"]', 'html:root', ':global(:root)'])('%sの指定を読み、親のある別状態と別テーマは読み込まない', prefix => {
+    const css = `.selected{color:black}${prefix} .selected{color:green}.parent ${prefix} .selected{color:red}html[data-theme="v7"] .selected{color:blue}html .selected{color:purple}html[data-theme="v8"].selected{color:orange}`
+    const body = frozenSelectorBody(css, '[data-theme="v8"] .selected')
     expect(body).toContain('color:green')
     expect(body).not.toMatch(/red|blue|purple|orange/)
   })

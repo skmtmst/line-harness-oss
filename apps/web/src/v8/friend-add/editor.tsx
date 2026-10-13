@@ -1,5 +1,11 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  rule_name: requiredText("設定名を入力してください。"),
+}
+
+
 import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
@@ -401,7 +407,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         : 'LINE公式アカウントを選んでください。')
       return null
     }
-    if (!rule.name.trim()) {
+    if ((b244Requirements.rule_name.check(rule.name) !== null)) {
       showFieldError({ step: 'basic', message: '設定名を入力してください。' })
       return null
     }
@@ -496,7 +502,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
     if (STEPS.findIndex((item) => item.key === nextStep) > currentIndex) {
-      if (!rule.name.trim()) {
+      if ((b244Requirements.rule_name.check(rule.name) !== null)) {
         showFieldError({ step: 'basic', message: '設定名を入力してください。' })
         return
       }
@@ -916,7 +922,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
       <Card variant="form" gap="normal" className={styles.card} aria-label="名前とフォルダ">
         <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
         <SettingsFormRow layout="name-folder">
-          <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name" required><SaveErrorField names={["name","rule.name","mine"]}><TextField
+          <div className={styles.field}><Field requirement={b244Requirements.rule_name} label="設定名（60文字まで）" htmlFor="fa-name"><SaveErrorField names={["name","rule.name","mine"]}><TextField
               id="fa-name"
               value={rule.name}
               maxLength={60}
@@ -1217,8 +1223,6 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           /></SaveErrorField>
           <MessageInsertRow readOnly={!canEdit} count={`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}>
             <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} />
-            <MessageInsertButton kind="field" label="友だち情報" disabled title="友だち情報の欄を選ぶ口はこの版にありません" onClick={() => {}} />
-            <MessageInsertButton kind="var" label="共通情報" disabled title="共通情報の値を選ぶ口はこの版にありません" onClick={() => {}} />
           </MessageInsertRow>
         </MessageBody>
         {scenarioError && canEdit ? (

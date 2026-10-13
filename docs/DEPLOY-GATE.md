@@ -125,6 +125,28 @@ SHAが変わっていた場合は削除せず、現在の保持者を確認す�
 **古いロック**は `status` で「放置の可能性あり」と表示されますが（90分）、
 **時間経過での自動解放はしません**。デプロイ継続中か中断かは人が判断すべきだからです。
 
+### GitHub Actions のロック（2026-10-13 修正）
+
+`deploy-cloudflare-staging.yml` は `DELIVERY_MODE=apply` のときだけロックを取得し、
+run が終わる段で解放します。この解放の段は
+**`always() && steps.staging_lock.outcome == 'success'`** です。
+
+- 途中の段が失敗・中断しても解放します。ロックは「いま配備中」の宣言であり、
+  run が終わった時点で配備している人はいないためです。
+  途中まで反映された事実は run の失敗と `Summarize` の出力が示します。
+- 取得していない run（`outcome != success`）は解放しません。
+  他担当のロックに触れないためです。
+
+以前はここが `success()` だったため、**取得後に1段でも失敗すると解放が飛ばされ、
+誰も配備していないのにロックが残り続けました**。
+run [38250060610](https://github.com/skmtmst/line-harness-oss/actions/runs/38250060610) で
+Worker の配備は成功、管理画面が Cloudflare 側の `Unknown internal error occurred` で失敗し、
+staging のロックが242分残留してその間の配備が全部止まりました。
+`scripts/deploy/staging-actions-workflow.test.ts` が `success()` への差し戻しを拒否します。
+
+残ってしまったロックの扱いは人の判断です。保持者に解放してもらうか、
+**保持者と状況を確認した上で** `pnpm deploy:lock release staging --force` を使います。
+
 ## 事前確認（preflight）が見ているもの
 
 `scripts/deploy/preflight.ts` は次を確認し、違反を全件まとめて表示します。

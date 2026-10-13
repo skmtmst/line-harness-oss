@@ -849,18 +849,18 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 保存で落ちた欄（B-139）。名前・トーク画面の下の文言は①、切り替えの行き先は②の面。
    * 帯ではなく欄を赤くして真下に理由を出し、別の手順・タブ・面ならそこを開いて移る。面の一覧に赤い丸。
    */
-  saveErrors.define('name', 'メニュー名', () => null, { reveal: () => setStep('shape') })
-  saveErrors.define('chatBarText', 'トーク画面の下の文言', () => null, { reveal: () => setStep('shape') })
+  saveErrors.define('name', 'メニュー名', () => null, { required: true, reveal: () => setStep('shape') })
+  saveErrors.define('chatBarText', 'トーク画面の下の文言', () => null, { required: true, reveal: () => setStep('shape') })
   const fields = useFormErrors()
-  fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { reveal: () => setStep('shape') })
-  fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { reveal: () => setStep('shape') })
+  fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { required: true, reveal: () => setStep('shape') })
+  fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { required: true, reveal: () => setStep('shape') })
   if (group) {
     pages.forEach((page, pageIndex) => {
       page.areas.forEach((area, areaIndex) => {
         if (area.actionType !== 'richmenuswitch') return
         fields.define(`area-${area.id}`, `タブ${pageIndex + 1}の面 ${String.fromCharCode(65 + areaIndex)} の切り替え先`, () => (
           String(area.actionData?.targetPageId ?? '').trim() ? null : '「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。'
-        ), { reveal: () => { setStep('buttons'); setActivePageId(page.id); setSelectedAreaId(area.id) }, group: `area-${area.id}` })
+        ), { required: true, reveal: () => { setStep('buttons'); setActivePageId(page.id); setSelectedAreaId(area.id) }, group: `area-${area.id}` })
       })
     })
   }
@@ -2097,7 +2097,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <Card variant="form" gap="normal">
           <SectionHeader title="名前とフォルダ" />
           <div className={styles.fieldGrid}>
-            <Field label="メニュー名（友だちには見えません）" required htmlFor="rm-name" error={fields.error('name')}>
+            <Field requirement={fields.requirement('name')} label="メニュー名（友だちには見えません）" htmlFor="rm-name" error={fields.error('name')}>
               <SaveErrorField names={["name"]}><TextInput {...fields.bind('name')} id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：通常メニュー（会員向け）" invalid={fields.invalid('name')} /></SaveErrorField>
             </Field>
             <Field label="フォルダ">
@@ -2114,7 +2114,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} /></SaveErrorField>
             </Field>
           </div>
-          <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" error={fields.error('chatbar')}>
+          <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" requirement={fields.requirement('chatbar')} error={fields.error('chatbar')}>
             <SaveErrorField names={["chatBarText","chat_bar_text"]}><TextInput {...fields.bind('chatbar')} id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => setChatBarText(e.target.value)} placeholder="メニュー" invalid={fields.invalid('chatbar')} /></SaveErrorField>
           </Field>
         </Card>

@@ -135,11 +135,11 @@ export default function AffiliateOfferCreateV8() {
 
   /* 欄に結び付く誤りは欄で知らせて1つ目へ移る（B-139）。上の帯はアカウントと候補の読み込みだけ。 */
   const fields = useFormErrors()
-  fields.define('name', '案件名', () => (name.trim() ? null : '案件名を入力してください'))
-  fields.define('amount', '報酬額（円）', () => (!rewardAmount && !rewardMiles ? '報酬（円かマイル）のどちらかを入れてください' : rewardIntegerError(rewardAmount, 'amount')))
-  fields.define('miles', 'マイル', () => rewardIntegerError(rewardMiles, 'miles'))
-  fields.define('tag', '付けるタグ', () => (tagEnabled && !tagId ? '付けるタグを選んでください' : null))
-  fields.define('scenario', '開始するシナリオ', () => (scenarioEnabled && !scenarioId ? '開始するシナリオを選んでください' : null))
+  fields.define('name', '案件名', () => (name.trim() ? null : '案件名を入力してください'), { required: true })
+  fields.define('amount', '報酬額（円）', () => (!rewardAmount && !rewardMiles ? '報酬（円かマイル）のどちらかを入れてください' : rewardIntegerError(rewardAmount, 'amount')), { required: !rewardMiles })
+  fields.define('miles', 'マイル', () => rewardIntegerError(rewardMiles, 'miles'), { required: false })
+  fields.define('tag', '付けるタグ', () => (tagEnabled && !tagId ? '付けるタグを選んでください' : null), { required: tagEnabled })
+  fields.define('scenario', '開始するシナリオ', () => (scenarioEnabled && !scenarioId ? '開始するシナリオを選んでください' : null), { required: scenarioEnabled })
   const describedBy = (key: string) => (fields.invalid(key) ? `of-${key}-error` : undefined)
 
   const validate = (): string | null => {
@@ -287,7 +287,7 @@ export default function AffiliateOfferCreateV8() {
 
       <Card variant="form" aria-labelledby="af-new-what">
         <CardHeader size="stacked" titleId="af-new-what" title="どんな案件か" meta="アフィリエイターの画面に出ます" />
-        <Field label="案件名" required htmlFor="of-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} /></SaveErrorField>
+        <Field requirement={fields.requirement('name')} label="案件名" htmlFor="of-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-name-error">{fields.error('name')}</FieldError></Field>
         <Field label="説明" htmlFor="of-description"><SaveErrorField names={["description"]}><TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} /></SaveErrorField></Field>
       </Card>
@@ -302,9 +302,9 @@ export default function AffiliateOfferCreateV8() {
       <Card variant="form" aria-labelledby="af-new-reward">
         <CardHeader size="stacked" titleId="af-new-reward" title="いくら払うか" meta="アフィリエイター側の決まりが「定額」のときにこの額を使います" />
         <SettingsFormRow>
-          <Field label="報酬額（円）" htmlFor="of-amount"><SaveErrorField names={["rewardAmount","reward_amount"]}><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} /></SaveErrorField>
+          <Field requirement={fields.requirement('amount')} label="報酬額（円）" htmlFor="of-amount"><SaveErrorField names={["rewardAmount","reward_amount"]}><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-amount-error">{fields.error('amount')}</FieldError></Field>
-          <Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
+          <Field requirement={fields.requirement('miles')} label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field>
         </SettingsFormRow>
       </Card>

@@ -2,9 +2,10 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChartNoAxesColumn } from 'lucide-react'
+import { ArrowRight, ChartNoAxesColumn, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
+import ActionMenu, { type ActionMenuItem } from './action-menu'
 import { isKpiNumberText } from './kpi-number-text'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
@@ -17,6 +18,20 @@ function hasDetail(node: ReactNode): boolean {
     if (typeof child === 'string' || typeof child === 'number') return String(child).trim().length > 0
     return React.isValidElement<{ children?: ReactNode }>(child) && hasDetail(child.props.children)
   })
+}
+
+/** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
+function staticMenuDescription(menu: ReactNode): string | undefined {
+  if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
+  const props = menu.props
+  if (props.type !== 'button' || typeof props.title !== 'string' || !Object.keys(props).every(key => ['type', 'title', 'className', 'aria-label', 'children'].includes(key))) return
+  const child = props.children
+  const decorativeDots = React.isValidElement<Record<string, unknown>>(child)
+    && child.type === MoreHorizontal
+    && (child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true')
+    && Object.keys(child.props).every(key => ['size', 'aria-hidden'].includes(key))
+  if (child !== '…' && child !== '...' && !decorativeDots) return
+  return props.title.trim() || undefined
 }
 
 export type KpiCardProps = {
@@ -33,6 +48,7 @@ export type KpiCardProps = {
    * `x?.y` をそのまま渡しても画面ごと落ちない。**0 は 0 のまま出す。**
    */
   /** B-145：数の帯に『…』を置かず、数から既存の内訳を開く。 */
+  valueMenu?: { label: string; open: boolean; items: ActionMenuItem[]; onOpenChange: (open: boolean) => void }
   valueAction?: { label: string; expanded: boolean; onClick: () => void }
   value: number | null | undefined
   unit: string
@@ -115,6 +131,7 @@ export default function KpiCard({
   menu,
   value,
   valueAction,
+  valueMenu,
   unit,
   unitSpacing = 'normal',
   signed = false,
@@ -139,6 +156,7 @@ export default function KpiCard({
   valueTextWithUnit = false,
   ...cardProps
 }: KpiCardProps) {
+  const valueRef = React.useRef<HTMLButtonElement>(null)
   const classes = [styles.card, className].filter(Boolean).join(' ')
 
   /*
@@ -148,7 +166,8 @@ export default function KpiCard({
   const textIsNumber = valueText === undefined || isKpiNumberText(valueText)
   const statusText = textIsNumber ? undefined : valueText
   const numberText = textIsNumber ? valueText : undefined
-  const tip = help ?? description
+  const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
+  const tip = help ?? description ?? menuDescription
   const hasTip = tip !== undefined && tip !== null
 
   const numberAndUnit = <>
@@ -171,6 +190,7 @@ export default function KpiCard({
           全文は title で読めるようにする（読み上げは変わらない）。
         */}
         <p
+          data-kpi-label
           className={styles.label}
           title={title || undefined}
         >
@@ -189,7 +209,7 @@ export default function KpiCard({
             </HelpTip>
           ) : null}
         </p>
-        {menu ? <span className={styles.menu}>{menu}</span> : null}
+        {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
         {badge ? (
           <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
         ) : null}
@@ -209,7 +229,7 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          {valueAction ? (
+          {valueMenu ? <button ref={valueRef} type="button" className={styles.valueAction} aria-label={valueMenu.label} aria-haspopup="menu" aria-expanded={valueMenu.open} onClick={() => valueMenu.onOpenChange(!valueMenu.open)}>{numberAndUnit}</button> : valueAction ? (
             <button type="button" className={styles.valueAction} aria-label={valueAction.label} aria-expanded={valueAction.expanded} onClick={valueAction.onClick}>{numberAndUnit}</button>
           ) : numberAndUnit}
 
@@ -220,6 +240,7 @@ export default function KpiCard({
       {delta ? <span className={styles.delta}>{delta}</span> : null}
       </div>
 
+      {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (

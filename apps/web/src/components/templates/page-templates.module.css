@@ -28,6 +28,8 @@
 :global(:root) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 題とタブの間は headingText の gap が持つ。二重に余白を足さない。 */
 :global(:root) .headingTabs { margin-top: 0; }
+/* メタ情報を持つ詳細のタブは、頭の段間8を保つ。 */
+:global(:root) [data-page-template='detail'] .headingTabs { margin-top: var(--tpl-head-gap); }
 /* タブ付きの頭は固定絵の下余白16。通常の頭の12とは分ける。 */
 :global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-folder-pad-block); }
 /* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
@@ -44,9 +46,11 @@
 :global(:root) .main { min-width: 0; flex: 1; }
 /* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global(:root) .folders + .main { border-left: 0; }
+:global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
+:global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
@@ -55,7 +59,8 @@
 /*
  * 統括（/hq）の列（絵 JKjsE・LRc93 ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
  * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
- * B-7：通常の列も中身200に左右12の余白と線を足す。外寸指定（folderWidth）は渡された幅を守る。
+ * 設定の列は中身200に左右12の余白と線を足す。通常の一覧は下の B-178 で余白込み200。
+ * 外寸指定（folderWidth）は渡された幅を守る。
  */
 :global(:root) .folders[data-folder-inset] { box-sizing: content-box; padding-left: var(--tpl-folder-inset-pad-start); }
 :global(:root) .collapsedFolders { display: none; }
@@ -309,7 +314,8 @@
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
 
-/* 詳細の説明とタブの間を詰める板（回答フォーム）。指定した詳細だけに効く。 */
+/* 案内と本文の間を詰める板。指定した一覧・詳細だけに効く。 */
+:global(:root) [data-page-template='list'] .heading[data-bottom-spacing='compact'] { padding-bottom: var(--tpl-head-gap); }
 :global(:root) [data-page-template='detail'] .heading[data-bottom-spacing='compact'] {
   padding-bottom: calc(var(--tpl-detail-head-pad-bottom) - var(--tpl-head-gap));
 }
@@ -372,6 +378,7 @@
 :global(:root) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsNav { width: auto; flex-direction: column; }
 :global(:root) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
 :global(:root) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }
+:global(:root) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) :global([data-settings-nav='inline'] li > ul) { --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad); }
 /* 同じ畳み方を SettingsPage.layout のアカウント3板にも使う（x2dSNv は上24：アカウント担当の測り）。 */
 @container v8-page (max-width: 1099px) {
   :global(:root) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
@@ -391,6 +398,7 @@
 }
 
 /* B-178：フォルダの列は余白込み200、ページ送りは右寄せ。 */
+:global(:root) [data-page-template='list'] .listBody:not([data-dialog-layout]) .folders:not([data-folder-inset]) { box-sizing: border-box; }
 :global(:root) [data-list-skeleton] .folders { box-sizing: border-box; width: var(--tpl-folder-width); }
 :global(:root) [data-list-skeleton] .paginationRow { justify-content: flex-end; gap: var(--space-16); }
 
@@ -428,7 +436,7 @@
 /* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
-:global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); }
+:global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
 :global(:root) [data-list-skeleton] .paginationRow,
 :global(:root) [data-list-skeleton] .pagination { justify-content: space-between; }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }
@@ -454,3 +462,8 @@
 
 /* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
 :global(:root) fieldset.createContent { border: 0; margin: 0; }
+/* 閉じた説明の器は、道具の前に空の段を残さない。 */
+:global(:root) .explanation:has(> [hidden]) { display: none; }
+
+/* 受信箱も白い板の下に24を残し、本文だけを送る。 */
+:global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }

@@ -1,6 +1,13 @@
 'use client'
 import Card from '@/components/shared/card'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  from: requiredText("始まりの日付を入れてください。"),
+  to: requiredText("終わりの日付を入れてください。"),
+}
+
+
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
@@ -500,8 +507,8 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
     setLocalError('')
     setDateErrors({})
     if (mode === 'bulk') {
-      if (!from) { failDate('from', '始まりの日付を入れてください。'); return }
-      if (!to) { failDate('to', '終わりの日付を入れてください。'); return }
+      if ((b244Requirements.from.check(from) !== null)) { failDate('from', '始まりの日付を入れてください。'); return }
+      if ((b244Requirements.to.check(to) !== null)) { failDate('to', '終わりの日付を入れてください。'); return }
       if (from > to) { failDate('to', '終わりは始まりと同じか後の日付にしてください。'); return }
       const rules: WebinarScheduleRule[] = []
       const cursor = new Date(`${from}T00:00:00+09:00`)
@@ -536,8 +543,8 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
         {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><SaveErrorField names={["date"]}><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
           <div className={form.pair}>
-            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from"><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
-            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to"><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
+            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from" requirement={b244Requirements.from}><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
+            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to" requirement={b244Requirements.to}><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
           </div>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><SaveErrorField names={["time"]}><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></SaveErrorField></div>

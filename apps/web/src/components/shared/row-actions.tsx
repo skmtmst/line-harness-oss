@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from 'lucide-react'
 import { useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
-import ActionMenu, { type ActionMenuItem } from './action-menu'
+import ActionMenu, { orderActionMenuItems, type ActionMenuItem } from './action-menu'
 import Button from './button'
 import IconButton from './icon-button'
 import ReorderHandle, { type ReorderDirection } from './reorder-handle'
@@ -86,12 +86,7 @@ export function MoreAction({ label = 'そのほかの操作', buttonRef, ...rest
  * 「危険な操作は赤字で区切りの下」は部品の中で決める（画面ごとに並べない）。
  */
 export function orderRowMenuItems(items: ActionMenuItem[]): ActionMenuItem[] {
-  const safe = items.filter((item) => item.tone !== 'danger')
-  const danger = items.filter((item) => item.tone === 'danger')
-  return [
-    ...safe,
-    ...danger.map((item, index) => ({ ...item, dividerBefore: index === 0 ? safe.length > 0 : false })),
-  ]
+  return orderActionMenuItems(items)
 }
 
 type RowMenuTriggerProps = Omit<
@@ -117,8 +112,8 @@ export type RowMenuProps = {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /**
-   * 見た目。'plain' は固定V8一覧の枠なしの「…」。
-   * 'box' は行内で行う操作など、枠付きの印ボタンが指定された場所。
+   * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
+   * V8では両方とも共通の薄い枠を持つ（B-253・一覧の型i0Ao0R）。
    */
   appearance?: 'box' | 'plain'
   /**

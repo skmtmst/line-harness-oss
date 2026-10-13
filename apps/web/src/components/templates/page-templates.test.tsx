@@ -55,12 +55,11 @@ describe('V8 の型へ渡す操作', () => {
     expect(save).toHaveBeenCalledOnce()
     expect(screen.getByRole('navigation', { name: 'この設定の目次' })).toBeTruthy()
   })
-  it('型の説明をキーボード操作で開き、閉じたら元の？へ戻る', () => {
-    render(<ListPage title="タグ" help="友だちに付ける目印です。">一覧</ListPage>)
-    const help = screen.getByRole('button', { name: 'タグの説明' })
+  it('型の説明は初めに開き、閉じてもボタンにフォーカスを保つ', () => {
+    render(<ListPage title="タグ" explanation="友だちに付ける目印です。">一覧</ListPage>)
+    const help = screen.getByRole('button', { name: 'この画面の説明' })
     help.focus(); fireEvent.click(help)
     expect(screen.getByText('友だちに付ける目印です。')).toBeTruthy()
-    fireEvent.keyDown(document, { key: 'Escape' })
     expect(document.activeElement).toBe(help)
     expect(help.getAttribute('aria-expanded')).toBe('false')
   })

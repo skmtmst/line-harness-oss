@@ -86,3 +86,5 @@
 :root .title { font-size: var(--polish-text-body); font-weight: var(--polish-weight-label); }
 
 :root .title { font-size: var(--text-body); }
+
+.microTime { display: block; color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--text-micro); line-height: var(--activity-time-line-height, var(--text-micro--line-height)); }

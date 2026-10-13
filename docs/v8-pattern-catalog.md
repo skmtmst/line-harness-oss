@@ -142,7 +142,8 @@
 <a id="page-head"></a>
 ## page-head 一覧・画面の頭
 
-- **役目**：板の題・「？」・右の主ボタンを1段で出す
+- **役目**：板の題・「？」・右の主ボタンを1段で出す。画面全体の説明はB-245の「この画面の説明」で灰色の説明を開閉する。
+- **B-245の持ち主**：`components/shared/page-explanation.tsx` の `PageExplanationProvider`・`PageExplanationToggle`・`PageExplanationBody`。型の題の横と既存の説明の位置へ置き、人・画面ごとの開閉を覚える。欄や数の用語説明は `HelpTip`、一時的な失敗・閲覧のみは `Notice` のまま。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-frame.tsx`・`apps/web/src/components/shared/page-header.tsx`・`apps/web/src/components/shared/help-tip.tsx`（部品 `PageHeading`・`PageTitle`・`PageFrame`・`ListPage`・`CreatePage`・`DetailPage`・`DashboardPage`・`SettingsPage`・`AnalyticsPage`・`InboxPage`）
   - 読む変数：`--text-title`
 - **持ち主（Pen）**：`EnlYo`「板の頭」・`KjC1z`「？」
@@ -225,7 +226,7 @@
 
 - **役目**：表を見出し40・左右24・線は黒7%で並べる
 - **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
-  - 行高の対応（§6.5-3・2026-10-11 B-243③訂正）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧、`ListSkeleton`、Pen JpOg0「表の行」は **60**（`--tpl-list-row-h`）。カード内など一般の `DataTable`・`GridTable`・`TableSkeleton` は **56**（`--polish-table-row`）。会員の節目一覧は個別の絵 zQ5vY の行60を一覧の変数で読む。
+  - 行高の対応（§6.5-3・2026-10-12 B-254）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧は、**セル内の描画文字が1行なら52、2行・3行なら60**。判定は共通表の `useListRowDensity`、値は `--tpl-list-row-h`／`--tpl-list-row-multi-h`。文字のない高さ40の見本画像は複数行相当。WQmepの受信表は絵で確認した既存の専用口60を保持。1行の `ListSkeleton` は52、一般の表・`TableSkeleton` は56。行高の正本は見た目の決まり §6.5-3。
   - 読む変数：`--color-table-head`・`--color-hairline`
 - **持ち主（Pen）**：`ASVsl`「表の見出し」・`JpOg0`「表の行」・`TBCUY`「横に送れる表」
 - **見つけ方（コード）**：
@@ -354,6 +355,7 @@
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
 
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
+- 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
 - **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
 - **持ち主（Pen）**：**未定**
   - 注：Pen の欄の部品 ID が無い（決まりの板 MqqcW・aXUuh は見本。板では「選んだもの（B-163 窓で選ぶ）」の名前）
@@ -374,6 +376,7 @@
 - **役目**：数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ
 - **持ち主（コード）**：`apps/web/src/components/shared/select.tsx`・`apps/web/src/components/shared/select.module.css`・`apps/web/src/components/shared/select-menu.tsx`・`apps/web/src/components/shared/select-menu.module.css`・`apps/web/src/components/shared/menu-portal.tsx`（部品 `Select`・`SelectMenu`）
   - 読む変数：`--color-control-border`・`--radius-control`
+  - 既存の栞付き絞り込み（axFrW／wjfLe）は `icon`・`valueAlign="start"`・`showChevron={false}`、狭い段は `iconOnly`。画面側でボタンの余白・矢印・値を上書きしない。
 - **持ち主（Pen）**：`wMMk6`「選ぶ欄」・`StFE7`「選ぶ欄/開いた」
   - 部品の板の html に書き出されていない ID：`StFE7`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：
@@ -955,3 +958,41 @@
 - 固定の保存項目しか持たない行うことは `FixedActionList` から既存 `ActionList` へ渡す。種類は保存できる物だけ、順序は固定。対象の選択を確定するまで行を作らず、保存形式は画面の既存の口へ戻す。
 
 - 条件を足す種類も `ConditionBuilder` の `EntityPickerDialog` で選ぶ。種類の制限・AND/ORの保存形を保ち、取消では条件を追加しない。条件のかたまりの箱と頭は共通 `Card` / `CardHeader`。
+<a id="b244"></a>
+## B-244 必須・任意、行の組、狭い板の道具
+
+- **持ち主**：`shared/form-controls`のField・RequiredBadge、`lib/form-requirement`と`use-form-errors`の検査定義。行の組は`shared/action-menu`（RowMenuも同じ順を使う）、道具は`shared/list-toolbar`とListPageBodyが渡す先頭の口。
+- **決まり**：§6.43・B-244。必須と検査を共有、欄下の理由と読み上げ、見る→整理→停止・削除と線・5項目から見出し、狭い白い板の2段と右端の件数。
+- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`scripts/v8-guard/b244-rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
+
+<a id="screen-explanation"></a>
+## screen-explanation この画面の説明（B-245）
+
+- **持ち主**：`shared/screen-explanation.tsx`・CSS、型のPageHeading（一覧・作る・詳細・設定・分析から共通に使う）。画面全体の説明はexplanation、短い言葉の説明はhelp、必要ならexplanationKeyを渡す。
+- **形と動き**：題の横に青い文字と矢印、下に灰色・角8・12pxの文。初回は開き、担当者IDと画面・タブごとに開閉を保存。今だけの知らせと危ない操作の確認は残す。
+- **Pen**：B-245採用見本pkrzG。部品IDと合格の記録は司令塔。
+- **見張り**：`b244-behavior.test.tsx`、`page-heading-rules.test.tsx`、verify:design。
+
+<a id="save-feedback"></a>
+## save-feedback 保存の4つの状態（B-246 D1）
+
+- **持ち主**：`shared/save-feedback.tsx`。useSaveFeedbackが二重開始と状態、SaveFeedbackが結果とやり直しの口を持つ。画面は工程の完了記録と最新の版を持ち、入力を残して残りだけ送る。
+- **見張り**：共通動作試験、予約ルールのpartial-save、イベントcreate-recovery、マイルreward-partial-save。成功分のAPIを再送しないことを実行回数と版で確かめる。
+- **Pen**：B-246採用見本y45k2。今回の対象はD1。
+
+<a id="friend-filter-band"></a>
+## friend-filter-band お客さまで絞った一覧の帯（B-247 E1）
+
+- **持ち主**：`shared/friend-filter-band.tsx`・CSS。顔・絞り込み対象・全員を見る・右端の友だち詳細へ戻る。名前は表示だけ、URLはIDだけ。
+- **適用**：取得済みの登録IDで全ページから絞るリマインダ。APIの無い一覧は機能待ち表へ。API・DBは作らない。
+- **見張り**：共通動作試験と`lib/friend-reminder-list`の全ページ・途中失敗の試験。
+- **Pen**：B-247採用見本ggPZt。共通部品IDは司令塔。
+
+<a id="aggregation-status"></a>
+## aggregation-status 集計の状態（B-247 E2）
+
+- **持ち主**：`shared/aggregation-status.tsx`。未集計・集計中・失敗・完成、開始時刻・データの時点と再試行。ファネル・クロス分析・成果レポートは状態と実行の口だけを渡す。
+- **見張り**：共通動作試験、分析の404と同時開始の試験。データの時点が無い応答は未取得と表示し、時刻を捏造しない。
+- **Pen**：B-247採用見本ggPZt。共通部品IDと合格の記録は司令塔。
+
+受信箱の取得カーソルによる続きの操作は `shared/inbox-list` の `InboxHistoryButton` が形を持つ。会話・メール・古い本文の取得処理は画面に残し、ページ数が返らない履歴に全ページ数を作らない。画面から色・文字・影を上書きしない。

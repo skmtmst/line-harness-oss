@@ -101,10 +101,10 @@ describe('V8 ダッシュボード編集', () => {
     expect(onApply.mock.calls[0][0].today.map((i: { id: string }) => i.id)).toEqual(latest.today.map((i) => i.id))
   })
 
-  it('保存中は閉じる・反映を押せず、反映は「保存中…」になる', () => {
+  it('保存中は閉じる・反映を押せず、反映は「保存しています…」になる', () => {
     renderEditor({ saving: true })
     for (const close of screen.getAllByRole('button', { name: '閉じる' })) expect(close.hasAttribute('disabled')).toBe(true)
-    expect(screen.getByRole('button', { name: /保存中/ }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: /保存しています/ }).hasAttribute('disabled')).toBe(true)
   })
 
   it('閉じるで配置を渡さずに閉じる', () => {

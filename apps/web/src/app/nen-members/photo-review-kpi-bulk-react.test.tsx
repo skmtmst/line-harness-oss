@@ -130,12 +130,13 @@ async function selectPhoto(index: number) {
   await act(async () => { target.click() })
 }
 
-/** 「投稿から審査までの日数」カードの大きな値（ラベルの直後の要素）を取る。 */
-function averageTimeValue(): string | undefined {
-  const button = Array.from(host.querySelectorAll('button')).find((node) => node.getAttribute('title')?.includes('投稿から審査までの日数'))
-  const title = button?.getAttribute('title') ?? ''
-  return title.split('投稿から審査までの日数：')[1]
-
+/** B-245: read the actual explanation opened from the shared help button. */
+async function averageTimeValue(): Promise<string | undefined> {
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="審査待ちの説明"]')
+  if (!button) return undefined
+  if (button.getAttribute('aria-expanded') !== 'true') await act(async () => { button.click() })
+  const tip = document.getElementById(button.getAttribute('aria-describedby') ?? '')
+  return tip?.textContent?.split('投稿から審査までの日数：')[1]?.trim()
 }
 
 describe('「投稿から審査までの日数」の読みやすい単位（Issue #666）', () => {
@@ -151,9 +152,9 @@ describe('「投稿から審査までの日数」の読みやすい単位（Issu
     net.handler = listHandler()
     await render()
 
-    expect(averageTimeValue()).toBe(expected)
+    expect(await averageTimeValue()).toBe(expected)
     // 60分を超える値では、生の分数がそのまま出ていないことも確認する。
-    if (minutes >= 60) expect(averageTimeValue()).not.toBe(`平均 ${minutes}分`)
+    if (minutes >= 60) expect(await averageTimeValue()).not.toBe(`平均 ${minutes}分`)
   })
 
   it('指標が取れないときは — を出す', async () => {
@@ -161,7 +162,7 @@ describe('「投稿から審査までの日数」の読みやすい単位（Issu
     net.handler = listHandler()
     await render()
 
-    expect(averageTimeValue()).toBe('—')
+    expect(await averageTimeValue()).toBe('—')
   })
 })
 

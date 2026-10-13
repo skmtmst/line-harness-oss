@@ -143,22 +143,8 @@
 :root .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
 :root .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
 :root .toolbar:has(.optional) .row1 > .search { flex: none; }
-.optional { position: relative; flex: none; width: max-content; }
-.optional > summary { display: none; }
-.optional > div { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-.optional[data-collapsed] > summary {
-  display: flex; align-items: center; justify-content: center; list-style: none;
-  height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap); cursor: pointer;
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
-}
-.optional > summary::-webkit-details-marker { display: none; }
-.optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
-.optional[data-collapsed] > div {
-  position: absolute; right: 0; top: 100%; z-index: 50;
-  padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
-}
-.optional[data-collapsed]:not([open]) > div { display: none; }
+.optional { display: inline-flex; flex: none; align-items: center; gap: var(--tpl-toolbar-gap); }
+.leading { display: none; }
 :root .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
 /*
  * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
@@ -212,3 +198,49 @@
 .slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+.slotTool { display: contents; }
+.rowBreak { display: none; }
+.slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+/* B-244：白い板が狭い時、役目で必ず2段。件数は2段目の右端。 */
+@container v8-page (max-width: 1099px) {
+  :root .toolbar:is([data-toolbar-layout='band'], [data-toolbar-layout='stacked']) {
+    display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: var(--tpl-toolbar-gap);
+  }
+  :root .toolbar .row1,
+  :root .toolbar .row2 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); min-width: 0; }
+  :root .toolbar .row1 > *,
+  :root .toolbar .filters > *,
+  :root .toolbar .trailing { order: 0; }
+  :root .toolbar .filters { display: flex; flex: 1 1 0; min-width: 0; }
+  :root .toolbar .row2 .trailing { margin-left: auto; }
+  :root .toolbar .leading { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); }
+  :root .toolbar .row1 > .search { flex: 1 1 var(--tpl-list-search-min); min-width: 0; }
+  :root .slots > .slotsRow { display: contents; }
+  :root .slots .leading,
+  :root .slotsRow > .leading { display: inline-flex; gap: var(--tpl-toolbar-gap); order: 0; }
+  :root .rowBreak { display: block; flex-basis: 100%; height: 0; order: 1; }
+  :root .slotTool { display: flex; align-items: center; min-width: 0; order: 2; }
+  :root .slotTool[data-toolbar-role='search'] { order: 0; flex: 1 1 var(--tpl-list-search-min); }
+  :root .slotTool[data-toolbar-role='sort'] { order: 3; margin-left: auto; }
+  :root .slotTool[data-toolbar-role='count'] { order: 4; margin-left: auto; }
+  :root .slotsEnd { margin-left: auto; }
+}
+
+/* B-244：保存した条件などの道具は、狭い板の2段目へ。広い板の順は保つ。 */
+.actions { display: contents; }
+:root .actions > * { order: 3; }
+@container v8-page (max-width: 1099px) {
+  :root .actions > * { order: 0; }
+}
+/* A notice and the search controls form two sections. Preserve the section gap
+   even when the old screen supplied an extra wrapper around the notice. */
+html:root :global([data-template-region='toolbar']):has(> div > :is([data-design-part='notice'], [role='status'], [role='alert'])):has(> .slots > .toolbar) {
+  row-gap: var(--polish-space-card);
+}
+
+/* 2段の型では、各段が道具の幅を持つ。display:contentsで段の外へ出さない。 */
+@container v8-page (max-width: 1099px) {
+:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; flex-wrap: wrap; width: 100%; }
+}

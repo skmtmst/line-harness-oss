@@ -71,7 +71,7 @@ describe('数の帯（Pp3nS）', () => {
     const collapse = readFileSync(join(HERE, '..', 'ui', 'kpi-collapse.tsx'), 'utf8')
     expect(collapse).toContain('data-kpi-presentation="band"')
     const knowledge = readFileSync(join(HERE, '..', '..', 'v8', 'ops', 'knowledge.tsx'), 'utf8')
-    expect(knowledge).toMatch(/<KpiBand\b/)
+    expect(knowledge).toContain('<KpiBand')
     expect(knowledge).toContain('presentation="cell"')
   })
 

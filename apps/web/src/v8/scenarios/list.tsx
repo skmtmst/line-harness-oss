@@ -15,7 +15,7 @@ import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag,
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bookmark, CalendarPlus, Copy, Folder as FolderIcon, Lightbulb, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, UserCheck, Users, Workflow } from 'lucide-react';
+import { Bookmark, CalendarPlus, CircleCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
 
 
 import Link from '@/components/shared/list-navigation'
@@ -72,6 +72,7 @@ import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback
 import { notifyToast } from '@/components/shared/toast';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -705,7 +706,7 @@ export default function ScenariosListV8() {
     },
     {
       title: '読み終えた人',
-      icon: UserCheck,
+      icon: CircleCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
       detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
@@ -929,9 +930,7 @@ export default function ScenariosListV8() {
                         label={s.name}
                         disabledReason={reorderDisabledReason}
                         onMove={(direction) => keyboardMove(s.id, direction)}
-                      >
-                        <span aria-hidden>⠿</span>
-                      </ReorderHandle>}
+                      />}
                     </Td>
                     <NameCell name={
                         <div className={styles.nameRow}>
@@ -1032,9 +1031,9 @@ export default function ScenariosListV8() {
   /* ===== 道具の段の部品（広い板と狭い板で同じものを並べ替える） ===== */
 
   const noteBand = (
-    <Notice tone="info" icon={<Lightbulb size={16} aria-hidden="true" />}>
+    <PageExplanationBody>
       作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
-    </Notice>
+    </PageExplanationBody>
   )
 
   const filterChips = (
@@ -1063,9 +1062,13 @@ export default function ScenariosListV8() {
 
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["savedFilter","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
+        size="full"
+        icon={<Bookmark aria-hidden="true" />}
+        valueAlign="start"
+        showChevron={false}
+        iconOnly={narrow}
         value={savedFilter}
         onChange={(value) => {
           setSavedFilter(value)
@@ -1095,36 +1098,12 @@ export default function ScenariosListV8() {
    * 1152 の板（wjfLe）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {noteBand}
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で探す"
-            value={nameQuery}
-            onChange={(value) => setNameQuery(clampSearchQuery(value))}
-            onClear={() => setNameQuery('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
-      </ListToolbarRow>
-      {filteredCount}
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <>
       {/* 案内の帯は表の上の主列に置く（板 axFrW）。toolbar 枠の先頭で一行を取る。 */}
-      <div className={styles.noteRow}>{noteBand}</div>
+      <div className={styles.noteRow}></div>
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
@@ -1155,7 +1134,7 @@ export default function ScenariosListV8() {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <PageExplanationProvider pageKey="scenarios"><SaveErrorScope errors={saveErrors}><ListPage
       heightMode="content"
       toolbarSpacing="section"
       noticeSpacing="section"
@@ -1163,6 +1142,7 @@ export default function ScenariosListV8() {
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
+      titleAccessory={<PageExplanationToggle />}
 
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
@@ -1320,14 +1300,14 @@ export default function ScenariosListV8() {
         <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
         {folderPanel}
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={<>{createButton(false)}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={listPager}
     >
       {actionError ? (
         <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
-    </ListPage></SaveErrorScope>
+    </ListPage></SaveErrorScope></PageExplanationProvider>
   )
 }

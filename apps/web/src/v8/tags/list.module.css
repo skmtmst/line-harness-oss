@@ -1,6 +1,6 @@
 /*
  * ★V8 タグ タグの一覧（Pencil I1E7Bt・1152 aPeD8・閲覧のみ fkGUR）。
- * 寸法は app/globals.css の [data-theme="v8"] の --tpl-tag-* と型の --tpl-*。
+ * 寸法は app/globals.css の :root の --tpl-tag-* と型の --tpl-*。
  */
 
 /* 閲覧のみの帯（fkGUR「帯の段 閲覧のみ」：左右24・下8、中は 10/14・印16・間10・字13/20）。 */

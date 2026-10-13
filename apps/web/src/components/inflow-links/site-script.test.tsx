@@ -16,10 +16,9 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import SiteScript from '@/v8/inflow-links/site-script'
-import SiteScriptV8 from '@/v8/inflow-links/site-script'
-import { fireEvent, screen } from '@testing-library/react'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/staff-role', async original => ({...await original(), useStaffRole: () => staffRole}))
+import { fireEvent, screen } from '@testing-library/react'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -218,7 +217,7 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
 
     // 「…」を開いて止めるを選ぶ（絵どおりの操作）
-    await act(async () => { (host.querySelector('button[aria-label="「公式ショップ」の操作"]') as HTMLElement).click() })
+    await act(async () => { (host.querySelector('tbody button[aria-haspopup="menu"]') as HTMLElement).click() })
     await settle()
     const stop = button('止める')
     expect(stop).toBeTruthy()
@@ -244,10 +243,10 @@ describe('R275 計測サイトの停止と再開', () => {
     expect(host.querySelector('[title="理由: サイトを閉じたため"]')).not.toBeNull()
     expect(text()).not.toContain('data-site="site-1"')
     // 「…」の中に再開だけあり、止めるは無い
-    await act(async () => { (host.querySelector('button[aria-label="「公式ショップ」の操作"]') as HTMLElement).click() })
+    await act(async () => { (host.querySelector('tbody button[aria-haspopup="menu"]') as HTMLElement).click() })
     await settle()
     expect(button('再開する')).toBeTruthy()
-    expect(button('止める')).toBeUndefined()
+    expect(button('止める')).toBeFalsy()
   })
 
   it('staffには止める・再開する入口を出さない', async () => {
@@ -278,7 +277,7 @@ describe('V8 計測サイトの共通メニューからの停止・再開', () =
 
   it('理由がない停止は送らず、理由を入れた停止だけ送る', async () => {
     staffRole = 'owner'; sites = [{ ...site }]
-    await act(async () => { root.render(<SiteScriptV8 />) }); await settle(); await settle()
+    await act(async () => { root.render(<SiteScript />) }); await settle(); await settle()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '「公式ショップ」の操作' })) }); await settle()
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '止める' })) }); await settle()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '計測を止める', exact: true })) }); await settle()
@@ -292,7 +291,7 @@ describe('V8 計測サイトの共通メニューからの停止・再開', () =
 
   it('停止中の再開は確認した後だけ送る', async () => {
     staffRole = 'owner'; sites = [{ ...site, stoppedAt: '2026-09-27T00:00:00.000Z', stoppedReason: 'サイトを閉じたため' }]
-    await act(async () => { root.render(<SiteScriptV8 />) }); await settle(); await settle()
+    await act(async () => { root.render(<SiteScript />) }); await settle(); await settle()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '「公式ショップ」の操作' })) }); await settle()
     expect(screen.queryByRole('menuitem', { name: '止める' })).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '再開する' })) }); await settle()

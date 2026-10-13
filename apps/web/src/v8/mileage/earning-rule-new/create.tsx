@@ -1,6 +1,12 @@
 'use client'
 import Card, { CardHeader } from '@/components/shared/card'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("ルール名を入力してください"),
+}
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -148,7 +154,7 @@ function EarningRuleCreateBody() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const fieldErrors: Record<string, string> = {}
-  if (!name.trim()) fieldErrors['er-name'] = 'ルール名を入力してください'
+  if ((b244Requirements.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
   if (!validAmount) fieldErrors['er-amount'] = '付与マイルは1以上の整数で入力してください'
   if (validFrom && validUntil && validFrom > validUntil) fieldErrors['er-until'] = '終了日は開始日より後にしてください'
   if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
@@ -343,7 +349,7 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-rule">
         <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
-        <Field required label="名前" htmlFor="er-name" error={errorOf('er-name')}>
+        <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
           <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <div className={styles.fieldRow}>

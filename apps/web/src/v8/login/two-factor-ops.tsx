@@ -121,7 +121,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page}>
       <Card variant="form" gap="normal" className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
-        <PageHeading inset="none" title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={scope === 'ops' ? <> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</> : <>認証アプリに表示されている6桁コードを入力してください。コードを入力できない場合はログインからやり直してください。</>} />
+        <PageHeading inset="none" title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" subtitleSize="body" subtitle={scope === 'ops' ? <>パスワードを確かめました。認証アプリに出ている6桁を入れてください。</> : undefined} help={scope === 'admin' ? <>認証アプリに表示されている6桁コードを入力してください。コードを入力できない場合はログインからやり直してください。</> : undefined} />
         {scope === 'admin' ? <p className={styles.foot}>{brandName}{ready && challenge ? ` · ✓ ${method === 'password' ? 'メールログイン' : 'LINEログイン'}` : ''}</p> : null}
 
         {missingChallenge ? (
@@ -152,6 +152,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
         >
           <LogIn aria-hidden="true" className={styles.icon} />ログイン
         </Button>
+        {scope === 'ops' ? <p className={styles.foot}>認証アプリが使えないときは、運営のオーナーに連絡してください。</p> : null}
         {scope === 'admin' ? <>
           <p className={styles.foot}>コードは約30秒ごとに更新されます</p>
           <Link href="/login" onClick={clearTwoFactorChallenge}>{missingChallenge || method === 'password' ? 'ログインに戻る' : '別のLINEアカウントでログイン'}</Link>

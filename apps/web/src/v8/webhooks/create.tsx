@@ -105,6 +105,8 @@ const SAMPLES: Record<string, { when: string; lines: string[] }> = {
 }
 
 /* 1欄ずつの確かめ。文は「何をすれば直るか」を1文で書く。 */
+const nameRequirement = { required: true, check: validateName }
+const urlRequirement = { required: true, check: validateUrl }
 function validateName(value: string): string | null {
   return value.trim() ? null : '名前を入力してください'
 }
@@ -166,9 +168,9 @@ function WebhooksCreateV8Inner() {
 
   const validate = (): Record<string, string> => {
     const errors: Record<string, string> = {}
-    const nameError = validateName(name)
+    const nameError = nameRequirement.check(name)
     if (nameError) errors.name = nameError
-    const urlError = validateUrl(url)
+    const urlError = urlRequirement.check(url)
     if (urlError) errors.url = urlError
     const secretError = validateSecret(secret)
     if (secretError) errors.secret = secretError
@@ -402,7 +404,7 @@ function WebhooksCreateV8Inner() {
 
       <Card variant="form" aria-labelledby="wh-new-dest">
         <CardHeader size="stacked" titleId="wh-new-dest" title="どこへ送りますか" />
-        <Field required label="名前" htmlFor="wh-new-name" error={fieldErrors.name}>
+        <Field requirement={nameRequirement} label="名前" htmlFor="wh-new-name" error={fieldErrors.name}>
           <SaveErrorField names={["name"]}><TextField
             id="wh-new-name"
             value={name}
@@ -416,7 +418,7 @@ function WebhooksCreateV8Inner() {
             required
           /></SaveErrorField>
         </Field>
-        <Field required label="送り先の URL" htmlFor="wh-new-url" error={fieldErrors.url}>
+        <Field requirement={urlRequirement} label="送り先の URL" htmlFor="wh-new-url" error={fieldErrors.url}>
           <SaveErrorField names={["url"]}><TextField
             id="wh-new-url"
             type="url"

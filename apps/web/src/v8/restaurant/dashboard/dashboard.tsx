@@ -132,7 +132,7 @@ function TodayStore() {
   }
 
   const actions = d.store ? (
-    <><EntitySelect aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
+    <><EntitySelect compact aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
       <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button></>:null}
     </>
   ) : null

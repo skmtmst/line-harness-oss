@@ -47,10 +47,10 @@ describe('表の外側の余白の洗い出し', () => {
     const css = read('v8', 'affiliates', 'affiliates.module.css')
     expect(body).toContain('<Th grow>アフィリエイター</Th>')
     expect(body).toContain('<Th className={styles.colOps}>操作</Th>')
-    expect(body).toContain('columnLayout={AFFILIATE_TABLE_LAYOUT}')
     const frame = read('v8', 'affiliates', 'frame.tsx')
+    expect(body).toContain('columnLayout={AFFILIATE_TABLE_LAYOUT}')
     expect(frame).toContain("padding: '0 var(--tpl-list-inset)'")
-    expect(frame).toContain("rowHeight: 'var(--tpl-af-row-h)'")
+    expect(frame).toContain("bodyTextSize: 'var(--polish-text-body)'")
     expect(css).toContain('.colOps { width: var(--tpl-af-col-ops); }')
   })
 

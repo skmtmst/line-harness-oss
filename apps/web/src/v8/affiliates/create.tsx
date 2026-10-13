@@ -1,5 +1,12 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("名前・屋号を入力してください"),
+}
+
+import Toggle from '@/components/shared/toggle';
+
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
@@ -188,7 +195,7 @@ export default function CreateAffiliateV8() {
       return false
     }
     const errors: typeof fieldErrors = {}
-    if (!name.trim()) errors.name = '名前・屋号を入力してください'
+    if ((b244Requirements.name.check(name) !== null)) errors.name = '名前・屋号を入力してください'
     if (code.trim() && !/^[A-Za-z0-9]{4,}$/.test(code.trim())) errors.code = '紹介コードは英数字4文字以上で入力してください'
     const rateError = commissionRateError(payoutKind, commissionRate)
     if (rateError) errors.rate = rateError
@@ -389,7 +396,7 @@ export default function CreateAffiliateV8() {
       <Card variant="form" aria-label="だれを登録するか">
         <CardHeader size="stacked" title="だれを登録するか" meta="会社でも個人でも登録できます" />
         <SettingsFormRow>
-          <Field label="名前（表示名）" required htmlFor="af-name" error={fieldErrors.name}>
+          <Field requirement={b244Requirements.name} label="名前（表示名）" htmlFor="af-name" error={fieldErrors.name}>
             <SaveErrorField names={["name"]}><TextField readOnly={!canEdit} id="af-name" value={name} onChange={(event) => { setName(event.target.value); clearField('name') }} placeholder="例：ペットライフ編集部" maxLength={120} /></SaveErrorField>
           </Field>
           <Field label="紹介コード（リンクの最後に付く）" htmlFor="af-code" error={fieldErrors.code}

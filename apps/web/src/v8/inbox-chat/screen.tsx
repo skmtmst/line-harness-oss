@@ -5,8 +5,9 @@ import { jstDate, jstCalendar } from '@/lib/jst-datetime'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageTitle } from '@/components/templates/page-frame'
 import FilterChip from '@/components/shared/filter-chip'
+import ListState from '@/components/shared/list-state'
 import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread'
-import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls } from '@/components/shared/inbox-list'
+import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list'
 
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
@@ -3293,27 +3294,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 })()}
 
                 {hasMoreChats && (
-                  <Button variant="text" busy={loadingMore} busyLabel="読み込み中..."
+                  <InboxHistoryButton context="list" busy={loadingMore}
                     onClick={() => { void loadMoreChats() }}
-                    disabled={loadingMore}
-                    className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b border-hairline"
                   >
                     さらに読み込む
-                  </Button>
+                  </InboxHistoryButton>
                 )}
                 {/*
                   メールの続き。メールは上限200件で切れていた分を offset で遡る。
                   LINEの「さらに読み込む」とは別物なので文言を分ける。
                 */}
                 {hasMoreEmails && (
-                  <Button variant="text" busy={loadingMoreEmails} busyLabel="読み込み中..."
+                  <InboxHistoryButton context="list" busy={loadingMoreEmails}
                     onClick={() => { void loadEmails(emailItems.length, true) }}
-                    disabled={loadingMoreEmails}
-                    className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b"
-                    style={{ borderBottomColor: 'var(--color-hairline)' }}
                   >
                     メールの続きを読み込む
-                  </Button>
+                  </InboxHistoryButton>
                 )}
             </>
           </div>
@@ -3353,14 +3349,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
             </div>
           ) : !selectedChatId ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              {/* 空の右側に、何をすればよいかを添える（★V7・better-writing「空の状態は次の一手を」）。 */}
-              <span aria-hidden="true" className="bg-canvas-sunken text-ink-faint mb-1 flex h-12 w-12 items-center justify-center rounded-pill">
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" /></svg>
-              </span>
-              <p className="text-ink text-sm font-bold">会話を選ぶと、ここに表示されます</p>
-              <p className="text-ink-faint max-w-xs text-xs leading-relaxed">左の一覧から選んでください。「要返信」で、まだ返していない会話だけに絞れます。</p>
-            </div>
+            <ListState kind="empty" emptyPreset="readonly" title="会話を選ぶと、ここに表示されます" description="左の一覧から選んでください。「要返信」で、まだ返していない会話だけに絞れます。" />
           ) : detailLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-ink-faint text-sm">読み込み中...</p>
@@ -3416,14 +3405,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 */}
                 {messagesHasMore && (chatDetail.messages?.length ?? 0) > 0 && (
                   <div className="flex justify-center pb-1">
-                    <Button variant="text" busy={loadingOlderMessages} busyLabel="読み込み中..."
-                      type="button"
+                    <InboxHistoryButton context="thread" busy={loadingOlderMessages}
                       onClick={() => { void loadOlderMessages() }}
-                      disabled={loadingOlderMessages}
-                      className="bg-canvas/90 rounded-pill px-3 py-1 text-xs font-semibold text-action shadow-card disabled:opacity-50"
                     >
                       前のメッセージ
-                    </Button>
+                    </InboxHistoryButton>
                   </div>
                 )}
                 {(!chatDetail.messages || chatDetail.messages.length === 0) ? (

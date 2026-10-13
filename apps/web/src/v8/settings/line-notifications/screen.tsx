@@ -1,4 +1,6 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+const notificationTitleRequirement = requiredText('通知の見出しを入力してください。')
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { RowActions } from '@/components/shared/row-actions'
 import { notifySaved } from '@/components/shared/toast'
@@ -569,7 +571,7 @@ function CustomerNotificationEditor({
   const titleRef = useRef<HTMLInputElement>(null)
   const [titleError, setTitleError] = useState('')
   const validateEditor = (action: () => void) => {
-    if (!setting.title?.trim()) {
+    if (notificationTitleRequirement.check(setting.title ?? '')) {
       setTitleError('通知の見出しを入力してください。')
       titleRef.current?.focus()
       titleRef.current?.scrollIntoView?.({ block: 'center' })
@@ -605,7 +607,7 @@ function CustomerNotificationEditor({
         <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">送るもの</h2>
           <div className="mt-3 space-y-4">
-            <Field htmlFor="customer-notification-title" label="通知の見出し" error={titleError}><SaveErrorField names={["title","setting.title","titleError","name","title_error"]}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></SaveErrorField></Field>
+            <Field htmlFor="customer-notification-title" label="通知の見出し" requirement={notificationTitleRequirement} error={titleError}><SaveErrorField names={["title","setting.title","titleError","name","title_error"]}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></SaveErrorField></Field>
             <Field htmlFor="customer-notification-intro" label="ご案内文"><SaveErrorField names={["introText","setting.introText","intro_text","setting.intro_text"]}><TextArea id="customer-notification-intro" value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} /></SaveErrorField></Field>
             <div className="rounded-control border border-nen-border bg-nen-ivory p-4">
               <p className="text-sm font-bold text-nen-green">このお知らせで差し込める項目（EC連携から来ます）</p>
@@ -1109,7 +1111,7 @@ function LineNotificationsPage() {
   }
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
-    if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
+    if (notificationTitleRequirement.check(setting.title ?? '')) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     if (definitionsFailed && !definitionByEvent.get(setting.eventType)) {
       setNotice({ tone: 'error', text: 'お知らせの設定を読み込めなかったため、保存できません。読み直してから、もう一度お試しください。' })
@@ -1209,7 +1211,8 @@ function LineNotificationsPage() {
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
     title="LINE通知"
-    help="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
+    explanationKey={`line-notifications:${tab}`}
+    explanation={tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*

@@ -1,5 +1,12 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("名前を入力してください"),
+  step_label: requiredText("この段に名前を付けてください"),
+}
+
+
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
@@ -249,9 +256,9 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
 
   const save = async () => {
     const errors: Record<string, string> = {}
-    if (!name.trim()) errors['fn-v8-name'] = '名前を入力してください'
+    if ((b244Requirements.name.check(name) !== null)) errors['fn-v8-name'] = '名前を入力してください'
     steps.forEach((step, index) => {
-      if (!step.label.trim()) errors[`fn-v8-step-${index}`] = 'この段に名前を付けてください'
+      if ((b244Requirements.step_label.check(step.label) !== null)) errors[`fn-v8-step-${index}`] = 'この段に名前を付けてください'
       if (kindNeedsValue(step.kind) && !step.value.trim()) errors[`fn-v8-${step.other ? 'value' : 'choice'}-${index}`] = step.kind === 'site_event' ? 'パスのまとまりを入力してください' : '何をしたら進むかを選んでください'
     })
     focusTarget.current = Object.keys(errors)[0] ?? null
@@ -335,7 +342,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
             成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
           </Notice>
         ) : null}
-        <Field label="名前" htmlFor="fn-v8-name" error={fieldErrors['fn-v8-name']}>
+        <Field label="名前" htmlFor="fn-v8-name" error={fieldErrors['fn-v8-name']} requirement={b244Requirements.name}>
           <SaveErrorField names={["name"]}><TextField id="fn-v8-name" value={name} onChange={(e) => { setName(e.target.value); clearFieldError('fn-v8-name') }} placeholder="例：広告から購入まで" /></SaveErrorField>
         </Field>
         <div className={styles.field}>
@@ -361,7 +368,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
               <div key={i} className={styles.stepBlock}>
                 <div className={styles.stepRow}>
                   <div className={styles.stepCol}>
-                    <Field label={`段${i + 1}の名前`} htmlFor={`fn-v8-step-${i}`} error={fieldErrors[`fn-v8-step-${i}`]}>
+                    <Field label={`段${i + 1}の名前`} htmlFor={`fn-v8-step-${i}`} error={fieldErrors[`fn-v8-step-${i}`]} requirement={b244Requirements.step_label}>
                       <SaveErrorField names={[`steps.${i}.label`,"label","step.label"]}><TextField id={`fn-v8-step-${i}`} value={step.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="例：友だち追加" /></SaveErrorField>
                     </Field>
                       {steps.length > MIN_STEPS ? (

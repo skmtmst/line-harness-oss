@@ -1,6 +1,7 @@
 'use client'
 import Card, { CardHeader } from '@/components/shared/card'
 import IconButton from '@/components/shared/icon-button'
+import { markNameRequirement } from '@/v8/tags/mark-requirement'
 import { createPageReturnHref } from '@/components/shared/create-page';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import { notifySaved } from '@/components/shared/toast';
@@ -289,7 +290,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   }
 
   const save = async () => {
-    if (!name.trim()) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    if (markNameRequirement.check(name)) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
