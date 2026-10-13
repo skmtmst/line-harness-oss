@@ -153,6 +153,23 @@ it('下書きの配信したい日時を日本時間で残し、予約済みと�
 })
 
 describe('V8 NEN配信の一覧', () => {
+  it.each(['columns', 'history'] as const)('%sは1ページでも件数とページ送りを同じ帯に出す', async (tab) => {
+    await render(baseProps({ tab }))
+    const pager = within(host).getByRole('navigation', { name: 'ページ送り' })
+    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe(tab === 'columns' ? '2件中 1〜2件' : '1件中 1〜1件')
+    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('送信履歴の総数と実際に読めた範囲を分け、次ページのカーソルを渡す', async () => {
+    const props = baseProps({ tab: 'history', deliveryList: { ...DELIVERIES, pagination: { ...DELIVERIES.pagination, total: 41 } } })
+    await render(props)
+    const pager = within(host).getByRole('navigation', { name: 'ページ送り' })
+    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('41件中 1〜1件')
+    await act(async () => fireEvent.click(within(pager).getByRole('button', { name: '次のページ' })))
+    expect(props.onChangeDeliveryView).toHaveBeenCalledWith(undefined, '20', '')
+  })
+
   it('V8 のテーマで、自動配信の表に止めている配信も今月多く送った順で並び、コラムは並ばない', async () => {
     await render(baseProps())
     expect(document.documentElement.dataset.theme).toBe('v8')

@@ -18,7 +18,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import Link from '@/components/shared/list-navigation'
 import { Eye } from 'lucide-react';
 
-import { ListPage } from '@/components/templates';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -745,7 +745,10 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
               })}
             </tbody>
           </DataTable>
-          <Pager total={visible.length} page={safePage} size={pageSize} onPage={setPage} />
+          <ListPagePagination>
+            <Pagination page={safePage} pageCount={Math.max(1, Math.ceil(visible.length / pageSize))} onPageChange={setPage}
+              range={{ total: visible.length, first: (safePage - 1) * pageSize + 1, last: Math.min(visible.length, safePage * pageSize) }} />
+          </ListPagePagination>
           {props.columnsTotal != null && props.columnsTotal > columns.length ? (
             <div className={styles.noteRow}>
               {/* WEB231：検索は読み込んだ分の中だけで探す。続きを読み込めるようにし、検索を勧めない。 */}
@@ -991,7 +994,11 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
               })}
             </tbody>
           </DataTable>
-          <Pager total={total} page={page} size={limit} onPage={(next) => props.onChangeDeliveryView(historyStatus(filter), String(Math.max(0, (next - 1) * limit)), query.trim())} />
+          <ListPagePagination>
+            <Pagination page={page} pageCount={pageCount}
+              onPageChange={(next) => props.onChangeDeliveryView(historyStatus(filter), String(Math.max(0, (next - 1) * limit)), query.trim())}
+              range={{ total, first: cursor + 1, last: Math.min(total, cursor + shown.length) }} />
+          </ListPagePagination>
           <p className={styles.hint}>{canEdit ? '行の「…」から 中身を見る・再送待ちへ戻す。' : '行の「…」から 中身を見る。'}</p>
         </>
       )}
