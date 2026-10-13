@@ -1,7 +1,7 @@
 'use client'
 import PageSizeSelect from '@/components/shared/page-size-select'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarLeading, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -647,7 +647,14 @@ export default function FriendsListV8() {
     </>
   )
 
+  const primaryFilter = (
+    <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
+          onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
+          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
+  )
+
   const toolbar = (
+    <ListToolbarLeading leading={primaryFilter}>
     <ListToolbarFrame data-design="V8SearchPanel">
       <ListToolbarRow as="form"
         onSubmit={(event) => {
@@ -672,9 +679,8 @@ export default function FriendsListV8() {
           />
         </ListToolbarSearchSlot>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
-        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
-          onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
-          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
+
+        <ListToolbarOptional collapse="overflow">
         <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
           options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
@@ -698,6 +704,7 @@ export default function FriendsListV8() {
             保存した検索
           </Button>
         ) : null}
+        </ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         <div role="group" aria-label="すばやく絞り込む" className={styles.chips}>
@@ -719,6 +726,7 @@ export default function FriendsListV8() {
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
+        <ListToolbarEnd>
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
           aria-label="並び順"
@@ -728,6 +736,7 @@ export default function FriendsListV8() {
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
         /></SaveErrorField>
+        </ListToolbarEnd>
       </ListToolbarRow>
       {advanced?.summary.length ? (
         <div className={styles.applied}>
@@ -754,6 +763,7 @@ export default function FriendsListV8() {
         </p>
       ) : null}
     </ListToolbarFrame>
+    </ListToolbarLeading>
   )
 
   const colCount = 4 + displayColumns.length
@@ -857,7 +867,7 @@ export default function FriendsListV8() {
                   </Td>
                   )
                   if (column.key === 'source') return (
-                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || emptyValue('unknown')}>{friend.firstTrackedLinkName || emptyValue('unknown')}</span></Td>
                   )
                   if (column.key === 'last') return (
                   <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
