@@ -1060,6 +1060,10 @@
 
 - 名前とフォルダの2列は `SettingsFormRow layout="name-folder"`。名前2・フォルダ1の比率で行の幅を埋め、間は共通12。フォルダは既存 `FolderSelect size="full"`。文字数・再試行・社内メモは各入力の共通部品へ渡す。
 
+- 独立した入力の2列・3列は `SettingsFormRow layout="columns"` と `columns`。白い板1100未満では共通の行が1列へ畳む。エラーを出すID・焦点のref・入力値はそのまま渡す。郵便番号など一つの入力の内部は別の口として保つ。「押したら」の種類と中身も `TapActionField` が同じ板幅で縦へ並べ、保存する動きは変えない。
+
+- 並べ替えの矢印の禁止理由は `reorderMoveReason` または `useReorder.moveReason`。先頭・末尾・保存中・閲覧などの理由を共通の並びから出し、矢印の共通ボタンの `title` へ渡す。画面の保存順・API・動かせる条件は保つ。
+
 - 固定の保存項目しか持たない行うことは `FixedActionList` から既存 `ActionList` へ渡す。種類は保存できる物だけ、順序は固定。対象の選択を確定するまで行を作らず、保存形式は画面の既存の口へ戻す。
 
 - 条件を足す種類も `ConditionBuilder` の `EntityPickerDialog` で選ぶ。種類の制限・AND/ORの保存形を保ち、取消では条件を追加しない。条件のかたまりの箱と頭は共通 `Card` / `CardHeader`。

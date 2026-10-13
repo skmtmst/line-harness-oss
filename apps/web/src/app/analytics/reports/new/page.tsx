@@ -1,4 +1,5 @@
 'use client'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -1151,29 +1152,3 @@ function AnalyticsReportFormPage() {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
                 return <li key={def.id}><Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} title={!alertsEnabled ? '「大きな変化を知らせる」をオンにすると選べます' : undefined} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong>{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
-                  <SettingsFormRow layout="columns">
-                    <Field label={def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値' : 'しきい値'} required><NumberInput unit={def.id === 'conversions' ? '日' : '%'} id={`report-alert-${def.id}-threshold`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-threshold`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-threshold`) ? `report-alert-${def.id}-threshold-error` : undefined} type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-threshold`) && <p id={`report-alert-${def.id}-threshold-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-threshold`)}</p>}</Field>
-                    <Field label="判定に必要な最低件数" required help="集計できた件数が、この数以上のときだけ判定します。"><NumberInput unit="件" id={`report-alert-${def.id}-sample`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-sample`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-sample`) ? `report-alert-${def.id}-sample-error` : undefined} type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-sample`) && <p id={`report-alert-${def.id}-sample-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-sample`)}</p>}</Field>
-                  </SettingsFormRow>
-                </Card></li>
-              })}
-            </ul>
-          </Card>
-      </CreatePage>
-      <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
-        <VersionCompare before={latestSummary} after={draftSummary} />
-      </Dialog>
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
-  )
-}
-
-export default function AnalyticsReportNewPage() {
-  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <AnalyticsReportFormPage />
-    </Suspense>
-  )
-}

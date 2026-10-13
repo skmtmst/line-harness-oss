@@ -233,6 +233,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     }
   }
   const listPages = roots.filter(root=>root.dataset.pageTemplate==='list').length
-  if (!listPages) counts.F10 = null // This detector measures the narrow list shape, not other templates.
-  return { counts, findings, inventory, coverage: { pages: roots.length, listPages, notApplicable: listPages ? [] : ['F10: narrow list shape'], templates: [...new Set(roots.map(root=>root.dataset.pageTemplate))], DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9',...(listPages ? ['F10'] : [])], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6' } }
+  const formPages = roots.filter(root=>root.dataset.pageTemplate==='create').length
+  if (!listPages && !formPages) counts.F10 = null
+  return { counts, findings, inventory, coverage: { pages: roots.length, listPages, formPages, notApplicable: listPages || formPages ? [] : ['F10: narrow list or form shape'], templates: [...new Set(roots.map(root=>root.dataset.pageTemplate))], DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9',...(listPages || formPages ? ['F10'] : [])], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6; form geometry: form-rules and form-columns' } }
 }

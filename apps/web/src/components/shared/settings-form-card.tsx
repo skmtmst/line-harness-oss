@@ -1,4 +1,4 @@
-import type { FormHTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, FormHTMLAttributes, ReactNode } from 'react'
 import SectionHeader from './section-header'
 import Card from './card'
 import styles from './settings-form-card.module.css'
@@ -17,6 +17,10 @@ export function SettingsFormCard({ title, description, children, actions, ...pro
   </form>
 }
 
-export function SettingsFormRow({ children, postal = false, layout, columns = 2 }: { children: ReactNode; postal?: boolean; layout?: 'name-folder' | 'columns'; columns?: 2 | 3 }) {
-  return <div className={layout === 'name-folder' ? styles.nameFolderRow : layout === 'columns' ? styles.columnsRow : postal ? styles.postalRow : styles.row} data-form-row={layout} data-form-columns={layout === 'columns' ? columns : undefined}>{children}</div>
-}
+export function SettingsFormRow({ children, postal = false, layout, columns = 2, ...props }: {
+  children: ReactNode
+  postal?: boolean
+  layout?: 'name-folder' | 'columns'
+  columns?: 2 | 3
+} & Omit<ComponentPropsWithRef<'div'>, 'children' | 'className' | 'style'>) {
+  return <div {...props} className={layout === 'name-folder' ? styles.nameFolderRow : layout === 'columns' ? styles.columnsRow : postal ? styles.postalRow : styles.row} data-form-row={layout} data-form-columns={layout === 'columns' ? columns : undefined}>{children}</div>

@@ -1070,16 +1070,9 @@ function EditCommonVarV8Inner() {
     )
   ) : undefined
 
-  return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
-      boardId={narrow ? 'C67dE' : 'AYc6O'}
-      title={item?.name ?? '共通情報を編集'}
-      help={item ? (
-        <>
-          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
+  const conflictNotice = item && conflict ? <>
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
-          {conflict ? (
-            /* 帯は共通部品（save-conflict）に寄せた。誰が・いつ保存したかの文はこの画面のまま。 */
+            {/* 誰が・いつ保存したかの文と、入力を残す動きは同じ。 */}
             <div className={styles.conflictSlot}>
               <SaveConflictBand
                 title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
@@ -1089,9 +1082,20 @@ function EditCommonVarV8Inner() {
                 onReload={adoptLatest}
               />
             </div>
-          ) : null}
+  </> : undefined
+
+  return (
+    <SaveErrorScope errors={saveErrors}><CreatePage
+      boardId={narrow ? 'C67dE' : 'AYc6O'}
+      title={item?.name ?? '共通情報を編集'}
+      help={item ? (
+        <>
+          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
+
         </>
       ) : undefined}
+      notice={conflictNotice}
+      noticeSpacing="band"
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
