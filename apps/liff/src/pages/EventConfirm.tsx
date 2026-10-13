@@ -199,7 +199,7 @@ export default function EventConfirm() {
       {/* 板 EscPA：中身は上下左右 16・間 14。並びは 内容の箱 → 質問 → 備考 → 注意 → プライバシーの一行。 */}
       <div className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-4 pb-28">
         <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
-        <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
+        <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventSpan(slot.starts_at, slot.ends_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
@@ -279,7 +279,7 @@ export default function EventConfirm() {
         <div className="space-y-2">
           <FieldLabel htmlFor="event-note">備考</FieldLabel>
           <TextArea
-            id="event-note" value={note}
+            appearance="event" id="event-note" value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             maxLength={5000}

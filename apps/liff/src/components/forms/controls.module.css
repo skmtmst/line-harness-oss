@@ -9,6 +9,8 @@
 .choiceInput { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--color-liff-primary); }
 .nightInput { height: 44px; min-width: 0; width: 100%; border: 0; border-radius: 999px; background: var(--color-night-panel); padding: 0 16px; font-size: 13px; color: var(--color-white); }
 .nightInput::placeholder { color: var(--color-night-dim); }
+
+input.nightInput:not([type='radio']):not([type='checkbox']) { height: 44px; border: 0; border-radius: 999px; padding: 0 16px; background: var(--color-night-panel); color: white; font-size: 13px; }
 .nightInput:focus-visible { outline: 2px solid var(--color-liff-primary); outline-offset: 2px; }
 .pin { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 48px; cursor: text; opacity: 0; }
 .wrap { position: relative; min-width: 0; }
@@ -16,6 +18,8 @@
 .input::placeholder { color: var(--color-liff-idle, var(--v8-liff-idle, var(--color-ink-faint))); }
 .input:focus { outline: none; border-color: var(--color-liff-primary, var(--fe-phone-main, var(--v8-liff-primary, var(--color-accent)))); }
 .textarea { min-height: 88px; resize: vertical; }
+.bookingTextarea { min-height: 72px; height: 72px; }
+.eventTextarea { min-height: 80px; height: 80px; }
 .input[data-temporal] { min-height: 46px; padding-right: 40px; }
 .input[data-empty]:not(:focus) { color: transparent; }
 .input[data-empty]:not(:focus)::-webkit-datetime-edit { opacity: 0; }
@@ -25,7 +29,7 @@
 .icon { width: 18px; height: 18px; flex-shrink: 0; }
 .select { appearance: none; padding-right: 40px; }
 .note { margin: 0; font-size: 12px; line-height: 18px; color: var(--color-liff-sub, var(--v8-liff-sub, var(--color-ink-faint))); }
-.choice { display: flex; min-height: 44px; align-items: center; gap: 10px; border: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); border-radius: 10px; padding: 12px 14px; background: var(--color-canvas); color: var(--color-ink); font-size: 14px; line-height: 20px; }
+.choice { display: flex; min-height: 44px; align-items: center; gap: 10px; border: 0; outline: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); outline-offset: -0.5px; border-radius: 10px; padding: 12px 14px; background: var(--color-canvas); color: var(--color-ink); font-size: 14px; line-height: 21px; }
 .choice[data-selected] { border-color: var(--color-liff-primary, var(--fe-phone-main, var(--v8-liff-primary, var(--color-accent)))); background: var(--color-liff-soft, var(--v8-liff-primary-soft, var(--color-accent-soft))); }
 .choice input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--color-liff-primary, var(--fe-phone-main, var(--v8-liff-primary, var(--color-accent)))); }
 .stars { display: flex; gap: 4px; }
@@ -53,7 +57,7 @@
 .labelRow { display: flex; align-items: center; gap: 6px; }
 .label { color: var(--color-ink); font-size: 13px; line-height: 20px; font-weight: 700; }
 .required { background: var(--color-liff-required-bg, var(--color-canvas-sunken)); color: var(--color-liff-sun, var(--color-ink)); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
-.optional { color: var(--color-liff-sub, var(--color-ink-faint)); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.optional { color: var(--color-liff-sub, var(--color-ink-faint)); background: transparent; padding: 0; font-size: 11px; font-weight: 400; white-space: nowrap; }
 .choiceInput { width: 18px; height: 18px; accent-color: var(--color-liff-primary, var(--color-accent)); flex-shrink: 0; }
 
 .nightInput { width: 100%; min-width: 0; height: 44px; border: 0; border-radius: 999px; padding: 0 16px; background: var(--color-night-panel); color: white; font-size: 13px; }
@@ -74,7 +78,7 @@
 .input[aria-invalid="true"] { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
 
 /* B-203：本番LIFFと管理画面の入力見本に同じ輪・点・チェック。 */
-.choice[data-selected] { border: var(--choice-card-ring) solid var(--color-selection-border); background: var(--color-choice-selected); }
+.choice[data-selected] { border-color: transparent; outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -1px; background: var(--color-choice-selected); }
 .choiceInput, .choice input { appearance: none; width: var(--choice-size); height: var(--choice-size); margin: 0; border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
 input.choiceInput[type='radio'], .choice input[type='radio'] { border-radius: 50%; }
 input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
@@ -86,6 +90,8 @@ input.choiceInput[type='checkbox']:checked, .choice input[type='checkbox']:check
 
 input.choiceInput[type='radio'], .choice input[type='radio'] { width: var(--liff-radio-size, 18px); height: var(--liff-radio-size, 18px); }
 input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { background: radial-gradient(circle, var(--color-selection-border) calc(var(--liff-radio-dot, 9px) / 2), var(--color-canvas) calc(var(--liff-radio-dot, 9px) / 2)); }
+.choice input.choiceInput[type='radio']:checked { background: radial-gradient(circle, var(--color-canvas) calc(var(--liff-radio-dot, 9px) / 2), var(--color-liff-primary, var(--color-selection-border)) calc(var(--liff-radio-dot, 9px) / 2)); border-color: var(--color-liff-primary, var(--color-selection-border)); outline: 3px solid var(--color-liff-primary, var(--color-selection-border)); }
+.choice input.choiceInput[type='radio']:checked:focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }
 
 .formLabel { font-size: 15px; line-height: 22px; }
 .days .day { border: 0; outline: 1px solid var(--color-liff-line, var(--color-border)); outline-offset: -0.5px; font-family: Inter, system-ui, sans-serif; line-height: normal; }

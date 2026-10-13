@@ -450,7 +450,7 @@ export default function SeatReserve() {
               onTime={pickTime}
               onRetry={() => void fetchDay(store, date, guestCount, generation.current)}
             />
-            {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
+            {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify-text" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
             {waitlistSlot && <SeatWaitlistSheet storeId={store.id} storeName={store.name} startsAt={waitlistSlot.startsAt} guestCount={waitlistSlot.guestCount} onClose={() => setWaitlistSlot(null)} />}
             {canRefer && <section className="space-y-3" aria-label="系列店の案内">
               {referrals.length>0 && <h2 className="text-[13px] leading-5 font-bold text-ink">近くの系列店なら空いています</h2>}

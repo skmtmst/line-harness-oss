@@ -297,6 +297,7 @@ export default function DateTimePicker({
   confirmLabel = '内容を確かめる',
   onBackToStaff,
   onLoadState,
+  onEmptyState,
 }: {
   menu: MenuItem;
   staff: StaffItem;
@@ -310,6 +311,7 @@ export default function DateTimePicker({
   onBackToStaff: () => void;
   /** 読み込み中・失敗・空きが無い間は、下の帯を出さないための合図。 */
   onLoadState?: (ready: boolean) => void;
+  onEmptyState?: (empty: boolean) => void;
 }) {
   const today = jstToday();
   // 414 幅の板（`xvtSz`）は板 ID だけを替える。中身は同じ。
@@ -414,7 +416,6 @@ export default function DateTimePicker({
         });
         setView(fallback);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 週表示: 見ている5日ぶんが未読なら読む。読んだぶんは窓を越えて残す。
@@ -452,7 +453,6 @@ export default function DateTimePicker({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, settings, winStart, menu.id, staff.id, today, windowEnd, loadedWins, weekReloadKey]);
 
   // 見ている週が読めたら、空きのある一番早い日を選ぶ。
@@ -556,6 +556,8 @@ export default function DateTimePicker({
   // 満席の日がある週は日の並びを出す（満席の日を押すと時刻の鈴＝空いたら知らせるへ進める）。
   const weekHasFull = weekDays.some((d) => weekFull[d]);
   const weekShowsStrip = weekHasOpen || weekHasFull;
+  const emptyWeek = view === 'list' && !weekFailed && !weekLoading && weekByDate !== null && loadedWins.has(winStart) && !weekShowsStrip;
+  useEffect(() => { onEmptyState?.(emptyWeek); }, [emptyWeek, onEmptyState]);
   const calHasSlots = Object.values(calByDate).some((times) => times.some((t) => t.open));
   const monthLoaded = loadedMonths.includes(month);
   useEffect(() => {
@@ -704,12 +706,12 @@ export default function DateTimePicker({
 
   return (
     <div className="space-y-3.5" data-design-node={view === 'calendar' ? 'k3aJKU' : wide ? 'xvtSz' : 'M2p63S'}>
-      <div>
+      {!emptyWeek && <div>
         <h2 className="text-xl font-bold text-ink">日時を選んでください</h2>
         <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">
           {`${menu.name}・${staff.display_name}`}
         </p>
-      </div>
+      </div>}
       {hint && <p className="text-xs leading-5 text-liff-sub">{hint}</p>}
       {/* 週だけ・月だけの店では切り替えを出さない (見せ方が1つに決まる)。 */}
       {allowedViews(settings.calendarMode).length > 1 && (
@@ -731,7 +733,7 @@ export default function DateTimePicker({
           <LoadingView />
         ) : !weekShowsStrip ? (
           // ★V8 (ADutg)：印・題・本文・ボタンを 12 ずつ空け、画面の真ん中の高さに置く。
-          <div className="flex flex-col items-center gap-3 px-2 pt-16 text-center" data-design-node="ADutg">
+          <div className="flex min-h-[calc(100dvh-180px)] flex-col items-center justify-center gap-3 px-2 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
               <Icon name="calendar-x" className="h-10 w-10" />
             </span>

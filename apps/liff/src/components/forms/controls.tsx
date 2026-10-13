@@ -26,8 +26,8 @@ export function TextInput({ appearance = 'default', className = '', placeholder,
   return <input {...props} ref={ref} placeholder={examplePlaceholder(placeholder)} className={`${look} ${className}`} />
 }
 
-export function TextArea({ className = '', placeholder, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} placeholder={examplePlaceholder(placeholder)} className={`${styles.input} ${styles.textarea} ${className}`} />
+export function TextArea({ className = '', placeholder, appearance = 'default', ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { appearance?: 'default' | 'booking' | 'event' }) {
+  return <textarea {...props} placeholder={examplePlaceholder(placeholder)} className={`${styles.input} ${styles.textarea} ${appearance === 'booking' ? styles.bookingTextarea : appearance === 'event' ? styles.eventTextarea : ''} ${className}`} />
 }
 
 export function ChoiceInput(props: InputHTMLAttributes<HTMLInputElement>) {
