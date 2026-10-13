@@ -277,6 +277,13 @@ jobs:
             node scripts/visual-qa/v8-pattern-audit.mjs \
               --code . --out "$RUNNER_TEMP/pattern-ownership"
           fi
+      - name: Guard newly added source visual contracts (B-273)
+        env:
+          SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --test scripts/verify-no-source-visual-contracts.test.mjs
+          base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
+          node scripts/verify-no-source-visual-contracts.mjs --base "$base"
       - name: Build shared packages
         run: >-
           pnpm
