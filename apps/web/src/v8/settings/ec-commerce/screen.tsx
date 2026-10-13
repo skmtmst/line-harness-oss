@@ -5,7 +5,7 @@ import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleDot, Plug, Star } from 'lucide-react'
+import { CircleDot, Plug, Star, CircleCheck, Clock, CircleSlash, TriangleAlert } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
@@ -14,6 +14,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import TruncatedText from '@/components/shared/truncated-text'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -353,10 +354,10 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   return (
     <>
       <KpiBand presentation="band">
-        <KpiCard presentation="band" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="処理中" value={processingCount ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="" detail="件・送る設定がない" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="失敗" value={failedCount ?? null} unit="" detail="件" valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleCheck size={14} aria-hidden="true" />} title="処理完了" value={listedSummary?.succeeded ?? null} unit="件" detail={null} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<Clock size={14} aria-hidden="true" />} title="処理中" value={processingCount ?? null} unit="件" detail={null} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleSlash size={14} aria-hidden="true" />} title="送信なし" value={listedSummary?.skipped ?? null} unit="件" detail="送る設定がない" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗" value={failedCount ?? null} unit="件" detail={null} valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
       </KpiBand>
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">
@@ -461,7 +462,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
                   <Td><span className={styles.text} title={amount ? `${contents}・${amount}` : contents}>
                     {amount ? `${contents}・${amount}` : contents}
                   </span></Td>
-                  <Td><span className={styles.done}>{actionDone(action)}</span></Td>
+                  <Td><TruncatedText value={actionDone(action)} /></Td>
                   <Td><span className={styles.stack}>
                     <StatusBadge tone={statusInfo.tone} size="compact">{actionStatusLabel(action)}</StatusBadge>
                     {action.failureKind && action.status !== 'succeeded'
@@ -496,7 +497,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
             {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : emptyValue('unknown')}件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
-          {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       ) : null}
       {/* ★V8-B nAesv：注文の状況の引き出し（同じ場所の order-drawer.tsx）。 */}
@@ -557,6 +558,7 @@ export default function EcCommerceScreen({
     <SbSettingsScreen
       boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : 'GmVR5'}
       layout="narrow-nav"
+      contentLayout="wide"
       title="EC連携"
       help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={actions}

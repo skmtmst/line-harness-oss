@@ -405,7 +405,8 @@ function FriendDetailInner() {
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="確定待ち" value={pendingMiles} unit="マイル"
             detail={historyPartial
               ? `最新${formatNumber(displayedHistory.length)} 件のうち ${pendingItems.length} 件が確定待ち`
-              : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち` : '確定待ちはありません'} />
+              : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち`
+                : pendingMiles > 0 ? '確定待ちの残高があります。明細を確認してください' : '確定待ちはありません'} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
             detail={<span title={rewardedActions === null ? '付与記録の回数は未取得' : `${formatNumber(rewardedActions)} 回の付与記録`}>{monthComplete
               ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
