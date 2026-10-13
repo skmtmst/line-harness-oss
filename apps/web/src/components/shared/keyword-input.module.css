@@ -1,6 +1,9 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .entry {
   display: inline-flex;
   flex: 0 1 var(--tpl-kw-input-w);
   min-width: 0;
   max-width: 100%;
+}
 }

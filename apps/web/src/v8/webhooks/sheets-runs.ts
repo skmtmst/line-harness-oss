@@ -39,4 +39,3 @@ export function syncResultProblem(data: { status: string; results?: Array<{ stat
   if (data.status === 'already_running') return 'いま同期しています。終わってから、もう一度お試しください。'
   return null
 }
-

@@ -149,7 +149,7 @@ function TableHead() {
   return (
     <thead>
       <TableHeadRow data-table-layout="columns">
-        <Th grow className={styles.colWhen}>いつ・だれに</Th>
+        <Th grow>いつ・だれに</Th>
         <Th className={styles.colRule}>オートメーション</Th>
         <Th className={styles.colResult}>結果</Th>
         <Th className={styles.colDone}>したこと</Th>
@@ -520,7 +520,7 @@ export default function AutomationRunsV8() {
                 const subjectName = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」`
                 return (
                   <Tr key={run.id} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
-                    <Td grow className={styles.colWhen}>
+                    <Td grow>
                       <RowNameButton title={run.subject ?? "友だち名なし"} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
                       </RowNameButton>

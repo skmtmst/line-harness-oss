@@ -196,8 +196,8 @@ function toolbarRole(node: ReactNode): 'search' | 'filter' | 'sort' | 'count' {
   return roles.find(role => role !== 'filter') ?? 'filter'
 }
 
-export function ListToolbarSearchSlot({ children, width }: { children: ReactNode; width?: number }) {
-  return <div className={styles.searchSlot} data-toolbar-search style={width ? ({ '--list-search-width': `${width}px` } as React.CSSProperties) : undefined}>{children}</div>
+export function ListToolbarSearchSlot({ children, width, search }: { children?: ReactNode; width?: number; search?: ListToolbarSearch }) {
+  return <div className={styles.searchSlot} data-toolbar-search style={width ? ({ '--list-search-width': `${width}px` } as React.CSSProperties) : undefined}>{search ? <SearchField value={search.value} onChange={search.onChange} onClear={() => search.onChange('')} placeholder={search.placeholder} aria-label={search.label ?? search.placeholder} maxLength={search.maxLength} loading={search.loading} updateMode={search.updateMode} /> : children}</div>
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {

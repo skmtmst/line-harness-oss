@@ -70,7 +70,6 @@ export default function IdentityDecisionDialog({
   const [mode, setMode] = useState<IdentityReprocessMode>('future_only')
   const [profileSelections, setProfileSelections] = useState<Record<string, string>>({})
   const [consents, setConsents] = useState([false, false, false])
-  const disabledReasonId = useId()
 
   // 別の候補を開いたら、前の候補の入力を持ち越さない。
   useEffect(() => {
