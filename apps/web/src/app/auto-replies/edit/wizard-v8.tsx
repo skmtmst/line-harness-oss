@@ -1367,25 +1367,20 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'trigger' && (
             <>
-              <Card variant="aside" gap="tight" className={styles.sideCard}>
-                <CardHeader size="stacked" title={<>保存したあとに、過去28日で当たった数が出ます</>} />
-                {/* 絵 A0pDt：数（— 件）→ 説明 → 試しの文2つ（いまの言葉で当たるか）。 */}
-                <p className={styles.countRow} aria-label="当たった受信（過去28日）">
-                  <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
-                  <span className={styles.countUnit}>件</span>
-                </p>
-                <p className={styles.sideHint}>
-                  いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。
-                </p>
-                <dl className={styles.kvList}>
-                  {triggerSamples.map((sample) => (
-                    <div key={sample.text} className={styles.kvRow}>
-                      <dt>「{sample.text}」</dt>
-                      <dd className={sample.hit ? styles.sampleHit : styles.sampleMiss}>{sample.hit ? '当たる' : '当たらない'}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </Card>
+              <CreateSummaryCard
+                title="保存したあとに、過去28日で当たった数が出ます"
+                leading={<>
+                  <p className={styles.countRow} aria-label="当たった受信（過去28日）">
+                    <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
+                    <span className={styles.countUnit}>件</span>
+                  </p>
+                  <p className={styles.sideHint}>いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。</p>
+                </>}
+                rows={triggerSamples.map(sample => ({
+                  key: sample.text, label: `「${sample.text}」`,
+                  value: <span className={sample.hit ? styles.sampleHit : styles.sampleMiss}>{sample.hit ? '当たる' : '当たらない'}</span>,
+                }))}
+              />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">
@@ -1398,39 +1393,19 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'response' && (
             <>
-              <Card variant="aside" gap="tight" className={styles.sideCard}>
-                <CardHeader size="stacked" title={<>送るものの確認</>} />
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">返すもの</dt>
-                    <dd className={styles.kvVal}>
-                      {form.mode === 'silent'
-                        ? '返信しない'
-                        : form.mode === 'template'
-                          ? selectedTemplate?.name ?? 'テンプレート'
-                          : form.mode === 'inline-flex'
-                            ? 'カード'
-                            : form.mode === 'inline-image'
-                              ? '画像'
-                              : `テキスト${form.responseContent ? ` ${formatNumber(form.responseContent.length)}字` : ''}`}
-                    </dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">後の処理</dt>
-                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none')}</dd>
-                  </div>
-                  {(() => {
-                    const used = insertedLabels(form.responseContent)
-                    if (form.mode !== 'inline-text' || used.length === 0) return null
-                    return (
-                      <div className={styles.kvRow}>
-                        <dt className="text-ink-faint text-xs">差し込み</dt>
-                        <dd className={styles.kvVal}>{used.map((label) => label === '名前' ? '名前（取れないときは空欄）' : label).join('・')}</dd>
-                      </div>
-                    )
-                  })()}
-                </dl>
-              </Card>
+              <CreateSummaryCard
+                title="送るものの確認"
+                rows={[
+                  { label: '返すもの', value: form.mode === 'silent' ? '返信しない'
+                    : form.mode === 'template' ? selectedTemplate?.name ?? 'テンプレート'
+                    : form.mode === 'inline-flex' ? 'カード'
+                    : form.mode === 'inline-image' ? '画像'
+                    : `テキスト${form.responseContent ? ` ${formatNumber(form.responseContent.length)}字` : ''}` },
+                  { label: '後の処理', value: form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none') },
+                  ...(form.mode === 'inline-text' && insertedLabels(form.responseContent).length > 0
+                    ? [{ label: '差し込み', value: insertedLabels(form.responseContent).map(label => label === '名前' ? '名前（取れないときは空欄）' : label).join('・') }] : []),
+                ]}
+              />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
@@ -1516,27 +1491,11 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'confirm' && (
             <>
-              <Card variant="aside" gap="tight" className={styles.sideCard}>
-                <CardHeader size="stacked" title={<>設定内容</>} />
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">状態</dt>
-                    <dd className={styles.kvVal}>
-                      {isActive ? '有効のまま更新' : '停止中 → 有効にする'}
-                    </dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">動く順番</dt>
-                    <dd className={styles.kvVal}>{myPositionLabel}</dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
-                    <dd className={styles.kvVal}>
-                      {conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none')}
-                    </dd>
-                  </div>
-                </dl>
-              </Card>
+              <CreateSummaryCard rows={[
+                { label: '状態', value: isActive ? '有効のまま更新' : '停止中 → 有効にする' },
+                { label: '動く順番', value: myPositionLabel },
+                { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
+              ]} />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>

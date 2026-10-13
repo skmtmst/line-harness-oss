@@ -70,6 +70,24 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('正の行うことの選択肢データを通し、同じ語の手書きや偽の持ち主は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/shared/action-list.tsx', 'export default function ActionList() { return null }')
+    put(root, 'apps/web/src/components/shared/fixed-action-list.tsx', 'export default function FixedActionList() { return null }')
+    put(root, 'apps/web/src/v8/demo/choices.tsx', [
+      "import FixedActionList from '@/components/shared/fixed-action-list'",
+      "import ActionList from '@/components/shared/action-list'",
+      "export const P = () => <><FixedActionList options={[{id:'tag',label:'タグを付ける'}]} /><ActionList choices={[{id:'score',label:'スコアを足す'}]} /></>",
+    ].join('\n'))
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file.endsWith('choices.tsx'))
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "export const P = () => <button>タグを付ける</button>")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from './own-actions'; export const P = () => <FixedActionList options={[{label:'タグを付ける'}]} />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from '@/components/shared/fixed-action-list'; export const P = () => <FixedActionList options={[{label:'別の動作',editor:<button>タグを付ける</button>}]} />")
+    expect(findings()).toHaveLength(1)
+  })
   it('移動した同じ中身は通し、コピー・中身の変更・移動先の新しい手書きは止める', () => {
     const { root } = fixture()
     const old = 'apps/web/src/v8/other/source.tsx'

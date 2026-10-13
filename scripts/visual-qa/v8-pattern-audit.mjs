@@ -77,6 +77,7 @@ export function compilePattern(pattern, catalog = { _global: { excludeFiles: [],
   const glob = catalog._global
   const components = owner.components ?? []
   pattern._code = {
+    choiceOwners: catalog.patterns?.find(p => p.id === 'action-list')?.owner?.code ?? { files: [], components: [] },
     excludeFiles: [...glob.excludeFiles, ...(code.excludeFiles ?? []).map((s) => rx(s)), ...(owner.files ?? []).map((f) => rx(`${escapeRe(f)}$`))],
     ownerFiles: (owner.files ?? []).map((f) => rx(`${escapeRe(f)}$`)),
     canonicalUse: code.canonicalUse ? rx(code.canonicalUse) : (components.length ? rx(`<(${components.map(escapeRe).join('|')})\\b|\\b(${components.map(escapeRe).join('|')})\\(`) : null),
@@ -245,6 +246,14 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
       const proof = sourceEvidence(rel, content, m.index, m[0].length)
       if (proof?.comment) continue
+      // 正の行うことの選択肢へ渡す label は、押したらの欄の手書きではない。
+      // 実在する持ち主への import と JSX のデータの口を両方照合する。
+      if (signal.id === 'own-extra' && proof?.literalProperty === 'label' && ['options', 'choices'].includes(proof.attribute) && codeRoot) {
+        const imported = proof.imports?.[proof.tag]
+        const ownerFile = imported?.path.startsWith('@/') ? 'apps/web/src/' + imported.path.slice(2) + '.tsx' : null
+        const ownerName = imported?.name === 'default' ? proof.tag : imported?.name
+        if (ownerFile && p.choiceOwners.files.includes(ownerFile) && p.choiceOwners.components.includes(ownerName) && existsSync(join(codeRoot, ownerFile))) continue
+      }
       // 共通の欄・浮く面へ渡す読み上げ属性は、その面を画面が手書きした証拠ではない。
       if (proof?.imports?.[proof.tag]?.path.startsWith('@/components/') && codeRoot && existsSync(join(codeRoot, 'apps/web/src', proof.imports[proof.tag].path.slice(2) + '.tsx')) && ['role', 'aria-modal', 'aria-invalid'].includes(proof.attribute) && ['raw-dialog', 'raw-alert', 'own-invalid'].includes(signal.id)) continue
       // 必須・エラーのFieldで正の押したらの欄を包んでも、手書きの選択肢にはならない。
