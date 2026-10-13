@@ -211,7 +211,6 @@
   width: var(--tpl-nph-menu-size);
   height: var(--tpl-nph-menu-size);
 }
-
 /* 表の下（件数・ヒント）。 */
 .pagerRow {
   padding: var(--tpl-nph-pager-pad);

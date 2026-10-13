@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import scanListOperations from './list-operation-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -170,6 +171,38 @@ test('F2 distinguishes a column of upload instructions from a wrapped short acti
   } finally { await browser.close() }
 })
 
+test('F5 counts a page-owned explanation in the tool band and accepts shared notice ownership', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage(), owners = sharedControlOwners()
+    assert.ok(owners.includes('notice'))
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar"><p class="page_readonlyBand__abc">項目の種類を変える前の説明</p></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns, { cssOwners: owners })).counts.F5, 1)
+    await page.locator('p').evaluate(el => el.className = 'notice_notice__abc')
+    assert.equal((await page.evaluate(scanFixPatterns, { cssOwners: owners })).counts.F5, 0)
+    assert.equal(await page.locator('p').innerText(), '項目の種類を変える前の説明')
+  } finally { await browser.close() }
+})
+
+test('F1 catches a selected label ellipsized by half a pixel and accepts its exact rendered width', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><span data-select-value style="display:inline-block;font:13px Arial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォルダ：すべて</span><span data-list-name style="display:inline-block;width:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">省略してよい名前</span></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+    const fullWidth = await page.locator('[data-select-value]').evaluate(el => el.getBoundingClientRect().width)
+    await page.locator('[data-select-value]').evaluate((el, width) => el.style.width = `${width - .5}px`, fullWidth)
+    const deficit = await page.locator('[data-select-value]').evaluate(el => {
+      const range = document.createRange(); range.selectNodeContents(el)
+      return range.getBoundingClientRect().width - el.getBoundingClientRect().width
+    })
+    assert.ok(deficit > 0 && deficit < 1, 'the regression is smaller than the former one-pixel tolerance')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 1)
+    await page.locator('[data-select-value]').evaluate((el, width) => el.style.width = `${width}px`, fullWidth)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+  } finally { await browser.close() }
+})
+
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
   try {
@@ -299,4 +332,33 @@ test('W4 distinguishes heading actions and archive filters without board IDs',as
  const after=await page.evaluate(scanFixPatterns)
  assert.equal(after.counts.F5,0);assert.equal(after.counts.F4,0)
  }finally{await browser.close()}
+})
+
+
+test('list semantics catches two folder/create entries even when they fit, while a distinct creation action stays available', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list"><div data-template-region="toolbar"><button aria-label="フォルダ">フォルダ：すべて</button><button aria-label="フォルダで絞り込む">フォルダ：すべて</button><a href="/new">案内を作る</a><a href="/new">案内を作る</a><a href="/folder-new">フォルダを作る</a></div></section>')
+    const broken = await page.evaluate(scanListOperations)
+    assert.equal(broken.findings.length,2)
+    await page.getByRole('button',{name:'フォルダで絞り込む',exact:true}).evaluate(el=>el.remove())
+    await page.locator('a[href="/new"]').last().evaluate(el=>el.remove())
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+    assert.equal(await page.locator('a').count(),2)
+  } finally { await browser.close() }
+})
+
+test('read-only list selection is detected, while editable and row-ineligible selections are retained', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list"><div data-read-only-notice>閲覧のみ</div><table><thead><tr><th><input type="checkbox" aria-label="全部選ぶ"></th></tr></thead><tbody><tr><td><input type="checkbox" disabled title="この行は対象外" aria-label="行を選ぶ"></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,2)
+    await page.locator('[data-read-only-notice]').evaluate(el=>el.remove())
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+    await page.locator('section').evaluate(el=>{ const notice=document.createElement('div');notice.dataset.readOnlyNotice='';notice.textContent='閲覧のみ';el.prepend(notice) })
+    await page.locator('input').evaluateAll(els=>els.forEach(el=>el.remove()))
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+  } finally { await browser.close() }
 })

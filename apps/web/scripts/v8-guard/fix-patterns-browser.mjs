@@ -112,7 +112,9 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const rects = textRects(el)
       if (!rects.length) continue
       const paintedWidth = Math.max(...rects.map(r=>r.right)) - Math.min(...rects.map(r=>r.left))
-      if (paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
+      const selectedValueContentWidth = el.getBoundingClientRect().width - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
+      const selectedValueIsEllipsized = el.matches('[data-select-value]') && css.textOverflow === 'ellipsis' && paintedWidth > selectedValueContentWidth
+      if (selectedValueIsEllipsized || paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
         || rects.some(r => r.top < el.getBoundingClientRect().top + (parseFloat(css.paddingTop) || 0) - 1 || r.bottom > el.getBoundingClientRect().bottom - (parseFloat(css.paddingBottom) || 0) + 1)) add('F1', el, 'short text does not fit')
     }
     for (const el of all('input[type="search"]')) {
@@ -149,6 +151,9 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (!visible(value) || !/^並び[：:].+/.test(value.textContent.trim())) add('F8', el, 'sort has no visible current value')
     }
     const owned = el => !!el && [...el.classList].some(cls => cssOwners.some(name => cls === name || cls.startsWith(`${name}_`)))
+    if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] > p')) {
+      if (!owned(el)) add('F5', el, 'toolbar explanation has a page CSS owner instead of shared parts')
+    }
     if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] button,[data-template-region="toolbar"] input,[data-template-region="toolbar"] select,[data-template-region="toolbar"] summary')) {
       if (owned(el) || el.matches('summary') && owned(el.closest('[data-toolbar-optional]'))
         || el.matches('input[type="checkbox"],input[type="radio"]') && owned(el.closest('label'))) continue
@@ -228,6 +233,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     }
   }
   const listPages = roots.filter(root=>root.dataset.pageTemplate==='list').length
-  if (!listPages) counts.F10 = null // This detector measures the narrow list shape, not other templates.
-  return { counts, findings, inventory, coverage: { pages: roots.length, listPages, notApplicable: listPages ? [] : ['F10: narrow list shape'], templates: [...new Set(roots.map(root=>root.dataset.pageTemplate))], DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9',...(listPages ? ['F10'] : [])], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6' } }
+  const formPages = roots.filter(root=>root.dataset.pageTemplate==='create').length
+  if (!listPages && !formPages) counts.F10 = null
+  return { counts, findings, inventory, coverage: { pages: roots.length, listPages, formPages, notApplicable: listPages || formPages ? [] : ['F10: narrow list or form shape'], templates: [...new Set(roots.map(root=>root.dataset.pageTemplate))], DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9',...(listPages || formPages ? ['F10'] : [])], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6; form geometry: form-rules and form-columns' } }
 }

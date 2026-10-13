@@ -1,36 +1,8 @@
-/*
- * V8 の速さ予算を測る道具（2026-10-04 オーナー採用「1」）。
- *
- * 主要10画面を **V8 でだけ**開き、表示までの時間・押してからの反応・
- * 長い作業・最初に読む JS の量を測る。v7 は開かない・変えない。
- * 偽の API（画面確認用のモック）を使い、一覧に 2,000 行を返す場面も測る。
- *
- *   node apps/web/scripts/v8-guard/speed-budget.mjs <baseUrl> [結果json]
- *   node apps/web/scripts/v8-guard/speed-budget.mjs <baseUrl> --update-baseline
- *
- * 手元の砂場では待ち受けが禁止なので、ファイル直開き＋通信差し替えで測る：
- *   node apps/web/scripts/v8-guard/speed-budget.mjs --local-stub apps/web/out --update-baseline
- * 中身（JS・偽APIのデータ・描画）は本物そのまま。運び方だけ違う。
- *
- * 予算（speed-budget.json と同じ値を使う）:
- *   表示 showMs・LCP lcpMs … 1,000ms 以内
- *   反応 pressMs          … 100ms 以内（押してから次の描画まで）
- *   長い作業 longTaskMs   … 50ms 以内（longtask が出たら超過）
- *   JS jsBytes            … ラチェット（基準より1バイトでも増えたら超過）
- * 判定は「悪くなったら落とす」だけ（2026-10-04 司令塔決定）。
- *   時間（表示・LCP・反応・長い作業）… 1画面5回測って真ん中の値で比べ、
- *     基準より 20% を超えて悪くなったら落ちる（CIの時間は1.30倍の余裕）。
- *     longtask の基準0は検出境界50msを下限とする。JSは補正しない。
- *   JS jsBytes … 基準より 1KB を超えて増えたら落ちる。
- *     ただし同じ PR で speed-budget.json の基準を更新していれば通す
- *     （機能を足すと JS は増えるため。理由は PR に書くこと）
- * 良くなったら --update-baseline で基準を更新する（人が意図して回す）。
- *
- * 目標（表示1秒・反応100ms・長い作業50ms）は別の表 `targets` に残す。
- * 届いていない画面は結果に出すだけで、落とさない。
- *
- * 対照（わざと遅くすると落ちること）: SLOW_MS=800 を付けると各画面の
- * 表示後に 800ms 待ってから測る。showMs が約800ms 増えて予算で落ちる。
+/**
+ * V8の11場面を各5回測り、中央値と生の測定値を保存する。
+ * node apps/web/scripts/v8-guard/speed-budget.mjs <baseUrl> [結果json]
+ * node apps/web/scripts/v8-guard/speed-budget.mjs --local-stub apps/web/out [結果json]
+ * 超過の扱いはspeed-outcome.mjsで決め、測定失敗は常に失敗とする。
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -39,6 +11,7 @@ import {cpus,loadavg,platform,arch} from 'node:os'
 import {execFileSync} from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { screenReady } from './screen-ready.mjs'
+import { finishSpeedCheck } from './speed-outcome.mjs'
 import { SAMPLE_COUNT, REGRESSION_FACTOR, LONG_TASK_FLOOR_MS, speedPolicy } from './speed-policy.mjs'
 export { screenReady } from './screen-ready.mjs'
 
@@ -330,37 +303,29 @@ export async function measureStress(browser, target) {
 }
 
 /* 落とすのは悪化だけ。時間は20%、JS は1KB（2026-10-04 司令塔決定①）。 */
-function judge(measured, baselines, policy = speedPolicy('local')) {
-  const failures = []
+export function budgetExceedances(measured, baselines, policy = speedPolicy('local')) {
+  const exceedances = []
   for (const m of measured) {
     const base = baselines[m.name]
     if (!base) continue
-    for (const key of ['showMs', 'lcpMs', 'pressMs', 'longTaskMs']) {
-      const value = m[key]
-      const b = base[key]
-      if (typeof value !== 'number' || typeof b !== 'number') continue
-      const reference = key === 'longTaskMs' ? Math.max(b, LONG_TASK_FLOOR_MS) : b
-      const limit = reference * REGRESSION_FACTOR * policy.timeFactor
-      if (value > limit) {
-        failures.push(`${m.name} ${key}=${value} が基準 ${b} の許容上限 ${limit.toFixed(1)} を超えて悪い（20%・${policy.profile}時間倍率${policy.timeFactor}）`)
-      }
-    }
-    if (typeof m.jsBytes === 'number' && typeof base.jsBytes === 'number'
-      && m.jsBytes > base.jsBytes + JS_SLACK_BYTES) {
-      failures.push(`${m.name} jsBytes=${m.jsBytes} が基準 ${base.jsBytes} より1KBを超えて増えた（機能追加で増える場合は同じPRで基準を更新し理由をPRに書く）`)
+    for (const metric of ['showMs', 'lcpMs', 'pressMs', 'longTaskMs', 'jsBytes']) {
+      const value = m[metric], b = base[metric]
+      if (!Number.isFinite(value) || !Number.isFinite(b)) continue
+      const limit = metric === 'jsBytes' ? b + JS_SLACK_BYTES
+        : (metric === 'longTaskMs' ? Math.max(b, LONG_TASK_FLOOR_MS) : b) * REGRESSION_FACTOR * policy.timeFactor
+      if (value > limit) exceedances.push({ screen: m.name, metric, value, limit, unit: metric === 'jsBytes' ? 'B' : 'ms', check: 'budget' })
     }
   }
-  return failures
+  return exceedances
 }
 
-/* 同じ PR で基準を更新済みなら JS 超過は通す（理由は PR に書くこと）。
-   時間の悪化は通さない。時間倍率はspeed-policy.mjsで決める。 */
-export function applyJsBaselineAllowance(failures, allowed) {
-  if (!allowed) return { failures, notices: [] }
-  return {
-    failures: failures.filter((f) => !f.includes('jsBytes=')),
-    notices: failures.filter((f) => f.includes('jsBytes=')),
-  }
+function judge(measured, baselines, policy = speedPolicy('local')) {
+  return budgetExceedances(measured, baselines, policy).map(row => `${row.screen} ${row.metric}=${row.value} が許容上限 ${row.limit} を超過`)
+}
+
+export function targetExceedances(measured, targets) {
+  return measured.flatMap(m => Object.entries(targets).filter(([metric, limit]) => Number.isFinite(m[metric]) && Number.isFinite(limit) && m[metric] > limit)
+    .map(([metric, limit]) => ({ screen: m.name, metric, value: m[metric], limit, unit: metric === 'jsBytes' ? 'B' : 'ms', check: 'target' })))
 }
 
 /* 目標に届いていない画面。結果に出すだけで、落とさない（司令塔決定②）。 */
@@ -508,20 +473,9 @@ if (isMain) {
     console.log(`${m.name} ${m.showMs} ${m.lcpMs ?? '-'} ${m.pressMs ?? '-'} ${m.longTaskMs} ${m.jsBytes}`)
   }
 
-  /* 同じ PR で基準を更新済みなら JS 超過は通す。CI が環境変数で教える。 */
-  const allowJs = process.env.ALLOW_JS_BASELINE_UPDATE === '1'
-  const judged = updateBaseline ? { failures: [], notices: [] } : applyJsBaselineAllowance(judge(measured, budget.baselines, policy), allowJs)
-  const failures = judged.failures
-  /* 目標に届いていない画面は出すだけ。落とさない（司令塔決定②）。 */
-  for (const miss of targetMisses(measured, budget.targets ?? {})) {
-    console.log(`目標未達: ${miss}`)
-  }
-  for (const notice of judged.notices) {
-    console.log(`基準更新あり: ${notice}`)
-  }
-  if (failures.length) {
-    for (const f of failures) console.log(`予算超過: ${f}`)
-    process.exit(1)
-  }
-  console.log(`速さ予算: 合格（${measured.length}画面）`)
+  const exceedances = updateBaseline ? [] : budgetExceedances(measured, budget.baselines, policy)
+  const targets = targetExceedances(measured, budget.targets ?? {})
+  if (out) writeFileSync(out, `${JSON.stringify({ measured, complete: true, error: null, policy, environment, budgetExceedances: exceedances, targetExceedances: targets }, null, 2)}\n`)
+  process.exitCode = finishSpeedCheck(exceedances, '速さ予算')
+  for (const miss of targetMisses(measured, budget.targets ?? {})) console.log(`目標未達: ${miss}`)
 }
