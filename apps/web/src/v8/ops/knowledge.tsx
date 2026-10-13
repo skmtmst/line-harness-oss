@@ -3,7 +3,6 @@ import { BadgeCheck, CircleHelp, Clock, MessageSquareText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
@@ -11,15 +10,12 @@ import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
-import ListToolbar from '@/components/shared/list-toolbar'
-import { ListPageBody } from '@/components/templates'
-import { PageFrame } from '@/components/templates/page-frame'
+import { OpsListPage, OpsListToolbar } from './list-page'
 import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameButton, ActionCell } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { OpsHead } from './shell'
 import KnowledgeArticleV8 from './knowledge-article'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -104,20 +100,14 @@ export default function OpsKnowledgeV8() {
   const pageHelp = 'このページの件数です。全件の集計ではありません。'
 
   return (
-    <PageFrame kind="list" boardId="h114s">
-      <OpsHead
-        title="ナレッジ"
-        description="解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
-      />
-      <ListPageBody
+    <OpsListPage boardId="h114s" title="ナレッジ" help="解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。"
         stats={<KpiBand aria-label="このページの記事の状況">
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="承認済み" value={count((row) => knowledgeState(row).label === '承認済み')} unit="件" detail="AI の返信に使う" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="承認待ち" value={count((row) => row.reviewState === 'pending')} unit="件" detail="根拠が揃った下書き" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<CircleHelp size={13} aria-hidden="true" />} title="要確認" value={count((row) => row.reviewState === 'needs_review')} unit="件" detail="運営の回答がない" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : emptyValue('unknown')} help="このページの記事の累計です。" loading={!loaded} />
         </KpiBand>}
-        toolbar={<ListToolbar
+        toolbar={<OpsListToolbar
           search={{ value: q, onChange: (value) => { setQ(value); setOffset(0) }, placeholder: 'タイトル・質問・キーワードで探す' }}
           filters={<>
             <SaveErrorField names={["kind"]}><Select size="content" aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} /></SaveErrorField>
@@ -149,8 +139,7 @@ export default function OpsKnowledgeV8() {
               </Tr>
             })}</tbody>
           </DataTable>}
-      </ListPageBody>
-    </PageFrame>
+    </OpsListPage>
   )
 }
 

@@ -6,7 +6,6 @@ import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -14,14 +13,11 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
-import ListToolbar from '@/components/shared/list-toolbar'
-import { ListPageBody } from '@/components/templates'
-import { PageFrame } from '@/components/templates/page-frame'
-import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameLink } from '@/components/shared/table'
+import { OpsListPage, OpsListToolbar } from './list-page'
+import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameLink, DateCell } from '@/components/shared/table'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
-import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
@@ -147,23 +143,15 @@ export default function OpsTenantsV8() {
   const kpiLoading = loading && !summary
 
   return (
-    <PageFrame kind="list" boardId="XWtYC">
-      <OpsHead
-        title="契約先アカウント"
-        description="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
-        actions={readOnly ? null : (
-          <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>
-        )}
-      />
-      <ListPageBody
+    <OpsListPage boardId="XWtYC" title="契約先アカウント" help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
+      actions={readOnly ? null : <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>}
         stats={<KpiBand>
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<CreditCard size={13} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Pause size={13} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
         </KpiBand>}
-        toolbar={<ListToolbar
+        toolbar={<OpsListToolbar
           search={{ value: q, onChange: setQ, placeholder: '統括名・メール・店舗名で探す', label: '契約先を探す' }}
           filters={<>
             <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
@@ -176,13 +164,13 @@ export default function OpsTenantsV8() {
         {loading && rows.length === 0 ? <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
           : listLoadError && rows.length === 0 ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
           : visible.length === 0 ? <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
-          : <DataTable aria-label="契約先" columnSizing="content">
-            <thead><TableHeadRow>
+          : <DataTable aria-label="契約先" columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-slot-gap)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
+            <thead><TableHeadRow data-table-layout="columns">
               <Th grow>統括名</Th><Th>プラン</Th><Th>状態</Th><Th align="right" collapseAt="narrow">店舗</Th><Th align="right" collapseAt="narrow">権限者</Th><Th>利用 / 請求</Th><Th collapseAt="narrow">契約日</Th><Th>最終ログイン</Th><Th collapseAt="narrow">飲食店機能</Th>
             </TableHeadRow></thead>
             <tbody>{visible.map((row) => {
               const state = tenantState(row)
-              return <Tr key={row.id} href={tenantDetailHref(row.id)}>
+              return <Tr data-table-layout="columns" key={row.id} href={tenantDetailHref(row.id)}>
                 <NameCell grow name={<RowNameLink href={tenantDetailHref(row.id)} title={row.name}><TruncatedText value={String(row.name ?? '')} /></RowNameLink>} />
                 <Td>{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</Td>
                 <Td title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${PLAN_STATUS_LABEL[row.plan_status] ?? row.plan_status}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></Td>
@@ -192,13 +180,12 @@ export default function OpsTenantsV8() {
                   <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
                   <span className={styles.billingSub} title={`トライアル期限 ${formatDateTime(row.trial_ends_at)}・次回請求 ${formatDateTime(row.current_period_ends_at)}`}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
                 </span></Td>
-                <Td data-list-date-time collapseAt="narrow">{formatDate(row.created_at).replace(/-/g, '/')}</Td>
-                <Td data-list-date-time title={formatDateTime(row.last_login_at)}>{monthDay(row.last_login_at)}</Td>
+                <DateCell collapseAt="narrow"><span data-list-date-time>{formatDate(row.created_at).replace(/-/g, '/')}</span></DateCell>
+                <DateCell title={formatDateTime(row.last_login_at)}><span data-list-date-time>{monthDay(row.last_login_at)}</span></DateCell>
                 <Td collapseAt="narrow">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</Td>
               </Tr>
             })}</tbody>
           </DataTable>}
-      </ListPageBody>
 
       <Dialog
         open={creating}
@@ -225,6 +212,6 @@ export default function OpsTenantsV8() {
           <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>
         </div>
       </Dialog>
-    </PageFrame>
+    </OpsListPage>
   )
 }
