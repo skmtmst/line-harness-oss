@@ -10,10 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RichMenuConnectionsPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-const mocks = vi.hoisted(() => ({ get: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), role: 'owner', readOnly: false, permissionKeys: [] as string[] }))
 vi.mock('@/lib/api', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/api')>(),
-  api: { richMenuGroups: { get: mocks.get } },
+  api: { richMenuGroups: { get: mocks.get }, staff: { me: async () => ({ success: true, data: { id: 'connections-qa', role: mocks.role, readOnly: mocks.readOnly, permissionKeys: mocks.permissionKeys } }) } },
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
@@ -39,6 +39,7 @@ let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.role = 'owner'; mocks.readOnly = false; mocks.permissionKeys = []
   mocks.get.mockResolvedValue({ success: true, data: group })
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
 })
@@ -70,4 +71,23 @@ describe('切替のつながりV8（wxIQ7）', () => {
     expect(host.querySelector('[data-design-node="DIUbO"]')).toBeNull()
     expect(host.querySelector('[data-design-node="wxIQ7"]')).not.toBeNull()
   })
+  it('本人APIが閲覧のみなら編集・修正・追加を隠し、状態と詳しく見るを残す', async () => {
+    mocks.readOnly = true
+    await render()
+    expect(host.querySelector('[data-read-only-notice]')).not.toBeNull()
+    expect(host.querySelector('a[href*="step=buttons"]')).toBeNull()
+    expect([...host.querySelectorAll('a')].some(node => node.textContent?.includes('編集する'))).toBe(false)
+    expect(host.textContent).toContain('詳しく見る')
+    expect(host.textContent).toContain('いまの状態')
+    expect(mocks.get).toHaveBeenCalledWith('group-1')
+  })
+  it('編集を任されたstaffは既存の編集と追加を使える', async () => {
+    mocks.role = 'staff'; mocks.permissionKeys = ['/rich-menus']
+    await render()
+    expect(host.querySelector('[data-read-only-notice]')).toBeNull()
+    expect(host.querySelector('a[href*="step=buttons"]')).not.toBeNull()
+    expect(host.textContent).toContain('編集する')
+    expect(host.textContent).toContain('切替先のメニューを足す')
+  })
+
 })
