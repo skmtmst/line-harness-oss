@@ -50,6 +50,8 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
+import { Trash2 } from 'lucide-react'
 
 /*
  * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
@@ -1099,9 +1101,7 @@ function EditCommonVarV8Inner() {
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <Button variant="danger" type="button" onClick={() => openDelete()} busyLabel="処理中…">
-          削除
-        </Button>
+        <StickyBarAction label="共通情報を削除する" icon={Trash2} onClick={() => openDelete()} />
       ) : undefined}
       status={blocked.length > 0 ? `${blocked[0]}。直すまで保存できません。` : undefined}
       footerActions={(
