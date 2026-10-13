@@ -23,3 +23,10 @@ test('Y2 実物の作成型CSSで右欄は白い板と同じ地、灰色へ戻�
  await page.setContent(content);await page.locator('.preview').evaluate(e=>e.setAttribute('data-preview-surface','plain'));assert.equal(await page.locator('.preview').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
  }finally{await browser.close()}
 });
+
+test('Y3 作る題と編集のパンくずの不一致を落とし、同じ状態の題なら通す',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();await page.setContent('<nav aria-label="パンくず"><h1>ルールを編集・基本設定</h1></nav><main><section data-page-template="create"><h2>ルールを作る</h2></section></main>');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,1);
+ await page.locator('nav h1').evaluate(e=>e.textContent='ルールを作る・基本設定');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,0);
+ await page.locator('main h2').evaluate(e=>e.textContent='ルールを編集');await page.locator('nav h1').evaluate(e=>e.textContent='ルールを編集・基本設定');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,0);
+ }finally{await browser.close()}
+});

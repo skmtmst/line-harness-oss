@@ -447,11 +447,6 @@ function AutoReplyWizardV8Inner() {
   const step = readStep(params.get('step'))
   const [published, setPublished] = useState<{ name: string } | null>(null)
   const stage: WizardStep | 'done' = published ? 'done' : step
-  usePageTitle(
-    stage === 'done'
-      ? '自動応答・有効化完了'
-      : `自動応答ルールを${autoReplyId ? '編集' : '作成'}・${STEP_LABELS_V8[stage]}`,
-  )
 
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -459,6 +454,8 @@ function AutoReplyWizardV8Inner() {
   const savedVersionRef = useRef<number | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState('draft')
+  const pageTitle = autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'
+  usePageTitle(stage === 'done' ? '自動応答・有効化完了' : `${pageTitle}・${STEP_LABELS_V8[stage]}`)
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
   const [wasPublished, setWasPublished] = useState(false)
   const [matchedAccountId, setMatchedAccountId] = useState<string | null>(null)
@@ -1500,7 +1497,7 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
+    <SaveErrorScope errors={saveErrors}><CreatePage footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
