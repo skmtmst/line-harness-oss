@@ -352,6 +352,20 @@ function qaForm() {
   };
 }
 
+function qaDocumentForm() {
+  return {
+    id: 'qa-document', name: '書類確認', description: '試験用の書類入力です。実際の書類は使わないでください。', isActive: true,
+    layout: {
+      version: 2, header: [],
+      sections: [{ id: 'qa-document-section', name: '書類', blocks: [{
+        id: 'qa-document-file', kind: 'input', type: 'file', name: 'identity', label: '本人確認書類',
+        required: true, fileKind: 'identity', fileBothSides: true, fileMaxCount: 2,
+      }] }],
+      options: { confirmDialog: { enabled: false } },
+    },
+  };
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -728,6 +742,21 @@ const server = createServer(async (req, res) => {
   {
     const m = pathname.match(/^\/api\/forms\/([^/]+)\/files$/);
     if (method === 'POST' && m) {
+      if (m[1] === 'qa-document') {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const bytes = Buffer.concat(chunks);
+        const side = url.searchParams.get('side');
+        if (!['front', 'back'].includes(side) || !bytes.length || url.searchParams.get('block_id') !== 'qa-document-file') {
+          json(res, 400, { success: false, error: 'invalid_document_upload' });
+          return;
+        }
+        json(res, 200, { success: true, data: { file: {
+          fileId: `qa-document-${side}`, side, filename: url.searchParams.get('filename') || 'qa.png',
+          mimeType: req.headers['content-type'] || 'image/png', size: bytes.length, state: 'ready',
+        } } });
+        return;
+      }
       json(res, 200, {
         success: true,
         data: { key: 'qa-key', url: 'https://example.com/qa.png', mimeType: 'image/png', size: 123 },
@@ -747,7 +776,8 @@ const server = createServer(async (req, res) => {
     if (method === 'GET' && m) {
       // 本物と同じ包み。試し合言葉付きは本物と同じく isTest:true を足す。
       const testToken = url.searchParams.get('test_token');
-      json(res, 200, { success: true, data: testToken ? { ...qaForm(), isTest: true } : qaForm() });
+      const form = m[1] === 'qa-document' ? qaDocumentForm() : qaForm();
+      json(res, 200, { success: true, data: testToken ? { ...form, isTest: true } : form });
       return;
     }
   }

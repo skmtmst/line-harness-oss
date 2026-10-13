@@ -69,6 +69,7 @@ export default function Booking() {
   }, []);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
+  const [emptyDatetime, setEmptyDatetime] = useState(false);
   useEffect(() => {
     setStepReady(false);
   }, [step]);
@@ -110,7 +111,7 @@ export default function Booking() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
-      {step !== 'done' && !waiting && <Stepper steps={steps} current={stepIndex} />}
+      {step !== 'done' && !waiting && !(step === 'datetime' && emptyDatetime) && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
@@ -148,6 +149,7 @@ export default function Booking() {
             onConfirm={isPeek ? exitPeekToBooking : () => setStep('confirm')}
             confirmLabel={isPeek ? 'この時間で予約に進む' : undefined}
             onBackToStaff={() => setStep('staff')}
+            onEmptyState={setEmptyDatetime}
           />
         )}
         {step === 'confirm' && menu && staff && slot && (

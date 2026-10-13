@@ -57,11 +57,11 @@
   --color-night-body: #e6e8eb;
   --color-night-dim: #8a9098;
   /* ── ウェビナー配信中 ★V8 (RpW2h) の地・動画の枠・副の字・途中のボタン。
-   * 途中のボタン (個別相談を申し込む) は板どおり LINE の緑。ここだけで使う。 ── */
+   * 主の操作は LIFF の主の色を読む。 ── */
   --color-night-deep: #111214;
   --color-night-panel: #2a2c30;
   --color-night-sub: #a8adb4;
-  --color-night-cta: #06c755;
+  --color-night-cta: var(--color-liff-primary);
   /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
   --color-shell-gray: #ebedf1;
   /* 空きの点の金 (残りわずか)。型ごとに替える。 */
@@ -86,6 +86,24 @@
   --liff-header-h: 43px;
   --liff-radius: 10px;
   --liff-radius-lg: 14px;
+  --liff-radius-night-action: 12px;
+  --liff-radius-stamp-control: 8px;
+  --liff-document-empty-height: 110px;
+  --liff-document-preview-height: 118px;
+  --liff-document-radius: 12px;
+  --liff-document-gap: 14px;
+  --liff-document-slot-gap: 10px;
+  --liff-document-action-gap: 10px;
+  --liff-document-remove-size: 24px;
+  --color-liff-document-empty: #f7f8fa;
+  --color-liff-document-preview: #e8edf3;
+  --color-liff-document-remove: #1d1d1fb3;
+  --liff-pending-bg: #f973161a;
+  --liff-pending-ink: #c2410c;
+  --liff-pending-dot: #f97316;
+  --liff-live-bg: #e5484d;
+  --liff-live-sound-bg: #00000099;
+  --liff-booking-info-ink: #2f6fde;
 }
 
 /* 主の色の上の字。店の色で上書きする (見やすさの計算で白か濃字か)。 */

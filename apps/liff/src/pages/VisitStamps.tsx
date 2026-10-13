@@ -1,7 +1,7 @@
 
 import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
+import { visitStampDarkInk } from '@line-crm/shared';
 import stampStyles from './VisitStamps.module.css';
 import StampConditions from '../components/StampConditions.js';
 import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
@@ -80,7 +80,7 @@ function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
   const count = total(card);
   const rewardAt = new Map(card.settings.rewards.map((r) => [r.stamps, r]));
   return (
-    <div className="grid grid-cols-[repeat(5,auto)] justify-between gap-y-3" role="list" aria-label={`${count}個中 ${Math.min(balance, count)}個 たまっています`}>
+    <div className={stampStyles.slots} role="list" aria-label={`${count}個中 ${Math.min(balance, count)}個 たまっています`}>
       {Array.from({ length: count }, (_, i) => {
         const n = i + 1;
         const done = n <= balance;
@@ -90,7 +90,7 @@ function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
             key={n}
             role="listitem"
             aria-label={done ? `${n}個目 済み` : reward ? `${n}個目 ${reward.name}` : `${n}個目`}
-            className={`${stampStyles.slot} ${done ? stampStyles.done : ''}`}
+            className={`${stampStyles.slot} ${reward ? stampStyles.reward : ''} ${done ? stampStyles.done : ''}`}
           >
             {done ? <Icon name="check" className="h-6 w-6" /> : reward ? (
               <>
@@ -186,11 +186,11 @@ export default function VisitStamps() {
     } finally { setBusy(false); }
   }
 
-  if (state === 'loading') return <LiffLookScope className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadingView /></LiffLookScope>;
-  if (state === 'error') return <LiffLookScope className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadErrorView note="スタンプはなくなっていません。" onRetry={() => void load()} /></LiffLookScope>;
+  if (state === 'loading') return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadingView /></LiffLookScope>;
+  if (state === 'error') return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadErrorView note="スタンプはなくなっていません。" onRetry={() => void load()} /></LiffLookScope>;
   if (state === 'empty' || !entry || !info) {
     return (
-      <LiffLookScope className="min-h-screen bg-canvas">
+      <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas">
         <LiffHeader title="来店スタンプ" />
         <StatusView icon="gift" title="スタンプカードはまだありません" body="お店がカードを始めると、ここにたまったスタンプが出ます。" />
       </LiffLookScope>
@@ -222,7 +222,7 @@ export default function VisitStamps() {
   if (view === 'used' && redemption && used) {
     const next = cardState(card, used.balance).next;
     return (
-      <LiffLookScope className="min-h-screen bg-canvas" designNode="xe8ga">
+      <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas" designNode="xe8ga">
         <LiffHeader title="特典を使う" />
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-40">
           <div className="flex flex-col items-center gap-2.5 px-4 pt-12 pb-6 text-center">
@@ -237,7 +237,7 @@ export default function VisitStamps() {
             ['カード', `残り ${used.balance}個${next ? `（次は${next.name}）` : ''}`],
           ]} />
         </div>
-        <BottomBar>
+        <BottomBar appearance="stamp">
           <Button variant="secondary" className="min-h-12" onClick={() => { setView('card'); setRedemption(null); setUsed(null); setPicked(''); }}>カードに戻る</Button>
         </BottomBar>
       </LiffLookScope>
@@ -245,7 +245,7 @@ export default function VisitStamps() {
   }
 
   if (view === 'paper' || view === 'pending') {
-    if (requestsFailed || requests === null) return <LiffLookScope className="min-h-screen bg-canvas"><LiffHeader title="紙のカードを移す" />{requestsFailed ? <LoadErrorView note="申請はなくなっていません。" onRetry={() => void loadRequests()} /> : <LoadingView />}<BottomBar><Button variant="secondary" onClick={() => setView('card')}>カードに戻る</Button></BottomBar></LiffLookScope>;
+    if (requestsFailed || requests === null) return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="紙のカードを移す" />{requestsFailed ? <LoadErrorView note="申請はなくなっていません。" onRetry={() => void loadRequests()} /> : <LoadingView />}<BottomBar appearance="stamp"><Button variant="secondary" onClick={() => setView('card')}>カードに戻る</Button></BottomBar></LiffLookScope>;
     return (
       <PaperCard
         accountId={accountId}
@@ -258,27 +258,25 @@ export default function VisitStamps() {
   }
 
   return (
-    <LiffLookScope className="min-h-screen bg-canvas" designNode="jQRsr">
+    <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas" designNode="jQRsr">
       <LiffHeader title="来店スタンプ" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-44">
-        <section className={stampStyles.card} aria-label={card.name} style={{ backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR, color: visitStampDarkInk(card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR) ? 'var(--color-ink)' : 'var(--color-canvas)' }}>
+        <section className={stampStyles.card} aria-label={card.name} style={card.settings.backgroundColor ? { backgroundColor: card.settings.backgroundColor, color: visitStampDarkInk(card.settings.backgroundColor) ? 'var(--color-ink)' : 'var(--color-canvas)' } : undefined}>
           {card.settings.backgroundImageUrl ? <img className={stampStyles.background} src={card.settings.backgroundImageUrl} alt="" /> : null}
           <div className={stampStyles.content}>
-          <div className={stampStyles.title} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>
+          <div className={stampStyles.title} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? 'var(--color-canvas)' } : undefined}>
             <h1 className="min-w-0 flex-1 truncate text-sm leading-[21px] font-semibold">{card.name}</h1>
-            <span className="liff-num text-sm leading-[21px] font-bold">{`${Math.min(wallet.balance, count)} / ${count}`}</span>
+            <span className={`${stampStyles.balance} liff-num text-sm leading-[21px] font-bold`} style={card.settings.backgroundColor ? { color: 'inherit' } : undefined}>{`${Math.min(wallet.balance, count)} / ${count}`}</span>
           </div>
           <Slots card={card} balance={wallet.balance} />
-          {card.settings.instructions ? <p className={stampStyles.instructions} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>{card.settings.instructions}</p> : null}
-          <p className={stampStyles.expiry} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>
+          {card.settings.instructions ? <p className={stampStyles.instructions} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? 'var(--color-canvas)' } : undefined}>{card.settings.instructions}</p> : null}
+          <p className={stampStyles.expiry} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? 'var(--color-canvas)' } : undefined}>
             {wallet.expiresAt
               ? `期限：${jpDate(wallet.expiresAt)}${card.settings.expiryMonths ? `（${card.settings.expiryBasis === 'first_visit' ? '最初' : '最後'}の来店から ${card.settings.expiryMonths}か月）` : ''}`
               : card.settings.expiryBasis !== 'none' && card.settings.expiryMonths ? `期限：${card.settings.expiryBasis === 'first_visit' ? '最初' : '最後'}の来店から ${card.settings.expiryMonths}か月` : '期限はありません'}
           </p>
           </div>
         </section>
-
-        <StampConditions settings={card.settings} />
 
         {info.best ? (
           <section className="flex flex-col gap-2.5 rounded-2xl bg-liff-ok-bg p-4 outline-[1.5px] outline-liff-primary" aria-label="使える特典">
@@ -296,7 +294,7 @@ export default function VisitStamps() {
             const selected = chosen?.id === r.id;
             return (
               <li key={r.id}>
-                <Button variant="option" selected={selected}
+                <Button variant={info.usable.length > 1 ? 'stamp-choice' : 'stamp-reward'} selected={selected}
                   type="button"
                   disabled={!ok}
                   onClick={() => setPicked(r.id)}
@@ -310,11 +308,12 @@ export default function VisitStamps() {
             );
           })}
         </ul>
+        <StampConditions settings={card.settings} />
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       </div>
-      <BottomBar>
+      <BottomBar appearance="stamp">
         {info.best ? (
-          <Button variant="primary" disabled={busy} onClick={() => void show()}><Icon name="gift" className="h-4 w-4" />店員に見せる</Button>
+          <Button variant="stamp-primary" disabled={busy} onClick={() => void show()}><Icon name="gift" className="h-4 w-4" />店員に見せる</Button>
         ) : null}
         <TextButton icon="camera" onClick={() => setView('paper')}>紙のカードを移す</TextButton>
       </BottomBar>
@@ -349,7 +348,7 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
   }
 
   return (
-    <LiffLookScope className="min-h-screen bg-canvas" designNode="V2HU7">
+    <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas" designNode="V2HU7">
       <LiffHeader title="特典を使う" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-44">
         <section className="flex flex-col items-center gap-2 rounded-2xl bg-liff-ok-bg px-4 py-7 text-center outline-[1.5px] outline-liff-primary" aria-label="見せる特典">
@@ -388,8 +387,8 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
           {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
         </div>
       </div>
-      <BottomBar>
-        <Button variant="primary" disabled={busy} onClick={() => void submit()}><Icon name="check" className="h-4 w-4" />使用済みにする</Button>
+      <BottomBar appearance="stamp">
+        <Button variant="stamp-primary" disabled={busy} onClick={() => void submit()}><Icon name="check" className="h-4 w-4" />使用済みにする</Button>
         <TextButton onClick={onBack}>戻る</TextButton>
       </BottomBar>
     </LiffLookScope>
@@ -426,18 +425,18 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
     const shownStamps = pending ? pending.stamps : stamps;
     const shownAt = pending ? requestDate(pending.createdAt) : sentAt;
     return (
-      <LiffLookScope className="min-h-screen bg-canvas" designNode="etLd8">
+      <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas" designNode="etLd8">
         <LiffHeader title="紙のカードを移す" />
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-40">
           <div className="flex flex-col items-center gap-2.5 px-4 pt-12 pb-6 text-center">
-            <span className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink" aria-hidden="true"><Icon name="hourglass" className="h-9 w-9" /></span>
+            <span className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-ink" aria-hidden="true"><Icon name="hourglass" className="h-9 w-9" /></span>
             <h1 className="text-2xl leading-9 font-bold text-ink">お店の確認待ち</h1>
-            <Badge tone="pending">確認待ち</Badge>
+            <Badge tone="pending" withDot>確認待ち</Badge>
             <p className="w-full text-sm leading-[21px] text-liff-sub">確認できたらカードに足して、LINE でお知らせします。</p>
           </div>
           <InfoRows rows={[['押印数', `${shownStamps} 個`], ['申請日', shownAt ? jpDateTime(shownAt) : '—'], ['写真', '1枚']]} />
         </div>
-        <BottomBar>
+        <BottomBar appearance="stamp">
           <Button variant="secondary" className="min-h-12" onClick={onBack}>カードに戻る</Button>
         </BottomBar>
       </LiffLookScope>
@@ -461,7 +460,7 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
   }
 
   return (
-    <LiffLookScope className="min-h-screen bg-canvas" designNode="h2HKh">
+    <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas" designNode="h2HKh">
       <LiffHeader title="紙のカードを移す" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-36">
         <p className="text-sm leading-[21px] text-liff-sub">お手持ちの紙のスタンプカードを、LINE のカードに移せます。お店が確認してから足します。</p>
@@ -483,22 +482,22 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
           <TextInput appearance="hidden" ref={fileRef} type="file" accept="image/*" capture="environment" aria-label="紙のカードの写真"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (photo) URL.revokeObjectURL(photo.url); setPhoto({ file: f, url: URL.createObjectURL(f) }); setError(''); } e.target.value = ''; }} />
           {/* 絵の「撮り直す」は高さ36の枠のボタン（副ボタン 44 より低い）。 */}
-          <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()}>
+          <Button variant="compact-secondary" type="button" onClick={() => fileRef.current?.click()}>
             <Icon name="camera" className="h-4 w-4" />{photo ? '撮り直す' : '写真を撮る'}
           </Button>
         </div>
         <div className="flex flex-col gap-2">
           <h2 className="text-sm leading-[21px] font-semibold text-ink">② 押してある数</h2>
           <div className="flex items-center gap-3">
-            <Button variant="icon" type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))}><Icon name="minus" className="h-4 w-4" /></Button>
+            <Button variant="counter" type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))}><Icon name="minus" className="h-4 w-4" /></Button>
             <span className="liff-num text-xl leading-[30px] font-bold text-ink" aria-live="polite">{`${stamps} 個`}</span>
-            <Button variant="icon" type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))}><Icon name="plus" className="h-4 w-4" /></Button>
+            <Button variant="counter" type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))}><Icon name="plus" className="h-4 w-4" /></Button>
           </div>
         </div>
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       </div>
-      <BottomBar>
-        <Button variant="primary" disabled={busy} onClick={() => void submit()}><Icon name="send" className="h-4 w-4" />申請する</Button>
+      <BottomBar appearance="stamp">
+        <Button variant="stamp-primary" disabled={busy} onClick={() => void submit()}><Icon name="send" className="h-4 w-4" />申請する</Button>
       </BottomBar>
     </LiffLookScope>
   );

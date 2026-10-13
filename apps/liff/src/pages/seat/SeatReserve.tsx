@@ -12,6 +12,7 @@ import LiffLookScope from '../../components/LiffLookScope.js';
 import Stepper from '../../components/ui/Stepper.js';
 import BottomBar from '../../components/ui/BottomBar.js';
 import Button from '../../components/ui/Button.js';
+import Icon from '../../components/ui/Icon.js';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.js';
 import LoadingView from '../../components/LoadingView.js';
 import LoadErrorView from '../../components/LoadErrorView.js';
@@ -450,7 +451,7 @@ export default function SeatReserve() {
               onTime={pickTime}
               onRetry={() => void fetchDay(store, date, guestCount, generation.current)}
             />
-            {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
+            {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify-text" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
             {waitlistSlot && <SeatWaitlistSheet storeId={store.id} storeName={store.name} startsAt={waitlistSlot.startsAt} guestCount={waitlistSlot.guestCount} onClose={() => setWaitlistSlot(null)} />}
             {canRefer && <section className="space-y-3" aria-label="系列店の案内">
               {referrals.length>0 && <h2 className="text-[13px] leading-5 font-bold text-ink">近くの系列店なら空いています</h2>}
@@ -467,7 +468,7 @@ export default function SeatReserve() {
                     if(busyRef.current)return;busyRef.current=true;setBusy(true);setReferralError(false);
                     try {const next=await restaurantBookingApi.referral({storeId:store.id,targetStoreId:r.storeId,date,startsAt:r.startsAt,guestCount,courseId});window.location.assign(next.data.bookingUrl);}
                     catch{setReferralError(true);}finally{busyRef.current=false;setBusy(false);}
-                  }}>この店で予約する</Button></div>
+                  }}><Icon name="arrow-right" className="h-4 w-4 shrink-0" />この店で予約する</Button></div>
                 </div>
               </Card>)}
             </section>}
