@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 import scanCreateConsistency from './create-consistency-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
+
+import { assessAgainstBase, measurePage, record, validateAllowances } from './layout-defects.mjs'
 const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8');
 const actions=()=>readFileSync(new URL('../../src/components/shared/action-list.module.css',import.meta.url),'utf8');
 const row='<div class="item" data-action-row><div class="row"><span class="icon">◆</span><div class="details"><button class="titleButton" data-action-name>本人にLINEで知らせる</button><div class="extra" data-action-value>成果1件ごとに</div></div><button aria-label="その他操作">…</button></div></div>';
@@ -64,3 +66,34 @@ test('言葉の追加は札の隣の箱つき入力で、枠なしと名前な�
   }
  } finally { await browser.close() }
 })
+
+test('Y1〜Y4の説明値を保ち、数値の実測で本線比較・新規・件数増加・悪化を判定する',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();
+ const fixtures=[
+  ['form-action-value','<main><div data-action-row style="--tpl-action-row-gap:12px"><span data-action-name style="font-size:14px">名前</span><span data-action-value style="font-size:16px">値</span></div></main>','nameSize'],
+  ['form-preview-surface','<main><section data-page-template="create" style="background:white"><aside data-template-region="preview" style="background:#f7f8fa">見本</aside></section></main>','bg'],
+  ['form-create-title','<nav aria-label="パンくず"><h1>ルールを編集</h1></nav><main><h2>ルールを作る</h2></main>','breadcrumb'],
+  ['form-save-icon','<main><div data-sticky-actions><button class="button_primary_x">保存する<svg class="lucide lucide-check" width="16" height="16"></svg></button></div></main>','icons'],
+ ];
+ for(const [kind,markup,detailKey] of fixtures){
+  await page.setContent(markup);
+  const findings=(await measurePage(page)).filter(f=>f.kind===kind);
+  assert.equal(findings.length,1,kind);
+  const f=findings[0];assert.ok(detailKey in f.detail,kind);
+  assert.ok(Object.values(f.measure).every(n=>Number.isFinite(n)&&n>=0),JSON.stringify(f));
+  const fixed=validateAllowances(record(findings,'/fixture',1152,'既存の故障対照'));
+  const compare=values=>assessAgainstBase(values,findings,'/fixture',1152);
+  assert.equal(compare(findings).existing.length,1,kind);
+  assert.equal(compare([]).failures.length,0,kind);
+  assert.equal(compare([f,f]).failures.length,1,kind);
+  assert.equal(compare([{...f,target:'aside.new'}]).failures.length,1,kind);
+  for(const key of Object.keys(f.measure)){
+   const worse={...f,measure:{...f.measure,[key]:f.measure[key]+1}};
+   assert.equal(compare([worse]).failures.length,1,kind+' '+key);
+   assert.equal(assessAgainstBase([worse],findings,'/fixture',1152,fixed).failures.length,1,kind+' 固定許可');
+  }
+  assert.equal(assessAgainstBase(findings,[],'/fixture',1152).failures.length,1,kind+' 新規');
+  assert.throws(()=>validateAllowances([{...fixed[0],measure:f.detail}]),kind+' 説明値を許可の実寸に混ぜない');
+ }
+ }finally{await browser.close()}
+});
