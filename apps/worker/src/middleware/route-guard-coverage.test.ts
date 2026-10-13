@@ -329,6 +329,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/recipes',
     'GET /api/recipes/:id',
     'GET /api/recipes/clone-runs/:runId',
+    'GET /api/restaurant-test/delivery/ubereats/connection',
     'GET /api/restaurant-test/google/oauth/callback',
     'GET /api/restaurant-test/inbound-emails',
     'GET /api/restaurant-test/intake-addresses',
