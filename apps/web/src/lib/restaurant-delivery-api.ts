@@ -216,6 +216,43 @@ export interface DeliveryIntakeResumeData {
   failed: Array<{ service: DeliveryService; code: string; retryable: boolean }>
 }
 
+/**
+ * 設定 › デリバリー連携（★承認済み デリバリー連携_v03.pen 2026-10-12
+ * DL-1 `dF4Ov`／DL-2 `OIY4Z`／DL-3 `kJLks`／DL-4 `X5d8UF`）の Uber Eats 接続。
+ *
+ * `pending_store` は「ログインは済んだが、つなぐお店をまだ選んでいない」状態。
+ * 画面ではまだ「つながっていない」として出す（お店を選ぶまで注文は入らない）。
+ */
+export type UberConnectionStatus =
+  | 'pending_store'
+  | 'connected'
+  | 'expired'
+  | 'no_permission'
+  | 'disconnected'
+
+export interface UberConnectionData {
+  success: true
+  store: { id: string; name: string }
+  /** この環境に接続の設定があるか。無ければ画面はつなぐボタンを押させない。 */
+  oauthConfigured: boolean
+  connection: {
+    status: UberConnectionStatus
+    storeName: string | null
+    connectedAt: string | null
+    provisionedAt: string | null
+    checkedAt: string | null
+    /** 分類済みの符号だけ。Uber が返した自由文は入らない。 */
+    lastError: string | null
+  }
+}
+
+export interface UberConnectStartData {
+  success: true
+  mode: 'connect' | 'reconnect'
+  /** Uber のログイン画面のURL。画面はここへそのまま移動する。 */
+  authorizeUrl: string
+}
+
 function withAccount(
   path: string,
   accountId: string,
@@ -368,5 +405,24 @@ export const restaurantDeliveryApi = {
       method: 'POST',
       body: JSON.stringify({ services }),
     })
+  },
+
+  /**
+   * DL-1 `dF4Ov` Uber Eats 接続の今の状態。画面を開いたときに読む。
+   * 見るのはこちらのD1だけで、Uber へは問い合わせない。
+   */
+  ubereatsConnection(accountId: string): Promise<UberConnectionData> {
+    return fetchApi<UberConnectionData>(withAccount(`${BASE}/ubereats/connection`, accountId))
+  },
+
+  /**
+   * DL-1 `dF4Ov`「Uber Eats にログインしてつなぐ」。
+   * 返った `authorizeUrl` へ画面をそのまま移す。鍵や秘密は画面を通らない。
+   */
+  ubereatsConnectStart(accountId: string): Promise<UberConnectStartData> {
+    return fetchApi<UberConnectStartData>(
+      withAccount(`${BASE}/ubereats/connect/start`, accountId),
+      { method: 'POST', body: '{}' },
+    )
   },
 }
