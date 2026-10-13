@@ -178,7 +178,7 @@ describe('V8 NEN配信の一覧', () => {
     await render(props)
     await act(async () => { fireEvent.click(button('「お誕生日クーポン」の操作')!) })
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(items).toEqual(expect.arrayContaining(['編集', 'テスト送信', 'クーポンの決めごと', '止める', '送った履歴を見る']))
+    expect(items).toEqual(expect.arrayContaining(['編集する', 'テスト送信', 'クーポンの決めごと', '止める', '送った履歴を見る']))
     const stop = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '止める') as HTMLElement
     await act(async () => { fireEvent.click(stop) })
     expect(props.onToggleSetting).not.toHaveBeenCalled()
@@ -195,7 +195,7 @@ describe('V8 NEN配信の一覧', () => {
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
     expect(items).not.toContain('止める')
     expect(items).not.toContain('テスト送信')
-    expect(items).not.toContain('編集')
+    expect(items).not.toContain('編集する')
     // 押せない（disabled）ボタンを置いて見せることもしない。
     expect([...host.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
     await render(baseProps({ tab: 'columns' }))

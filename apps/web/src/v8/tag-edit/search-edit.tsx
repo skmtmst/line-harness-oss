@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X , Trash2 } from 'lucide-react'
 import { isSavedSearchOpAllowed, isSavedSearchValueOptionalOp } from '@line-crm/shared'
 import type { FriendField, SavedSearch, SavedSearchCondition, SavedSearchConditionKind, SavedSearchConditions, Scenario, SupportMark, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -19,7 +20,9 @@ import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import SegmentedControl from '@/components/shared/segmented'
+import IconButton from '@/components/shared/icon-button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -34,7 +37,6 @@ import styles from './search-edit.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 タグ：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
@@ -457,9 +459,9 @@ function ConditionRow({
     <div className={styles.conditionRow}>
       <span className={label === '最初' ? styles.opFirst : label === 'かつ' ? styles.opAnd : styles.opOr}>{label}</span>
       <ConditionControls condition={condition} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={onChange} />
-      <button type="button" aria-label="この条件を削除する" title="この条件を削除する" onClick={onDelete} className={styles.conditionRemove}>
+      <IconButton size="small" aria-label="この条件を削除する" title="この条件を削除する" onClick={onDelete}>
         <X size={14} aria-hidden="true" />
-      </button>
+      </IconButton>
     </div>
     </Field>
   )
@@ -714,7 +716,7 @@ export default function SavedSearchEditV8() {
   }
 
   const save = async () => {
-    if (!selectedAccountId || !id || saving) return
+    if (!selectedAccountId || !id || saving || !canManageRole(staffRole)) return
     if (!name.trim()) { setNameError('条件名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     const editableConditions = [...(conditions.all ?? []), ...(conditions.any ?? [])]
@@ -751,7 +753,7 @@ export default function SavedSearchEditV8() {
   }
 
   const duplicate = async () => {
-    if (!selectedAccountId || saving) return
+    if (!selectedAccountId || saving || !canManageRole(staffRole)) return
     const editableConditions = [...(conditions.all ?? []), ...(conditions.any ?? [])]
     const problem = editableConditions.length === 0
       ? '条件を1つ以上追加してください'
@@ -776,7 +778,7 @@ export default function SavedSearchEditV8() {
   }
 
   const remove = async () => {
-    if (!selectedAccountId || !id || original?.canDelete !== true) return
+    if (!selectedAccountId || !id || original?.canDelete !== true || !canManageRole(staffRole)) return
     try {
       await api.savedSearches.delete(id, selectedAccountId)
       router.push('/tags?tab=searches')
@@ -878,7 +880,7 @@ export default function SavedSearchEditV8() {
     </div>
   )
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
+  if (!canManageRole(staffRole)) return <CreatePage boardId="AqDWN" title={original.name} readOnly footerActions={<Button href="/tags?tab=searches">一覧へ戻る</Button>}>{null}</CreatePage>
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.page}>
@@ -892,7 +894,7 @@ export default function SavedSearchEditV8() {
         ].join('・')}
         preview={side}
         destructive={(
-          <Button variant="danger" type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={deleteReason}>削除する</Button>
+          <StickyBarAction label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />
         )}
         status={dirty ? '変更内容を確かめて保存してください' : undefined}
         footerActions={(
@@ -905,8 +907,8 @@ export default function SavedSearchEditV8() {
       >
         {error ? <Notice tone="danger" message={error} /> : null}
         <Card variant="form" gap="normal" aria-label="名前と共有">
-          <h2 className={styles.cardTitle}>名前と共有</h2>
-          <Field label="条件名"><Field error={nameError}><SaveErrorField names={["name"]}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></SaveErrorField></Field>
+          <CardHeader size="stacked" title="名前と共有" />
+          <Field label="条件名" required error={nameError}><SaveErrorField names={["name"]}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></SaveErrorField>
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" /></Field>
           <Field label="説明"><SaveErrorField names={["description","conditions.description"]}><TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} /></SaveErrorField></Field>
           <div className={styles.field}>
@@ -915,18 +917,12 @@ export default function SavedSearchEditV8() {
               {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
               <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
             </span>
-            <div className={styles.seg} role="radiogroup" aria-label="共有">
-              <button type="button" role="radio" aria-checked={isShared} className={isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(true)}>全員</button>
-              <button type="button" role="radio" aria-checked={!isShared} className={!isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(false)}>自分だけ</button>
-            </div>
+            <SegmentedControl aria-label="共有" value={isShared ? 'all' : 'self'} options={[{ value: 'all', label: '全員' }, { value: 'self', label: '自分だけ' }]} onChange={(value) => setIsShared(value === 'all')} />
           </div>
         </Card>
 
         <div ref={conditionsRef}><Card variant="form" gap="normal" aria-label="条件">
-          <div className={styles.cardTitles}>
-            <h2 className={styles.cardTitle}>条件</h2>
-            <p className={styles.cardNote}>「かつ」はすべて満たす人、「または」はどれかを満たす人に当てはまります。</p>
-          </div>
+          <CardHeader size="stacked" title="条件" meta="「かつ」はすべて満たす人、「または」はどれかを満たす人に当てはまります。" />
           {allConditions.length === 0 && anyConditions.length === 0 ? <p className={styles.hint} role={conditionsError ? 'alert' : undefined}>{conditionsError || '条件はまだありません。下のボタンで足します。'}</p> : null}
           {allConditions.map((condition, index) => (
             <ConditionRow
@@ -963,13 +959,13 @@ export default function SavedSearchEditV8() {
             />
           ))}
           <div className={styles.addButtons}>
-            <button type="button" className={styles.ghostButton} onClick={() => patchConditions({ ...conditions, all: [...allConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />かつの条件を足す</button>
-            <button type="button" className={styles.ghostButton} onClick={() => patchConditions({ ...conditions, any: [...anyConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />またはの条件を足す</button>
+            <Button type="button" variant="text" onClick={() => patchConditions({ ...conditions, all: [...allConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />かつの条件を足す</Button>
+            <Button type="button" variant="text" onClick={() => patchConditions({ ...conditions, any: [...anyConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />またはの条件を足す</Button>
           </div>
         </Card></div>
 
         <Card variant="form" gap="normal" aria-label="友だち一覧での見せ方">
-          <h2 className={styles.cardTitle}>友だち一覧での見せ方</h2>
+          <CardHeader size="stacked" title="友だち一覧での見せ方" />
           <div className={styles.listRow}>
             <div className={styles.field}>
               <span className={styles.label}>並び順</span>

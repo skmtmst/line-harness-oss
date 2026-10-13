@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import NewConversionPage from './page'
 
@@ -90,7 +90,7 @@ function setName() {
 }
 
 function addOrGroup() {
-  fireEvent.click(screen.getByRole('button', { name: /いずれか1つ以上を満たす.*を追加/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'いずれか条件のかたまりを足す' }))
 }
 
 function save() {
@@ -98,10 +98,10 @@ function save() {
 }
 
 function pickKind(field: HTMLElement, query: string) {
-  fireEvent.focus(field)
-  fireEvent.change(field, { target: { value: query } })
-  fireEvent.keyDown(field, { key: 'ArrowDown' })
-  fireEvent.keyDown(field, { key: 'Enter' })
+  fireEvent.click(field)
+  const dialog = screen.getByRole('dialog', { name: '条件を選ぶ', hidden: true })
+  fireEvent.click(within(dialog).getByRole('radio', { name: query, hidden: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '条件を足す', hidden: true }))
 }
 
 describe('S4-OR 成果地点の数えない条件', () => {
@@ -122,7 +122,7 @@ describe('S4-OR 成果地点の数えない条件', () => {
     await renderPage()
     setName()
     addOrGroup()
-    const fields = screen.getAllByRole('combobox', { name: '追加する条件を選ぶ' })
+    const fields = screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
     expect(fields).toHaveLength(2)
     pickKind(fields[1], '行動スコア')
     await act(async () => {

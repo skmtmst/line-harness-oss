@@ -23,7 +23,7 @@ describe('V8タグ一覧の件数の母集団', () => {
   })
   it('保管の絞り込みとページの件数は同じ母集団を使う', () => {
     expect(PAGE).toContain("if ((tag.status === 'archived') !== onlyArchived) return false")
-    expect(PAGE).toContain('paginationSummary(filtered.length,')
+    expect(PAGE).toContain('range={{ total: filtered.length,')
     expect(PAGE).toContain("const archiveChip = <FilterChip selected={onlyArchived}")
   })
   it('アカウント切替で前のフォルダ・行・件数を残さない', () => {

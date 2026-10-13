@@ -290,11 +290,11 @@ describe('V8 友だち情報の欄の通し：作る→値を書く', () => {
     await flush()
     await act(async () => { setInputValue(host.querySelector('input[placeholder="例：愛犬のお名前"]') as HTMLInputElement, '来店時刻') })
     await act(async () => { setInputValue(host.querySelector('input[placeholder="pet_name"]') as HTMLInputElement, 'visit_time') })
-    const chip = screen.getByRole('radio', { name: /時刻/ }) as HTMLButtonElement
+    const chip = screen.getByRole('radio', { name: /時刻/ }) as HTMLInputElement
     expect(chip.disabled).toBe(false)
     fireEvent.click(chip)
     await flush()
-    expect(chip.getAttribute('aria-checked')).toBe('true')
+    expect(chip.checked).toBe(true)
     const defaultInput = host.querySelector('#ff-default') as HTMLInputElement
     expect(defaultInput, '既定値の入力が見つかりません').toBeTruthy()
     await act(async () => { setInputValue(defaultInput, '9時半') })

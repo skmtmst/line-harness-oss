@@ -16,7 +16,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -34,9 +34,9 @@ import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/compon
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu from '@/components/shared/context-menu'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -439,7 +439,7 @@ export default function WebhooksOutgoingV8() {
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
   const createButton = canManage
-    ? <Button variant="primary" href="/webhooks/new" className={styles.createButton}><Plus size={15} aria-hidden="true" />送り先を作る</Button>
+    ? <Button variant="primary" href="/webhooks/new"><Plus size={15} aria-hidden="true" />送り先を作る</Button>
     : <span className={styles.createSpace} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
@@ -572,7 +572,7 @@ export default function WebhooksOutgoingV8() {
           }}
         >
         <div className={styles.tableWrap}>
-          <DataTable columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: narrow ? 'var(--tpl-af2-wh-narrow-row-h)' : 'var(--tpl-wh-row-h)', gap: narrow ? '0px' : 'var(--tpl-wh-col-gap)', padding: narrow ? 'var(--tpl-wh-narrow-column-pad)' : 'var(--tpl-wh-row-pad)', numberInset: 'var(--tpl-wh-num-pad-end)', nameInset: narrow ? 'var(--tpl-af2-wh-name-end)' : undefined }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-wh-col-gap)', padding: '0 var(--tpl-list-inset)', numberInset: 'var(--tpl-wh-num-pad-end)' }}>
             <thead>
               {narrow ? (
                 /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
@@ -628,7 +628,7 @@ export default function WebhooksOutgoingV8() {
                       <Td className={styles.colStateNarrow}>
                         <StatusBadge tone={tone === 'active' ? 'success' : tone}>{stateWord}</StatusBadge>
                       </Td>
-                      <Td className={styles.colOpsNarrow}>
+                      <ActionCell>
                         {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
                         <div className={styles.opsBox}>
                           <RowMenu
@@ -646,7 +646,7 @@ export default function WebhooksOutgoingV8() {
                             note={canManage ? undefined : MANAGE_REASON}
                           />
                         </div>
-                      </Td>
+                      </ActionCell>
                     </Tr>
                   )
                 }
@@ -663,8 +663,8 @@ export default function WebhooksOutgoingV8() {
                       </FolderDotName>
 
                     </Td>
-                    <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
-                    <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
+                    <Td className={styles.colWhen}><TruncatedText value={when} /></Td>
+                    <Td className={styles.colPayload}><TruncatedText value={payload} /></Td>
                     <Td align="right" className={styles.colCount}>
                       <span className={styles.num}>{formatNumber(item.deliverySummary.total)} 回</span>
                       <span className={styles.numSub}>
@@ -679,32 +679,23 @@ export default function WebhooksOutgoingV8() {
                         ? <span className={styles.sub}>最終 {shortDateTime(completedAt)}</span>
                         : item.isActive && !toggling ? <span className={styles.sub}>まだ送っていません</span> : null}
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
                         {item.deliverySummary.canRetry && canManage
-                          ? <Button href="/webhooks?tab=interactions">やり直す</Button>
-                          : <Button href="/webhooks?tab=interactions">中身を見る</Button>}
+                          ? <Button size="compact" href="/webhooks?tab=interactions">やり直す</Button>
+                          : <Button size="compact" href="/webhooks?tab=interactions">中身を見る</Button>}
                         {showMenu ? (
-                          <>
-                            <Button
-                              aria-haspopup="menu"
-                              aria-expanded={menuId === item.id}
-                              aria-label={`「${item.name}」の設定`}
-                              onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                            >
-                              設定
-                            </Button>
-                            <ActionMenu
-                              open={menuId === item.id}
-                              onClose={() => setMenuId(null)}
-                              ariaLabel={`「${item.name}」の設定`}
-                              items={menuItems}
-                              note={canManage ? undefined : MANAGE_REASON}
-                            />
-                          </>
+                          <RowMenu
+                            label={`「${item.name}」の設定`}
+                            title="設定"
+                            open={menuId === item.id}
+                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                            items={menuItems}
+                            note={canManage ? undefined : MANAGE_REASON}
+                          />
                         ) : null}
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -716,12 +707,9 @@ export default function WebhooksOutgoingV8() {
     )
   }
 
-  const pager = ready && pageCount > 1 ? (
+  const pager = ready && visible.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + visible.length }} />
     </ListPagePagination>
   ) : null
 

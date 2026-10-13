@@ -188,7 +188,7 @@ export default function EcIdentityCandidatesScreen() {
           />
         </KpiBand>
 
-        <p className={styles.band} title={AUTO_LINK_NOTE}>{AUTO_LINK_NOTE}</p>
+
 
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
@@ -299,6 +299,8 @@ export default function EcIdentityCandidatesScreen() {
       boardId="w1W8h"
       layout="narrow-nav"
       title="EC連携"
+      explanation={AUTO_LINK_NOTE}
+      explanationKey="ec-identity"
       help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={<Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={shared.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>}
     >

@@ -3,20 +3,6 @@
  * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-id-*・--tpl-sb-*）。
  */
 
-/* 自動で結びつく条件の帯（薄い青の地・角丸 8・余白 10/12・字 11）。1行で、入りきらないときは「…」と title。 */
-.band {
-  margin: 0;
-  overflow: hidden;
-  padding: var(--tpl-st2-id-band-pad);
-  border-radius: var(--tpl-sb-seg-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-st2-id-band-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .toolbar {
   display: flex;
   align-items: center;

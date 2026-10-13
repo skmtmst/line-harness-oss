@@ -204,7 +204,7 @@ test('狭い画面の条件編集は小窓で開き、変更した期間を閉�
   await act(async () => root.render(<FriendAddSettingsPage />))
   await eventually(() => expect(host.querySelector('[data-friend-add-routes]')).toBeTruthy())
   expect(host.querySelector('#fa-from')).toBeNull()
-  const open = [...host.querySelectorAll('button')].find((button) => button.textContent === '対象をしぼる（任意）')!
+  const open = [...host.querySelectorAll('button')].find((button) => button.textContent?.replace(/\s/g, '') === '対象をしぼる任意')!
   await act(async () => open.click())
   await eventually(() => expect(document.querySelector('[role="dialog"] #fa-from')).toBeTruthy())
   const dialog = document.querySelector('[role="dialog"]')!

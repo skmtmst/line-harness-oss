@@ -1,5 +1,5 @@
 'use client'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import type { ReactNode } from 'react'
 import { CalendarDays, Play } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -69,9 +69,7 @@ export function BasicForm({
   return (
     <>
       <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-basic`}>
-        <div className={styles.cardHead}>
-          <h2 id={`${idPrefix}-basic`} className={styles.cardTitle}>基本設定</h2>
-        </div>
+        <CardHeader size="stacked" titleId={`${idPrefix}-basic`} title="基本設定" />
         <div className={styles.field}><Field label="名前" htmlFor={`${idPrefix}-title`} required><SaveErrorField names={["title","values.title"]}><TextField
             id={`${idPrefix}-title`}
             value={values.title}
@@ -116,10 +114,7 @@ export function BasicForm({
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-kind`}>
-        <div className={styles.cardHead}>
-          <h2 id={`${idPrefix}-kind`} className={styles.cardTitle}>開催形式</h2>
-          <p className={styles.cardNote}>あとから動画の段でも変えられます</p>
-        </div>
+        <CardHeader size="stacked" titleId={`${idPrefix}-kind`} title="開催形式" meta="あとから動画の段でも変えられます" />
         {/* 閲覧のみ：選ぶ部品は置かず、選んでいる形式を文字で見せる（2026-10-06 オーナー決定）。 */}
         {readOnly ? (
           <ReadValue label="開催形式">{values.deliveryKind === 'scheduled' ? '日時指定配信' : values.deliveryKind === 'on_demand' ? 'オンデマンド配信' : '外部の動画'}</ReadValue>
@@ -133,9 +128,7 @@ export function BasicForm({
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-audience`}>
-        <div className={styles.cardHead}>
-          <h2 id={`${idPrefix}-audience`} className={styles.cardTitle}>だれに案内するか</h2>
-        </div>
+        <CardHeader size="stacked" titleId={`${idPrefix}-audience`} title="だれに案内するか" />
         <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
             ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
             : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}

@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { guardCompositionEnter } from './composition-enter'
 import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './text-field.module.css'
@@ -63,6 +63,20 @@ export const TextField = forwardRef<
       className={[styles.field, styles.single, a11y.invalid && styles.invalid, className].filter(Boolean).join(' ')}
     />
   )
+})
+
+/** 前後に固定の文字を添える1行欄。入力値・ref・読み上げはTextFieldに渡す。 */
+export const AffixedTextField = forwardRef<
+  HTMLInputElement,
+  ControlOwnProps & { startAdornment?: ReactNode; endAdornment?: ReactNode; monospace?: boolean } & Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>
+>(function AffixedTextField({ startAdornment, endAdornment, monospace, className, style, ...props }, ref) {
+  const a11y = useControlA11y(props)
+  return <span className={[styles.field, styles.single, styles.affixed, className].filter(Boolean).join(' ')}
+    style={style} aria-invalid={a11y['aria-invalid']} data-disabled={props.disabled || undefined} data-monospace={monospace || undefined}>
+    {startAdornment !== undefined && <span className={styles.adornment} aria-hidden="true">{startAdornment}</span>}
+    <TextField {...props} ref={ref} className={styles.affixedControl} />
+    {endAdornment !== undefined && <span className={styles.adornment} aria-hidden="true">{endAdornment}</span>}
+  </span>
 })
 
 /**

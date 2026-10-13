@@ -7,7 +7,7 @@
  * 空のかたまりは下書きとして残し、保存のときに案内する（R243）。
  */
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ConditionBuilder from './condition-builder'
 import {
@@ -72,7 +72,7 @@ function Harness({
 }
 
 function pickers() {
-  return screen.getAllByRole('combobox', { name: '追加する条件を選ぶ' })
+  return screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
 }
 
 function groupRemovers() {
@@ -80,14 +80,14 @@ function groupRemovers() {
 }
 
 function pickKind(field: HTMLElement, query: string) {
-  fireEvent.focus(field)
-  fireEvent.change(field, { target: { value: query } })
-  fireEvent.keyDown(field, { key: 'ArrowDown' })
-  fireEvent.keyDown(field, { key: 'Enter' })
+  fireEvent.click(field)
+  const dialog = screen.getByRole('dialog', { name: '条件を選ぶ', hidden: true })
+  fireEvent.click(within(dialog).getByRole('radio', { name: query, hidden: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '条件を足す', hidden: true }))
 }
 
 function addOrGroup() {
-  fireEvent.click(screen.getByRole('button', { name: /いずれか1つ以上を満たす.*を追加/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'いずれか条件のかたまりを足す' }))
 }
 
 describe('S4-OR 空の or かたまりは下書きとして残る', () => {

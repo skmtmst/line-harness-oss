@@ -23,8 +23,6 @@
 .tools { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); min-width: 0; }
 .projectSearch { width: var(--tpl-hb-project-search-w); flex-shrink: 0; }
 .librarySearch { width: var(--tpl-hb-library-search-w); flex-shrink: 0; }
-.projectSort { width: var(--tpl-hb-project-sort-w); flex-shrink: 0; }
-.projectSort :global(*) { max-width: 100%; }
 .toolLabel { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
 .chips { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 .sortStatic {

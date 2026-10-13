@@ -9,7 +9,20 @@ import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 import { assess, assessAgainstBase, record, measurePage, identifyStableTargets, validateAllowances } from './layout-defects.mjs'
 import scanPanelBlank from './panel-blank-browser.mjs'
+import scanBlankGap from './blank-gap-browser.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
+
+test('horizontal blank runs stay inside a semantic section; a real tall blank in that section still fails', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const section = (name, height) => `<section data-template-region="${name}" style="height:${height}px;width:1000px"><span style="display:block;width:760px;height:${height}px;background:#fafafa">内容</span></section>`
+    await page.setContent(shell(section('heading',80)+section('stats',116)+'<footer style="height:40px;width:1000px;background:#eee">続き</footer>'))
+    assert.ok(!(await page.evaluate(scanBlankGap)).findings.some(f => f.kind === 'horizontal' && !f.excluded))
+    await page.setContent(shell(section('stats',320)+'<footer style="height:40px;width:1000px;background:#eee">続き</footer>'))
+    assert.ok((await page.evaluate(scanBlankGap)).findings.some(f => f.kind === 'horizontal' && f.excess >= 96 && !f.excluded))
+  } finally { await browser.close() }
+})
 const cases = {
   'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
   'control-blocked': '<div data-list-row style="position:relative"><button style="width:80px;height:36px">…</button><span style="position:absolute;left:20px;top:0;width:36px;height:36px;background:#fff"></span></div>',
@@ -272,4 +285,53 @@ test('空白検査はCIで一度だけ実行し、既存V8 guardと同じ必須�
   const baseBuild = job.split('      - name:').find(step => step.includes('Build the base admin'))
   assert.match(baseBuild,/steps.scope.outputs.compare == 'true'/)
   assert.doesNotMatch(baseBuild,/steps.scope.outputs.diff/,'v7の画素を飛ばしても崩れの土台を測る')
+})
+
+// P〜Sは実際のCSSの故障を検出する。許可や上限では通さない。
+import scanFormRules from './form-rules-browser.mjs'
+test('F組の色・左操作・任意・欄の右端を、正しい形と故障注入で守る', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const good = `<style>button{box-sizing:border-box} [role=radio]{width:24px;height:24px;border-radius:50%;border:0} [aria-checked=true]{outline:2px solid black} [data-sticky-lead] button{background:white;outline:1px solid gray} [data-form-row]{width:480px;display:grid;grid-template-columns:2fr 1fr;gap:12px} input{box-sizing:border-box;width:100%}</style><main>
+      <div data-color-palette="inline" role="radiogroup"><button role="radio" aria-label="赤" aria-checked="true"></button><button role="radio" aria-label="青" aria-checked="false"></button></div>
+      <div data-sticky-lead><div><button disabled>保管する<svg></svg></button><span role="note">使用先があるため保管できません</span></div></div>
+      <h2>ひな形から作る <span aria-hidden="true">任意</span></h2>
+      <div data-form-row="name-folder"><div><input aria-label="名前" /></div><div><input aria-label="フォルダ" /></div></div></main>`
+    for (const width of [1440, 1152]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.setContent(good)
+      assert.deepEqual(await page.evaluate(scanFormRules), [])
+      const bad = good.replace('width:24px;height:24px', 'width:18px;height:18px').replace('outline:2px solid black', 'outline:none').replace('<span role="note">使用先があるため保管できません</span>', '').replace('<span aria-hidden="true">任意</span>', '（任意）').replace('width:100%', 'width:calc(100% - 48px)')
+      await page.setContent(bad)
+      const findings = await page.evaluate(scanFormRules)
+      for (const kind of ['form-color', 'form-footer-action', 'form-optional', 'form-row-end']) assert.ok(findings.some(f => f.kind === kind), kind)
+      assert.ok(findings.some(f => f.text === '選んだ色には輪を出す'))
+      await page.setContent(good.replace('aria-checked="true"', 'aria-checked="false"'))
+      assert.ok((await page.evaluate(scanFormRules)).some(f => f.text === '選んだ色を1つ表示する'))
+      await page.setContent(good.replace('background:white', 'background:red').replace('<svg></svg>', ''))
+      assert.ok((await page.evaluate(scanFormRules)).some(f => f.text === '左端の操作は印つき副ボタン'))
+    }
+  } finally { await browser.close() }
+})
+test('作る型の実CSS：1152は右欄を畳み名前とフォルダを1列、1440は2列', async () => {
+  const { default: scanFormRules } = await import('./form-rules-browser.mjs')
+  const rowCss = readFileSync(new URL('../../src/components/shared/settings-form-card.module.css', import.meta.url), 'utf8')
+  const tplCss = readFileSync(new URL('../../src/components/templates/page-templates.module.css', import.meta.url), 'utf8').replaceAll(':global(:root)', ':root')
+  const html = (row, template) => `<style>*{box-sizing:border-box}body{margin:0}.frame{container:v8-page/inline-size;width:calc(100vw - 248px)}.nameFolderRow>div{height:80px}input{width:100%;height:32px}${row}${template}</style><main><div class="frame" data-page-template="create"><div class="nameFolderRow" data-form-row="name-folder"><div><input aria-label="名前"></div><div><input aria-label="フォルダ"></div></div><aside style="width:280px;height:100px" data-template-region="preview" data-preview-narrow="hidden">見え方</aside></div></main>`
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const width of [1440, 1152]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.setContent(html(rowCss, tplCss))
+      assert.deepEqual(await page.evaluate(scanFormRules), [])
+      if (width === 1152) {
+        await page.setContent(html(rowCss.replace('@container v8-page (width < 1100px)', '@container v8-page (width < 1px)'), ''))
+        const faults = await page.evaluate(scanFormRules)
+        assert.ok(faults.some(f => f.text === '狭い白い板では右欄を畳む'))
+        assert.ok(faults.some(f => f.text === '狭い白い板では名前とフォルダを1列へ'))
+      }
+    }
+  } finally { await browser.close() }
 })

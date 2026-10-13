@@ -1,5 +1,7 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+
 import ListToolbar, { ListToolbarFrame, ListToolbarOptional, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -26,7 +28,7 @@ import { ListPage, ListPagePagination } from '@/components/templates';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -48,7 +50,7 @@ import GenreDialog from './genre-dialog'
 import BulkDialog, { type BulkRouteAction } from './bulk-dialog';
 import StatusBadge from '@/components/shared/status-badge'
 import QrDialog, { referralUrl, type QrRoute } from './qr-dialog';
-import { becameLines, buildRows, formatLatest, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
+import { becameLines, buildRows, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -152,7 +154,6 @@ export default function InflowListV8({
   const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
-  const [openTileMenu, setOpenTileMenu] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -649,11 +650,11 @@ export default function InflowListV8({
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-il-col-gap)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--polish-text-body)', numberInset: 'var(--tpl-il-num-pad-end)', collapseScope: 'page' }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-il-col-gap)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--polish-text-body)', numberInset: 'var(--tpl-il-num-pad-end)', collapseScope: 'page' }}>
             <thead>
               <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colCheck}>
-                  {readonly ? null : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
+                  {readonly ? <UnavailableSelection label="このページの全経路をまとめて操作の対象にする" /> : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
                     indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
@@ -708,7 +709,7 @@ export default function InflowListV8({
                           }}
                         /></SaveErrorField>
                       ) : (
-                        <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
+                        <UnavailableSelection label={`${r.name}をまとめて操作の対象にする`} reason={readonly ? "閲覧のみのため選べません" : "まとめて操作は登録済みの流入経路だけに使えます"} />
                       )}
                     </Td>
                     <Td grow data-list-name-cell>
@@ -741,7 +742,7 @@ export default function InflowListV8({
                       <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : emptyValue('unknown')}</span>
                     </Td>
                     <Td collapseAt="narrow" className={styles.colLatest}>
-                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : emptyValue('unknown')}</span>
+                      <span className={styles.cellMain}>{summaryAvailable ? <ListDateTime value={r.stats?.latestAt} /> : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colStatus}>
                       {status ? (
@@ -769,6 +770,8 @@ export default function InflowListV8({
                           <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">{emptyValue('unknown')}</span>
                         ) : (
                           <Button
+                            size="compact"
+                            data-row-quick-action=""
                             onClick={() => setEditing({ register: r.refCode })}
                             title="未登録 ref を登録します。流入実績はそのまま引き継がれます。"
                           >
@@ -796,12 +799,9 @@ export default function InflowListV8({
     )
   }
 
-  const pager = !loading && !loadFailed && pageCount > 1 ? (
+  const pager = !loading && !loadFailed && currentRows.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" range={{ total: sortedRows.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + currentRows.length }} />
     </ListPagePagination>
   ) : null
 
@@ -881,18 +881,10 @@ export default function InflowListV8({
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
             detail="友だちになっても何も起きない"
-            valueMenu={{
-              label: "動きが未設定の経路の操作",
-              open: openTileMenu === "unconfigured",
-              onOpenChange: open => setOpenTileMenu(open ? "unconfigured" : null),
-              items: [{
-                id: 'filter',
-                label: '動きが未設定の経路だけに絞る',
-                disabled: !routeCountAvailable || unconfiguredCount === 0,
-                disabledReason: !routeCountAvailable || unconfiguredCount === 0 ? '動きが未設定の経路はありません' : undefined,
-                onSelect: () => { setFilter('unconfigured'); setPage(1) },
-              }],
-            }}
+            action={routeCountAvailable && unconfiguredCount > 0 ? {
+              label: '未設定を見る',
+              onClick: () => { setFilter('unconfigured'); setPage(1) },
+            } : undefined}
           />
           <KpiCard
             presentation="band"
@@ -901,15 +893,7 @@ export default function InflowListV8({
             value={adConnected ? adConnected.total : null}
             unit={adConnected ? '件' : ''}
             detail={adNamesSub}
-            valueMenu={{
-              label: "広告とつないだ経路の操作",
-              open: openTileMenu === "ads",
-              onOpenChange: open => setOpenTileMenu(open ? "ads" : null),
-              items: [
-                { id: 'ads', label: '広告連携を開く', external: false, href: '/inflow-links?tab=ads', onSelect: () => router.push('/inflow-links?tab=ads') },
-                { id: 'connections', label: '広告とのつなぎを開く', external: false, href: '/inflow-links?tab=connections', onSelect: () => router.push('/inflow-links?tab=connections') },
-              ],
-            }}
+            action={{ label: '広告連携を開く', href: '/inflow-links?tab=ads' }}
           />
         </KpiBand>
       </>}
@@ -979,5 +963,3 @@ export default function InflowListV8({
     </ListPage></SaveErrorScope>
   )
 }
-
-/** 数の帯のマスの右上の「…」（絵のマスの「…」）。押すとそのマスから行ける操作を出す。 */

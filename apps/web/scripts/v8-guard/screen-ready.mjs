@@ -3,10 +3,15 @@ export function screenReady({ route, expectedRows = null }) {
   if (document.documentElement.dataset.theme !== 'v8') return false
   const main = document.querySelector('main')
   if (!main || !main.textContent?.trim()) return false
-  const text = main.textContent
+  const visible = el => {
+    const rect = el.getBoundingClientRect(), css = getComputedStyle(el)
+    return rect.width > 0 && rect.height > 0 && css.visibility !== 'hidden'
+      && !el.closest('[hidden],[inert],[aria-hidden="true"]')
+  }
+  const text = main.innerText
   if (/画面を表示できませんでした|Application error|読み込めませんでした|見る権限がありません/.test(text)
-    || main.querySelector('[data-list-state="error"], [data-list-state="forbidden"]')) return 'error'
-  if (main.querySelector('[aria-busy="true"], [data-list-state="loading"]')) return false
+    || [...main.querySelectorAll('[data-list-state="error"], [data-list-state="forbidden"]')].some(visible)) return 'error'
+  if ([...main.querySelectorAll('[aria-busy="true"], [data-list-state="loading"]')].some(visible)) return false
   if (route === '/friends') {
     if (!main.querySelector('[data-friend-row]')) return false
     // 応答だけでなく描画済みの行を数える。件数表示の文言・助数に依存しない。

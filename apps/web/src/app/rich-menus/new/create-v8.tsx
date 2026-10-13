@@ -35,7 +35,7 @@ import {
 import Card from '@/components/shared/card'
 import LayoutPicker from '@/components/shared/layout-picker'
 import TargetMissing from '@/components/shared/target-missing'
-import { Field, TextInput } from '@/components/shared/form-controls'
+import { Field, TextInput, OptionalBadge } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
@@ -1868,9 +1868,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     return <SaveErrorScope errors={saveErrors}><p className={styles.editLoading} role="status">読み込み中…</p></SaveErrorScope>
   }
 
+  if (!host && !canOperate && !editGroupId && !group) return <CreatePage boardId="JeINq" title="リッチメニューを作る" readOnly footerActions={<Button href="/rich-menus">一覧へ戻る</Button>} dirty={false}>{null}</CreatePage>
+
   return (
     <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents">
-    <CreatePage dirty={false} boardId={
+    <CreatePage dirty={false} readOnly={!host && !canOperate} boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conditionHelp ? <p>{conditionHelp}</p> : null}{conflict ? (
@@ -1886,7 +1888,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             />
           </div>
         ) : null}</>} identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
-          host ? (
+          !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
             <>
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
               {step === 'publish' ? (
@@ -2092,7 +2094,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
     return (
       <>
-        <Card padding="roomy" layout="vertical" className={styles.stackSection}>
+        <Card variant="form" gap="normal">
           <SectionHeader title="名前とフォルダ" />
           <div className={styles.fieldGrid}>
             <Field label="メニュー名（友だちには見えません）" htmlFor="rm-name" requirement={fields.requirement('name')} error={fields.error('name')}>
@@ -2117,7 +2119,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           </Field>
         </Card>
 
-        <Card padding="roomy" layout="vertical" className={styles.stackSection}>
+        <Card variant="form" gap="normal">
           <SectionHeader title="大きさと切替タブ" />
           <SaveErrorField names={["rich-menu-size","value","opt.value","size"]}><RadioCardGroup legend="大きさ" className="grid grid-cols-2 gap-3">
             {SIZE_OPTIONS.map((opt) => <RadioCard key={opt.value} name="rich-menu-size" value={opt.value}
@@ -2173,7 +2175,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </Card>
 
         {/* 面の分け方 */}
-        <Card padding="roomy" layout="vertical" className={styles.stackSection}>
+        <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="面の分け方" />
             <p className={styles.cardNote}>押せるところをいくつに分けるか。あとで区切り直せます</p>
@@ -2195,7 +2197,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </Card>
 
         {/* 画像（採用案 K6Ot7O：タブがあるときはタブごとに1枚、枠を横に並べる）。 */}
-        <Card padding="roomy" layout="vertical" className={styles.stackSection}>
+        <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title={hasTabs ? '画像（タブごとに1枚）' : '画像'} />
             <p className={styles.cardNote}>
@@ -2434,7 +2436,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     return (
       <>
         {/* 出す相手 */}
-        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        <Card variant="form" gap="normal">
           <SectionHeader title="出す相手" />
           <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
             <RadioCard
@@ -2508,7 +2510,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
         {/* 出す順番（統括：配った先の出す順番。小さいほど先） */}
         {host ? (
-          <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+          <Card variant="form" gap="normal">
             <div className={`flex flex-col ${styles.stackCompact}`}>
               <SectionHeader title="出す順番" />
               <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます。配った先の順番として届きます</p>
@@ -2527,7 +2529,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             </Field>
           </Card>
         ) : null}
-        {host ? null : <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        {host ? null : <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="出す順番" actions={editGroupId && canOperate ? <Button type="button" variant="text" size="inline" onClick={() => {
               setPriorityInput(String(targetingPriority + 1)); setPriorityOpen(true)
@@ -2552,7 +2554,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </Card>}
 
         {/* トークを開いたとき（統括のひな形は持たない。配った先で決める） */}
-        {host ? null : <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        {host ? null : <Card variant="form" gap="normal">
           <SectionHeader title="トークを開いたとき" />
           <div className={styles.segRow}>
             <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
@@ -2587,7 +2589,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (done) {
       return (
-        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        <Card variant="form" gap="normal">
           <h2 className={styles.cardTitle}>
             {done === 'published' ? 'LINEへの登録が終わりました' : '公開予約を受け付けました'}
           </h2>
@@ -2606,7 +2608,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     return (
       <>
         {/* いつ公開するか */}
-        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        <Card variant="form" gap="normal">
           <SectionHeader title="いつ公開するか" actions={!host && group ? <RichMenuSchedules key={`${accountId}:${group.id}`} groupId={group.id} canOperate={canOperate && !aggregateOnly} restoreMenus={restoreMenus} /> : undefined} />
           <SaveErrorField names={["timing","mode","publishPlan.mode","endEnabled","timingIsScheduled","publishPlan"]}><RadioCardGroup legend="いつ公開するか" className="grid grid-cols-2 gap-3">
             <RadioCard
@@ -2645,7 +2647,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           {/* 板 `F4gELj`：終わりを決めるは枠の箱。上の行に題とトグル、下の行に「日時 に終わり、［戻す先］に戻す」。オフのときは入力を無効化。 */}
           <div className={styles.endBox}>
             <div className={styles.endHead}>
-              <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める（任意）</span>
+              <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める <OptionalBadge /></span>
               <SaveErrorField names={["endEnabled","end_enabled"]}><SettingCheckbox
                 label="終わりを決める"
                 checked={endEnabled}
@@ -2684,7 +2686,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </Card>
 
         {/* 公開の前の確認 */}
-        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="公開の前の確認" />
             <p className={styles.cardNote} title={checks ? `ページ数: ${checks.pages.count} / ${checks.pages.max}${checks.pages.state === 'ng' ? '（上限を超えています）' : ''}` : undefined}>3つそろうと公開できます</p>

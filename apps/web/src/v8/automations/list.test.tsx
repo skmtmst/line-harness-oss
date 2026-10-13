@@ -240,8 +240,12 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     expect(named('ルールを作る')).toHaveLength(0)
     expect(named('フォルダを追加')).toHaveLength(0)
     expect(named('見本から作る')).toHaveLength(0)
-    const disabled = buttons().filter((element) => element.matches(':disabled, [aria-disabled="true"]'))
+    const disabled = buttons().filter((element) => !element.closest('[data-pagination]') && element.matches(':disabled, [aria-disabled="true"]'))
     expect(disabled.map((element) => element.textContent)).toEqual([])
+    const pager = host.querySelector('[aria-label="ルール一覧のページ送り"]')!
+    expect(pager.querySelector('[aria-label="前のページ"]')).toHaveProperty('disabled', true)
+    expect(pager.querySelector('[aria-label="次のページ"]')).toHaveProperty('disabled', true)
+    expect(pager.querySelector('[aria-current="page"]')?.textContent).toBe('1')
     // 「…」は動いた記録を見るだけ。
     const menu = host.querySelector('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]') as HTMLButtonElement
     await act(async () => { menu.click() })

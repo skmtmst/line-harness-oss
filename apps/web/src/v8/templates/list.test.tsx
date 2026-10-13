@@ -123,12 +123,14 @@ describe('V8 テンプレートの一覧', () => {
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-  it('サーバの役割が staff なら閲覧のみの帯が出て、作るボタンと選ぶチェックは出さない', async () => {
+  it('サーバの役割が staff なら閲覧のみの帯が出て、選ぶ枠だけを残し、作るボタンは出さない', async () => {
     role.value = 'staff'
     await renderList()
     expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryAllByRole('button', { name: /テンプレートを作る/ })).toHaveLength(0)
-    expect(screen.queryAllByRole('checkbox', { name: /を選択$/ })).toHaveLength(0)
+    const selections = screen.getAllByRole('checkbox', { name: /を選択$/ }) as HTMLInputElement[]
+    expect(selections.every(input => input.disabled)).toBe(true)
+    expect(selections.every(input => input.title.includes('閲覧のみ'))).toBe(true)
   })
 
   it('オーナーには閲覧のみの帯を出さない', async () => {
@@ -237,4 +239,15 @@ it('B-241：見本の取得失敗を見本なしとして消さず、同じ窓�
  await act(async()=>{})
  expect(fetchApi).toHaveBeenCalledTimes(2)
  expect(screen.queryByText('見本を読み込めませんでした')).toBeNull()
+})
+
+it('U2：題の共通説明を開いて閉じ、一覧の操作を保つ', async () => {
+  await renderList()
+  const help = screen.getByRole('button', { name: 'テンプレートの説明' })
+  fireEvent.click(help)
+  const descriptionId = help.getAttribute('aria-describedby')!
+  expect(document.getElementById(descriptionId)?.textContent).toContain('直して公開すると、使っている所に反映されます。')
+  fireEvent.keyDown(help, { key: 'Escape' })
+  expect(document.getElementById(descriptionId)).toBeNull()
+  expect(screen.getByText('予約前日のご案内')).toBeTruthy()
 })

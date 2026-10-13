@@ -1,7 +1,9 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -42,12 +44,12 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
 import { runOptimistic } from '@/lib/undoable';
-import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -611,7 +613,7 @@ export default function BroadcastListV8() {
       icon: CalendarClock,
       value: kpiPending ? null : (listKpis?.scheduled ?? null),
       unit: '件',
-      detail: '今日 —（未取得）',
+      detail: <span title="今日の予約件数は取得していません">今日 {emptyValue('unknown')}</span>,
     },
     narrow
       ? {
@@ -789,16 +791,15 @@ export default function BroadcastListV8() {
 
   const dateBox = (
     <div className={styles.datePopoverWrap} ref={datePopoverRef}>
-      <button
-        type="button"
-        className={styles.dateButton}
-        data-active={Boolean(dateFrom || dateTo)}
+      <FilterChip
+        selected={Boolean(dateFrom || dateTo)}
+        aria-haspopup="dialog"
         aria-expanded={datePopoverOpen}
-        onClick={() => setDatePopoverOpen((open) => !open)}
+        onChange={() => setDatePopoverOpen((open) => !open)}
+        icon={<CalendarDays size={14} aria-hidden="true" />}
       >
         {dateRangeLabel(dateFrom, dateTo)}
-        <CalendarDays size={14} aria-hidden="true" />
-      </button>
+      </FilterChip>
       {datePopoverOpen ? (
         <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
           <p className={styles.datePopoverLabel}>配信日で絞る（開始〜終了）</p>
@@ -817,14 +818,15 @@ export default function BroadcastListV8() {
 
   /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
   const saveCurrentButton = canEdit ? (
-    <button
+    <Button
       type="button"
-      className={styles.ghostButton}
+      variant="text"
+      textTone="quiet"
       onClick={() => setSavedViewOpen((open) => !open)}
     >
       <Bookmark size={14} aria-hidden="true" />
       この条件を保存する
-    </button>
+    </Button>
   ) : (
     <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
       <Bookmark size={14} aria-hidden="true" />
@@ -925,19 +927,14 @@ export default function BroadcastListV8() {
 
   /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {searchBox}
-        {dateBox}
-        {saveCurrentButton}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedSearchBox}
+        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         {statusChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {pageSizeBox}
-        {sortButton}
+        <ListToolbarEnd>{sortButton}{pageSizeBox}</ListToolbarEnd>
       </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
@@ -1062,8 +1059,8 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : emptyValue('unknown'))
-                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
+                    ? (broadcast.sentAt ? <ListDateTime value={broadcast.sentAt} /> : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? <ListDateTime value={broadcast.scheduledAt} /> : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
@@ -1089,7 +1086,8 @@ export default function BroadcastListV8() {
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
                     <RowMenu
-                      className={styles.menuButton}
+                      appearance="box"
+                      size="row"
                       label={menuLabel}
                       items={rowMenuItems(broadcast)}
                       open={openMenuId === broadcast.id}
@@ -1121,7 +1119,7 @@ export default function BroadcastListV8() {
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
       <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
-        summary={paginationSummary(resultTotal ?? visibleBroadcasts.length, rangeFirst, rangeLast)} />
+        range={{ total: resultTotal ?? visibleBroadcasts.length, first: rangeFirst, last: rangeLast }} />
     </ListPagePagination>
   ) : null
 

@@ -19,6 +19,7 @@ import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ListPage } from '@/components/templates'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -42,6 +43,7 @@ import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -335,34 +337,41 @@ function BillingInner() {
         ) : invoices === null || invoices.length === 0 ? (
           <p className={styles.empty}>まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>
         ) : (
-          <div className={styles.table} role="table" aria-label="支払い履歴">
-            <div className={styles.head} role="row">
-              <span role="columnheader">日付</span>
-              <span role="columnheader">内容</span>
-              <span role="columnheader" className={styles.amount}>金額</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader">領収書</span>
-            </div>
-            {invoices.map((inv) => (
-              <div key={inv.id} className={styles.row} role="row">
-                <span role="cell">{invoiceDate(inv.createdAt)}</span>
-                <span role="cell" className={styles.cell} title={inv.description ?? inv.number ?? ''}>{inv.description ?? inv.number ?? emptyValue('unknown')}</span>
-                <span role="cell" className={styles.amount}>{yen(inv.amountYen)}</span>
-                <span role="cell">
+          <DataTable label="支払い履歴" columnSizing="content" grid={{
+            columns: 'var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-hq-col-paystate) var(--tpl-hq-col-receipt)',
+            padding: 'var(--tpl-hq-pay-row-pad)',
+            headPadding: 'var(--tpl-hq-head-pad)',
+            gap: 'var(--tpl-hq-col-gap)',
+            bodyTextSize: 'var(--text-caption)',
+            headTextSize: 'var(--text-micro)',
+          }}>
+            <thead><TableHeadRow>
+              <Th>日付</Th>
+              <Th grow>内容</Th>
+              <Th align="right">金額</Th>
+              <Th>状態</Th>
+              <Th>領収書</Th>
+            </TableHeadRow></thead>
+            <tbody>{invoices.map((inv) => (
+              <Tr key={inv.id}>
+                <Td>{invoiceDate(inv.createdAt)}</Td>
+                <Td grow><TruncatedText value={inv.description ?? inv.number ?? emptyValue('unknown')} /></Td>
+                <Td align="right">{yen(inv.amountYen)}</Td>
+                <Td>
                   <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</span>
-                </span>
-                <span role="cell">
+                </Td>
+                <Td>
                   {inv.hostedUrl ? (
-                    <Button external href={inv.hostedUrl}  >
+                    <Button size="compact" external href={inv.hostedUrl}>
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書
                     </Button>
                   ) : (
                     <span className={styles.faint}>{emptyValue('unknown')}</span>
                   )}
-                </span>
-              </div>
-            ))}
-          </div>
+                </Td>
+              </Tr>
+            ))}</tbody>
+          </DataTable>
         )}
       </section>
     </>,

@@ -21,6 +21,8 @@ export type ActionChoice<T> = {
     title: string
     items: EntityPickerItem[]
     multiple?: boolean
+    /** 種類ごとのフォルダ・作成・見本も、既存の選ぶ窓へ渡す。 */
+    render?: (props: { onConfirm: (ids: string[]) => void; onCancel: () => void }) => ReactNode
     apply: (item: T, ids: string[]) => T
   }
 }
@@ -52,7 +54,7 @@ export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label
         icon: choice.icon ? <choice.icon size={16} aria-hidden="true" /> : undefined,
         onSelect: () => { if (choice.picker) setPendingId(choice.id); else onAdd(choice.make()) },
       }))} />
-    {pending?.picker ? pending.picker.multiple
+    {pending?.picker ? pending.picker.render ? pending.picker.render({ onConfirm: confirmTarget, onCancel: () => setPendingId(null) }) : pending.picker.multiple
       ? <EntityMultiPickerDialog title={pending.picker.title} items={pending.picker.items} initialIds={[]} allowEmpty={false} onConfirm={confirmTarget} onCancel={() => setPendingId(null)} />
       : <EntityPickerDialog title={pending.picker.title} items={pending.picker.items} onConfirm={id => confirmTarget([id])} onCancel={() => setPendingId(null)} />
       : null}

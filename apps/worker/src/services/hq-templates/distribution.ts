@@ -144,8 +144,13 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
     const names = JSON.parse(distributed_account_names_json) as string[];
     return {
       ...template,
+      message_type: null,
       ...(() => {
         try {
+          if(template.template_type==='template'&&definition_json) {
+            const definition=parseMessageTemplateDefinition(JSON.parse(definition_json));
+            return {message_type:definition.card?.format??definition.template.messageType};
+          }
           if(template.template_type==='tag'&&definition_json) {
             const tag=parseTagDefinition(JSON.parse(definition_json)).tag;
             return {manual_assignment_allowed:tag.manualAssignmentAllowed!==false,
@@ -164,7 +169,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
             return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':'配布先で店が決める'};
           }
         } catch { /* 壊れた版は未取得。 */ }
-        return {manual_assignment_allowed:null,assignment_method:null,display_order:null,display_audience:null};
+        return {message_type:null,manual_assignment_allowed:null,assignment_method:null,display_order:null,display_audience:null};
       })(),
       distributed_account_names: names,
       distributed_account_more: Math.max(0, template.distributed_account_count - names.length),

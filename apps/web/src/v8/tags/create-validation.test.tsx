@@ -3,12 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ create: vi.fn() }))
+const net = vi.hoisted(() => ({ create: vi.fn(), role: 'admin' as string | null }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/tags/new' }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => net.role, canManageRole: (role: string | null) => role === 'admin' || role === 'owner' }))
 vi.mock('@/lib/use-unsaved-guard', () => ({ useUnsavedGuard: () => ({ disarm: vi.fn(), dialogOpen: false }) }))
 vi.mock('@/lib/unsaved-leave-dialog', () => ({ UnsavedLeaveDialog: () => null }))
 vi.mock('@/lib/api', async (original) => {
@@ -16,7 +16,7 @@ vi.mock('@/lib/api', async (original) => {
   return { ...actual, api: { ...actual.api, tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }), createDefinition: net.create }, tagGroups: { ...actual.api.tagGroups, list: async () => ({ success: true, data: [] }) } } }
 })
 import TagCreate from './create'
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); net.role = 'admin' })
 
 test('未入力で保存すると名前欄に理由を一度だけ出し、そこへ移動して送信を止める', async () => {
   const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined)
@@ -54,4 +54,13 @@ test('保存APIの422を名前欄の下に出し、最初の欄へ移り、打�
   expect(screen.queryByText('このタグ名は使われています')).toBeNull()
   scroll.mockRestore()
   vi.unstubAllGlobals()
+})
+
+for (const role of [null, 'viewer', 'staff']) test(`権限${role}の人には入力と保存を出さず、APIを送らない`, () => {
+  net.role = role
+  render(<TagCreate />)
+  expect(screen.queryByLabelText('タグ名')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'タグを作る', exact: true })).toBeNull()
+  expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
+  expect(net.create).not.toHaveBeenCalled()
 })
