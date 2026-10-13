@@ -612,7 +612,7 @@ jobs:
         run: |
           pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
           pnpm --filter web build
-          mv apps/web/out /tmp/head-out
+          cp -a apps/web/out /tmp/head-out
       - name: Build the base admin against the same mock API
         if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
         env:
