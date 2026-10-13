@@ -363,7 +363,6 @@ function InflowDetailContent() {
   })
   const friendPageCount = Math.max(1, Math.ceil(friendRows.length / friendPageSize))
   const friendPageRows = friendRows.slice((friendPage - 1) * friendPageSize, friendPage * friendPageSize)
-  const friendSummary = `${formatNumber(friendRows.length)} 人中 ${(friendPage - 1) * friendPageSize + 1}〜${Math.min(friendPage * friendPageSize, friendRows.length)} 人`
 
   // 削除の窓を開く。「…」と帯の「止める」から、選ぶ内容だけ変える。
   const openDelete = (choice: DeleteChoice) => {
@@ -687,12 +686,8 @@ function InflowDetailContent() {
           )}
           {friendRows.length > 0 ? (
             <div className={styles.pager}>
-              {/* 1ページだけのときは送りの部品が出ないので、件数の行だけ出す（絵は件数とページ送りの1行）。 */}
-              {friendPageCount > 1 ? (
-                <Pagination page={friendPage} pageCount={friendPageCount} onPageChange={setFriendPage} summary={friendSummary} />
-              ) : (
-                <p className={styles.pagerSummary}>{friendSummary}</p>
-              )}
+              <Pagination page={friendPage} pageCount={friendPageCount} onPageChange={setFriendPage}
+                range={{ total: friendRows.length, first: (friendPage - 1) * friendPageSize + 1, last: Math.min(friendPage * friendPageSize, friendRows.length), unit: '人' }} />
             </div>
           ) : null}
         </Card>

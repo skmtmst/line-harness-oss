@@ -5,6 +5,18 @@ import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 import { readFileSync } from 'node:fs'
 
+test('F3 counts spaced handwritten pager units and retains partial-read disclosure', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="detail"><nav data-pagination><span>214 件中 1〜20 件</span></nav><p class="pagerSummary">5 人中 1〜5 人</p></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3, 2)
+    await page.locator('nav span').evaluate(el => el.textContent = '最新100件（全340件）のうち 100件中 1〜20件')
+    await page.locator('p').evaluate(el => el.textContent = '5人中 1〜5人')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3, 0)
+  } finally { await browser.close() }
+})
+
 test('Z1 detects a stacked avatar even when every text node occupies one line', async () => {
   const browser = await chromium.launch()
   try {

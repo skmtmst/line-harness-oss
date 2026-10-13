@@ -94,6 +94,9 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (/\d+\s+件表示/.test(el.textContent) && el.matches('button') && !el.querySelector('button')) add('F3', el, 'page size does not use the shared compact wording')
       if (/^(直す|編集|編集をする)$/.test(el.textContent.trim()) || /（任意）/.test(el.textContent) && el.matches('[data-page-title]')) add('F3', el, 'noncanonical action or optional title')
     }
+    for (const el of all('[data-pagination] > span,[data-pagination-summary],span[class*="pager"],p[class*="pager"]')) {
+      if (/(?:[\d,]+|—)\s+(?:件|人)中/.test(el.textContent)) add('F3', el, 'pagination count contains spaced handwritten units')
+    }
     for (const el of all('[data-unknown-value],td:not([data-list-name-cell]) [data-design-node="xRvDB"],td:not([data-list-name-cell]),[data-kpi-detail] [role="note"]')) {
       if (el.matches('td') && el.querySelector('[data-unknown-value]')) continue
       if ((el.hasAttribute('data-unknown-value') || /^(?:種類を確認.*|確認できません|不明|未取得|[（(]未取得[）)])$/.test(el.textContent.trim())

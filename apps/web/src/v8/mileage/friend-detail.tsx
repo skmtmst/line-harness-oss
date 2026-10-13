@@ -30,7 +30,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -525,12 +525,10 @@ function FriendDetailInner() {
 
         {filtered.length > 0 ? (
           <div className={styles.historyPager}>
-            <span className={styles.pagerCount}>
-              {historyPartial
-                ? `最新${formatNumber(displayedHistory.length)} 件（全${formatNumber(historyTotal ?? 0)} 件）のうち ${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} 件`
-                : `${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} 件`}
-            </span>
-            {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<>
+              {historyPartial ? `最新${formatNumber(displayedHistory.length)}件（全${formatNumber(historyTotal ?? 0)}件）のうち ` : null}
+              {paginationSummary(filtered.length, (page - 1) * pageSize + 1, Math.min(page * pageSize, filtered.length))}
+            </>} />
           </div>
         ) : null}
       </Card>
