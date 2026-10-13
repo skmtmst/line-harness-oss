@@ -3,6 +3,7 @@ import { bumpAuthThrottle, toJstString } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { readBoundedBytes } from '../lib/input-errors.js';
 import { isOutputRequest } from './output-audit.js';
+import { isPublicApiBoundary } from './auth.js';
 
 const MINUTE = 60_000;
 async function digest(value: string): Promise<string> {
@@ -37,9 +38,9 @@ async function reserve(c: Context<Env>, feature: string, principal: string, max:
 }
 
 /** Cloudflare supplies the connection IP. Unverified forwarding headers cannot create buckets. */
-export async function preAuthSensitiveLimit(c: Context<Env>): Promise<Response | undefined> {
+export async function preAuthSensitiveLimit(c: Context<Env>, authenticated = false): Promise<Response | undefined> {
   const ip = c.req.header('cf-connecting-ip') ?? 'unknown';
-  if (authAttempt(c)) {
+  if (authAttempt(c) && (authenticated || isPublicApiBoundary(c.req.method, c.req.path))) {
     const denied = await reserve(c, 'auth-ip', ip, 30, MINUTE);
     if (denied) return denied;
     const bytes = await readBoundedBytes(c.req.raw, 16 * 1024);
@@ -52,7 +53,7 @@ export async function preAuthSensitiveLimit(c: Context<Env>): Promise<Response |
         return reserve(c, reset ? 'reset-mail' : 'login-mail', body.email.trim().toLowerCase(), reset ? 3 : 10, reset ? 24 * 60 * MINUTE : 15 * MINUTE);
       }
     }
-  } else if (isUploadRequest(c)) {
+  } else if (isUploadRequest(c) && isPublicApiBoundary(c.req.method, c.req.path)) {
     return reserve(c, 'upload-ip', ip, 30, MINUTE);
   }
 }
@@ -61,9 +62,18 @@ export async function preAuthSensitiveLimit(c: Context<Env>): Promise<Response |
 export async function authenticatedSensitiveLimit(c: Context<Env>): Promise<Response | undefined> {
   const staff = c.get('staff');
   if (!staff) return;
+  if (staff.readOnly && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method) && (authAttempt(c) || isUploadRequest(c))) {
+    return c.json({ success: false, error: '閲覧のみのため実行できません' }, 403);
+  }
   const principal = `${staff.tenantId ?? ''}:${staff.id}`;
   const output = isOutputRequest(c.req.path, c.req.query('format'), c.req.method);
   if (output) return reserve(c, 'export-staff', principal, 30, MINUTE);
-  if (isUploadRequest(c)) return reserve(c, 'upload-staff', principal, 30, MINUTE);
-  if (authAttempt(c)) return reserve(c, 'auth-staff', principal, 30, MINUTE);
+  if (isUploadRequest(c)) {
+    const denied = await reserve(c, 'upload-ip', c.req.header('cf-connecting-ip') ?? 'unknown', 30, MINUTE);
+    return denied ?? reserve(c, 'upload-staff', principal, 30, MINUTE);
+  }
+  if (authAttempt(c)) {
+    const denied = isPublicApiBoundary(c.req.method, c.req.path) ? undefined : await preAuthSensitiveLimit(c, true);
+    return denied ?? reserve(c, 'auth-staff', principal, 30, MINUTE);
+  }
 }
