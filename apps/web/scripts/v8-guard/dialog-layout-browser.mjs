@@ -4,6 +4,23 @@ export function scanDialogAudit({ expectedWidth, fullForm = false, requiredActio
   const rect = panel.getBoundingClientRect()
   const inventory = [{ kind: 'panel', width: rect.width, height: rect.height }]
   const findings = []
+  const descriptionBand = panel.getAttribute('data-description-band')
+  if (descriptionBand === 'danger' || descriptionBand === 'warning') {
+    const description = (panel.getAttribute('aria-describedby') ?? '').split(/\s+/).map(id => document.getElementById(id)).find(el => el && panel.contains(el))
+    if (description) {
+      const probe = document.createElement('span')
+      probe.style.color = `var(${descriptionBand === 'danger' ? '--color-danger' : '--color-warning'})`
+      panel.append(probe)
+      const expectedColor = getComputedStyle(probe).color
+      probe.remove()
+      const css = getComputedStyle(description)
+      const actual = { color: css.color, fontSize: parseFloat(css.fontSize), lineHeight: parseFloat(css.lineHeight) }
+      inventory.push({ kind: 'description-band', band: descriptionBand, ...actual, expectedColor })
+      if (actual.color !== expectedColor || actual.fontSize !== 11 || actual.lineHeight !== 17) {
+        findings.push({ pattern: 'F6', kind: 'dialog-description-band', band: descriptionBand, ...actual, expectedColor })
+      }
+    }
+  }
   if (requiredAction && ![...panel.querySelectorAll('button,[role="menuitem"]')].some(el => el.innerText?.trim() === requiredAction)) {
     findings.push({ pattern: 'F8', kind: 'dialog-action-label', expected: requiredAction })
   }
