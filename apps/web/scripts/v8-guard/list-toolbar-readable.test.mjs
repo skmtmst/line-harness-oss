@@ -370,3 +370,18 @@ test('named overflow measures its tools, not free space reserved for the rightmo
     assert.equal((await page.locator('.toolbar').evaluate(toolbarContentFit)).fits,false)
   } finally { await browser.close() }
 })
+
+test('page size shares the final row with a shorter centered switch; an earlier row or inset end still fails', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({viewport:{width:1152,height:900}})
+    await page.setContent(`<style>*{box-sizing:border-box}.toolbar{display:flex;align-items:center;width:800px;gap:8px}.end{margin-left:auto}button{height:36px}.switch{height:32px}</style><section data-list-skeleton style="width:800px"><div class="toolbar" data-toolbar-layout="band"><div data-toolbar-row><button class="switch">格子</button></div><span class="end" data-toolbar-end><span data-list-page-size><button>20件表示</button></span></span></div></section>`)
+    const rule='V1 件数は最後の道具行の右'
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes(rule))
+    await page.locator('.switch').evaluate(el=>el.style.transform='translateY(36px)')
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes(rule),'count must not occupy an earlier row')
+    await page.locator('.switch').evaluate(el=>el.style.transform='')
+    await page.locator('.end').evaluate(el=>el.style.marginRight='8px')
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes(rule),'the right-edge tolerance is unchanged')
+  } finally { await browser.close() }
+})

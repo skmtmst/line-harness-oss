@@ -414,12 +414,12 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
     ? '— ・ いま作成中'
     : `${project.imageCount} 枚 ・ ${monthDay(project.updatedAt)} 更新`
   return (
-    <Card layout="vertical" overflow="hidden" aria-label={project.name}>
+    <Card padding="rows" overflow="hidden" aria-label={project.name}>
       <button type="button" className={styles.mosaic} onClick={onOpen} aria-label={`${project.name} を開く`}>
         {[0, 1, 2].map((i) => <Thumb key={i} image={thumbnails[i] ?? null} />)}
       </button>
-      <CardContent><CardHeader size="panel" headingLevel={3} title={<RowNameButton onClick={onOpen} title={project.name}>{project.name}</RowNameButton>}
-        meta={<><TruncatedText value={project.description || '説明はまだありません'} /><br />{meta}
+      <CardContent><CardHeader size="content" headingLevel={3} title={<RowNameButton onClick={onOpen} title={project.name}>{project.name}</RowNameButton>}
+        meta={<><TruncatedText value={project.description || '説明はまだありません'} /><TruncatedText value={meta} />
           {running ? <StatusBadge tone="info">生成中</StatusBadge> : null}
           {project.archivedAt ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : null}</>}
         action={canManage ? <IconButton variant="plain" size="small" onClick={onToggleFavorite} disabled={busy}

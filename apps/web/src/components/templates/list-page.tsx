@@ -141,5 +141,5 @@ export function ListPager({ children }: { children: ReactNode }) {
 
 /** Lists of cards use the same spacing as other groups of content. */
 export function ListPageCards({ children, columns = 3 }: { children: ReactNode; columns?: 1 | 3 | 4 }) {
-  return <div className={styles.listCards} style={{ '--tpl-list-card-columns': columns } as CSSProperties}>{children}</div>
+  return <div className={styles.listCards} data-card-columns={columns} style={{ '--tpl-list-card-columns': columns } as CSSProperties}>{children}</div>
 }
