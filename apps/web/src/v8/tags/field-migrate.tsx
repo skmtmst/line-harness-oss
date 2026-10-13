@@ -1,10 +1,10 @@
 'use client'
 
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, TriangleAlert } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { FriendField, FriendFieldType } from '@line-crm/shared';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -28,6 +28,11 @@ import { permissionDeniedMessage, withPermissionFailure } from '@/components/sha
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { TextField } from '@/components/shared/text-field'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 
 /*
  * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
@@ -525,14 +530,13 @@ function FieldMigrate() {
         ) : null}
       </>}
     >
-      <p className={styles.infoNote}>
-        <TriangleAlert className={styles.wayIcon} aria-hidden="true" />
+      <Notice tone="info">
         種類を変えると、合わない値は空になることがあります。まず新しい種類の項目を作って、値がどう移るかを事前に確かめます。今の項目はそのまま残ります。
-      </p>
+      </Notice>
       {error ? <Notice tone="danger" message={error} /> : null}
 
       <Card variant="form" gap="normal" aria-labelledby="migrate-target">
-        <div className={styles.cardHead}><h2 className={styles.cardTitle} id="migrate-target">移行の先</h2></div>
+        <CardHeader title="移行の先" titleId="migrate-target" />
         {targetMode === 'new' && !createdTarget ? (
           <div ><Field label={<span>移行後の種類</span>}>
 
@@ -548,23 +552,25 @@ function FieldMigrate() {
           </Field></div>
         ) : null}
 
-        <div className={styles.sampleTable} role="table" aria-label="値の移り方の見本">
-          <div className={styles.sampleHead} role="row">
-            <span role="columnheader">今の値</span>
-            <span role="columnheader">移したあと</span>
-            <span role="columnheader" className={styles.sampleCount}>人数</span>
-          </div>
-          {sampleState === 'loading' ? <p className={styles.sampleNote}>値の移り方を確かめています…</p> : null}
-          {sampleState === 'error' ? <p className={styles.sampleNote}>値の移り方を確かめられませんでした。「項目を作って事前確認」で確かめられます。</p> : null}
-          {sampleState === 'ready' && rows.length === 0 ? <p className={styles.sampleNote}>値が入っている友だちはいません。</p> : null}
+        <DataTable density="records" label="値の移り方の見本">
+          <thead><TableHeadRow>
+            <Th truncate>今の値</Th>
+            <Th truncate>移したあと</Th>
+            <Th truncate align="right">人数</Th>
+          </TableHeadRow></thead>
+          <tbody>
+          {sampleState === 'loading' ? <Tr><Td colSpan={3}>値の移り方を確かめています…</Td></Tr> : null}
+          {sampleState === 'error' ? <Tr><Td colSpan={3}>値の移り方を確かめられませんでした。「項目を作って事前確認」で確かめられます。</Td></Tr> : null}
+          {sampleState === 'ready' && rows.length === 0 ? <Tr><Td colSpan={3}>値が入っている友だちはいません。</Td></Tr> : null}
           {rows.map((row) => (
-            <div key={`${row.from}:${row.to}`} className={styles.sampleRow} role="row">
-              <span role="cell" title={row.from}>{row.from}</span>
-              <span role="cell" title={row.to}>{row.to}</span>
-              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)} 人`}</span>
-            </div>
+            <Tr key={`${row.from}:${row.to}`}>
+              <Td><TruncatedText value={row.from} /></Td>
+              <Td><TruncatedText value={row.to} /></Td>
+              <Td align="right">{`${formatNumber(row.count)} 人`}</Td>
+            </Tr>
           ))}
-        </div>
+          </tbody>
+        </DataTable>
 
         {target ? (
           <div ><Field label={<span>移行先の項目</span>}>
@@ -583,10 +589,10 @@ function FieldMigrate() {
               onChange={(value) => { setTargetMode(value); resetConfirmation() }}
             /></SaveErrorField>
             {targetMode === 'new' ? (
-              <div className={styles.twoCols}>
-                <Field label="新しい項目の名前"><SaveErrorField names={["targetName","name","target_name"]}><input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
-                <Field label="差し込みの名前"><SaveErrorField names={["targetKey","fieldKey","target_key"]}><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
-              </div>
+              <SettingsFormRow layout="name-folder">
+                <Field label="新しい項目の名前"><SaveErrorField names={["targetName","name","target_name"]}><TextField value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
+                <Field label="差し込みの名前"><SaveErrorField names={["targetKey","fieldKey","target_key"]}><TextField value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
+              </SettingsFormRow>
             ) : (
               <div ><Field label={<span>移行先</span>}>
 
@@ -611,24 +617,20 @@ function FieldMigrate() {
 
       {preview ? (
         <Card variant="form" gap="normal" aria-labelledby="migrate-preview">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="migrate-preview">事前確認の結果</h2>
-            <p className={styles.cardNote}>登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。</p>
-          </div>
-          <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>値がある友だち</dt><dd>{`${preview.summary.total} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>そのまま移せる</dt><dd>{`${preview.summary.convertible} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>人が確認する</dt><dd>{`${preview.summary.review} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>空欄</dt><dd>{`${preview.summary.invalid} 人`}</dd></div>
-          </dl>
-          <div className={styles.cardHead}><h3 className={styles.labelStrong}>切り替わる使用先</h3></div>
+          <CardHeader title="事前確認の結果" titleId="migrate-preview" meta="登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。" />
+          <CreateSummaryCard title="値の移行" rows={[
+            { label: '値がある友だち', value: `${preview.summary.total} 人` },
+            { label: 'そのまま移せる', value: `${preview.summary.convertible} 人` },
+            { label: '人が確認する', value: `${preview.summary.review} 人` },
+            { label: '空欄', value: `${preview.summary.invalid} 人` },
+          ]} />
           {preview.usageTargets.length > 0 ? (
-            <dl className={styles.placeList}>
-              {preview.usageTargets.map((item) => (
-                <div key={`${item.kind}:${item.id}`} className={styles.placeRow}><dt title={item.name}>{item.name}</dt><dd>{item.switchable ? '移行のときに切り替わる' : '手で確かめる'}</dd></div>
-              ))}
-            </dl>
-          ) : <p className={styles.fieldNote}>切り替えが必要な使用先はありません。</p>}
+            <CreateSummaryCard title="切り替わる使用先" rows={preview.usageTargets.map(item => ({
+              key: `${item.kind}:${item.id}`,
+              label: <TruncatedText value={item.name} />,
+              value: item.switchable ? '移行のときに切り替わる' : '手で確かめる',
+            }))} />
+          ) : <Notice tone="info" message="切り替えが必要な使用先はありません。" />}
           {preview.runId && preview.previewExpiresAt ? <p className={styles.fieldNote}>{`確認番号：${preview.runId} ／ 有効期限：${formatDateTime(preview.previewExpiresAt)}`}</p> : null}
         </Card>
       ) : null}
@@ -636,21 +638,16 @@ function FieldMigrate() {
       {/* 実行を受け付けたのに結果がまだ無い間は「未確認」と出し、再取得・再開へつなげる（R548）。 */}
       {!run && executedRunId ? (
         <Card variant="form" gap="normal" aria-live="polite">
-          <h2 className={styles.cardTitle}>移行の結果</h2>
-          <p className={styles.cardNote}>{pollProblem || '実行を受け付けました。結果を確認しています…'}</p>
+          <CardHeader title="移行の結果" meta={pollProblem || '実行を受け付けました。結果を確認しています…'} />
         </Card>
       ) : null}
       {run ? (
         <Card variant="form" gap="normal" aria-live="polite">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>移行の結果</h2>
-            <p className={styles.cardNote}>{RUN_STATUS_LABELS[run.status]}</p>
-          </div>
-          <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>移行できた</dt><dd>{`${run.summary.succeeded} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>移行できなかった</dt><dd>{`${run.summary.failed} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>確認が必要なまま</dt><dd>{`${run.summary.review + run.summary.invalid} 人`}</dd></div>
-          </dl>
+          <CreateSummaryCard title="移行の結果" description={RUN_STATUS_LABELS[run.status]} rows={[
+            { label: '移行できた', value: `${run.summary.succeeded} 人` },
+            { label: '移行できなかった', value: `${run.summary.failed} 人` },
+            { label: '確認が必要なまま', value: `${run.summary.review + run.summary.invalid} 人` },
+          ]} />
           {run.rows.filter((row) => row.status === 'failed').map((row) => (
             <p key={row.friendId} className={styles.fieldError}>{`${row.sourceValue || '（空欄）'}：${row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}`}</p>
           ))}
