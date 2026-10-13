@@ -90,10 +90,12 @@
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global(:root) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
+/* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
+:global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
-:global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
+:global(:root) .frame[data-page-template='create'] [data-template-region='preview'][data-preview-surface='plain'] { background: transparent; }
 :global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
 :global(:root) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
 /*
@@ -464,6 +466,8 @@
 /* 申込者の数の帯も、本文と同じ左右24・上16。 */
 :global(:root) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }
 
+/* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
+:global(:root) fieldset.createContent { border: 0; margin: 0; }
 /* Collapsed list folders keep the complete selected label. */
 :global(:root) .collapsedSelect { width: max-content; flex: none; }
 
@@ -473,7 +477,7 @@
 /* 受信箱も白い板の下に24を残し、本文だけを送る。 */
 :global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }
 /* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
-:global(:root) fieldset.createContent { border: 0; margin: 0; }
+
 
 /* No-choice lists retain their create action even without other tools. */
 :global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }

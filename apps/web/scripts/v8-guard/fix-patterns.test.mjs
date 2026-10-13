@@ -87,6 +87,32 @@ test('X1/X2 use folder capability across widths; X3 checks all heading types', a
   } finally {await browser.close()}
 })
 
+test('F1 reads painted labels without counting an enlarged radio hit target as clipped text', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>label{position:relative;display:flex;width:max-content;height:20px;font:13px/20px sans-serif}label::before{content:"";position:absolute;inset:-3px}span{white-space:nowrap}</style><section data-page-template="create"><label><span>リッチメッセージ</span></label></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+    await page.addStyleTag({ content: 'label{width:40px;overflow:hidden}' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F1 > 0)
+    await page.addStyleTag({ content: 'label{width:max-content;height:8px;overflow:hidden}' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F1 > 0)
+  } finally { await browser.close() }
+})
+
+test('F2 distinguishes a column of upload instructions from a wrapped short action label', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>button{display:flex;flex-direction:column;width:240px;font:13px/20px sans-serif}span{display:block}</style><section data-page-template="create"><button><span>画像を追加</span><span>ドラッグ＆ドロップ<br>またはクリック</span><span>PNG・JPEG・10MBまで</span></button></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F2, 0)
+    await page.addStyleTag({ content: 'button{width:45px}' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+    await page.setContent('<section data-page-template="create"><button style="width:40px;font:13px/20px sans-serif">変更を保存する</button></section>')
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+  } finally { await browser.close() }
+})
+
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
   try {

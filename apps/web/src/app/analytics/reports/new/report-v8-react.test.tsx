@@ -173,6 +173,16 @@ afterEach(async () => {
 })
 
 describe('V8 レポート作成（H5UoIu）', () => {
+  it('宛先が未選択なら理由を伝えて送信せず、選んだ後に同じ操作が使える', async () => {
+    await mount()
+    await settle()
+    const send = buttonByText('今すぐ1回だけ送る')
+    expect(send.disabled).toBe(true)
+    expect(send.title).toBe('受け取る人を1人以上選んでください')
+    await pickEntities('レポートを受け取る人', ['担当1'])
+    expect(send.disabled).toBe(false)
+    expect(send.title).toBe('')
+  })
   it('板ID・題・必須・右欄の見本を出す', async () => {
     await mount()
     await settle()

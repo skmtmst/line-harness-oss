@@ -89,7 +89,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (!rects.length) continue
       const paintedWidth = Math.max(...rects.map(r=>r.right)) - Math.min(...rects.map(r=>r.left))
       if (paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
-        || el.scrollHeight > el.clientHeight + 1) add('F1', el, 'short text does not fit')
+        || rects.some(r => r.top < el.getBoundingClientRect().top + (parseFloat(css.paddingTop) || 0) - 1 || r.bottom > el.getBoundingClientRect().bottom - (parseFloat(css.paddingBottom) || 0) + 1)) add('F1', el, 'short text does not fit')
     }
     for (const el of all('input[type="search"]')) {
       if (el.value || !el.placeholder) continue
@@ -97,7 +97,12 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (canvas.measureText(el.placeholder).width > el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1) add('F1', el, 'search placeholder does not fit')
     }
     for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button,[data-page-title],[data-template-region="heading"] h1,[data-template-region="heading"] h2')) {
-      if (lines(el) > 1) add('F2', el, 'short text wraps')
+      // A column of title/instructions is a composite control. Audit each
+      // short label; explicit line breaks in instructions are intentional.
+      const css = getComputedStyle(el)
+      const composite = el.matches('button') && css.display.includes('flex') && css.flexDirection === 'column'
+      const targets = composite ? [...el.children].filter(child => visible(child) && child.textContent.trim() && !child.matches('svg') && !child.querySelector('br')) : [el]
+      for (const target of targets) if (lines(target) > 1) add('F2', target, 'short text wraps')
     }
     for (const el of all('button,a[role="button"],[data-page-title]')) {
       if (/\d+\s+件表示/.test(el.textContent) && el.matches('button') && !el.querySelector('button')) add('F3', el, 'page size does not use the shared compact wording')

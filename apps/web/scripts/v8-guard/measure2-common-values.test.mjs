@@ -15,7 +15,9 @@ test('本物の選ぶカードCSS: 丸の下の本文は狭めず、通常の本
    await page.setViewportSize({width,height:600});await page.setContent(html(css));assert.deepEqual(await values(),{fits:true,pad:'40px',bodyPad:'0px',clear:true})
    assert.equal(await page.locator('.card:not(.tile) .body').evaluate(el=>getComputedStyle(el).paddingRight),'24px')
    const correctWidth=await page.locator('.tile .title').evaluate(el=>el.getBoundingClientRect().width)
-   await page.setContent(html(css.replace(/html\[data-theme='v8'\] \.card:not\(\.row\)\[data-content-placement='below-indicator'\] \.body\s*\{[^}]*\}/,'')));assert.equal(correctWidth-await page.locator('.tile .title').evaluate(el=>el.getBoundingClientRect().width),24,'本文を丸用に24px狭める故障を検出')
+   const bad=css.replace(/html(?:\[data-theme='v8'\]|:root) \.card:not\(\.row\)\[data-content-placement='below-indicator'\] \.body\s*\{[^}]*\}/,'')
+   assert.notEqual(bad,css,'実物の本文幅の指定を取り除く')
+   await page.setContent(html(bad));assert.equal(correctWidth-await page.locator('.tile .title').evaluate(el=>el.getBoundingClientRect().width),24,'本文を丸用に24px狭める故障を検出')
   }
  }finally{await browser.close()}
 })
@@ -26,11 +28,11 @@ test('本物の件数欄CSS: 20 件表示を切らず、旧幅100の故障を検
  const browser=await chromium.launch()
  try{
   const page=await browser.newPage()
-  const html=style=>`<html data-theme="v8"><style>${globals}\n${css}\n${toolbar}\n${style}</style><body><div class="toolbar"><div class="root pageSize" data-design-node="niGPF"><button class="trigger closedTrigger"><span class="value">20 件表示</span><svg class="chevron"></svg></button></div></div></body></html>`
+  const html=style=>`<html data-theme="v8"><style>${globals}\n${css}\n${toolbar}\n${style}</style><body><div class="toolbar"><div class="root pageSize" data-design-node="niGPF"><button class="trigger closedTrigger" data-chevron="true"><span class="value">20 件表示</span><svg class="chevron"></svg></button></div></div></body></html>`
   const fits=()=>page.locator('.value').evaluate(el=>el.scrollWidth<=el.clientWidth)
   for(const width of [1440,1152]){
    await page.setViewportSize({width,height:600});await page.setContent(html(''));assert.equal(await fits(),true)
-   await page.setContent(html("html[data-theme='v8'] {--tpl-select-page-size:100px}"));assert.equal(await fits(),false)
+   await page.setContent(html("html:root .root.pageSize .trigger {width:100px;min-width:0}"));assert.equal(await fits(),false,'子の操作を100へ縮める故障を検出')
    await page.setContent(html("[data-theme='v8'] .toolbar [data-design-node='niGPF'] {width:100px;min-width:0}"));assert.equal(await fits(),false,'親で最小幅を解除する故障を検出')
   }
  }finally{await browser.close()}
@@ -40,11 +42,13 @@ test('本物の選ぶ欄CSS: wMMk6の左右12・間8・矢印16を共通値で�
  const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
  const browser=await chromium.launch()
  try{
-  const page=await browser.newPage();const html=style=>`<html data-theme="v8"><style>${globals}\n${style}</style><body><div class="trigger closedTrigger"><span class="value">20件表示</span><svg class="chevron"></svg></div></body></html>`
+  const page=await browser.newPage();const html=style=>`<html data-theme="v8"><style>${globals}\n${style}</style><body><div class="trigger closedTrigger" data-chevron="true"><span class="value">20件表示</span><svg class="chevron"></svg></div></body></html>`
   const values=()=>page.locator('.trigger').evaluate(el=>{const s=getComputedStyle(el);return [s.paddingLeft,s.paddingRight,s.gap,el.querySelector('svg').getBoundingClientRect().width]})
   for(const width of [1440,1152]){
    await page.setViewportSize({width,height:600});await page.setContent(html(css));assert.deepEqual(await values(),['12px','12px','8px',16])
-   await page.setContent(html(css.replaceAll('padding: 0 var(--tpl-select-inset)', 'padding: 0 10px 0 12px').replaceAll('gap: var(--tpl-select-gap)','gap: 6px')));assert.deepEqual((await values()).slice(0,3),['12px','10px','6px'])
+   const bad=css.replaceAll('padding: 0 var(--tpl-select-inset)', 'padding: 0 10px 0 12px').replaceAll('gap: var(--tpl-select-gap)','gap: 6px')
+   assert.notEqual(bad,css,'実物の内側と間の指定を変える')
+   await page.setContent(html(bad));assert.deepEqual((await values()).slice(0,3),['12px','10px','6px'])
   }
  }finally{await browser.close()}
 })
@@ -58,7 +62,9 @@ test('本物のページ送りCSS: 現在地の緑は通常セルの色に負け
   const colors=()=>page.locator('.page').evaluateAll(els=>els.map(el=>getComputedStyle(el).color))
   for(const width of [1440,1152]){
    await page.setViewportSize({width,height:600});await page.setContent(html(css));assert.deepEqual(await colors(),['rgb(8, 122, 62)','rgb(74, 85, 101)'])
-   await page.setContent(html(css.replace(/html\[data-theme='v8'\] \.current\s*\{[^}]*\}/,' ')));assert.deepEqual(await colors(),['rgb(74, 85, 101)','rgb(74, 85, 101)'],'選択色の指定欠けを検出')
+   const bad=css.replace(/html(?:\[data-theme='v8'\]|:root) \.current\s*\{[^}]*\}/,' ')
+   assert.notEqual(bad,css,'実物の現在地の色指定を取り除く')
+   await page.setContent(html(bad));assert.deepEqual(await colors(),['rgb(74, 85, 101)','rgb(74, 85, 101)'],'選択色の指定欠けを検出')
   }
  }finally{await browser.close()}
 })

@@ -105,6 +105,8 @@ export function sourceEvidence(file, source, offset, length = 1) {
     tag: opening?.tagName.getText(entry.tree),
     emptyElement: Boolean(jsx && (ts.isJsxSelfClosingElement(jsx) || jsx.children.every(child => ts.isJsxText(child) && !child.text.trim()))),
     attribute: attribute?.name.getText(entry.tree),
+    literalAttribute: Boolean(literal && attribute && (attribute.initializer === literal || (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression === literal))),
+    literalProperty: literal && ts.isPropertyAssignment(literal.parent) ? literal.parent.name.getText(entry.tree) : undefined,
     imports: entry.imports,
     calls: parents.filter(ts.isCallExpression).map(node => node.expression.getText(entry.tree)),
     ancestorTags: parents.filter(node => ts.isJsxElement(node)).map(node => node.openingElement.tagName.getText(entry.tree)),
