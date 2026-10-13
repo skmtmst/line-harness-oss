@@ -19,7 +19,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -154,7 +154,7 @@ function TableHead() {
         <Th className={styles.colResult}>結果</Th>
         <Th className={styles.colDone}>したこと</Th>
         <Th className={styles.colTime} align="right">かかった時間</Th>
-        <Th className={styles.colOps}>操作</Th>
+        <Th>操作</Th>
       </TableHeadRow>
     </thead>
   )
@@ -186,7 +186,6 @@ export default function AutomationRunsV8() {
   const includeTest = saved === 'include-test'
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [runId, setRunId] = useDetailPanelUrl('run')
   const [selectedRun, setSelectedRunState] = useState<AutomationRunRow | null>(null)
   const setSelectedRun = (run: AutomationRunRow | null | ((current: AutomationRunRow | null) => AutomationRunRow | null)) => {
@@ -510,7 +509,7 @@ export default function AutomationRunsV8() {
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <TableHead />
             <tbody>
               {data.items.map((run) => {
@@ -518,7 +517,7 @@ export default function AutomationRunsV8() {
                 const reason = resultReason(run)
                 const whenLine = [shortDateTime(run.occurredAt), run.accountLabel].filter(Boolean).join('・')
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
-                const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
+                const subjectName = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」`
                 return (
                   <Tr key={run.id} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
                     <Td grow className={styles.colWhen}>
@@ -540,16 +539,8 @@ export default function AutomationRunsV8() {
                       {done.length > 0 ? <span className={styles.sub}>{`${done.length} つ`}</span> : null}
                     </Td>
                     <Td align="right" className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
-                    <ActionCell className={styles.colOps}>
-                      <div className={styles.opsBox}>
-                        <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
-                        <RowMenu
-                          label={menuLabel}
-                          open={openMenuId === run.id}
-                          onOpenChange={(next) => setOpenMenuId(next ? run.id : null)}
-                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
-                        />
-                      </div>
+                    <ActionCell>
+                      <RowActions subjectName={subjectName} detail={{ label: '中身を見る', onClick: () => setSelectedRun(run) }} menuItems={rowMenuItems(run)} />
                     </ActionCell>
                   </Tr>
                 )

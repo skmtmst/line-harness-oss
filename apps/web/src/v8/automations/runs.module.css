@@ -20,7 +20,6 @@
 .colResult { width: var(--tpl-am-run-col-result); flex-shrink: 0; min-width: 0; }
 .colDone { width: var(--tpl-am-run-col-done); flex-shrink: 0; min-width: 0; }
 .colTime { width: var(--tpl-am-run-col-time); flex-shrink: 0; }
-.colOps { width: var(--tpl-am-run-col-ops); flex-shrink: 0; }
 
 /* いつ・だれに：友だちの名前（緑の 13/600）と日時・店。 */
 .subject {
@@ -67,13 +66,6 @@
 }
 
 /* 結果の札（点つき）。 */
-
-/* 行の右端：中身を見ると「…」。 */
-.opsBox {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-am-ops-gap);
-}
 
 /* 状態の札の並び。 */
 .chipGroup {
