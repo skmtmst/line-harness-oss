@@ -1,4 +1,6 @@
 'use client'
+
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Toggle from '@/components/shared/toggle'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -428,10 +430,10 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       <div className={styles.cardHead}>
         <h2 className={styles.cardTitle}>名前とフォルダ</h2>
       </div>
-      <div className={styles.pair}>
+      <SettingsFormRow layout="name-folder">
         <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor={`te-${kind}-name`} requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
 <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError></Field></div>
-        <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+        <div className={styles.field}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}
@@ -444,7 +446,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                 : undefined}
           /></SaveErrorField></Field></div>
-      </div>
+      </SettingsFormRow>
     </Card>
   )
 
@@ -553,12 +555,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <SaveErrorField names={["lottery"]}><SettingCheckbox checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
               </div>
               {lottery ? (
-                <div className={styles.pair}>
+                <SettingsFormRow layout="columns">
                   <div className={`${styles.field} ${styles.grow}`}><Field label="当たる確率（%）" htmlFor="te-lottery-rate" requirement={fields.requirement('rate')}><SaveErrorField names={["lotteryRate","lottery_rate"]}><NumberInput unit="%" {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} /></SaveErrorField>
 <FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError></Field></div>
                   <div className={`${styles.field} ${styles.grow}`}><Field label="当選人数の上限（人）" htmlFor="te-winner-limit" requirement={fields.requirement('limit')}><SaveErrorField names={["winnerLimit","winner_limit"]}><NumberInput unit="人" {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} /></SaveErrorField>
 <FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError></Field></div>
-                </div>
+                </SettingsFormRow>
               ) : (
                 <p className={styles.cardNote}>抽選しないときは、受け取った人全員に配ります。</p>
               )}
@@ -623,11 +625,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                       消す
                     </button>
                   </div>
-                  <div className={styles.pair}>
+                  <SettingsFormRow layout="columns">
                     <div className={`${styles.field} ${styles.grow}`}><Field label="質問文" htmlFor={`te-q-${question.key}`} requirement={fields.requirement(`q-${question.key}`)}><SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>
 <FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError></Field></div>
                     <div className={`${styles.field} ${styles.formatField}`}><Field label="答え方" htmlFor={`te-qf-${question.key}`}><SaveErrorField names={[`shown.${index}.format`,"format","question.format"]}><Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} /></SaveErrorField></Field></div>
-                  </div>
+                  </SettingsFormRow>
                   {question.format !== 'free' ? (
                     <>
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>

@@ -1931,6 +1931,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                       (checks !== null && publishPlan.mode === 'now' && !checksAllOk) ||
                       (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
+                    title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
                     busy={publishing || saving}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
                     onClick={() => void handlePublishSubmit()}
@@ -2660,15 +2661,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             </div>
             <div className={styles.endRow}>
               <span className={styles.endDate}>
-                <SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
+                <Field label="終わる日時" labelHidden optional={false} note={!endEnabled ? '「終わりを決める」をオンにすると設定できます' : undefined}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
                   value={publishPlan.endsAt}
                   onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
                   disabled={!endEnabled}
-                /></SaveErrorField>
+                /></SaveErrorField></Field>
               </span>
               <span>に終わり、</span>
-              <SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
+              <Field label="終わったらどうする" labelHidden optional={false} note={!endEnabled ? '「終わりを決める」をオンにすると設定できます' : undefined}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
@@ -2677,7 +2678,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
                   ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
                 ]}
-              /></SaveErrorField>
+              /></SaveErrorField></Field>
               <span>に戻す</span>
             </div>
           </div>
