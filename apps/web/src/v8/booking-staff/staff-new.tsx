@@ -318,7 +318,7 @@ export default function StaffNewV8() {
           previewLabel="予約画面での見え方を見る" previewTitle="予約画面での見え方"
           preview={<>
             {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
-            <CardHeader title="予約画面での見え方" />
+            <CardHeader size="stacked" title="予約画面での見え方" />
             {staffPreviewError ? <ListState kind="error" title="担当の見本を読み込めませんでした" onRetry={() => setStaffPreviewRetry(value => value + 1)} /> : null}
             <PhoneStaffStep menu={previewMenu} staff={previewStaff} designationFree={designationFree}
               status={menusLoading || staffPreviewLoading ? 'loading' : menusError || staffPreviewError ? 'error' : 'ready'} />
@@ -332,7 +332,7 @@ export default function StaffNewV8() {
           </>}
         >
           <Card variant="form" gap="normal" aria-labelledby="bs-card-info">
-            <CardHeader title="お客さまに見える情報" titleId="bs-card-info" />
+            <CardHeader size="stacked" title="お客さまに見える情報" titleId="bs-card-info" />
             <SettingsFormRow layout="columns">
               <Field label="スタッフ名（管理画面での呼び名）" htmlFor="bs-name" required error={fieldErrors.name}
                 count={{ value: name.length, max: BOOKING_STAFF_LIMITS.name }}>
@@ -368,7 +368,7 @@ export default function StaffNewV8() {
           </Card>
 
           <Card variant="form" gap="normal" aria-labelledby="bs-card-menus">
-            <CardHeader title="予約を受けられるメニュー" titleId="bs-card-menus" />
+            <CardHeader size="stacked" title="予約を受けられるメニュー" titleId="bs-card-menus" />
             <Notice tone="info">選んだメニューだけ、このスタッフを指名できます。1つも選ばないと予約画面に出ません。</Notice>
             {menusLoading ? <span aria-busy="true"><span className="sr-only">メニューを読み込んでいます</span>
               <DelayedSkeleton loading skeleton={<Skeleton width="100%" height={36} />} /></span>
@@ -384,7 +384,7 @@ export default function StaffNewV8() {
           </Card>
 
           <Card variant="form" gap="normal" aria-labelledby="bs-card-accept">
-            <CardHeader title="受付と表示" titleId="bs-card-accept" />
+            <CardHeader size="stacked" title="受付と表示" titleId="bs-card-accept" />
             <Notice tone="info">最初は店舗の営業時間に合わせます。個別に変えるときは、登録後に「勤務とシフト」で調整できます。</Notice>
             <SaveErrorField names={["isDesignationOptional", "is_designation_optional"]}>
               <Checkbox checked={isDesignationOptional} onCheckedChange={setIsDesignationOptional} aria-label="「指名なし」の枠にも含める"
@@ -398,7 +398,7 @@ export default function StaffNewV8() {
           </Card>
 
           <Card variant="form" gap="normal" aria-labelledby="bs-card-member">
-            <CardHeader title="ログインユーザーとのひも付け" titleId="bs-card-member" />
+            <CardHeader size="stacked" title="ログインユーザーとのひも付け" titleId="bs-card-member" />
             <Notice tone="info">ひも付けると、その人が左メニュー「自分の勤務」で、このスタッフのシフト・休憩・Google カレンダーを決められます。</Notice>
             {membersLoading ? <span aria-busy="true"><span className="sr-only">ログインユーザーを読み込んでいます</span>
               <DelayedSkeleton loading skeleton={<Skeleton width="100%" height={36} />} /></span>
