@@ -364,3 +364,13 @@ test('作る型の実CSS：1152は右欄を畳み名前とフォルダを1列、
     }
   } finally { await browser.close() }
 })
+
+test('LINE見本の描かれる箱を内容として数え、スクロールの箱や端末後の本当の空白は見逃さない',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage({viewport:{width:1440,height:900}});
+ const phone='<section data-line-preview-part="phone" style="width:300px;height:600px;background:#111"><div data-line-preview-part="talk" style="height:520px"><p style="margin:0;color:white">短い見本</p></div></section>';
+ const pane=height=>shell(`<aside data-template-region="preview" style="width:400px;height:${height}px;padding:24px;background:white;overflow:auto">${phone}</aside><footer style="margin-top:900px">続き</footer>`);
+ await page.setContent(pane(400));assert.deepEqual(await page.evaluate(scanPanelBlank),[]);
+ await page.setContent(pane(760));const bad=await page.evaluate(scanPanelBlank);assert.equal(bad.length,1);assert.equal(bad[0].measure.gap,136);
+ await page.setContent(pane(400));await page.locator('[data-line-preview-part="phone"]').evaluate(e=>{e.removeAttribute('data-line-preview-part');e.style.height='300px';e.style.background='transparent'});assert.ok((await page.evaluate(scanPanelBlank)).some(f=>f.measure.gap>=64));
+ }finally{await browser.close()}
+});
