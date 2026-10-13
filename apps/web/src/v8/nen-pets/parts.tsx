@@ -99,7 +99,7 @@ export function RowMenu({ subject, items }: { subject: string; items: ActionMenu
   return (
     <span className={styles.menuBox}>
       <SharedRowMenu
-        className={styles.menuButton}
+        appearance="box"
         label={`「${subject}」の操作`}
         open={open}
         onOpenChange={setOpen}
