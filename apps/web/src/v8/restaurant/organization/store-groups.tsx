@@ -102,7 +102,7 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
   }
   return <Panel title="店の組（満席のとき案内してよい店）" description="同じ組の店舗ごとに、案内への参加と距離を設定します。" flush>
     {loading ? <ListState kind="loading" /> : loadError ? <ListState kind="error" error={loadError} onRetry={() => setRetry(current => current + 1)} /> : groups.length === 0 ? <ListEmptyMessage>店の組：なし</ListEmptyMessage> :
-      <GridTable label="店の組の店舗別設定" framed={false} design={{ columns: 'minmax(0, 1fr) max-content max-content max-content', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', rowHeight: 'var(--polish-table-row)', fontSize: 'var(--polish-text-body)' }}>
+      <GridTable label="店の組の店舗別設定" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-rt-col-80) var(--tpl-rt-col-130) var(--tpl-rt-col-80)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', rowHeight: 'var(--polish-table-row)', fontSize: 'var(--polish-text-body)' }}>
         {groups.flatMap(group => group.members.map(member => {
           const store = stores.find(item => item.id === member.store_id)
           return <GridRow key={`${group.id}:${member.store_id}`}>
@@ -110,7 +110,7 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
               <TruncatedText value={store?.name ?? '—'} className={styles.memberName} />
               <TruncatedText value={group.name} className={styles.sub} />
             </GridCell>
-            <GridCell><Status value={member.referral_enabled ? 'active' : 'paused'} /></GridCell>
+            <GridCell><Status value={member.referral_enabled ? 'active' : 'disabled'} /></GridCell>
             <GridCell className={styles.shortText}>{member.max_distance}km まで</GridCell>
             <GridCell align="right">{readOnly || !store ? null : <RowActions subjectName={`${store.name}の案内設定`} edit={{ onClick: () => setTarget({ group, member, store }) }} />}</GridCell>
           </GridRow>

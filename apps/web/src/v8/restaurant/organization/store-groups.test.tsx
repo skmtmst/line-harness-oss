@@ -78,6 +78,8 @@ it('閲覧のみは距離と状態を読み、編集の操作は出さない', a
   render(<StoreGroups accountId="account" stores={stores} readOnly />)
   await screen.findByText('試験店A')
   expect(screen.getByText('3km まで')).toBeTruthy()
+  expect(screen.getByText('停止中')).toBeTruthy()
+  expect(screen.queryByText('paused')).toBeNull()
   expect(screen.queryByRole('button', { name: /のその他操作/ })).toBeNull()
 })
 
