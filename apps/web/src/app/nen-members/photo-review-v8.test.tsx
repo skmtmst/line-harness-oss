@@ -154,7 +154,7 @@ describe('投稿 V8', () => {
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     fireEvent.click(screen.getByRole('tab', { name: '公式サイト掲載' }))
-    expect(await screen.findByText('どこで使っているか')).toBeTruthy()
+    expect(await screen.findByRole('columnheader', { name: /掲載先/ })).toBeTruthy()
     expect(container.querySelector('[data-design-node="SyQA1"]')).toBeTruthy()
     expect(screen.getByRole('button', { name: '掲載先から外す' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '出すときの決めごと' })).toBeTruthy()

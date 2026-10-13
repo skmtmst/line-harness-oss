@@ -1299,7 +1299,7 @@ function PublicationsV8({
                   <TableHeadRow data-table-layout="columns">
                     <Th>写真</Th>
                     <Th grow>ペット</Th>
-                    <Th>どこで使っているか</Th>
+                    <Th help="この写真を使っている掲載先です。複数の場所は行にまとめて表示します。">掲載先</Th>
                     <Th align="right"><span title="30日間の集計は未接続です。累計の回数には置き換えません">この30日に見た</span></Th>
                     <Th>公開の同意</Th>
                     <Th align="right">操作</Th>
@@ -1328,8 +1328,8 @@ function PublicationsV8({
                           <span className={styles.petSubV8}>{Number(item.hide_owner_name) === 0 ? '名前を出しています' : '名前は伏せています'}</span>
                         </Td>
                         <Td><span className={styles.pubCell} title={placementLabels(item)}>{placementLabels(item)}</span></Td>
-                        <Td align="right">{viewsText(item.view_count_30_days)}</Td>
-                        <Td>{consented ? <Chip tone="ok">同意あり</Chip> : <Chip tone="neutral">未取得</Chip>}</Td>
+                        <Td align="right" data-list-number>{viewsText(item.view_count_30_days)}</Td>
+                        <Td><StatusBadge tone={consented ? 'success' : 'neutral'} size="compact">{consented ? '同意あり' : '未取得'}</StatusBadge></Td>
                         <ActionCell>
                           {canEdit ? <RowActions subjectName={name}
                             detail={{ label: busyId === text(item.id) ? '外しています...' : '掲載先から外す', disabled: busyId === text(item.id), onClick: () => { setNotice(''); setWithdrawTarget(item) } }}
