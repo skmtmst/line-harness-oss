@@ -77,6 +77,7 @@ function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<Me
 /** G-9。吹き出しの枠・タブ・本文・素材・作成の入口は統括と店で同じ部品。 */
 export default function MessageComposer(props: MessageComposerProps) {
   const { bubbles, accountId, onChange, onMove, onDelete, onAdd, onPickTemplate, onSaveTemplate, onCompose, unavailable = {}, busy = false } = props
+  const busyReason = busy ? '処理中です。完了してから操作してください。' : undefined
   return <section className={styles.root} data-message-composer>
     <div className={styles.heading}>
       <div className={styles.title}><h3>{`メッセージ（${bubbles.length} / ${MAX_BUBBLES}）`}</h3><HelpTip label="メッセージの説明">1回の配信に5つまで入れられます。上から順に届きます。</HelpTip></div>
@@ -91,7 +92,7 @@ export default function MessageComposer(props: MessageComposerProps) {
       return <Card key={bubble.id} className={styles.bubble} padding="rows" overflow="hidden" aria-label={`${index + 1}通目の吹き出し`}>
         <div className={styles.header}>
           <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={16} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
-          <div className={styles.controls}><IconButton size="row" aria-label={`${index + 1}通目を上へ移動`} disabled={busy || index === 0} title={busy ? '処理が終わるまでお待ちください' : index === 0 ? 'いちばん上のため、上へ移動できません' : undefined} onClick={() => onMove(index, -1)}><ArrowUp size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を下へ移動`} disabled={busy || index === bubbles.length - 1} title={busy ? '処理が終わるまでお待ちください' : index === bubbles.length - 1 ? 'いちばん下のため、下へ移動できません' : undefined} onClick={() => onMove(index, 1)}><ArrowDown size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を削除する`} disabled={busy || bubbles.length === 1} title={busy ? '処理が終わるまでお待ちください' : bubbles.length === 1 ? 'メッセージは1つ以上必要です' : undefined} onClick={() => onDelete(index)}><Trash2 size={14} aria-hidden /></IconButton></div>
+          <div className={styles.controls}><IconButton size="row" aria-label={`${index + 1}通目を上へ移動`} disabled={busy || index === 0} title={busyReason ?? (index === 0 ? '最初のメッセージです。' : undefined)} onClick={() => onMove(index, -1)}><ArrowUp size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を下へ移動`} disabled={busy || index === bubbles.length - 1} title={busyReason ?? (index === bubbles.length - 1 ? '最後のメッセージです。' : undefined)} onClick={() => onMove(index, 1)}><ArrowDown size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を削除する`} disabled={busy || bubbles.length === 1} title={busyReason ?? (bubbles.length === 1 ? 'メッセージは1通以上必要です。' : undefined)} onClick={() => onDelete(index)}><Trash2 size={14} aria-hidden /></IconButton></div>
         </div>
         <div className={styles.tabs} role="tablist" aria-label={`${index + 1}通目のメッセージ形式`} onKeyDown={(event) => {
           const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']

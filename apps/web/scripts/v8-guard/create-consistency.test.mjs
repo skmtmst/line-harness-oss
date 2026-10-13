@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 import scanCreateConsistency from './create-consistency-browser.mjs'
+import scanFormRules from './form-rules-browser.mjs'
+
 import { assessAgainstBase, measurePage, record, validateAllowances } from './layout-defects.mjs'
 const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8');
 const actions=()=>readFileSync(new URL('../../src/components/shared/action-list.module.css',import.meta.url),'utf8');
@@ -42,6 +44,28 @@ test('Y4 主保存の実SVGを数え、チェック・印なし・二重印の�
  await page.setContent(button(svg('arrow-right')).replace('保存する','次へ'));assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
  }finally{await browser.close()}
 });
+
+test('言葉の追加は札の隣の箱つき入力で、枠なしと名前なしの札を検出する', async () => {
+ const fieldCss = readFileSync(new URL('../../src/components/shared/text-field.module.css', import.meta.url), 'utf8')
+ const entryCss = readFileSync(new URL('../../src/components/shared/keyword-input.module.css', import.meta.url), 'utf8')
+ const browser = await chromium.launch()
+ try {
+  const page = await browser.newPage()
+  for (const width of [1440, 1152, 1920]) {
+   await page.setViewportSize({ width, height: 900 })
+   await page.setContent(`<style>${globals}${fieldCss}${entryCss}</style><div data-theme="v8"><main><div style="display:flex;gap:8px;width:400px;align-items:center">
+     <span>予約変更</span><span data-keyword-input class="entry"><span class="field single affixed"><span class="adornment">検索</span><input class="field single affixedControl" placeholder="言葉を入れて Enter" aria-label="言葉を足す"></span></span></div></main></div>`)
+   const defects = () => page.evaluate(scanFormRules).then(rows => rows.filter(row => row.kind === 'form-keyword-input'))
+   assert.equal((await defects()).length, 0)
+   const boxes = await page.locator('[data-keyword-input]').evaluate(el => ({ width: el.getBoundingClientRect().width, parent: el.parentElement.getBoundingClientRect().width }))
+   assert.ok(boxes.width > 0 && boxes.width <= boxes.parent)
+   await page.addStyleTag({ content: 'html:root [data-keyword-input] > span{border:0;outline:0}' })
+   assert.equal((await defects()).length, 1, '枠を落とした故障を止める')
+   await page.setContent('<main><div data-form-requirement="optional"><label><svg width="14" height="14"></svg></label><span>任意</span><input style="border:0" placeholder="言葉を入れて Enter"></div></main>')
+   assert.equal((await defects()).length, 1, '素の欄と名前のない札へ戻る故障を止める')
+  }
+ } finally { await browser.close() }
+})
 
 test('Y1〜Y4の説明値を保ち、数値の実測で本線比較・新規・件数増加・悪化を判定する',async()=>{
  const browser=await chromium.launch();try{const page=await browser.newPage();

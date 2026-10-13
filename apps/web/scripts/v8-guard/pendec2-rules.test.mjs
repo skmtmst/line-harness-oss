@@ -196,3 +196,24 @@ test('板の下余白は題で照合し、説明文が変わっても実寸の�
     assert.equal(assessAgainstBase(worse,base,'/fixture',1152,[]).failures.length,1)
   } finally { await browser.close() }
 })
+
+test('2択の器の空の尾を検出し、文字幅の器と等幅の器を保つ', async () => {
+ const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace('@theme {', ':root {')
+ const css = readFileSync(new URL('../../src/components/shared/segmented.module.css', import.meta.url), 'utf8')
+ const browser = await chromium.launch()
+ try {
+  const page = await browser.newPage()
+  for (const width of [1440,1152,1920]) {
+   await page.setViewportSize({width,height:900})
+   await page.setContent(`<style>${globals}${css}</style><div data-theme="v8"><main style="display:flex;flex-direction:column;width:600px"><div class="root" data-segmented-control data-appearance="track" data-size="medium"><button class="item selected" aria-pressed="true">1つだけ選ぶ</button><button class="item" aria-pressed="false">いくつでも選ぶ</button></div></main></div>`)
+   const empty = () => page.evaluate(scan).then(rows => rows.filter(row => row.kind === 'segempty'))
+   assert.equal((await empty()).length,1,'縦flexへ器を渡すだけでは空の尾が残る')
+   await page.locator('[data-segmented-control]').evaluate(el=>el.setAttribute('data-segmented-fit','content'))
+   assert.equal((await empty()).length,0)
+   await page.addStyleTag({content:'html:root .root[data-segmented-fit="content"]{align-self:stretch;width:auto}'})
+   assert.equal((await empty()).length,1,'文字幅の指定を落とす故障を止める')
+   await page.locator('[data-segmented-control]').evaluate(el=>{el.removeAttribute('data-segmented-fit');el.setAttribute('data-equal-width','true')})
+   assert.equal((await empty()).length,0,'均等に使う器は空の尾ではない')
+  }
+ } finally { await browser.close() }
+})

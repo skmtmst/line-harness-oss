@@ -32,6 +32,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     return css.display.includes('flex') && css.flexDirection === 'column'
   }
   const shortControlParts = el => {
+    if (!el.matches('button') && [...el.children].some(child => child.matches('br'))) return []
     const column = isTextColumn(el) || [...el.querySelectorAll('*')].some(isTextColumn)
     if (!column) return [el]
     if ([...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) return [el]

@@ -806,8 +806,8 @@ function VisitStampsScreen() {
             status={dirty ? '保存していない変更があります' : undefined}
             actions={(
               <>
-                <Button disabled={!dirty || saving || imageBusy} onClick={() => resetDraft(card)}>キャンセル</Button>
-                <Button variant="primary" disabled={!dirty || saving || imageBusy} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />保存する</Button>
+                <Button disabled={!dirty || saving || imageBusy} disabledReason={saving ? '保存しています' : imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => resetDraft(card)}>キャンセル</Button>
+                <Button variant="primary" disabled={!dirty || saving || imageBusy} disabledReason={imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />保存する</Button>
               </>
             )}
           />
