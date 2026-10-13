@@ -43,7 +43,7 @@ export interface CreatePageProps extends PageHeadingProps {
    * E-9 統括の一括配信 p17Qku）。画面の CSS で型の余白を上書きせず、ここで選ぶ。
    */
   contentSpacing?: 'flush-top'
-  /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ表の頭と同じ地。 */
+  /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ白い板と同じ地。 */
   previewSurface?: 'plain'
   footerActions: ReactNode
   /** 浮いた帯が本文の末尾の余白に重なる板。入力段の中身には重ねない。 */

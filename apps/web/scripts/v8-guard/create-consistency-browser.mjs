@@ -30,7 +30,7 @@ export default function scanYRules() {
  if(/作る/.test(title)&&/編集|直す/.test(breadcrumb))add('Y3',heading,{title,breadcrumb});
  const saves=[];
  for(const button of document.querySelectorAll('[data-sticky-actions] button')){
-  if(!visible(button)||!/(保存|登録|作る|変更|公開|発行|有効|追加|やり直す)/.test(button.textContent)||button.getAttribute('aria-busy')==='true')continue;
+  if(!visible(button)||!/(保存|登録|作る|つくって|動かす|変更|公開|発行|有効|追加|やり直す)/.test(button.textContent)||button.getAttribute('aria-busy')==='true')continue;
   if(![...button.classList].some(c=>c.includes('_primary')))continue;
   const icons=[...button.querySelectorAll('svg')].map(e=>({classes:e.getAttribute('class'),canonical:e.hasAttribute('data-sticky-save-icon')}));
   saves.push({text:button.textContent,icons});
