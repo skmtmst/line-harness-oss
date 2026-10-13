@@ -213,7 +213,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
                 <Td className={styles.colWhen}><span className={styles.main} title={[joinNote(participant), joinKindLabel(participant)].filter(Boolean).join("・")}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
                   <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
-                  <span className={styles.sub}>{participantStateLabel(participant, webinar.durationSeconds)}</span>
+                  <TruncatedText className={styles.sub} value={participantStateLabel(participant, webinar.durationSeconds)} />
                 </Td>
                 <Td className={styles.colAction}>
                   <span className={styles.pill} data-tone={badge.done ? 'done' : 'neutral'}>
@@ -281,8 +281,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         pagination={<>
           {state === 'ready' && searched.length > 0 ? (
             <ListPagePagination>
-              <span className={styles.pagerCount}>{`${formatNumber(searched.length)} 件中 ${from}〜${to} 件`}</span>
-              <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" />
+              <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" range={{ total: searched.length, first: from, last: to }} />
             </ListPagePagination>
           ) : null}
         </>}
