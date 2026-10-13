@@ -24,9 +24,49 @@ test('numeric support columns reserve the full note instead of the old truncatio
   } finally { await browser.close() }
 })
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import scanVisualState from './visual-state-browser.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
+
+test('an explicit plain preview keeps the reading detail ground through creation-only CSS changes', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const styles = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
+    const html = sheet => `<html data-theme="v8"><style>${read('../../src/app/globals.css')}${sheet}</style><main><section class="frame" data-page-template="detail"><aside class="preview" data-template-region="preview" data-preview-surface="plain">状態と操作</aside></section></main></html>`
+    await page.setContent(html(styles))
+    assert.equal((await page.evaluate(scanVisualState)).findings.length, 0)
+    const broken = styles.replace(".preview[data-preview-surface='plain']", ".frame[data-page-template='create'] [data-template-region='preview'][data-preview-surface='plain']")
+    assert.notEqual(broken, styles)
+    await page.setContent(html(broken))
+    assert.equal((await page.evaluate(scanVisualState)).findings[0].kind, 'preview-background')
+    await page.setContent(html(styles))
+    assert.equal((await page.evaluate(scanVisualState)).findings.length, 0)
+    await page.locator('section').evaluate(el => {
+      el.dataset.pageTemplate = 'create'
+      el.querySelector('aside').removeAttribute('data-preview-surface')
+    })
+    assert.equal((await page.evaluate(scanVisualState)).findings.length, 0, 'the creation ground remains white without the plain option')
+  } finally { await browser.close() }
+})
+
+test('a compact listbox control keeps its shared square while text selects fit their label', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${read('../../src/app/globals.css')}${css('icon-button')}${css('select')}${css('list-toolbar')}</style><main><div class="toolbar"><div class="root" data-select-icon-only><button class="button" data-size="compact" data-icon-only aria-haspopup="listbox" aria-label="よく使う絞り込み"><svg width="16" height="16"></svg><span hidden>停止中のみ</span></button></div><div class="root standard"><button class="trigger" aria-haspopup="listbox"><span class="value">状態：すべて</span></button></div></div></main>`)
+    const sizes = () => page.locator('button').evaluateAll(els => els.map(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height })))
+    const good = await sizes()
+    assert.deepEqual(good[0], { width: 32, height: 32 })
+    const fault = await page.addStyleTag({ content: css('list-toolbar').replace(':not([data-icon-only])', '') })
+    const broken = await sizes()
+    assert.equal(broken[0].width, 16, 'fitting the icon as if it were a text value shrinks the frame')
+    assert.deepEqual(broken[1], good[1], 'the ordinary text select keeps its intrinsic width')
+    await fault.evaluate(el => el.remove())
+    assert.deepEqual(await sizes(), good)
+  } finally { await browser.close() }
+})
 
 test('KPI filtering and navigation actions have the same line height; a normal button minimum stretches the band', async () => {
   const browser = await chromium.launch()

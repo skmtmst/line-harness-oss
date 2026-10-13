@@ -14,3 +14,8 @@ test('an unmeasured case has empty cells and cannot become a passing zero',()=>{
   assert.deepEqual(values.slice(3,13),Array(10).fill(''))
   assert.ok(!t.includes('\tpass\t'))
 })
+test('a visual state defect cannot become a pass when the old pattern counts are zero',()=>{
+  const output=countTable([{board:'conflict',route:'/edit',width:1152,counts:{},findings:[],errors:[],writes:[],visualState:{findings:[{kind:'state-mismatch'}]}}])
+  assert.ok(output.includes('\tfail\t'))
+  assert.ok(!output.includes('\tpass\t'))
+})

@@ -106,6 +106,7 @@
 ## card カード（中身のまとまりの箱）
 
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
+- 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
 
 - **役目**：中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる
 - **持ち主（コード）**：`apps/web/src/components/shared/card.tsx`・`apps/web/src/components/shared/card.module.css`（部品 `Card`・`CardHeader`）

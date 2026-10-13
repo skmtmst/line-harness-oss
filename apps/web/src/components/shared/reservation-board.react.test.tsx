@@ -7,6 +7,22 @@ const entry:ReservationBoardEntry={id:'r',kind:'seats',version:4,scopeId:'s',sta
 const resources=[{id:'t1',label:'T1',capacity:2,active:true},{id:'t2',label:'T2',capacity:2,active:true}]
 afterEach(()=>{cleanup();vi.restoreAllMocks()})
 describe('共通盤の操作',()=>{
+ it('飲食の一覧で名前から同じ予約を開き、注意事項は全文を読めて印刷にも残る',async()=>{
+  const open=vi.fn(),allergy='そば・小麦・えび（予約時に確認した内容）'
+  vi.spyOn(HTMLElement.prototype,'scrollWidth','get').mockReturnValue(300)
+  vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(80)
+  render(<ReservationBoard axis="list" columns="dining" diningContentColumns entries={[{...entry,currentAllergy:allergy}]} resources={resources} onOpen={open}/>)
+  fireEvent.click(screen.getByRole('button',{name:entry.customerName}))
+  expect(open).toHaveBeenCalledWith(entry.id)
+  const note=screen.getByText(allergy)
+  expect(note.getAttribute('aria-label')).toBe(allergy)
+  fireEvent.focus(note)
+  expect((await screen.findByRole('tooltip')).textContent).toBe(allergy)
+  vi.spyOn(window,'requestAnimationFrame').mockImplementation(cb=>setTimeout(()=>cb(0),0) as unknown as number)
+  const print=vi.spyOn(window,'print').mockImplementation(()=>{expect(document.querySelector('[data-reservation-print]')?.textContent).toContain(allergy)})
+  fireEvent.click(screen.getByRole('button',{name:'印刷'}))
+  await waitFor(()=>expect(print).toHaveBeenCalledTimes(1))
+ })
  it('移動には読んだ版を送り、失敗しても元の予約を残す',async()=>{
   const move=vi.fn().mockRejectedValue(new Error('409'))
   const {container}=render(<ReservationBoard entries={[entry]} resources={resources} dates={['2027-02-01']} canWrite onOpen={()=>{}} onMove={move}/>)

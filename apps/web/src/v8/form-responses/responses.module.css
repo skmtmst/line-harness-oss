@@ -24,11 +24,6 @@
   gap: var(--tpl-body-pad);
   min-width: 0;
 }
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-}
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
@@ -44,38 +39,6 @@
 }
 
 /* 後処理が終わっていない回答の帯。 */
-.alert {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-ev-fr-alert-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-status-danger-soft);
-}
-.alertIcon {
-  flex-shrink: 0;
-  color: var(--color-danger);
-}
-.alertText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-  min-width: 0;
-}
-.alertTitle {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: var(--tpl-row-name-lh);
-}
-.alertNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-wh-cell-lh);
-}
 
 /* まとめ：棒の行（名前・棒・件数）。 */
 .bars {
@@ -134,39 +97,6 @@
 }
 
 /* 自由に書く欄の新しい答え。 */
-.quotes {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.quoteRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-rule-row-gap);
-  min-height: var(--tpl-ev-fr-quote-h);
-  box-shadow: var(--shadow-row-line);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-wh-cell-lh);
-}
-.quoteText {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.quoteWho {
-  flex-shrink: 0;
-  color: var(--color-ink);
-  font-weight: 600;
-}
-.cardFoot {
-  display: flex;
-  justify-content: flex-end;
-}
 .linkButton {
   display: inline-flex;
   align-items: center;

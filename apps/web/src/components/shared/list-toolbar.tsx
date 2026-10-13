@@ -43,9 +43,9 @@ function useToolbarFit() {
 
 
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
-const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean }>({ leading: null })
+const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean; trailingAccessory?: ReactNode }>({ leading: null })
 const FrameContext = createContext(false)
-export function ListToolbarLeading({ children, leading, persistent, accessory }: { children: ReactNode; leading: ReactNode; persistent?: boolean; accessory?: ReactNode }) {
+export function ListToolbarLeading({ children, leading, persistent, accessory, trailingAccessory }: { children: ReactNode; leading: ReactNode; persistent?: boolean; accessory?: ReactNode; trailingAccessory?: ReactNode }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
   const flatten = (items: ReactNode, prefix = ''): ReactNode[] => Children.toArray(items).flatMap((node, index) => {
     if (!isValidElement<{ children?: ReactNode }>(node)) return [node]
@@ -67,7 +67,7 @@ export function ListToolbarLeading({ children, leading, persistent, accessory }:
     if (isValidElement(node) && node.type === ListToolbarRow || !containsTool(node) && node !== accessory) return node
     return <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>
   })}</ListToolbarFrame></> : <>{children}{accessory}</>
-  return <LeadingContext.Provider value={{ leading: contentSizedSelects(leading), persistent }}>{tools}</LeadingContext.Provider>
+  return <LeadingContext.Provider value={{ leading: contentSizedSelects(leading), persistent, trailingAccessory }}>{tools}</LeadingContext.Provider>
 }
 
 export type ListToolbarSearch = {
@@ -85,6 +85,8 @@ export type ListToolbarSearch = {
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
+  /** 入力直後の操作も同じ検索条件を使う画面で指定する。 */
+  updateMode?: 'debounced' | 'immediate'
 }
 
 /**
@@ -132,7 +134,7 @@ export default function ListToolbar({
   layout?: 'band' | 'stacked'
 }) {
   const ref = useToolbarFit()
-  const { leading, persistent } = useContext(LeadingContext)
+  const { leading, persistent, trailingAccessory } = useContext(LeadingContext)
   return (
     <div ref={ref} className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1} data-toolbar-tools data-toolbar-row>
@@ -145,13 +147,14 @@ export default function ListToolbar({
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
+          updateMode={search.updateMode}
         /></div> : searchSlot ? <div className={styles.search} data-toolbar-search>{searchSlot}</div> : null}
       </div>
-      {filters || secondary || actions || trailing || sort ? (
+      {filters || secondary || actions || trailing || sort || trailingAccessory ? (
         <div className={styles.row2} data-toolbar-row>
           {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}{secondary}</div> : null}
           {actions ? <span className={styles.actions} data-toolbar-actions>{actions}</span> : null}
-          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
+          {trailing || sort || trailingAccessory ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
         </div>
       ) : null}
     </div>
@@ -198,7 +201,8 @@ export function ListToolbarSearchSlot({ children, width }: { children: ReactNode
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(children)}</span>
+  const { trailingAccessory } = useContext(LeadingContext)
+  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{children}</>)}</span>
 }
 
 /** B-244: the shared end owns order; keep each control and its handler intact. */

@@ -11,6 +11,7 @@ import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
 import type { StatusBadgeTone } from './status-badge'
 import { fitSelectContent } from './select-content-size.mjs'
+import IconButton from './icon-button'
 
 export interface SelectOption {
   value: string
@@ -304,6 +305,7 @@ export default function Select({
     }
   }
 
+  const Trigger = iconOnly ? IconButton : 'button'
   return (
     <div
       ref={rootRef}
@@ -329,13 +331,15 @@ export default function Select({
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
       data-list-page-size={isPageSizeControl || undefined}
+      data-select-icon-only={iconOnly || undefined}
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
-      <button
+      <Trigger
+        size={iconOnly ? 'compact' : undefined}
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
+        className={iconOnly ? undefined : `${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
         data-tone={treatment === 'pill' ? selected?.tone ?? 'neutral' : undefined}
         data-value-align={valueAlign}
         data-chevron={showChevron || undefined}
@@ -360,7 +364,7 @@ export default function Select({
           </span>
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
-        <span className={styles.value} data-select-value title={selected?.label ?? undefined}>
+        <span className={styles.value} hidden={iconOnly} data-select-value title={selected?.label ?? undefined}>
           {label ? `${label}：${selected ? heads.labelOf(selected) : ''}` : selected?.label ?? ''}
         </span>
         {showChevron && !iconOnly && (open ? (
@@ -368,7 +372,7 @@ export default function Select({
         ) : (
           <ChevronDown className={styles.chevron} aria-hidden="true" />
         ))}
-      </button>
+      </Trigger>
       {open ? (
         <SelectMenu
           open={open}

@@ -1061,7 +1061,6 @@ export default function ScenariosListV8() {
       valueAlign="start"
       showChevron={false}
       iconOnly={narrow}
-      width={narrow ? 56 : undefined}
       value={savedFilter}
       onChange={(value) => {
         setSavedFilter(value)
