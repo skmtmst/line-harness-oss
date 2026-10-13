@@ -1,4 +1,6 @@
 'use client'
+
+import { PageContent } from '@/components/templates/page-frame'
 import { Field as SharedField } from '@/components/shared/form-controls'
 import StatusPill from '@/components/shared/status-pill'
 import { CheckCircle2, Plus, X } from 'lucide-react'
@@ -193,7 +195,7 @@ export default function HqSupportV8() {
       help="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
       folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}
     >
-      <div className={styles.body}>
+      <PageContent>
         {/* 契約者専用LINEの登録案内（2026-09-18 決定：ここからもいつでも開ける。開いた状態が板 D6fh3） */}
         {!tenantUnavailable ? <NoticeLineDialogV8 open={lineGuide} onClose={() => setLineGuide(false)} /> : null}
 
@@ -357,7 +359,7 @@ export default function HqSupportV8() {
             </GridTable>
           )}
         </section>
-      </div>
+      </PageContent>
     </ListPage></SaveErrorScope>
   )
 }

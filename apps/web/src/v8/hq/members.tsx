@@ -1,4 +1,6 @@
 'use client'
+
+import { PageContent } from '@/components/templates/page-frame'
 import { Plus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -225,7 +227,7 @@ function MembersInner() {
       ) : undefined}
       folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
-      <div className={styles.body}>
+      <PageContent>
         {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
@@ -282,7 +284,7 @@ function MembersInner() {
             <p className={styles.legend}>役割：オーナー（請求・メンバーまで全部）／管理者／担当者（担当範囲のアカウントだけ）／閲覧のみ（見るだけ）</p>
           </>
         )}
-      </div>
+      </PageContent>
 
       <MemberDialogV8
         /* 確認（M4jS9）を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageContent } from '@/components/templates/page-frame'
+
 /*
  * ★V8 統括の請求（Pencil `JB8V1`）。
  *
@@ -176,7 +178,7 @@ function BillingInner() {
 
   const frame = (body: React.ReactNode) => (
     <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
-      <div className={styles.body}>{body}</div>
+      <PageContent>{body}</PageContent>
     </ListPage>
   )
 

@@ -2,14 +2,6 @@
  * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。頭・左の列は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
-.body {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-hq-plans-gap);
-  padding: var(--tpl-hq-body-pad);
-  min-width: 0;
-}
-
 .main {
   display: flex;
   flex-direction: column;

@@ -2,14 +2,6 @@
  * ★V8 統括のメンバー（Pencil `r4ARpV`）。頭・左の列は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-body-gap);
-  padding: var(--tpl-hq-body-pad);
-  min-width: 0;
-}
-
 .buttonIcon {
   width: var(--tpl-hq-button-icon);
   height: var(--tpl-hq-button-icon);

@@ -1,4 +1,6 @@
 'use client'
+
+import { PageContent } from '@/components/templates/page-frame'
 import StatusPill from '@/components/shared/status-pill'
 import { Paperclip, Send, X } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
@@ -189,7 +191,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
 
   return (
     <ListPage boardId="OhguS" title={title} help={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
-      <div className={styles.body}>
+      <PageContent>
         <div className={styles.main}>
           {idMissing ? (
             <TargetMissing kind="unspecified" title="開くお問い合わせが指定されていません" description="一覧から開くお問い合わせを選び直してください。" backHref="/hq/support" backLabel="問い合わせの一覧へ戻る" />
@@ -278,7 +280,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
             {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
           </CreateSummaryCard>
         </aside>
-      </div>
+      </PageContent>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの続き" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </ListPage>
   )
