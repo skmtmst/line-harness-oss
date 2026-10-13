@@ -966,7 +966,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
             value="first_time"
             checked={rule.friendKind === 'first_time'}
             disabled={locked}
-            disabledReason={rule.friendKind === 'first_time' ? undefined : lockReason}
+            disabledReason={lockReason}
             onChange={() => setRule((current) => ({ ...current, friendKind: 'first_time' }))}
             icon={<UserPlus size={16} />}
             title="はじめて友だち追加した人"
@@ -978,7 +978,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
             value="returning"
             checked={rule.friendKind === 'returning'}
             disabled={locked}
-            disabledReason={rule.friendKind === 'returning' ? undefined : lockReason}
+            disabledReason={lockReason}
             onChange={() => setRule((current) => ({ ...current, friendKind: 'returning' }))}
             icon={<UserRound size={16} />}
             title="以前からの友だち・ブロック解除した人"

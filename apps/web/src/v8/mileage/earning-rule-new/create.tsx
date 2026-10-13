@@ -394,24 +394,11 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-amount">
         <CardHeader size="stacked" titleId="er-new-amount" title="何マイル付けるか" />
-        <SettingsFormRow layout="columns">
           <div className={styles.field}>
-            <Field required label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
+            <Field required label="マイル" htmlFor="er-amount" note="付け方：決まった数" error={errorOf('er-amount')}>
               <SaveErrorField names={["amount"]}><NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} /></SaveErrorField>
             </Field>
           </div>
-          <div className={styles.field}>
-            <span className={styles.pickLabel}>付け方</span>
-            <Select
-              aria-label="付け方"
-              value="決まった数"
-              onChange={() => {}}
-              size="full"
-              options={[{ value: '決まった数', label: '決まった数' }]}
-              disabled
-            />
-          </div>
-        </SettingsFormRow>
       </Card>
 
       <Card variant="form" aria-labelledby="er-new-who">

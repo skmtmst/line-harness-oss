@@ -220,6 +220,7 @@ export default function FieldEditor({
   useEffect(() => { onDraftChange?.(draftValues) }, [draftValues, onDraftChange])
   const typeLocked = mode === 'edit' || locked
   const optionsActive = NEEDS_OPTIONS.has(effectiveType) && !locked
+  const optionsDisabledReason = locked ? 'この情報欄は編集できません' : !optionsActive ? '種類が選択肢の項目のときに追加できます' : undefined
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
   const shownKey = mode === 'create' ? (fieldKey.trim() || 'pet_name') : (field?.fieldKey ?? '')
 
@@ -297,6 +298,7 @@ export default function FieldEditor({
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
                   value={value}
                   disabled={!optionsActive}
+                  title={optionsDisabledReason}
                   aria-label={`選択肢 ${index + 1}`}
                   placeholder={OPTION_EXAMPLES[index] ?? undefined}
                   onChange={(event) => setOption(index, event.target.value)}
@@ -304,7 +306,7 @@ export default function FieldEditor({
             ))}
             {fieldError('options')}
             <span>
-              <Button type="button" disabled={!optionsActive} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
+              <Button type="button" disabled={!optionsActive} title={optionsDisabledReason} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
             </span>
           </div>
           <div className={styles.defaultBox} ref={(element) => { validationRefs.current.default = element }}>

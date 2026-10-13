@@ -452,6 +452,7 @@ function AnalyticsReportFormPage() {
     return trimmed !== '' && !isEmail(trimmed) ? trimmed : null
   })
   const hasInvalidEmail = invalidEmails.some(Boolean)
+  const submitDisabledReason = saving ? '保存しています' : !hasRecipient ? '受け取る人を1人以上選んでください' : hasInvalidEmail ? 'メールアドレスの形を確認してください' : undefined
 
   // R455: 保存応答が遅れて戻ったとき、別の依頼・別アカウントへ移って
   // いたらその応答を捨てる。応答のたびに「いま見ている対象」と比べる。
@@ -1058,8 +1059,8 @@ function AnalyticsReportFormPage() {
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
-        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
+        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}

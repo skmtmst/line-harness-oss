@@ -276,6 +276,22 @@ test('空白検査はCIで一度だけ実行し、既存V8 guardと同じ必須�
 
 // P〜Sは実際のCSSの故障を検出する。許可や上限では通さない。
 import scanFormRules from './form-rules-browser.mjs'
+test('F8の見張りはフォーム内の押せない理由とその接続を検査し、既存CIでも故障を検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-page-template="create"><button disabled title="受け取る人を選んでください">送る</button><input disabled aria-describedby="reason"><p id="reason">種類を選んでください</p><button disabled aria-busy="true">処理中…</button></div></main>')
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 0)
+    await page.locator('button').first().evaluate(el => el.removeAttribute('title'))
+    await page.locator('#reason').evaluate(el => el.hidden = true)
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 2)
+    await page.locator('#reason').evaluate(el => el.remove())
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 2)
+    await page.locator('button').first().evaluate(el => el.setAttribute('title', '受け取る人を選んでください'))
+    await page.locator('input').evaluate(el => el.setAttribute('aria-description', '種類を選んでください'))
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 0)
+  } finally { await browser.close() }
+})
 test('作成の題の説明と条件の日本語を、欠け・旧表記の故障で見張る', async () => {
   const browser = await chromium.launch()
   try {
