@@ -85,17 +85,31 @@ describe('切替のつながりV8（wxIQ7）', () => {
     await act(async () => { host.querySelector<HTMLButtonElement>('[data-row-menu]')!.click() })
     expect(document.querySelector('[role="menu"] a[href*="step=buttons"]')).toBeNull()
   })
-  it('ボタンの変更と一覧への行き先を右の操作から使える', async () => {
+  it('同じ編集先を重複させず、追加と一覧への移動を使える', async () => {
     await render()
+    expect(host.querySelectorAll('a[href="/rich-menus/edit?id=group-1"]')).toHaveLength(1)
+    expect(host.querySelectorAll('a[href*="step=buttons"]')).toHaveLength(1)
+    expect(host.querySelector('a[href="/rich-menus/connections?id=group-1"]')).toBeNull()
     await act(async () => { host.querySelector<HTMLButtonElement>('[data-row-menu]')!.click() })
     const menu = document.querySelector('[role="menu"]')!
-    const change = [...menu.querySelectorAll('a')].find(node => node.textContent?.includes('ボタンの動き'))!
-    const href = new URL(change.getAttribute('href')!, 'http://localhost')
-    expect(href.searchParams.get('id')).toBe('group-1')
-    expect(href.searchParams.get('step')).toBe('buttons')
+    expect(menu.querySelector('a[href*="step=buttons"]')).toBeNull()
+    expect(menu.querySelector('a[href="/rich-menus/edit?id=group-1"]')).toBeNull()
     const list = [...menu.querySelectorAll('button')].find(node => node.textContent?.includes('メニュー一覧へ'))!
     await act(async () => { list.click() })
     expect(new URL(mocks.push.mock.calls[0][0], 'http://localhost').pathname).toBe('/rich-menus')
+  })
+  it('追加の上限に達しても保存済みのボタンを変更できる', async () => {
+    mocks.get.mockResolvedValue({ success: true, data: { ...group, pages: [
+      ...group.pages,
+      ...Array.from({ length: 8 }, (_, index) => ({ id: `extra-${index}`, name: `メニュー${index}`, orderIndex: index + 2, areas: [] })),
+    ] } })
+    await render()
+    expect(host.textContent).not.toContain('切替先のメニューを足す')
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-row-menu]')!.click() })
+    const change = document.querySelector<HTMLAnchorElement>('[role="menu"] a[href*="step=buttons"]')!
+    const href = new URL(change.getAttribute('href')!, 'http://localhost')
+    expect(href.searchParams.get('id')).toBe('group-1')
+    expect(href.searchParams.get('step')).toBe('buttons')
   })
   it('編集を任されたstaffは既存の編集と追加を使える', async () => {
     mocks.role = 'staff'; mocks.permissionKeys = ['/rich-menus']

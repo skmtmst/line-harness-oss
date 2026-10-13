@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useSearchParams } from 'next/navigation';
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Pencil, Plus } from 'lucide-react';
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -25,16 +25,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
 
-/*
- * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
- *
- * 読み込み（古い応答を捨てる）・404 と失敗の分け方・アカウント違いの扱い・つながりの調べ方
- * （保存済みのページと切替ボタンだけから、戻れない・届かない・切替先なしを見る）は今の画面
- * （app/rich-menus/connections/page.tsx）と同じ。見せ方を絵に合わせた：
- * 左に段「つながりの図」（メニューのカードとタブの行き来）と「よくある事故の見張り」、
- * 右の列に操作（編集する・切替のつながり・…）と「いまの状態」。
- * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
- */
+// 保存済みの切替ボタンを解析し、行けない先や戻れないページを表示する。
 
 const MAX_PAGES = 10
 
@@ -67,7 +58,7 @@ export function linkLabel(analysis: ConnectionAnalysis, entryId: string, pageId:
   const goIndex = out.findIndex((edge) => edge.targetPageId === pageId)
   const backIndex = back.findIndex((edge) => edge.targetPageId === entryId)
   /*
-   * WEB220：直接のタブが無くても、別のメニューを通って行ける・戻れることがある（A→B→C→A）。
+   * 直接のタブが無くても、別のメニューを通って行ける・戻れることがある（A→B→C→A）。
    * 行けるか・戻れるかは、たどり着けるかの解析（reachable・cannotReturn）で決める。
    */
   const reachable = analysis.reachablePageIds.has(pageId)
@@ -166,7 +157,7 @@ function Connections() {
   const others = pages.filter((page) => page.id !== entryId)
   const editHref = `/rich-menus/edit?id=${encodeURIComponent(group.id)}`
   const buttonsHref = `/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=buttons`
-  // WEB220：直接のタブが無くても、別のメニューを通ってトップへ戻れるなら「帰れない」と言わない。
+  // 直接のタブが無くても、別のメニューを通ってトップへ戻れるなら「帰れない」と言わない。
   const noReturn = others.filter((page) => analysis.cannotReturnPageIds.has(page.id))
   const draftTargets = group.status === 'published' ? others.filter((page) => !page.lineRichmenuId) : []
   const audienceText = group.isDefaultForAll || !group.targetingEnabled || !group.targetingCondition ? 'すべての友だち（既定）' : '条件で出し分け'
@@ -174,8 +165,7 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    { id: 'open', label: canEdit ? 'メニューを開く' : '詳しく見る', external: false, href: editHref, onSelect: () => router.push(editHref) },
-    ...(canEdit ? [{ id: 'buttons', label: 'ボタンの動きを直す', href: buttonsHref, onSelect: () => router.push(buttonsHref) }] : []),
+    ...(canEdit && pages.length >= MAX_PAGES ? [{ id: 'buttons', label: 'ボタンの動きを直す', href: buttonsHref, onSelect: () => router.push(buttonsHref) }] : []),
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -183,7 +173,6 @@ function Connections() {
     <div className={styles.aside}>
       <div className={styles.asideActions}>
         <Button href={editHref} className={styles.asideButton}><Pencil size={15} aria-hidden="true" />{canEdit ? '編集する' : '詳しく見る'}</Button>
-        <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} aria-current="page" className={styles.asideButton}><GitFork size={15} aria-hidden="true" />切替のつながり</Button>
         <span className={styles.menuAnchor}>
           <RowMenu label="そのほかの操作" items={menuItems} />
         </span>
