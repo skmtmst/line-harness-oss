@@ -17,7 +17,7 @@ export default function collectFormLayouts() {
    if(!cs.length && !marked.some(el=>[...el.querySelectorAll('[role=radio],[role=checkbox],button[aria-pressed]')].some(visible)))return null
    // Nested forms/cards are regions, not two independent fields.
    if(marked.length>1 || (!marked.length&&cs.length>2))return null
-   const label=child.querySelector('label,[id*="label"],[class*="label"]')?.textContent?.trim()||cs[0].getAttribute('aria-label')||cs[0].getAttribute('placeholder')||cs[0].id||cs[0].tagName
+   const label=child.querySelector('label,[id*="label"],[class*="label"]')?.textContent?.trim()||cs[0]?.getAttribute('aria-label')||cs[0]?.getAttribute('placeholder')||cs[0]?.id||cs[0]?.tagName||'入力欄'
    return {label,controls:cs.map(c=>({id:c.id,name:c.getAttribute('aria-label'),width:c.getBoundingClientRect().width})),rect:child.getBoundingClientRect()}
   })
   if(fields.some(f=>!f))continue

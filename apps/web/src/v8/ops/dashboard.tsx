@@ -19,6 +19,12 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
+import { PageFrame } from '@/components/templates/page-frame'
+import { DashboardColumns } from '@/components/templates/dashboard-page'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
 import parts from './parts.module.css'
 import styles from './dashboard.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -109,7 +115,7 @@ export default function OpsDashboardV8() {
   const loading = data === null && !error
 
   return (
-    <div data-design-node="CyW0E">
+    <PageFrame kind="dashboard" boardId="CyW0E" standalone>
       <OpsHead
         title="ダッシュボード"
         description="契約先の売上・使用量・お問い合わせを見て、要対応から片づけます。"
@@ -126,30 +132,30 @@ export default function OpsDashboardV8() {
           {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
           <KpiBand>
             <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? <span title={contractDetail(k.active, k.byPlan, k.filledByListPriceCount)}>{`契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）`}</span> : emptyValue('unknown')} loading={loading} />
-            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data && k ? <span title={revenueDetail(k.revenueDelta, k.refundsThisMonth)}>{`決済失敗 ${data.alerts.pastDue} 社`}</span> : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data && k ? <span title={revenueDetail(k.revenueDelta, k.refundsThisMonth)}>{`決済失敗 ${data.alerts.pastDue} 社`}</span> : emptyValue('unknown')} description={k ? `今月の売上（入金済み）・${revenueDetail(k.revenueDelta, k.refundsThisMonth)}` : '今月に入金済みの売上です。'} loading={loading} />
             <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data && k ? <span title={`新規 ${k.newInPeriod}件・新規トライアル ${k.newTrialsInPeriod}件・解約 ${k.churnInPeriod}件・解約率 ${k.churnRate.toFixed(1)}%`}>{`期限 3日以内 ${data.alerts.trialEndingSoon}`}</span> : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
           </KpiBand>
 
-          <div className={parts.row}>
-            <section aria-label="要対応" className={parts.panel}>
-              <h3 className={parts.panelTitle}>要対応</h3>
+          <DashboardColumns layout="cards">{[
+            <Card key="alerts" aria-label="要対応" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="要対応" />
               {data ? (
-                <div className={parts.mini}>
-                  <div className={parts.miniHead}>
-                    <span className={parts.grow}>何が</span>
-                    <span className={`${parts.num} ${styles.colCount}`}>件数</span>
-                    <span className={`${parts.fixed} ${styles.colOpen}`} aria-hidden="true" />
-                  </div>
+                <GridTable label="要対応" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-op-dash-count-w) var(--tpl-op-dash-open-w)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+                  <GridHeadRow>
+                    <GridCell role="columnheader">何が</GridCell>
+                    <GridCell role="columnheader" align="right">件数</GridCell>
+                    <GridCell role="columnheader">操作</GridCell>
+                  </GridHeadRow>
                   <AlertRow label="決済が失敗している契約先" count={data.alerts.pastDue} href="/ops/tenants?status=past_due" />
                   <AlertRow label="トライアル期限が3日以内" count={data.alerts.trialEndingSoon} href="/ops/tenants?status=trialing" />
                   <AlertRow label="LINEのトークン期限が近い店舗" count={data.alerts.lineTokenExpiring} href="/ops/tenants" />
                   <AlertRow label="未返信のお問い合わせ" count={data.alerts.unansweredTickets} href="/ops/support" />
-                </div>
+                </GridTable>
               ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
-            </section>
-            <section aria-label="月ごとの売上" className={parts.panel}>
-              <h3 className={parts.panelTitle}>月ごとの売上</h3>
+            </Card>,
+            <Card key="revenue" aria-label="月ごとの売上" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="月ごとの売上" />
               {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
               <div className={styles.chartFoot}>
                 <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : emptyValue('unknown')}</p>
@@ -159,39 +165,37 @@ export default function OpsDashboardV8() {
               </div>
               {billingSyncNotice ? <p role="status" className={parts.status}>{billingSyncNotice}</p> : null}
               {billingSyncError ? <Notice tone="danger" className={parts.alertNoticePlacement} >{billingSyncError}</Notice> : null}
-            </section>
-          </div>
+            </Card>
+          ]}</DashboardColumns>
 
-          <div className={parts.row}>
-            <section aria-label="上限に近い契約先" className={parts.panel}>
-              <h3 className={parts.panelTitle}>上限に近い契約先</h3>
+          <DashboardColumns layout="cards">{[
+            <Card key="usage" aria-label="上限に近い契約先" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="上限に近い契約先" />
               {!data ? (
                 <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
               ) : data.usage.length === 0 ? (
                 <ListState permissionScope="hq" kind="empty" title="今月はまだ使用量がありません" description="配信・バナー生成・メディア登録があると、上限に近い契約先から順に並びます。" />
               ) : (
-                <div className={parts.mini}>
-                  <div className={parts.miniHead}>
-                    <span className={parts.grow}>契約先</span>
-                    <span className={`${parts.fixed} ${styles.colPlan}`}>プラン</span>
-                    <span className={`${parts.num} ${styles.colRate}`}>配信通数</span>
-                    <span className={`${parts.num} ${styles.colRate}`}>バナー生成</span>
-                    <span className={`${parts.num} ${styles.colMedia}`}>メディア容量</span>
-                  </div>
+                <GridTable label="上限に近い契約先" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-op-dash-rate-w) var(--tpl-op-dash-rate-w) var(--tpl-op-dash-media-w)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+                  <GridHeadRow>
+                    <GridCell role="columnheader">契約先</GridCell>
+                    <GridCell role="columnheader" align="right">配信通数</GridCell>
+                    <GridCell role="columnheader" align="right">バナー生成</GridCell>
+                    <GridCell role="columnheader" align="right">メディア容量</GridCell>
+                  </GridHeadRow>
                   {data.usage.map((row) => (
-                    <div key={row.tenantId} className={parts.miniRow}>
-                      <Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className={`${parts.grow} ${parts.link}`} title={row.tenantName}>{row.tenantName}</Link>
-                      <span className={`${parts.fixed} ${styles.colPlan}`}>{row.planLabel}</span>
-                      <span className={`${parts.num} ${styles.colRate}`} title={`${row.messages.toLocaleString('ja-JP')} / ${row.limits.messages?.toLocaleString('ja-JP') ?? '—'}`}>{usagePercent(row.messages, row.limits.messages)}</span>
-                      <span className={`${parts.num} ${styles.colRate}`} title={`${row.bannerUnits} / ${row.limits.images ?? '—'}`}>{usagePercent(row.bannerUnits, row.limits.images)}</span>
-                      <span className={`${parts.num} ${styles.colMedia}`} title={`${formatBytes(row.mediaBytes)} / ${row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}`}>{usagePercent(row.mediaBytes, row.limits.mediaBytes)}</span>
-                    </div>
+                    <GridRow key={row.tenantId}>
+                      <GridNameCell folder={false} name={<><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`}><TruncatedText value={row.tenantName} /></Link><TruncatedText value={row.planLabel} /></>} />
+                      <GridCell align="right" title={`${row.messages.toLocaleString('ja-JP')} / ${row.limits.messages?.toLocaleString('ja-JP') ?? '—'}`}>{usagePercent(row.messages, row.limits.messages)}</GridCell>
+                      <GridCell align="right" title={`${row.bannerUnits} / ${row.limits.images ?? '—'}`}>{usagePercent(row.bannerUnits, row.limits.images)}</GridCell>
+                      <GridCell align="right" title={`${formatBytes(row.mediaBytes)} / ${row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}`}>{usagePercent(row.mediaBytes, row.limits.mediaBytes)}</GridCell>
+                    </GridRow>
                   ))}
-                </div>
+                </GridTable>
               )}
-            </section>
-            <section aria-label="お問い合わせ（チケット）" className={`${parts.panel} ${styles.tickets}`}>
-              <h3 className={parts.panelTitle} title={data ? `解決済み ${data.tickets.closedInPeriod}件・初回返信 ${minutesLabel(data.tickets.avgFirstReplyMinutes)}` : undefined}>お問い合わせ（チケット）</h3>
+            </Card>,
+            <Card key="tickets" aria-label="お問い合わせ（チケット）" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="お問い合わせ（チケット）" help={data ? `解決済み ${data.tickets.closedInPeriod}件・初回返信 ${minutesLabel(data.tickets.avgFirstReplyMinutes)}` : undefined} helpLabel="お問い合わせの集計の説明" />
               {data ? (
                 <>
                   <KpiBand density="compact">
@@ -202,16 +206,16 @@ export default function OpsDashboardV8() {
                   <Link href="/ops/support" className={parts.textLink}>すべて見る →</Link>
                 </>
               ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
-            </section>
-          </div>
+            </Card>
+          ]}</DashboardColumns>
 
-          <div className={parts.row}>
-            <section aria-label="プラン別の契約" className={parts.panel}>
-              <h3 className={parts.panelTitle}>プラン別の契約</h3>
+          <DashboardColumns layout="cards">{[
+            <Card key="plans" aria-label="プラン別の契約" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="プラン別の契約" />
               {data ? <p className={parts.line} title={data.planShare.rows.map(row => `${row.label} ${row.percent}%`).join('・')}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
-            </section>
-            <section aria-label="契約者専用LINEに未登録の権限者" className={parts.panel}>
-              <h3 className={parts.panelTitle}>契約者専用LINEに未登録の権限者</h3>
+            </Card>,
+            <Card key="unregistered" aria-label="契約者専用LINEに未登録の権限者" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="契約者専用LINEに未登録の権限者" />
               {data ? (
                 <div className={styles.lineRow}>
                   <p className={parts.line} title={`契約者専用LINEの登録 ${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
@@ -222,8 +226,8 @@ export default function OpsDashboardV8() {
                   ) : null}
                 </div>
               ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
-            </section>
-          </div>
+            </Card>
+          ]}</DashboardColumns>
         </div>
       )}
 
@@ -237,33 +241,33 @@ export default function OpsDashboardV8() {
           unregistered.people.length === 0 ? (
             <p className={parts.line}>未登録の人はいません。</p>
           ) : (
-            <div className={parts.mini}>
+            <GridTable label="契約者専用LINEに未登録の権限者" framed={false} design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-rt-col-130)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
               {unregistered.people.map((p) => (
-                <div key={p.staffId} className={parts.miniRow}>
-                  <span className={parts.fixed}>{p.name}</span>
-                  <span className={parts.grow}>{p.tenantName}</span>
-                  {p.hasEmail ? null : <Chip tone="warn">メール未登録</Chip>}
-                </div>
+                <GridRow key={p.staffId}>
+                  <GridCell><TruncatedText value={p.name} /></GridCell>
+                  <GridCell><TruncatedText value={p.tenantName} /></GridCell>
+                  <GridCell>{p.hasEmail ? null : <Chip tone="warn">メール未登録</Chip>}</GridCell>
+                </GridRow>
               ))}
-            </div>
+            </GridTable>
           )
         ) : unregisteredError ? (
           <ListState permissionScope="hq" kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
         ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
       </Dialog>
-    </div>
+    </PageFrame>
   )
 }
 
 function AlertRow({ label, count, href }: { label: string; count: number; href: string }) {
   return (
-    <div className={`${parts.miniRow} ${styles.alertRow}`}>
-      <span className={parts.grow}>{label}</span>
-      <span className={`${parts.num} ${styles.colCount}`}>{count}</span>
-      <span className={`${parts.fixed} ${styles.colOpen}`}>
+    <GridRow>
+      <GridCell><TruncatedText value={label} /></GridCell>
+      <GridCell align="right">{count}</GridCell>
+      <GridCell align="right">
         <Button href={href} aria-label={`${label}を開く`}>開く</Button>
-      </span>
-    </div>
+      </GridCell>
+    </GridRow>
   )
 }
 

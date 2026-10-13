@@ -69,15 +69,17 @@ describe('表の外側の余白の洗い出し', () => {
 
   it('/ops/members：名前は残りの幅を使い、名前とメールの全文を確認できる', () => {
     const body = code(read('v8', 'ops', 'members.tsx'))
-    expect(body).toContain('className={parts.grow} role="cell" title={m.name}')
-    expect(body).toContain('styles.colMail}`} role="cell" title={m.email')
+    expect(body).toContain('<GridNameCell folder={false}')
+    expect(body).toContain("columns: 'minmax(0, 1fr) minmax(0, 1fr)")
+    expect(body).toContain('<TruncatedText value={m.email')
     expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.grow\s*\{[^}]*min-width: 0;[^}]*flex: 1;/)
   })
 
   it('/ops/dashboard：契約先で吸収し、使用率は右へ寄せる', () => {
     const body = code(read('v8', 'ops', 'dashboard.tsx'))
-    expect(body).toContain('className={parts.grow}>契約先</span>')
-    expect(body).toContain('parts.num} ${styles.colRate}')
+    expect(body).toContain('<GridCell role="columnheader">契約先</GridCell>')
+    expect(body).toContain("columns: 'minmax(0, 1fr)")
+    expect(body.match(/<GridCell align="right" title=/g)).toHaveLength(3)
     expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.num\s*\{[^}]*text-align: right;/)
   })
 
@@ -141,9 +143,9 @@ describe('表の外側の余白の洗い出し', () => {
     expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
-  it('/ops/members：自分自身の行にも「—」を置き、右端を空にしない', () => {
+  it('/ops/members：自分自身は理由付き操作、閲覧のみは操作を出さない', () => {
     const body = code(read('v8', 'ops', 'members.tsx'))
-    expect(body).toContain('self || readOnly ? (')
-    expect(body).toContain('<span className={styles.faint}>{emptyValue(\'unknown\')}</span>')
+    expect(body).toContain('readOnly ? null : self ? <RowActions')
+    expect(body).toContain("disabled: true, title: '自分の運営アカウントは停止・取り消しできません'")
   })
 })

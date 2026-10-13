@@ -80,7 +80,9 @@ describe('契約先の詳細の概要', () => {
     expect(lists.length).toBe(2)
     for (const dl of lists) {
       expect(dl.className).toContain('kvs')
-      expect(dl.closest('section')?.className).toContain('panel')
+      const card = dl.closest('[data-design-part="card"]')
+      expect(card).not.toBeNull()
+      expect((card as HTMLElement).style.getPropertyValue('--card-content-padding')).toBe('var(--polish-space-section)')
     }
   })
 })

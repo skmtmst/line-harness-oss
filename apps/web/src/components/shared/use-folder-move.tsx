@@ -5,7 +5,7 @@ import type { Folder } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import BulkBar from './bulk-bar'
 import Button from './button'
-import Checkbox, { UnavailableSelection } from './checkbox'
+import Checkbox from './checkbox'
 import { EntityPickerDialog } from './entity-picker'
 import { notifyToast } from './toast'
 
@@ -61,8 +61,8 @@ export function useFolderMove<T extends Item>({ accountId, canEdit, items, folde
   }
   return {
     open: (item: T) => open([item]),
-    checkbox: (item: T) => canEdit ? <Checkbox aria-label={`${item.name}を選ぶ`} checked={selected.has(item.id)} disabled={busy} onClick={(event) => event.stopPropagation()} onCheckedChange={(next) => { if (!busy) setSelected((old) => { const value = new Set(old); if (next) value.add(item.id); else value.delete(item.id); return value }) }} /> : <UnavailableSelection label={`${item.name}を選ぶ`} />,
-    pageCheckbox: canEdit ? <Checkbox aria-label="このページを全部選ぶ" disabled={busy || items.length === 0} checked={items.length > 0 && items.every((item) => selected.has(item.id))} indeterminate={selected.size > 0 && selected.size < items.length} onCheckedChange={(next) => { if (!busy) setSelected(next ? new Set(items.map((item) => item.id)) : new Set()) }} /> : <UnavailableSelection label="このページを全部選ぶ" />,
+    checkbox: (item: T) => canEdit ? <Checkbox aria-label={`${item.name}を選ぶ`} checked={selected.has(item.id)} disabled={busy} onClick={(event) => event.stopPropagation()} onCheckedChange={(next) => { if (!busy) setSelected((old) => { const value = new Set(old); if (next) value.add(item.id); else value.delete(item.id); return value }) }} /> : null,
+    pageCheckbox: canEdit ? <Checkbox aria-label="このページを全部選ぶ" disabled={busy || items.length === 0} checked={items.length > 0 && items.every((item) => selected.has(item.id))} indeterminate={selected.size > 0 && selected.size < items.length} onCheckedChange={(next) => { if (!busy) setSelected(next ? new Set(items.map((item) => item.id)) : new Set()) }} /> : null,
     overlays: <>
       {canEdit ? <BulkBar count={selected.size} onClear={() => setSelected(new Set())}>
         <Button variant="secondary" disabled={busy} onClick={() => open(items.filter((item) => selected.has(item.id)))}>フォルダへ移す</Button>

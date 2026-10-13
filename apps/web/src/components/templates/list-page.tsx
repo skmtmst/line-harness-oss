@@ -100,8 +100,8 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
       <div className={styles.main}>
         {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation || noFolderChoices ? undefined : ''}>
           {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset="notice">{explanation}</PageExplanationBody></div> : null}
-          {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices} trailingAccessory={helpAtEnd ? help : undefined}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}
-          {helpAtEnd ? null : help}
+          {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices} accessory={!helpAtEnd ? help : undefined} trailingAccessory={helpAtEnd ? help : undefined}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}
+          {!toolbar ? help : null}
         </div> : null}
         <div className={styles.content} data-template-region="content" data-content-inset={contentInset || undefined}>{children}</div>
         {pagination ? <div className={styles.pagination} data-template-region="pagination">{pagination}</div> : null}
