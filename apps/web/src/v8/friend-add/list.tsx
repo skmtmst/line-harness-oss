@@ -679,7 +679,8 @@ function FriendAddList() {
         <div className={styles.menuBox} data-design-node={rule.isFallback && openMenuId === rule.id ? 'C0lfUP' : undefined}>
           <RowMenu
             label={label}
-            className={styles.menuButton}
+            appearance="box"
+            size="row"
             note={rule.isFallback && canEdit ? 'この設定は消せません（いちばん最後の受け皿）' : undefined}
             items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
             open={openMenuId === rule.id}

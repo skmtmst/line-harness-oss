@@ -209,10 +209,6 @@
   display: flex;
   align-items: center;
 }
-.menuButton {
-  width: var(--tpl-fa-col-menu);
-  height: var(--tpl-fa-col-menu);
-}
 
 .footNote {
   margin: 0;
