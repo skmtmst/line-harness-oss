@@ -78,7 +78,7 @@ export function assessAgainstBase(findings, baseFindings, route, width, allowanc
   })
   // 固定の許可の上限を変えない。同じ項目の件数を二重に足すこともない。
   const fixedKeys = new Set(allowances.filter(a => a.route === route && a.width === width).map(keyOf))
-  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'form-required-badge'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
+  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'form-required-badge', 'form-action-reason'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
     .filter(a => !fixedKeys.has(keyOf(a)))
   const baseKeys = new Set(baseline.map(keyOf))
   const result = assess(findings, route, width, [...allowances, ...baseline])
