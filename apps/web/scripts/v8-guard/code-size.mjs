@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
-export const INITIAL_SHA = '8e57d715cd73e2e4172a42411c9f9054cf8dd631'
+export const INITIAL_SHA = 'b61bb4b0c55bd7ab3a239d247dc876fe072ec27c'
 export const BASELINE_PATH = 'apps/web/scripts/v8-guard/code-size-baseline.json'
 export const MAX_LINES = 400
 // No filename or source comment can declare new generated-code exemptions.
