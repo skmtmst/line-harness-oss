@@ -716,7 +716,7 @@ app.route('/', operations);
 // ADMIN_API_KEY middleware on subpaths.
 app.route('/admin', adminVersion);
 // Phase 5 Task 18 — self-update endpoints guarded by x-admin-api-key.
-// authMiddleware skips non-/api/ paths so this router owns its own auth gate.
+// HTTP self-update is retired; the router returns 404 for every request.
 app.route('/admin/update', adminUpdate);
 
 // QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
