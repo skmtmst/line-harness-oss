@@ -364,6 +364,8 @@ export default function CreateAffiliateV8() {
       boardId="RaMf3"
       title="アフィリエイターを作る"
       help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
+      previewLabel="紹介リンクを見る"
+      previewTitle="紹介リンク"
       preview={preview}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
@@ -396,7 +398,7 @@ export default function CreateAffiliateV8() {
       <Card variant="form" aria-label="だれを登録するか">
         <CardHeader size="stacked" title="だれを登録するか" meta="会社でも個人でも登録できます" />
         <SettingsFormRow>
-          <Field label="名前（表示名）" htmlFor="af-name" requirement={b244Requirements.name} error={fieldErrors.name}>
+          <Field requirement={b244Requirements.name} label="名前（表示名）" htmlFor="af-name" error={fieldErrors.name}>
             <SaveErrorField names={["name"]}><TextField readOnly={!canEdit} id="af-name" value={name} onChange={(event) => { setName(event.target.value); clearField('name') }} placeholder="例：ペットライフ編集部" maxLength={120} /></SaveErrorField>
           </Field>
           <Field label="紹介コード（リンクの最後に付く）" htmlFor="af-code" error={fieldErrors.code}

@@ -12,6 +12,40 @@ import './list-row-height.test.mjs'
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
 const table = body => `<div role="table" data-shared-part="list-table" style="width:600px">${body}</div>`
+test('同じ面の編集本文は描いた文字の余白を測り、余白0・別枠の端接触は止める', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const content = (padding, ownFrame = '') => shell(`<section style="width:240px;height:120px;background:white;border:1px solid gray"><div contenteditable="true" role="textbox" style="height:100%;padding:${padding}px;background:white;${ownFrame}">編集する本文</div></section>`)
+    for (const editable of ['true', 'false']) {
+      await page.setContent(content(12).replace('contenteditable="true"', `contenteditable="${editable}"`))
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 0)
+    }
+    await page.setContent(content(0))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    await page.setContent(content(12, 'border:1px solid black;'))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    await page.setContent(content(12, 'background:#ddd;'))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+  } finally { await browser.close() }
+})
+test('本文と差し込みの一つの枠は読み込み順によらず内側の影を外し、外側のフォーカスを保つ', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const bodyCSS = readFileSync(new URL('../../src/components/shared/message-insert-row.module.css', import.meta.url), 'utf8')
+    const editorCSS = readFileSync(new URL('../../src/components/shared/insert-text-field.module.css', import.meta.url), 'utf8')
+    for (const ordered of [[bodyCSS, editorCSS], [editorCSS, bodyCSS]]) {
+      await page.setContent(shell(`<style>:root{--control-shadow:0 1px 2px #aaa;--color-canvas:white;--color-control-border:gray;--color-focus-ring:blue;--tpl-nc-body-pad:10px 12px}${ordered.join('\n')}</style><div class="body" style="height:120px;width:240px"><div class="editor editorCompact" data-insert-field contenteditable="true" style="height:100%;padding:12px">編集する本文</div></div>`))
+      assert.equal(await page.locator('[data-insert-field]').evaluate(el => getComputedStyle(el).boxShadow), 'none')
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 0)
+      await page.locator('[data-insert-field]').focus()
+      assert.equal(await page.locator('.body').evaluate(el => getComputedStyle(el).outlineWidth), '2px')
+      await page.locator('[data-insert-field]').evaluate(el => { el.style.padding = '0px' })
+      assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    }
+  } finally { await browser.close() }
+})
 test('B-245：共通の説明ボタンは青で出し、印だけの手書きや頭の外の青は検出する', async () => {
   const browser = await chromium.launch()
   try {

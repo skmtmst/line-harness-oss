@@ -155,8 +155,21 @@ export default function scanOwnerRules() {
         return true
       })
       if (leaves.length) {
-        const top = Math.min(...leaves.map(d=>d.getBoundingClientRect().top))-r.top
-        const bottom = r.bottom-Math.max(...leaves.map(d=>d.getBoundingClientRect().bottom))
+        const leafRect = leaf => {
+          const style = css(leaf)
+          // 同じ面の編集本文は、箱の外縁ではなく描かれた文字を測る。
+          // 別の枠・地・輪を持つ内側の操作は従来どおり外縁を測る。
+          const sameSurface = style.backgroundColor === c.backgroundColor || style.backgroundColor === 'rgba(0, 0, 0, 0)'
+          if (leaf.hasAttribute('contenteditable') && sameSurface && !hasBorder(style) && style.outlineStyle === 'none') {
+            const range = document.createRange(); range.selectNodeContents(leaf)
+            const text = range.getBoundingClientRect()
+            if (text.width > 0 && text.height > 0) return text
+          }
+          return leaf.getBoundingClientRect()
+        }
+        const rects = leaves.map(leafRect)
+        const top = Math.min(...rects.map(rect=>rect.top))-r.top
+        const bottom = r.bottom-Math.max(...rects.map(rect=>rect.bottom))
         if (top < 8 || bottom < 8) add('tight',el,{topDeficit:Math.max(0,Math.ceil(8-top)),bottomDeficit:Math.max(0,Math.ceil(8-bottom))})
       }
     }

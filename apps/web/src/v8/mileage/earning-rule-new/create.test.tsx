@@ -128,6 +128,8 @@ describe('V8 たまる決めごとを作る', () => {
 
   it('保存して動かすは、作る→下書きの順に送って一覧へ戻る', async () => {
     await mount()
+    expect(screen.queryByRole('button', { name: '付け方' })).toBeNull()
+    expect(screen.getByText('付け方：決まった数')).toBeTruthy()
     type('名前', 'リンクをクリック')
     type('マイル', '10')
     await clickButton('保存して動かす')

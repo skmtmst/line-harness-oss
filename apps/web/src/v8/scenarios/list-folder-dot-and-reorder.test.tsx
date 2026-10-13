@@ -58,7 +58,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => 'owner' }
+  return { ...actual, useStaffRole: () => 'owner', useStaffIdentity: () => ({ id: 'staff-one' }) }
 })
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -87,6 +87,39 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 import ScenariosListV8 from './list'
+
+test('シナリオの説明本文を型へつなぎ、開閉と同じ人の保存キーを保つ', async () => {
+  const stored = new Map<string, string>()
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'localStorage')
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => { stored.set(key, value) },
+  } })
+  try {
+    const first = render(<ScenariosListV8 />)
+    await first.findByText('新規登録7日間フォロー')
+    const toggle = first.getByRole('button', { name: 'この画面の説明' })
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(body).not.toBeNull()
+    expect(body.textContent).toContain('作っただけでは送られません。')
+    expect(body.hidden).toBe(false)
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(true)
+    expect(stored.get('lh_page_explanation_v1:staff-one:scenarios')).toBe('closed')
+    first.unmount()
+    const next = render(<ScenariosListV8 />)
+    await next.findByText('新規登録7日間フォロー')
+    const nextToggle = next.getByRole('button', { name: 'この画面の説明' })
+    expect(nextToggle.getAttribute('aria-expanded')).toBe('false')
+    expect(document.getElementById(nextToggle.getAttribute('aria-controls')!)?.hidden).toBe(true)
+    fireEvent.click(nextToggle)
+    expect(next.getByRole('region').textContent).toContain('テストを送ってから配信を始めます')
+  } finally {
+    cleanup()
+    if (descriptor) Object.defineProperty(window, 'localStorage', descriptor)
+    else Reflect.deleteProperty(window, 'localStorage')
+  }
+})
 
 afterEach(() => {
   cleanup()

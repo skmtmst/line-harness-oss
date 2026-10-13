@@ -37,6 +37,7 @@ import { tapActionLiffUrl } from '@/lib/tap-actions'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
@@ -459,7 +460,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-when">
         <CardHeader size="stacked" titleId="nen-edit-when" title="いつ送りますか" meta="このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます" />
-        <div className={styles.row}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.labelSmall}>きっかけ</span>
             {isBirthday ? (
@@ -491,7 +492,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             {/* 届かない日を決める口はまだ無い。毎日送る（今の作りのまま）。 */}
             <StaticBox label="届かない日" value="なし（毎日送る）" />
           </div>
-        </div>
+        </SettingsFormRow>
         {isBirthday ? (
           <p className={styles.cardNote}>誕生日のきっかけ・日時は配信の実行処理で固定されています。</p>
         ) : (
@@ -550,7 +551,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
 
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-after">
         <CardHeader size="stacked" titleId="nen-edit-after" title="押されたあとにすること" meta={`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`} />
-        <div className={styles.row}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる <OptionalBadge /></span>
             {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <>
@@ -586,7 +587,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
               ]}
             /></SaveErrorField>}
           </div>
-        </div>
+        </SettingsFormRow>
         <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ タグ</p>
       </Card>
       <Drawer open={previewOpen} title="配信のプレビュー" width="narrow" onClose={() => setPreviewOpen(false)}>{preview}</Drawer>
