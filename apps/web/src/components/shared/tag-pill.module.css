@@ -79,9 +79,29 @@
 .remove svg { width: var(--tag-pill-font); height: var(--tag-pill-font); }
 .remove:hover { background: var(--color-shell); }
 .link:focus-visible, .remove:focus-visible, .toggle:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 .toggle { cursor: pointer; }
 .toggle[data-selected='false'] { background: var(--color-shell); color: var(--color-ink-secondary); }
+}
+
+/* B-180：表・要点の欄・編集の札はすべて同じ24px。 */
+:root .pill,
+:root .pill[data-size] {
+  box-sizing: border-box;
+  height: var(--tpl-tag-pill-h);
+  --tag-pill-font: var(--text-caption);
+  --tag-pill-dot: 6px;
+  --tag-pill-pad: 0 8px;
+  --tag-pill-gap: 6px;
+}
+
+/* 固定した札の通常寸法。高さ24はB-180、小さい札の寸法は保つ。 */
+:root .pill[data-size='md'] {
+  --tag-pill-font: var(--polish-text-body);
+  --tag-pill-dot: 8px;
+  --tag-pill-pad: 0 12px;
+  --tag-pill-gap: 8px;
+  line-height: 20px;
 }

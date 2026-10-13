@@ -119,8 +119,8 @@
 
 .linkButton:hover { text-decoration: underline; }
 
-.error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
-.warn { margin: 0; color: var(--color-status-warn-deep); font-size: var(--text-label); }
+
+.warn { color: var(--color-status-warn-deep); font-size: var(--text-label); }
 
 .actions {
   display: flex;
@@ -219,3 +219,5 @@
 
 /* 画像を添える所（MediaSlot・Z7vd2 の小さい形）。 */
 .attachSlot { width: var(--tpl-slot-w-compact); }
+
+.warn, .warnNoticePlacement { margin: 0; }

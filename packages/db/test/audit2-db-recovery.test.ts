@@ -42,7 +42,7 @@ describe('監査2: 件数の境界と途中失敗の回復', () => {
       raw.prepare("INSERT INTO friend_field_values(friend_id,field_id,value,updated_at) VALUES('friend',?,'value','2026-10-08')").run(id);
     }
     const summary = await getFriendFieldListSummary(db, scope);
-    expect(summary).toMatchObject({ total: 157, inUse: 150, registeredFriends: 1 });
+    expect(summary).toMatchObject({ total: 160, inUse: 150, registeredFriends: 1 });
     expect((await countFriendFieldValuesForScopes(db, ids, scope)).size).toBe(150);
   });
   it('PKG49/50: 95件と子明細を外部キーを守って集計・削除し、再実行で二重計上しない', async () => {

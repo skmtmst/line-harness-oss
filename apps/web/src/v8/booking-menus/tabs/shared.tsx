@@ -11,6 +11,8 @@ import {
 } from 'react'
 import { type BookingMenu, type BookingSettings } from '@/lib/api'
 import styles from '../settings.module.css'
+import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
 
 export type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -95,18 +97,13 @@ export function StateCard({ icon, title, description, action }: {
   action?: ReactNode
 }) {
   return (
-    <div className={styles.stateCard} data-design-node="xCoDe">
-      <span className={styles.stateIcon} aria-hidden="true">{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{description}</p>
-      {action ? <div className={styles.stateActions}>{action}</div> : null}
-    </div>
+    <ListState kind={title.includes('読み込めません') ? 'error' : title.includes('読み込み') ? 'loading' : 'empty'} title={title} description={description} data-design-node="xCoDe" icon={icon} action={action} />
   )
 }
 
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className={styles.skeletonRows} aria-label="読み込み中" role="status">
+    <DelayedSkeleton loading skeleton={<div className={styles.skeletonRows} aria-label="読み込み中" role="status">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className={styles.skeletonRow}>
           <span className={styles.skeletonDot} />
@@ -114,7 +111,7 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
           <span className={`${styles.skeletonBar} ${styles.skeletonBarShort}`} />
         </div>
       ))}
-    </div>
+    </div>} />
   )
 }
 

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,8 +25,8 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children?: unknown }) => children }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: fixture.tab }),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
@@ -135,6 +136,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-09-09T00:00:00.000Z'))
   fixture.accountId = 'account-a'
@@ -161,8 +163,7 @@ afterEach(async () => {
 async function render() {
   await act(async () => {
     root.render(<AnalyticsPage />)
-    await Promise.resolve()
-    await Promise.resolve()
+    for (let tick = 0; tick < 8; tick++) await Promise.resolve()
   })
 }
 
@@ -206,7 +207,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await render()
 
     for (const days of [7, 30, 90]) {
-      await click(`${days}日`)
+      await click(`過去${days}日`)
       const params = latestPath(endpoint)
       expect(params.get('from')).toBe(expectedRange(days).from)
       expect(params.get('to')).toBe(expectedRange(days).to)
@@ -230,9 +231,9 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     await render()
     await select('url-state', 'active')
-    expect(host.querySelectorAll('tbody tr')).toHaveLength(10)
-    expect(host.textContent).toContain('13件中')
-    await click('CSV で書き出す')
+    expect(host.querySelectorAll('[role="table"][aria-label="URLごとのクリック"] [role="row"][data-h]')).toHaveLength(10)
+    expect(host.textContent).toContain('13 件中')
+    await click('CSVで書き出す')
     const body = await csv!.text()
     expect(body).toContain('"リンク24",')
     expect(body).not.toContain('"リンク1",')
@@ -256,14 +257,14 @@ describe('分析の対象者種別・期間選択(#835)', () => {
 
     // 先頭段は「前段との差」が無いので、旧実装ではdisabledだった。到達/進行中も
     // 選べる契約を、実際に先頭段を押して確かめる。
-    const firstStage = host.querySelector('button[aria-label="案内の段"]') as HTMLButtonElement | null
+    const firstStage = host.querySelector('button[aria-label="案内 10人"]') as HTMLButtonElement | null
     expect(firstStage).not.toBeNull()
     expect(firstStage?.disabled).toBe(false)
     await act(async () => { firstStage?.click(); await Promise.resolve() })
 
     for (const selection of ['reached', 'stopped', 'in_progress'] as const) {
       await click({ reached: '到達した人', stopped: '止まった人', in_progress: '進行中の人' }[selection])
-      await click('友だち一覧で見る')
+      await click('対象者を開く')
       const request = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
       expect(request, JSON.stringify(net.calls)).toBeDefined()
       expect(JSON.parse(String(request?.init?.body))).toMatchObject({
@@ -271,16 +272,16 @@ describe('分析の対象者種別・期間選択(#835)', () => {
       })
     }
 
-    const secondStage = host.querySelector('button[aria-label="申込の段"]') as HTMLButtonElement | null
+    const secondStage = host.querySelector('button[aria-label^="申込 5人"]') as HTMLButtonElement | null
     expect(secondStage).not.toBeNull()
     await act(async () => { secondStage?.click(); await Promise.resolve() })
     await click('止まった人')
-    await click('友だち一覧で見る')
+    await click('対象者を開く')
     const secondRequest = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
     expect(JSON.parse(String(secondRequest?.init?.body))).toMatchObject({ stepOrder: 2, selection: 'stopped' })
 
     for (const days of [7, 30, 90]) {
-      await click(`${days}日`)
+      await click(`過去${days}日`)
       await click(`この${days}日を再集計`)
       const request = net.calls.filter((call) => call.path.includes('/api/analytics/funnels/funnel-1/run?')).at(-1)
       const body = JSON.parse(String(request?.init?.body))
@@ -309,9 +310,10 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     }
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
-    expect(host.textContent).toContain('まだ集計がありません。「この30日を再集計」を押してください')
-    await click('7日')
-    expect(host.textContent).toContain('まだ集計がありません。「この7日を再集計」を押してください')
+    await click('過去30日')
+    expect(host.textContent).toContain('まだ集計していません')
+    await click('過去7日')
+    expect(host.textContent, host.textContent ?? '').toContain('まだ集計していません')
     await click('この7日を再集計')
 
     fixture.accountId = 'account-b'
@@ -350,7 +352,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     expect(host.textContent).toContain('参照切れ 未取得: 所属を確認できません')
     expect(host.textContent).toContain('参照切れ 1（一部のみ）: 未対応種別を除外')
     expect(host.textContent).toContain('参照切れ 取得失敗: 照合失敗')
-    expect(host.textContent).toContain('確認できた参照切れ')
+    expect(host.textContent).toContain('参照切れ 1（一部のみ）')
     /*
      * #1005: 理由の長文はカードを伸ばさないよう説明アイコンの中へ。
      * 閉じている間は短い状態だけが見え、開くと全文が読める。
@@ -409,7 +411,7 @@ function type(id: string, value: string) {
 }
 
 async function clickInDocument(label: string) {
-  const target = Array.from(document.body.querySelectorAll('button')).find(
+  const target = Array.from((document.body.querySelector('[role="dialog"], [role="alertdialog"]') ?? document.body).querySelectorAll('button')).find(
     (item) => item.textContent === label,
   )
   if (!target) throw new Error(`「${label}」のボタンが見つかりません: ${document.body.textContent}`)
@@ -425,15 +427,15 @@ describe('ファネルの編集・停止・保管(#841)', () => {
 
     await click('定義を編集')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    const nameInput = document.body.querySelector('#fn-name') as HTMLInputElement | null
+    const nameInput = document.body.querySelector('#fn-v8-name') as HTMLInputElement | null
     expect(nameInput?.value).toBe('申込導線')
     const stepInputs = Array.from(document.body.querySelectorAll('input'))
       .map((input) => (input as HTMLInputElement).value)
     expect(stepInputs).toContain('案内')
-    expect(stepInputs).toContain('form-1')
+    expect(Array.from(document.body.querySelectorAll('input')).map(input => input.value)).toContain('申込')
     expect(document.body.textContent).toContain('新版として保存する')
 
-    await act(async () => { type('fn-name', '申込導線（改訂）'); await Promise.resolve() })
+    await act(async () => { type('fn-v8-name', '申込導線（改訂）'); await Promise.resolve() })
     net.handler = (async (path: string, init?: RequestInit) => {
       if (path.includes('/versions?')) {
         const body = JSON.parse(String(init?.body))
@@ -511,9 +513,9 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
 
-    await click('保管')
+    await click('削除する')
     expect(document.body.textContent).toContain('あとから戻せません')
-    await clickInDocument('保管する')
+    await clickInDocument('削除する')
     const request = net.calls.find((call) => call.path.includes('/status?'))
     expect(JSON.parse(String(request!.init?.body))).toEqual({
       status: 'archived', expectedStatus: 'active',
@@ -537,7 +539,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await act(async () => { await Promise.resolve() })
     await clickInDocument('新版として保存する')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    expect(document.body.textContent).toContain('他の人が先に変更しています')
+    expect(document.body.textContent).toContain('ほかの人が先にこのファネルを保存しました')
   })
 
   it('編集の新版保存はフォームに出せない条件（絞り込み・比較・段の副条件）を落とさない', async () => {
@@ -589,13 +591,13 @@ describe('ファネルの編集・停止・保管(#841)', () => {
 
     await click('結果を見る')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    const firstStage = host.querySelector('button[aria-label="案内の段"]') as HTMLButtonElement | null
+    const firstStage = host.querySelector('button[aria-label="案内 10人"]') as HTMLButtonElement | null
     await act(async () => { firstStage?.click(); await Promise.resolve(); await Promise.resolve() })
 
     expect(host.textContent).toContain('停止中・保管したファネルでは対象者づくりはできません')
     expect(host.querySelector('#funnel-audience-selection')).toBeNull()
     expect(
-      Array.from(host.querySelectorAll('button')).some((b) => b.textContent === '友だち一覧で見る'),
+      Array.from(host.querySelectorAll('button')).some((b) => b.textContent === '対象者を開く'),
     ).toBe(false)
     expect(net.calls.some((call) => call.path.includes('/audiences?'))).toBe(false)
   })
@@ -612,7 +614,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
 
     expect(host.textContent).not.toContain('定義を編集')
-    expect(host.textContent).not.toContain('保管')
+    expect(Array.from(host.querySelectorAll('button')).some(item => item.textContent === '削除する')).toBe(false)
     expect(
       Array.from(host.querySelectorAll('button')).some((item) => item.textContent === '停止'),
     ).toBe(false)

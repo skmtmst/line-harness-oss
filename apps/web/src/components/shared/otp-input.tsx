@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { Check } from 'lucide-react'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './otp-input.module.css'
 
 /**
@@ -61,7 +62,9 @@ export default function OtpInput({
   success = false,
   busy = false,
   visualLabel,
+  format = 'digits',
 }: {
+  format?: 'digits' | 'recovery'
   visualLabel?: string
   value: string
   onChange: (value: string) => void
@@ -86,13 +89,16 @@ export default function OtpInput({
   /** 確かめを送っている間。枠を押せない形にして輪を出す（disabled と同じく入力を止める）。 */
   busy?: boolean
 }) {
+  const field = useFieldContext()
+  describedBy = joinDescribedBy(describedBy, field?.describedBy)
   const refs = useRef<Array<HTMLInputElement | null>>([])
   /**
    * 値を変えたあとに移るマス。値が画面に反映される前に移ると、移った先が
    * 古い値を見て「空いたマスが先にある」と判断し、1マス目へ戻してしまう。
    */
   const pendingFocus = useRef<number | null>(null)
-  const digits = otpDigits(value).slice(0, length)
+  const normalize = (raw: string) => format === 'recovery' ? raw.normalize('NFKC').toUpperCase().replace(/[^A-Z2-9]/g, '') : otpDigits(raw)
+  const digits = normalize(value).slice(0, length)
   const locked = disabled || busy
   const groupRef = useRef<HTMLDivElement | null>(null)
 
@@ -116,7 +122,8 @@ export default function OtpInput({
     }
     if (digits.length > 0) {
       pendingFocus.current = 0
-      onChange('')
+      if (field?.onInvalidReset) field.onInvalidReset()
+      else onChange('')
     } else {
       focusSlot(0)
     }
@@ -145,7 +152,7 @@ export default function OtpInput({
   }, [value])
 
   const commit = (next: string, focusIndex: number) => {
-    const clean = otpDigits(next).slice(0, length)
+    const clean = normalize(next).slice(0, length)
     const target = Math.min(focusIndex, clean.length)
     // 値が変わらない（同じ数字で上書きした）ときは画面が作り直されないので、その場で移る。
     if (clean === digits) {
@@ -161,7 +168,7 @@ export default function OtpInput({
   /** 位置 index から数字の並びを書き込む。貼り付け・自動入力・1桁の入力で共通。 */
   const writeFrom = (index: number, incoming: string) => {
     const start = Math.min(index, digits.length)
-    const numbers = otpDigits(incoming)
+    const numbers = normalize(incoming)
     if (!numbers) return
     const next = (digits.slice(0, start) + numbers + digits.slice(start + numbers.length)).slice(0, length)
     commit(next, start + numbers.length)
@@ -169,7 +176,7 @@ export default function OtpInput({
 
   const onKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
-    if (/^[0-9０-９]$/.test(event.key)) {
+    if ((format === 'recovery' ? /^[A-Za-z2-9Ａ-Ｚａ-ｚ２-９]$/ : /^[0-9０-９]$/).test(event.key)) {
       event.preventDefault()
       writeFrom(index, event.key)
       return
@@ -221,19 +228,21 @@ export default function OtpInput({
       aria-describedby={describedBy}
       ref={groupRef}
       className={styles.group}
+      data-format={format}
       data-state={invalid ? 'error' : success ? 'success' : undefined}
       aria-busy={busy || undefined}
     >
       {Array.from({ length }, (_, index) => (
+        <Fragment key={index}>
+        {format === 'recovery' && index === 4 ? <span className={styles.separator} aria-hidden="true">−</span> : null}
         <input
-          key={index}
           ref={(node) => { refs.current[index] = node }}
           id={index === 0 ? id : undefined}
           type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          autoComplete={index === 0 ? 'one-time-code' : 'off'}
-          aria-label={`${index + 1}桁目`}
+          inputMode={format === 'recovery' ? 'text' : 'numeric'}
+          pattern={format === 'recovery' ? '[A-Za-z2-9]*' : '[0-9]*'}
+          autoComplete={format === 'digits' && index === 0 ? 'one-time-code' : 'off'}
+          aria-label={`${index + 1}${format === 'recovery' ? '文字目' : '桁目'}`} autoCapitalize={format === 'recovery' ? 'characters' : undefined}
           aria-invalid={invalid || undefined}
           disabled={locked}
           value={digits[index] ?? ''}
@@ -242,7 +251,7 @@ export default function OtpInput({
           onPaste={(event) => onPaste(index, event)}
           // 変換確定・自動入力・携帯のキーボードなど、keydown で数字が来ない入力はここで受ける。
           onChange={(event) => {
-            const typed = otpDigits(event.target.value)
+            const typed = normalize(event.target.value)
             const current = digits[index] ?? ''
             if (!typed) {
               if (current) commit(digits.slice(0, index) + digits.slice(index + 1), index)
@@ -261,6 +270,7 @@ export default function OtpInput({
             event.currentTarget.select?.()
           }}
         />
+        </Fragment>
       ))}
       {busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
       {success && !busy ? <Check className={styles.check} size={18} aria-hidden="true" /> : null}

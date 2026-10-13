@@ -1,7 +1,11 @@
+import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
+import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
-import { getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
+import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
+
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 import type { AdminSameSite } from './admin-auth-config.js';
 
@@ -174,6 +178,7 @@ function toAuthenticatedStaff(staff: {
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
+  permissionKeys = effectiveStaffEditKeys(permissionKeys);
   let viewPermissionKeys: string[] = [];
   try { viewPermissionKeys = staff.view_permission_keys ? JSON.parse(staff.view_permission_keys) as string[] : []; } catch { viewPermissionKeys = []; }
   const emailMask = staff.email_mask === 'full' || staff.email_mask === 'masked' || staff.email_mask === 'none'
@@ -214,22 +219,14 @@ export function isTenantSuspensionExemptPath(method: string, path: string): bool
 }
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
+  ['/api/auth/two-factor/policy', 'auth.mfa.policy'],
+  ...DELIVERY_API_PERMISSIONS,
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
   ['/api/support', '/chats'], ['/api/operators', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
-  ['/api/scenarios', '/scenarios'], ['/api/scenario-drafts', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/broadcast-message-assets/upload-sessions', '/broadcasts'], ['/api/reminders', '/reminders'],
-  ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
-  ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
-  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
-  ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
-  ['/api/form-files', '/form-submissions'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
-  // 危険なファイルの検査は登録メディアと同じ contents の鍵で守る。
-  // 一覧・設定・戻し・消去は route 側で owner/admin に絞っている。
-  ['/api/file-scans', '/contents'],
-  // 共通情報は登録メディアと同じ contents.ts 配下。メニューの href と同じ鍵を使う。
-  ['/api/common-vars', '/contents/vars'],
+  ['/api/form-files', '/form-submissions'],
   // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
   ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
   ['/api/message-templates', '/inflow-links'],
@@ -249,15 +246,12 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
   ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
-  ['/api/webhooks', '/webhooks'], ['/api/instagram', '/webhooks'], ['/api/line-notifications', '/line-notifications'],
+  ['/api/webhooks', '/webhooks'], ['/api/instagram', '/webhooks'],
   ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
   // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
   // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
   ['/api/meet-consultations', '/booking/bookings'],
-  // 友だち追加時の配信ルールと実行記録。旧 `/api/friend-add` 項目に
-  // 合う実経路は無いが、互換のため残す。
-  ['/api/friend-add-rules', '/friend-add-settings'], ['/api/friend-add-runs', '/friend-add-settings'],
-  ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
+  ['/api/ec-commerce', '/ec-commerce'],
   // 然の会員（★V6 37-1）。メニューの href は /nen/members。
   ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
   // 然のマイペット・健康日記（★V6 37-3／37-4）。主食のカロリー表はマイペット画面へ移した。
@@ -336,6 +330,9 @@ export function permissionForApiPath(path: string): string | null {
  */
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/auth/session'],
+  // These routes derive the target exclusively from the authenticated principal.
+  ['GET', '/api/auth/two-factor/self'],
+  ['POST', '/api/auth/two-factor/recovery'],
   ['POST', '/api/auth/step-up'],
   // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
   ['GET', '/api/auth/sessions'],
@@ -421,10 +418,16 @@ export function isStaffSelfEndpoint(method: string, path: string, staffId?: stri
 const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/staff'],
   ['GET', '/api/restaurant-test/stores'],
+  ['GET', '/api/restaurant-test/store-groups'],
   ['GET', '/api/restaurant-test/store-context'],
   ['GET', '/api/restaurant-test/terms-agreement'],
   ['POST', '/api/restaurant-test/stores/selection/clear'],
   ['GET', '/api/restaurant-test/snapshot'],
+  ['GET', '/api/restaurant-test/board'],
+  ['GET', '/api/restaurant-test/rotation'],
+  ['GET', '/api/restaurant-test/external-links'],
+  ['POST', '/api/restaurant-test/external-links'],
+  ['GET', '/api/restaurant-test/floors'],
   ['GET', '/api/restaurant-test/opening-hours'],
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
@@ -468,18 +471,32 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   // performance/sync は口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
   ['GET', '/api/restaurant-test/google/performance'],
   ['POST', '/api/restaurant-test/google/performance/sync'],
+  // デリバリー受注（D-1〜D-6）：担当者も注文を読み、厨房の流れ（受注→準備完了→受け渡し）と
+  // 品切れの一括設定を進められる。拒否・キャンセル・受付の一括停止と再開は店舗管理者以上。
+  ['GET', '/api/restaurant-test/delivery/orders'],
+  ['GET', '/api/restaurant-test/delivery/history'],
+  ['GET', '/api/restaurant-test/delivery/history.csv'],
+  ['GET', '/api/restaurant-test/delivery/menu-items'],
+  ['POST', '/api/restaurant-test/delivery/menu-items/bulk-sold-out'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
 ];
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  // 飲食3：担当者はフォロー・返事・登録情報を読む。開始・編集は管理者だけ。
+  ['GET', /^\/api\/restaurant-test\/followups\/[^/]+(?:\/review-history)?$/],
+  ['GET', /^\/api\/restaurant-test\/reservations\/[^/]+(?:\/confirmations)?$/],
+  ['GET', /^\/api\/restaurant-test\/external-links\/[^/]+$/],
+  ['PATCH', /^\/api\/restaurant-test\/external-links\/[^/]+$/],
+  ['DELETE', /^\/api\/restaurant-test\/external-links\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
   ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
   // 席の空き待ちの取り消し・繰り上げ・来店の印（booking-plus 席版）。
   ['DELETE', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+\/convert$/],
   ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/attendance$/],
   ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['PATCH', /^\/api\/restaurant-test\/closures\/[^/]+$/],
   ['DELETE', /^\/api\/restaurant-test\/closures\/[^/]+$/],
@@ -492,6 +509,11 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['GET', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
   ['PUT', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/posts\/[^/]+\/cancel$/],
+  // デリバリー受注の1件表示と、厨房の流れの3操作。拒否・キャンセルは含めない。
+  ['GET', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+\/accept$/],
+  ['POST', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+\/ready$/],
+  ['POST', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+\/handed-over$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
@@ -569,6 +591,10 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     // N-270: 外部システムからの成果受信。route 内で地点ごとの
     // 受信鍵をHMAC-SHA256で照合する。管理画面の認証は通さない。
     (normalizedMethod === 'POST' && /^\/api\/conversions\/ingest\/[^/]+$/.test(path)) ||
+    // デリバリー受注の通知受け口。route 内でサービスごとの合言葉を
+    // HMAC-SHA256で照合し、受信台帳で重複を排除する。管理画面の認証は通さない。
+    (normalizedMethod === 'POST' &&
+      /^\/api\/restaurant-test\/delivery\/webhooks\/[^/]+$/.test(path)) ||
     // #939 N-380: 外部システム向け公開API。route 内で integration_api_tokens
     // の Bearer トークンを照合する。管理画面の認証は通さない。
     path.startsWith('/api/public/v1/') ||
@@ -593,6 +619,15 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
+  const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+  const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
+  if (required || registered) {
+    const verified = await getPlatformSetting(c.env.DB, `auth.mfa.session:${await sha256Hex(token)}`);
+    if ((required && !registered) || verified !== staff.id) {
+      await deleteAdminSession(c.env.DB, await sha256Hex(token));
+      return null;
+    }
+  }
   return { ...toAuthenticatedStaff(staff), credential: 'session' };
 }
 
@@ -627,11 +662,16 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
+    const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+    // This endpoint exchanges the primary credential for a challenge, never
+    // for an authenticated staff context usable by other APIs.
+    if (c.req.path !== '/api/auth/login' && (required || staff.totp_enabled_at)) return null;
     return { ...toAuthenticatedStaff(staff), credential: 'api-key' };
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
+    if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
@@ -645,6 +685,7 @@ export async function authenticateApiToken(
     c.env.LEGACY_API_KEY !== c.env.API_KEY &&
     token === c.env.LEGACY_API_KEY
   ) {
+    if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     console.log('[auth] accept_via=LEGACY_API_KEY');
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
@@ -684,7 +725,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // must continue through the normal admin authentication below.
   const isPublicFormDefinition =
     method === 'GET' && /^\/api\/forms\/[^/]+$/.test(path);
-  if (isPublicFormDefinition) {
+  if (isPublicFormDefinition && !c.req.query('account_id')) {
     const bearer = bearerToken(c);
     const cookie = adminSessionTokenFromCookie(c);
     const staff = bearer
@@ -697,7 +738,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // 公開境界(LIFF・webhook・署名検証の入口)は認証より手前へ通す。
   // 判定の中身は isPublicApiBoundary に集約し、契約テストと共有する。
   // (LIFF の回答系は route 側で LINE 署名を見るため管理認証の対象外)
-  if (isPublicApiBoundary(method, path)) return next();
+  if (isPublicApiBoundary(method, path) && !(isPublicFormDefinition && c.req.query('account_id'))) return next();
 
   const bearer = bearerToken(c);
   const cookie = adminSessionTokenFromCookie(c);
@@ -737,7 +778,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // /api/ops/* は直後の route 側で requirePlatformAdmin() が全件を守るため、
   // ここで通常スタッフ向けの画面権限へ落とすと、登録済みの運営メンバーまで
   // 専用判定へ到達する前に 403 になる。運営 API だけは専用の門番へ委ねる。
-  const usesPlatformAdminAuthorization = path.startsWith('/api/ops/');
+  const usesPlatformAdminAuthorization = path.startsWith('/api/ops/') || path === '/api/auth/two-factor/policy';
   if (staff.role === 'staff'
       && !usesPlatformAdminAuthorization
       && !isStaffSelfEndpoint(method, path, staff.id)

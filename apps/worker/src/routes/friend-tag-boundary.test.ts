@@ -62,7 +62,7 @@ describe('N-041/N-044 タグ付与の所属と手動禁止 (#803)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seed(testDb);
     target = createApp(testDb.db);
   });

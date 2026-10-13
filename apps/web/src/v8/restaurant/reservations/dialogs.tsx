@@ -1,9 +1,8 @@
 'use client'
 
-/*
- * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
- * 送る形は今の画面（app/restaurant-test/v8/reservations.tsx）と同じ。
- */
+import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
+
+
 import { useEffect, useState } from 'react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -19,18 +18,25 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+
+/*
+ * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
+ * 送る形は今の画面（app/restaurant-test/v8/reservations.tsx）と同じ。
+ */
 
 function toLocalInput(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  return jstDateTimeLocal(date)
 }
 
 /** 「10/2（金）」の形（取消の確認の1行目）。 */
 function monthDayWeek(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.getMonth() + 1}/${date.getDate()}（${'日月火水木金土'[date.getDay()]}）`
+  return `${jstCalendar(date).getUTCMonth() + 1}/${jstCalendar(date).getUTCDate()}（${'日月火水木金土'[jstCalendar(date).getUTCDay()]}）`
 }
 
 export type ReservationPatch = Record<string, unknown>
@@ -38,7 +44,7 @@ export type ReservationPatch = Record<string, unknown>
 /** 閲覧のみ：選ぶ部品は置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
 function ReadOnlyChoice({ label, value, options }: { label: string; value: string; options: Array<{ value: string; label: string }> }) {
   const shown = options.find((option) => option.value === value)?.label ?? value
-  return <TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} />
+  return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
 export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore }: {
@@ -67,10 +73,10 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     })
   }, [reservation])
   const fields = useFormErrors()
-  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。')
-  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。')
-  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。')
-  fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。')
+  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
+  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
+  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
+  fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。', { required: true })
   if (!reservation) return null
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
@@ -86,8 +92,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     customerName: draft.customerName,
     customerPhone: draft.customerPhone || null,
     guestCount: Number(draft.guestCount),
-    startsAt: new Date(draft.startsAt).toISOString(),
-    endsAt: new Date(draft.endsAt).toISOString(),
+    startsAt: datetimeLocalJstToUtcIso(draft.startsAt),
+    endsAt: datetimeLocalJstToUtcIso(draft.endsAt),
     tableId: draft.tableId || null,
     courseId: draft.courseId || null,
     allergyNote: draft.allergyNote || null,
@@ -132,38 +138,38 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       ) : (
         <>
           <div className={styles.pair}>
-            <Field label="お客様名" htmlFor="rs-edit-name" error={fields.error('name')}>
-              <TextField id="rs-edit-name" invalid={fields.invalid('name')} required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+            <Field label="お客様名" htmlFor="rs-edit-name" error={fields.error('name')} requirement={fields.requirement('name')}>
+              <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-edit-name" invalid={fields.invalid('name')} required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
             </Field>
             <Field label="電話番号" htmlFor="rs-edit-phone">
-              <TextField id="rs-edit-phone" readOnly={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} />
+              <SaveErrorField names={["customerPhone","draft.customerPhone","customer_phone","draft.customer_phone"]}><TextField id="rs-edit-phone" readOnly={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} /></SaveErrorField>
             </Field>
           </div>
           <div className={styles.pair}>
-            <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')}>
-              <NumberInput id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+            <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')} requirement={fields.requirement('count')}>
+              <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><NumberInput id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
             </Field>
             <Field labelSize="compact" label="卓">
               {canWrite ? (
-                <Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
+                <SaveErrorField names={["tableId","draft.tableId","table_id","draft.table_id"]}><EntitySelect aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} /></SaveErrorField>
               ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
             </Field>
           </div>
           <div className={styles.pair}>
-            <Field label="開始日時" htmlFor="rs-edit-start" error={fields.error('start')}>
-              <DateTimeField id="rs-edit-start" invalid={fields.invalid('start')} required readOnly={!canWrite} value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+            <Field label="開始日時" htmlFor="rs-edit-start" error={fields.error('start')} requirement={fields.requirement('start')}>
+              <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-edit-start" invalid={fields.invalid('start')} required readOnly={!canWrite} value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
             </Field>
-            <Field label="終了日時" htmlFor="rs-edit-end" error={fields.error('end')}>
-              <DateTimeField id="rs-edit-end" invalid={fields.invalid('end')} required readOnly={!canWrite} value={draft.endsAt} onChange={(next) => setDraft({ ...draft, endsAt: next })} />
+            <Field label="終了日時" htmlFor="rs-edit-end" error={fields.error('end')} requirement={fields.requirement('end')}>
+              <SaveErrorField names={["endsAt","draft.endsAt","ends_at","draft.ends_at"]}><DateTimeField id="rs-edit-end" invalid={fields.invalid('end')} required readOnly={!canWrite} value={draft.endsAt} onChange={(next) => setDraft({ ...draft, endsAt: next })} /></SaveErrorField>
             </Field>
           </div>
           <Field labelSize="compact" label="コース">
             {canWrite ? (
-              <Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
+              <SaveErrorField names={["courseId","draft.courseId","course_id","draft.course_id"]}><EntitySelect aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} /></SaveErrorField>
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
           </Field>
           <Field label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
-            <TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} />
+            <SaveErrorField names={["allergyNote","draft.allergyNote","allergy_note","draft.allergy_note"]}><TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} /></SaveErrorField>
           </Field>
         </>
       )}
@@ -208,10 +214,10 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
 }) {
   const [draft, setDraft] = useState({ provider: 'restaurant_board', externalId: '', customerName: '', guestCount: '2', startsAt: '' })
   const fields = useFormErrors()
-  fields.define('externalId', '外部予約ID', () => draft.externalId.trim() ? null : '外部予約IDを入れてください。')
-  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。')
-  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。')
-  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。')
+  fields.define('externalId', '外部予約ID', () => draft.externalId.trim() ? null : '外部予約IDを入れてください。', { required: true })
+  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
+  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
+  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
   useEffect(() => { if (open) setDraft({ provider: 'restaurant_board', externalId: `DEMO-${Date.now()}`, customerName: '', guestCount: '2', startsAt: '' }) }, [open])
   return (
     <RsDialog
@@ -231,7 +237,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
           })
           return
         }
-        onSubmit({ provider: draft.provider, externalId: draft.externalId, customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: new Date(draft.startsAt).toISOString() })
+        onSubmit({ provider: draft.provider, externalId: draft.externalId, customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: datetimeLocalJstToUtcIso(draft.startsAt) })
       }}
       actions={(
         <>
@@ -241,25 +247,25 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
       )}
     >
       <Field labelSize="compact" label="受信元">
-        <Select aria-label="受信元" size="full" value={draft.provider} onChange={(value) => setDraft({ ...draft, provider: value })} options={[
+        <SaveErrorField names={["provider","draft.provider"]}><Select aria-label="受信元" size="full" value={draft.provider} onChange={(value) => setDraft({ ...draft, provider: value })} options={[
           { value: 'restaurant_board', label: 'レストランボード' },
           { value: 'hotpepper', label: 'Hot Pepper' },
           { value: 'tabelog', label: '食べログ' },
-        ]} />
+        ]} /></SaveErrorField>
       </Field>
-      <Field label="外部予約ID" htmlFor="rs-trial-id" error={fields.error('externalId')}>
-        <TextField id="rs-trial-id" invalid={fields.invalid('externalId')} required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} />
+      <Field label="外部予約ID" htmlFor="rs-trial-id" error={fields.error('externalId')} requirement={fields.requirement('externalId')}>
+        <SaveErrorField names={["externalId","draft.externalId","external_id","draft.external_id"]}><TextField id="rs-trial-id" invalid={fields.invalid('externalId')} required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} /></SaveErrorField>
       </Field>
       <div className={styles.pair}>
-        <Field label="お客様名" htmlFor="rs-trial-name" error={fields.error('name')}>
-          <TextField id="rs-trial-name" invalid={fields.invalid('name')} required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+        <Field label="お客様名" htmlFor="rs-trial-name" error={fields.error('name')} requirement={fields.requirement('name')}>
+          <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-trial-name" invalid={fields.invalid('name')} required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
         </Field>
-        <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')}>
-          <NumberInput id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+        <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')} requirement={fields.requirement('count')}>
+          <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><NumberInput id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
         </Field>
       </div>
-      <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')}>
-        <DateTimeField id="rs-trial-start" invalid={fields.invalid('start')} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+      <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')} requirement={fields.requirement('start')}>
+        <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-trial-start" invalid={fields.invalid('start')} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
       </Field>
       <DialogNote>試した予約は台帳に入ります。予約媒体へは何も送りません。</DialogNote>
     </RsDialog>

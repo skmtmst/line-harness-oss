@@ -193,7 +193,7 @@ function form(index, overrides = {}) {
 
 async function openHarness(browser, {
   role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {},
-  detail = null, putResults = [], viewport = { width: 1440, height: 1000 },
+  detail = null, putResults = [], tags = [], viewport = { width: 1440, height: 1000 },
 } = {}) {
   const state = {
     listCalls: [], folderWrites: [], putBodies: [], publishBodies: [], fail,
@@ -246,6 +246,7 @@ async function openHarness(browser, {
       return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [] } })
     }
     if (path === '/api/line-accounts') return json({ success: true, data: ACCOUNTS })
+    if (path === '/api/tags') return json({ success: true, data: tags })
     // 左メニューは表示設定を読む。形が違うと画面全体が落ちるので、既定の形で返す。
     if (path === '/api/settings/features') {
       return json({
@@ -504,12 +505,21 @@ try {
       form(2, { id: 'sales-old', name: '古い営業フォーム', updatedAt: null, monthlySubmitCount: null, monthlyCompletionRate: null }),
     ]
     const { context, page } = await openHarness(browser, { formsByAccount: { 'account-a': forms } })
-    await openList(page)
+    await openList(page, `?q=${encodeURIComponent('営業')}`)
+    const listSource = new URL(page.url()).pathname + new URL(page.url()).search
 
     const newLink = page.getByRole('link', { name: '営業フォームの集まった回答を見る', exact: true })
     const oldLink = page.getByRole('link', { name: '古い営業フォームの集まった回答を見る', exact: true })
-    assert.equal(await newLink.getAttribute('href'), '/form-submissions/responses?id=sales-new')
-    assert.equal(await oldLink.getAttribute('href'), '/form-submissions/responses?id=sales-old')
+    for (const [link, id] of [[newLink, 'sales-new'], [oldLink, 'sales-old']]) {
+      const destination = new URL(await link.getAttribute('href'), baseUrl)
+      assert.equal(destination.pathname, '/form-submissions/responses')
+      assert.equal(destination.searchParams.get('id'), id, '回答はその行のフォームを指す')
+      const returnDestination = new URL(destination.searchParams.get('returnTo'), baseUrl)
+      assert.equal(returnDestination.pathname, '/form-submissions', '回答から同じ一覧へ戻れる')
+      assert.equal(returnDestination.searchParams.get('q'), '営業', '検索条件を持ち運ぶ')
+      assert.equal(returnDestination.searchParams.get('form'), id, '戻る対象を持ち運ぶ')
+      assert.equal(destination.searchParams.get('returnAccount'), 'account-a', '戻り先のアカウントを持ち運ぶ')
+    }
 
     const newRow = rows(page).filter({ has: newLink })
     // V8は更新日時の独立列を廃止し、回答数と今月の回答・完了率をまとめる。
@@ -519,7 +529,11 @@ try {
     // R27: 行の「編集」は質問の編集へ。「…」内の操作から対象を引き継ぐ。
     await newRow.getByRole('button', { name: /その他の操作/ }).click()
     await page.getByRole('menuitem', { name: '編集', exact: true }).click()
-    await page.waitForURL('**/form-submissions/edit?id=sales-new&tab=basic')
+    await page.waitForURL((url) => url.pathname === '/form-submissions/edit'
+      && url.searchParams.get('id') === 'sales-new' && url.searchParams.get('tab') === 'basic')
+    const editDestination = new URL(page.url())
+    assert.equal(editDestination.searchParams.get('returnTo'), listSource, '編集メニューも検索条件を持ち運ぶ')
+    assert.equal(editDestination.searchParams.get('returnAccount'), 'account-a')
     await context.close()
   }
 
@@ -596,7 +610,7 @@ try {
   {
     const { context, page, state } = await openHarness(browser, { fail: true })
     await openList(page)
-    await page.getByText('表示できませんでした', { exact: true }).waitFor()
+    await page.getByText('読み込めませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
     assert.equal(await page.getByText('まだ回答フォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
     state.fail = false
@@ -682,8 +696,7 @@ try {
 
   async function openV8Editor(page, formName, tab = 'appearance') {
     await openList(page)
-    await page.getByRole('button', { name: `「${formName}」の詳細を見る`, exact: true }).click()
-    await page.getByRole('link', { name: '編集する', exact: true }).click()
+    await page.getByRole('link', { name: `「${formName}」の詳細を見る`, exact: true }).click()
     await page.getByRole('tab', { name: '受付と見た目', exact: true }).click()
     await page.waitForFunction(
       (expected) => document.querySelector('#fe-name')?.value === expected,
@@ -692,24 +705,47 @@ try {
     if (tab !== 'appearance') await page.getByRole('tab', { name: tab === 'after' ? '答え終わったあと' : '中身', exact: true }).click()
   }
 
-  // 10. 390pxでV8の動作を足す窓の種類・対象・削除が画面内で操作できる。
+  // 10. 390pxで共通の追加メニュー・対象を選ぶ窓・行の編集と削除が操作できる。
   {
     const detail = { ...form(1, { id: 'form-1', name: '動作を設定するフォーム' }), contentRevision: 4 }
     const { context, page } = await openHarness(browser, {
       detail, viewport: { width: 390, height: 844 }, formsByAccount: { 'account-a': [detail] },
+      tags: [{ id: 'tag-mobile', name: '回答済み' }],
     })
     await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=after`, { waitUntil: 'domcontentloaded' })
-    await page.getByRole('button', { name: 'タグ', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '答え終わったら行うこと', exact: true })
+    await page.getByRole('button', { name: '行うことを足す', exact: true }).click()
+    const kinds = page.getByRole('menu', { name: '行うことの種類', exact: true })
+    await kinds.waitFor()
+    for (const right of await kinds.getByRole('menuitem').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
+      assert.ok(right <= 390, `R26: 種類の選択が画面に収まる（右端 ${Math.round(right)}px）`)
+    }
+    await kinds.getByRole('menuitem', { name: 'タグを付ける・外す', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'タグを選ぶ', exact: true })
     await dialog.waitFor()
     const box = await dialog.boundingBox()
     assert.ok(box && box.height <= 844, 'R26: 窓の高さが画面に収まる')
-    await dialog.getByRole('button', { name: '動作の種類' }).waitFor()
+    await dialog.getByRole('checkbox', { name: '回答済み', exact: true }).check()
     for (const right of await dialog.locator('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
       assert.ok(right <= 390, `R26: 動作の操作が画面に収まる（右端 ${Math.round(right)}px）`)
     }
-    const remove = await dialog.getByRole('button', { name: 'この動作を削除' }).boundingBox()
+    await dialog.getByRole('button', { name: 'この 1件にする', exact: true }).click()
+    await dialog.waitFor({ state: 'detached' })
+    const action = page.locator('[data-action-row]')
+    assert.equal(await action.count(), 1, '対象を確定した行だけ追加する')
+    await action.getByRole('button', { name: 'タグ：変える', exact: true }).waitFor()
+    const title = await action.getByRole('button', { name: 'タグ「回答済み」を付ける', exact: true }).boundingBox()
+    assert.ok(title && title.width > 0 && title.x >= 0 && title.x + title.width <= 390,
+      'R26: 行の名前も省略できる幅を保って画面内に表示する')
+    for (const right of await action.getByRole('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
+      assert.ok(right <= 390, `R26: 行の操作が画面に収まる（右端 ${Math.round(right)}px）`)
+    }
+    await action.getByRole('button', { name: '1つ目の行うことのその他操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '削除する', exact: true }).click()
+    const removeDialog = page.getByRole('dialog', { name: '「行うこと」を削除しますか？', exact: true })
+    const remove = await removeDialog.getByRole('button', { name: '削除する', exact: true }).boundingBox()
     assert.ok(remove && remove.x + remove.width <= 390, 'R26: 動作の削除が画面に収まる')
+    await removeDialog.getByRole('button', { name: '削除する', exact: true }).click()
+    assert.equal(await action.count(), 0, '確認した後に行を削除する')
     await context.close()
   }
 

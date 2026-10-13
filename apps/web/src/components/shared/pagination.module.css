@@ -1,24 +1,16 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .pagination {
   display: flex;
   flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
   align-items: center;
-  gap: 6px;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 32px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-segment);
   background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 500;
-  line-height: 1;
   white-space: nowrap;
 }
 
@@ -30,27 +22,23 @@ button.item:hover:not(:disabled, .current) {
   background: var(--color-canvas-sunken);
 }
 
-button.item:focus-visible {
-  outline: revert;
-}
-
 /*
  * ★V8 仕上げ（M10-2）：ページ送りの乗せた・押した動きと印。
  * 色の変化は 120ms、押したときはほんの少し沈む（明るさで）。
  * キーボードの印はボタンと同じ緑の輪。いまのページの緑は変えない。
  */
-[data-theme='v8'] button.item {
+:root button.item {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     filter var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] button.item:active:not(:disabled, .current) {
+:root button.item:active:not(:disabled, .current) {
   filter: brightness(0.95);
 }
 
-[data-theme='v8'] button.item:focus-visible {
-  outline: 2px solid var(--color-action);
+:root button.item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -67,14 +55,11 @@ button.item:disabled {
   width: 38px;
 }
 
-/*
- * いま開いているページ。**白文字が乗るので `$accent-deep`。**
- * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
- */
+/* B-211：いま開いているページは薄い緑・緑の枠・濃い緑の文字。 */
 .current {
-  border-color: transparent;
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  color: var(--color-selection-border);
   font-weight: 500;
 }
 
@@ -92,22 +77,19 @@ button.item:disabled {
  * 帯の左端に出す件数の文（例「40件中 1〜20件を表示」）。v7 は帯の外に
  * 従来の件数表示があるので、ここは v8 のときだけ出す。
  */
-.summary {
-  display: none;
-}
 
 /*
  * ★V8「ページ送り」（jX2Uw）：帯の余白は上下10・左右20、間は 6。
  * 各ボタンは 32×32・角丸 control・文字は 13px/1.5。前・次は「‹」「›」の
  * 印だけの正方形にする。いまのページの緑は変えない。
  */
-[data-theme='v8'] .pagination {
+:root .pagination {
   gap: 6px;
   padding: 10px 20px;
   font-variant-numeric: normal;
 }
 
-[data-theme='v8'] .summary {
+:root .summary {
   display: inline-flex;
   align-items: center;
   margin-right: auto;
@@ -119,46 +101,65 @@ button.item:disabled {
 
 /* 中身は bare の ListRange（文字指定を持たない）を想定し、帯側が決める */
 
-[data-theme='v8'] .item {
+:root .item {
   height: 32px;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
 }
 
-[data-theme='v8'] .page {
+:root .page {
   width: 32px;
 }
 
-[data-theme='v8'] .control {
+:root .control {
   width: 32px;
   padding: 0;
 }
 
-.controlGlyph {
+:root .controlLabel {
   display: none;
 }
 
-[data-theme='v8'] .controlLabel {
-  display: none;
-}
-
-[data-theme='v8'] .controlGlyph {
+:root .controlGlyph {
   display: inline;
 }
 
-[data-theme='v8'] .item {
+:root .item {
   border: 0; border-radius: var(--polish-radius-control); color: var(--color-ink-secondary);
-  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow);
   font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
 }
-[data-theme='v8'] .current {
-  outline-color: transparent; background: var(--color-ink); color: var(--color-canvas);
+:root .current {
+  outline: 1px solid var(--color-selection-border); outline-offset: -1px;
 }
-[data-theme='v8'] span.item { outline-color: transparent; }
-[data-theme='v8'] .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
+/* B-211：通常の .item の色より現在地の選択色を優先する。 */
+html:root .current {
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  color: var(--color-selection-border);
+}
+:root span.item:not(.current) { outline-color: transparent; }
+:root .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
 
-[data-theme='v8'] .summary { flex: 1; gap: 0; }
-[data-theme='v8'] .pagination[data-spacing='roomy'] { padding: calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-rsv-head-row-gap)) calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-cell-side)); }
+:root .summary { flex: 1; gap: 0; }
+:root .pagination[data-spacing='restaurant']{padding:8px 0;gap:8px;}
+
+:root .pagination[data-spacing='roomy'] { padding: calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-rsv-head-row-gap)) calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-cell-side)); }
 
 }
+
+/* B-178：一覧の余白は型が持つ。件数と送り先を1つの右寄せの組にする。 */
+:root :global([data-list-skeleton]) .pagination { width: auto; justify-content: flex-end; padding: 0; }
+:root :global([data-list-skeleton]) .summary { flex: none; margin-right: var(--space-16); }
+:root :global([data-list-skeleton]) .pagination:has(> .summary) { flex: 1; min-width: 0; }
+:root :global([data-list-skeleton]) .pagination:has(> .summary) .summary { margin-right: auto; }
+
+/* 前後に進めない時も、送り先の枠を残し、矢印だけを薄くする。 */
+html:root button.control:disabled {
+  opacity: 1;
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  box-shadow: var(--control-shadow);
+}
+html:root button.control:disabled .controlGlyph { opacity: .5; }

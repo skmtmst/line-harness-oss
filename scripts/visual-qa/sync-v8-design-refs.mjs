@@ -50,10 +50,16 @@ let copied = 0
 let skipped = 0
 const missing = []
 for (const [id, entry] of targets) {
+  const srcHtml = join(DESIGN_DIR, map.frozenAt ? entry.exportHtml ?? `html/${id}.html` : `lint/${entry.doc}/${id}.html`)
+  if (includeHtml && existsSync(srcHtml)) copyFileSync(srcHtml, join(DEST, `${id}.html`))
   const src = join(DESIGN_DIR, entry.shot ?? `lint/${entry.doc}/shots/${id}.png`)
   const dest = join(DEST, `${id}.png`)
   if (!existsSync(src)) {
     missing.push(id)
+    continue
+  }
+  if (map.frozenAt && existsSync(srcHtml) && statSync(src).mtimeMs < statSync(srcHtml).mtimeMs) {
+    missing.push(`${id}（PNGが固定HTMLより古い。撮り直しが必要）`)
     continue
   }
   const fresh = existsSync(dest)
@@ -65,10 +71,6 @@ for (const [id, entry] of targets) {
   }
   copyFileSync(src, dest)
   copied += 1
-  if (includeHtml) {
-    const srcHtml = join(DESIGN_DIR, `lint/${entry.doc}/${id}.html`)
-    if (existsSync(srcHtml)) copyFileSync(srcHtml, join(DEST, `${id}.html`))
-  }
 }
 
 console.log(`[sync-v8-design-refs] 写した ${copied} 枚・最新そのまま ${skipped} 枚 → ${DEST}`)

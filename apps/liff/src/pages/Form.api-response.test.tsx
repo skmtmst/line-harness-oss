@@ -81,3 +81,39 @@ describe('L15：本物の応答でフォームを開き、失敗から読み直�
     expect(screen.queryByText('フォームを開けませんでした')).toBeNull();
   });
 });
+
+it.each(['このフォームの回答期限は終了しました', 'このフォームは、お一人さま1回までです', 'このフォームは受付を終了しました'])('入力前に受付できない理由を知らせる：%s', async reason => {
+  formResponse = { success: true, data: { ...form, availability: { accepting: false, reason, deadlineAt: null, oncePerFriend: false, totalRemaining: 0, choices: {} } } };
+  open();
+  expect(await screen.findByText(reason)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '送信する' })).toBeNull();
+  expect(screen.queryByRole('textbox')).toBeNull();
+});
+
+it('締め切りと1回制限・残り件数を先に出し、定員いっぱいの選択肢を無効にする', async () => {
+  formResponse = { success: true, data: { ...form,
+    availability: { accepting: true, reason: null, deadlineAt: '2099-10-01T15:00:00Z', oncePerFriend: true, totalRemaining: 3, choices: { pick: { full: { full: true, remaining: 0 }, open: { full: false, remaining: 2 } } } },
+    layout: { ...form.layout, sections: [{ id: 's1', blocks: [{ id: 'b1', kind: 'input', type: 'radio', name: 'pick', label: 'ご希望', choices: [{ id: 'full', label: '満席', defaultSelected: true }, { id: 'open', label: '空席' }] }] }], options: {} },
+  } };
+  open();
+  expect(await screen.findByText('回答はお一人さま1回までです')).toBeTruthy();
+  expect(screen.getByText(/締め切り：/)).toBeTruthy();
+  expect(screen.getByText(/受付上限まで残り3件/)).toBeTruthy();
+  const full = screen.getByRole('radio', { name: '満席（受付終了）' }) as HTMLInputElement;
+  expect(full.disabled).toBe(true);
+  expect(full.checked).toBe(false);
+  expect((screen.getByRole('radio', { name: '空席（残り2件）' }) as HTMLInputElement).disabled).toBe(false);
+});
+
+it.each(['radio', 'checkbox', 'select'])('満席のその他の初期値と前回の自由記入を復元しない：%s', async type => {
+  formResponse = { success: true, data: { ...form,
+    availability: { accepting: true, reason: null, deadlineAt: null, oncePerFriend: false, totalRemaining: null, choices: { pick: { full: { full: true, remaining: 0 } } } },
+    layout: { ...form.layout, sections: [{ id: 's1', blocks: [{ id: 'b1', kind: 'input', type, name: 'pick', label: 'ご希望', defaultValue: '前回の自由記入', choices: [{ id: 'open', label: '通常' }, { id: 'full', label: 'その他', isOther: true }] }] }] },
+  } };
+  latestResponse = { success: true, data: { answers: { pick: type === 'checkbox' ? ['前回の自由記入'] : '前回の自由記入' }, createdAt: '2026-10-01' } };
+  open();
+  await screen.findByRole('button', { name: '送信する' });
+  await vi.waitFor(() => expect(fetcher.mock.calls.some(([url]) => String(url).includes('/my-latest'))).toBe(true));
+  expect(screen.queryByDisplayValue('前回の自由記入')).toBeNull();
+  if (type !== 'select') expect((screen.getByRole(type, { name: 'その他（受付終了）' }) as HTMLInputElement).checked).toBe(false);
+});

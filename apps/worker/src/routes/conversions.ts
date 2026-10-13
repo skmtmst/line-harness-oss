@@ -1,3 +1,5 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { hasStaffAccess } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
@@ -85,7 +87,7 @@ async function adminAccountScope(c: Context<Env>, alias = '') {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const column = `${alias}line_account_id`;
   const where = scope.allowedAccountIds.length
-    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    ? `(${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
     : scope.canSeeUnassigned
       ? `${column} IS NULL`
       : '1 = 0';
@@ -137,18 +139,11 @@ type ConversionPermission = 'view' | 'edit' | 'export';
 function conversionPermission(permission: ConversionPermission): MiddlewareHandler<Env> {
   return async (c, next) => {
     const staff = c.get('staff');
-    const keys = staff?.permissionKeys ?? [];
-    const hasFeature = keys.includes('/conversions');
-    const allowed = staff && (
-      staff.role === 'owner'
-      || staff.role === 'admin'
-      || (permission === 'view' && hasFeature)
-      || (permission === 'edit' && hasFeature && keys.includes('conversion.definition.edit'))
-      || (permission === 'export' && hasFeature && keys.includes('conversion.report.export'))
-    );
-    if (!allowed) {
-      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
-    }
+    const read = permission === 'view';
+    const allowed = hasStaffAccess(staff, '/conversions', read)
+      && (permission === 'view' || hasStaffAccess(staff,
+        permission === 'edit' ? 'conversion.definition.edit' : 'conversion.report.export', read));
+    if (!allowed) return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     await next();
   };
 }
@@ -1109,6 +1104,7 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
       '期間開始', '期間終了', 'タイムゾーン', '純額定義', '成果地点ID', '成果地点名',
       '起点', '状態', '状態詳細', '成果件数', '純成果件数', '取消件数', '純金額', '利用先数', '更新日時',
     ];
+    c.set('outputAudit', { count: items.length, accountId: filters.value.lineAccountId ?? undefined, accountIds: [...scope.value.allowedAccountIds], accountCounts: Object.fromEntries(scope.value.allowedAccountIds.map(id => [id, items.filter(item => item.lineAccountId === id).length])) });
     const rows = items.map((item) => [
       range.range.from,
       range.range.to,

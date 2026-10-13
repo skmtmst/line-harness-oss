@@ -1,10 +1,4 @@
 'use client'
-
-/*
- * 会話の頭の下に差す「会話の中を探す」帯（V8.pen 枠 v7GV2 の f64Ok）。
- * 探す欄（緑の枠）・「n件中 m件目」・↑・↓・×。
- * Enter＝古い方（↑）、Shift+Enter＝新しい方（↓）、Esc＝閉じる。
- */
 import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react'
 import IconButton from '@/components/shared/icon-button'
@@ -12,6 +6,14 @@ import { CHAT_SEARCH_MAX_CHARS, type ChatSearch } from './use-chat-search'
 import styles from './chat-search-bar.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * 会話の頭の下に差す「会話の中を探す」帯（V8.pen 枠 v7GV2 の f64Ok）。
+ * 探す欄（緑の枠）・「n件中 m件目」・↑・↓・×。
+ * Enter＝古い方（↑）、Shift+Enter＝新しい方（↓）、Esc＝閉じる。
+ */
 
 export function chatSearchCountText(search: Pick<ChatSearch, 'query' | 'status' | 'total' | 'index'>): string {
   if (!search.query.trim()) return ''
@@ -50,7 +52,7 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
 
   return (
     <div className={styles.band} role="search" aria-label="会話の中を探す" data-design-node="f64Ok">
-      <Field label={<><Search aria-hidden="true" className={styles.fieldIcon} /></>}><input
+      <Field label={<><Search aria-hidden="true" className={styles.fieldIcon} /></>}><SaveErrorField names={["query","search.query"]}><input
           ref={inputRef}
           type="search"
           className={styles.input}
@@ -60,7 +62,7 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
           aria-label="会話の中を探す"
           onChange={(event) => search.setQuery(event.target.value)}
           onKeyDown={onKeyDown}
-        /></Field>
+        /></SaveErrorField></Field>
       <span className={styles.count} role="status" aria-live="polite">{count}</span>
       <IconButton
         className={styles.button}

@@ -24,6 +24,6 @@ export type RestaurantLoginMember = {
 export type RestaurantMenuChangeResult = { id: string; approvalId: string | null; requestId: string | null; pendingPrice: number | null };
 
 export type RestaurantTablePosition = { id: string; floorX: number; floorY: number; joinGroup: string | null };
-export type RestaurantTableLayoutInput = { storeId: string; tables: RestaurantTablePosition[] };
+export type RestaurantTableLayoutInput = { storeId: string; expectedVersion:number; tables: RestaurantTablePosition[] };
 
 export type RestaurantApprovalDecision = { id: string; status: string; menuChangeStatus: 'pending' | 'approved' | 'returned' | 'applied' | 'failed' | null; failureReason: string | null };

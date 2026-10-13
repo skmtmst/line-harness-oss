@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
@@ -46,6 +47,7 @@ function sessionFingerprint(handoffToken: string): string {
 
 /** テストと、外から「次の遷移で必ず確認して」が必要なときの口。 */
 export function invalidateAuthSessionCheck(): void {
+  forgetStaffIdentity()
   lastSessionCheck = null
   forgetSessionSnapshot()
   forgetAuthCheck()
@@ -160,6 +162,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         // 代理ログイン帯はこの結果を読む。同じ応答をもう一度取りに行かせない（V6R-S0-a）。
         const snapshot: SessionSnapshot = {
           impersonation: (data.data.impersonation as OpsImpersonation | null | undefined) ?? null,
+          recoveryCodesRemaining: typeof data.data.recoveryCodesRemaining === 'number' ? data.data.recoveryCodesRemaining : null,
           unfamiliarAt: typeof data.data.unfamiliarAt === 'string' ? data.data.unfamiliarAt : null,
           stepUpMethod: data.data.stepUpMethod === 'totp' || data.data.stepUpMethod === 'password'
             ? data.data.stepUpMethod

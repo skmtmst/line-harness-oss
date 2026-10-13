@@ -64,13 +64,22 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     await act(async () => { root.render(<OpsMembersPage />) })
     await settle()
     const body = text()
-    expect(body).toContain('招待された人はパスワードを設定し')
+    // 見出し下の説明は共通の「？」から読む。説明の欠落と開閉の動きを検査する。
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="メンバー管理の説明"]')!
+    expect(help).toBeTruthy()
+    expect(help.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
+    expect(host.querySelector('[role="note"]')?.textContent).toContain('招待された人はパスワードを設定し')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).toContain('運営メンバー')
     expect(body).toContain('運営の情報')
     expect(body).not.toContain('権限者')
     expect(body).toContain('有効 2・招待中 1')
     expect(body).toContain('監査ログに記録')
     expect(body).not.toContain('未設定 1人')
+    expect(host.querySelector('[title="2要素認証 設定済み 2人 / 3人・未設定 1人"]')).not.toBeNull()
     // 招待の行
     expect(body).toContain('招待メールを送る')
     expect(body).not.toContain('運営メンバーを招待')

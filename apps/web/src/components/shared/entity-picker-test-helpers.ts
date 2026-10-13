@@ -7,19 +7,29 @@ import { expect } from 'vitest'
 
 function escape(text: string) { return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
 
+/** 初回描画から body の portal へ移り終わった、現在の窓を返す。 */
+export async function findPickerDialog(name?: string) {
+  return waitFor(() => {
+    const dialog = name ? screen.getByRole('dialog', { name }) : screen.getAllByRole('dialog').at(-1)!
+    expect(dialog.closest('[role="presentation"]')?.parentElement).toBe(document.body)
+    return dialog
+  })
+}
+
 /** 1つ選ぶ欄。label は欄の読み上げ名、name は候補の名前。confirm は主ボタンの文字（既定は「選ぶ」）。 */
 export async function pickEntity(label: string, name: string, confirm = '選ぶ') {
-  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${escape(label)}：(選ぶ|変える)$`) }))
-  const dialog = (await screen.findAllByRole('dialog')).at(-1)!
-  fireEvent.click(await within(dialog).findByRole(within(dialog).queryByRole('checkbox', {name}) ? 'checkbox' : 'radio', { name }))
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${escape(label)}(?::|：)?(選ぶ|変える)?$`) }))
+  const dialog = await findPickerDialog()
+  await waitFor(() => expect(within(dialog).queryByRole('checkbox', { name }) ?? within(dialog).queryByRole('radio', { name })).not.toBeNull())
+  fireEvent.click((within(dialog).queryByRole('checkbox', { name }) ?? within(dialog).getByRole('radio', { name }))!)
   fireEvent.click(within(dialog).getByRole('button', { name: within(dialog).queryByRole('button',{name:confirm}) ? confirm : /^選ぶ（\d+件）$/ }))
   await waitFor(() => expect(screen.queryAllByRole('dialog').includes(dialog)).toBe(false))
 }
 
 /** まとめて選ぶ欄。names の行にチェックを入れて確定する。 */
 export async function pickEntities(label: string, names: string[]) {
-  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${escape(label)}：(選ぶ|変える)$`) }))
-  const dialog = (await screen.findAllByRole('dialog')).at(-1)!
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${escape(label)}(?::|：)?(選ぶ|変える)?$`) }))
+  const dialog = await findPickerDialog()
   for (const name of names) fireEvent.click(await within(dialog).findByRole('checkbox', { name }))
   fireEvent.click(within(dialog).getByRole('button', { name: /^この .+にする$|^この.+にする$/ }))
   await waitFor(() => expect(screen.queryAllByRole('dialog').includes(dialog)).toBe(false))

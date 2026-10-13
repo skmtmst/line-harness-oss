@@ -70,7 +70,7 @@ test('v8 では hsD8e の作る画面（向き・見本・下の帯）が出る'
   expect(board?.textContent).toContain('下書きを保存')
 })
 
-test('v7 では従来の作る画面が出て hsD8e は出ない', async () => {
+test('旧テーマ属性でも現在の作成画面が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="hsD8e"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="hsD8e"]')).not.toBeNull()
 })

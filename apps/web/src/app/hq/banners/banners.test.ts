@@ -6,13 +6,17 @@ const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8'
 const listPage = read('../../../v8/hq-banners/list.tsx')
 const projectPage = read('../../../v8/hq-banners/project.tsx')
 const panel = read('../../../components/hq/banners/generation-panel.tsx')
-const modal = read('../../../components/hq/banners/image-detail-modal.tsx')
-const projects = read('../../../components/hq/banners/projects-section.tsx')
-const library = read('../../../components/hq/banners/library-section.tsx')
-const shell = read('../../../components/hq/banners/banner-shell.tsx')
+const modal = read('../../../v8/hq-banners/image-detail.tsx')
+const frame = read('../../../v8/hq-banners/frame.tsx')
+const dialog = read('../../../components/shared/dialog.tsx')
+const dialogCss = read('../../../components/shared/dialog.module.css')
+const picker = read('../../../components/shared/hq-account-picker.tsx')
+const projects = listPage
+const library = listPage
+const shell = listPage
 /* ★V8 のプロジェクトの中。承認済み ★BG-B `qIp42` に合わせた言葉と見出しの見張りに使う。 */
 const v8Project = read('../../../v8/hq-banners/project.tsx')
-const banners = [listPage, projectPage, panel, modal, projects, library, shell, read('../../../components/hq/banners/image-tile.tsx'), read('../../../components/hq/banners/project-card.tsx')]
+const banners = [listPage, projectPage, panel, modal, projects, library, shell]
 
 /**
  * 統括のバナー生成の画面が、設計と共通ルールから外れていないかを見張る。
@@ -97,18 +101,20 @@ describe('統括 バナー生成', () => {
   })
 
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
-    expect(modal).toContain('fixed inset-0')
-    expect(modal).toContain('bg-scrim')
-    expect(modal).toContain('maxWidth: 1160')
+    expect(frame).toContain('<Dialog')
+    expect(frame).toContain("kind === 'detail' || kind === 'reference' ? 960")
+    expect(dialogCss).toMatch(/position:\s*fixed/)
+    expect(dialogCss).toMatch(/width:\s*min\(/)
     expect(modal).not.toMatch(/width:\s*1160|width:\s*1920/)
-    expect(modal).toContain('useOverlayFocus')
+    expect(dialog).toContain('useOverlayFocus')
   })
 
   it('アカウントへ渡すは、渡し済みのアカウントを灰色にして二度渡さない', () => {
     expect(modal).toContain('delivered.has(account.id)')
-    expect(modal).toContain('disabled={already || busy}')
-    expect(modal).toContain('渡し済み')
-    expect(modal).toContain('アカウントへ渡す')
+    expect(modal).toContain('disabledIds={image.deliveredAccountIds}')
+    expect(picker).toContain('disabledIds.includes(account.id)')
+    expect(modal).toContain('配布済み')
+    expect(modal).toContain('アカウントへ配る')
   })
 
   it('「削除」ではなく「一覧から外す」「アーカイブ」と言う', () => {

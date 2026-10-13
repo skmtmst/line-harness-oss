@@ -89,6 +89,7 @@ const json = (data: unknown, status = 200) => new Response(
 let fetchCalls: string[] = []
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/webinars')
   listItems = [webinar()]
   staffRole = 'admin'
   fetchCalls = []
@@ -136,7 +137,9 @@ test('v8 では UyUMw の一覧（帯・表・視聴の2行）が出る', async 
   expect(board?.textContent).toContain('視聴開始 98人')
   expect(board?.textContent).toContain('視聴完了 —')
   expect(board?.textContent).toContain('公開中')
-  expect(board?.textContent).toContain('編集')
+  expect(Array.from(board!.querySelectorAll('button')).some((button) => button.textContent?.trim() === '編集')).toBe(false)
+  await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label^="ウェビナー「"][aria-label$="の操作"]')!.click() })
+  expect(document.querySelector('[role="menu"]')?.textContent).toContain('編集する')
 })
 
 /* 公開期間が終わった行の札は、一覧の絵（UyUMw・uBMuB・jiNg0）どおり「非公開」。 */
@@ -175,19 +178,19 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみ
 
 /* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。
  * 共通パネルは最上層へ描画されるため、パネル内の操作は文書全体から探す。 */
-function detailButton(title: string): HTMLButtonElement {
-  const found = [...host.querySelectorAll('button')].find(
+function detailButton(title: string): HTMLAnchorElement {
+  const found = [...host.querySelectorAll('a')].find(
     (button) => button.getAttribute('aria-label') === `「${title}」の詳細を見る`,
   )
   if (!found) throw new Error(`detail button not found: ${title}`)
-  return found as HTMLButtonElement
+  return found as HTMLAnchorElement
 }
 
 test('v8 で行を押すと右の詳細パネルが開き↑↓で次の行へ移る', async () => {
   listItems = [webinar(), webinar({ id: 'webinar-2', title: '2つ目のセミナー', slug: 'second' })]
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  await act(async () => { (detailButton('NEN活用スタートセミナー').closest('tr') as HTMLElement).click() })
   const panel = document.querySelector('[data-design-part="detail-panel"]')
   expect(panel).not.toBeNull()
   expect(panel?.textContent).toContain('NEN活用スタートセミナー')
@@ -215,7 +218,7 @@ test('v8 で行を右クリックすると「…」と同じ操作が出る', as
 test('v8 で詳細パネルの名前をその場で変えると保存口へ届く', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  await act(async () => { (detailButton('NEN活用スタートセミナー').closest('tr') as HTMLElement).click() })
   const panel = document.querySelector('[data-design-part="detail-panel"]')
   const edit = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'ウェビナー名を変更する')
   expect(edit).toBeTruthy()
@@ -291,10 +294,10 @@ test('アーカイブ済みを開いて記録を読み、確認してから下�
   await act(async () => { option.querySelector('button')!.click() })
   expect(requests.some((r) => r.url.includes('status=archived'))).toBe(true)
   const row = host.querySelector('tbody tr')!
-  expect(row.textContent).toContain('● アーカイブ')
+  expect(row.textContent).toContain('アーカイブ')
   expect(row.textContent).toContain('124人')
   expect(row.textContent).toContain('視聴開始 98人')
-  await act(async () => { (row.querySelector('button[aria-label="NEN活用スタートセミナーのその他操作"]') as HTMLButtonElement).click() })
+  await act(async () => { (row.querySelector('button[aria-label="ウェビナー「NEN活用スタートセミナー」の操作"]') as HTMLButtonElement).click() })
   const restore = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('下書きに戻す')) as HTMLElement
   await act(async () => { restore.click() })
   expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(0)

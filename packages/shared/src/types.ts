@@ -1864,6 +1864,14 @@ export type AutomationEventType =
   | "message_received"
   | "postback_received"
   | "calendar_booked"
+  | "restaurant.reservation.created"
+  | "restaurant.reservation.changed"
+  | "restaurant.reservation.cancelled"
+  | "restaurant.arrived"
+  | "restaurant.arrival_undone"
+  | "restaurant.departed"
+  | "restaurant.departure_undone"
+  | "restaurant.waitlist.invited"
   | "form_submitted"
   | "link_clicked"
   | "datetime"
@@ -1912,6 +1920,8 @@ export interface AutomationLog {
 // -----------------------------------------------------------------------------
 export interface StaffMember {
   id: string;
+  /** 本人APIが返す実効的な閲覧専用状態（代理ログインも含む）。 */
+  readOnly?: boolean;
   /** 認証済み本人APIが返すテナント識別子。古いAPI応答との互換のため任意。 */
   tenantId?: string;
   name: string;
@@ -2589,6 +2599,8 @@ export interface AutoReplyRun extends ExecutionRunListItem {
   inputPreview: string | null;
   matchedKeyword: string | null;
   versionNumber: number | null;
+  /** 送達不明を通常の失敗と区別する台帳の理由。 */
+  errorCode?: string | null;
   domainStatus: AutoReplyEvaluationStatus;
   replyStatus: "not_attempted" | "accepted" | "failed";
   actionSummary: Record<string, number>;

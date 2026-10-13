@@ -10,11 +10,11 @@ describe('保存した検索の条件編集', () => {
     expect(PAGE).toContain('api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })')
     expect(PAGE).toContain('api.scenarios.list({ accountId: selectedAccountId })')
     expect(PAGE).toContain('api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })')
-    expect(PAGE).toContain('marks.map((mark) => ({ value: mark.id, label: mark.name }))')
+    expect(PAGE).toContain('marks.map((mark) => ({ ...entityOptionMetadata(mark), value: mark.id, label: mark.name }))')
     // シナリオは選ぶ窓（候補の行をそのまま渡す）。
     expect(PAGE).toContain('kind="scenario"')
     expect(PAGE).toContain('options={scenarios}')
-    expect(PAGE).toContain('fields.map((field) => ({ value: field.fieldKey, label: field.name }))')
+    expect(PAGE).toContain('fields.map((field) => ({ ...entityOptionMetadata(field), value: field.fieldKey, label: field.name }))')
   })
 
   it('参照先を取得できない状態と0件を同じ言葉にしない', () => {

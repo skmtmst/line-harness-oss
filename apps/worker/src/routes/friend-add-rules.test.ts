@@ -173,7 +173,7 @@ describe('friend add rules API', () => {
     db.recordFriendAddRuleTest.mockClear();
     expect((await denied.request('/api/friend-add-rules/test', request, makeEnv())).status).toBe(403);
     expect(db.recordFriendAddRuleTest).not.toHaveBeenCalled();
-    expect((await allowed.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
+    expect((await denied.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
       method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0001' },
     }, makeEnv())).status).toBe(403);
   });

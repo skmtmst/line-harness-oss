@@ -3,19 +3,8 @@
  * 枠・見出しは型（DetailPage）が持つ。ここは数のマス・版の履歴・呼び出し元の表だけ。
  */
 
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
+
 
 /* 中身の段（絵：上 16・左右 24・間 14）。型の詳細の中身（上 20・左右 28・間 20）との差だけ外へ出す。 */
 .body {
@@ -141,21 +130,21 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   gap: var(--tpl-am-col-gap);
   height: var(--tpl-am-ver-head-h);
   min-height: 0;
   padding: var(--tpl-am-ver-head-pad);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-am-col-gap);
   height: var(--tpl-am-ver-use-row-h);
   padding: var(--tpl-am-ver-use-row-pad);
   border-bottom: 0;
   box-shadow: var(--tpl-am-ver-use-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -166,23 +155,23 @@
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+:global(:root) .table .headRow[data-table-layout='columns'] > th {
   font-size: var(--text-micro);
   font-weight: 600;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colNum,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colNum {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colNum,
+:global(:root) .table .row[data-table-layout='columns'] > td.colNum {
   align-items: flex-end;
   padding-right: var(--tpl-am-ver-num-pad-end);
   text-align: right;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colWhere,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colWhere {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colWhere,
+:global(:root) .table .row[data-table-layout='columns'] > td.colWhere {
   flex: 1 1 0;
   min-width: 0;
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colState {
+:global(:root) .table .row[data-table-layout='columns'] > td.colOps,
+:global(:root) .table .row[data-table-layout='columns'] > td.colState {
   align-items: flex-start;
 }
 .colPinned { width: var(--tpl-am-ver-col-pinned); flex-shrink: 0; }

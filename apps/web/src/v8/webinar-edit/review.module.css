@@ -19,7 +19,6 @@
 .checkDetail { flex-shrink: 1; max-width: 50%; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); text-align: right; }
 
 .blocker {
-  margin: 0;
   padding: var(--tpl-wc-rv-band-pad);
   border-radius: var(--tpl-wc-an-chart-radius);
   background: var(--color-danger-bg);
@@ -66,3 +65,5 @@
   background: var(--color-ink);
   color: var(--color-canvas);
 }
+
+.blocker, .blockerNoticePlacement { margin: 0; }

@@ -1,13 +1,5 @@
 'use client'
-
-/*
- * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
- *
- * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
- * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
- * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
- */
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay } from '@line-crm/shared'
@@ -31,6 +23,16 @@ import {
 import styles from './closures.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
+ *
+ * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
+ * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
+ * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
+ */
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }
 
@@ -66,6 +68,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   dialog: ClosureDialogTarget | null
   onDialog: (target: ClosureDialogTarget | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const store = ctx.store
   const storeId = ctx.selectedStoreId
@@ -75,6 +78,9 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const [closures, setClosures] = useState<RestaurantClosure[] | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
+  const [tasksError,setTasksError]=useState(false)
+  const [mediaError,setMediaError]=useState(false)
+  const [mediaRetry,setMediaRetry]=useState(0)
   const [tasks, setTasks] = useState<RestaurantChannelCloseTask[]>([])
   const [media, setMedia] = useState<MediaLink[]>([])
   const [reservations, setReservations] = useState<RestaurantReservation[] | null>(null)
@@ -108,7 +114,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
 
   const loadTasks = useCallback(async () => {
     if (!accountId || !storeId) return
-    await restaurantTestApi.channelCloseTasks(accountId, storeId).then((res) => setTasks(Array.isArray(res.data) ? res.data : [])).catch(() => setTasks([]))
+    await restaurantTestApi.channelCloseTasks(accountId, storeId).then((res) => {if(!Array.isArray(res.data))throw new Error('invalid_tasks');setTasks(res.data);setTasksError(false)}).catch(() => setTasksError(true))
   }, [accountId, storeId])
 
   useEffect(() => { void loadClosures(); void loadTasks() }, [loadClosures, loadTasks])
@@ -118,13 +124,13 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
     let current = true
     void restaurantTestApi.openingHours(accountId, storeId).then((res) => { if (current) setHours(res.data.hours ?? []) }).catch(() => { if (current) setHours(null) })
     void restaurantTestApi.mediaLinks(accountId, storeId)
-      .then((res) => { if (current) setMedia(res.data.map((m) => ({ code: m.code, name: m.name, loginUrl: m.loginUrl, closeOnBooking: Boolean(m.closeOnBooking) }))) })
-      .catch(() => { if (current) setMedia([]) })
+      .then((res) => { if (current) {setMediaError(false);setMedia(res.data.map((m) => ({ code: m.code, name: m.name, loginUrl: m.loginUrl, closeOnBooking: Boolean(m.closeOnBooking) })));} })
+      .catch(() => { if (current) setMediaError(true) })
     void restaurantGoogleApi.profile(accountId)
       .then((res) => { if (current) setSpecial(res.profile.specialHours ?? []) })
       .catch(() => { if (current) setSpecial('none') })
     return () => { current = false }
-  }, [accountId, storeId])
+  }, [accountId, storeId, mediaRetry])
 
   useEffect(() => {
     if (!accountId) return
@@ -182,7 +188,11 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' }) }
     } finally {
       await loadTasks()
       setBusy('')
@@ -236,14 +246,16 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   }
 
   if (loadError !== null && closures === null) {
-    return <div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div>
+    return <SaveErrorScope errors={saveErrors}><div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div></SaveErrorScope>
   }
 
   const weeks = monthWeeks(month)
   const closeMedia = media.filter((m) => m.closeOnBooking)
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
+      {tasksError?<ListState kind="error" title="枠を閉じる知らせを読み込めませんでした" onRetry={()=>void loadTasks()}/>:null}
+      {mediaError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
       {first && firstItem ? (
         <div className={styles.bandRow}>
           <div className={styles.band} role="status" data-closure-band="">
@@ -432,6 +444,6 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         onConfirm={() => remove()}
         onCancel={() => setRemoving(null)}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -1,14 +1,5 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
- *
- * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
- * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
- * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
- * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
- * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -26,7 +17,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
 import {
   approvalReviewReasons,
@@ -43,7 +35,7 @@ import {
 } from './display'
 import AttributionSection from './attribution-view'
 import BulkOpWizard from './bulk-op'
-import { AffiliateFrame, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import {
   AffiliateToolbar,
   PerPageSelect,
@@ -57,6 +49,17 @@ import {
 import styles from './affiliates.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
+ *
+ * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
+ * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
+ * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
+ * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
+ * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
+ */
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -86,7 +89,13 @@ export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
-  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', focusAffiliateId)
+  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', null)
+  const appliedFocus = useRef<string | null>(null)
+  useEffect(() => {
+    if (!focusAffiliateId || appliedFocus.current === focusAffiliateId) return
+    appliedFocus.current = focusAffiliateId
+    setAffiliateFilter(focusAffiliateId)
+  }, [focusAffiliateId, setAffiliateFilter])
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [holdDays, setHoldDays] = useState<number | null>(null)
@@ -214,7 +223,9 @@ export default function ApprovalsTab() {
     }
   }, [loadItems])
 
-  const scoped = useMemo(() => (affiliateFilter ? items.filter((item) => item.affiliateId === affiliateFilter) : items), [affiliateFilter, items])
+  const scoped = useMemo(() => items
+    .filter((item) => !accountId || item.lineAccountId === accountId)
+    .filter((item) => !affiliateFilter || item.affiliateId === affiliateFilter), [accountId, affiliateFilter, items])
   const affiliateFilterName = affiliateFilter ? (items.find((item) => item.affiliateId === affiliateFilter)?.affiliateName ?? null) : null
 
   const retryBulkLeftovers = useCallback(() => {
@@ -407,12 +418,12 @@ export default function ApprovalsTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableApprovals}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
+          <TableHeadRow data-table-layout="columns">
             <Th className={styles.colCheck}>
               {canSelect ? (
-                <Checkbox
+                <SaveErrorField names={["allSafeSelected","selected","all_safe_selected"]}><Checkbox
                   aria-label="このページの確認不要な成果をすべて選ぶ"
                   checked={allSafeSelected}
                   onCheckedChange={(checked) => setSelected((current) => {
@@ -423,28 +434,28 @@ export default function ApprovalsTab() {
                     }
                     return next
                   })}
-                />
+                /></SaveErrorField>
               ) : null}
             </Th>
-            <Th className={styles.colName}>友だちと、成果が出た時刻</Th>
+            <Th grow>友だち</Th>
             <Th className={styles.colApAffiliate}>紹介した人</Th>
-            <Th className={styles.colApAccount}>アカウント</Th>
+            <Th collapseAt="narrow" className={styles.colApAccount}>アカウント</Th>
             <Th className={styles.colApOffer}>案件と成果地点</Th>
-            <Th className={`${styles.colApReward} ${styles.num}`}>報酬</Th>
+            <Th align="right" className={styles.colApReward}>報酬</Th>
             <Th className={styles.colApCheck}>確認</Th>
             <Th className={styles.colApOps}>決める</Th>
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedItems.map((item) => {
+          {pagedItems.map((item, saveFieldIndex) => {
             const reasons = approvalReviewReasons(item)
             const needsReview = reasons.length > 0
             const pending = item.approvalStatus === 'pending'
             return (
-              <Tr key={item.eventId} className={styles.row} data-table-layout="columns">
+              <Tr key={item.eventId} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
                 <Td className={styles.colCheck}>
                   {canSelect ? (
-                    <Checkbox
+                    <SaveErrorField names={[`pagedItems.${saveFieldIndex}.eventId`,`pagedItems.${saveFieldIndex}.event_id`,"eventId","item.eventId","selected","event_id","id","item.event_id"]}><Checkbox
                       aria-label={`${personName(item.friendName)}の成果を選ぶ`}
                       checked={selected.has(item.eventId)}
                       disabled={needsReview}
@@ -455,24 +466,24 @@ export default function ApprovalsTab() {
                         else next.delete(item.eventId)
                         return next
                       })}
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Td>
-                <Td className={styles.colName}>
+                <Td grow><FolderDotName>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={personName(item.friendName)}  onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
-                    <span className={styles.rowPlan}>{`${formatMonthDayTime(item.createdAt)} に成果`}</span>
+                    <RowNameButton title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</RowNameButton>
+
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={styles.colApAffiliate}><span className={styles.cellNum} title={item.affiliateName ?? undefined}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></Td>
-                <Td className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
+                <Td collapseAt="narrow" className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
                 <Td className={styles.colApOffer}>
                   <span className={styles.stack}>
                     <span className={styles.cellNum} title={item.offerName ?? undefined}>{item.offerName ?? '案件は未設定'}</span>
-                    <span className={styles.rowWrap}>{`${item.conversionPointName ?? '成果地点は未設定'}・成果額 ${formatYenNullable(item.value)}`}</span>
+                    <span className={styles.rowWrap}><TruncatedText value={`${item.conversionPointName ?? '成果地点は未設定'}・成果額 ${formatYenNullable(item.value)}`} /></span>
                   </span>
                 </Td>
-                <Td className={`${styles.colApReward} ${styles.num}`}>
+                <Td align="right" className={styles.colApReward}>
                   <span className={styles.cellNum}>{item.rewardAmount != null ? formatYen(item.rewardAmount) : '未確定'}</span>
                 </Td>
                 <Td className={styles.colApCheck}>

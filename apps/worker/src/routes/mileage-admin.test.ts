@@ -5,6 +5,7 @@ const dbMocks = {
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async () => null),
   getPlatformAdminRecord: vi.fn(async () => null),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getFriendById: vi.fn(),
   getMileageAdminOverview: vi.fn(),
@@ -1280,4 +1281,8 @@ describe('R: 確定待ち・承認・決めごとテストのルート', () => {
       env.DB, expect.objectContaining({ lineAccountId: 'account-1' }),
     );
   });
+});
+
+it('API-02 history rejects February 30',async()=>{
+ expect((await call('/api/mileage/history?accountId=account-1&from=2026-02-30&to=2026-03-01')).status).toBe(400);
 });

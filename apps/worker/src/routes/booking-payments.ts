@@ -2,7 +2,6 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   createBookingPayment,
-  getBookingAdminSettings,
   getBookingPaymentByBooking,
   getBookingPaymentConfig,
   markBookingPayment,
@@ -26,7 +25,7 @@ import {
   registerPaymentProvider,
   type PaymentProvider,
 } from '../services/payment-providers.js';
-import { recordBookingAudit } from '@line-crm/db';
+import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../services/booking-payment-recovery.js';
 
 /**
  * 予約の支払い（決済サービスを差し替えられる作り）。
@@ -334,34 +333,16 @@ bookingPayments.get(
   },
 );
 
-/**
- * 仮押さえの期限切れ。期限を過ぎた未払い・支払い中は予約ごと外す。
- * 期限の監視はここ（見るたび）と知らせの受け口で行い、新しい監視の仕組みは作らない。
- */
+/** 状態の読込で旧版の分割更新も補完する。定期回収と同じ条件付き更新。 */
 export async function expireBookingPaymentIfHeld(
   db: D1Database,
   lineAccountId: string,
   bookingId: string,
 ) {
   const record = await getBookingPaymentByBooking(db, lineAccountId, bookingId);
-  if (!record || (record.status !== 'unpaid' && record.status !== 'pending')) return record;
-  if (!record.hold_until || record.hold_until > new Date().toISOString()) return record;
-  await markBookingPayment(db, {
-    lineAccountId, paymentId: record.id, status: 'expired',
-  });
-  await db.prepare(
-    `UPDATE bookings SET status = 'expired', updated_at = ?
-      WHERE id = ? AND status = 'requested'`,
-  ).bind(new Date().toISOString(), bookingId).run();
-  await recordBookingAudit(db, {
-    bookingId,
-    lineAccountId,
-    action: 'expired',
-    after: { status: 'expired', reason: 'payment_hold_expired' },
-    actorType: 'system',
-    actorId: null,
-    occurredAt: new Date().toISOString(),
-  }).catch(() => undefined);
+  if (!record) return null;
+  if (record.status === 'paid') await reconcilePaidBookingPayment(db, record.id);
+  else await reconcileExpiredBookingPayment(db, record.id);
   return getBookingPaymentByBooking(db, lineAccountId, bookingId);
 }
 
@@ -415,7 +396,9 @@ bookingPayments.post(
       await markUnpaidBookingPaymentByProviderId(c.env.DB, outcome.providerPaymentId, 'failed');
       return c.json({ success: true, status: 'failed' });
     }
-    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId);
+    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId, {
+      email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    });
     if (!applied) return c.json({ success: true, status: 'unknown_payment' });
     return c.json({ success: true, status: applied.duplicate ? 'duplicate' : 'paid' });
   },
@@ -431,7 +414,9 @@ async function markUnpaidBookingPaymentByProviderId(
       WHERE provider_payment_id = ? AND status IN ('unpaid', 'pending')`,
   ).bind(providerPaymentId).first<{ id: string; line_account_id: string }>();
   if (!row) return;
-  await markBookingPayment(db, { lineAccountId: row.line_account_id, paymentId: row.id, status });
+  await db.prepare(`UPDATE booking_payments SET status = ?, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND status IN ('unpaid', 'pending')`)
+    .bind(status, new Date().toISOString(), row.id, row.line_account_id).run();
 }
 
 /**
@@ -442,47 +427,12 @@ async function markUnpaidBookingPaymentByProviderId(
 export async function applyPaidBookingPayment(
   db: D1Database,
   providerPaymentId: string,
+  credentials: import('../services/google-service-account.js').GoogleServiceAccountCredentials = {},
 ): Promise<{ duplicate: boolean } | null> {
   const row = await db.prepare(
-    `SELECT id, line_account_id, booking_id, status FROM booking_payments
-      WHERE provider_payment_id = ?`,
-  ).bind(providerPaymentId).first<{
-    id: string; line_account_id: string; booking_id: string; status: string;
-  }>();
-  if (!row) return null;
-  if (row.status === 'paid') return { duplicate: true };
-  if (row.status !== 'unpaid' && row.status !== 'pending') return { duplicate: true };
-  await markBookingPayment(db, {
-    lineAccountId: row.line_account_id, paymentId: row.id, status: 'paid',
-  });
-  const settings = await getBookingAdminSettings(db, row.line_account_id);
-  const now = new Date().toISOString();
-  if (settings?.approvalMode === 'manual') {
-    await recordBookingAudit(db, {
-      bookingId: row.booking_id,
-      lineAccountId: row.line_account_id,
-      action: 'paid_awaiting_approval',
-      after: { status: 'requested', payment: 'paid' },
-      actorType: 'system',
-      actorId: null,
-      occurredAt: now,
-    }).catch(() => undefined);
-    return { duplicate: false };
-  }
-  await db.prepare(
-    `UPDATE bookings SET status = 'confirmed', decided_at = ?, updated_at = ?
-      WHERE id = ? AND status = 'requested'`,
-  ).bind(now, now, row.booking_id).run();
-  await recordBookingAudit(db, {
-    bookingId: row.booking_id,
-    lineAccountId: row.line_account_id,
-    action: 'confirmed',
-    after: { status: 'confirmed', payment: 'paid' },
-    actorType: 'system',
-    actorId: null,
-    occurredAt: now,
-  }).catch(() => undefined);
-  return { duplicate: false };
+    `SELECT id FROM booking_payments WHERE provider_payment_id = ?`,
+  ).bind(providerPaymentId).first<{ id: string }>();
+  return row ? reconcilePaidBookingPayment(db, row.id, new Date(), true, credentials) : null;
 }
 
 // DELETE /api/booking/admin/menus/:id/payment — メニューごとの上書きを消して店の既定に戻す

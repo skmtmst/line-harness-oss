@@ -8,6 +8,7 @@ import Button from './button'
 import { TextField } from './text-field'
 import FolderColorButton, { type FolderColorOption } from './folder-color-button'
 import { isImeComposing } from './ime'
+import { SaveErrorField } from './save-form-errors'
 import styles from './folder-editor-dialog.module.css'
 
 export interface FolderNameColorFieldsProps {
@@ -34,11 +35,11 @@ export function FolderNameColorFields({ name, nameError, nameRef, onNameChange, 
   return <div className={styles.row} data-folder-name-color="">
     <div className={styles.name}>
       <label htmlFor={id} className={styles.label}>{nameLabel}</label>
-      <TextField ref={nameRef} id={id} invalid={Boolean(nameError)} aria-describedby={nameError ? `${id}-error` : undefined} value={name} onChange={(event) => onNameChange(event.target.value)} autoFocus
+      <SaveErrorField names={["name", "folderName"]}><TextField ref={nameRef} id={id} invalid={Boolean(nameError)} aria-describedby={nameError ? `${id}-error` : undefined} value={name} onChange={(event) => onNameChange(event.target.value)} autoFocus
         placeholder={placeholder} maxLength={maxLength} disabled={disabled}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !isImeComposing(event) && name.trim() && !disabled) { event.preventDefault(); onSubmit?.() }
-        }} />
+        }} /></SaveErrorField>
       {nameError ? <p id={`${id}-error`} className={styles.nameError} role="alert">{nameError}</p> : null}
     </div>
     <div className={styles.color}>

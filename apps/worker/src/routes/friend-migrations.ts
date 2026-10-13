@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -840,6 +841,7 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inp
       id, accountId, JSON.stringify({ accountId }), JSON.stringify(columns), body.encoding ?? 'utf-8',
       count?.count ?? 0, staff.id, staff.name, now.toISOString(), new Date(now.getTime() + 7 * 86_400_000).toISOString(),
     ).run();
+    c.set('outputAudit', { count: count?.count ?? null, accountId, targetId: id, phase: 'requested' });
     return c.json({ success: true, data: { id, rowCount: count?.count ?? null, status: 'completed', downloadUrl: `/api/friends/exports/${id}/download` } }, 201);
   } catch (error) {
     console.error(JSON.stringify({ event: 'friend_export_create_failed', error: String(error) }));
@@ -858,6 +860,8 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
   const fields = (JSON.parse(job.columns_json) as ExportColumn[]).includes('friend_fields')
     ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }, { status: 'active' })
     : [];
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM friends WHERE line_account_id=?').bind(job.line_account_id).first<{ n: number }>();
+  c.set('outputAudit', { count: count?.n ?? 0, accountId: job.line_account_id, targetId: c.req.param('id') });
   const encoder = new TextEncoder();
   let offset = 0;
   let started = false;
@@ -1081,14 +1085,14 @@ friendMigrations.get('/api/friends/migration-jobs', requireRole('owner', 'admin'
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (scope.allowedAccountIds.length === 0) return c.json({ success: true, data: [] });
-    const placeholders = scope.allowedAccountIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(scope.allowedAccountIds).sql;
     const [exports, imports] = await Promise.all([
       c.env.DB.prepare(`SELECT id, line_account_id, row_count, status, created_by_name, created_at, expires_at
         FROM friend_export_jobs WHERE line_account_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 20`)
-        .bind(...scope.allowedAccountIds).all<Record<string, unknown>>(),
+        .bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>(),
       c.env.DB.prepare(`SELECT id, line_account_id, total_count, update_count, conflict_count, status,
         created_by_name, created_at FROM friend_import_jobs WHERE line_account_id IN (${placeholders})
-        ORDER BY created_at DESC LIMIT 20`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>(),
+        ORDER BY created_at DESC LIMIT 20`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>(),
     ]);
     const jobs = [
       ...exports.results.map((row) => ({ ...row, kind: 'export', sortCreatedAt: String(row['created_at']) })),

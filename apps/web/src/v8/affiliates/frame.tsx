@@ -9,12 +9,24 @@
  * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
  */
 import { createContext, useContext, type ReactNode } from 'react'
-import { Eye } from 'lucide-react'
+
 import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './affiliates.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/** 5つの一覧が同じ共通表の口へ渡す寸法。 */
+export const AFFILIATE_TABLE_LAYOUT = {
+  headHeight: 'var(--tpl-af-head-h)',
+  rowHeight: 'var(--tpl-af-row-h)',
+  gap: 'var(--tpl-af-col-gap)',
+  padding: '0 var(--tpl-list-inset)',
+  numberInset: 'var(--tpl-af-num-pad-end)',
+  bodyTextSize: 'var(--polish-text-body)',
+  collapseScope: 'page' as const,
+}
 
 export const AFFILIATE_TABS = [
   { key: 'affiliates', label: 'アフィリエイター', board: 'nJlxX' },
@@ -62,16 +74,13 @@ export function useAffiliateShell(): AffiliateShellContext {
 /** 閲覧のみの帯（v9JWQ）。数の帯の上。 */
 export function ViewerBand() {
   return (
-    <p className={styles.viewerBand} role="note">
-      <Eye size={16} aria-hidden="true" />
-      <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-    </p>
+    <div className={styles.viewerBand}><ReadOnlyNotice role="note"></ReadOnlyNotice></div>
   )
 }
 
 /**
  * 作るボタン。閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で
- * 残さず隠す）。フォルダの列の上（full）は場所だけ空けて並びを絵どおりに保つ。
+ * 残さず隠す）。隠した作成操作のための空白も置かない。
  */
 export function CreateButton({
   href,
@@ -86,7 +95,7 @@ export function CreateButton({
   full?: boolean
   children: ReactNode
 }) {
-  if (readonly) return full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null
+  if (readonly) return null
   return (
     <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick}>
       {children}
@@ -119,6 +128,7 @@ export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolb
   return (
     <ListPage
       help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
+      skeleton
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"

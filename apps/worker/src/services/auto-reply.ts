@@ -645,6 +645,19 @@ export async function matchAndReply(
     matchedKeyword,
   });
 
+  // 1人1回の部分失敗は消化しない。ただし届いた返信と成功済みの動作は
+  // 次の一致でも繰り返さない。元の実行結果から失敗動作だけを再試行する。
+  if (rule.once_per_friend === 1) {
+    const partial = await db.prepare(`SELECT id FROM auto_reply_evaluations
+      WHERE winning_auto_reply_id=? AND friend_id=? AND reply_status='accepted'
+        AND status IN ('partial_failed','actions_running','failed') AND id!=?
+      ORDER BY evaluated_at,id LIMIT 1`).bind(rule.id,friend.id,evaluationId).first<{id:string}>();
+    if (partial) {
+      await markAutoReplyEvaluationSkipped(db,evaluationId,'partial_failure_requires_retry');
+      return {matched:true,replyTokenConsumed:false};
+    }
+  }
+
   // 設定されたアクション（タグ付け・友だち情報・対応マーク・シナリオ・共通情報）を
   // 並べた順に実行する。返信より先に動かすのは、「タグを付けてから、そのタグで
   // 差し込む文面を作る」書き方ができるようにするため。
@@ -774,7 +787,7 @@ export async function matchAndReply(
       errorCode: actionSummary.failed > 0 ? 'action_failed' : null,
     });
     try {
-      await recordAutoReplyHit(db, {
+      if (actionSummary.failed === 0) await recordAutoReplyHit(db, {
         autoReplyId: rule.id,
         friendId: friend.id,
         lineAccountId,
@@ -977,5 +990,14 @@ export async function retryAutoReplyActionRuns(
   }
 
   const outcome = await recomputeAutoReplyEvaluationFromActions(db, evaluation.id);
+  if(outcome?.status==='completed' && evaluation.reply_status==='accepted') {
+    // 失敗動作が全部済んだ時点で初めて1人1回を消化する。同時再試行でも1行。
+    await db.prepare(`INSERT INTO auto_reply_hits(id,auto_reply_id,friend_id,line_account_id,matched_keyword,hit_at)
+      SELECT ?,e.winning_auto_reply_id,e.friend_id,e.line_account_id,e.matched_keyword,?
+      FROM auto_reply_evaluations e JOIN auto_replies r ON r.id=e.winning_auto_reply_id
+      WHERE e.id=? AND r.once_per_friend=1 AND e.status='completed' AND e.reply_status='accepted'
+        AND NOT EXISTS(SELECT 1 FROM auto_reply_hits h WHERE h.auto_reply_id=e.winning_auto_reply_id AND h.friend_id=e.friend_id)`)
+      .bind(crypto.randomUUID(),new Date().toISOString(),evaluation.id).run();
+  }
   return { retriedCount, status: outcome?.status ?? evaluation.status };
 }

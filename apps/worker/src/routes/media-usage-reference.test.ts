@@ -210,7 +210,7 @@ function mediaMetadata(id = 'md-1'): { filename: string; folder_id: string | nul
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   enforceD1BindLimit = false;
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');
@@ -507,10 +507,10 @@ describe('認証と権限', () => {
     expect(templateContent('t-pinned')).toContain(V1_KEY);
   });
 
-  it('staffは役割不足で403', async () => {
+  it('素材の編集権限を持つstaffは参照を切り替えられる', async () => {
     const res = await patchUsageReference(CONTENTS_KEY, switchBody);
-    expect(res.status).toBe(403);
-    expect(templateContent('t-pinned')).toContain(V1_KEY);
+    expect(res.status).toBe(200);
+    expect(templateContent('t-pinned')).toContain(LIVE_URL);
   });
 
   it('権限のないstaffは境界で403', async () => {

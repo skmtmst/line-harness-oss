@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 一覧の行に置くアイコン操作。Pencil V5 の
@@ -170,4 +170,52 @@
 }
 }
 
-[data-theme='v8'] .action[data-size='small'] { min-height: 0; width: var(--tpl-icon-btn-sm); height: var(--tpl-icon-btn-sm); }
+:root .action[data-size='small'] { min-height: 0; width: var(--tpl-icon-btn-sm); height: var(--tpl-icon-btn-sm); }
+
+/* B-199：同じ列の主操作は最長の文字に合わせた同じ幅。 */
+html:root .rowButton, html:root .quickAction { width: var(--row-action-width, max-content); min-width: max-content; justify-content: center; }
+
+/* つまみと行操作の見た目はセルの色や素のbuttonの規則に左右されない。 */
+html:root :is(.inlineGrip, .grip)[data-reorder-handle] { color: var(--color-ink-secondary); }
+html:root .action[data-row-menu] {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--polish-radius-control);
+  background: transparent;
+  box-shadow: none;
+}
+/* 見える枠は28角、押せる所は既存の36角。型の列幅を動かさない。 */
+html:root .action[data-row-menu]:not(:focus-visible) {
+  outline: none;
+}
+
+html:root .action[data-row-menu]::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  width: var(--tpl-icon-btn-row);
+  height: var(--tpl-icon-btn-row);
+  border-radius: var(--polish-radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--control-shadow);
+}
+html:root .action[data-row-menu]:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* V8：既定の「…」は共通 IconButton と同じ36角。 */
+@media (pointer: fine) {
+  :root .action[data-row-menu]:not([data-size]) {
+    width: var(--tpl-icon-btn-row-hit);
+    height: var(--tpl-icon-btn-row-hit);
+  }
+}
+
+/* 文字で渡される6点も、共通の印と同じ大きさで描く。 */
+html:root .inlineGrip:not(:has(svg)) {
+  font-size: var(--polish-icon-control);
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "route": "/nen-members",
+    "width": 1152,
+    "owner": "p.review_listHint",
+    "maxExcess": 413,
+    "reason": "写真一覧の最終行が1枚のとき、2列目が空く。枚数に合わせた並びを保つため今回の修正から残し、司令塔の絵との確認を待つ。"
+  }
+]

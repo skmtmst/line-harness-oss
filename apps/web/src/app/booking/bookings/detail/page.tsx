@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageHeading } from '@/components/templates/page-frame'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -916,7 +917,7 @@ function BookingDetailInner() {
 
   return (
     <div className="flex flex-col gap-4" data-design-node="If9Mh">
-      <div className="v8-only"><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
+      <div><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {error && detail && (
@@ -1015,10 +1016,10 @@ function BookingDetailInner() {
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
-                    <Select disabled={saving} size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
+                    <EntitySelect kind="booking_menu" disabled={saving} size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} />
                   </EditField>
                   <EditField label="スタッフ">
-                    <Select disabled={saving} size="full" aria-label="スタッフ" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
+                    <EntitySelect disabled={saving} size="full" aria-label="スタッフ" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name }))} />
                   </EditField>
                   <EditField label="日付">
                     <DateField

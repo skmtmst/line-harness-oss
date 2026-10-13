@@ -5,7 +5,6 @@
 .folderBox { min-width: 0; }
 
 .createButton { width: 100%; }
-.createSpace { display: block; height: var(--tpl-htn-input-h); }
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .full { width: 100%; }
 

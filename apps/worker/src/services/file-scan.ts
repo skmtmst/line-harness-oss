@@ -1,4 +1,5 @@
 import { jstNow } from '@line-crm/db';
+import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 
 /*
  * 危険なファイルの検査（m12b）。
@@ -62,6 +63,7 @@ export const FILE_SCAN_REASON_LABELS: Record<string, string> = {
   office_macro: 'マクロが見つかりました',
   executable_signature: '実行ファイルの印があります',
   external_flagged: '外部の検査で問題が見つかりました',
+  scan_attempts_exhausted: '検査が終わらなかったため、使えません',
   scan_unavailable: '検査が止まっています',
 };
 
@@ -300,6 +302,10 @@ export interface ThreatScanner {
   ): Promise<'clean' | 'quarantined'>;
 }
 
+export const FORM_FILE_SCAN_MAX_ATTEMPTS = 5;
+export function isPrivateFormDocumentScan(scan: Pick<FileScanRow, 'subject_kind' | 'subject_id'>): boolean {
+  return scan.subject_kind === 'form_file' && scan.subject_id.startsWith('private/form-documents/');
+}
 export class ScanRetryableError extends Error {}
 
 export function nextFileScanRetryAt(attempts: number, nowMs: number): string {
@@ -399,13 +405,19 @@ export async function markFileScanQuarantined(
   ).bind(reasonCode, detail, now, now, now, id).run();
 }
 
-export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number): Promise<void> {
+export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number, maxAttempts?: number): Promise<FileScanStatus> {
   const now = jstNow();
+  if (maxAttempts !== undefined && attempts + 1 >= maxAttempts) {
+    await db.prepare(`UPDATE media_file_scans SET attempts = ? WHERE id = ?`).bind(attempts + 1, id).run();
+    await markFileScanRejected(db, id, 'scan_attempts_exhausted', `検査を${maxAttempts}回試しても終わりませんでした`);
+    return 'rejected';
+  }
   await db.prepare(
     `UPDATE media_file_scans
         SET status = 'pending', attempts = ?, next_retry_at = ?, updated_at = ?
       WHERE id = ?`,
   ).bind(attempts + 1, nextFileScanRetryAt(attempts, Date.now()), now, id).run();
+  return 'pending';
 }
 
 /** 内蔵検査を回して行を進める。外の検査は呼び出し側が ThreatScanner で足す。 */
@@ -465,8 +477,8 @@ export async function runScanForStoredObject(
 ): Promise<FileScanRow> {
   const head = await readSlice(store, r2Key, { offset: 0, length: FILE_SCAN_HEAD_BYTES });
   if (!head || head.length === 0) {
-    await markFileScanPendingRetry(db, scan.id, scan.attempts);
-    return { ...scan, status: 'pending', attempts: scan.attempts + 1 };
+    const status = await markFileScanPendingRetry(db, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined);
+    return { ...scan, status, attempts: scan.attempts + 1 };
   }
   const tail = scan.size_bytes > head.length
     ? await readSlice(store, r2Key, { suffix: FILE_SCAN_TAIL_BYTES })
@@ -602,8 +614,8 @@ export async function getFileScanConfig(db: ScanDb, lineAccountId: string): Prom
 }
 
 /**
- * 外の検査サービスを使う口。設定がなければ null（内蔵検査だけ）。
- * 鍵は設定に置かず、設定の secret_ref が指す名前の環境値から読む。
+ * 不許可の古い設定も null（内蔵検査だけ）。運営が許可した宛先と
+ * 検査専用の名前の同じ組を確認し終わるまで、選択された環境値を読まない。
  */
 export function resolveExternalScanner(
   env: Record<string, string | undefined>,
@@ -611,18 +623,23 @@ export function resolveExternalScanner(
 ): ThreatScanner | null {
   const endpoint = config?.external_endpoint_url?.trim();
   if (!config?.external_provider || !endpoint) return null;
-  const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   const secretRef = config.external_secret_ref?.trim();
+  if (!isFileScanSecretRef(secretRef)) return null;
+  const url = allowedFileScanEndpoint(endpoint, env.FILE_SCAN_ALLOWED_PAIRS, secretRef);
+  if (!url) return null;
+  const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   return {
     name: config.external_provider,
     async scan(bytes, context) {
       const headers: Record<string, string> = { 'content-type': context.mimeType };
-      if (secretRef && env[secretRef]) headers.authorization = `Bearer ${env[secretRef]}`;
+      const token = env[secretRef];
+      if (token) headers.authorization = `Bearer ${token}`;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const res = await fetch(endpoint, {
+        const res = await fetch(url.href, {
           method: 'POST',
+          redirect: 'manual',
           headers: {
             ...headers,
             'x-file-scan-filename': encodeURIComponent(context.filename),
@@ -632,6 +649,10 @@ export function resolveExternalScanner(
           body: bytes as unknown as BodyInit,
           signal: controller.signal,
         });
+        // Workerの型はtypeをdefault/errorに限定する。互換fetchのopaque転送も拒否する。
+        if (String(res.type) === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+          throw new ScanRetryableError('external scanner redirect refused');
+        }
         if (!res.ok) throw new ScanRetryableError(`external scanner responded ${res.status}`);
         const data = await res.json<{ verdict?: unknown }>().catch(() => null);
         if (data?.verdict === 'clean') return 'clean';
@@ -639,7 +660,8 @@ export function resolveExternalScanner(
         throw new ScanRetryableError('external scanner returned an unknown verdict');
       } catch (err) {
         if (err instanceof ScanRetryableError) throw err;
-        throw new ScanRetryableError(err instanceof Error ? err.message : 'external scanner failed');
+        // fetch例外にはURLや資格情報が含まれる可能性があるので記録へ持ち込まない。
+        throw new ScanRetryableError('external scanner failed');
       } finally {
         clearTimeout(timer);
       }

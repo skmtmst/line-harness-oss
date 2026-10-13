@@ -1,4 +1,22 @@
 'use client'
+import Link from '@/components/shared/list-navigation'
+import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
+import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { isForbidden, loadFailureCopy } from '@/components/shared/api-error-message'
+import { FriendsManageNavV8 } from '@/app/friends/friends-nav-v8'
+import { formatNumber } from '@/lib/format'
+import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-duplicates-data'
+import DuplicatesStatsNotice from './duplicates-stats-notice'
+import { formatDateTime } from '@/lib/format'
+import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、タブを消した採用版は `sdbsQ` 板1、
@@ -9,22 +27,6 @@
  * 替え、数の帯・道具の段・候補の表を板どおりに組む。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
-import Link from 'next/link'
-import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
-import Button from '@/components/shared/button'
-import HelpTip from '@/components/shared/help-tip'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { isForbidden } from '@/components/shared/api-error-message'
-import { FriendsManageNavV8 } from '@/app/friends/friends-nav-v8'
-import { formatNumber } from '@/lib/format'
-import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-duplicates-data'
-import DuplicatesStatsNotice from './duplicates-stats-notice'
-import { formatDateTime } from '@/lib/format'
-import styles from '@/app/friends/friends-v8.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
 
 const CONFIDENCE_LABEL = { very_high: '最高', high: '高', medium: '中', low: '低' } as const
 
@@ -141,7 +143,7 @@ export default function DuplicatesV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["status","d.status"]}><Select
             aria-label="状態で絞り込む"
             label="状態"
             size="full"
@@ -154,7 +156,7 @@ export default function DuplicatesV8() {
               { value: 'deferred', label: '保留' },
               { value: 'different', label: '別人' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <span className={styles.toolbarSpacer} />
         {d.data?.computedAt ? (
@@ -186,8 +188,8 @@ export default function DuplicatesV8() {
                     <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
-                    <p className={styles.stateTitle}>重複の候補を読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void d.loadCandidates()}>
+                    <p className={styles.stateTitle}>{isForbidden(d.candidateFailure) ? loadFailureCopy(d.candidateFailure, '重複の候補').title : '重複の候補を読み込めませんでした'}</p>
+                    <Button type="button" variant="primary" onClick={() => void (d.data ? d.loadCandidates() : d.load())} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>
@@ -270,7 +272,7 @@ export default function DuplicatesV8() {
                     ) : (
                       <>
                         <p className={styles.stateDesc}>同じ人が別の友だちとして登録されていそうなときに、ここに出ます。</p>
-                        <Button type="button" variant="secondary" onClick={() => void d.loadCandidates()}>
+                        <Button type="button" variant="secondary" onClick={() => d.loadCandidates()} busyLabel="処理中…">
                           もう一度見直す
                         </Button>
                       </>

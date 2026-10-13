@@ -1,4 +1,30 @@
 'use client'
+import StatusPill from '@/components/shared/status-pill'
+import { Paperclip, Send, X } from 'lucide-react'
+import Link from '@/components/shared/list-navigation'
+import { Suspense, useCallback, useEffect, useId, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import type { StaffMember } from '@line-crm/shared'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
+import { TextArea } from '@/components/shared/text-field'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { api, ApiError } from '@/lib/api'
+import { readFileAsBase64 } from '@/lib/hq-banners'
+import { SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, validateSupportAttachment, type HqSupportDetail, type HqSupportRequest } from '@/lib/hq-support'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
+import styles from './support-detail.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
@@ -9,36 +35,6 @@
  * 続きを送るカード・右に送信者とこれまでの問い合わせ。
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
  */
-import StatusPill from '@/components/shared/status-pill'
-import { Paperclip, Send, X } from 'lucide-react'
-import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useId, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import type { StaffMember } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
-import TargetMissing from '@/components/shared/target-missing'
-import { TextArea } from '@/components/shared/text-field'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { api, ApiError } from '@/lib/api'
-import { readFileAsBase64 } from '@/lib/hq-banners'
-import {
-  SUPPORT_ATTACHMENT_MAX,
-  SUPPORT_BODY_MAX,
-  validateSupportAttachment,
-  type HqSupportDetail,
-  type HqSupportRequest,
-} from '@/lib/hq-support'
-import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
-import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
-import styles from './support-detail.module.css'
-import { Field } from '@/components/shared/form-controls'
-import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -216,7 +212,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ))}
               </ol>
 
-              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><TextArea
+              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -224,7 +220,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   maxLength={SUPPORT_BODY_MAX}
                   disabled={sending}
                   className={styles.textarea}
-                />
+                /></SaveErrorField>
 {attachments.length > 0 ? (
                   <ul className={styles.thumbs}>
                     {attachments.map((a, i) => (
@@ -240,8 +236,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ) : null}
 {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
                 <div className={styles.attachSlot}>
-                  <MediaSlot
-                    size="compact"
+                  <ImageFrame
+
                     title="画像を添える"
                     accept="image/png,image/jpeg"
                     maxBytes={5 * 1024 * 1024} help={`${SUPPORT_ATTACHMENT_MAX}枚まで`}
@@ -258,7 +254,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   </Button>
                 </div>
 {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-{error ? <p className={styles.error} role="alert">{error}</p> : null}</Field></div>
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
             </>
           )}
         </div>

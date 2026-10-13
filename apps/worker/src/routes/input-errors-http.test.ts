@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, BUNDLE_PRESETS, scopeLevelsToKeys } from '@line-crm/shared';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { templates } from './templates.js';
 import { tags } from './tags.js';
 import { broadcasts } from './broadcasts.js';
@@ -23,15 +24,17 @@ import booking from './booking.js';
 
 let fixture: SqliteD1;
 let app: Hono<Env>;
+let actor: AuthenticatedStaff;
 beforeEach(() => {
   fixture = createTestD1();
   fixture.raw.prepare(`INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)
     VALUES('shop','試験','fixture','fixture','fixture',?)`).run(DEFAULT_TENANT_ID);
   fixture.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,tenant_id)
     VALUES('owner','管理者','owner','fixture',?)`).run(DEFAULT_TENANT_ID);
+  actor = { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: DEFAULT_TENANT_ID };
   app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: DEFAULT_TENANT_ID });
+    c.set('staff', actor);
     await next();
   });
   // 本番と同じ順で実ルートを組み合わせる。入力不備で保存されないことも確認する。
@@ -135,5 +138,27 @@ describe('B-154 欄ごとの入力エラーを実HTTPで返す', () => {
     }, { DB: fixture.db } as Env['Bindings']);
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: expect.any(String), fields: {} });
+  });
+});
+
+
+describe('配信の編集権限と欄ごとの入力検査を両方残す', () => {
+  it.each([
+    ['/api/templates', { accountId: 'shop', name: 123 }, 'name'],
+    ['/api/scenarios', { name: 123 }, 'name'],
+    ['/api/rich-menu-groups', { accountId: 'shop', name: 123 }, 'name'],
+    ['/api/forms', { accountId: 'shop', name: 123 }, 'name'],
+  ])('%s: 編集できるスタッフに入力理由を返し、閲覧だけは保存前に拒否する', async (path, body, field) => {
+    const keys = scopeLevelsToKeys(BUNDLE_PRESETS.operations.levels).edit;
+    actor = { ...actor, role: 'staff', permissionKeys: keys };
+    fixture.raw.prepare("UPDATE staff_members SET role='staff',permission_keys=? WHERE id='owner'").run(JSON.stringify(keys));
+    const invalid = await request(path, body);
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ fields: { [field]: expect.any(String) } });
+    actor = { ...actor, permissionKeys: [], viewPermissionKeys: keys };
+    expect((await request(path, { ...body, name: '作成不可', triggerType: 'manual', messageType: 'text', messageContent: '本文', chatBarText: '開く', size: 'large' })).status).toBe(403);
+    for (const table of ['templates', 'scenarios', 'rich_menu_groups', 'forms']) {
+      expect(fixture.raw.prepare(`SELECT COUNT(*) count FROM ${table}`).get()).toEqual({ count: 0 });
+    }
   });
 });

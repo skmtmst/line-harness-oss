@@ -1,9 +1,10 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type { ChatStatus } from './inbox-dropdown'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -119,14 +120,14 @@ export default function InboxFilterPanel({
           <div>
             <span className={labelClass}>担当</span>
             <div className="mt-1.5">
-              <Combobox
+              <EntitySelect clearable size="full"
                 aria-label="担当者で絞り込む（パネル）"
                 placeholder="すべて"
                 value={value.assignee === 'all' ? '' : value.assignee}
                 onChange={(next) => set({ assignee: next || 'all' })}
                 options={[
                   { value: 'unassigned', label: '未割り当て' },
-                  ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                  ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name })),
                 ]}
                 className="w-full"
               />

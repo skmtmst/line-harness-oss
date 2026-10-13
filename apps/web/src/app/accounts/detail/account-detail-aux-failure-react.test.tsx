@@ -19,12 +19,12 @@ vi.hoisted(() => {
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams('id=child-a'),
   usePathname: () => '/accounts/detail',
   useRouter: () => ({ push: vi.fn() }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', async () => ({...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
 
 const CHILD = {
   id: 'child-a', channelId: '2007000009', name: '子アカウント',
@@ -78,13 +78,14 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
+  document.documentElement.dataset.theme='v8'
   net.listDown = true
   stubFetch()
 })
 
 afterEach(async () => {
   await act(async () => { root.unmount() })
-  container.remove()
+  container.remove(); delete document.documentElement.dataset.theme
   globalThis.fetch = originalFetch
   vi.restoreAllMocks()
 })
@@ -129,3 +130,5 @@ describe('R521 親一覧だけ失敗したときの詳細（本物のReact）', 
     expect(text).not.toContain('読み込めませんでした')
   })
 })
+
+vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId:'a1',selectedAccount:{id:'a1',name:'Fixture'},accounts:[],loading:false})}))

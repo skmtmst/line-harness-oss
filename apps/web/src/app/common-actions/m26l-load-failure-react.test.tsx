@@ -73,7 +73,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=ca-1'),
   usePathname: () => '/common-actions',
@@ -89,7 +89,7 @@ vi.mock('@/components/automations/use-common-action-permission', () => ({
   useCanManageCommonActions: () => true,
 }))
 vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
   usePageChrome: () => ({ title: null }),
 }))
@@ -120,6 +120,7 @@ function buttonNamed(name: string): HTMLButtonElement | undefined {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   net.getMode = 'ok'
   net.resourcesMode = 'ok-empty'
   net.getCount = 0
@@ -196,10 +197,10 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     // 失敗時は真の0件（選べる◯◯がありません）と混ぜない。
     expect(text()).not.toContain('選べるタグがありません')
     // 保存の入口は閉じ、理由を示す。
-    const save = buttonNamed('下書きを保存する')
+    const save = buttonNamed('下書きを保存')
     expect(save, '保存ボタンがある').toBeTruthy()
     expect(save!.disabled).toBe(true)
-    expect(text()).toContain('選択肢を読み込めていないため保存できません')
+    expect(save!.title).toContain('選択肢を読み込めていないため保存できません')
   })
 
   it('再取得の成功後は未保存の入力を保ったまま候補が戻り保存できる', async () => {
@@ -226,7 +227,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     // 候補が戻る（空でない取得なので真の0件の文は出ない）。共有Selectは
     // 閉じている間は候補名を描かないため、0件文の不在で戻りを確かめる。
     expect(text()).not.toContain('選べるタグがありません')
-    const save = buttonNamed('下書きを保存する')
+    const save = buttonNamed('下書きを保存')
     expect(save, '保存ボタンがある').toBeTruthy()
     expect(save!.disabled).toBe(false)
   })
@@ -237,8 +238,9 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await flush()
 
     expect(text()).not.toContain('選択肢を読み込めませんでした')
+    await act(async () => { (container.querySelector('[data-action-row] button[aria-expanded]') as HTMLButtonElement).click() })
     expect(text()).toContain('選べるタグがありません')
-    const save = buttonNamed('下書きを保存する')
+    const save = buttonNamed('下書きを保存')
     expect(save, '保存ボタンがある').toBeTruthy()
     expect(save!.disabled).toBe(false)
   })

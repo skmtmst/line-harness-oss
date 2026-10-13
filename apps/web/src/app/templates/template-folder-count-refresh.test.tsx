@@ -43,6 +43,7 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     templates: {
       list: fixture.templatesList,
       get: (id: string) => Promise.resolve({
@@ -73,7 +74,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: () => {}, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
@@ -88,8 +89,12 @@ vi.mock('next/link', () => ({
 }))
 
 import TemplatesPage from './page'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/templates')
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
     setItem: () => {},
@@ -107,24 +112,60 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  clearToastsForTest()
+  flushListUrlState()
   vi.unstubAllGlobals()
 })
 
 async function renderReady() {
-  const view = render(<TemplatesPage />)
+  const view = render(<><TemplatesPage /><ToastHost /></>)
   await screen.findByRole('table')
   return view
 }
 
 describe('R195 フォルダ件数の読み直し', () => {
+  async function chooseFolder() {
+    await renderReady()
+    const row = within(screen.getByRole('table')).getByText('来店お礼').closest('tr')!
+    fireEvent.keyDown(row, { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す' }))
+    fireEvent.click(await screen.findByRole('button', { name: '移動先のフォルダ' }))
+    const option = await screen.findByRole('option', { name: /営業/ })
+    fireEvent.click(within(option).getByRole('button'))
+    return screen.getByRole('button', { name: '移動する' })
+  }
+
+  test('移動を続けて二度押しても同じ更新を二重に送らない', async () => {
+    let finish!: (value: unknown) => void
+    fixture.templatesUpdate.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const button = await chooseFolder()
+    await act(async () => { fireEvent.click(button); fireEvent.click(button) })
+    expect(fixture.templatesUpdate).toHaveBeenCalledTimes(1)
+    await act(async () => { finish({ success: true, data: TEMPLATE }) })
+  })
+
+  test('移動に失敗したら元のフォルダへ戻し、一覧と件数を読み直して失敗を知らせる', async () => {
+    fixture.templatesUpdate.mockResolvedValue({ success: false, error: 'unavailable' })
+    const button = await chooseFolder()
+    const beforeList = fixture.templatesList.mock.calls.length
+    const beforeFolders = fixture.foldersList.mock.calls.length
+    fireEvent.click(button)
+    expect(await screen.findByText('フォルダへ移せませんでした。状態を読み直したので、もう一度お試しください。')).toBeTruthy()
+    await vi.waitFor(() => {
+      expect(fixture.templatesList.mock.calls.length).toBeGreaterThan(beforeList)
+      expect(fixture.foldersList.mock.calls.length).toBeGreaterThan(beforeFolders)
+    })
+    expect(screen.getByRole('dialog').querySelector('p')?.textContent).toBe('未分類')
+  })
+
   test('削除したあと、一覧と一緒にフォルダ件数も読み直す', async () => {
     await renderReady()
     const beforeCalls = fixture.foldersList.mock.calls.length
 
     // 行の「…」→「テンプレートを削除」→確認窓で「削除する」
     // （表とモバイルカードの両方にメニューがあるので先頭を押す）
-    fireEvent.click(screen.getAllByRole('button', { name: '来店お礼のその他操作' })[0])
-    fireEvent.click((await screen.findAllByRole('menuitem', { name: 'テンプレートを削除する' }))[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テンプレート「来店お礼」の操作' })[0])
+    fireEvent.click((await screen.findAllByRole('menuitem', { name: '削除する' }))[0])
     fireEvent.click(await screen.findByRole('button', { name: '削除する' }))
 
     await vi.waitFor(() => {
@@ -137,15 +178,17 @@ describe('R195 フォルダ件数の読み直し', () => {
     await renderReady()
     // 行を開いて詳細を出す
     const table = screen.getByRole('table')
-    fireEvent.click(within(table).getByText('来店お礼'))
+    fireEvent.keyDown(within(table).getByText('来店お礼').closest('tr')!, { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す' }))
     const beforeCalls = fixture.foldersList.mock.calls.length
 
-    const selectButton = await screen.findByRole('button', { name: '置き場' })
+    const selectButton = await screen.findByRole('button', { name: '移動先のフォルダ' })
     await act(async () => { fireEvent.click(selectButton) })
     const option = await screen.findByRole('option', { name: /営業/ })
     // 実際の押し口は選択肢の内側の button。li 自体を押しても動かない。
     await act(async () => { fireEvent.click(within(option).getByRole('button')) })
 
+    fireEvent.click(screen.getByRole('button', { name: '移動する' }))
     await vi.waitFor(() => {
       expect(fixture.templatesUpdate).toHaveBeenCalledWith('tpl-1', { folderId: 'folder-sales' })
       expect(fixture.foldersList.mock.calls.length).toBeGreaterThan(beforeCalls)

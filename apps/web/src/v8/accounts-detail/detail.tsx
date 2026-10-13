@@ -10,9 +10,9 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
-import { ArchiveRestore, ArrowLeftRight, Eye, Pause, Pencil, Play, QrCode } from 'lucide-react'
+import { ArchiveRestore, ArrowLeftRight, Pause, Pencil, Play, QrCode } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -22,8 +22,8 @@ import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
+
+
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import {
@@ -37,6 +37,7 @@ import {
 } from './dialogs'
 import {
   archiveBlockedReason,
+  capacityDetails,
   credentialLine,
   friendsLine,
   shortDateTime,
@@ -48,9 +49,10 @@ import {
   type AccountDetailView,
 } from './view'
 import styles from './detail.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
@@ -265,7 +267,7 @@ export default function AccountDetailV8() {
         navigation={<SettingsInnerNav inline />}
       >
         {viewer ? (
-          <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
+          <ReadOnlyNotice role="status"></ReadOnlyNotice>
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
@@ -277,7 +279,7 @@ export default function AccountDetailV8() {
                 {parentValue ?? (
                   <span className={styles.inline}>
                     読み込めませんでした
-                    <Button type="button" variant="text" presentation="account-inline" onClick={() => void loadAll()}>もう一度読み込む</Button>
+                    <Button type="button" variant="text" presentation="account-inline" onClick={() => loadAll()} busyLabel="処理中…">もう一度読み込む</Button>
                   </span>
                 )}
               </Row>
@@ -295,7 +297,7 @@ export default function AccountDetailV8() {
             <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-credentials">
               <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-inner-pad)" gap="var(--tpl-acd-card-gap)" className={styles.inner}>
                 <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
-                <Pair label="友だち数">{friendsLine(account)}</Pair>
+                <Pair label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Pair>
                 <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
                 <Pair label="国・地域">{account.country ?? emptyValue('unconfigured')}</Pair>
                 <Pair label="役割メモ">{account.role ?? emptyValue('unconfigured')}</Pair>

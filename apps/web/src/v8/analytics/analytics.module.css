@@ -63,22 +63,7 @@
 }
 
 /* 閲覧のみの帯（タブの下・数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-an-ro-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-an-ro-margin); }
 
 /* 説明は絵どおり字の途中で折る（全体の言葉のまとまりの折り返しを外す）。 */
 .description {
@@ -179,12 +164,12 @@
 }
 
 /* 期間の切り替え（器 3・項目 5/14・文 12）。 */
-:global([data-theme='v8']) .range {
+:global(:root) .range {
   padding: var(--tpl-an-range-pad);
   border-radius: var(--tpl-an-seg-radius);
   background: var(--color-surface-pearl);
 }
-:global([data-theme='v8']) .range button {
+:global(:root) .range button {
   min-height: 0;
   padding: var(--tpl-an-range-item-pad);
   font-size: var(--text-caption);
@@ -424,7 +409,6 @@
   min-width: 0;
 }
 .caption {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-an-sub-lh);
@@ -809,7 +793,7 @@
 .rowMenu {
   display: inline-flex;
 }
-:global([data-theme='v8']) .rowMenuButton {
+:global(:root) .rowMenuButton {
   width: var(--tpl-an-icon-btn);
   height: var(--tpl-an-icon-btn);
   flex: 0 0 var(--tpl-an-icon-btn);
@@ -870,7 +854,7 @@
 .trow[data-h='pill'] { min-height: var(--tpl-an-pill-row-h); }
 .trow[data-h='button'] { min-height: var(--tpl-an-button-row-h); }
 .rowActions[data-gap='wide'] { gap: var(--tpl-an-wide-gap); }
-:global([data-theme='v8']) .rowButton {
+:global(:root) .rowButton {
   min-height: 0;
 }
 .rowButton {
@@ -913,14 +897,7 @@
   gap: var(--tpl-an-wide-gap);
   min-width: 0;
 }
-.inlineError {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-an-wide-gap);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 .resultList {
   display: flex;
   flex-direction: column;
@@ -1000,7 +977,7 @@
   text-align: left;
   cursor: pointer;
 }
-:global([data-theme='v8']) .funnelStep {
+:global(:root) .funnelStep {
   min-height: 0;
 }
 .funnelStep[data-selected] {
@@ -1193,7 +1170,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-:global([data-theme='v8']) .gridCell {
+:global(:root) .gridCell {
   min-height: 0;
 }
 .gridCell[data-strong] { color: var(--color-canvas); }
@@ -1238,3 +1215,5 @@
 .table[data-kind='page'] .thead[data-size='compact'],
 .table[data-kind='page'] .trow[data-size='compact'] { gap: var(--tpl-an-report-col-gap); }
 .table[data-kind='page'] .num[data-w^='sc'] { padding-right: var(--tpl-an-num-pad-end); }
+
+.caption, .captionNoticePlacement { margin: 0; }

@@ -1,22 +1,17 @@
 'use client'
 
-/*
- * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
- *
- * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
- * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
- * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
- * タブの中身はタブごとのファイルに分けた。
- */
 import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, Star, Workflow, Zap } from 'lucide-react'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import Notice from '@/components/shared/notice'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -32,11 +27,12 @@ import { inboxHrefForFriend } from './timeline'
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import OverviewTab from './overview-tab'
 import HistoryTab from './history-tab'
-import InfoTab, { BASIC_GROUP } from './info-tab'
+import InfoTab, { ALL_GROUP } from './info-tab'
 import FormsTab from './forms-tab'
 import ScenarioTab from './scenario-tab'
 import BookingsTab from './bookings-tab'
 import RemindersTab from './reminders-tab'
+import { friendFilterHref } from '@/components/shared/friend-filter-band'
 import ActionsTab from './actions-tab'
 import MilesTab from './miles-tab'
 import RichMenuTab from './rich-menu-tab'
@@ -45,6 +41,17 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+
+/*
+ * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
+ *
+ * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
+ * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
+ * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
+ * タブの中身はタブごとのファイルに分けた。
+ */
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -67,7 +74,7 @@ function FriendDetailV8Inner() {
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
   const tab: TabKey = (FRIEND_DETAIL_TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
-  const group = params.get('group') ?? BASIC_GROUP
+  const group = params.get('group') ?? ALL_GROUP
   const { selectedAccountId, selectedAccount } = useAccount()
   // 情報欄タブは friend_fields の画面。オフのアカウントではタブごと出さない。
   const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
@@ -75,6 +82,7 @@ function FriendDetailV8Inner() {
   const data = useFriendDetail(friendId, selectedAccountId, tab)
   const perms = useFriendDetailPermissions()
   const { friend } = data
+  const deletion = useCustomerDeletion(() => { router.push('/friends') })
   usePageTitle(friend?.displayName ?? '友だち詳細')
   usePageCrumbs([{ label: '友だち', href: '/friends' }])
 
@@ -114,11 +122,12 @@ function FriendDetailV8Inner() {
   ]
   // 「…」＝関連する画面を開く。別の画面へ移るものは ↗（external）。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, href: '/templates', onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, href: '/scenarios', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, href: '/reminders', onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, href: '/mileage', onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, href: '/duplicates', onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: false, href: '/templates', onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: false, href: '/scenarios', onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'この友だちのリマインダを見る', icon: <List size={16} />, external: false, href: friendFilterHref('/reminders', friendId), onSelect: () => router.push(friendFilterHref('/reminders', friendId)) },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, href: '/mileage', onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, href: '/duplicates', onSelect: () => router.push('/duplicates') },
+    ...(perms.manage ? [{ id: 'delete-friend-data', label: '友だちのデータを削除する', tone: 'danger' as const, onSelect: () => deletion.open({ id: friendId, name: 'この友だちのデータ', kind: 'friend_data', path: `/api/friends/${encodeURIComponent(friendId)}/data` }) }] : []),
     { id: 'back-to-list', label: '友だち一覧へ戻る', icon: <ArrowLeft size={16} />, dividerBefore: true, onSelect: () => router.push('/friends') },
   ]
 
@@ -147,7 +156,9 @@ function FriendDetailV8Inner() {
     <PageFrame kind="detail" boardId="Q5F2QE">
       <PageHeading title={friend?.displayName ?? '友だち詳細'}
         help={<>{subtitle}</>}
-        actions={<><Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />{status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}<span className={styles.menuAnchor}>
+        leading={<Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />}
+        titleAccessory={status ? <StatusBadge tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
+        actions={<><span className={styles.menuAnchor}>
           <RowMenu
             className={styles.square}
             label="その他の操作"
@@ -169,7 +180,7 @@ function FriendDetailV8Inner() {
 
       {perms.viewOnly ? (
         <div className={styles.band}>
-          <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+          <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
         </div>
       ) : null}
 
@@ -178,7 +189,7 @@ function FriendDetailV8Inner() {
           label="友だち詳細の中身"
           items={visibleTabs.map((t) => ({
             label: t.label,
-            href: `/friends/detail?id=${encodeURIComponent(friendId)}&tab=${t.key}${group === BASIC_GROUP ? '' : `&group=${encodeURIComponent(group)}`}`,
+            href: `/friends/detail?id=${encodeURIComponent(friendId)}&tab=${t.key}${group === ALL_GROUP ? '' : `&group=${encodeURIComponent(group)}`}`,
             current: tab === t.key,
           }))}
         />
@@ -219,7 +230,7 @@ function FriendDetailV8Inner() {
       ) : tab === 'orders' ? (
         <BookingsTab />
       ) : tab === 'reminders' ? (
-        <RemindersTab />
+        <RemindersTab friendId={friendId} />
       ) : tab === 'actions' ? (
         <ActionsTab friendId={friendId} />
       ) : tab === 'miles' ? (
@@ -231,6 +242,17 @@ function FriendDetailV8Inner() {
       {tab !== 'timeline' && scenarioNotice ? <div className={styles.notice}><Notice tone="success" message={scenarioNotice} onClose={() => setScenarioNotice('')} /></div> : null}
       {support.dialog}
       {scenario.dialog}
+      <ConfirmDialog open={deletion.target !== null} title="友だちのデータを削除しますか？" deleteName="この友だちのデータ"
+        description="お客さまから削除の依頼を受けた場合に実行してください。次の顧客データを削除します。元に戻せません。監査・支払・審査の記録と外部サービスのデータは残ります。"
+        destructive confirmDisabled={deletion.blocked} busy={deletion.busy} busyLabel="削除中…" error={deletion.error}
+        onConfirm={deletion.confirm} onCancel={deletion.close}>
+        <ul>
+          <li>プロフィール・情報欄・タグとの紐付け・メモ</li>
+          <li>トークと送信待ち・配信・予約などの顧客記録</li>
+          <li>回答と添付した写真・PDF・本人確認書類</li>
+          <li>未添付の書類・登録した写真など</li>
+        </ul>
+      </ConfirmDialog>
     </PageFrame>
   )
 }

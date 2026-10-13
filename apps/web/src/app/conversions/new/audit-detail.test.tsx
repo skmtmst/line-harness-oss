@@ -32,7 +32,8 @@ const st = vi.hoisted(() => ({
   >,
 }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: st.accountId,
@@ -105,19 +106,30 @@ afterEach(async () => {
 async function render() {
   await act(async () => root.render(<NewConversionPage />))
 }
+async function openUsagePicker() {
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes('使う場所を足す'))!
+  await act(async () => fireEvent.click(button))
+}
+async function openDetails() {
+  const button = [...host.querySelectorAll('summary')].find((item) => item.textContent?.includes('詳細設定'))!
+  await act(async () => fireEvent.click(button))
+}
+function text() { return document.body.textContent ?? '' }
 
 describe('DETAIL-16 「使う場所」の候補は失敗と空の成功を区別する', () => {
   it('全部の候補APIが失敗しても「まだありません」にはしない。読み込めません＋再読み込みを出す', async () => {
     st.usage = { analytics: 'error', nen_campaign: 'error', automation: 'error' }
     await render()
-    expect(host.textContent).toContain('読み込めませんでした')
-    expect(host.textContent).toContain('再読み込み')
-    expect(host.textContent).not.toContain('がまだありません')
+    expect([...host.querySelectorAll('button')].filter((button) => button.textContent === 'もう一度読み込む')).toHaveLength(3)
+    await openUsagePicker()
+    expect(text()).toContain('読み込めませんでした')
+    expect(text()).not.toContain('がまだありません')
   })
 
   it('403は権限不足として区別し、変わらない再読み込みは出さない', async () => {
     st.usage = { analytics: 'forbidden', nen_campaign: 'forbidden', automation: 'forbidden' }
     await render()
+    await openUsagePicker()
     expect(host.textContent).toContain('権限がありません')
     expect(host.textContent).not.toContain('がまだありません')
     expect(host.textContent).not.toContain('再読み込み')
@@ -125,20 +137,22 @@ describe('DETAIL-16 「使う場所」の候補は失敗と空の成功を区別
 
   it('空200は「まだありません」のまま（失敗と混ぜない）', async () => {
     await render()
-    expect(host.textContent).toContain('使える分析がまだありません')
-    expect(host.textContent).toContain('使えるNEN配信がまだありません')
-    expect(host.textContent).toContain('使える自動化がまだありません')
+    await openUsagePicker()
+    expect(text()).toContain('使える分析（ファネル・レポート）がまだありません')
+    expect(text()).toContain('使えるNEN配信がまだありません')
+    expect(text()).toContain('使える自動化（オートメーション）がまだありません')
   })
 
   it('一種類だけ失敗：その種類だけ失敗表示、読めた種類の候補は使えるまま', async () => {
     st.withData = true
     st.usage = { analytics: 'ok', nen_campaign: 'ok', automation: 'error' }
     await render()
-    expect(host.textContent).toContain('購入までのファネル')
-    expect(host.textContent).toContain('定期便の案内')
-    expect(host.textContent).toContain('使える自動化を読み込めませんでした')
-    expect(host.textContent).not.toContain('使える分析を読み込めませんでした')
-    expect(host.textContent).not.toContain('使えるNEN配信を読み込めませんでした')
+    await openUsagePicker()
+    expect(text()).toContain('購入までのファネル')
+    expect(text()).toContain('定期便の案内')
+    expect(text()).toContain('使える自動化（オートメーション）を読み込めませんでした')
+    expect(text()).not.toContain('使える分析（ファネル・レポート）を読み込めませんでした')
+    expect(text()).not.toContain('使えるNEN配信を読み込めませんでした')
   })
 
   it('失敗した種類の再読み込みで候補が戻る', async () => {
@@ -147,31 +161,33 @@ describe('DETAIL-16 「使う場所」の候補は失敗と空の成功を区別
     await render()
     st.usage = { ...st.usage, automation: 'ok' }
     const retry = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent === '自動化を再読み込み',
+      (button) => button.textContent === 'もう一度読み込む',
     )
     expect(retry).toBeTruthy()
     await act(async () => {
       fireEvent.click(retry!)
     })
-    expect(host.textContent).toContain('購入後の挨拶')
-    expect(host.textContent).not.toContain('使える自動化を読み込めませんでした')
+    await openUsagePicker()
+    expect(text()).toContain('購入後の挨拶')
+    expect(text()).not.toContain('使える自動化（オートメーション）を読み込めませんでした')
   })
 })
 
 describe('DETAIL-17 集計対象は画面上部のアカウントに固定', () => {
   it('詳細設定の対象欄は選び直せる選択欄ではなく、固定対象の明示', async () => {
     await render()
+    await openDetails()
     const el = host.querySelector('#cv-account')
     expect(el?.tagName).not.toBe('SELECT')
     expect(el?.textContent).toBe('A店')
-    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="集計対象アカウントの説明"]')!.click() })
-    expect(host.textContent).toContain('画面上部で選んでいるLINEアカウントに固定されます')
+    expect(el?.getAttribute('title')).toBe('画面上部で選んでいるLINEアカウントに固定されます')
     // 「すべて」は保存側がアカウント必須のため、選べる選択肢にはしない。
     expect(host.querySelector('select#cv-account')).toBeNull()
   })
 
   it('ヘッダーのアカウントが変わると固定表示も追従する', async () => {
     await render()
+    await openDetails()
     st.accountId = 'account-b'
     await act(async () => root.render(<NewConversionPage />))
     expect(host.querySelector('#cv-account')?.textContent).toBe('B店')
@@ -183,7 +199,7 @@ async function clickTrigger(value: string) {
     order: '注文が確定した', form: 'フォームが送信された', booking: '予約が確定した',
     page: 'ページを見た', video: '動画を見終えた', tag: 'タグが付いた',
   }
-  const trigger = host.querySelector('#cv-trigger')
+  const trigger = host.querySelector('button[aria-label="できごと"]')
   expect(trigger).not.toBeNull()
   await act(async () => { fireEvent.click(trigger!) })
   const option = [...document.body.querySelectorAll('[role="option"] button')].find((item) => item.textContent?.includes(labels[value]))
@@ -198,23 +214,24 @@ describe('R40/R41 数えない条件と起点の説明', () => {
     // 共通の条件部品(ConditionBuilder)の入力行。
     expect(host.textContent).toContain('絞り込む項目を更に追加できます')
     // 自由文のメモは別の欄。条件として効く入力と混ぜない。
-    expect(host.querySelector('#cv-exclusion-memo')).not.toBeNull()
+    expect(host.querySelector('#cv-memo')).not.toBeNull()
     expect(host.querySelector('#cv-excluded-condition')).toBeNull()
   })
 
   it('タグ起点を選ぶと対象がタグの説明になり、注文の言葉が出ない', async () => {
     await render()
     await clickTrigger('tag')
-    expect(host.textContent).toContain('どのタグが付いても')
-    expect(host.textContent).not.toContain('すべての注文')
+    const explanation = [...host.querySelectorAll('[title]')].map((el) => el.getAttribute('title')).join('\n')
+    expect(explanation).toContain('どのタグが付いても')
+    expect(explanation).not.toContain('すべての注文')
   })
 })
 
 describe('起点に合わない金額の出し方は選べない', () => {
   // 共通 Select は button＋listbox（MenuPortalでbodyへ出す）。素<select>ではない。
   const LABEL_TO_VALUE: Record<string, string> = {
-    '注文の金額をそのまま使う': 'source',
-    '決まった額を使う': 'fixed',
+    '注文の金額': 'source',
+    '決まった額': 'fixed',
     '金額を集計しない': 'none',
   }
   function valueButton(): HTMLButtonElement {

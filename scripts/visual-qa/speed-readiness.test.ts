@@ -20,12 +20,15 @@ const mockFetch = async () => ({ status: 200, body: JSON.stringify({ success: tr
 describe('WEB236 速度検査の成立条件', () => {
   it('負荷画面の待ち時間を延ばしても、2,000行の完了印を必須にする', async () => {
     const calls: unknown[] = []
-    const page = { waitForFunction: async (_fn: unknown, arg: unknown, options: unknown) => {
+    const loadState = vi.fn(async () => {})
+    const page = { waitForLoadState: loadState, waitForFunction: async (_fn: unknown, arg: unknown, options: unknown) => {
       calls.push([arg, options])
       return { jsonValue: async () => true }
     } }
     await waitForScreenReady(page, '/friends', 2000)
     await waitForScreenReady(page, '/friends')
+    expect(loadState).toHaveBeenNthCalledWith(1, 'domcontentloaded', { timeout: 60000 })
+    expect(loadState).toHaveBeenCalledTimes(2)
     expect(calls).toEqual([
       [{ route: '/friends', expectedRows: 2000 }, { timeout: 180000 }],
       [{ route: '/friends', expectedRows: null }, { timeout: 15000 }],

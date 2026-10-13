@@ -159,7 +159,7 @@ describe('外部連携 V8', () => {
     await render(<WebhooksOutgoingV8 />)
     await act(async () => { buttons().find((element) => element.getAttribute('aria-label') === '「顧客台帳」の操作')!.click() })
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
-    expect(items).toContain('中身を見る')
+    expect(items).toContain('送信の記録を見る')
     expect(items.includes('試しに送る')).toBe(staffRole === 'admin')
     for (const action of ['止める', '動かす', '直す', '鍵を作り直す', '削除する']) expect(items).not.toContain(action)
     expect(posted).toHaveLength(0)

@@ -89,7 +89,7 @@ describe('V6 自動応答一覧の契約', () => {
     for (const word of ['orderedRules', 'このルール', '試す', '後の処理', "同じ人へ続けて返さない"]) {
       expect(PUBLISH).toContain(word)
     }
-    expect(PUBLISH).toContain("conflicts.map((conflict)")
+    expect(PUBLISH).toMatch(/conflicts\.map\(\(conflict(?:,\s*\w+)?\)/)
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PUBLISH).toContain('<LinePreview')
   })

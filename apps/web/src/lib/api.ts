@@ -1,3 +1,4 @@
+import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
@@ -81,7 +82,6 @@ import type {
   ConversionPoint,
   ConversionMeasureMethod,
   Affiliate,
-  Template,
   Automation,
   AutomationLog,
   Chat,
@@ -944,7 +944,22 @@ export type OperationHealthResult = {
   observedAt: string
 }
 
+/** LINE受信の工程状態。本文・返信の鍵は含めない。 */
+export type LineWebhookRecoveryEvent = {
+  webhookEventId: string;
+  lineAccountId: string | null;
+  eventType: string;
+  status: 'received' | 'processing' | 'succeeded' | 'failed';
+  receivedAt: string;
+  canRetry: boolean;
+  recoveryStatus: 'needs_review' | null;
+  recoveryLabel: string | null;
+  recoveryReasonCode: string | null;
+  recoveryReason: string | null;
+};
+
 export type OperationHealthSnapshot = {
+  loginSecurity?: { configured: boolean; notice: string | null }
   latestRun: {
     id: string
     lineAccountId: string | null
@@ -2488,7 +2503,7 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  * 残っているかどうかを見て、案内を出すか、ただの未ログインとして
  * 見送るかを決める。
  */
-export const SESSION_LOST_EVENT = 'lh-session-lost'
+export { SESSION_LOST_EVENT } from './session-events'
 
 /** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
 export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
@@ -2961,6 +2976,25 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+const sharedReads = new Map<string, Promise<unknown>>()
+
+/** 同時に出る請求表示だけ共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
+function fetchSharedRead<T>(path: string): Promise<T> {
+  const csrf = getCsrfToken()
+  // Cookie だけでセッションの世代が分からない場合は共有しない。
+  if (!csrf) return fetchApi<T>(path)
+  const key = JSON.stringify([path, adminSessionHeaders(), csrf])
+  let pending = sharedReads.get(key)
+  if (!pending) {
+    pending = fetchApi<T>(path)
+    sharedReads.set(key, pending)
+    const forget = () => { if (sharedReads.get(key) === pending) sharedReads.delete(key) }
+    pending.then(forget, forget)
+  }
+  // 呼び出し側で表示用に並べ替え・加工しても、もう一方の表示へ伝えない。
+  return (pending as Promise<T>).then((response) => structuredClone(response))
+}
+
 /**
  * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
  *
@@ -3117,6 +3151,7 @@ export type FriendListParams = {
    * handled を付与。L-step 風友だちリスト UI 用。デフォルトは false。
    */
   includeChatStatus?: boolean
+  fieldColumns?: string[]
   /** 並び替え。`oldest` で created_at ASC、未指定 / `recent` で DESC. */
   sort?: 'recent' | 'oldest'
   /** `unhandled` で「最新が未返信の incoming」だけに絞る (サーバ側 SQL filter). */
@@ -3884,6 +3919,7 @@ export type FriendScoreDetail = {
 }
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
+  fieldValues: Record<string, string | null>
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
   latestOutgoingAt: string | null
   activeScenario: { name: string; status: string } | null
@@ -3899,8 +3935,6 @@ export type FriendListItem = FriendWithTags & Partial<{
 export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
   return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
 }
-
-
 
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
 export type ListStats = {
@@ -5988,6 +6022,8 @@ export type FileScanConfig = {
   externalProvider: string | null
   externalEndpointUrl: string | null
   externalSecretRef: string | null
+  /** 現在の運営の許可設定で送信できるか。鍵の実在・疎通確認ではない。 */
+  externalEnabled: boolean
   externalTimeoutMs: number
   maxBytesOverride: number | null
   maxPixelsOverride: number | null
@@ -6339,6 +6375,9 @@ export type OpsSupportDetail = {
 
 /** 大事な操作の直前再確認（V）が対象にする操作の名前。Workerの STEP_UP_PURPOSES と一致させる。 */
 export type StepUpPurpose =
+  | 'auth.mfa.policy'
+  | 'auth.mfa.recovery'
+  | 'auth.mfa.reenroll'
   | 'operations.control'
   | 'affiliate.payout.export'
   | 'photo.original.download'
@@ -6396,6 +6435,7 @@ export const api = {
       if (params?.search) query.search = params.search
       if (params?.includeTags === false) query.includeTags = 'false'
       if (params?.includeChatStatus) query.includeChatStatus = 'true'
+      if (params?.fieldColumns?.length) query.fieldColumns = JSON.stringify(params.fieldColumns)
       if (params?.sort) query.sort = params.sort
       if (params?.handled) query.handled = params.handled
       if (params?.operatorId) query.operatorId = params.operatorId
@@ -8894,6 +8934,10 @@ export const api = {
   },
 
   accountSettings: {
+    saveCustomerLook: (accountId: string, look: import('@line-crm/shared').CustomerLook, expectedVersion: number) => fetchApi<{success: boolean; data?: {version: number; look: import('@line-crm/shared').CustomerLook}; error?: string}>('/api/account-settings/customer-look',{method:'PUT',body:JSON.stringify({accountId,look,expectedVersion})}),
+    getCustomerLook: (accountId: string) => fetchApi<{success: boolean; data: {version: number; look: import('@line-crm/shared').CustomerLook}; error?: string}>(`/api/account-settings/customer-look?accountId=${encodeURIComponent(accountId)}`),
+    getAllergyOptions: (accountId: string) => fetchApi<{ success: boolean; data: {version: number; options: string[]}; error?: string }>(`/api/account-settings/allergy-options?accountId=${encodeURIComponent(accountId)}`),
+    saveAllergyOptions: (accountId: string, options: string[], expectedVersion: number) => fetchApi<{success: boolean; data?: {version: number}; error?: string}>('/api/account-settings/allergy-options', { method: 'PUT', body: JSON.stringify({accountId, options, expectedVersion}) }),
     getTestRecipients: (accountId: string) =>
       fetchApi<{ success: boolean; data: Array<{ id: string; displayName: string; pictureUrl: string | null }> }>(`/api/account-settings/test-recipients?accountId=${accountId}`),
     getTestRecipientLoginUsers: (accountId: string) =>
@@ -9131,7 +9175,7 @@ export const api = {
         amountDueYen: number; prorationDifferenceYen: number; nextBillingAt: string | null;
         estimatedAt: string; isEstimate: true; notice: string }>>(
         `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
-    summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    summary: () => fetchSharedRead<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),
@@ -10876,12 +10920,14 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      folderId?: string;
       limit?: number;
       offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
+      if (params.folderId) query.set('folder_id', params.folderId);
       if (params.limit !== undefined) query.set('limit', String(params.limit));
       if (params.offset !== undefined) query.set('offset', String(params.offset));
       return fetchApi<ApiResponse<CommonActionSummary[]> & {
@@ -11267,6 +11313,14 @@ export const api = {
    * 以後はこの V6 rules/runs 契約だけを使う。
    */
   friendAddRules: {
+    restore: (accountId: string, id: string, expectedVersion: number) => fetchApi<ApiResponse<{ id: string; status: 'draft'; version: number }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/unarchive?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
+    duplicate: (accountId: string, id: string, expectedVersion: number, idempotencyKey: string) => fetchApi<ApiResponse<{ id: string; status: 'draft' }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ expectedVersion }) },
+    ),
     list: (accountId: string, kind: FriendAddRuleKind, params?: {
       status?: FriendAddRuleStatus
       cursor?: string
@@ -11275,6 +11329,8 @@ export const api = {
       q?: string
       /** フォルダ名での絞り込み。未分類は '__uncategorized'。 */
       folder?: string
+      /** 複製直後の行を先頭へ。ページ送りにも同じ値を渡す。 */
+      highlightId?: string
     }) => {
       const query = new URLSearchParams({ account_id: accountId, kind })
       if (params?.status) query.set('status', params.status)
@@ -11282,6 +11338,7 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.q) query.set('q', params.q)
       if (params?.folder) query.set('folder', params.folder)
+      if (params?.highlightId) query.set('highlight', params.highlightId)
       return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
     },
     get: (accountId: string, ruleId: string) =>
@@ -12572,6 +12629,14 @@ export const api = {
   },
   webhooks: {
     incoming: {
+      saveConfig: (id: string, lineAccountId: string, data: {
+        expectedVersion: number;
+        identityMatching: IncomingWebhookDetail['identityMatching'];
+        actions: Array<Pick<IncomingWebhookDetail['actions'][number], 'refKind' | 'refId' | 'refVersionId'>>;
+      }) => fetchApi<ApiResponse<{ id: string; version: number }>>(
+        `/api/webhooks/incoming/${encodeURIComponent(id)}/config?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<IncomingWebhook[]>>(
           `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,
@@ -12937,7 +13002,7 @@ export const api = {
     beginTwoFactorSetup: (id: string) =>
       fetchApi<ApiResponse<{ provisioningUri: string; manualKey: string }>>(`/api/staff/${id}/two-factor/setup`, { method: 'POST' }),
     confirmTwoFactorSetup: (id: string, code: string) =>
-      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) }),
+      fetchApi<ApiResponse<StaffMember & { recoveryCodes?: string[] }>>(`/api/staff/${id}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) }),
     disableTwoFactor: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor`, {
         method: 'DELETE',
@@ -13540,7 +13605,7 @@ export const api = {
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links
   // の順でフォールバックするので、tracked_links 登録済み ref は実際にはシナリオ発火している。
   trackedLinks: {
-    list: () =>
+    list: (accountId?: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -13558,7 +13623,7 @@ export const api = {
             updatedAt: string
           }>
         >
-      >('/api/tracked-links'),
+      >(`/api/tracked-links${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   pools: {
     list: (options?: FetchApiOptions) =>
@@ -13576,7 +13641,7 @@ export const api = {
       }),
     update: (
       id: string,
-      data: Partial<{ name: string; activeAccountId: string; isActive: boolean }>,
+      data: Partial<{ name: string; activeAccountId: string; isActive: boolean; expectedUpdatedAt: string }>,
     ) =>
       fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`, {
         method: 'PUT',
@@ -13861,6 +13926,10 @@ export const api = {
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
   /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
+    lineReceipts: (accountId: string) => fetchApi<ApiResponse<LineWebhookRecoveryEvent[]>>(`/api/line-webhook-events?status=failed&account_id=${encodeURIComponent(accountId)}`),
+    retryLineReceipt: (id: string) => fetchApi<{ success: boolean; status: 'succeeded' | 'needs_review' | 'busy' | 'failed'; reason?: string }>(
+      `/api/line-webhook-events/${encodeURIComponent(id)}/retry`, { method: 'POST' },
+    ),
     health: (accountId: string) =>
       fetchApi<ApiResponse<OperationHealthSnapshot>>(
         `/api/operations/health?account_id=${encodeURIComponent(accountId)}`,
@@ -14301,6 +14370,8 @@ export interface BookingVisitMark {
 
 /** 今日の予約の人（スタッフ）の行。 */
 export interface BookingTodayStaffRow {
+  line_account_id?: string;
+  lock_version?: number;
   kind: 'staff';
   id: string;
   starts_at: string;
@@ -14319,6 +14390,10 @@ export interface BookingTodayStaffRow {
 
 /** 今日の予約の席（卓）の行。 */
 export interface BookingTodaySeatRow {
+  customer_version?: number;
+  table_id?: string | null;
+  table_ids_json?: string;
+  source?: string;
   kind: 'seat';
   id: string;
   store_id: string;
@@ -15477,6 +15552,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  folderId?: string | null;
   venue_address?: string | null;
   id: string;
   name: string;
@@ -15798,6 +15874,10 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  duplicate: (accountId: string, id: string, expectedVersion: number) => fetchApi<{ id: string; lifecycle_status: 'draft' }>(
+    withAccount(`/api/events/admin/events/${encodeURIComponent(id)}/duplicate`, accountId),
+    { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+  ),
   applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
     fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (

@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -7,7 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
@@ -41,6 +42,7 @@ const SETTINGS_ORDER = [
   '/line-notifications', // LINE通知
   '/settings/sns', // SNS 連携（提案 E-6）。今ある絵の並びを動かさないよう末尾に足す
   '/settings/booking-media', // 予約サイト・グルメ媒体（提案 E-4）。飲食店向け（テスト）が使える環境だけ出す
+  '/settings/delivery', // デリバリー連携（承認案 DL-1 `dF4Ov`）。飲食店向け（テスト）が使える環境だけ出す
 ] as const
 
 /** 絵の印（lucide）。 */
@@ -55,12 +57,14 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
   '/line-notifications': BellRing,
   '/settings/sns': Share2,
   '/settings/booking-media': Store,
+  '/settings/delivery': Truck,
 }
 
 /** 左のメニュー（lib/menu）に無く、設定の中のメニューにだけ出す項目。 */
 const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-sns', href: '/settings/sns', label: 'SNS 連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
   { id: 'settings-booking-media', href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: '', note: '店ごとの予約サイト・グルメ媒体の URL と、他のサイトの枠を閉じる知らせ', required: true },
+  { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
 ]
 
 /** 機能設定の下に付く2つの画面（絵の「下にマニュアルの正本表・ファイルの検査」）。 */
@@ -96,7 +100,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
-  const [staffRole, setStaffRole] = useState<string | null>(null)
+  const staffRole = useStaffRole()
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Record<string, boolean> | null>(null)
@@ -115,7 +119,6 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   }, [selectedAccountId])
 
   useEffect(() => {
-    setStaffRole(localStorage.getItem('lh_staff_role'))
     try { setStaffPermissions(JSON.parse(localStorage.getItem('lh_staff_permissions') || '[]')) } catch { setStaffPermissions([]) }
     try { setStaffViewPermissions(JSON.parse(localStorage.getItem('lh_staff_view_permissions') || '[]')) } catch { setStaffViewPermissions([]) }
   }, [])
@@ -149,7 +152,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    * 設定の中のメニュー）。出し分けの決まりは左のメニューと同じ。
    */
   const itemVisible = (item: MenuItem): boolean => {
-    if (item.href === '/settings/booking-media' && !restaurantTestUiEnabled()) return false
+    if ((item.href === '/settings/booking-media' || item.href === '/settings/delivery') && !restaurantTestUiEnabled()) return false
     if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
     if (item.href === '/accounts' && staffRole === 'staff') return false
     const permissionKey = item.permissionKey ?? item.href
@@ -183,7 +186,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
           className={`${styles.item} ${active ? styles.itemActive : ''}`}
           aria-current={active ? 'page' : undefined}
         >
-          {Icon ? <Icon size={14} aria-hidden="true" className={styles.icon} /> : null}
+          {Icon ? <Icon size={16} aria-hidden="true" className={styles.icon} /> : null}
           {item.label}
         </Link>
         {children.length > 0 && (

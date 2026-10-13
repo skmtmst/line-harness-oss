@@ -4,6 +4,8 @@
  * 行の「…」から QR コードの小窓（GtI4Y）が開く・停止中の行は URL を出さない・
  * 閲覧のみは作る／編集を出さない・未登録 ref は「登録する」・数の帯の未設定の数。
  */
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -65,6 +67,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  forgetStaffIdentity();
   role.value = 'owner'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -136,32 +139,34 @@ describe('V8 流入と計測の一覧', () => {
     await act(async () => { qr.click() })
     const dialog = document.querySelector('[role="dialog"]')
     expect(dialog?.textContent).toContain('夏のInstagram投稿 の QR コード')
-    expect(dialog?.textContent).toContain('/…/summer-ig')
-    expect(dialog?.querySelector('[data-truncated-text]')?.getAttribute('aria-label')).toContain('/r/summer-ig')
-    expect(dialog?.textContent).toContain('PNG を保存')
-    expect(dialog?.textContent).toContain('印刷用 PDF')
+    expect(dialog?.querySelector('textarea')?.value).toContain('/r/summer-ig')
+    expect(dialog?.querySelector('a[href*="download=1"]')?.getAttribute('href')).toContain('summer-ig')
+    expect(dialog?.textContent).toContain('画像をダウンロード')
+    expect(dialog?.textContent).toContain('PDFで印刷')
   })
 
-  it('WEB-037：停止中も札とURLコピー・QR保存を残す', async () => {
+  it('B-201：停止の札と再開操作を保ち、正本QR窓でQR保存を止める', async () => {
     await render()
     const row = rowOf('flyer-26s')
     expect(row?.textContent).toContain('停止中')
-    expect(buttonByLabel('チラシ計測リンクのURLをコピー')).toBeTruthy()
+    expect(buttonByLabel('チラシ計測リンクのURLをコピー')).toBeUndefined() // コピーは共通のその他操作へ
     await act(async () => { buttonByLabel('「チラシ計測リンク」の操作')!.click() })
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent)
     expect(labels.some((text) => text?.includes('QRコード'))).toBe(true)
     const qr = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('QRコード')) as HTMLElement
     await act(async () => qr.click())
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('停止中')
-    expect([...document.querySelectorAll('a')].some(a => a.download.endsWith('.png'))).toBe(true)
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('停止しています')
+    expect([...document.querySelectorAll('a')].some(a => a.download.endsWith('.png'))).toBe(false)
     expect(labels.some((text) => text?.includes('受付を再開する'))).toBe(true)
   })
 
-  it('未登録の ref の行は「登録する」、登録済みは「編集」', async () => {
+  it('未登録の ref の行は「登録する」、登録済みの編集はメニューへ', async () => {
     await render()
     expect(rowOf('mail-sign')?.textContent).toContain('未設定')
     expect(rowOf('mail-sign')?.textContent).toContain('登録する')
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
   })
 
   it('数の帯の「動きが未設定」は、タグもシナリオも無い登録済みの数（停止中も含む）', async () => {
@@ -173,6 +178,7 @@ describe('V8 流入と計測の一覧', () => {
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
   it('閲覧のみ（staff）は帯を出し、作る・編集・チェックを出さない', async () => {
     role.value = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: [] } as StaffMember)
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
@@ -218,6 +224,7 @@ describe('V8 流入と計測の一覧', () => {
 
   it('WEB034: 「流入」を任された staff には作る・編集を出し、フォルダの作成は出さない', async () => {
     role.value = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/inflow-links'] } as StaffMember)
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => (key === 'lh_staff_permissions' ? JSON.stringify(['/inflow-links']) : key === 'lh_staff_role' ? 'staff' : null),
       setItem: () => undefined,
@@ -226,7 +233,26 @@ describe('V8 流入と計測の一覧', () => {
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
     expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('流入リンクを作る'))).toBe(true)
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
     expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
   })
+})
+
+it.each(['/api/entry-route-genres','/api/scenarios','/api/message-templates','/api/tags'])('B-241：%sの拒否は空の候補として隠さず読み直す',async(path)=>{
+ const fixtureFetch=globalThis.fetch
+ let failed=true,reads=0
+ vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+  if(new URL(String(input)).pathname===path){reads++;if(failed)throw new Error('fixture failure')}
+  return fixtureFetch(input,init)
+ })
+ await render()
+ const error=[...host.querySelectorAll('[data-list-state="error"]')].find(el=>el.textContent?.includes('読み込めませんでした'))
+ expect(error).toBeTruthy()
+ failed=false
+ await act(async()=>{(error!.querySelector('button') as HTMLButtonElement).click()})
+ for(let i=0;i<8;i++)await act(async()=>{})
+ expect(host.querySelector('[data-list-state="error"]')).toBeNull()
+ expect(reads).toBeGreaterThanOrEqual(2)
 })

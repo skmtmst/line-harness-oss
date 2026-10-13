@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useStaffRole } from '@/lib/staff-role'
 
 /**
  * R511: 対応マークの作成・編集を画面で案内してよい役割か。
@@ -20,13 +20,5 @@ export function canManageSupportMarkByRole(role: string | null): boolean | null 
 }
 
 export function useCanManageSupportMark(): boolean | null {
-  const [allowed, setAllowed] = useState<boolean | null>(null)
-  useEffect(() => {
-    try {
-      setAllowed(canManageSupportMarkByRole(window.localStorage.getItem('lh_staff_role')))
-    } catch {
-      setAllowed(null)
-    }
-  }, [])
-  return allowed
+  return canManageSupportMarkByRole(useStaffRole()) ?? false
 }

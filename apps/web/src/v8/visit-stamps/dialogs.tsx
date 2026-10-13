@@ -1,10 +1,5 @@
 'use client'
 
-/*
- * 来店スタンプ（V8 w4SBbv）の小窓。絵に窓は無いので、共通の Dialog に欄を並べるだけにする。
- * 特典・倍率・初回ボーナス・ランク倍率は「下書き」を変えるだけ（保存は下の帯の［保存する］）。
- * 理由・暗証番号・写真は、その場で口を呼ぶ（呼び出しは画面側）。
- */
 import { Field as SharedField } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import { useEffect, useState } from 'react'
@@ -18,6 +13,17 @@ import { useFormErrors, type FormErrors } from '@/lib/use-form-errors'
 import { WEEKDAYS, minuteLabel } from './display'
 import styles from './visit-stamps.module.css'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { EntityMultiPickerDialog } from '@/components/shared/entity-picker'
+import EntityRemoteField from '@/components/shared/entity-remote-field'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EditorSurface from '@/components/shared/editor-surface'
+
+/*
+ * 来店スタンプ（V8 w4SBbv）の小窓。絵に窓は無いので、共通の Dialog に欄を並べるだけにする。
+ * 特典・倍率・初回ボーナス・ランク倍率は「下書き」を変えるだけ（保存は下の帯の［保存する］）。
+ * 理由・暗証番号・写真は、その場で口を呼ぶ（呼び出しは画面側）。
+ */
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <SharedField label={label}>{children}</SharedField>
@@ -28,7 +34,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * 打っている途中には出さない（窓の下の帯にも出さない）。
  */
 function CheckedField({ id, label, fields, name, children }: { id: string; label: string; fields: FormErrors; name: string; children: React.ReactNode }) {
-  return <SharedField label={label} htmlFor={id}>{children}<FieldError id={`${id}-error`}>{fields.error(name)}</FieldError></SharedField>
+  return <SharedField label={label} htmlFor={id} requirement={fields.requirement(name)}>{children}<FieldError id={`${id}-error`}>{fields.error(name)}</FieldError></SharedField>
 }
 const checkedProps = (fields: FormErrors, name: string, id: string) => ({ ...fields.bind(name), id, invalid: fields.invalid(name), 'aria-describedby': fields.invalid(name) ? `${id}-error` : undefined })
 
@@ -43,16 +49,16 @@ export function RewardDialog({ open, reward, onClose, onSave }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setName(reward?.name ?? ''); setStamps(reward ? String(reward.stamps) : ''); fields.reset() } }, [open, reward])
   const n = toInt(stamps)
-  fields.define('name', '特典の名前', () => (name.trim() ? null : '特典の名前を入れてください。'))
-  fields.define('stamps', '何個で使えるか', () => (Number.isInteger(n) && n >= 1 ? null : '何個で使えるかを 1 以上の数で入れてください。'))
+  fields.define('name', '特典の名前', () => (name.trim() ? null : '特典の名前を入れてください。'), { required: true })
+  fields.define('stamps', '何個で使えるか', () => (Number.isInteger(n) && n >= 1 ? null : '何個で使えるかを 1 以上の数で入れてください。'), { required: true })
   return (
-    <Dialog open={open} title={reward ? '特典を変える' : '特典を足す'} confirmLabel={reward ? '変える' : '足す'} onCancel={onClose}
+    <EditorSurface surface={reward ? 'inline' : 'dialog'} open={open} title={reward ? '特典を変える' : '特典を足す'} confirmLabel={reward ? '変える' : '足す'} onCancel={onClose}
       onConfirm={() => { if (fields.submit().length === 0) onSave({ id: reward?.id ?? `reward-${Date.now().toString(36)}`, name: name.trim(), stamps: n }) }}>
       <div className={styles.dialogBody}>
-        <CheckedField id="vs-reward-name" label="特典の名前" fields={fields} name="name"><TextField {...checkedProps(fields, 'name', 'vs-reward-name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="例：ドリンク 1杯" maxLength={100} /></CheckedField>
-        <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><NumberInput numericText {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></CheckedField>
+        <CheckedField id="vs-reward-name" label="特典の名前" fields={fields} name="name"><SaveErrorField names={["name"]}><TextField {...checkedProps(fields, 'name', 'vs-reward-name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="例：ドリンク 1杯" maxLength={100} /></SaveErrorField></CheckedField>
+        <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><SaveErrorField names={["stamps"]}><NumberInput numericText {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></SaveErrorField></CheckedField>
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }
 
@@ -90,17 +96,17 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
     setFrom(toDate(multiplier?.from)); setTo(toDate(multiplier?.to, true))
   }, [open, multiplier]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   const r = Number(rate)
-  fields.define('rate', '倍率', () => (!Number.isFinite(r) || r < 1 || r > 100 ? '倍率は 1〜100 で入れてください。' : null))
-  fields.define('start', '時間の始まり', () => (start === '' && end !== '' ? '始まりも選んでください。' : null))
+  fields.define('rate', '倍率', () => (!Number.isFinite(r) || r < 1 || r > 100 ? '倍率は 1〜100 で入れてください。' : null), { required: true })
+  fields.define('start', '時間の始まり', () => (start === '' && end !== '' ? '始まりも選んでください。' : null), { required: end !== '' })
   fields.define('end', '時間の終わり', () => (
     end === '' && start !== '' ? '終わりも選んでください。'
       : start !== '' && end !== '' && Number(start) >= Number(end) ? '終わりの時間を始まりより後にしてください。' : null
-  ))
-  fields.define('to', '期間の終わり', () => (from && to && from > to ? '期間の終わりを始まりより後にしてください。' : null))
+  ), { required: start !== '' })
+  fields.define('to', '期間の終わり', () => (from && to && from > to ? '期間の終わりを始まりより後にしてください。' : null), { required: false })
   const timeOptions = [{ value: '', label: '指定なし' }, ...MINUTES.map((m) => ({ value: String(m), label: minuteLabel(m) }))]
   const endOptions = [{ value: '', label: '指定なし' }, ...MINUTES.slice(1).map((m) => ({ value: String(m), label: minuteLabel(m) })), { value: '1440', label: '24:00' }]
   return (
-    <Dialog open={open} title={multiplier ? '倍率を変える' : '倍率を足す'} confirmLabel={multiplier ? '変える' : '足す'} onCancel={onClose}
+    <EditorSurface surface={multiplier ? 'inline' : 'dialog'} open={open} title={multiplier ? '倍率を変える' : '倍率を足す'} confirmLabel={multiplier ? '変える' : '足す'} onCancel={onClose}
       onConfirm={() => {
         if (fields.submit().length > 0) return
         onSave({
@@ -115,26 +121,26 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
         })
       }}>
       <div className={styles.dialogBody}>
-        <Field label="名前（任意）"><TextField value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} placeholder="例：火曜の夕方 2倍デー" /></Field>
-        <CheckedField id="vs-mul-rate" label="倍率" fields={fields} name="rate"><TextField {...checkedProps(fields, 'rate', 'vs-mul-rate')} value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" /></CheckedField>
+        <Field label="名前（任意）"><SaveErrorField names={["label","name"]}><TextField value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} placeholder="例：火曜の夕方 2倍デー" /></SaveErrorField></Field>
+        <CheckedField id="vs-mul-rate" label="倍率" fields={fields} name="rate"><SaveErrorField names={["rate"]}><TextField {...checkedProps(fields, 'rate', 'vs-mul-rate')} value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" /></SaveErrorField></CheckedField>
         <div className={styles.field}>
           <span className={styles.label}>曜日（選ばなければ毎日）</span>
           <div className={styles.weekdays}>
             {WEEKDAYS.map((d, i) => (
-              <Checkbox key={d} checked={days.includes(i)} onCheckedChange={(on) => setDays(on ? [...days, i] : days.filter((x) => x !== i))}>{d}</Checkbox>
+              <SaveErrorField names={["i","days"]} key={d}><Checkbox key={d} checked={days.includes(i)} onCheckedChange={(on) => setDays(on ? [...days, i] : days.filter((x) => x !== i))}>{d}</Checkbox></SaveErrorField>
             ))}
           </div>
         </div>
         <div className={styles.row2}>
-          <CheckedField id="vs-mul-start" label="時間の始まり" fields={fields} name="start"><div {...fields.bind('start')}><Select id="vs-mul-start" aria-label="時間の始まり" size="full" value={start} error={fields.error('start') ?? undefined} onChange={(v) => { fields.clear('start'); setStart(v) }} options={timeOptions} /></div></CheckedField>
-          <CheckedField id="vs-mul-end" label="時間の終わり" fields={fields} name="end"><div {...fields.bind('end')}><Select id="vs-mul-end" aria-label="時間の終わり" size="full" value={end} error={fields.error('end') ?? undefined} onChange={(v) => { fields.clear('end'); setEnd(v) }} options={endOptions} /></div></CheckedField>
+          <CheckedField id="vs-mul-start" label="時間の始まり" fields={fields} name="start"><div {...fields.bind('start')}><SaveErrorField names={["start"]}><Select id="vs-mul-start" aria-label="時間の始まり" size="full" value={start} error={fields.error('start') ?? undefined} onChange={(v) => { fields.clear('start'); setStart(v) }} options={timeOptions} /></SaveErrorField></div></CheckedField>
+          <CheckedField id="vs-mul-end" label="時間の終わり" fields={fields} name="end"><div {...fields.bind('end')}><SaveErrorField names={["end"]}><Select id="vs-mul-end" aria-label="時間の終わり" size="full" value={end} error={fields.error('end') ?? undefined} onChange={(v) => { fields.clear('end'); setEnd(v) }} options={endOptions} /></SaveErrorField></div></CheckedField>
         </div>
         <div className={styles.row2}>
-          <Field label="期間の始まり（任意）"><DateField value={from} onChange={setFrom} /></Field>
-          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange={setTo} /></CheckedField>
+          <Field label="期間の始まり（任意）"><SaveErrorField names={["from"]}><DateField value={from} onChange={setFrom} /></SaveErrorField></Field>
+          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><SaveErrorField names={["to"]}><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange={setTo} /></SaveErrorField></CheckedField>
         </div>
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }
 
@@ -144,11 +150,11 @@ export function BonusDialog({ open, value, onClose, onSave }: { open: boolean; v
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setCount(String(value || 1)); fields.reset() } }, [open, value])
   const n = toInt(count)
-  fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'))
+  fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'), { required: true })
   return (
-    <Dialog open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
-      <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><NumberInput numericText {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></CheckedField>
-    </Dialog>
+    <EditorSurface surface={'inline'} open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
+      <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><SaveErrorField names={["count"]}><NumberInput numericText {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></SaveErrorField></CheckedField>
+    </EditorSurface>
   )
 }
 
@@ -163,9 +169,9 @@ export function RankDialog({ open, settings, onClose, onSave }: {
     if (open) setRows(settings.rankMultipliers.length ? settings.rankMultipliers.map((r) => ({ tagName: r.tagName, multiplier: String(r.multiplier) })) : [{ tagName: '', multiplier: '1.5' }])
   }, [open, settings.rankMultipliers]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   const used = rows.filter((r) => r.tagName.trim())
-  rows.forEach((row, i) => fields.define(`rate-${i}`, `倍率 ${i + 1}`, () => (row.tagName.trim() && !(Number(row.multiplier) >= 1 && Number(row.multiplier) <= 100) ? '倍率は 1〜100 で入れてください。' : null)))
+  rows.forEach((row, i) => fields.define(`rate-${i}`, `倍率 ${i + 1}`, () => (row.tagName.trim() && !(Number(row.multiplier) >= 1 && Number(row.multiplier) <= 100) ? '倍率は 1〜100 で入れてください。' : null), { required: Boolean(row.tagName.trim()) }))
   return (
-    <Dialog open={open} title="会員ランクの倍率" description="友だちに付いたタグの名前ごとに倍率を決めます。いくつも当たるときは、いちばん高い倍率だけを使います。" confirmLabel="変える" onCancel={onClose}
+    <EditorSurface surface={'inline'} open={open} title="会員ランクの倍率" description="友だちに付いたタグの名前ごとに倍率を決めます。いくつも当たるときは、いちばん高い倍率だけを使います。" confirmLabel="変える" onCancel={onClose}
       onConfirm={() => {
         if (fields.submit().length > 0) return
         /* 前からあるランクの名前・止めているかは残す（タグの名前で突き合わせる）。 */
@@ -177,13 +183,13 @@ export function RankDialog({ open, settings, onClose, onSave }: {
       <div className={styles.dialogBody}>
         {rows.map((row, i) => (
           <div key={i} className={styles.row2}>
-            <Field label={`タグの名前 ${i + 1}`}><TextField value={row.tagName} onChange={(e) => setRows(rows.map((r, k) => (k === i ? { ...r, tagName: e.target.value } : r)))} placeholder="例：ゴールド" /></Field>
-            <CheckedField id={`vs-rank-rate-${i}`} label="倍率" fields={fields} name={`rate-${i}`}><TextField {...checkedProps(fields, `rate-${i}`, `vs-rank-rate-${i}`)} value={row.multiplier} onChange={(e) => setRows(rows.map((r, k) => (k === i ? { ...r, multiplier: e.target.value } : r)))} inputMode="decimal" /></CheckedField>
+            <Field label={`タグ ${i + 1}`}><SaveErrorField names={[`rows.${i}.tagName`,`rows.${i}.tag_name`,"tagName","row.tagName","rows","tag_name","row.tag_name"]}><EntityRemoteField kind="tag" valueMode="name" label={`タグ ${i + 1}`} value={row.tagName} emptyLabel="指定しない" onChange={(tagName) => setRows(rows.map((r, k) => (k === i ? { ...r, tagName } : r)))} /></SaveErrorField></Field>
+            <CheckedField id={`vs-rank-rate-${i}`} label="倍率" fields={fields} name={`rate-${i}`}><SaveErrorField names={[`rows.${i}.multiplier`,"multiplier","row.multiplier","rows"]}><TextField {...checkedProps(fields, `rate-${i}`, `vs-rank-rate-${i}`)} value={row.multiplier} onChange={(e) => setRows(rows.map((r, k) => (k === i ? { ...r, multiplier: e.target.value } : r)))} inputMode="decimal" /></SaveErrorField></CheckedField>
           </div>
         ))}
         {rows.length < 20 ? <button type="button" className={styles.link} onClick={() => setRows([...rows, { tagName: '', multiplier: '1.2' }])}>＋ ランクを足す</button> : null}
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }
 
@@ -195,11 +201,11 @@ export function ReasonDialog({ open, title, description, confirmLabel, busy, err
   const fields = useFormErrors()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setReason(''); fields.reset() } }, [open])
-  fields.define('reason', '理由', () => (reason.trim() ? null : '理由を入れてください。'))
+  fields.define('reason', '理由', () => (reason.trim() ? null : '理由を入れてください。'), { required: true })
   return (
     <Dialog open={open} title={title} description={description} confirmLabel={confirmLabel} tone="destructive" busy={busy} error={error} onCancel={onClose}
       onConfirm={() => { if (fields.submit().length === 0) onConfirm(reason.trim()) }}>
-      <CheckedField id="vs-reason" label="理由" fields={fields} name="reason"><TextField {...checkedProps(fields, 'reason', 'vs-reason')} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="例：写真の数と合わない" /></CheckedField>
+      <CheckedField id="vs-reason" label="理由" fields={fields} name="reason"><SaveErrorField names={["reason"]}><TextField {...checkedProps(fields, 'reason', 'vs-reason')} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="例：写真の数と合わない" /></SaveErrorField></CheckedField>
     </Dialog>
   )
 }
@@ -213,14 +219,14 @@ export function PinDialog({ open, staff, busy, error, onClose, onSave }: {
   const fields = useFormErrors()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
   useEffect(() => { if (open) { setStaffId(staff[0]?.id ?? ''); setPin(''); fields.reset() } }, [open, staff])
-  fields.define('staff', '店員', () => (staffId ? null : '店員を選んでください。'))
-  fields.define('pin', '暗証番号', () => (/^\d{4}$/.test(pin) ? null : '暗証番号は4桁の数字で入れてください。'))
+  fields.define('staff', '店員', () => (staffId ? null : '店員を選んでください。'), { required: true })
+  fields.define('pin', '暗証番号', () => (/^\d{4}$/.test(pin) ? null : '暗証番号は4桁の数字で入れてください。'), { required: true })
   return (
     <Dialog open={open} title="店員の暗証番号" description="特典を使用済みにするとき、店員がお客さまのスマホで打つ4桁の番号です。保存したあとは番号を表示しません。" confirmLabel="保存する" busy={busy} error={error}
       onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(staffId, pin) }}>
       <div className={styles.dialogBody}>
-        <CheckedField id="vs-pin-staff" label="店員" fields={fields} name="staff"><div {...fields.bind('staff')}><Select id="vs-pin-staff" aria-label="店員" size="full" value={staffId} error={fields.error('staff') ?? undefined} onChange={(v) => { fields.clear('staff'); setStaffId(v) }} options={staff.map((s) => ({ value: s.id, label: s.name }))} /></div></CheckedField>
-        <CheckedField id="vs-pin" label="暗証番号（4桁）" fields={fields} name="pin"><TextField {...checkedProps(fields, 'pin', 'vs-pin')} className={styles.pin} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric" autoComplete="off" type="password" /></CheckedField>
+        <CheckedField id="vs-pin-staff" label="店員" fields={fields} name="staff"><div {...fields.bind('staff')}><SaveErrorField names={["staffId","staff_id"]}><EntitySelect id="vs-pin-staff" aria-label="店員" size="full" value={staffId} error={fields.error('staff') ?? undefined} onChange={(v) => { fields.clear('staff'); setStaffId(v) }} options={staff.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></SaveErrorField></div></CheckedField>
+        <CheckedField id="vs-pin" label="暗証番号（4桁）" fields={fields} name="pin"><SaveErrorField names={["pin"]}><TextField {...checkedProps(fields, 'pin', 'vs-pin')} className={styles.pin} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric" autoComplete="off" type="password" /></SaveErrorField></CheckedField>
       </div>
     </Dialog>
   )
@@ -230,18 +236,7 @@ export function PinDialog({ open, staff, busy, error, onClose, onSave }: {
 export function StoresDialog({ open, accounts, value, onClose, onSave }: {
   open: boolean; accounts: Array<{ id: string; name: string }>; value: string[]; onClose: () => void; onSave: (ids: string[]) => void
 }) {
-  const [ids, setIds] = useState<string[]>([])
-  useEffect(() => { if (open) setIds(value) }, [open, value])
-  return (
-    <Dialog open={open} title="押せる店" description="このカードのスタンプを押せる店です。同じカードの店どうしでスタンプを合わせて数えます。" confirmLabel="決める" onCancel={onClose}
-      error={ids.length ? undefined : '店を1つ以上選んでください。'} onConfirm={() => { if (ids.length) onSave(ids) }}>
-      <div className={styles.dialogBody}>
-        {accounts.map((a) => (
-          <Checkbox key={a.id} checked={ids.includes(a.id)} onCheckedChange={(on) => setIds(on ? [...ids, a.id] : ids.filter((x) => x !== a.id))}>{a.name}</Checkbox>
-        ))}
-      </div>
-    </Dialog>
-  )
+  return open ? <EntityMultiPickerDialog title="押せる店" description="このカードのスタンプを押せる店です。同じカードの店どうしでスタンプを合わせて数えます。" items={accounts} initialIds={value} allowEmpty={false} onCancel={onClose} onConfirm={ onSave }/> : null
 }
 
 export function PhotoDialog({ url, name, onClose }: { url: string | null; name: string; onClose: () => void }) {

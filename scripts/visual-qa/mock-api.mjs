@@ -1,3 +1,5 @@
+import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
+import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
 /**
  * 画面確認だけのための、Workerの代わりになる小さなAPI。
  *
@@ -17,7 +19,7 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
@@ -113,7 +115,7 @@ import {
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_DETAIL_PUBLISHED, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
-  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
+  CONVERSION_POINTS, CONVERSION_FOLDERS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY, OPERATION_ALERTS,
@@ -312,6 +314,11 @@ const HQ_TEMPLATES_HTN = [
   { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 2, distributed_account_names: ['本店', '渋谷店'], distributed_account_more: 0, content_summary: 'タグ 1', friend_count: 64, manual_assignment_allowed: true, assignment_method: '手動・自動' },
   { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1', friend_count: 0, manual_assignment_allowed: false, assignment_method: '自動' },
 ]
+/** 配信設定は別の受け口の種類。画面確認で空一覧に落とさない。 */
+const HQ_DELIVERY_FIXTURES = ['auto_reply', 'friend_add_rule', 'reminder'].map((type, index) => ({
+  template: { id: `visual-hq-delivery-${type}`, template_type: type, name: ['営業時間のご案内','友だち追加のお礼','イベント前日のお知らせ'][index], description: null, revision: 2, folder_id: null, distributed_account_count: 2, distributed_account_names: ['本店','渋谷店'], distributed_account_more: 0, content_summary: ['キーワード・本文','初めての友だち・本文','予定日の前日'][index] },
+  definition: { schemaVersion: 1, references: [], settings: type === 'auto_reply' ? { name:'営業時間のご案内', keyword:'営業時間', matchType:'contains', responseType:'text', responseContent:'営業時間は10時から18時です。' } : type === 'friend_add_rule' ? { name:'友だち追加のお礼', friendKind:'first_time', priority:0, definition:{ routeIds:[],scenarioId:null,messageType:'text',messageText:'友だち追加ありがとうございます。',timing:'immediate',friendCondition:'',actions:[],activeFrom:null,activeUntil:null } } : { name:'イベント前日のお知らせ', description:'前日のご案内', triggerType:'event', deliveryMode:'time',triggerOffsetMinutes:-1440,sendAtTime:'10:00',stopConditions:{},steps:[] } },
+}))
 const HQ_TEMPLATE_FOLDERS_HTN = [
   { id: 'visual-hq-folder-inquiry', name: 'お問い合わせ', revision: 1 },
   { id: 'visual-hq-folder-booking', name: '予約', revision: 1 },
@@ -321,7 +328,7 @@ const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },
   { id: 'visual-qa-account-store', name: '然 -NEN- 渋谷店' },
   { id: 'visual-qa-account-event-2025', name: '2025年イベント' },
-  { id: 'visual-qa-account', name: '然 -NEN- TEST' },
+  { id: 'visual-qa-account', name: '然-NEN-TEST' },
 ]
 function hqTemplateDefinitionHtn(row) {
   /* 統括のリッチメニュー（作る①〜④ gobhu・egdGx・K0gu1・gQabc）：大きい・6面（予約する・お知らせ・クーポン・会員証・よくある質問・お問い合わせ）。 */
@@ -505,19 +512,19 @@ const OPS_TENANTS = [
 const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
-    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '河野',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
     action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
-    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '河野',
     tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
     action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
     ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
   },
   {
-    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '河野',
     tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
     action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
@@ -549,7 +556,7 @@ const OPS_MEMBERS = [
     lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
+    staffId: 'visual-ops-invited', name: '山田 花子', email: null, isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
@@ -922,9 +929,9 @@ const FRIEND_ADD_RULE_OPTIONS = {
   ],
   tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }, { id: 'tag-member', name: 'NEN会員' }],
   folders: [
-    { id: 'friend-add-folder-store', name: '店頭' },
-    { id: 'friend-add-folder-ads', name: '広告' },
-    { id: 'friend-add-folder-referral', name: '紹介' },
+    { id: 'friend-add-folder-store', name: '店頭', color: '#2563EB' },
+    { id: 'friend-add-folder-ads', name: '広告', color: '#16A34A' },
+    { id: 'friend-add-folder-referral', name: '紹介', color: '#D97706' },
   ],
 }
 
@@ -1178,7 +1185,7 @@ const SUPPORT_INBOX_ITEMS = [
     id: 'inbox-1',
     channel: 'line',
     customerName: 'Kyohei Yamamoto',
-    preview: '🚕💐',
+    preview: '🚚💐',
     // 「6日前」と出したい。撮るときの時計は `VISUAL_QA_NOW` で止めてある。
     lastIncomingAt: '2026-08-13T12:00:00.000Z',
   },
@@ -1279,7 +1286,7 @@ const FEATURES = {
   friend_add_routing: true, multi_store_hierarchy: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
-  webinars: false, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
+  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
   ec_commerce: true, line_notifications: true, nen_campaigns: true,
   restaurant_test: true,
 }
@@ -1341,6 +1348,10 @@ const RESTAURANT_TABLES = [
   { id: 'tbl-5', store_id: 'store-sby', code: '個室B', label: '個室', seat_type: 'private_room', min_capacity: 4, max_capacity: 6, floor_x: 1, floor_y: 2, join_group: null, is_active: 0 },
   { id: 'tbl-9', store_id: 'store-sby', code: 'TR1', label: 'テラス', seat_type: 'terrace', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 2, join_group: null, is_active: 1 },
 ]
+const RESTAURANT_FLOORS=[{id:'floor-store-sby',storeId:'store-sby',name:'1階',width:660,height:420,version:1,
+ outline:[{x:1,y:1},{x:659,y:1},{x:659,y:419},{x:1,y:419}],
+ fixtures:[{id:'toilet',kind:'toilet',x:16,y:16,width:80,height:60},{id:'kitchen',kind:'kitchen',x:470,y:16,width:170,height:90},{id:'window',kind:'window',x:160,y:1,width:260,height:8},{id:'entrance',kind:'entrance',x:280,y:390,width:90,height:24}],
+ tables:RESTAURANT_TABLES.map((t,i)=>{const boxes=[[130,110,64,64],[214,110,64,64],[300,110,84,64],[130,200,84,64],[500,140,36,36],[500,190,36,36],[250,200,120,90],[390,240,90,80],[130,300,84,64]];const [x,y,width,height]=boxes[i];return {id:t.id,x,y,width,height,rotation:0,shape:t.seat_type==='counter'?'circle':'rectangle',joinGroup:t.join_group}})}]
 /* 板 MJoJR（メニュー管理）の6品：有効4・申請中1（ランチコースの価格改定）・保管済1。 */
 const RESTAURANT_MENU = [
   { id: 'menu-6', store_id: 'store-sby', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
@@ -1578,6 +1589,67 @@ const RESTAURANT_INBOUND_EMAILS = [
 ]
 const RESTAURANT_INTAKE_ADDRESSES = [
   { id: 'ia-1', storeId: 'store-sby', localPart: 'r-sby01', address: 'r-sby01@intake.example.jp', status: 'active', createdAt: restaurantAt(9, 0, -30), revokedAt: null },
+]
+
+/*
+ * 飲食店向け デリバリー受注（`restaurantDeliveryApi`・`/api/restaurant-test/delivery/*`）。
+ * ★V8 の板 `kDQHr`（注文一覧）・`OzHLO`（注文履歴）・`h7OeT`（品切れ一括）と
+ * 窓 `hjdqV`・`dgeTy`・`XCVGd`。
+ *
+ * 無いと既定の器（`EMPTY_PAGE`）が返り、`success` が真なので画面は例外を捕まえられず、
+ * `data.store.id`・`data.services`・`data.orders` が回せずに
+ * 「画面を表示できませんでした」になっていた（`/restaurant-test/delivery`）。
+ * 返事の形は本物（`apps/worker/src/routes/restaurant-delivery.ts`）と同じく
+ * `data` で包まない平らな形にする（`apps/web/src/lib/restaurant-delivery-api.ts` の型）。
+ *
+ * 測定専用の `scripts/visual-qa/delivery-fixtures.mjs`（絵との画素比べ用）とは
+ * 別に持つ。あちらは絵に合わせて件数や文字を動かすので、ここから読み込むと
+ * 184画面の共通の仮サーバーが絵の調整につられて壊れる。
+ */
+const DELIVERY_STORE = { id: 'store-sby', name: '然 渋谷店' }
+const DELIVERY_SERVICE_LABELS = { ubereats: 'Uber Eats', demaecan: '出前館', rocketnow: 'ロケットナウ' }
+const DELIVERY_SERVICES = [
+  { service: 'ubereats', label: 'Uber Eats', connectionStatus: 'connected', intakeStatus: 'open', stopUntil: null, todayCount: 14, todayAmount: 39600 },
+  { service: 'demaecan', label: '出前館', connectionStatus: 'connected', intakeStatus: 'open', stopUntil: null, todayCount: 11, todayAmount: 28800 },
+  { service: 'rocketnow', label: 'ロケットナウ', connectionStatus: 'connected', intakeStatus: 'stopped', stopUntil: restaurantAt(13, 0), todayCount: 7, todayAmount: 18000 },
+]
+const deliveryOrder = (id, service, orderNumber, status, statusLabel, totalAmount, itemCount, itemSummary, urgency, urgencyReason, receivedAt, wantedAt) => ({
+  id, service, serviceLabel: DELIVERY_SERVICE_LABELS[service], orderNumber, status, statusLabel,
+  totalAmount, itemCount, itemSummary, urgency, urgencyReason, receivedAt, wantedAt,
+})
+const DELIVERY_ORDERS = [
+  deliveryOrder('ord-ue-1042', 'ubereats', 'UE-1042', 'new', '新着', 3480, 4, '唐揚げ弁当×2 ほか3点', 'urgent', '受け取り希望まで13分・品数4点のため、先に調理を始めるのがおすすめです', restaurantAt(12, 2), restaurantAt(12, 15)),
+  deliveryOrder('ord-dm-8821', 'demaecan', 'DM-8821', 'new', '新着', 1180, 1, '天丼セット×1', 'normal', null, restaurantAt(12, 4), restaurantAt(12, 25)),
+  deliveryOrder('ord-rn-310', 'rocketnow', 'RN-310', 'cooking', '調理中', 2560, 4, 'バターチキンカレー×2 ナン×2', 'urgent', '受け取り希望まで8分です', restaurantAt(12, 6), restaurantAt(12, 16)),
+  deliveryOrder('ord-ue-1041', 'ubereats', 'UE-1041', 'cooking', '調理中', 2180, 2, '海鮮丼×1 みそ汁×1', 'normal', null, restaurantAt(12, 9), restaurantAt(12, 30)),
+  deliveryOrder('ord-dm-8820', 'demaecan', 'DM-8820', 'cooking', '調理中', 4140, 3, 'ハンバーグ定食×3', 'watch', '品数が多く調理に時間がかかります', restaurantAt(12, 12), restaurantAt(12, 35)),
+  deliveryOrder('ord-ue-1039', 'ubereats', 'UE-1039', 'handed_over', '受け渡し済み', 1160, 1, '唐揚げ弁当×1', 'normal', null, restaurantAt(11, 48), restaurantAt(12, 5)),
+  deliveryOrder('ord-rn-309', 'rocketnow', 'RN-309', 'canceled', 'キャンセル', 980, 1, 'チキンカレー×1', 'normal', null, restaurantAt(11, 40), restaurantAt(12, 0)),
+]
+/* 表の選び取り（`tab`）は本物と同じく Worker 側で絞る。`all` は全部。 */
+const deliveryOrdersByTab = (tab) => (tab === 'all' ? DELIVERY_ORDERS : DELIVERY_ORDERS.filter((row) => row.status === tab))
+const DELIVERY_ORDER_ITEMS = {
+  'ord-ue-1042': [
+    { name: '唐揚げ弁当', note: '特製タレ増量（無料）', quantity: 2, amount: 2160 },
+    { name: 'ポテトサラダ', note: null, quantity: 1, amount: 380 },
+    { name: '緑茶（500ml）', note: null, quantity: 2, amount: 440 },
+  ],
+}
+const DELIVERY_HISTORY = DELIVERY_ORDERS.map((row) => ({
+  id: row.id, service: row.service, serviceLabel: row.serviceLabel, orderNumber: row.orderNumber,
+  status: row.status, statusLabel: row.statusLabel, totalAmount: row.totalAmount, itemCount: row.itemCount,
+  itemSummary: row.itemSummary, receivedAt: row.receivedAt,
+  handedOverAt: row.status === 'handed_over' ? restaurantAt(12, 0) : null,
+  canceledAt: row.status === 'canceled' ? restaurantAt(11, 44) : null,
+}))
+const DELIVERY_MENU_SERVICE_TAGS = DELIVERY_SERVICES.map(({ service, label }) => ({ service, label }))
+const DELIVERY_MENU_ITEMS = [
+  { id: 'dm-1', name: '唐揚げ弁当', category: '弁当', price: 1080, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-2', name: '日替わり弁当', category: '弁当', price: 980, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-3', name: '親子丼セット', category: '丼もの', price: 1180, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-4', name: '焼き魚定食', category: '定食', price: 1180, soldOut: true, soldOutAt: restaurantAt(11, 10), services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-5', name: 'ポテトサラダ', category: '副菜', price: 380, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-6', name: '緑茶（500ml）', category: 'ドリンク', price: 220, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
 ]
 
 /**
@@ -2062,7 +2134,7 @@ const SHAPES = {
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
   '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
-  '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
+  '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', accountName: '然-NEN-TEST', count: 5 }], oldestWaitMinutes: 9110 },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
   /*
@@ -2184,6 +2256,9 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { id: 'apitok-new', name: '在庫システム', tokenPrefix: 'lh_live_7Kq2', scopes: ['tags:read', 'tags:write'], createdBy: 'visual-qa-owner', lastUsedAt: null, rotatedFromId: null, createdAt: '2026-10-05T01:00:00.000Z', revokedAt: null, token: 'lh_live_7Kq2mZ9xW4pR8vN3tY6bH1cJ5dF3f9a' }
   }
   // 統括のテンプレート（★V8-B meBRB）：配る前の確認。
+  const deliveryFixture = HQ_DELIVERY_FIXTURES.find(row=>pathname.startsWith(`/api/hq/templates/${row.template.id}/`))
+  if (deliveryFixture && method==='POST' && pathname.endsWith('/preflight')) return {...HQ_TEMPLATE_PREFLIGHT_HTN, stores: HQ_TEMPLATE_PREFLIGHT_HTN.stores.map(store=>({...store,items:store.items.map(item=>({...item,sourceId:deliveryFixture.template.id,itemKind:deliveryFixture.template.template_type,name:deliveryFixture.template.name}))}))}
+  if (deliveryFixture && method==='POST' && pathname.endsWith('/distribute')) return HQ_TEMPLATE_RESULT_HTN
   if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/preflight$/.test(pathname)) return HQ_TEMPLATE_PREFLIGHT_HTN
   // 統括のテンプレート（★V8-B dEvJM）：配る。結果の窓に出す成功2・失敗1を返す。
   if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/distribute$/.test(pathname)) return HQ_TEMPLATE_RESULT_HTN
@@ -2693,6 +2768,33 @@ const HQ_RUN_SENT = {
   ],
 }
 
+/* 作成③の撮影状態。既存APIから5つの吹き出しを戻す。未選択の素材は下書きのまま。 */
+const VISUAL_COMPOSE_BUBBLES = [
+  { id: 'visual-text', type: 'text', content: { text: '{{name}}さん、いつもありがとうございます。\n定期便のお客さま限定で、秋の新商品を先行でご案内します🍂' } },
+  { id: 'visual-sticker', type: 'sticker', content: { state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: '', duration: '' },
+    sticker: { packageId: '11537', stickerId: '52002734' },
+  } } },
+  { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
+    columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      title, text: '秋のおすすめ商品をご案内します',
+      actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
+    }))),
+  } },
+  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
+    sticker: { packageId: '', stickerId: '' },
+  } } },
+  { id: 'visual-rich', type: 'rich_message', content: {} },
+]
+const HQ_VISUAL_COMPOSE_DRAFT = { ...HQ_RUN_DRAFT, id: 'hq-visual-compose', input: { ...HQ_RUN_INPUT, messageBubblesJson: JSON.stringify(VISUAL_COMPOSE_BUBBLES) } }
+const HQ_VISUAL_SENT = { ...HQ_RUN_SENT, id: 'hq-visual-sent', title: '新商品発売のお知らせ', status: 'sent' }
+const VISUAL_COMPOSE_DRAFT = { ...BROADCASTS[1], id: 'visual-compose', targetType: 'all', messageBubbles: VISUAL_COMPOSE_BUBBLES }
+
 const HQ_BROADCAST_FOLDERS = [
   { id: 'hqbf-reserve', name: '予約配信', revision: 1, item_count: 0 },
   { id: 'hqbf-campaign', name: 'キャンペーン', revision: 1, item_count: 1 },
@@ -2775,7 +2877,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/approval$/.test(pathname)) return { success: true, data: HQ_APPROVAL_NONE }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/activity$/.test(pathname)) return { success: true, data: { rows: [{ id: 'act-2', accountId: '', actorId: 'stf-1', action: 'scheduled', createdAt: '2026-01-14T09:00:00.000Z' }, { id: 'act-1', accountId: '', actorId: 'stf-1', action: 'target_fixed', createdAt: '2026-01-14T08:40:00.000Z' }], nextCursor: null } }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/recipients$/.test(pathname)) return { success: true, data: { rows: [{ friendId: 'f-1', displayName: '山田 花子', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:10.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }, { friendId: 'f-2', displayName: '佐藤 健二', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:11.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }], total: 2, nextCursor: null } }
-  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
+  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-visual-compose') ? HQ_VISUAL_COMPOSE_DRAFT : pathname.endsWith('/hq-visual-sent') ? HQ_VISUAL_SENT : pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
   /*
     友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
     絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
@@ -2859,6 +2961,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 飲食店向けテスト（`/restaurant-test/*`）。`restaurant-test-api.ts` の
    * 読み口だけを固定で返す。書き込み（発行・承認・保存）は従来どおり405。
    */
+  if(method==='GET'&&pathname==='/api/restaurant-test/floors')return {success:true,data:RESTAURANT_FLOORS.filter(f=>f.storeId===(query.get('storeId')??'store-sby'))}
+  if(method==='GET'&&pathname==='/api/restaurant-test/board'){
+   const from=Date.parse(query.get('from')),to=Date.parse(query.get('to')),offset=Number(query.get('offset')??0),limit=Number(query.get('limit')??500);
+   const entries=RESTAURANT_RESERVATIONS.filter(r=>Date.parse(r.starts_at)>=from&&Date.parse(r.starts_at)<to).map(r=>seatBoardEntry({...r,customer_version:1,dining_snapshot_json:JSON.stringify({allergy:r.allergy_note,anniversary:null,seatPreference:null,courseId:r.course_id,capturedAt:QA_CLOCK})}));
+   return {success:true,data:{entries:entries.slice(offset,offset+limit),total:entries.length,offset,limit}}
+  }
   if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
     return { success: true, data: RESTAURANT_SNAPSHOT }
   }
@@ -2931,7 +3039,78 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/terms-agreement') {
     return { success: true, data: { documentKey: 'musubo-terms', agreedVersion: null, agreedAt: null } }
   }
+  /*
+   * デリバリー受注の読み口。`data` で包まない（`DELIVERY_*` の注記のとおり）。
+   * 状態の進み・品切れの一括・受付の停止は書き込みなので従来どおり405。
+   */
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/orders') {
+    const tab = ['all', 'new', 'cooking', 'handed_over'].includes(query.get('tab')) ? query.get('tab') : 'new'
+    const service = query.get('service')
+    const rows = deliveryOrdersByTab(tab).filter((row) => !service || row.service === service)
+    return {
+      success: true,
+      store: DELIVERY_STORE,
+      services: DELIVERY_SERVICES,
+      kpis: {
+        todayCount: 32, todayCountDelta: 4, handedOverCount: 24, todaySales: 86400,
+        todaySalesDeltaPercent: 8, averageAmount: 2700, urgentCount: 2,
+        averagePrepMinutes: 12, averagePrepMinutesDelta: -2,
+      },
+      tab,
+      tabCounts: {
+        all: DELIVERY_ORDERS.length,
+        new: deliveryOrdersByTab('new').length,
+        cooking: deliveryOrdersByTab('cooking').length,
+        handed_over: deliveryOrdersByTab('handed_over').length,
+      },
+      orders: rows,
+    }
+  }
+  const deliveryOrderDetail = method === 'GET' ? /^\/api\/restaurant-test\/delivery\/orders\/([^/]+)$/.exec(pathname) : null
+  if (deliveryOrderDetail) {
+    const id = decodeURIComponent(deliveryOrderDetail[1])
+    const row = DELIVERY_ORDERS.find((item) => item.id === id) ?? DELIVERY_ORDERS[0]
+    return {
+      success: true,
+      order: {
+        ...row,
+        currency: 'JPY',
+        pickupMethod: `配達（${row.serviceLabel} 配達員）`,
+        customerNote: row.urgency === 'urgent' ? 'タレ多めでお願いします' : null,
+        cancelReasonCode: row.status === 'canceled' ? 'store_closed' : null,
+        canceledBy: row.status === 'canceled' ? 'store' : null,
+        acceptedAt: row.status === 'new' ? null : restaurantAt(12, 7),
+        readyAt: row.status === 'handed_over' ? restaurantAt(11, 58) : null,
+        handedOverAt: row.status === 'handed_over' ? restaurantAt(12, 0) : null,
+        canceledAt: row.status === 'canceled' ? restaurantAt(11, 44) : null,
+      },
+      items: DELIVERY_ORDER_ITEMS[row.id] ?? [{ name: row.itemSummary, note: null, quantity: row.itemCount, amount: row.totalAmount }],
+    }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/history') {
+    const service = query.get('service')
+    const status = query.get('status')
+    const rows = DELIVERY_HISTORY.filter((row) => (!service || row.service === service) && (!status || row.status === status))
+    const date = storeYmd(QA_CLOCK, RESTAURANT_STORES[0].timezone)
+    return {
+      success: true,
+      range: { from: query.get('from') || date, to: query.get('to') || date },
+      filter: { service: service || null, status: status || null },
+      totals: {
+        count: 32,
+        amount: 86400,
+        canceledCount: 2,
+        byService: DELIVERY_SERVICES.map(({ service: key, label, todayCount, todayAmount }) => ({ service: key, label, count: todayCount, amount: todayAmount })),
+      },
+      orders: rows,
+    }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items') {
+    return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
+  }
 
+  if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
+  if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
@@ -3334,6 +3513,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/templates' && method === 'GET') {
     const type = query.get('type')
     const kind = query.get('kind')
+    const deliveries = HQ_DELIVERY_FIXTURES.filter(row=>row.template.template_type===type)
+    if (deliveries.length) return {success:true,data:deliveries.map(row=>row.template)}
     if (type === 'friend_field' || type === 'mark') {
       const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
       return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
@@ -3381,6 +3562,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const attribute = HQ_ATTRIBUTE_ROWS.find((item) => pathname === `/api/hq/templates/${item.template.id}`)
   if (attribute && method === 'GET') return { success: true, data: attribute }
   if (/^\/api\/hq\/templates\/visual-hq-attr-[^/]+\/received-versions$/.test(pathname)) return { success: true, data: [] }
+  const deliveryDetail = HQ_DELIVERY_FIXTURES.find(row=>pathname===`/api/hq/templates/${row.template.id}`)
+  if (deliveryDetail && method==='GET') return {success:true,data:deliveryDetail}
   const hqTemplateDetail = /^\/api\/hq\/templates\/(visual-hq-tpl-[^/]+)$/.exec(pathname)
   if (hqTemplateDetail && method === 'GET') {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])
@@ -3390,6 +3573,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
     return { success: true, data: { deleted: true } }
   }
+  if (pathname === '/api/line-webhook-events') return { success: true, data: [] }
   if (pathname === '/api/operations/health') {
     /* 確認の時刻は「いま」に寄せる（固定の日時だと全部が「古い確認」になり、★V8 Y4LkX1 の判定が撮れない）。 */
     const now = Date.now()
@@ -3554,7 +3738,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (method === 'GET' && pathname === '/api/tenants/me/company-contact') return { success: true, data: {
-    legalCompanyName: 'Shed Products株式会社', postalCode: '1500001', address: '東京都渋谷区神宮前1-2-3',
+    legalCompanyName: 'Shed Products株式会社', postalCode: '150-0001', address: '東京都渋谷区神宮前1-2-3',
     building: null, phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
   } }
   if (method === 'GET' && pathname === '/api/postal-code/search') return { success: true, data: {
@@ -3774,6 +3958,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ['email', 'メール', 'email', 'sample@example.test'],
       ['tel', '電話', 'tel', '09012345678'],
       ['address', '住所', 'textarea', '東京都新宿区1-2'],
+      // B-235：基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
+      ['allergy', 'アレルギー', 'checkbox', JSON.stringify(['小麦', 'えび', 'くるみ'])],
     ]
     const basics = specs.map(([fixedKey, name, type, value], index) => ({
       id: `fixed-${fixedKey}`, fixedKey, name, fieldKey: `fixed_${fixedKey}`, type, value,
@@ -4029,6 +4215,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
+  if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
+    return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }
+  }
   if (pathname === '/api/account-settings/test-recipient-login-users') {
     /*
      * 無いと既定の器（`{items,total,page,limit}`）が返り、
@@ -4133,6 +4322,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
     return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'conversion') {
+    return { success: true, data: CONVERSION_FOLDERS, unfiledCount: 0 }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
     // 板 `axFrW`：未分類は `folderId: null` の1件（会員更新リマインド）。
@@ -4537,7 +4729,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
-    const found = BROADCASTS.find((item) => item.id === broadcastOne[1])
+    const found = broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') {
@@ -5679,8 +5871,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       metadata: null, isRead, createdAt,
     })
     const items = [
-      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
-      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, new Date(Date.now() - 2 * 3600_000).toISOString()),
+      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, new Date(Date.now() - 3 * 3600_000).toISOString()),
       item('nc-1', 'broadcast.send_failed', 'error', '一斉配信「8月号のご案内」で 12 件が送信失敗', '配信結果を開く', false, '2026-08-20T11:05:00.000Z'),
       item('nc-4', 'visual_qa.update', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', true, '2026-08-20T00:00:00.000Z'),
       item('nc-5', 'visual_qa.update', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
@@ -6392,6 +6584,30 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(jpeg)
+    return
+  }
+
+  // 一覧は配信URLではなく認証付きの内容取得口を読む。同じ見本画像を返す。
+  const mediaContent = /^\/api\/media\/([^/]+)\/content$/.exec(url.pathname)
+  if (method === 'GET' && mediaContent) {
+    const item = MEDIA_ITEMS.find((row) => row.id === mediaContent[1])
+    if (item?.kind === 'image' && item.url.startsWith('data:image/svg+xml,')) {
+      const svg = decodeURIComponent(item.url.slice('data:image/svg+xml,'.length))
+      res.setHeader('Content-Type', 'image/svg+xml')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(svg)
+      return
+    }
+  }
+
+  const richThumb = /^\/api\/rich-menu-images\/qa-thumb-(normal|gold|autumn|guide)$/.exec(url.pathname)
+  if (method === 'GET' && richThumb) {
+    const color = { normal: '#9bd4b1', gold: '#e8bf6b', autumn: '#f4d2be', guide: '#cbd9f1' }[richThumb[1]]
+    const compact = richThumb[1] === 'autumn'
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="44"><rect width="64" height="44" fill="${color}"/><path d="M21 0v44M43 0v44${compact ? '' : 'M0 22h64'}" stroke="white" stroke-width="2"/></svg>`
+    res.setHeader('Content-Type', 'image/svg+xml')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(svg)
     return
   }
 

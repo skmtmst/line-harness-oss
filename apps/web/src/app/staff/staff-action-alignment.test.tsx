@@ -7,7 +7,7 @@
  *   - 二段階認証の操作はログイン中の本人にだけ出す
  *   - 「この人を外す」は確認後に一度だけ停止口を呼び、失敗理由を窓に残す
  */
-import React from 'react'
+
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,7 +18,8 @@ const fixture = vi.hoisted(() => ({
   deleteStaff: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
@@ -28,7 +29,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: ({ tabs }: { tabs: Array<{ key: string; label: string }> }) => <nav aria-label="ログインユーザーのタブ">{tabs.map((tab) => <span key={tab.key}>{tab.label}</span>)}</nav>,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -114,11 +115,11 @@ const { default: ToastHost, clearToastsForTest } = await import('@/components/sh
 async function mount() {
   // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
   await act(async () => { render(<><StaffPage /><ToastHost /></>) })
-  await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
 }
 
 function rowFor(name: string): HTMLTableRowElement {
-  return screen.getByText(name).closest('tr') as HTMLTableRowElement
+  return screen.getByRole('button', { name: `${name}の中身を見る` }).closest('[role="row"]') as HTMLElement
 }
 
 beforeEach(() => {
@@ -132,11 +133,12 @@ afterEach(() => cleanup())
 describe('ログインユーザー操作の表示と実処理 (#834)', () => {
   it('別ユーザーの権限のかたまりは保存前APIなしで下書きへコピーする', async () => {
     await mount()
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: /の中身を見る$/ }))
 
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
-    fireEvent.click(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'コピー元さん（閲覧のみ）' }))
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
 
     expect(fixture.updateStaff).not.toHaveBeenCalled()
     // 画面の中の知らせ（role=status）。置き場所の知らせの入れ物も role=status なので、全部の中から文で見る
@@ -156,7 +158,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
   it('「項目ごとに決める」を触ると3択表ごと更新口へ送る（N-424）', async () => {
     await mount()
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: /の中身を見る$/ }))
 
     // 対象者は「運用」。プリセットでは「設定」は出さない → 「変えられる」へ直すと個別設定になる。
     fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
@@ -172,12 +174,12 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
   it('コピー元には対象本人を出さない', async () => {
     await mount()
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: /の中身を見る$/ }))
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
 
-    expect(screen.queryByRole('button', { name: '対象者（スタッフ）' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' })).toBeTruthy()
+    expect(screen.queryByRole('radio', { name: '対象者（スタッフ）' })).toBeNull()
+    expect(screen.getByRole('radio', { name: 'コピー元さん（閲覧のみ）' })).toBeTruthy()
   })
 
   it('見せる範囲の保存を同一render内で二度押ししても更新は1回だけになる', async () => {
@@ -186,7 +188,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
       release = () => resolve({ success: true, data: state.members[0] })
     }))
     await mount()
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: /の中身を見る$/ }))
     // R497: 何も変えない保存は更新要求を送らない。二度押しの検証は変更ありで行う。
     fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
 
@@ -211,9 +213,12 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
   it('二段階認証は本人だけ操作でき、他人は状態表示だけになる', async () => {
     await mount()
 
-    expect(within(rowFor('対象者')).queryByRole('button', { name: '入れていません' })).toBeNull()
-    expect(within(rowFor('対象者')).getByText('入れていません')).toBeTruthy()
-    expect(within(rowFor('ログイン中の人')).getByRole('button', { name: '入れていません' })).toBeTruthy()
+    expect(within(rowFor('対象者')).getByTitle('確認が必要')).toBeTruthy()
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者の操作' }))
+    expect(screen.queryByRole('menuitem', { name: '2段階の確認を設定する' })).toBeNull()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    fireEvent.click(within(rowFor('ログイン中の人')).getByRole('button', { name: 'ログイン中の人の操作' }))
+    expect(screen.getByRole('menuitem', { name: '2段階の確認を設定する' })).toBeTruthy()
   })
 
   it('外す操作は確認前に呼ばず、確認後の素早い二度押しでも1回だけ呼ぶ', async () => {
@@ -225,8 +230,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
     /* 外すは行の「…」の中。開いてから項目を押す（確認フロー自体は変えない）。
        項目は最上層（MenuPortal→document.body）に出るので画面全体で探す。 */
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者のその他操作' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'この人を外す' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
     expect(fixture.deleteStaff).not.toHaveBeenCalled()
 
     const confirm = screen.getByRole('button', { name: '外す' })
@@ -245,8 +250,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fixture.deleteStaff.mockRejectedValue(new Error('最後の管理者は外せません'))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者のその他操作' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'この人を外す' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
     fireEvent.click(screen.getByRole('button', { name: '外す' }))
 
     await waitFor(() => expect(screen.getByText('最後の管理者は外せません')).toBeTruthy())
@@ -262,7 +267,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
       expect(screen.getByRole('tab', { name: /いまいる人/ })).toBeTruthy()
       expect(screen.queryByText('利用停止中の人')).toBeNull()
-      expect(screen.getByText('ログインユーザー 3人中 3人を表示')).toBeTruthy()
+      expect(screen.getByText('ログインユーザー 3 人中 3 人を表示')).toBeTruthy()
     } finally {
       state.members.pop()
       state.users.pop()
@@ -271,7 +276,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
   it('見せる範囲の保存は再ログインを確認し、取消・成功・失敗を正しく出す', async () => {
     await mount()
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: /の中身を見る$/ }))
     // R497: 何も変えない保存は確認窓を出さず閉じるだけ。確認の検証は変更ありで行う。
     fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))

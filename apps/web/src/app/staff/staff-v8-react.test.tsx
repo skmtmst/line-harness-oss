@@ -2,8 +2,9 @@
 /*
  * ログインユーザー V8（板 nku0f・A35Gh）。
  * V8 では見出し・タブ・板IDを出し、権限なしでは閲覧のみの帯を出す。
- * 役割でできることの欄を足す。v7 はそのまま。
+ * 役割でできることの欄を出し、テーマ指定なしでもV8に固定する。
  */
+import '@/test-utils/staff-location-reset'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,8 +44,7 @@ vi.mock('@/lib/api', async importOriginal => {
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
-vi.mock('next/navigation', async importOriginal => ({
-  ...await importOriginal<typeof import('next/navigation')>(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {} }),
   useSearchParams: () => ({ get: () => null }),
   usePathname: () => '/staff',

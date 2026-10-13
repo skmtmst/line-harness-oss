@@ -229,7 +229,7 @@ function testSend(reminderId: string, apiKey: string, key = IDEMPOTENCY_KEY) {
 
 beforeEach(async () => {
   line.pushMessageWithRequestId.mockReset().mockResolvedValue({ requestId: 'req-1' });
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });
@@ -345,11 +345,20 @@ describe('テスト送信の失敗と回復 (N-070)', () => {
     expect(line.pushMessageWithRequestId).toHaveBeenCalledTimes(1);
   });
 
+  test.each(['unknown','in_progress'])('SEND-S02仲間: %sの古い試し送りはLINEへ進まない', async status => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    expect((await testSend(REMINDER_A, KEY_OWNER)).status).toBe(200);
+    sqlite.raw.prepare("UPDATE outbound_send_requests SET status=?,response_id=NULL,created_at='2020-01-01T00:00:00Z',lease_token='lost',failure_code='DELIVERY_UNKNOWN',last_failed_at='2020-01-01T00:00:00Z'").run(status);
+    const recovered = await testSend(REMINDER_A, KEY_OWNER);
+    expect(recovered.status).toBeGreaterThanOrEqual(400);
+    expect(line.pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+  });
+
   test('アカウント範囲外の下書きへは送信できない', async () => {
     setTestRecipients(sqlite.raw, ACC_B, [FRIEND_B]);
-    // staff は requireRole で止まる。
-    const staffDenied = await testSend(REMINDER_B, KEY_STAFF_B);
-    expect(staffDenied.status).toBe(403);
+    // 編集権限があっても担当外アカウントは隠す。
+    const staffDenied = await testSend(REMINDER_B, KEY_STAFF_A);
+    expect(staffDenied.status).toBe(404);
     // acc-a だけの admin は role を通っても acc-b の下書きには届かない。
     const outOfScope = await testSend(REMINDER_B, KEY_ADMIN_A);
     expect(outOfScope.status).toBe(404);

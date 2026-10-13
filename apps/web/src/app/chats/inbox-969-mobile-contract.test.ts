@@ -11,7 +11,7 @@
  * これは**書き方の見張り**で、実際の幅の挙動は目視で確かめる。
  * 後から手を入れたときに、折り返しと縮まない約束が黙って消えないかだけを見る。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -35,7 +35,9 @@ describe('#969-U010 補助操作: テンプレート・送信設定・内部メ�
   const toolbar = region(PAGE, '{/* 上段 */}', '{/* 送信の設定は送信キーだけ')
 
   it('補助操作の列は折り返せる。flex-nowrap で右端へ押し出さない', () => {
-    expect(toolbar).toContain('flex-wrap')
+    expect(toolbar).toContain('<InboxComposerTools')
+    const css = readFileSync(join(HERE, '../../components/shared/inbox-composer.module.css'), 'utf8')
+    expect(css).toMatch(/\.tools\s*\{[^}]*flex-wrap:\s*wrap/s)
     expect(toolbar).not.toContain('flex-nowrap')
   })
 

@@ -7,7 +7,7 @@
  * 呼ぶ口・判定・CSV は今の画面（UsageOverviewTab・app/analytics/analytics-usage.ts）と同じ。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Boxes, Clock, LayoutGrid, RefreshCw, Zap } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -105,7 +105,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
       <KpiCard presentation="band" title="使っている機能" icon={<LayoutGrid size={13} aria-hidden="true" />} value={menuFeatures?.enabled ?? null} unit={menuFeatures ? `/ ${menuFeatures.total}` : ''} detail={menuFeaturesError || 'メニューに出している機能のうち'} />
       <KpiCard presentation="band" title="自動で動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={shownValue(overview.summary.automaticRuns)} unit="回" {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日・手で送ったのは${formatNumber(overview.summary.manualSends.value)} 回` }, state.retry)} />
       <KpiCard presentation="band" title="手作業が減った時間" icon={<Clock size={13} aria-hidden="true" />} value={hoursValue} unit="時間" detail={hours.reason ? (METRIC_STATE_TEXT[hours.state] || '未取得') : '1件30秒として試算'} description={hours.reason ?? undefined} onRetry={hours.state === 'failed' ? state.retry : undefined} />
-      <KpiCard presentation="band" title="作ったのに使っていない" icon={<Boxes size={13} aria-hidden="true" />} value={shownValue(overview.summary.unusedItems)} unit="個" {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)} 件` }, state.retry)} />
+      <KpiCard presentation="band" title="作ったのに使っていない" icon={<Boxes size={13} aria-hidden="true" />} value={shownValue(overview.summary.unusedItems)} unit="個" {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)} 件` }, state.retry)} description={overview.summary.brokenReferences.reason ?? overview.summary.unusedItems.reason ?? undefined} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       {overview.stateReason

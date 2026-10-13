@@ -1,26 +1,30 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const inviteEmailRequirement = requiredText('招待する人のメールアドレスを入れてください')
 import { useUrlTab } from '@/lib/use-url-tab'
-
 import { Eye, LogIn, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
-import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
+import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
+import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './members.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のメンバー管理 V8（絵 `FvbHW`・停止の窓 `VUyYu`）。
@@ -60,9 +64,12 @@ export default function OpsMembersV8() {
 
   useEffect(() => { void load() }, [load])
 
+  const [inviteError, setInviteError] = useState<string | null>(null)
   const invite = async (event: FormEvent) => {
     event.preventDefault()
-    if (!email.trim()) { setError('招待する人のメールアドレスを入れてください'); return }
+    const problem = inviteEmailRequirement.check(email)
+    setInviteError(problem)
+    if (problem) return
     setBusy(true)
     setError('')
     const res = await opsCall(api.ops.addMember({ email: email.trim() }))
@@ -118,23 +125,23 @@ export default function OpsMembersV8() {
 
         {tab === 'members' ? (
           <>
-            <div className={`${parts.kpis} ${styles.kpis3} ${kpiStyles.strip}`}>
-              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `有効 ${active}・招待中 ${summary.invited}` : emptyValue('unknown')} loading={!loaded} />
+            <KpiBand gridClassName="grid grid-cols-3">
+              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${summary.members}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={13} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={13} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
-            </div>
+            </KpiBand>
 
             {readOnly ? null : (
               <form onSubmit={(event) => void invite(event)} className={styles.invite}>
                 <div className={styles.inviteField}>
-                  <TextField
+                  <Field label="招待する人のメールアドレス" requirement={inviteEmailRequirement} error={inviteError}><SaveErrorField names={["email"]}><TextField
                     type="email"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    onChange={(event) => { setEmail(event.target.value); setInviteError(null) }}
                     placeholder="招待する人のメールアドレス"
                     aria-label="招待する人のメールアドレス"
                     autoComplete="off"
-                  />
+                  /></SaveErrorField></Field>
                 </div>
                 <Button type="submit" variant="primary" disabled={busy}>
                   <Send aria-hidden="true" />招待メールを送る
@@ -143,7 +150,7 @@ export default function OpsMembersV8() {
             )}
 
             {notice ? <p role="status" className={parts.status}>{notice}</p> : null}
-            {error && !listFailed ? <p role="alert" className={parts.alert}>{error}</p> : null}
+            {error && !listFailed ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
 
             {!loaded ? (
               <ListState permissionScope="hq" kind="loading" title="運営メンバーを読み込んでいます" />
@@ -174,7 +181,7 @@ export default function OpsMembersV8() {
                       <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? emptyValue('unknown')}</span>
                       <span className={`${parts.fixed} ${styles.colTotp}`} role="cell">{totpChip(m)}</span>
                       <span className={`${parts.fixed} ${styles.colState}`} role="cell">{stateChip(m)}</span>
-                      <span className={`${parts.fixed} ${styles.colLogin} ${m.lastLoginAt ? '' : styles.faint}`} role="cell">{shortDateTime(m.lastLoginAt)}</span>
+                      <span className={`${parts.fixed} ${styles.colLogin} ${m.lastLoginAt ? '' : styles.faint}`} role="cell" title={m.lastLoginAt ? formatDateTime(m.lastLoginAt) : undefined}>{shortDateTime(m.lastLoginAt)}</span>
                       <span className={`${styles.colOps} ${styles.ops}`} role="cell">
                         {self || readOnly ? (
                           <span className={styles.faint}>{emptyValue('unknown')}</span>

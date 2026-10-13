@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * ★V8（夕44-A・部品 T7XSI6）：左メニューの組の開閉と「設定」の入口。
  *
@@ -80,6 +82,7 @@ async function renderSidebar(props: { friendAttributesV2Mode?: boolean } = {}) {
 
 describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
   beforeEach(() => {
+    forgetStaffIdentity()
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
     fixture.get.mockReset()
@@ -92,6 +95,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     document.documentElement.dataset.theme = 'v8'
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
     /*
      * 画面幅 1280 未満では畳んだ形で開く既定がある（テスト環境の幅は
      * happy-dom の小さい値）。組の出し分けを見るので、ここでは
@@ -150,7 +154,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(box.hasAttribute('aria-hidden')).toBe(false)
     const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.module.css'), 'utf8')
     // 動きは「動きを減らす」設定では付けない
-    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme="v8"\] \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
+    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*:root \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
     expect(css).toMatch(/\.sectionItemsClosed \{\s*grid-template-rows: 0fr;/)
   })
 
@@ -169,6 +173,8 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     cleanup()
 
     window.localStorage.setItem('lh_staff_role', 'staff')
+
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     const staffView = await renderSidebar()
     expect(staffView.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
   })
@@ -187,25 +193,24 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     }
   })
 
-  it('v7 では組の開閉も「設定」の入口も出さず、全項目がそのまま出る', async () => {
+  it('旧テーマ指定でも組を開閉でき、設定と自分の入口を出す', async () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderSidebar()
-    // 組の見出しはボタンではない（開閉しない）
-    expect(view.queryAllByRole('button', { name: '自動化' })).toHaveLength(0)
-    // 全項目が常に出る
+    const automation = view.getAllByRole('button', { name: '自動化' })[0]!
+    expect(automation.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { automation.click() })
     expect(view.getAllByRole('link', { name: 'オートメーション' }).length).toBeGreaterThan(0)
+    await act(async () => { view.getAllByRole('button', { name: '設定' })[0]!.click() })
     expect(view.getAllByRole('link', { name: '機能設定' }).length).toBeGreaterThan(0)
-    // 歯車の「設定」リンクは無い
-    expect(view.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
-    // V8 の左下の自分も出さない（v7 の店は上の帯の名前とログアウトのまま）
-    expect(view.queryAllByTestId('sidebar-account')).toHaveLength(0)
+    expect(view.getAllByRole('link', { name: '設定' }).length).toBeGreaterThan(0)
+    expect(view.getAllByTestId('sidebar-account').length).toBeGreaterThan(0)
   })
 
-  it('v7 では V2 モードの組隠しが今までどおり効く', async () => {
+  it('旧テーマとV2指定でも組を丸ごと隠さない', async () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderSidebar({ friendAttributesV2Mode: true })
-    expect(view.queryAllByText('自動化')).toHaveLength(0)
-    expect(view.queryAllByText('予約')).toHaveLength(0)
+    expect(view.getAllByRole('button', { name: '自動化' }).length).toBeGreaterThan(0)
+    expect(view.getAllByRole('button', { name: '予約' }).length).toBeGreaterThan(0)
   })
 })
 
@@ -219,6 +224,7 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
     fixture.pathname = '/hq'
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
     window.localStorage.setItem('lh-sidebar-collapsed', '0')
   })
 
@@ -259,15 +265,14 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
     expect(home.getAllByRole('link', { name: '統括の設定' })[0].className).not.toMatch(/active/)
   })
 
-  it('v7 の統括は今までどおり（見出し無し・左下はアカウントの行・統括の設定と版は無し）', async () => {
+  it('旧テーマ指定でも統括の見出し・設定・版と自分の入口を出す', async () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderHq()
-    expect(view.queryAllByRole('button', { name: '統括' })).toHaveLength(0)
-    expect(view.queryAllByRole('link', { name: '統括の設定' })).toHaveLength(0)
-    expect(view.queryAllByText('version')).toHaveLength(0)
-    expect(view.getAllByText('hq').length).toBeGreaterThan(0)
-    // v7 の統括には V8 の左下の自分を出さない。
-    expect(view.queryAllByTestId('sidebar-account')).toHaveLength(0)
+    expect(view.getAllByRole('button', { name: '統括' }).length).toBeGreaterThan(0)
+    expect(view.getAllByRole('link', { name: '統括の設定' }).length).toBeGreaterThan(0)
+    expect(view.getAllByText('version').length).toBeGreaterThan(0)
+    expect(view.queryAllByText('hq')).toHaveLength(0)
+    expect(view.getAllByTestId('sidebar-account').length).toBeGreaterThan(0)
   })
 })
 

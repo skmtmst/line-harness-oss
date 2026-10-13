@@ -1,4 +1,5 @@
-import Link from 'next/link'
+
+import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -8,7 +9,6 @@ import type {
   ReactNode,
 } from 'react'
 import styles from './button.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type CommonProps = {
   /**
@@ -21,13 +21,29 @@ type CommonProps = {
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
+   *
+   * `delivery-head` は★V8 デリバリー受注の板の頭の操作（絵 kDQHr・OzHLO）と
+   * 注文詳細の窓の足（絵 hjdqV）だけ。どの絵も余白 14・印 15・間 6 で同じ値。
+   * 高さ・角丸・字は既定と同じで、左右の余白と印の大きさだけ絵へ合わせる。
+   * 渡さないボタンは変わらない。
+   *
+   * `delivery-bulk` は★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT）だけ。
+   * 高さ28・左右10・角丸8・字12は `delivery-row` と同じで、印13角・印と字の間5が違う。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
+  fullWidth?: boolean
   align?: 'start'
-  /** 行内の時刻など、リンク色にしない文字操作。 */
-  textTone?: 'action' | 'ink'
+  /**
+   * 字の色だけを絵に合わせる指定。渡したボタンだけに効き、既定のボタンと他の画面は変えない。
+   * `action` が既定（指定なしと同じ）。`ink` は行内の時刻など、リンク色にしない文字操作。
+   * `danger`（赤）・`accent`（濃い緑）・`quiet`（本文より淡い灰）は、
+   * 白地・細枠のまま字だけ色を変える絵のために置く
+   * （★V8 デリバリー受注 kDQHr の `AuCyJ`/`HKAi1` 拒否・`WvPd6`/`jEsnn` 準備完了、
+   * サービス札の「停止」「再開」）。画面CSSから共通ボタンを上書きしない書き方（設計ルール2節）。
+   */
+  textTone?: 'action' | 'ink' | 'danger' | 'accent' | 'quiet'
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
-  presentation?: 'account-inline' | 'registration-inline'
+  presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
   children: ReactNode
 }
@@ -55,6 +71,15 @@ type NativeButtonProps = CommonProps &
     done?: boolean | null
     /** `done` の間に出す文字。規定は「保存しました」。 */
     doneLabel?: string
+    /**
+     * 幅の控えのしかた。規定の `'states'` は「保存中…」「保存しました」の
+     * 両方を先に測って広いほうで幅を押さえる（文字が変わっても跳ねない）。
+     *
+     * `'idle'` は平常時の文字だけで幅を決める。`done` を渡さないボタン、
+     * かつ絵が幅を指定している並び（窓の足など）で使う。`busy` の間も
+     * 平常時の幅を下回らないので、こちらでも幅は跳ねない。
+     */
+    widthReserve?: 'states' | 'idle'
   }
 
 type LinkButtonProps = CommonProps &
@@ -91,17 +116,27 @@ function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:
   return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
 }
 
+/** 字の色の指定を束ねの名前へ。`action`（既定）は何も足さない。 */
+const TEXT_TONE = {
+  ink: 'textInk',
+  danger: 'textDanger',
+  accent: 'textAccent',
+  quiet: 'textQuiet',
+} as const
+
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
-  const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
+  const tone = props.textTone && props.textTone !== 'action' ? styles[TEXT_TONE[props.textTone]] : null
+  const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
+    const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={external ? '_blank' : linkProps.target} rel={external ? 'noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
+      <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}
-        {external ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
+        {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
   }
@@ -117,14 +152,16 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     variant: _variant,
     size: _size,
     align,
+    fullWidth,
     textTone: _textTone,
     presentation,
     href: _href,
     type = 'button',
     busy,
-    busyLabel = '保存中…',
+    busyLabel = '保存しています…',
     done,
     doneLabel = '保存しました',
+    widthReserve = 'states',
     disabled,
     ref,
     onClick,
@@ -140,7 +177,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const [automaticBusy, setAutomaticBusy] = useState(false)
   const [automaticError, setAutomaticError] = useState('')
   const automaticLock = useRef(false)
-  const stateful = busy !== undefined || done !== undefined || automaticBusy
+  const stateful = busy !== undefined || done !== undefined || props.busyLabel !== undefined || automaticBusy
   const busyNow = busy === true || (busy === undefined && automaticBusy)
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
@@ -155,18 +192,31 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   }, [done, busy])
 
   const elementRef = useRef<HTMLButtonElement | null>(null)
-  const v8 = useAdminTheme() === 'v8'
   const idleWidthRef = useRef(0)
+  const measuredLabelRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     const el = elementRef.current
     if (!el || !stateful) return
-    if (busy === true || done === true) {
+    if (fullWidth) { el.style.width = ''; el.style.minWidth = ''; return }
+    if (busyNow || done === true) {
       if (idleWidthRef.current > 0) el.style.minWidth = `${idleWidthRef.current}px`
       return
     }
+    // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
+    if (measuredLabelRef.current === measurementKey) return
+    measuredLabelRef.current = measurementKey
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
-    if (!v8) return
+    if (widthReserve === 'idle') {
+      /*
+       * 絵が幅を決めている並び。結果の文字の分を控えず、平常時の文字で幅を決める。
+       * `busy` の間は上の min-width がこの幅を守るので、やはり跳ねない。
+       */
+      el.style.width = ''
+      idleWidthRef.current = el.offsetWidth
+      return
+    }
     // いちばん長い結果の文字も最初に測る。成功した瞬間に幅が跳ねない。
     const sample = el.cloneNode(false) as HTMLButtonElement
     sample.removeAttribute('id')
@@ -207,7 +257,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     <button
       type={type}
       className={classes}
-      data-align={align}
+      data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined}
       data-presentation={presentation}
       ref={setRefs}
       disabled={disabled || busyNow}

@@ -9,6 +9,7 @@
  * 401以外で出してはいけない。権限不足(403)や不正な入力(400)まで
  * 「ログインが届いていません」と案内すると、別の原因を探しに行かせる。
  */
+import { SESSION_LOST_EVENT } from './session-events'
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -24,7 +25,8 @@ const noticeSource = readFileSync(join(SRC, 'components/session-lost-notice.tsx'
 
 describe('合図の名前', () => {
   it('出す側と受ける側で揃っている', () => {
-    expect(apiSource).toContain("export const SESSION_LOST_EVENT = 'lh-session-lost'")
+    expect(SESSION_LOST_EVENT).toBe('lh-session-lost')
+    expect(apiSource).toContain("export { SESSION_LOST_EVENT } from './session-events'")
     expect(noticeSource).toContain("SESSION_LOST_EVENT")
     expect(noticeSource).toContain("addEventListener(SESSION_LOST_EVENT")
   })

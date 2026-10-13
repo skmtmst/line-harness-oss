@@ -16,7 +16,7 @@ const fixture = vi.hoisted(() => ({
   selectedAccountId: 'acc-1' as string | null,
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -37,7 +37,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const { default: NewStaffPage } = await import('./page')
-const labels = await import('../permission-labels')
+const labels = await import('@/v8/settings/staff/permission-labels')
 
 async function fillBasics() {
   render(<NewStaffPage />)
@@ -45,11 +45,12 @@ async function fillBasics() {
     expect(screen.getByLabelText('最初に表示するアカウント')).toBeTruthy()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: /スタッフ/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /スタッフ/ }))
     fireEvent.change(screen.getByLabelText(/名前/), { target: { value: '承認担当' } })
     fireEvent.change(screen.getByLabelText(/メールアドレス/), { target: { value: 'approve@example.test' } })
     fireEvent.click(screen.getByLabelText('最初に表示するアカウント'))
-    fireEvent.click(await screen.findByRole('button', { name: '本店' }))
+    fireEvent.click(await screen.findByRole('radio', { name: '本店' }))
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
   })
 }
 

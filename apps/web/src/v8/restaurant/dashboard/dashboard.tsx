@@ -1,17 +1,9 @@
 'use client'
-
-/*
- * ★V8 飲食店のダッシュボード「今日のお店」（提案 E-1 `hKRRF`。採用 2026-10-07）。
- *
- * 板の頭（今日のお店・日付・営業時間・更新／＋ウォークイン・＋電話予約）→ 店のタブ
- * → 他の予約サイトの枠を閉じる知らせ → 今日の数（今日の予約・来店予定・空席（いま）・未返信の口コミ）
- * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
- * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
+import EntitySelect from '@/components/shared/entity-select'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -34,6 +26,17 @@ import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summar
 import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 飲食店のダッシュボード「今日のお店」（提案 E-1 `hKRRF`。採用 2026-10-07）。
+ *
+ * 板の頭（今日のお店・日付・営業時間・更新／＋ウォークイン・＋電話予約）→ 店のタブ
+ * → 他の予約サイトの枠を閉じる知らせ → 今日の数（今日の予約・来店予定・空席（いま）・未返信の口コミ）
+ * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
+ * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
+ */
 
 function daysAgo(iso: string, now: number): string {
   const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
@@ -60,6 +63,7 @@ export function sourceBreakdown(summary: Pick<ReturnType<typeof summarizeToday>,
 }
 
 function TodayStore() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('店舗ダッシュボード')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId } = useAccount()
@@ -84,8 +88,8 @@ function TodayStore() {
     if (!d.accountId) return
     setBusyId(id)
     try {
-      await restaurantTestApi.postSeatVisitMark(d.accountId, id, { kind: 'visited' })
-      notifyToast('来店にしました。')
+      const response=await restaurantTestApi.postSeatVisitMark(d.accountId, id, { kind: 'visited',expectedVersion:d.today?.find(r=>r.id===id)?.customer_version??1,requestId:crypto.randomUUID() })
+      notifyToast(response?.data?.stamp?.status==='recorded'?`来店にしました。スタンプ ${response.data.stamp.count} 個を確認しました。`:'来店にしました。')
       await d.reload()
     } catch (caught) {
       notifyToast(caught instanceof Error && caught.message ? caught.message : '来店にできませんでした。', { tone: 'error' })
@@ -99,7 +103,7 @@ function TodayStore() {
     if (!d.accountId) return
     setBusyId(id)
     try {
-      await restaurantTestApi.deleteSeatVisitMark(d.accountId, id)
+      await restaurantTestApi.deleteSeatVisitMark(d.accountId, id,d.today?.find(r=>r.id===id)?.customer_version??1,crypto.randomUUID())
       notifyToast('来店の印を取り消しました。')
     } catch (caught) {
       notifyToast(caught instanceof Error && caught.message ? caught.message : '取り消せませんでした。', { tone: 'error' })
@@ -116,30 +120,75 @@ function TodayStore() {
       await restaurantTestApi.completeChannelCloseTask(d.accountId, taskId)
       notifyToast(`${name}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
     } finally {
       await d.reload()
       setBusyId('')
     }
   }
 
-  const actions = canWrite && d.store ? (
-    <>
-      <Button onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
-      <Button variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button>
+  const actions = d.store ? (
+    <><EntitySelect compact aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
+      <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button></>:null}
     </>
   ) : null
 
   let body
   if (d.loading && !d.snapshot) {
     body = <div className={styles.state}><ListState kind="loading" /></div>
-  } else if (d.error && !d.snapshot) {
-    body = <div className={styles.state}><ListState kind="error" error={d.error} onRetry={() => window.location.reload()} /></div>
+  } else if (d.error) {
+    body = <div className={styles.state}><ListState kind="error" title="お店の情報を読み込めませんでした" error={d.error} onRetry={() => void d.reload()} /></div>
   } else if (!d.store) {
     body = <div className={styles.state}><ListState kind="empty" title="店舗が登録されていません" description="統括から店舗を登録してください。" /></div>
   } else {
     body = (
       <>
+        <div className={styles.stats}>
+          <KpiBand data-restaurant-fusion="dashboard" gridClassName="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <KpiCard
+              presentation="band"
+              title="今日の予約"
+              icon={<CalendarCheck size={13} aria-hidden="true" />}
+              value={summary?.groups ?? null}
+              unit="組"
+              loading={!summary}
+              detail={summary ? sourceBreakdown(summary) : '読み込んでいます'}
+            />
+            <KpiCard
+              presentation="band"
+              title="来店予定"
+              icon={<Users size={13} aria-hidden="true" />}
+              value={summary?.guests ?? null}
+              unit="人"
+              loading={!summary}
+              detail={summary ? (summary.peak ? `最多 ${summary.peak.label}（${summary.peak.guests}人）` : '今日の予約はまだありません') : '読み込んでいます'}
+            />
+            <KpiCard
+              presentation="band"
+              title="空席（いま）"
+              icon={<Armchair size={13} aria-hidden="true" />}
+              value={summary?.freeTables ?? null}
+              unit="卓"
+              loading={!summary}
+              detail={summary ? `全 ${summary.totalTables} 卓${summary.counterSeats ? `・カウンター ${summary.counterSeats} 席` : ''}` : '読み込んでいます'}
+              help="動いている卓のうち、いま予約が重なっていない卓の数です。"
+            />
+            <KpiCard
+              presentation="band"
+              title="未返信の口コミ"
+              icon={<Star size={13} aria-hidden="true" />}
+              value={googleConnected ? google.summary.unrepliedCount : null}
+              unit="件"
+              detail={googleConnected
+                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
+                : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
+            />
+          </KpiBand>
+        </div>
         {first ? (
           <div className={styles.closeRow}>
             <div className={styles.closeBand} role="status" data-close-band="">
@@ -154,7 +203,7 @@ function TodayStore() {
                 <Button external href={firstMedium.adminUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
               ) : null}
               {canWrite && firstItem ? (
-                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`} busy={Boolean(busyId === firstItem.id)} busyLabel="処理中…">
+                <Button presentation="restaurant" variant="primary" doneLabel="閉じた" onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`} busy={Boolean(busyId === firstItem.id)} busyLabel="処理中…">
                   <Check size={15} aria-hidden="true" />閉じた
                 </Button>
               ) : null}
@@ -162,59 +211,13 @@ function TodayStore() {
             </div>
           </div>
         ) : null}
-        <div className={styles.stats}>
-          <KpiBand gridClassName="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <KpiCard
-              presentation="band"
-              title="今日の予約"
-              icon={<CalendarCheck size={13} aria-hidden="true" />}
-              value={summary?.groups ?? null}
-              unit="組"
-              loading={!summary}
-              detail={summary ? sourceBreakdown(summary) : '読み込んでいます'}
-              action={{ label: '予約台帳を開く', href: '/restaurant-test/reservations' }}
-            />
-            <KpiCard
-              presentation="band"
-              title="来店予定"
-              icon={<Users size={13} aria-hidden="true" />}
-              value={summary?.guests ?? null}
-              unit="人"
-              loading={!summary}
-              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests} 人）` : '今日の予約はまだありません') : '読み込んでいます'}
-              action={{ label: '時間ごとに見る', href: '/restaurant-test/reservations' }}
-            />
-            <KpiCard
-              presentation="band"
-              title="空席（いま）"
-              icon={<Armchair size={13} aria-hidden="true" />}
-              value={summary?.freeTables ?? null}
-              unit="卓"
-              loading={!summary}
-              detail={summary ? `全 ${summary.totalTables} 卓${summary.counterSeats ? `・カウンター ${summary.counterSeats} 席` : ''}` : '読み込んでいます'}
-              help="動いている卓のうち、いま予約が重なっていない卓の数です。"
-              action={{ label: '席を見る', href: '/restaurant-test/tables' }}
-            />
-            <KpiCard
-              presentation="band"
-              title="未返信の口コミ"
-              icon={<Star size={13} aria-hidden="true" />}
-              value={googleConnected ? google.summary.unrepliedCount : null}
-              unit="件"
-              delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
-              detail={googleConnected
-                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
-                : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
-              action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
-            />
-          </KpiBand>
-        </div>
         <DashboardRow
-          asideSize="wide"
-          aside={<SidePanel media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
+          variant="restaurant" asideSize="restaurant"
+          aside={<SidePanel rotation={d.rotation} media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
-            rows={d.today}
+            onDeparture={async(id,undo)=>{setBusyId(id);try{await restaurantTestApi.attendance(d.accountId,id,{action:undo?'undo_departure':'depart',expectedVersion:d.today?.find(r=>r.id===id)?.customer_version??1,requestId:crypto.randomUUID()});notifyToast(undo?'退店を訂正しました。':'退店にしました。卓が空きました。')}catch(e){notifyToast(e instanceof Error?e.message:'退店を保存できませんでした。',{tone:'error'})}finally{await d.reload();setBusyId('')}}}
+            rows={d.today} tables={tables} storeName={d.store?.name}
             canWrite={canWrite}
             busyId={busyId}
             onVisited={(id) => void markVisited(id)}
@@ -226,11 +229,12 @@ function TodayStore() {
   }
 
   return (
-    <DashboardPage
+    <SaveErrorScope errors={saveErrors}><DashboardPage
       boardId="hKRRF"
-      headingSize="compact"
+      layout="restaurant"
+      subtitle={d.store ? headDescription(d.hours,d.updatedAt) : undefined}
       title="今日のお店"
-      help={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      help="お店の今日の予約と運用状況です。"
       actions={actions}
       tabs={<StoreTabs current="dashboard" flush />}
     >
@@ -263,7 +267,7 @@ function TodayStore() {
           />
         </>
       ) : null}
-    </DashboardPage>
+    </DashboardPage></SaveErrorScope>
   )
 }
 

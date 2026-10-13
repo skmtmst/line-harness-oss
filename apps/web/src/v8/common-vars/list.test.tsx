@@ -146,7 +146,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     expect(host.textContent).toContain('会社名')
-    expect(host.textContent).toContain('{{var.company_name}}')
+    expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('{{var.company_name}}')
     expect(host.textContent).toContain('問い合わせ先')
     expect(host.textContent).toContain('差し込んでいる所')
     expect(host.textContent).toContain('「問い合わせ先」が空のまま 2か所で使われています。')
@@ -172,7 +172,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     act(() => { fix.click() })
     await flush()
     expect(host.textContent).not.toContain('株式会社NEN')
-    expect(host.textContent).toContain('{{var.contact}}')
+    expect(host.textContent).toContain('問い合わせ先')
   })
 
   it('行の「…」から止める窓（Hhl9M）が開き、予約中の配信を知らせる', async () => {
@@ -187,6 +187,12 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
   })
 
   it('行の「…」から削除の窓（xxKtW）が開き、使われているものは「まだ消せません」', async () => {
+    const original = await deleteImpact()
+    deleteImpact.mockResolvedValue({ ...original, data: {
+      ...original.data,
+      historicalTotal: 1,
+      items: [...original.data.items, { kind: 'broadcast', kindLabel: '一斉配信', name: '送信済みのお知らせ', status: '配信済み', href: '/broadcasts/edit?id=sent', blocksDeletion: false, currentPreview: '' }],
+    } })
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
@@ -196,16 +202,24 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(document.body.textContent).toContain('「会社名」はまだ消せません')
     expect(document.body.textContent).toContain('どうしますか')
     expect(document.body.textContent).toContain('消さずに止める')
+    expect(document.body.textContent).toContain('送信済みの配信はこれから変わりません')
+    expect(document.body.textContent).toContain('送信済みのお知らせ')
+    expect(document.querySelector('a[href="/broadcasts/edit?id=sent"]')).toBeNull()
+    expect(document.querySelector('a[href="/broadcasts/edit?id=b1"]')).not.toBeNull()
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-  it('閲覧のみ（staff）では帯が出て、作るボタンと行の「…」は出さない', async () => {
+  it('閲覧のみ（staff）では帯が出て、作成・変更は隠しコピーだけを使える', async () => {
     staffRole.value = 'staff'
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
     const create = [...host.querySelectorAll('button, a')].filter((b) => b.textContent?.includes('共通情報を作る'))
     expect(create).toHaveLength(0)
-    expect(host.querySelector('button[aria-label^="共通情報「"][aria-label$="」の操作"]')).toBeNull()
+    act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
+    await flush()
+    const menu = document.querySelector('[role="menu"]')!
+    expect(menu.textContent).toContain('差し込みキーをコピー')
+    for (const label of ['編集', '止める', '削除する', '再開する']) expect(menu.textContent).not.toContain(label)
   })
 })

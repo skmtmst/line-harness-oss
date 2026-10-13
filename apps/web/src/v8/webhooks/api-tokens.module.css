@@ -168,16 +168,16 @@
 }
 
 /* 窓の枠・×・題は共通の Dialog。発行した鍵の窓は「余白24・題17・題の行は×と同じ36・間14・下の線は余白の内側」で描かれている。 */
-:global([data-theme='v8'] [data-design-part='dialog']):has(.issuedBody) > :global(div:first-child) {
+:global(:root [data-design-part='dialog']):has(.issuedBody) > :global(div:first-child) {
   padding: var(--tpl-ms-key-head-pad);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.issuedBody) :global(h2) {
+:global(:root [data-design-part='dialog']):has(.issuedBody) :global(h2) {
   font-size: var(--tpl-ms-key-title-size);
   line-height: var(--tpl-ms-key-title-lh);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.issuedBody) > :global(div:nth-child(2)) {
+:global(:root [data-design-part='dialog']):has(.issuedBody) > :global(div:nth-child(2)) {
   padding: var(--tpl-ms-key-content-pad);
 }
 

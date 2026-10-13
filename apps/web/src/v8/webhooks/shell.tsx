@@ -10,17 +10,18 @@
  * v7 の画面（app/webhooks/page.tsx ほか）は触らない。データの口は同じ。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Eye, Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
+import { Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Notice from '@/components/shared/notice'
+
 import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatNumber } from '@/lib/format'
 import styles from './shell.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type WebhookTabKey = 'outgoing' | 'incoming' | 'api-tokens' | 'sheets' | 'interactions' | 'notify'
 export type LoadStatus = 'loading' | 'ready' | 'error'
@@ -216,7 +217,7 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
+      <ReadOnlyNotice role="status"></ReadOnlyNotice>
     </div>
   )
 }

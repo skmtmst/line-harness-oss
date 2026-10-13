@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRequestGeneration } from '../../lib/use-request-generation.js';
+import { FieldError } from '../../components/forms/controls.js';
+import CourseChoice from '../../components/CourseChoice.js';
+import Card from '../../components/ui/Card.js';
+import { useUrlStep } from '../../lib/use-url-step.js';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import liff from '@line/liff';
+import liff from '../../lib/liff-runtime.js';
 import type { RestaurantCustomerBooking, RestaurantLateArrivalPolicy, RestaurantUnavailableReason } from '@line-crm/shared';
 import LiffHeader from '../../components/ui/LiffHeader.js';
 import LiffLookScope from '../../components/LiffLookScope.js';
@@ -31,29 +36,44 @@ import {
   zonedToday,
   type DayChip,
 } from '../../lib/seat-reserve.js';
+import SeatWaitlistSheet from '../../components/SeatWaitlistSheet.js';
 import SeatPick, { type DaySlots } from './SeatPick.js';
 import SeatConfirm from './SeatConfirm.js';
 import SeatDone from './SeatDone.js';
 import SeatMine from './SeatMine.js';
 
 type View = 'pick' | 'confirm' | 'done' | 'mine';
+type Course = import('@line-crm/shared').RestaurantCustomerCourse;
 type Store = { id: string; name: string; timezone: string };
 
-const STEPS = ['人数・日時', 'お客さま', '確認'];
+const STEPS = ['人数・日時・コース', '確認'];
 const DEFAULT_GUESTS = 2;
 
 /**
- * 飲食店の席の予約 (E-11・★V8 glL3g→km8EG→sAnyy)。入口は /restaurant/reserve/:token。
+ * 飲食店の席の予約 (E-11・★V8 KRppA→B3oGt3→sAnyy)。入口は ?page=restaurant&token=...。
  * token は管理画面の「LINE 予約の URL」から店を決める。?view=mine で変更・取り消しから開く。
  * 流れ：① 人数と日時 → 仮押さえ → ② 確認 (残り時間) → 確定 → ③ 受け付けました。
  * 変更は ① で選び直して ② で「この内容に変える」(仮押さえなし・版を指定)。
  */
 export default function SeatReserve() {
-  const { token = '' } = useParams();
-  const [params] = useSearchParams();
+  const route = useParams();
+  const [params, setParams] = useSearchParams();
+  const legacy = window.location.pathname.match(/\/restaurant\/reserve\/([^/]+)$/)?.[1];
+  let legacyToken='';try{legacyToken=legacy ? decodeURIComponent(legacy):'';}catch{}
+  const token = route.token ?? params.get('token') ?? legacyToken;
+  const initialGuests=Number(params.get('guestCount'));
+  const defaultGuests=Number.isInteger(initialGuests)&&initialGuests>=1&&initialGuests<=100 ? initialGuests:DEFAULT_GUESTS;
+  const [courses,setCourses] = useState<Course[]>([]);
+  const [courseId,setCourseId] = useState<string|null>(null);
+  const courseRef = useRef<string|null>(null);
+  const [referrals,setReferrals] = useState<import('@line-crm/shared').RestaurantReferralCandidate[]>([]);
+  const [referralLoaded,setReferralLoaded] = useState(false);
+  const [referralError,setReferralError] = useState(false);
+  const busyRef = useRef(false);
+  const showMine = params.get('view') === 'mine';
   const [store, setStore] = useState<Store | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'error' | 'missing' | 'ready'>('loading');
-  const [view, setView] = useState<View>(params.get('view') === 'mine' ? 'mine' : 'pick');
+  const [view, setView] = useUrlStep<View>(params.get('view') === 'mine' ? 'mine' : 'pick', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
   const [today, setToday] = useState('');
   const [chips, setChips] = useState<DayChip[]>([]);
   const [days, setDays] = useState<Record<string, DaySlots>>({});
@@ -63,7 +83,7 @@ export default function SeatReserve() {
   /* ご要望・電話（任意）。確定の口へ送る。 */
   const [note, setNote] = useState('');
   const [phone, setPhone] = useState('');
-  const [guestCount, setGuestCount] = useState(DEFAULT_GUESTS);
+  const [guestCount, setGuestCount] = useState(defaultGuests);
   const [date, setDate] = useState('');
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [cancelMinutes, setCancelMinutes] = useState<number | null>(null);
@@ -81,11 +101,26 @@ export default function SeatReserve() {
   const requestId = useRef<string | null>(null);
   const generation = useRef(0);
 
+  const requestContext = JSON.stringify([token, store?.id, view, target?.id, date, guestCount, startsAt, courseId]);
+  const mutation = useRequestGeneration(requestContext);
+  useLayoutEffect(() => { busyRef.current = false; setBusy(false); }, [requestContext]);
+
+  const [waitlistSlot, setWaitlistSlot] = useState<{ startsAt: string; guestCount: number } | null>(null);
+  const currentSlots=Array.isArray(days[date]) ? days[date] as import('@line-crm/shared').RestaurantCustomerSlot[] : null;
+  const fullStartsAt=currentSlots?.find(s=>!s.available)?.startsAt;
+  const canRefer=!!currentSlots && (!!fullStartsAt || !hasOpenSlot(currentSlots));
+  useEffect(()=>{
+    if(!store || !canRefer){setReferrals([]);setReferralLoaded(false);return;}
+    let live=true;setReferralLoaded(false);setReferralError(false);
+    restaurantBookingApi.referrals(store.id,date,guestCount,fullStartsAt,courseId).then(r=>{if(live){setReferrals(r.data);setReferralLoaded(true);}}).catch(()=>{if(live)setReferralError(true);});
+    return()=>{live=false;};
+  },[store?.id,date,guestCount,courseId,fullStartsAt,canRefer]);
+
   const fetchDay = useCallback(
     async (s: Store, d: string, guests: number, gen: number) => {
       setDays((prev) => ({ ...prev, [d]: 'loading' }));
       try {
-        const r = await restaurantBookingApi.availability(s.id, d, guests);
+        const r = await restaurantBookingApi.availability(s.id, d, guests, courseRef.current);
         if (gen !== generation.current) return;
         setCancelMinutes(r.data.cancelDeadlineMinutesBefore);
         setLate(r.data.lateArrivalPolicy ?? null);
@@ -123,18 +158,22 @@ export default function SeatReserve() {
       const s = link.data;
       const t = zonedToday(s.timezone);
       const c = dayChips(t);
+      const cset = await restaurantBookingApi.courses(s.id);
+      setCourses(cset.data);
       setStore(s);
       setToday(t);
       setChips(c);
-      setDate(t);
-      await loadDays(s, [...c.map((x) => x.date), addDays(t, c.length)], DEFAULT_GUESTS);
-      if (params.get('view') === 'mine') await loadMine(s);
+      const requested=params.get('date');
+      const selected=requested && /^\d{4}-\d{2}-\d{2}$/.test(requested) && requested>=t ? requested:t;
+      setDate(selected);
+      await loadDays(s, [...c.map((x) => x.date), addDays(t, c.length),selected], defaultGuests);
+      if (showMine) await loadMine(s);
       setLoadState('ready');
     } catch (e) {
       logFailure('seat-link', e);
       setLoadState((e as { status?: number }).status === 404 ? 'missing' : 'error');
     }
-  }, [token, loadDays, loadMine, params]);
+  }, [token, loadDays, loadMine, showMine]);
 
   useEffect(() => {
     void load();
@@ -164,6 +203,7 @@ export default function SeatReserve() {
   function pickGuests(n: number) {
     if (!store || busy || n === guestCount) return;
     setGuestCount(n);
+    setReferrals([]);setReferralLoaded(false);
     setStartsAt(null);
     setError(null);
     requestId.current = null;
@@ -175,6 +215,7 @@ export default function SeatReserve() {
   function pickDate(d: string) {
     if (!store || busy) return;
     setDate(d);
+    setReferrals([]);setReferralLoaded(false);
     setStartsAt(null);
     setError(null);
     requestId.current = null;
@@ -194,10 +235,13 @@ export default function SeatReserve() {
   })();
 
   async function proceed() {
-    if (!store || !slot) return;
+    if (!store || !slot || busyRef.current) return;
+    const requestGeneration = mutation.begin();
+    busyRef.current=true;
     setError(null);
     if (target) {
       setView('confirm');
+      busyRef.current=false;
       return;
     }
     setBusy(true);
@@ -208,7 +252,9 @@ export default function SeatReserve() {
         startsAt: slot.startsAt,
         guestCount,
         requestId: requestId.current,
+        courseId,
       });
+      if (!mutation.isCurrent(requestGeneration)) return;
       setHold(r.data);
       setHoldMinutes(
         r.data.holdExpiresAt ? Math.max(1, Math.round((Date.parse(r.data.holdExpiresAt) - Date.now()) / 60000)) : 0,
@@ -216,6 +262,7 @@ export default function SeatReserve() {
       setExpired(false);
       setView('confirm');
     } catch (e) {
+      if (!mutation.isCurrent(requestGeneration)) return;
       logFailure('seat-hold', e);
       setError(seatErrorMessage(e));
       // 届いたか分からない失敗 (通信・500) は、次の押下で同じ受付番号を送って二重にしない。
@@ -227,17 +274,21 @@ export default function SeatReserve() {
         void fetchDay(store, date, guestCount, generation.current);
       }
     } finally {
+      if (!mutation.isCurrent(requestGeneration)) return;
+      busyRef.current=false;
       setBusy(false);
     }
   }
 
   async function finish() {
-    if (!store) return;
+    if (!store || busyRef.current) return;
     const problem = target ? '' : noteProblem(note) || phoneProblem(phone);
     if (problem) {
       setError(problem);
       return;
     }
+    const requestGeneration = mutation.begin();
+    busyRef.current=true;
     setBusy(true);
     setError(null);
     try {
@@ -246,26 +297,35 @@ export default function SeatReserve() {
             expectedVersion: target.version,
             startsAt: slot!.startsAt,
             guestCount,
+            courseId,
           })
         : await restaurantBookingApi.confirm(hold!.id, hold!.version, {
             note: note.trim() || null,
             customerPhone: normalizePhone(phone) || null,
+            ...(params.get('referralId') ? {referralId:params.get('referralId')!} : {}),
           });
+      if (!mutation.isCurrent(requestGeneration)) return;
       setResult({ booking: r.data, changed: !!target });
       setHold(null);
       setTarget(null);
       requestId.current = null;
       setView('done');
     } catch (e) {
+      if (!mutation.isCurrent(requestGeneration)) return;
       logFailure(target ? 'seat-reschedule' : 'seat-confirm', e);
       setError(seatErrorMessage(e));
       if ((e as { body?: { error?: string } }).body?.error === 'hold_expired') setExpired(true);
     } finally {
+      if (!mutation.isCurrent(requestGeneration)) return;
+      busyRef.current=false;
       setBusy(false);
     }
   }
 
   function backToPick() {
+    mutation.invalidate();
+    busyRef.current = false;
+    setBusy(false);
     // 仮押さえは返す (ほかのお客さまが選べるように)。失敗しても期限で外れるので止めない。
     if (hold && !expired) {
       restaurantBookingApi.cancel(hold.id, hold.version).catch((e) => logFailure('seat-release', e));
@@ -294,6 +354,8 @@ export default function SeatReserve() {
     if (!store) return;
     const d = zonedParts(b.startsAt, store.timezone).date;
     setTarget(b);
+    courseRef.current=b.courseId ?? null;
+    setCourseId(courseRef.current);
     setGuestCount(b.guestCount);
     setDate(d);
     setStartsAt(null);
@@ -316,11 +378,14 @@ export default function SeatReserve() {
       logFailure('seat-cancel', e);
       setError(seatErrorMessage(e));
     } finally {
+      busyRef.current=false;
       setBusy(false);
     }
   }
 
   function newBooking() {
+    courseRef.current=null;
+    setCourseId(null);
     setNote('');
     setPhone('');
     setTarget(null);
@@ -331,14 +396,14 @@ export default function SeatReserve() {
   }
 
   if (loadState === 'loading') return (
-    <LiffLookScope className="min-h-screen bg-canvas">
+    <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
       <div className="mx-auto w-full max-w-md px-4 pt-3"><LoadingView /></div>
     </LiffLookScope>
   );
   if (loadState === 'missing')
     return (
-      <LiffLookScope className="min-h-screen bg-canvas">
+      <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
         <LiffHeader title="ご予約" />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <StatusView
@@ -351,7 +416,7 @@ export default function SeatReserve() {
     );
   if (loadState === 'error' || !store)
     return (
-      <LiffLookScope className="min-h-screen bg-canvas">
+      <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
         <LiffHeader title="ご予約" />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <LoadErrorView note="ご予約はなくなっていません。" onRetry={() => void load()} />
@@ -361,14 +426,15 @@ export default function SeatReserve() {
 
   const minutes = cancelMinutes ?? 0;
   return (
-    <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" />
+    <LiffLookScope className={`${view==='pick'||view==='confirm'?'restaurant-fusion ':''}min-h-screen bg-canvas`}>
+      <LiffHeader title={view==='confirm'?'確認':'ご予約'} />
+      <div className={`mx-auto w-full max-w-md px-4 ${view==='pick'||view==='confirm'?'pt-4':'pt-3'}`}>
       {(view === 'pick' || view === 'confirm') && (
-        <Stepper steps={STEPS} current={view === 'pick' ? 0 : STEPS.length - 1} />
+        <Stepper appearance="restaurant" steps={STEPS} current={view === 'pick' ? 0 : STEPS.length - 1} />
       )}
-      <div className="mx-auto w-full max-w-md px-4 pt-3">
-        <div key={view} className="liff-step">
+        <div key={view} className={`liff-step ${view==='pick'||view==='confirm'?'mt-3 space-y-3 pb-28':''}`}>
           {view === 'pick' && (
+            <>
             <SeatPick
               timeZone={store.timezone}
               today={today}
@@ -384,11 +450,40 @@ export default function SeatReserve() {
               onTime={pickTime}
               onRetry={() => void fetchDay(store, date, guestCount, generation.current)}
             />
+            {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
+            {waitlistSlot && <SeatWaitlistSheet storeId={store.id} storeName={store.name} startsAt={waitlistSlot.startsAt} guestCount={waitlistSlot.guestCount} onClose={() => setWaitlistSlot(null)} />}
+            {canRefer && <section className="space-y-3" aria-label="系列店の案内">
+              {referrals.length>0 && <h2 className="text-[13px] leading-5 font-bold text-ink">近くの系列店なら空いています</h2>}
+              {referralError && <><FieldError tone="inherit">空きを読み込めませんでした。</FieldError><Button variant="restaurant-control" disabled={busy} onClick={async()=>{
+                setBusy(true);setReferralError(false);
+                try{setReferrals((await restaurantBookingApi.referrals(store.id,date,guestCount,fullStartsAt,courseId)).data);setReferralLoaded(true);}catch{setReferralError(true);}finally{setBusy(false);}
+              }}>もう一度読み込む</Button></>}
+              {referralLoaded && !referrals.length && <p className="text-xs leading-[18px] text-liff-sub">案内できるお店の空きがありません。ほかの日を選んでください。</p>}
+              {referrals.map(r=><Card key={r.storeId} className="space-y-4 p-6">
+                <div className="space-y-0.5"><h3 className="truncate text-[15px] leading-[23px] font-bold text-ink" title={r.storeName}>{r.storeName}</h3><p className="text-xs leading-[18px] text-liff-sub">{r.distanceKm.toFixed(1)}km</p></div>
+                <div className="space-y-2.5">
+                  <Button variant="restaurant-time" disabled aria-label="案内先の時刻">{zonedParts(r.startsAt,store.timezone).hm}</Button>
+                  <div><Button variant="restaurant-control" disabled={busy} onClick={async()=>{
+                    if(busyRef.current)return;busyRef.current=true;setBusy(true);setReferralError(false);
+                    try {const next=await restaurantBookingApi.referral({storeId:store.id,targetStoreId:r.storeId,date,startsAt:r.startsAt,guestCount,courseId});window.location.assign(next.data.bookingUrl);}
+                    catch{setReferralError(true);}finally{busyRef.current=false;setBusy(false);}
+                  }}>この店で予約する</Button></div>
+                </div>
+              </Card>)}
+            </section>}
+            {<CourseChoice compact courses={courses} value={courseId} disabled={busy} onChange={id=>{
+              setReferrals([]);setReferralLoaded(false);
+              courseRef.current=id; setCourseId(id); setStartsAt(null); requestId.current=null;
+              void loadDays(store,[...chips.map(c=>c.date),date],guestCount);
+            }} />}
+
+            </>
           )}
           {view === 'confirm' && slot && (
             <SeatConfirm
                 timeZone={store.timezone}
                 storeName={store.name}
+                courseName={courses.find(c=>c.id===courseId)?.name ?? hold?.courseName ?? null}
                 customerName={customerName}
                 // 確認は仮押さえした中身で出す（確定はこの仮押さえを送る）。
                 startsAt={!target && hold ? hold.startsAt : slot.startsAt}
@@ -434,9 +529,9 @@ export default function SeatReserve() {
       </div>
 
       {view === 'pick' && (
-        <BottomBar>
-          <Button variant="primary" disabled={!slot || busy} onClick={() => void proceed()}>
-            {busy ? 'お取りしています…' : 'この時刻で進む'}
+        <BottomBar appearance="restaurant">
+          <Button variant="restaurant-primary" aria-label={busy ? 'お取りしています…' : 'この時刻で進む'} disabled={!slot || busy} onClick={() => void proceed()}>
+            {busy ? 'お取りしています…' : '次へ'}
           </Button>
           {target && (
             <Button variant="text"
@@ -449,14 +544,14 @@ export default function SeatReserve() {
         </BottomBar>
       )}
       {view === 'confirm' && (
-        <BottomBar>
-          <Button variant="primary" disabled={busy || expired} onClick={() => void finish()}>
-            {busy ? '送信中...' : target ? 'この内容に変える' : '予約を確定する'}
+        <BottomBar appearance="restaurant">
+          <Button variant="restaurant-primary" aria-label={target ? 'この内容に変える' : '予約を確定する'} disabled={busy || expired} onClick={() => void finish()}>
+            {busy ? '送信中...' : target ? 'この内容に変える' : '予約する'}
           </Button>
         </BottomBar>
       )}
       {view === 'done' && (
-        <BottomBar>
+        <BottomBar appearance="form">
           <Button variant="primary" onClick={() => liff.closeWindow()}>
             LINEに戻る
           </Button>

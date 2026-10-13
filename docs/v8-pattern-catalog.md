@@ -1,0 +1,986 @@
+# V8 型の対応表（パターン台帳）
+
+- 作成：2026-10-09（オーナー「見落としていて決まりから外れているところが、次回から外れないように、同じものとして認識されるようにしておいて」・B-143・B-168・B-172）
+- 何の文書か：**同じ役目の物を、画面が違っても同じ物として見つける**ための表。型ごとに「役目・持ち主（正の部品）・見つけ方・決まり・見張り」を1節で書く。
+- 誰が読むか：画面を作る・直す人（Codex・Claude・Pen の作業役）と、点検の道具。機械が読む表は `scripts/visual-qa/v8-pattern-catalog.json`（この文書と同じ中身。正規表現は JSON が正）。
+- 点検の道具：`node scripts/visual-qa/v8-pattern-audit.mjs --code ~/lh-work/lh-train-12 --pen ~/lh-work/design/v8/html --out ~/lh-work/design/v8/review/pattern-audit-run`（`--only card,kpi-band` で型を絞る）。
+- 決まりの正本は `docs/v8-design-rules.md`。この文書は決まりを増やさない。決まりの節と B-番号へつなぐだけ。
+
+## 2026-10-10 B-172 のコード側の更新
+
+- 閲覧のみの帯は `ReadOnlyNotice` が持つ。`ListPageBody`・`CreatePage`・`DetailPage` に `readOnly` を渡しても出せる。権限の条件と、統括などの頼む先は画面が持つ。
+- アカウント未選択・未登録の案内は `AccountRequiredState`、一覧の空・取得失敗は `ListState`。既存の再試行・作成・戻る操作を渡せる。明示的な `action={null}` は、権限不足などで再試行を出さない意味。
+- 件数の正本は shared の `PAGE_SIZES`（10・20・50）。旧 ui の入口は互換用の再公開。取得用のバッチ上限やCSVの上限は一覧の表示件数ではない。
+- フォルダの作る操作を隠したときの空きは `FolderPanel`、削除後の案内は `FolderPanelNote` が持つ。既存の管理する列は `ManagedFolderPanel` がAPIと行の操作を持つ。選ぶ窓のフォルダ列は作る操作が元からないため、`reserveCreateSpace={false}` を指定する。
+- 既に本線で共通化された数の帯・状態の札・削除確認は既存の持ち主を使う。行の「…」は `RowMenu` / `MoreAction`、ページ内の戻るはパンくずとキャンセルへ寄せる。
+
+### 増殖を止めるCI
+
+`node scripts/visual-qa/v8-pattern-audit.mjs --code . --base <PRのbase SHA> --out <出力先>` を required-pr-gate の repository-checks で実行する。同じ対応表で土台と変更後を点検し、持ち主以外に新しい (a)(b)(c) 候補があれば非0終了する。既存候補の行移動は許可し、同じ候補の増殖は止める。
+
+文言だけの目印（words・account-words・retry-words・folder-words・prev-next・back-in-bar）は調査一覧に残し、CIの形の違反とは分ける。説明、完了画面、日付送りにも同じ語が出るため。帯のクラスで余白・位置だけを持つものと、すぐ内側が `ReadOnlyNotice` の包みだけは自作と数えない。同じファイルのほかの自作は検出する。`STANDARD_PAGE_SIZES` / `PAGE_SIZE_SELECT_OPTIONS` を読む定数は共通の正本への参照として扱う。
+
+実際に使われる経路の76ファイルの帯、15ファイル26か所の状態カード、一覧の件数定数、欄に結び付かない失敗の知らせを共通部品へ寄せた。同じ表での候補数は (a) 7032→6767、(b) 1435→1416、(c) 2497→2493。正規表現の全体一覧には未使用コードと要確認候補が残る。新しい候補0は、残りの候補が全部違反なしという意味ではない。Penの部品IDと見た目の合格は司令塔が記録する。
+
+## 使い方（必ず守る）
+
+1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
+2. **画面の CSS で部品の見た目を上書きしない**。部品に見た目の `className`・`style` を渡さない（幅・余白・並びは呼び出し側が渡してよい＝§5）。色・大きさ・角丸・影を直書きしない（変数を読む）。
+3. **Pen の板は部品の写しだけ**を使う。切り離し・見た目の上書きをしない（文字・件数・データの違いだけ上書きしてよい）。
+4. **直すときは持ち主だけを直す**。画面ごとに直したくなったら型が足りない合図。**この表に型（または部品の変わり形）を足してから**直す（B-172）。
+5. **新しい役目の物を作るとき**は、先にこの表と JSON に型を足す（id・役目・持ち主・見つけ方・決まり・見張り）。足したら道具を回して候補の数を記録する。
+
+## 点検の4つの数（B-172）
+
+| 記号 | 何を数えるか | どこで |
+|---|---|---|
+| (a) 手書き | 持ち主以外で同じ形を作っている所（下の「見つけ方（コード）」の目印に当たった所。共通部品・型の中は除く） | file:line |
+| (b) 上書き | 持ち主の部品に見た目の `className`・`style` を渡している所（渡したクラスの規則に色・枠・角丸・影・文字があるもの）／画面の `.module.css` が部品の中を `:global(.x)`・子孫の要素・`[data-variant]` などで塗り直している所 | file:line |
+| (c) 直書き | 画面の CSS に、色・大きさ（文字・高さ・幅）・角丸・影を変数なしで書いた所。型は selector の手がかりで割り当て、当たらない分は「（型なし）」 | file:line |
+| (d) Pen | 手描きの目印（下の「見つけ方（Pen）」）と、持ち主の部品の写しの見た目の上書き（`background-color・outline・box-shadow・border-radius` が写しで一番多い値と違う）・切り離し（ほかの写しに無い中身） | 板 ID |
+| 効く範囲 | 持ち主を直すと変わる所：持ち主の部品を読む画面側のファイル数・機能の数、Pen は写しを置いた板の数 | — |
+
+- 数はどれも**候補**。理由のある例外も混ざるので、直す前に目で確かめる。数を減らすために目印を外さない（外すときは理由をこの文書に書く）。
+- Pen の部品の板の html（`~/lh-work/design/v8/html/components-*.html`）は 10-04 の書き出しで古い。そのため (d) の写しは「部品の板の値」ではなく「同じ名前の写しで一番多い値」と比べる。部品の板を書き出し直したら、部品の値と比べる形に戻せる。
+- 道具そのものの試験：`scripts/visual-qa/v8-pattern-audit.test.ts`（偽の一致・見落としを作りものの repo と板で確かめる。持ち主のファイル・見張りの試験のファイルが実在するかも見る）。
+
+## 型の一覧（2026-10-09 の点検の数）
+
+10-09の数は当時の記録。10-11に確認した持ち主と追加の決まりは各節の追記を読む。機械の表と点検スクリプトは列車16〜18の本線の新版を保ち、今回の文書追記で検出範囲まで更新済みとは扱わない。
+
+数は `~/lh-work/lh-train-12`（本線＋列車11・12）と Pen の板 632 枚。(a) の括弧は v8 の置き場だけの数。
+
+| 型 | 持ち主 | (a) | (b) | (c) | (d) 手描き／写し | 効く範囲（ファイル／機能／Pen 板） |
+|---|---|---|---|---|---|---|
+| [card](#card) カード（中身のまとまりの箱） | 未定：Pen | 45（37） | 22 | 204 | 186／0 | 63／37／0 |
+| [kpi-band](#kpi-band) 数の帯 | 決まっている | 163（113） | 55 | 270 | 0／0 | 149／64／15 |
+| [page-head](#page-head) 一覧・画面の頭 | 決まっている | 158（109） | 4 | 216 | 26／149 | 169／74／505 |
+| [toolbar](#toolbar) 一覧の道具の段 | 決まっている | 227（170） | 1 | 9 | 157／3 | 36／29／191 |
+| [filter](#filter) 絞り込み | 決まっている | 190（90） | 28 | 29 | 37／5 | 116／55／40 |
+| [folder-column](#folder-column) フォルダの列 | 決まっている | 83（60） | 1 | 32 | 19／0 | 16／13／0 |
+| [table](#table) 表 | 決まっている | 546（458） | 581 | 204 | 4／20 | 223／81／86 |
+| [row-menu](#row-menu) 行の右端「…」 | 決まっている | 109（53） | 31 | 9 | 0／0 | 132／68／0 |
+| [pagination](#pagination) ページ送り | 決まっている | 222（126） | 0 | 12 | 8／0 | 155／71／56 |
+| [detail-panel](#detail-panel) 詳細のパネル・引き出し | 未定：Pen | 140（73） | 3 | 14 | 13／0 | 41／29／0 |
+| [dialog](#dialog) 窓（確かめ・編集） | 決まっている | 109（32） | 18 | 41 | 6／0 | 354／109／0 |
+| [picker-dialog](#picker-dialog) 選ぶ窓 | 決まっている | 2（1） | 1 | 1 | 3／0 | 2／1／0 |
+| [picker-field](#picker-field) 選ぶ欄（選ぶ前・選んだ後） | 未定：Pen | 137（71） | 0 | 2 | 64／0 | 7／4／0 |
+| [select](#select) プルダウン（許される範囲） | 決まっている | 154（88） | 33 | 18 | 12／3 | 376／111／97 |
+| [tap-action](#tap-action) 押したら（TapActionField） | 決まっている | 44（29） | 0 | 1 | 0／0 | 6／6／0 |
+| [tap-extra](#tap-extra) 押されたときにあわせて行うこと | 決まっている | 48（27） | 0 | 0 | 0／0 | 6／6／0 |
+| [action-list](#action-list) 行うことを足す | 未定：コード・Pen | 34（16） | 0 | 8 | 24／0 | 0／0／0 |
+| [media-slot](#media-slot) 画像の枠（MediaSlot） | 未定：Pen | 81（41） | 1 | 11 | 0／0 | 26／16／0 |
+| [field](#field) 欄（Field・必須・任意・文字数） | 決まっている | 804（332） | 52 | 196 | 1／4 | 269／91／104 |
+| [field-error](#field-error) 欄の赤表示 | 決まっている | 704（477） | 14 | 31 | 0／0 | 43／27／0 |
+| [sticky-bar](#sticky-bar) 作る・編集の下の帯 | 未定：Pen | 260（162） | 5 | 15 | 30／0 | 126／72／0 |
+| [tabs](#tabs) タブ | 決まっている | 86（52） | 19 | 13 | 130／13 | 80／51／132 |
+| [status-badge](#status-badge) 状態の札 | 決まっている | 436（268） | 81 | 54 | 306／10 | 125／56／178 |
+| [list-state](#list-state) 空・読めない・読み込み中 | 決まっている | 816（475） | 13 | 17 | 31／0 | 430／115／1 |
+| [viewer-band](#viewer-band) 閲覧のみの帯 | 未定：Pen | 248（239） | 0 | 10 | 8／0 | 0／0／0 |
+| [notice](#notice) 知らせ（トースト・Notice） | 決まっている | 195（62） | 0 | 20 | 23／0 | 394／112／23 |
+| [save-conflict](#save-conflict) ぶつかりの帯 | 未定：Pen | 223（131） | 2 | 8 | 0／0 | 12／11／0 |
+| [customer-info](#customer-info) 顧客情報の欄 | 決まっている | 20（9） | 0 | 0 | 20／0 | 0／0／0 |
+| [phone-preview](#phone-preview) スマホのプレビュー | 決まっている | 76（37） | 3 | 88 | 29／0 | 58／31／2 |
+| [period](#period) 期間の選択 | 未定：コード・Pen | 166（95） | 0 | 3 | 73／0 | 0／0／0 |
+| [chart](#chart) グラフ | 未定：Pen | 16（7） | 0 | 22 | 108／0 | 2／1／0 |
+| [external-link](#external-link) 外へのリンク | 決まっている | 85（47） | 0 | 48 | 57／0 | 4／1／13 |
+| [csv](#csv) CSV | 未定：コード・Pen | 158（93） | 0 | 0 | 80／0 | 0／0／0 |
+| [primary-button](#primary-button) 主ボタン・ボタン | 決まっている | 96（49） | 279 | 81 | 464／18 | 698／151／277 |
+| [date-time](#date-time) 日付・時刻の欄 | 未定：Pen | 86（43） | 7 | 12 | 0／0 | 102／48／0 |
+| [toggle](#toggle) オン・オフ・選ぶ部品 | 決まっている | 247（162） | 26 | 18 | 0／0 | 265／98／87 |
+| [copy](#copy) コピー | 未定：Pen | 47（25） | 0 | 0 | 0／0 | 2／1／0 |
+| [steps](#steps) 手順 | 決まっている | 34（23） | 9 | 77 | 85／2 | 20／19／19 |
+| [bulk-bar](#bulk-bar) まとめて選ぶ（一括バー） | 決まっている | 11（7） | 0 | 6 | 3／0 | 12／9／0 |
+| [back-link](#back-link) ページ内の戻る（置かない） | 未定：Pen | 53（43） | 0 | 6 | 0／0 | 11／6／0 |
+| [folder-select](#folder-select) 所属フォルダを選ぶ欄 | 決まっている | 61（45） | 0 | 0 | 0／0 | 25／18／0 |
+
+---
+
+<a id="card"></a>
+## card カード（中身のまとまりの箱）
+
+- **役目**：中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる
+- **持ち主（コード）**：`apps/web/src/components/shared/card.tsx`・`apps/web/src/components/shared/card.module.css`（部品 `Card`・`CardHeader`）
+  - 読む変数：`--card-shadow`・`--card-edge`・`--radius-card`
+- **持ち主（Pen）**：**未定**
+  - 注：Pen にカードの部品が無い（B-168「Pen もカードは部品のカードだけ」の部品を作る）
+- **見つけ方（コード）**：
+  - ring-card：CSS の規則に `border-radius:\s*(12px|var\(--radius-card\))` と `box-shadow:\s*var\(--tpl-[\w-]*ring\)|border:\s*1px solid var\(--color-(hairline|divider|border[\w-]*)\)|outline:\s*1px` があり、`--card-shadow` が無い — カードの角丸で線だけ（影なし）の箱（B-168）
+  - own-shadow-card：CSS の規則に `border-radius:\s*(12px|var\(--radius-card\))` と `box-shadow:\s*(0|[^;v]*rgba|var\(--shadow-card)` があり、`--card-shadow` が無い — カードの角丸で別の影の箱
+  - (c) の割り当て：直書きの selector が `card|panel|box|tile|section\b|sheet|block` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - outline-card：名前が `^(知らせ|選ぶカード|選ぶ欄|ポップ|吹き出し|ダイアログ|窓)` でない・style に `border-radius: 12px` と `background-color: #ffffff` と `outline: 1px`・style に `0px 1px 1px #1d1d1f29`・`0px 8px 24px` が無い — 白地・角丸12・線だけで影なし（カードの部品を使わない手描き）
+- **決まり**：[§6.2](v8-design-rules.md)・[§6.18](v8-design-rules.md)・B-137・B-148・B-168
+- **見張り**：なし／**要る試験**：画面の .module.css に「角丸がカードの値・枠だけ・--card-shadow なし」の規則を新しく書いたら落ちる試験（例外は一覧に理由つき。B-168）
+- **10-09 の数**：(a) 45（v8 37）・(b) 22・(c) 204・(d) 手描き 186（73 板）／写し 0・効く範囲 63 ファイル／37 機能／Pen 0 板
+
+- **10-11の追加**：[§6.31](v8-design-rules.md)・[§6.37](v8-design-rules.md)・B-208・B-222・B-224・B-233。箱の中は16以上（小さい箱12）、固定高さではみ出させず下の余白も守る。LIFFの白い中身カードも共通影。選ぶカード・入力欄・ボタンは影の対象外。
+
+<a id="kpi-band"></a>
+## kpi-band 数の帯
+
+- **役目**：数（KPI）を線で区切った1本の帯で並べる
+- **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
+  - 読む変数：`--color-hairline`
+- **持ち主（Pen）**：`Pp3nS`「数のマス」
+- **見つけ方（コード）**：
+  - own-stat：`\b(function|const)\s+(StatCard|Stat|MiniStat|Kpi|KpiMenu|StatTile|Metric|SummaryCard)\b` — 画面で数のマスを自作（KpiCard を使う）
+  - cards：`presentation=["']cards["']` — 数の並びをカードにしている（B-153 は線の帯）
+  - kpi-class：`styles\.(kpi|stat|stats|kpis|metric|metrics|summaryCards?)\b`（持ち主の部品を読んでいないファイルだけ） — 数の帯を CSS で手書き
+  - (b) の割り当て：画面の CSS の上書きの selector が `kpi|stat` に当たればこの型
+  - (c) の割り当て：直書きの selector が `kpi|stat|metric|summary(Cell|Item)|count(Cell|Box)` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - kpi-card：名前 `数のカード|^数 `・style に `box-shadow: 0px 1px 1px #1d1d1f29` — 数のカード（影の箱）で数を並べている
+- **決まり**：[§6.7](v8-design-rules.md)・[§6.1](v8-design-rules.md)・B-149・B-153・B-145
+- **見張り**：`apps/web/src/components/shared/kpi-band-contract.test.tsx`・`apps/web/src/components/shared/kpi-card-migration-contract.test.tsx`・`apps/web/src/components/shared/list-kpis-contract.test.ts`
+- **10-09 の数**：(a) 163（v8 113）・(b) 55・(c) 270・(d) 手描き 0（0 板）／写し 0・効く範囲 149 ファイル／64 機能／Pen 15 板
+
+- **10-11の追加**：[§6.29](v8-design-rules.md)・B-195・B-220。状態語は数字にせず状態札へ。帯の全マスに補足・行き先が無ければ高さ90、1つでもあれば全マスをそろえる。持ち主は同じ KpiBand＋KpiCard。既存の見張りに `kpi-card-description-react.test.tsx`、画面の余白の見張り `apps/web/scripts/v8-guard/pendec2-rules.test.mjs`（補足の空白の検出）をつなぐ。
+
+<a id="page-head"></a>
+## page-head 一覧・画面の頭
+
+- **役目**：板の題・「？」・右の主ボタンを1段で出す。画面全体の説明はB-245の「この画面の説明」で灰色の説明を開閉する。
+- **B-245の持ち主**：`components/shared/page-explanation.tsx` の `PageExplanationProvider`・`PageExplanationToggle`・`PageExplanationBody`。型の題の横と既存の説明の位置へ置き、人・画面ごとの開閉を覚える。欄や数の用語説明は `HelpTip`、一時的な失敗・閲覧のみは `Notice` のまま。
+- **持ち主（コード）**：`apps/web/src/components/templates/page-frame.tsx`・`apps/web/src/components/shared/page-header.tsx`・`apps/web/src/components/shared/help-tip.tsx`（部品 `PageHeading`・`PageTitle`・`PageFrame`・`ListPage`・`CreatePage`・`DetailPage`・`DashboardPage`・`SettingsPage`・`AnalyticsPage`・`InboxPage`）
+  - 読む変数：`--text-title`
+- **持ち主（Pen）**：`EnlYo`「板の頭」・`KjC1z`「？」
+- **見つけ方（コード）**：
+  - raw-h1：`<h1\b`（持ち主の部品を読んでいないファイルだけ） — 題を h1 で手書き（型の PageHeading を使う）
+  - header-desc：`<PageHeader\b(?:[^<>]|=>){0,400}?\bdescription=` — 頭の下の説明（B-158 の 2：説明は「？」へ）
+  - lead：`className=\{styles\.(lead|subtitle|pageDescription|headDescription|intro)\}` — 題の下の説明の行
+  - (b) の割り当て：画面の CSS の上書きの selector が `heading|pageHead` に当たればこの型
+  - (c) の割り当て：直書きの selector が `pageHead|heading|header\b|title\b|lead|subtitle|description` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - desc-line：名前 `^説明の行$|^説明$`・祖先の名前 `^板の頭|^頭$` — 頭の下の説明の行（「？」へ入れる）
+- **決まり**：[§5](v8-design-rules.md)・[§6.12-2](v8-design-rules.md)・B-158
+- **見張り**：`apps/web/src/components/shared/page-header-enlyo-contract.test.ts`・`apps/web/src/components/templates/page-templates-head-contract.test.ts`
+- **10-09 の数**：(a) 158（v8 109）・(b) 4・(c) 216・(d) 手描き 26（17 板）／写し 149・効く範囲 169 ファイル／74 機能／Pen 505 板
+
+<a id="toolbar"></a>
+## toolbar 一覧の道具の段
+
+- **役目**：検索→絞り込みの札→並び→右端に件数の切り替えを1段で並べる
+- **持ち主（コード）**：`apps/web/src/components/shared/list-toolbar.tsx`・`apps/web/src/components/shared/list-toolbar.module.css`・`apps/web/src/components/shared/search-field.tsx`（部品 `ListToolbar`・`ListToolbarSearch`・`ListToolbarOptional`）
+  - 読む変数：`--color-control-border`・`--control-shadow`
+- **持ち主（Pen）**：`c4n9Kr`「道具の1段」・`TkVyB`「検索」
+- **見つけ方（コード）**：
+  - toolbar-class：`styles\.(toolbar|toolBar|tools|controlsRow|filterBar|filtersRow|searchRow)\b`（持ち主の部品を読んでいないファイルだけ） — 道具の段を CSS で手書き
+  - search-alone：`<SearchField\b`（持ち主の部品を読んでいないファイルだけ） — 検索欄を道具の段の外で置いている
+  - sort-alone：`<SortSelect\b`（持ち主の部品を読んでいないファイルだけ） — 並びの欄を道具の段の外で置いている
+  - (b) の割り当て：画面の CSS の上書きの selector が `toolbar` に当たればこの型
+  - (c) の割り当て：直書きの selector が `toolbar|toolBar|controls\b|filters?Row|searchRow` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-toolbar：名前 `^(道具|道具の段|検索の段|絞り込みの段)$` — 道具の段の手描き（部品「道具の1段」でない）
+- **決まり**：[§6.8](v8-design-rules.md)・[§6.11-12](v8-design-rules.md)・B-143・B-122・B-157
+- **見張り**：`apps/web/src/components/shared/list-toolbar-contract.test.tsx`・`apps/web/src/components/ui/list-controls-contract.test.ts`
+- **10-09 の数**：(a) 227（v8 170）・(b) 1・(c) 9・(d) 手描き 157（153 板）／写し 3・効く範囲 36 ファイル／29 機能／Pen 191 板
+
+<a id="filter"></a>
+## filter 絞り込み
+
+- **役目**：一覧を状態・種類などで絞る札。数が増える物は選ぶ窓で絞る
+- **持ち主（コード）**：`apps/web/src/components/shared/filter-chip.tsx`・`apps/web/src/components/shared/filter-chip.css`（部品 `FilterChip`）
+  - 読む変数：`--color-control-border`
+- **持ち主（Pen）**：`XGJDa`「絞り込みの札/オン」・`O2fCAt`「絞り込みの札/オフ」
+- **見つけ方（コード）**：
+  - growing-select：`<Select\b(?:[^<>]|=>){0,400}?(label|aria-label|placeholder)=["'][^"']*(店舗|タグ|シナリオ|担当者|所属アカウント|送信者|スタッフ|テンプレート)` — 数が増える物の絞り込みをプルダウンで（B-164 は選ぶ窓）
+  - own-chip：`aria-pressed=\{`（持ち主の部品を読んでいないファイルだけ） — 絞り込みの札を aria-pressed で自作
+  - (b) の割り当て：画面の CSS の上書きの selector が `filter|chip` に当たればこの型
+  - (c) の割り当て：直書きの selector が `filter|chip` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-chip：名前 `^(札 すべて|絞り込み|札 絞り込み)`・名前が `絞り込みの札|窓を開く` でない — 絞り込みの札の手描き
+- **決まり**：[§6.17](v8-design-rules.md)・B-164・B-163
+- **見張り**：`apps/web/src/components/shared/filter-chip.test.tsx`／**要る試験**：道具の段の絞り込みで、作った物（店舗・タグ・シナリオ）を Select で並べたら落ちる試験
+- **10-09 の数**：(a) 190（v8 90）・(b) 28・(c) 29・(d) 手描き 37（27 板）／写し 5・効く範囲 116 ファイル／55 機能／Pen 40 板
+
+<a id="folder-column"></a>
+## folder-column フォルダの列
+
+- **役目**：一覧の左でフォルダを選び・作り・並べ替える
+- **持ち主（コード）**：`apps/web/src/components/shared/managed-folder-panel.tsx`・`apps/web/src/components/shared/managed-folder-panel.module.css`・`apps/web/src/components/shared/folder-panel.tsx`・`apps/web/src/components/shared/folder-panel.module.css`・`apps/web/src/components/shared/folder-row-actions.tsx`・`apps/web/src/components/shared/folder-add-dialog.tsx`・`apps/web/src/components/shared/folder-editor-dialog.tsx`・`apps/web/src/components/shared/folder-dot.tsx`（部品 `ManagedFolderPanel`・`FolderPanel`・`FolderDot`）
+  - 読む変数：`--color-hairline`
+- **持ち主（Pen）**：`faSbC`「フォルダの列」
+  - 部品の板の html に書き出されていない ID：`faSbC`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - raw-panel：`<FolderPanel\b`（持ち主の部品を読んでいないファイルだけ） — FolderPanel を直に使う（ManagedFolderPanel にする）
+  - row-actions：`\buseFolderRowActions\(` — フォルダの行の「…」を画面で組む
+  - own-dialog：`<(FolderAddDialog|FolderEditorDialog)\b` — フォルダの窓を画面で直に出す
+  - folder-words：`(?:>|['"'])[^<'"']{0,40}(?:フォルダを追加する|見る：|フォルダを消しても)` — フォルダの列の言葉が決まりと違う
+  - (b) の割り当て：画面の CSS の上書きの selector が `folder|rail` に当たればこの型
+  - (c) の割り当て：直書きの selector が `folder|rail` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-folders：名前 `^(フォルダ|フォルダの一覧|左の列|見る)$` — フォルダの列の手描き（部品 faSbC でない名前）
+- **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143・B-136・B-126・B-147
+- **見張り**：`apps/web/src/components/shared/folder-panel-contract.test.ts`・`apps/web/src/components/shared/managed-folder-panel.test.tsx`・`apps/web/src/components/shared/folder-rail-owner-contract.test.ts`・`apps/web/src/v8/folder-dot-1152-contract.test.ts`
+- **10-09 の数**：(a) 83（v8 60）・(b) 1・(c) 32・(d) 手描き 19（11 板）／写し 0・効く範囲 16 ファイル／13 機能／Pen 0 板
+
+<a id="table"></a>
+## table 表
+
+- **役目**：表を見出し40・左右24・線は黒7%で並べる
+- **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
+  - 行高の対応（§6.5-3・2026-10-12 B-254）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧は、**セル内の描画文字が1行なら52、2行・3行なら60**。判定は共通表の `useListRowDensity`、値は `--tpl-list-row-h`／`--tpl-list-row-multi-h`。文字のない高さ40の見本画像は複数行相当。WQmepの受信表は絵で確認した既存の専用口60を保持。1行の `ListSkeleton` は52、一般の表・`TableSkeleton` は56。行高の正本は見た目の決まり §6.5-3。
+  - 読む変数：`--color-table-head`・`--color-hairline`
+- **持ち主（Pen）**：`ASVsl`「表の見出し」・`JpOg0`「表の行」・`TBCUY`「横に送れる表」
+- **見つけ方（コード）**：
+  - raw-table：`<table\b` — 表を素の table で手書き
+  - raw-grid：`role=["'](grid|row|columnheader|rowheader)["']` — 表を role で手書き
+  - (b) の割り当て：画面の CSS の上書きの selector が `\b(table|thead|tbody|tr|th|td)\b` に当たればこの型
+  - (c) の割り当て：直書きの selector が `table|row\b|rows\b|cell|thead|tbody|\bth\b|\btd\b|\btr\b` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-row：名前 `^行 `・style に `height: 5\d px|height: 5\dpx|height: (52|54|56|60|61)px` — 表の行の手描き（部品「表の行」でない）
+- **決まり**：[§6.5-3](v8-design-rules.md)・[§6.1](v8-design-rules.md)・B-152・B-160
+- **見張り**：`apps/web/src/components/shared/table.test.tsx`・`apps/web/src/components/shared/v8-table-row-line-contract.test.ts`・`apps/web/src/components/shared/table-header-migration-contract.test.ts`
+- **10-09 の数**：(a) 546（v8 458）・(b) 581・(c) 204・(d) 手描き 4（2 板）／写し 20・効く範囲 223 ファイル／81 機能／Pen 86 板
+
+- **10-11の追加**：[§6.28](v8-design-rules.md)・B-217・B-218。一覧は外枠・角丸・影の無い平らな表、線と色付き行は領域いっぱい、中身は左右24。名前は黒の太字1行＋フォルダ丸。旧いv19Ivv基準・左右16は B-217、名前の緑は B-218 で置き換え。`apps/web/scripts/list-row-audit.mjs`・`apps/web/scripts/v8-guard/list-skeleton-audit.mjs` が既存の見張り。
+
+<a id="row-menu"></a>
+## row-menu 行の右端「…」
+
+- **役目**：行の操作を右端の「…」1つにまとめる
+- **持ち主（コード）**：`apps/web/src/components/shared/row-actions.tsx`・`apps/web/src/components/shared/row-actions.module.css`・`apps/web/src/components/shared/action-menu.tsx`・`apps/web/src/components/shared/action-menu.module.css`（部品 `RowMenu`・`MoreAction`・`RowActions`・`RowAction`・`RowQuickAction`）
+- **持ち主（Pen）**：`hnuY9`「その他操作メニュー」
+  - 部品の板の html に書き出されていない ID：`hnuY9`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - own-dots：`>\s*(…|⋯|\.\.\.)\s*<` — 「…」を手で描く
+  - dots-icon：`\b(MoreHorizontal|MoreVertical|DotsHorizontal|EllipsisHorizontal|Ellipsis)\b`（持ち主の部品を読んでいないファイルだけ） — 「…」の印を手で置く
+  - row-buttons：`styles\.(rowActions|rowButtons|actionsCell|rowOps)\b`（持ち主の部品を読んでいないファイルだけ） — 行の右端にボタンを並べる
+  - (b) の割り当て：画面の CSS の上書きの selector が `rowMenu|rowAction|more` に当たればこの型
+  - (c) の割り当て：直書きの selector が `rowMenu|rowAction|more\b|kebab|ellipsis|rowButtons?` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-dots：文字 `^(…|⋯)$`・祖先の名前 `^行|表の行` — 「…」の手描き（その他の操作の部品でない）
+  - 除く祖先：`^その他の操作`
+- **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143
+- **見張り**：`apps/web/src/components/shared/row-actions-contract.test.tsx`・`apps/web/src/v8/row-menu-contract.test.ts`
+- **10-09 の数**：(a) 109（v8 53）・(b) 31・(c) 9・(d) 手描き 0（0 板）／写し 0・効く範囲 132 ファイル／68 機能／Pen 0 板
+
+- **10-11の追加**：[§6.28](v8-design-rules.md)・[§6.39](v8-design-rules.md)・B-193・B-199・B-200・B-232。一覧の主操作は1つまで、編集の専用ボタン列を置かない。操作がある全行に同じxの「…」。閲覧のみで操作が無い板と読むだけの履歴表は対象外。
+
+<a id="pagination"></a>
+## pagination ページ送り
+
+- **役目**：ページを送り、10・20・50件を切り替える
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`ListPagePagination`）
+- **持ち主（Pen）**：`jX2Uw`「ページ送り」
+  - 注：PageSizeSelect は shared が持つ（B-172）。
+- **見つけ方（コード）**：
+  - own-size：`\b(const|let)\s+\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\w*\s*=` — 件数の定数を画面ごとに持つ
+  - size-100：`\[\s*20\s*,\s*50\s*,\s*100\s*\]` — 件数が 20・50・100（決まりは 10・20・50）
+  - more：`(?:>|['"'])[^<'"']{0,40}(?:もっと読む|さらに読み込む|もっと見る)` — 「もっと読む」（ページ送りにする）
+  - prev-next：`(?:>|['"'])[^<'"']{0,40}(?:前へ|次へ)`（持ち主の部品を読んでいないファイルだけ） — 前へ・次へを手で置く
+  - (b) の割り当て：画面の CSS の上書きの selector が `pagination|pager` に当たればこの型
+  - (c) の割り当て：直書きの selector が `pagination|pager|pageSize|perPage` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-pager：文字 `^(前へ|次へ|もっと読む|‹|›)$` — ページ送りの手描き
+  - 除く祖先：`^ページ送り`
+- **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143
+- **見張り**：`apps/web/src/components/ui/list-range-contract.test.ts`／**要る試験**：ページ送りのある一覧で件数の切り替え（10・20・50）が無い・定数を画面で持つと落ちる試験
+- **10-09 の数**：(a) 222（v8 126）・(b) 0・(c) 12・(d) 手描き 8（6 板）／写し 0・効く範囲 155 ファイル／71 機能／Pen 56 板
+
+- **10-11の追加**：[§6.30](v8-design-rules.md)・B-211・B-231。番号と次の矢印は同じ枠、今のページだけ薄い緑。部品 jX2Uw の番号・枠を画面の上書きで消さない。
+
+<a id="detail-panel"></a>
+## detail-panel 詳細のパネル・引き出し
+
+- **役目**：行の詳細は右の DetailPanel 360、編集は Drawer 480/540
+- **持ち主（コード）**：`apps/web/src/components/shared/detail-panel.tsx`・`apps/web/src/components/shared/detail-panel.module.css`・`apps/web/src/components/shared/drawer.tsx`・`apps/web/src/components/shared/drawer.module.css`・`apps/web/src/components/shared/slide-panel.tsx`（部品 `DetailPanel`・`Drawer`）
+  - 読む変数：`--radius-panel`・`--shadow-float`
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の部品 ID が対応表に無い（ZBjxY の「引き出し」は板の中の名前だけ）
+- **見つけ方（コード）**：
+  - fixed-right：CSS の規則に `position:\s*fixed` と `right:\s*0` と `width:\s*\d{3}px|width:\s*min\(` があり — 右から出るパネルを CSS で手書き
+  - aside：`<aside\b`（持ち主の部品を読んでいないファイルだけ） — 右のパネルを aside で手書き
+  - (b) の割り当て：画面の CSS の上書きの selector が `drawer|detailPanel` に当たればこの型
+  - (c) の割り当て：直書きの selector が `drawer|panel|aside|sidePane|sheet` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - odd-width：名前 `引き出し|詳細パネル|右の欄`・style に `width: \d+px`・style に `width: (360|480|540|320|1160)px` が無い — 段にない幅のパネル（360・480・540・320・1160 以外）
+- **決まり**：[§6.12-8](v8-design-rules.md)・B-158・B-160
+- **見張り**：`apps/web/src/components/shared/detail-panel.test.tsx`／**要る試験**：Drawer の幅が 480/540 以外・手書きの固定パネルで落ちる試験
+- **10-09 の数**：(a) 140（v8 73）・(b) 3・(c) 14・(d) 手描き 13（9 板）／写し 0・効く範囲 41 ファイル／29 機能／Pen 0 板
+
+<a id="dialog"></a>
+## dialog 窓（確かめ・編集）
+
+- **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
+- **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
+  - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
+- **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
+- **見つけ方（コード）**：
+  - raw-dialog：`role=["']dialog["']|aria-modal=|<dialog\b` — 窓を手書き
+  - confirm：`\bwindow\.confirm\(|(?<![\w.])confirm\(\s*['"']` — ブラウザの confirm
+  - half-q：`title=["'][^"']*\?["']` — 窓の題の「?」が半角（B-146 の 6）
+  - (b) の割り当て：画面の CSS の上書きの selector が `dialog|modal|\[role=.?dialog|::backdrop` に当たればこの型
+  - (c) の割り当て：直書きの selector が `dialog|modal|overlay|backdrop` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-dialog：名前 `(の窓|窓$|小窓)`・名前が `選ぶ窓|窓を開く|窓で選ぶ` でない・style に `border-radius: 16px` — 窓の手描き（部品「ダイアログ/中」でない）
+- **決まり**：[§5](v8-design-rules.md)・[§6.8](v8-design-rules.md)・[§6.12-8](v8-design-rules.md)・B-145・B-146
+- **見張り**：`apps/web/src/components/shared/dialog-design-size-contract.test.tsx`・`apps/web/src/components/shared/confirm-dialog-design-size.test.tsx`・`apps/web/src/components/shared/dialog-design-header.react.test.tsx`／**要る試験**：窓の題の終わりが半角「?」・記号なしで落ちる試験
+- **10-09 の数**：(a) 109（v8 32）・(b) 18・(c) 41・(d) 手描き 6（6 板）／写し 0・効く範囲 354 ファイル／109 機能／Pen 0 板
+
+- **10-11の追加**：[§6.42](v8-design-rules.md)・B-180・B-240。確かめの窓は480／560／720／960の段、既定480。絵の520等を正にしない。選ぶ窓640は [picker-dialog](#picker-dialog) の例外、引き出し480／540は [detail-panel](#detail-panel)。既存の幅の試験と照合で区別する。
+
+<a id="picker-dialog"></a>
+## picker-dialog 選ぶ窓
+
+- **役目**：作ってある物を、フォルダ・探す・見本付きの窓で選ぶ（受信箱の「テンプレートを選ぶ」の形1つ）
+- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
+- **持ち主（Pen）**：`S2Vgi`「選ぶ窓（正の形・B-165）」・`A1eZS`「選ぶ窓（V8-B の写し）」
+  - 部品の板の html に書き出されていない ID：`S2Vgi`・`A1eZS`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - old-picker：`<(SourcePickerDialog|SelectionDialog)\b` — 古い選ぶ窓（EntityPickerDialog にする）
+  - own-picker：`\b(function|const)\s+\w*(Picker|Chooser|Selector)(Dialog|Modal)\b` — 画面で選ぶ窓を自作
+  - (b) の割り当て：画面の CSS の上書きの selector が `picker` に当たればこの型
+  - (c) の割り当て：直書きの selector が `picker|chooser` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - old-window：名前 `選ぶ窓|を選ぶ窓|1つ選ぶ窓`・名前が `B-165|^10\. 選ぶ窓` でない — 正の形でない選ぶ窓（dJZ7Q など古い窓）
+- **決まり**：[§6.10](v8-design-rules.md)・[§6.17](v8-design-rules.md)・B-155・B-163・B-165・B-133
+- **見張り**：`apps/web/src/components/shared/entity-picker.test.tsx`・`apps/web/src/components/shared/select-window-react.test.tsx`／**要る試験**：選ぶ窓を SourcePickerDialog・自作の窓で出すと落ちる試験
+- **10-09 の数**：(a) 2（v8 1）・(b) 1・(c) 1・(d) 手描き 3（3 板）／写し 0・効く範囲 2 ファイル／1 機能／Pen 0 板
+
+<a id="picker-field"></a>
+## picker-field 選ぶ欄（選ぶ前・選んだ後）
+
+- **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
+- 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
+- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の欄の部品 ID が無い（決まりの板 MqqcW・aXUuh は見本。板では「選んだもの（B-163 窓で選ぶ）」の名前）
+- **見つけ方（コード）**：
+  - select-entity：`<(Select|Combobox|MultiSelect)\b(?:[^<>]|=>){0,500}?(label|aria-label|placeholder)=["'][^"']*(テンプレート|回答フォーム|タグ|シナリオ|リッチメニュー|予約メニュー|クーポン|スタンプカード|スタッフ|セグメント|アカウント|店舗|友だち情報)` — 作ってある物をプルダウンで選ばせる（B-155・B-163）
+  - multi-select：`<(MultiSelect|EntityMultiSelect)\b` — 下に広がる複数選び（B-163 は窓）
+  - (c) の割り当て：直書きの selector が `pickerField|picked|chosen` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - dropdown-entity：名前 `^欄 (テンプレート|回答フォーム|タグ|シナリオ|リッチメニュー|予約メニュー|クーポン|スタッフ|店舗|アカウント)` — 作ってある物を選ぶ欄がプルダウンの形
+- **決まり**：[§2](v8-design-rules.md)・[§6.10](v8-design-rules.md)・[§6.17](v8-design-rules.md)・B-155・B-163
+- **見張り**：`apps/web/src/components/shared/entity-picker.test.tsx`／**要る試験**：作ってある物（テンプレート・タグ…）の label の Select が出たら落ちる試験
+- **10-09 の数**：(a) 137（v8 71）・(b) 0・(c) 2・(d) 手描き 64（19 板）／写し 0・効く範囲 7 ファイル／4 機能／Pen 0 板
+
+<a id="select"></a>
+## select プルダウン（許される範囲）
+
+- **役目**：数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ
+- **持ち主（コード）**：`apps/web/src/components/shared/select.tsx`・`apps/web/src/components/shared/select.module.css`・`apps/web/src/components/shared/select-menu.tsx`・`apps/web/src/components/shared/select-menu.module.css`・`apps/web/src/components/shared/menu-portal.tsx`（部品 `Select`・`SelectMenu`）
+  - 読む変数：`--color-control-border`・`--radius-control`
+  - 既存の栞付き絞り込み（axFrW／wjfLe）は `icon`・`valueAlign="start"`・`showChevron={false}`、狭い段は `iconOnly`。画面側でボタンの余白・矢印・値を上書きしない。
+- **持ち主（Pen）**：`wMMk6`「選ぶ欄」・`StFE7`「選ぶ欄/開いた」
+  - 部品の板の html に書き出されていない ID：`StFE7`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - raw-select：`<select\b` — 素の select
+  - own-listbox：`role=["'](listbox|option|menu|menuitem)["']` — 開いた一覧を手書き
+  - head-prefix：`label:\s*['"'](並び|フォルダ|状態)：` — 選択肢に「並び：」などの頭（B-45）
+  - (b) の割り当て：画面の CSS の上書きの selector が `select|dropdown|listbox` に当たればこの型
+  - (c) の割り当て：直書きの selector が `select|dropdown|listbox|menuList` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-open：名前 `^(開いた|メニュー|選択肢の一覧|候補)$` — 開いた中身の手描き（StFE7 でない）
+- **決まり**：[§2](v8-design-rules.md)・[§6.17](v8-design-rules.md)・B-45・B-163
+- **見張り**：`apps/web/src/components/shared/select-menu.react.test.tsx`・`apps/web/src/components/shared/select-width-text.test.tsx`・`apps/web/src/components/shared/menu-portal-rollout-contract.test.ts`
+- **10-09 の数**：(a) 154（v8 88）・(b) 33・(c) 18・(d) 手描き 12（8 板）／写し 3・効く範囲 376 ファイル／111 機能／Pen 97 板
+
+<a id="tap-action"></a>
+## tap-action 押したら（TapActionField）
+
+- **役目**：ボタン・面を押したときの動き（URL・テキスト・予約・回答フォーム・予約履歴・来店スタンプ）を選ぶ
+- **持ち主（コード）**：`apps/web/src/components/shared/tap-action-field.tsx`・`apps/web/src/components/shared/tap-action-field.module.css`・`apps/web/src/lib/tap-actions.ts`・`apps/web/src/components/shared/use-tap-action-sources.ts`（部品 `TapActionField`・`TapTargetPicker`）
+- **持ち主（Pen）**：`Vx8Ny`「押したら（TapActionField）/閉じた」・`XVGg5`「押したら/開いた」・`c1qBx`「押したら/選んだ後」
+  - 部品の板の html に書き出されていない ID：`Vx8Ny`・`XVGg5`・`c1qBx`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - old-uri：`<UriTapActionField\b` — 古い押したらの欄
+  - own-types：`['"](uri|postback|message|datetimepicker)['"]\s*[,:]`（持ち主の部品を読んでいないファイルだけ）（ファイル `\.tsx$`） — 押したらの種類を画面で並べる
+  - own-label：`(?:>|['"'])[^<'"']{0,40}(?:押したときの動き|タップしたとき|押したら)`（持ち主の部品を読んでいないファイルだけ） — 押したらの欄を画面で組む
+  - (b) の割り当て：画面の CSS の上書きの selector が `tapAction` に当たればこの型
+  - (c) の割り当て：直書きの selector が `tapAction|actionType|tapType` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-tap：名前 `^(欄 )?(押したら|押した時の動き|ボタンの動き)$` — 押したらの欄の手描き
+- **決まり**：[§6.13](v8-design-rules.md)・B-129・B-135
+- **見張り**：`apps/web/src/components/shared/tap-action-field.test.tsx`・`apps/web/src/lib/tap-actions.test.ts`
+- **10-09 の数**：(a) 44（v8 29）・(b) 0・(c) 1・(d) 手描き 0（0 板）／写し 0・効く範囲 6 ファイル／6 機能／Pen 0 板
+
+<a id="tap-extra"></a>
+## tap-extra 押されたときにあわせて行うこと
+
+- **役目**：押したらに付けて、タグを付ける・スコアを足す
+- **持ち主（コード）**：`apps/web/src/components/shared/tap-action-field.tsx`（部品 `TapActionField`）
+- **持ち主（Pen）**：`A2gkiG`「あわせて行うこと/閉じた」・`TPuCf`「あわせて行うこと/開いた」・`b2hVaX`「あわせて行うこと/選んだ後」
+  - 部品の板の html に書き出されていない ID：`A2gkiG`・`TPuCf`・`b2hVaX`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - own-extra：`(?:>|['"'])[^<'"']{0,40}(?:タグを付ける|スコアを足す|スコアを加算|タグを追加する)`（持ち主の部品を読んでいないファイルだけ） — あわせて行うことを画面で組む
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-extra：名前 `押した人に|タグを付ける行` — あわせて行うことの手描き
+- **決まり**：[§6.17](v8-design-rules.md)・B-162・B-164
+- **見張り**：`apps/web/src/components/shared/tap-action-field.test.tsx`
+- **10-09 の数**：(a) 48（v8 27）・(b) 0・(c) 0・(d) 手描き 0（0 板）／写し 0・効く範囲 6 ファイル／6 機能／Pen 0 板
+
+<a id="action-list"></a>
+## action-list 行うことを足す
+
+- **役目**：［＋ 行うことを足す］→種類→選ぶ窓→行で並べる（回答フォーム・カルーセル・質問・自動応答・友だち追加・リッチメニュー）
+- **持ち主（コード）**：**未実装**
+- **持ち主（Pen）**：**未定**
+  - 注：未実装（B-169）。コードの部品も Pen の部品も無い。作ってから持ち主を書く
+- **見つけ方（コード）**：
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:行うことを足す|行うことを追加|アクションを追加|答え終わったら|回答したときに付けるタグ|使われたときに行うこと|答え終わったときに行うこと)` — 「行うこと」を画面ごとに組んでいる
+  - (c) の割り当て：直書きの selector が `actions?List|actionRow|addAction` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-actions：名前 `行うこと`・名前が `押されたときに、あわせて行うこと` でない — 行うことの段の手描き（部品が無い）
+- **決まり**：[§6.19](v8-design-rules.md)・B-169
+- **見張り**：なし／**要る試験**：共通部品を作ったら：回答フォーム・カルーセル・質問・自動応答・友だち追加・リッチメニューがその部品を読む試験
+- **10-09 の数**：(a) 34（v8 16）・(b) 0・(c) 8・(d) 手描き 24（16 板）／写し 0・効く範囲 0 ファイル／0 機能／Pen 0 板
+
+<a id="media-slot"></a>
+## media-slot 画像の枠（MediaSlot）
+
+- **役目**：画像・動画・音声・ファイルを入れる所（真ん中に印・題「〇〇を追加」・ドラッグ・制限の文）
+- **持ち主（コード）**：`apps/web/src/components/shared/media-slot.tsx`・`apps/web/src/components/shared/media-slot.module.css`・`apps/web/src/components/shared/media-picker-dialog.tsx`・`apps/web/src/components/shared/media-library-upload.ts`（部品 `MediaSlot`・`MediaPickerDialog`）
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の部品 ID が無い（Z7vd2 は見本で消した。板では「画像を追加 空・小・入った」の名前）
+- **見つけ方（コード）**：
+  - file-input：`type=["']file["']` — 手書きの file 入力
+  - old-upload：`<(ImageUploader|FileDropzone)\b` — 古い取り込み部品
+  - limit-text：`(?:>|['"'])[^<'"']{0,40}(?:MB\s*(以内|以下|まで)|JPG|jpg\/)`（持ち主の部品を読んでいないファイルだけ） — 上限の文を画面で書く
+  - dashed：CSS の規則に `border(-style)?:[^;]*dashed` があり — 点線の箱
+  - (b) の割り当て：画面の CSS の上書きの selector が `media|upload|drop` に当たればこの型
+  - (c) の割り当て：直書きの selector が `upload|dropzone|drop\b|media|thumb|imageBox` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - dashed-box：style に `dashed` — 点線の古い箱
+- **決まり**：[§6.12-9](v8-design-rules.md)・[§6.13](v8-design-rules.md)・B-128・B-138・B-161
+- **見張り**：`apps/web/src/components/shared/media-slot.test.tsx`／**要る試験**：type="file" を共通部品の外で書いたら落ちる試験
+- **10-09 の数**：(a) 81（v8 41）・(b) 1・(c) 11・(d) 手描き 0（0 板）／写し 0・効く範囲 26 ファイル／16 機能／Pen 0 板
+
+<a id="field"></a>
+## field 欄（Field・必須・任意・文字数）
+
+- **役目**：ラベル・必須/任意の札・文字数・補足 note を1つの形で出す
+- **持ち主（コード）**：`apps/web/src/components/shared/form-controls.tsx`・`apps/web/src/components/shared/form-controls.module.css`・`apps/web/src/components/shared/text-field.tsx`・`apps/web/src/components/shared/text-field.module.css`・`apps/web/src/components/shared/field-context.ts`（部品 `Field`・`TextInput`・`TextArea`・`RequiredBadge`・`OptionalBadge`・`TextField`）
+  - 読む変数：`--color-control-border`・`--radius-control`
+- **持ち主（Pen）**：`Ume2U`「入力欄」・`i5BW8b`「入力欄/複数行」
+  - 部品の板の html に書き出されていない ID：`i5BW8b`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - optional-paren：`（任意）|\(任意\)` — 「（任意）」（札にする）
+  - asterisk：`>\s*[＊*]\s*<` — 必須の「＊」
+  - own-count：`\.length\s*\}?\s*\/\s*\{?\s*\w*(MAX|max|limit|Limit|\d+)`（ファイル `\.tsx$`） — 文字数を画面で数えて出す
+  - half-ex：`['">]例:\s?` — 入力例が半角「例:」
+  - raw-label：`<label\b(?![^>]*className=\{styles\.(check|radio|toggle))`（持ち主の部品を読んでいないファイルだけ） — ラベルを手書き
+  - (b) の割り当て：画面の CSS の上書きの selector が `\b(input|textarea|label)\b|field` に当たればこの型
+  - (c) の割り当て：直書きの selector が `field|label|input|textarea|formRow|control\b` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - paren-optional：文字 `（任意）` — 「（任意）」の文字（札でない）
+- **決まり**：[§6.12-4](v8-design-rules.md)・[§6.12-16](v8-design-rules.md)・B-158
+- **見張り**：`apps/web/src/components/shared/optional-badge.test.tsx`・`apps/web/src/components/shared/text-field-unified.react.test.tsx`／**要る試験**：「（任意）」「＊」を書いたら落ちる試験
+- **10-09 の数**：(a) 804（v8 332）・(b) 52・(c) 196・(d) 手描き 1（1 板）／写し 4・効く範囲 269 ファイル／91 機能／Pen 104 板
+
+<a id="field-error"></a>
+## field-error 欄の赤表示
+
+- **役目**：誤りの欄を赤く・下に理由・最初の誤りへ移る。欄に結び付かない失敗だけ Notice danger
+- **持ち主（コード）**：`apps/web/src/lib/use-form-errors.ts`・`apps/web/src/components/shared/validation-summary.tsx`・`apps/web/src/components/shared/error-count-badge.tsx`・`apps/web/src/components/shared/form-controls.tsx`（部品 `useFormErrors`・`FieldError`・`ValidationSummary`・`ErrorCountBadge`）
+  - 読む変数：`--color-danger`
+- **持ち主（Pen）**：`fDAyI`「入力欄/エラー」
+  - 部品の板の html に書き出されていない ID：`fDAyI`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - raw-alert：`role=["']alert["']` — 手書きの role="alert"
+  - own-invalid：`aria-invalid=\{`（持ち主の部品を読んでいないファイルだけ） — 欄の誤りを画面で組む
+  - (b) の割り当て：画面の CSS の上書きの selector が `error|invalid` に当たればこの型
+  - (c) の割り当て：直書きの selector が `error|invalid|alert` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - red-band-only：名前 `^帯 (エラー|誤り|失敗)` — 上の赤い帯だけの誤り
+- **決まり**：[§6.9](v8-design-rules.md)・B-154・B-139
+- **見張り**：`apps/web/src/lib/use-form-errors.test.tsx`・`apps/web/src/components/shared/field-errors-controls.react.test.tsx`／**要る試験**：作る・編集の画面が useFormErrors を読まないと落ちる試験
+- **10-09 の数**：(a) 704（v8 477）・(b) 14・(c) 31・(d) 手描き 0（0 板）／写し 0・効く範囲 43 ファイル／27 機能／Pen 0 板
+
+<a id="sticky-bar"></a>
+## sticky-bar 作る・編集の下の帯
+
+- **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
+- **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）
+  - 読む変数：`--shadow-bar-float`
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の部品 ID が無い（板では「下の帯（追従・常に画面の下）」の名前）
+- **見つけ方（コード）**：
+  - sticky-bottom：CSS の規則に `position:\s*(sticky|fixed)` と `bottom:\s*0` があり — 下の帯を CSS で手書き
+  - back-in-bar：`(?:>|['"'])[^<'"']{0,40}(?:一覧へ戻る|一覧に戻る)` — 帯に「一覧へ戻る」
+  - (b) の割り当て：画面の CSS の上書きの selector が `footer|sticky|bottomBar` に当たればこの型
+  - (c) の割り当て：直書きの selector が `footer|bottomBar|stickyBar|actionBar|saveBar` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - fixed-bar：名前 `^下の帯（固定）$` — 「固定」の下の帯（追従でない名前）
+- **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143
+- **見張り**：`apps/web/src/components/shared/sticky-bar-contract.test.ts`・`apps/web/src/components/templates/create-page-spacing.test.tsx`／**要る試験**：帯に「一覧へ戻る」・削除が左端でない形で落ちる試験
+- **10-09 の数**：(a) 260（v8 162）・(b) 5・(c) 15・(d) 手描き 30（30 板）／写し 0・効く範囲 126 ファイル／72 機能／Pen 0 板
+
+<a id="tabs"></a>
+## tabs タブ
+
+- **役目**：中身を切り替える。?tab= と router.replace
+- **持ち主（コード）**：`apps/web/src/components/shared/tabs.tsx`・`apps/web/src/components/shared/tabs.module.css`・`apps/web/src/components/layout/scrollable-tabs.tsx`・`apps/web/src/components/layout/merged-tabs.tsx`（部品 `Tabs`・`ScrollableTabs`・`MergedTabs`）
+- **持ち主（Pen）**：`clV5c`「タブ」
+- **見つけ方（コード）**：
+  - raw-tab：`role=["'](tab|tablist)["']` — タブを手書き
+  - push-tab：`router\.push\([^)]*tab=` — タブで履歴を積む（replace にする）
+  - (b) の割り当て：画面の CSS の上書きの selector が `tab|\[role=.?tab` に当たればこの型
+  - (c) の割り当て：直書きの selector が `tab\b|tabs\b|tabList|tabBar` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-tab：名前 `^(タブの段|種類のタブ)$` — タブの段の手描き
+- **決まり**：[§5](v8-design-rules.md)・[§6.12-3](v8-design-rules.md)・B-158
+- **見張り**：`apps/web/src/components/shared/tabs-height-contract.test.ts`・`apps/web/src/components/shared/tabs-v8-indicator.react.test.tsx`・`apps/web/src/components/layout/scrollable-tabs-contract.test.ts`／**要る試験**：role="tab" を共通部品の外で書いたら落ちる試験
+- **10-09 の数**：(a) 86（v8 52）・(b) 19・(c) 13・(d) 手描き 130（108 板）／写し 13・効く範囲 80 ファイル／51 機能／Pen 132 板
+
+<a id="status-badge"></a>
+## status-badge 状態の札
+
+- **役目**：丸い札・12/600・左に6pxの丸・5色。言葉は状態の表から
+- **持ち主（コード）**：`apps/web/src/components/shared/status-badge.tsx`・`apps/web/src/components/shared/status-badge.module.css`（部品 `StatusBadge`）
+  - 読む変数：`--radius-pill`・`--color-success`・`--color-danger`・`--color-warning`・`--color-info`
+- **持ち主（Pen）**：`mpVfY`「状態の札/送信済み・対応済み」・`ekmYd`「状態の札/予約中・案内」・`ii85L`「状態の札/対応中・注意」・`XwfSH`「状態の札/未対応・失敗」・`hQeAo`「状態の札/下書き・停止」
+  - 注：状態の言葉の表は未実装（B-158 の 1）
+- **見つけ方（コード）**：
+  - own-badge：`\b(function|const)\s+\w*(StatusBadge|StatusPill|StatePill|StateBadge|Pill|Badge)\b\s*[=(]` — 状態の札を自作
+  - old-pill：`<(StatusPill|StatusChip)\b` — 別の札の部品
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:稼働中|一時停止|保管|アーカイブ済み|予約済み|送信完了)` — 使わない状態の言葉（B-158 の 1）
+  - (b) の割り当て：画面の CSS の上書きの selector が `badge|pill|status|\[data-tone` に当たればこの型
+  - (c) の割り当て：直書きの selector が `badge|pill|status|state(Tag|Label)?\b` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-badge：名前 `^札 (有効|公開中|下書き|停止中|予約中|送信済み|失敗|注意)` — 状態の札の手描き（「状態の札/…」の部品でない）
+- **決まり**：[§6.5-4](v8-design-rules.md)・[§6.12-1](v8-design-rules.md)・B-152・B-158・B-160
+- **見張り**：`apps/web/src/components/shared/status-chip.test.tsx`／**要る試験**：StatusBadge を自作・別の札で状態を出すと落ちる試験
+- **10-09 の数**：(a) 436（v8 268）・(b) 81・(c) 54・(d) 手描き 306（65 板）／写し 10・効く範囲 125 ファイル／56 機能／Pen 178 板
+
+<a id="list-state"></a>
+## list-state 空・読めない・読み込み中
+
+- **役目**：空・絞り込みで0件・読めなかった（もう一度読み込む）・骨組みを1つの形で出す
+- **持ち主（コード）**：`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
+  - 読む変数：`--radius-mini`
+- **持ち主（Pen）**：`hNXm7`「空の表示」・`jr5Nl`「骨格の行」・`Dr8Wr`「状態/検索結果0件」・`deztM`「状態/取得失敗」・`q0z77i`「状態/読み込み中」
+  - 部品の板の html に書き出されていない ID：`Dr8Wr`・`deztM`・`q0z77i`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - state-card：`styles\.(stateCard|emptyState|empty|loading|errorState)\b` — 空・読めない表示を CSS で手書き
+  - own-state：`\b(function|const)\s+(StateCard|PageState|EmptyState|LoadingState|ErrorState)\b` — 状態の部品を自作
+  - retry-words：`(?:>|['"'])[^<'"']{0,40}(?:再読み込み|再試行|もう一度試す|リトライ)` — 押し口の言葉が「もう一度読み込む」でない
+  - spinner：`animate-spin|<Spinner\b` — 回る印（保存中のボタンの中だけ）
+  - account-words：`(?:>|['"'])[^<'"']{0,40}(?:アカウントを選択してください|アカウントを選んでください)` — アカウント未選択の言葉（「LINE公式アカウントを選んでください」）
+  - (b) の割り当て：画面の CSS の上書きの selector が `empty|skeleton|state` に当たればこの型
+  - (c) の割り当て：直書きの selector が `empty|stateCard|loading|skeleton|placeholder|error(State|Card)` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-empty：名前 `^(空|空の表示（まだ1件も無い）|まだ無い)$` — 空の表示の手描き
+- **決まり**：[§6.5-8](v8-design-rules.md)・[§6.6-8](v8-design-rules.md)・[§6.11-11](v8-design-rules.md)・[§6.12-18](v8-design-rules.md)・B-143・B-157
+- **見張り**：`apps/web/src/components/shared/list-state-contract.test.tsx`・`apps/web/src/components/shared/list-state-retry-contract.test.tsx`・`apps/web/src/components/shared/skeleton-contract.test.tsx`
+- **10-09 の数**：(a) 816（v8 475）・(b) 13・(c) 17・(d) 手描き 31（27 板）／写し 0・効く範囲 430 ファイル／115 機能／Pen 1 板
+
+<a id="viewer-band"></a>
+## viewer-band 閲覧のみの帯
+
+- **役目**：閲覧のみの人に「閲覧のみで見ています。…」の帯を出す（型に readOnly）
+- **持ち主（コード）**：`apps/web/src/components/shared/read-only-notice.tsx`・`read-only-notice.module.css`（部品 `ReadOnlyNotice`）
+- **持ち主（Pen）**：**未定**（部品IDは司令塔の確定待ち）
+- **見つけ方（コード）**：
+  - own-band：`\b(ViewerBand|ReadOnlyBand|viewerBand|roBand|readonlyBand|readOnlyBand)\b` と `styles.readOnly` / `styles.readonly` / 同名の見た目CSS — 閲覧のみの帯を画面ごとに作る
+  - words：`閲覧のみで(見て|ご覧)` — 閲覧のみの文を画面で書く
+  - (c) の割り当て：直書きの selector が `viewer|readOnly|readonly|roBand` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - other-words：文字 `閲覧のみ`・文字が `^閲覧のみで見ています。変える操作は(オーナーか管理者|統括の管理者)に頼んでください。$|^閲覧のみ$` でない — 閲覧のみの帯の文が決まりと違う
+- **決まり**：[§2](v8-design-rules.md)・[§6.6-7](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-146・B-159
+- **見張り**：`apps/web/src/v8/viewer-hides-actions.test.ts`／**要る試験**：共通部品を作ったら：閲覧のみの文を画面で書くと落ちる試験
+- **10-09 の数**：(a) 248（v8 239）・(b) 0・(c) 10・(d) 手描き 8（7 板）／写し 0・効く範囲 0 ファイル／0 機能／Pen 0 板
+
+<a id="notice"></a>
+## notice 知らせ（トースト・Notice）
+
+- **役目**：保存できた＝トースト1つ。失敗は欄の赤か帯。種類は info・success・warn・danger
+- **持ち主（コード）**：`apps/web/src/components/shared/toast.tsx`・`apps/web/src/components/shared/toast.module.css`・`apps/web/src/components/shared/notice.tsx`・`apps/web/src/components/shared/notice.module.css`（部品 `Notice`・`notifyToast`・`Toast`）
+- **持ち主（Pen）**：`Q6cQB`「知らせ/うまくいった」・`tnWX9`「知らせ/できなかった」・`ThDed`「帯/案内」
+- **見つけ方（コード）**：
+  - tone-error：`tone=["']error["']` — tone="error"（danger にする）
+  - undo：`(?:>|['"'])[^<'"']{0,40}(?:元に戻す)` — 知らせの「元に戻す」（B-160 の 1）
+  - alert：`(?<![\w.])alert\(` — ブラウザの alert
+  - note-bar：`<NoteBar\b` — 別の帯の部品
+  - (b) の割り当て：画面の CSS の上書きの selector が `notice|toast` に当たればこの型
+  - (c) の割り当て：直書きの selector が `notice|toast|banner|alertBox|message(Box|Bar)` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-toast：名前 `^知らせ$` — 知らせの手描き（部品の知らせでない）
+- **決まり**：[§6.11-6](v8-design-rules.md)・[§6.12-20](v8-design-rules.md)・[§6.15-1](v8-design-rules.md)・B-157・B-158・B-160
+- **見張り**：`apps/web/src/components/shared/toast.test.tsx`・`apps/web/src/components/shared/notice-info-contract.test.ts`・`apps/web/src/components/shared/toast-stack.regression.test.tsx`
+- **10-09 の数**：(a) 195（v8 62）・(b) 0・(c) 20・(d) 手描き 23（23 板）／写し 0・効く範囲 394 ファイル／112 機能／Pen 23 板
+
+<a id="save-conflict"></a>
+## save-conflict ぶつかりの帯
+
+- **役目**：ほかの人が先に保存したとき、入力を残して比べる・最新を読み込む
+- **持ち主（コード）**：`apps/web/src/components/shared/save-conflict.tsx`・`apps/web/src/components/shared/save-conflict.module.css`（部品 `useSaveConflict`・`SaveConflictBand`・`SaveConflictCompareDialog`）
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の部品 ID が無い（見本「ぶつかりの帯」は型の見本 aHrwg の中）
+- **見つけ方（コード）**：
+  - own-409：`status\s*===?\s*409[\s\S]{0,300}?(conflict|Conflict|競合|revision|Revision|version|更新され|先に保存|ほかの人)`（持ち主の部品を読んでいないファイルだけ） — 保存のぶつかり（409）を画面で扱う
+  - old-bar：`<SaveConflictBar\b` — 古いぶつかりの帯
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:ほかの人が|他の人が|別の人が|他のユーザー)`（持ち主の部品を読んでいないファイルだけ） — ぶつかりの文を画面で書く
+  - (b) の割り当て：画面の CSS の上書きの selector が `conflict` に当たればこの型
+  - (c) の割り当て：直書きの selector が `conflict` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-conflict：文字 `ほかの人が先に|他の人が` — ぶつかりの帯の手描き
+- **決まり**：[§6.11-9](v8-design-rules.md)・B-157
+- **見張り**：`apps/web/src/components/shared/save-conflict-wiring-contract.test.ts`・`apps/web/src/components/shared/save-conflict.react.test.tsx`
+- **10-09 の数**：(a) 223（v8 131）・(b) 2・(c) 8・(d) 手描き 0（0 板）／写し 0・効く範囲 12 ファイル／11 機能／Pen 0 板
+
+<a id="customer-info"></a>
+## customer-info 顧客情報の欄
+
+- **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集・決まった8つの欄・タグ・マイル…）
+- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
+- **持ち主（Pen）**：`GBTyR`「顧客情報の欄（B-167）」
+  - 2026-10-11確認：両画面の入口は別でも欄の持ち主は CustomerInfoPanel。取得・保存・権限は呼び出す側が渡す。
+  - 部品の板の html に書き出されていない ID：`GBTyR`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - two-panels：`\b(CustomerPanel|FriendInfoSidebar|OverviewTab|customerPanel|friendInfo)\b` — 顧客情報の欄を画面ごとに作る
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:顧客情報をすべて表示|表示項目)` — 顧客情報の欄の組み立て
+  - (c) の割り当て：直書きの selector が `customer|friendInfo|profile(Panel|Card)` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-customer：名前 `顧客(情報|カルテ)|右の列|概要の左`・名前が `B-167` でない — 顧客情報の欄の手描き（GBTyR でない）
+- **決まり**：B-167・B-166（7つは B-235 で置き換え）・[§6.33](v8-design-rules.md)・[§6.40](v8-design-rules.md)・B-212・B-219・B-234・B-235・B-238
+- **見張り**：`apps/web/src/components/shared/customer-info-panel.test.tsx`。顔32・見出し72・出どころの印・タグ2つ＋+N・［表示項目を編集］を共通で出す。列と固定8つの動作は下の [display-items](#display-items) も読む。
+- **10-09 の数**：(a) 20（v8 9）・(b) 0・(c) 0・(d) 手描き 20（15 板）／写し 0・効く範囲 0 ファイル／0 機能／Pen 0 板
+
+<a id="phone-preview"></a>
+## phone-preview スマホのプレビュー
+
+- **役目**：LINE のトークは LinePreview 1つ。LIFF の画面は LIFF のスマホ枠1つ
+- **持ち主（コード）**：`apps/web/src/components/shared/line-preview.tsx`・`apps/web/src/components/shared/line-preview.module.css`（部品 `LinePreview`・`LinePreviewMessage`・`LinePreviewCard`）
+- **持ち主（Pen）**：`cfVyj`「LINEの見え方/スマホ」
+  - 注：LIFF のスマホ枠は未実装（B-158 の 10）
+- **見つけ方（コード）**：
+  - own-phone：`\b(function|const)\s+\w*(Phone|PhoneFrame|PhonePreview|Preview|MockPhone|Talk)\b\s*[=(]` — スマホの見本を自作
+  - phone-frame：CSS の規則に `border-radius:\s*(3\d|4\d|5\d)px` があり — スマホの外枠を CSS で描く
+  - (b) の割り当て：画面の CSS の上書きの selector が `phone|preview|bubble` に当たればこの型
+  - (c) の割り当て：直書きの selector が `phone|preview|bubble|talk` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-phone：名前 `^スマホ( |$)` — スマホの手描き（部品 cfVyj でない）
+- **決まり**：[§6.12-10](v8-design-rules.md)・B-158
+- **見張り**：`apps/web/src/components/shared/line-preview.test.tsx`・`apps/web/src/components/shared/line-preview-bubble.test.ts`／**要る試験**：トークの見本を LinePreview の外で描くと落ちる試験
+- **10-09 の数**：(a) 76（v8 37）・(b) 3・(c) 88・(d) 手描き 29（8 板）／写し 0・効く範囲 58 ファイル／31 機能／Pen 2 板
+
+<a id="period"></a>
+## period 期間の選択
+
+- **役目**：「過去7日／過去30日／過去90日／期間を指定」の1つの部品
+- **持ち主（コード）**：**未実装**
+- **持ち主（Pen）**：**未定**
+  - 注：未実装（B-158 の 5：部品を作る）
+- **見つけ方（コード）**：
+  - days-list：`\[\s*['"]?(7|28|30)['"]?\s*,\s*['"]?(28|30|90)['"]?\s*(,|\])` — 画面ごとの期間の並び
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:直近\s*\d+\s*日|この\s*\d+\s*日|過去\s*28\s*日|28日間)` — 期間の言葉が決まりと違う
+  - (c) の割り当て：直書きの selector が `range|period|days` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - other-period：文字 `直近\s*\d+日|この\d+日|28日` — 期間の言葉が決まりと違う
+- **決まり**：[§6.12-5](v8-design-rules.md)・[§6.15-7](v8-design-rules.md)・B-158・B-160
+- **見張り**：なし／**要る試験**：部品を作ったら：期間を画面で並べると落ちる試験
+- **10-09 の数**：(a) 166（v8 95）・(b) 0・(c) 3・(d) 手描き 73（46 板）／写し 0・効く範囲 0 ファイル／0 機能／Pen 0 板
+
+<a id="chart"></a>
+## chart グラフ
+
+- **役目**：棒・線・漏斗を共通部品で。色・吹き出し・軸は部品が持つ
+- **持ち主（コード）**：`apps/web/src/components/shared/bar-chart.tsx`・`apps/web/src/components/shared/bar-chart.module.css`（部品 `BarChart`・`BarChartEmpty`）
+- **持ち主（Pen）**：**未定**
+  - 注：線・漏斗は未実装。Pen の部品 ID が無い
+- **見つけ方（コード）**：
+  - own-chart：`\b(function|const)\s+\w*(Chart|Graph|Funnel|Sparkline|Bars)\b\s*[=(]` — グラフを自作
+  - svg-line：`<(polyline|path)\b[^>]*\b(points|d)=\{` — SVG で線を手描き
+  - (b) の割り当て：画面の CSS の上書きの selector が `chart|graph` に当たればこの型
+  - (c) の割り当て：直書きの selector が `chart|graph|bar\b|bars\b|funnel|spark` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-chart：名前 `グラフ|棒$` — グラフの手描き
+- **決まり**：[§6.12-11](v8-design-rules.md)・B-158
+- **見張り**：`apps/web/src/components/shared/bar-chart.test.tsx`
+- **10-09 の数**：(a) 16（v8 7）・(b) 0・(c) 22・(d) 手描き 108（31 板）／写し 0・効く範囲 2 ファイル／1 機能／Pen 0 板
+
+<a id="external-link"></a>
+## external-link 外へのリンク
+
+- **役目**：新しいタブ・↗ の印・rel="noreferrer" を部品が付ける
+- **持ち主（コード）**：`apps/web/src/components/shared/text-link.tsx`・`apps/web/src/components/shared/button.tsx`（部品 `TextLink`）
+- **持ち主（Pen）**：`g5Db8`「リンク」
+  - 注：external は未実装（TextLink・Button に足す）
+- **見つけ方（コード）**：
+  - blank：`target=["']_blank["']` — 新しいタブを画面で指定
+  - open：`window\.open\(` — window.open
+  - (c) の割り当て：直書きの selector が `link|external` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - no-arrow：文字 `(を開く|サイトへ|ページへ)$`・文字が `↗` でない — 外へ出る文に ↗ が無い
+- **決まり**：[§6.12-12](v8-design-rules.md)・B-158
+- **見張り**：なし／**要る試験**：external を作ったら：target="_blank" を画面で書くと落ちる試験
+- **10-09 の数**：(a) 85（v8 47）・(b) 0・(c) 48・(d) 手描き 57（46 板）／写し 0・効く範囲 4 ファイル／1 機能／Pen 13 板
+
+<a id="csv"></a>
+## csv CSV
+
+- **役目**：「CSVで書き出す」・ファイル名「機能名_YYYY-MM-DD.csv」（日本時間）を共通の関数で
+- **持ち主（コード）**：**未実装**
+- **持ち主（Pen）**：**未定**
+  - 注：未実装（共通の関数を作る）
+- **見つけ方（コード）**：
+  - blob：`text\/csv` — CSV を画面で組む
+  - name-utc：`toISOString\(\)\.slice\(0,\s*10\)[^\n]{0,60}\.csv|\.csv[^\n]{0,60}toISOString` — ファイル名の日付が世界時
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:CSV ?出力|CSVダウンロード|CSVをダウンロード|CSV で書き出す|CSVエクスポート|エクスポート)` — ボタンの言葉が「CSVで書き出す」でない
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - space-words：名前 `^CSV で書き出す$` — 「CSV で書き出す」（空きあり。決まりは「CSVで書き出す」）
+- **決まり**：[§6.12-7](v8-design-rules.md)・B-158
+- **見張り**：なし／**要る試験**：関数を作ったら：text/csv を画面で書くと落ちる試験
+- **10-09 の数**：(a) 158（v8 93）・(b) 0・(c) 0・(d) 手描き 80（80 板）／写し 0・効く範囲 0 ファイル／0 機能／Pen 0 板
+
+<a id="primary-button"></a>
+## primary-button 主ボタン・ボタン
+
+- **役目**：主＝文字の幅・高さ36・濃い緑の縁＋カードの影・角丸8。言葉は「〇〇を作る」「〜する」
+- **持ち主（コード）**：`apps/web/src/components/shared/button.tsx`・`apps/web/src/components/shared/button.module.css`・`apps/web/src/components/shared/icon-button.tsx`・`apps/web/src/components/shared/icon-button.module.css`（部品 `Button`・`IconButton`）
+  - 読む変数：`--card-shadow`・`--radius-control`
+- **持ち主（Pen）**：`doYdE`「ボタン/主」・`u101P`「ボタン/副」・`LrB2L`「ボタン/危険」・`wDPmk`「ボタン/文字」・`KspUx`「アイコンボタン」
+  - 注：主ボタンの縁 #06612f・角丸8の変数は未実装（§6.4）
+- **見つけ方（コード）**：
+  - green-fill：CSS の規則に `(button|btn|primary|cta|create|submit|save|action)[^{]*\{` と `background(-color)?:\s*(var\(--color-(primary|accent|brand|action-primary)[\w-]*\)|#087a3e|#06c755)` があり、`hover|:disabled` が無い — 緑の主ボタンを CSS で手書き
+  - words：`(?:>|['"'])[^<'"']{0,40}(?:新規作成|作成する|新しく作る|変更を保存(?!する)|コピーする)` — ボタンの言葉が決まりと違う（B-146）
+  - (b) の割り当て：画面の CSS の上書きの selector が `\bbutton\b|btn|primary` に当たればこの型
+  - (c) の割り当て：直書きの selector が `button|btn|primary|cta|action\b` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - green-hand：名前が `^(ボタン\/主|印|字|丸|点)` でない・style に `background-color: #087a3e` と `height: (32|36|40)px` — 緑の主ボタンの手描き（ボタン/主 でない）
+- **決まり**：[§6.4](v8-design-rules.md)・[§6.6](v8-design-rules.md)・B-151・B-146・B-159
+- **見張り**：`apps/web/src/components/shared/primary-green-contract.test.ts`・`apps/web/src/components/shared/button-migration-contract.test.ts`・`apps/web/src/components/shared/control-dimensions-contract.test.ts`
+- **10-09 の数**：(a) 96（v8 49）・(b) 279・(c) 81・(d) 手描き 464（354 板）／写し 18・効く範囲 698 ファイル／151 機能／Pen 277 板
+
+<a id="date-time"></a>
+## date-time 日付・時刻の欄
+
+- **役目**：DateField・TimeField・DateTimeField。高さ36・日本時間
+- **持ち主（コード）**：`apps/web/src/components/shared/date-field.tsx`・`apps/web/src/components/shared/date-time-field.tsx`・`apps/web/src/components/shared/time-field-v8.tsx`（部品 `DateField`・`DateTimeField`・`TimeField`・`TimeFieldV8`）
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の部品 ID が対応表に無い（YCOoR は提案の板）
+- **見つけ方（コード）**：
+  - native：`type=["'](date|time|datetime-local)["']` — 素の日付・時刻の入力
+  - utc-today：`new Date\(\)\.toISOString\(\)\.slice\(0,\s*10\)` — 「今日」を世界時で作る
+  - (b) の割り当て：画面の CSS の上書きの selector が `date|time` に当たればこの型
+  - (c) の割り当て：直書きの selector が `date|time|calendar` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：目印なし（写しの比べだけ）
+- **決まり**：[§2](v8-design-rules.md)・[§6.11-15](v8-design-rules.md)・B-157
+- **見張り**：`apps/web/src/components/shared/date-field.test.tsx`・`apps/web/src/components/shared/time-field-v8.test.tsx`・`apps/web/src/components/shared/date-time-field-width-contract.test.ts`／**要る試験**：type="date|time" を画面で書くと落ちる試験
+- **10-09 の数**：(a) 86（v8 43）・(b) 7・(c) 12・(d) 手描き 0（0 板）／写し 0・効く範囲 102 ファイル／48 機能／Pen 0 板
+
+<a id="toggle"></a>
+## toggle オン・オフ・選ぶ部品
+
+- **役目**：その場で効く＝Toggle、保存して効く＝Checkbox、3つ以上＝SegmentedControl か RadioCard
+- **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
+  - 読む変数：`--shadow-controls-toggle`
+- **持ち主（Pen）**：`bkjTv`「トグル/オン」・`LxHpj`「トグル/オフ」・`dQCCN`「チェック/オン」・`S9U7v`「チェック/オフ」・`dtJVi`「切り替え（3つ）」・`fNPdg`「選ぶカード/オン」・`r3xz1W`「選ぶカード/オフ」
+- **見つけ方（コード）**：
+  - pressed：`aria-pressed=` — aria-pressed の自作
+  - switch：`role=["'](switch|radio|radiogroup)["']` — オン・オフを手書き
+  - raw-check：`type=["'](checkbox|radio)["']` — 素のチェック・ラジオ
+  - (b) の割り当て：画面の CSS の上書きの selector が `toggle|switch|segment|checkbox|radio` に当たればこの型
+  - (c) の割り当て：直書きの selector が `toggle|switch|segment|checkbox|radio` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：目印なし（写しの比べだけ）
+- **決まり**：[§6.12-14](v8-design-rules.md)・B-158
+- **見張り**：`apps/web/src/components/shared/checkbox.test.tsx`・`apps/web/src/components/shared/segmented-size.test.tsx`・`apps/web/src/components/shared/radio-card-contract.test.tsx`／**要る試験**：aria-pressed を画面で書くと落ちる試験
+- **10-09 の数**：(a) 247（v8 162）・(b) 26・(c) 18・(d) 手描き 0（0 板）／写し 0・効く範囲 265 ファイル／98 機能／Pen 87 板
+
+<a id="copy"></a>
+## copy コピー
+
+- **役目**：ボタンの文字が「コピーしました」に1.5秒、失敗は「コピーできませんでした」
+- **持ち主（コード）**：`apps/web/src/components/shared/copy-text-button.tsx`・`apps/web/src/components/ui/copy-text-button.tsx`（部品 `CopyTextButton`）
+- **持ち主（Pen）**：**未定**
+  - 注：Pen の部品 ID が無い
+- **見つけ方（コード）**：
+  - clipboard：`navigator\.clipboard\.writeText` — コピーを画面で組む
+  - (c) の割り当て：直書きの selector が `copy` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：目印なし（写しの比べだけ）
+- **決まり**：[§6.11-13](v8-design-rules.md)・B-157
+- **見張り**：`apps/web/src/components/shared/copy-feedback.regression.test.tsx`／**要る試験**：navigator.clipboard を画面で書くと落ちる試験
+- **10-09 の数**：(a) 47（v8 25）・(b) 0・(c) 0・(d) 手描き 0（0 板）／写し 0・効く範囲 2 ファイル／1 機能／Pen 0 板
+
+<a id="steps"></a>
+## steps 手順
+
+- **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
+- **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）
+- **持ち主（Pen）**：`NUOgw`「手順」
+- **見つけ方（コード）**：
+  - old-stepper：`<(Stepper|DialogSteps)\b` — 別の手順の部品
+  - own-steps：`styles\.(steps|stepper|wizard|stepList)\b`（持ち主の部品を読んでいないファイルだけ） — 手順を CSS で手書き
+  - (b) の割り当て：画面の CSS の上書きの selector が `step` に当たればこの型
+  - (c) の割り当て：直書きの selector が `step|stepper|wizard` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-steps：名前 `^作る手順$` — 手順の手描き（部品「手順」でない名前）
+- **決まり**：[§2](v8-design-rules.md)・q1xNMz
+- **見張り**：`apps/web/src/components/templates/steps.test.tsx`・`apps/web/src/components/shared/stepper-contract.test.ts`
+- **10-09 の数**：(a) 34（v8 23）・(b) 9・(c) 77・(d) 手描き 85（85 板）／写し 2・効く範囲 20 ファイル／19 機能／Pen 19 板
+
+<a id="bulk-bar"></a>
+## bulk-bar まとめて選ぶ（一括バー）
+
+- **役目**：下から出る白いバー：操作を選ぶ→確かめる→結果。「〇件すべてを選ぶ」
+- **持ち主（コード）**：`apps/web/src/components/shared/bulk-bar.tsx`・`apps/web/src/components/shared/bulk-bar.module.css`（部品 `BulkBar`）
+  - 読む変数：`--shadow-float`
+- **持ち主（Pen）**：`q1tCSK`「一括操作バー」
+  - 部品の板の html に書き出されていない ID：`q1tCSK`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - own-bulk：`(?:>|['"'])[^<'"']{0,40}(?:件を選択中|件選択中|件を選んでいます|件選択)`（持ち主の部品を読んでいないファイルだけ） — 一括の帯を自作
+  - (b) の割り当て：画面の CSS の上書きの selector が `bulk` に当たればこの型
+  - (c) の割り当て：直書きの selector が `bulk|selection(Bar)?` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - hand-bulk：名前 `^一括バー$` — 一括バーの手描き
+- **決まり**：[§2](v8-design-rules.md)・[§6.11-14](v8-design-rules.md)・B-157
+- **見張り**：`apps/web/src/components/shared/bulk-bar.test.tsx`・`apps/web/src/components/shared/bulk-bar-sticky-contract.test.ts`
+- **10-09 の数**：(a) 11（v8 7）・(b) 0・(c) 6・(d) 手描き 3（3 板）／写し 0・効く範囲 12 ファイル／9 機能／Pen 0 板
+
+<a id="back-link"></a>
+## back-link ページ内の戻る（置かない）
+
+- **役目**：戻るはパンくずと［キャンセル］だけ。「← 〇〇へ」を置かない
+- **持ち主（コード）**：`apps/web/src/components/shared/breadcrumb.tsx`・`apps/web/src/components/layout/breadcrumb.tsx`（部品 `Breadcrumb`）
+- **持ち主（Pen）**：**未定**
+  - 注：置かない型（持ち主はパンくず）。Pen の部品 ID は外側 zUg8S の中
+- **見つけ方（コード）**：
+  - arrow-back：`['"'>]\s*←\s*[^<'"']{1,24}(へ|に戻る)` — ページ内の「← 〇〇へ」
+  - (c) の割り当て：直書きの selector が `back(Link)?\b` に当たればこの型
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：
+  - arrow-back：文字 `^←` — ページ内の「← 〇〇へ」
+- **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143
+- **見張り**：なし／**要る試験**：「← 〇〇へ」を画面に書くと落ちる試験
+- **10-09 の数**：(a) 53（v8 43）・(b) 0・(c) 6・(d) 手描き 0（0 板）／写し 0・効く範囲 11 ファイル／6 機能／Pen 0 板
+
+<a id="folder-select"></a>
+## folder-select 所属フォルダを選ぶ欄
+
+- **役目**：作る・直す画面の「どのフォルダに入れるか」。その場で作れる
+- **持ち主（コード）**：`apps/web/src/components/shared/folder-select.tsx`・`apps/web/src/components/shared/folder-select.module.css`（部品 `FolderSelect`）
+- **持ち主（Pen）**：`dLffh`「FolderSelect」・`iBuZH`「新しいフォルダを作る」
+  - 部品の板の html に書き出されていない ID：`dLffh`・`iBuZH`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
+- **見つけ方（コード）**：
+  - select-folder：`<Select\b(?:[^<>]|=>){0,400}?(label|aria-label)=["'][^"']*フォルダ` — フォルダをプルダウンで選ぶ（FolderSelect にする）
+  - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
+- **見つけ方（Pen）**：目印なし（写しの比べだけ）
+- **決まり**：[§2](v8-design-rules.md)・[§6.13](v8-design-rules.md)・B-127・B-147
+- **見張り**：`apps/web/src/components/shared/folder-select.react.test.tsx`・`apps/web/src/components/shared/folder-select-rollout-contract.test.ts`
+- **10-09 の数**：(a) 61（v8 45）・(b) 0・(c) 0・(d) 手描き 0（0 板）／写し 0・効く範囲 25 ファイル／18 機能／Pen 0 板
+
+
+<a id="message-insert-row"></a>
+## message-insert-row 本文の差し込みの行（2026-10-11追加）
+
+- **役目**：本文枠の内側の下端で、差し込む項目と文字数を同じ形で見せる。
+- **持ち主（コード）**：`apps/web/src/components/shared/message-insert-row.tsx`・`message-insert-row.module.css`（`MessageBody`・`MessageInsertRow`・`MessageInsertButton`）。本文中の札は `insert-text-field.tsx`・`insert-tokens.ts`、統括の種類の受け渡しは `hq-message-inserts.tsx`。
+- **持ち主（Pen）**：リマインダの採用形（B-221）。共通の部品IDは司令塔の確定待ち。V6xAo・U5rxyH・Bb8xi・pIHp3 等は画面の板のIDで、部品IDと混同しない。
+- **決まり**：[§6.34](v8-design-rules.md)・B-221・B-238。「差し込む」11px＋印付き文字ボタン＋右端の文字数。狭い時はその他にまとめ文字数は枠下。統括の項目は店名／電話／予約ページ／名前＋固定8つ。
+- **見つけ方**：枠外の「＋ 名前」の札・「差し込み：」・古い編集部品・同じ役目の自前行を探す。本文中の札と保存する {{…}} は違反ではない。
+- **見張り**：`message-insert-row.test.tsx`・`hq-message-inserts.test.tsx`・`insert-text-field.test.tsx`、V8の崩れ検査。機械の対応表への新型登録は次の道具更新で行う。
+
+<a id="choice-card"></a>
+## choice-card 選ぶカード（2026-10-11追加）
+
+- **役目**：カード全体を押して1つを選び、右上のラジオでも選択状態を示す。
+- **持ち主（コード）**：`apps/web/src/components/shared/radio-card.tsx`・`radio-card.module.css`（`RadioCard`・`RadioCardGroup`）。複数は共通 Checkbox。デザインの型は `customer-design-picker.tsx` が同じカードを使う。
+- **持ち主（Pen）**：B-203案A・B-229。共通の部品IDは司令塔の確定待ち。
+- **決まり**：[§6.30](v8-design-rules.md)。選択＝緑2px枠・薄い緑地・右上16のラジオ、未選択＝灰1px枠・白地。LIFFの素のラジオと見本は18＋点9（B-223）。ブロック追加と卓の表はこの型ではない。
+- **見つけ方**：ラジオ無しの選ぶ箱・青枠・灰枠の選択・説明へ重なる丸・カード型の上書きを探す。
+- **見張り**：`radio-card-contract.test.tsx`・`apps/web/scripts/v8-guard/pendec2-rules.test.mjs`（選ぶ箱の右上ラジオ）。機械の表では既存 toggle の対象だが、この文書では選ぶカードの役目を分けて示す。
+
+<a id="display-items"></a>
+## display-items 顧客情報と友だち一覧の表示項目（2026-10-11追加）
+
+- **役目**：決まった8つと、お店が実際に作った情報欄を選び、出す・隠す・並べ替える。
+- **持ち主（コード）**：`apps/web/src/components/shared/display-items-dialog.tsx`・`display-items-dialog.module.css`（共通の窓）、`fixed-friend-field-values.ts`（決まった値）、`allergy-field.tsx`。受信箱と概要は CustomerInfoPanel、友だち一覧は `apps/web/src/v8/friends/list/list.tsx`、情報欄タブは `apps/web/src/v8/friend-detail/info-tab.tsx` がデータと保存する設定を渡す。
+- **持ち主（Pen）**：CustomerInfoPanelの部品GBTyRとB-234〜B-238の採用板。表示項目の窓の共通部品IDは司令塔の確定待ち。
+- **決まり**：[§6.33](v8-design-rules.md)・[§6.40](v8-design-rules.md)。名前以外の列は1440で7・1152で4。お店の情報欄は固定の例ではなく実際の項目数、検索と縦送り・管理へのリンクを出す。列は鍵で保存、新項目を次の開き直しで反映、削除済み項目を列から外す。
+- アレルギーは固定8つ目・複数の札・店の選択肢＋自由入力。フォームの「書いてもらう」3行目で、保存先を変えない（B-235・B-238）。
+- **見つけ方**：固定7つ・1152で5列・仮の「お店の情報欄」の固定候補・一覧に無制限の列・横送り・アレルギー1行テキストを探す。
+- **見張り**：`customer-info-panel.test.tsx`・`display-items-dialog.test.tsx`、V8の列数・はみ出し検査。**要る動作確認**：追加・削除した項目、列上限、並べ替え、値の出どころ、複数アレルギー、店と統括のフォームの継承。文書の掲載だけで実装合格とはしない。
+
+## 認証の画面（B-263）
+
+- 持ち主：`components/templates/auth-page.tsx`。ログインの確認・初回登録・回復コードを同じ型で組む。
+- 形と値：BOj1aと修正案A〜E（2FA-PEN-1012）を使う。欄・トグル・確認は共通部品。回復コードは共有 `OtpInput` の recovery（8マス・4-4）と `RecoveryCodeList`（8個・2列）で組む。幅いっぱいの主ボタンは `Button.fullWidth` で中央文字（B-264）。
+- 見張り：`v8-pattern-audit.mjs` と二段階認証の操作試験。
+
+## 受信箱の列・入力・補助面（inbox-frame）
+
+- **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
+- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
+- **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
+- **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
+
+<a id="b244"></a>
+## B-244 必須・任意、行の組、狭い板の道具
+
+- **持ち主**：`shared/form-controls`のField・RequiredBadge、`lib/form-requirement`と`use-form-errors`の検査定義。行の組は`shared/action-menu`（RowMenuも同じ順を使う）、道具は`shared/list-toolbar`とListPageBodyが渡す先頭の口。
+- **決まり**：§6.43・B-244。必須と検査を共有、欄下の理由と読み上げ、見る→整理→停止・削除と線・5項目から見出し、狭い白い板の2段と右端の件数。
+- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`scripts/v8-guard/b244-rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
+
+<a id="screen-explanation"></a>
+## screen-explanation この画面の説明（B-245）
+
+- **持ち主**：`shared/screen-explanation.tsx`・CSS、型のPageHeading（一覧・作る・詳細・設定・分析から共通に使う）。画面全体の説明はexplanation、短い言葉の説明はhelp、必要ならexplanationKeyを渡す。
+- **形と動き**：題の横に青い文字と矢印、下に灰色・角8・12pxの文。初回は開き、担当者IDと画面・タブごとに開閉を保存。今だけの知らせと危ない操作の確認は残す。
+- **Pen**：B-245採用見本pkrzG。部品IDと合格の記録は司令塔。
+- **見張り**：`b244-behavior.test.tsx`、`page-heading-rules.test.tsx`、verify:design。
+
+<a id="save-feedback"></a>
+## save-feedback 保存の4つの状態（B-246 D1）
+
+- **持ち主**：`shared/save-feedback.tsx`。useSaveFeedbackが二重開始と状態、SaveFeedbackが結果とやり直しの口を持つ。画面は工程の完了記録と最新の版を持ち、入力を残して残りだけ送る。
+- **見張り**：共通動作試験、予約ルールのpartial-save、イベントcreate-recovery、マイルreward-partial-save。成功分のAPIを再送しないことを実行回数と版で確かめる。
+- **Pen**：B-246採用見本y45k2。今回の対象はD1。
+
+<a id="friend-filter-band"></a>
+## friend-filter-band お客さまで絞った一覧の帯（B-247 E1）
+
+- **持ち主**：`shared/friend-filter-band.tsx`・CSS。顔・絞り込み対象・全員を見る・右端の友だち詳細へ戻る。名前は表示だけ、URLはIDだけ。
+- **適用**：取得済みの登録IDで全ページから絞るリマインダ。APIの無い一覧は機能待ち表へ。API・DBは作らない。
+- **見張り**：共通動作試験と`lib/friend-reminder-list`の全ページ・途中失敗の試験。
+- **Pen**：B-247採用見本ggPZt。共通部品IDは司令塔。
+
+<a id="aggregation-status"></a>
+## aggregation-status 集計の状態（B-247 E2）
+
+- **持ち主**：`shared/aggregation-status.tsx`。未集計・集計中・失敗・完成、開始時刻・データの時点と再試行。ファネル・クロス分析・成果レポートは状態と実行の口だけを渡す。
+- **見張り**：共通動作試験、分析の404と同時開始の試験。データの時点が無い応答は未取得と表示し、時刻を捏造しない。
+- **Pen**：B-247採用見本ggPZt。共通部品IDと合格の記録は司令塔。
+
+受信箱の取得カーソルによる続きの操作は `shared/inbox-list` の `InboxHistoryButton` が形を持つ。会話・メール・古い本文の取得処理は画面に残し、ページ数が返らない履歴に全ページ数を作らない。画面から色・文字・影を上書きしない。

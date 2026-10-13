@@ -1,3 +1,8 @@
+import { referralCandidates } from '../services/restaurant-referrals.js';
+import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/shared';
+import { respondToRestaurantConfirmation, type RestaurantConfirmationResponse } from '../services/restaurant-confirmations.js';
+import { processRestaurantEvents } from '../services/restaurant-events.js';
+import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
@@ -13,6 +18,7 @@ import { tzDateStr } from '../services/availability.js';
 import { openSeatTables } from '../services/restaurant-closures.js';
 import {
   customerAvailability,
+  customerCourse,
   customerBooking,
   validCustomerDetails,
   customerDetailValue,
@@ -110,6 +116,8 @@ async function finish(c: Context<Env>, store: CustomerStore) {
   try {
     await reconcileRestaurantInventory(c.env, store.id);
     await processBookingWaitlists(c.env, store.line_account_id);
+    await processRestaurantEvents(c.env, store.id);
+    await processScenarioSourceJobs(c.env);
     await processRestaurantCustomerNotices(c.env, store.id);
   } catch {
     console.error(
@@ -142,6 +150,8 @@ restaurantCustomerBooking.get(
       store,
       c.req.query('date') ?? '',
       Number(c.req.query('guestCount')),
+      undefined,
+      c.req.query('courseId'),
     );
     return result
       ? c.json({ success: true, data: result.data })
@@ -173,9 +183,11 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   if (!store) return c.json({ success: false, error: 'not_found' }, 404);
   const db = dbFor(c.env, store.id),
     startsAt = new Date(body.startsAt).toISOString();
+  const course = await customerCourse(db, store.id, body.courseId);
+  if (course === undefined) return inputError(c,{success:false,error:'invalid_course'},400,['courseId']);
   const old = await db
     .prepare(
-      'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type FROM rt_reservations WHERE store_id=? AND line_uid=? AND customer_request_id=?',
+      'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE store_id=? AND line_uid=? AND customer_request_id=?',
     )
     .bind(store.id, self.uid, body.requestId)
     .first<CustomerReservationRow>();
@@ -185,18 +197,20 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       old.customer_phone !== customerDetailValue(body.customerPhone) ||
       old.starts_at !== startsAt ||
       old.guest_count !== body.guestCount ||
+      (old.course_id ?? null) !== (body.courseId || null) ||
       old.status === 'cancelled' ||
-      (old.status === 'pending' &&
-        Date.parse(old.hold_expires_at ?? '') <= Date.now())
+      (old.status === 'pending' && !old.hold_expires_at)
     )
       return c.json({ success: false, error: 'request_conflict' }, 409);
-    return c.json({ success: true, data: customerBooking(old) });
+    if(old.status!=='pending'||Date.parse(old.hold_expires_at!)>Date.now())return c.json({ success: true, data: customerBooking(old) });
   }
   const result = await customerAvailability(
       db,
       store,
       tzDateStr(store.timezone, new Date(startsAt)),
       body.guestCount,
+      undefined,
+      body.courseId,
     ),
     slot = result?.data.slots.find(
       (s) => s.startsAt === startsAt && s.available,
@@ -216,10 +230,16 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   const expires = new Date(
     Math.min(Date.now() + result.holdMinutes * 60000, Date.parse(startsAt)),
   ).toISOString();
+  if(old){
+    const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`).bind(startsAt,slot.endsAt,tables[0]!.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null).run();
+    if(!refreshed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+    const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
+    return c.json({success:true,data:customerBooking(row!)});
+  }
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
   await db
     .prepare(
-      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)`,
+      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
     )
     .bind(
       id,
@@ -235,12 +255,14 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       body.requestId,
       customerDetailValue(body.note),
       customerDetailValue(body.customerPhone),
+      body.courseId || null,
       store.id,
       result.hoursVersion,
+      body.courseId || null, body.courseId || null, store.id, course?.durationMinutes ?? null,
     )
     .run();
   const saved = await db
-    .prepare('SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type FROM rt_reservations WHERE id=?')
+    .prepare('SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE id=?')
     .bind(id)
     .first<CustomerReservationRow>();
   if (!saved) return c.json({ success: false, error: 'slot_conflict' }, 409);
@@ -256,7 +278,7 @@ restaurantCustomerBooking.get(
     const rows = (
       await dbFor(c.env, store.id)
         .prepare(
-          'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type FROM rt_reservations WHERE store_id=? AND line_uid=? ORDER BY starts_at DESC LIMIT 100',
+          'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE store_id=? AND line_uid=? ORDER BY starts_at DESC LIMIT 100',
         )
         .bind(store.id, self.uid)
         .all<CustomerReservationRow>()
@@ -264,6 +286,12 @@ restaurantCustomerBooking.get(
     return c.json({ success: true, data: rows.map(customerBooking) });
   },
 );
+function acceptReferral(db:D1Database,referralId:string,storeId:string,reservationId:string,uid:string,version:number) {
+  return db.prepare(`UPDATE rt_reservation_referrals SET accepted_at=COALESCE(accepted_at,datetime('now')) WHERE id=? AND target_store_id=?
+    AND EXISTS(SELECT 1 FROM rt_reservations WHERE id=? AND store_id=? AND line_uid=? AND customer_version=? AND status='confirmed')
+    AND EXISTS(SELECT 1 FROM rt_store_group_members m JOIN rt_store_group_members n ON n.group_id=m.group_id JOIN rt_stores s ON s.id=m.store_id JOIN rt_stores t ON t.id=n.store_id JOIN rt_store_groups g ON g.id=m.group_id WHERE m.store_id=source_store_id AND n.store_id=target_store_id AND m.referral_enabled=1 AND n.referral_enabled=1 AND s.organization_id=t.organization_id AND s.organization_id=g.organization_id)`)
+    .bind(referralId,storeId,reservationId,storeId,uid,version);
+}
 for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
   restaurantCustomerBooking.post(
     `/api/liff/restaurant/reservations/:id/${action}`,
@@ -271,7 +299,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const self = await identity(c);
       if (self instanceof Response) return self;
       const b = await c.req
-        .json<RestaurantCustomerConfirmInput & {startsAt?: string; guestCount?: number}>()
+        .json<RestaurantCustomerConfirmInput & {startsAt?: string; guestCount?: number; courseId?: string | null}>()
         .catch(() => null);
       if (
         !b ||
@@ -283,7 +311,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const db = dbFor(c.env),
         row = await db
           .prepare(
-            `SELECT r.*, (SELECT seat_type FROM rt_tables t WHERE t.id=r.table_id AND t.store_id=r.store_id) AS seat_type FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=? AND r.line_uid=? AND s.line_account_id=? AND s.status='active' AND r.customer_request_id IS NOT NULL`,
+            `SELECT r.*, (SELECT seat_type FROM rt_tables t WHERE t.id=r.table_id AND t.store_id=r.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=r.course_id AND m.store_id=r.store_id) AS course_name FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=? AND r.line_uid=? AND s.line_account_id=? AND s.status='active' AND r.customer_request_id IS NOT NULL`,
           )
           .bind(c.req.param('id'), self.uid, self.accountId)
           .first<CustomerReservationRow>();
@@ -294,6 +322,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         (action === 'cancel' && row.status === 'cancelled')
       ) {
         if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && customerDetailValue(b.customerPhone)!==row.customer_phone))) return c.json({success:false,error:'request_conflict'},409);
+        if(action==='confirm' && typeof b.referralId==='string') await acceptReferral(db,b.referralId,store.id,row.id,self.uid,row.customer_version).run();
         await finish(c, store);
         return c.json({ success: true, data: customerBooking(row) });
       }
@@ -325,6 +354,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         table = row.table_id,
         seatType = row.seat_type,
         count = row.guest_count,
+        courseId = row.course_id ?? null,
         hoursVersion: number | null = null;
       if (action === 'reschedule') {
         if (
@@ -337,6 +367,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           b.guestCount > 100
         )
           return inputError(c, { success: false, error: 'invalid_change' }, 400, ["startsAt","guestCount"]);
+        courseId = b.courseId === undefined ? courseId : b.courseId;
         starts = new Date(b.startsAt).toISOString();
         count = b.guestCount;
         const available = await customerAvailability(
@@ -345,6 +376,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             tzDateStr(store.timezone, new Date(starts)),
             count,
             row.id,
+            courseId,
           ),
           slot = available?.data.slots.find(
             (s) => s.startsAt === starts && s.available,
@@ -362,33 +394,18 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           count,
           true,
         );
-        table = null;
-        for (const t of candidates) {
-          if (
-            !(await db
-              .prepare(
-                `SELECT 1 FROM rt_reservations WHERE store_id=? AND id<>? AND table_id=? AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION ALL SELECT 1 FROM rt_seat_waitlist WHERE store_id=? AND table_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
-              )
-              .bind(
-                store.id,
-                row.id,
-                t.id,
-                ends,
-                starts,
-                store.id,
-                t.id,
-                ends,
-                starts,
-              )
-              .first())
-          ) {
-            table = t.id;
-            seatType = t.seatType ?? null;
-            break;
-          }
-        }
+        const occupied=(await db.prepare(`SELECT l.table_id FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=? AND r.id<>? AND r.departed_at IS NULL AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?) UNION SELECT l.table_id FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=? AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(?) AND julianday(w.ends_at)>julianday(?)`).bind(store.id,row.id,ends,starts,store.id,ends,starts).all<{table_id:string}>()).results;
+        const busy=new Set(occupied.map(r=>r.table_id));
+        const free=candidates.find(t=>!busy.has(t.id));
+        table=free?.id??null;
+        seatType=free?.seatType??null;
         if (!table)
           return c.json({ success: false, error: 'slot_conflict' }, 409);
+      }
+      if(action==='confirm'){
+        const available=await customerAvailability(db,store,tzDateStr(store.timezone,new Date(starts)),count,row.id,courseId);
+        if(!available?.data.slots.some(s=>s.startsAt===starts && s.available && s.endsAt===ends))return c.json({success:false,error:'slot_conflict'},409);
+        hoursVersion=available.hoursVersion;
       }
       const next = {
         ...row,
@@ -400,13 +417,14 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         table_id: table,
         seat_type: seatType,
         guest_count: count,
+        course_id: courseId,
         customer_version: row.customer_version + 1,
         hold_expires_at: null,
       };
       const results = await db.batch([
         db
           .prepare(
-            `UPDATE rt_reservations SET status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now'))`,
+            `UPDATE rt_reservations SET status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,course_id=?,dining_snapshot_json=CASE WHEN course_id IS NOT ? THEN json_set(dining_snapshot_json,'$.courseId',?,'$.courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=? AND store_id=?),'[]'))) ELSE dining_snapshot_json END,customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now')) AND (?='cancel' OR ? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
           )
           .bind(
             next.status,
@@ -416,6 +434,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             count,
             next.note,
             next.customer_phone,
+            courseId, courseId, courseId, courseId, store.id,
             row.id,
             self.uid,
             b.expectedVersion,
@@ -424,6 +443,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             store.id,
             hoursVersion,
             action,
+            action, courseId, courseId, store.id, Math.round((Date.parse(ends)-Date.parse(starts))/60000),
           ),
         // UPDATEが0件なら別の版への通知は作らない。
         db
@@ -441,11 +461,95 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
               : `${store.name}の予約を${action === 'confirm' ? '確定' : '変更'}しました。\n${new Intl.DateTimeFormat('ja-JP', { timeZone: store.timezone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(starts))}\n${count}名\n変更・取り消しはLINEの予約ページから行えます。`,
             crypto.randomUUID(),
           ),
+        ...(action==='confirm' && typeof b.referralId==='string' ? [acceptReferral(db,b.referralId,store.id,row.id,self.uid,next.customer_version)] : []),
       ]);
       if (!results[0]!.meta.changes)
         return c.json({ success: false, error: 'version_conflict' }, 409);
       await finish(c, store);
-      return c.json({ success: true, data: customerBooking(next) });
+      const saved=await db.prepare('SELECT *,NULL seat_type,(SELECT name FROM rt_menu_items WHERE id=rt_reservations.course_id) course_name FROM rt_reservations WHERE id=?').bind(next.id).first<CustomerReservationRow>();
+      return c.json({ success: true, data: customerBooking({...saved!,seat_type:seatType}) });
     },
   );
 }
+
+restaurantCustomerBooking.post('/api/liff/restaurant/confirmations/:requestId/respond',inputJsonBoundary(),async c=>{
+ const self=await identity(c);if(self instanceof Response)return self;
+ const b=await c.req.json<{expectedVersion?:number;response?:RestaurantConfirmationResponse}>().catch(()=>null);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['going','change_requested','cancel'].includes(b.response??''))return inputError(c,{success:false,error:'invalid_confirmation_response'},400,['expectedVersion','response']);
+ const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
+ if(!f)return c.json({success:false,error:'not_found'},404);
+ const result=await respondToRestaurantConfirmation(db,{requestId:c.req.param('requestId'),friendId:f.id,accountId:self.accountId,expectedVersion:b.expectedVersion!,response:b.response!});
+ if(!result.ok)return c.json({success:false,error:result.error},result.status);
+ const target=await db.prepare('SELECT r.store_id FROM rt_reservation_confirmations c JOIN rt_reservations r ON r.id=c.reservation_id WHERE c.request_id=?').bind(c.req.param('requestId')).first<{store_id:string}>();
+ if(target){const store=await storeFor(c,self.accountId,target.store_id);if(store)await finish(c,store);}
+ return c.json({success:true,data:result});
+});
+
+restaurantCustomerBooking.get('/api/liff/restaurant/courses', async c => {
+  const self=await identity(c); if(self instanceof Response)return self;
+  const store=await storeFor(c,self.accountId,c.req.query('storeId')); if(!store)return c.json({success:false,error:'not_found'},404);
+  const db=dbFor(c.env,store.id);
+  const rows=await db.prepare("SELECT id FROM rt_menu_items WHERE store_id=? AND kind='course' AND status='active' AND duration_minutes BETWEEN 1 AND 1440 ORDER BY price,id").bind(store.id).all<{id:string}>();
+  return c.json({success:true,timezone:store.timezone,data:await Promise.all(rows.results.map(r=>customerCourse(db,store.id,r.id)))});
+});
+
+restaurantCustomerBooking.get('/api/liff/restaurant/referrals',async c=>{
+ const self=await identity(c);if(self instanceof Response)return self;
+ const store=await storeFor(c,self.accountId,c.req.query('storeId'));if(!store)return c.json({success:false,error:'not_found'},404);
+ const date=c.req.query('date')??'',count=Number(c.req.query('guestCount')),starts=c.req.query('startsAt');
+ const source=await customerAvailability(dbFor(c.env),store,date,count,undefined,c.req.query('courseId'));
+ if(!source)return c.json({success:false,error:'invalid_date_or_unconfigured_hours'},400);
+ if(starts ? source.data.slots.some(s=>s.startsAt===starts&&s.available) : source.data.slots.some(s=>s.available))return c.json({success:true,data:[]});
+ return c.json({success:true,data:await referralCandidates(dbFor(c.env),store,date,count,starts)});
+});
+restaurantCustomerBooking.post('/api/liff/restaurant/referrals',inputJsonBoundary(),async c=>{
+ const self=await identity(c);if(self instanceof Response)return self;
+ const b=await c.req.json<{storeId:string;targetStoreId:string;date:string;startsAt:string;guestCount:number;courseId?:string|null}>();
+ if(!b || ![b.storeId,b.targetStoreId,b.date,b.startsAt].every(v=>typeof v==='string'&&v.length>0) || !Number.isFinite(Date.parse(b.startsAt)))return inputError(c,{success:false,error:'invalid_referral'},400,['storeId','targetStoreId','date','startsAt']);
+ const store=await storeFor(c,self.accountId,b.storeId);if(!store)return c.json({success:false,error:'not_found'},404);
+ const source=await customerAvailability(dbFor(c.env),store,b.date,b.guestCount,undefined,b.courseId);
+ if(!source)return c.json({success:false,error:'invalid_date_or_unconfigured_hours'},400);
+ if(source.data.slots.some(s=>s.startsAt===b.startsAt&&s.available))return c.json({success:false,error:'source_available'},409);
+ const target=(await referralCandidates(dbFor(c.env),store,b.date,b.guestCount,b.startsAt)).find(r=>r.storeId===b.targetStoreId);
+ if(!target)return c.json({success:false,error:'referral_unavailable'},409);
+ const id=crypto.randomUUID();
+ await dbFor(c.env).prepare('INSERT INTO rt_reservation_referrals(id,source_store_id,target_store_id) VALUES(?,?,?)').bind(id,store.id,target.storeId).run();
+ return c.json({success:true,data:{bookingUrl:target.bookingUrl+'&referralId='+encodeURIComponent(id)}});
+});
+/** 保存済み回答の公開版だけから、既存の席予約の口へ渡す。回答の再送も台帳を増やさない。 */
+restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoundary(),async c=>{
+ const self=await identity(c);if(self instanceof Response)return self;
+ const b=await c.req.json<{formId:string;blockId:string;submissionKey:string}>();
+ if(!b || ![b.formId,b.blockId,b.submissionKey].every(v=>typeof v==='string' && v.length>0 && v.length<=200))return inputError(c,{success:false,error:'invalid_form_booking'},400,['formId','blockId','submissionKey']);
+ const db=dbFor(c.env);
+ const saved=await db.prepare(`SELECT s.id,s.data,v.layout,v.fields FROM form_submit_claims q
+ JOIN form_submissions s ON s.id=q.submission_id JOIN friends f ON f.id=s.friend_id
+ JOIN form_versions v ON v.id=s.form_version_id AND v.form_id=s.form_id
+ WHERE q.form_id=s.form_id AND q.status='completed' AND q.form_id=? AND q.idempotency_key=? AND q.line_account_id=? AND q.friend_id=f.id AND f.line_user_id=? AND f.line_account_id=? AND s.is_test=0`)
+ .bind(b.formId,b.submissionKey,self.accountId,self.uid,self.accountId).first<{id:string;data:string;layout:string;fields:string}>();
+ if(!saved)return c.json({success:false,error:'saved_answer_required'},404);
+ const block=collectInputs(parseLayout(saved.layout,saved.fields)).find(x=>x.id===b.blockId&&x.type==='booking');
+ const picked=block ? normalizeBookingValue(JSON.parse(saved.data)[block.name]) : null;
+ if(!block || block.booking?.kind!=='seats' || !picked || picked.kind!=='seats' || picked.storeId!==block.booking.storeId || (block.booking.courseId && picked.courseId!==block.booking.courseId))return c.json({success:false,error:'invalid_booking_answer'},400);
+ const store=await storeFor(c,self.accountId,picked.storeId);
+ if(!store)return c.json({success:false,error:'not_found'},404);
+ const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(saved.id+':'+block.id));
+ const requestId='form_'+Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');
+ const base=new URL(c.req.url);base.pathname='/api/liff/restaurant/holds';
+ const headers={'Content-Type':'application/json',Authorization:c.req.header('Authorization')!};
+ const old=await db.prepare('SELECT id,customer_version,status,hold_expires_at FROM rt_reservations WHERE store_id=? AND line_uid=? AND customer_request_id=?').bind(picked.storeId,self.uid,requestId).first<{id:string;customer_version:number;status:string;hold_expires_at:string|null}>();
+ let holdId:string,version:number;
+ if(old && (old.status!=='pending' || Date.parse(old.hold_expires_at??'')>Date.now())){
+   if(old.status==='confirmed'||old.status==='cancelled'){
+    const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
+    return c.json({success:true,data:customerBooking(row!)});
+   }
+   holdId=old.id;version=old.customer_version;
+ }else{
+   const held=await restaurantCustomerBooking.request(base.href,{method:'POST',headers,body:JSON.stringify({storeId:picked.storeId,courseId:picked.courseId,guestCount:picked.guestCount,startsAt:picked.startsAt,requestId})},c.env);
+   if(!held.ok)return held;
+   const result=await held.json() as {data:{id:string;version:number}};holdId=result.data.id;version=result.data.version;
+ }
+ base.pathname='/api/liff/restaurant/reservations/'+encodeURIComponent(holdId)+'/confirm';
+ return restaurantCustomerBooking.request(base.href,{method:'POST',headers,body:JSON.stringify({expectedVersion:version})},c.env);
+});

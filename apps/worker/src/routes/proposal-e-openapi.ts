@@ -19,6 +19,11 @@ const entryPage={type:'object',properties:{items:{type:'array',items:entry},tota
 const photoResponse={description:'本人・担当店舗限定の写真',content:{'image/png':{schema:{type:'string',format:'binary'}},'image/jpeg':{schema:{type:'string',format:'binary'}},'image/webp':{schema:{type:'string',format:'binary'}}}};
 
 export const stampPaths={
+ '/api/visit-stamps/cards/{id}/storefront-qr':{get:{...op('店頭の印刷用QRを読む',{},[],['id']),parameters:[{name:'id',in:'path',required:true,schema:string},{name:'accountId',in:'query',required:true,schema:string}]},post:op('管理者が店頭QRを発行・交換。交換で古い紙のQRを失効',{accountId:string,requestId:string,expectedQrId:{type:['string','null']}},['accountId','requestId'],['id'])},
+ '/api/visit-stamps/cards/{id}/staff-qr':{post:op('担当者の30秒・1人用QRを発行。再送は同じ世代',{accountId:string,requestId:string,sessionId:string,previousQrId:{type:['string','null']},continueAfterUse:bool,count:number,amount:number},['accountId','requestId','sessionId'],['id'])},
+ '/api/visit-stamps/staff-qr/{id}':{get:{...op('自分が発行した店員QRの使用結果',{},[],['id']),parameters:[{name:'id',in:'path',required:true,schema:string},{name:'accountId',in:'query',required:true,schema:string}]},delete:{...op('自分が発行した未使用QRを失効',{},[],['id']),parameters:[{name:'id',in:'path',required:true,schema:string},{name:'accountId',in:'query',required:true,schema:string}]}},
+ '/api/liff/visit-stamps/qr/redeem':{post:op('LINE本人確認後にQRを読む。予約がある人は本人の来店済み予約を指定。台帳と二重に押さない',{token:string,requestId:string,visitId:string},['token','requestId'],[],true,{type:'object',properties:{status:{type:'string',enum:['success','limited','invalid','friend_required','visit_required']},alreadyCounted:bool,awarded:number,entryId:string,retryAt:string,visits:{type:'array',items:{type:'object',properties:{id:string,storeName:string,startsAt:string,arrived:bool}}}}})},
+
  '/api/visit-stamps/cards':{get:op('可視店舗の来店スタンプカード'),post:op('来店スタンプカードを作る',card,Object.keys(card))},
  '/api/visit-stamps/cards/{id}':{put:op('来店スタンプカードの設定と押せる店を保存',card,Object.keys(card),['id'])},
  '/api/visit-stamps/cards/{id}/wallet':{get:{...op('スタンプ残高・有効期限・記録を読む',{},[],['id']),parameters:[{name:'id',in:'path',required:true,schema:string},{name:'accountId',in:'query',required:true,schema:string},{name:'friendId',in:'query',required:true,schema:string}]}},

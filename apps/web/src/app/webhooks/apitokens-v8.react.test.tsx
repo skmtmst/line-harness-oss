@@ -8,6 +8,7 @@ vi.hoisted(() => {
 })
 
 import WebhooksPage from './page'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 /*
  * ★V8-B 外部連携の API 接続（板 `ralAc`）の契約。
@@ -105,9 +106,9 @@ test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async (
   expect(board?.textContent).toContain('鍵を発行する')
 })
 
-test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {
+test('旧テーマ属性でも現役の鍵タブが出て ralAc が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="ralAc"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="ralAc"]')).not.toBeNull()
 })
 
 test('v8 で行を右クリックすると「…」と同じ止めるが出る', async () => {
@@ -148,4 +149,25 @@ test('v8 の読み込み中は鍵の表の形の骨組みが出て「読み込�
   } finally {
     vi.useRealTimers()
   }
+})
+
+test('鍵の入れ替えの競合理由は一覧を取り直したあとも残る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const originalFetch = globalThis.fetch
+  let refreshed = 0
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api-tokens/') && url.includes('/rotate')) {
+      return json({ success: false, error: 'fixture conflict', code: 'TOKEN_ROTATE_CONFLICT' }, 409)
+    }
+    if (url.includes('/api-tokens')) refreshed++
+    return originalFetch(input, init)
+  })
+  await renderPage()
+  const row = host.querySelector('[data-row-id="tok-1"]')!
+  fireEvent.click(within(row as HTMLElement).getByRole('button', {name:'入れ替える'}))
+  const confirm = await screen.findByRole('dialog', {name:'「予約システム連携」の鍵を入れ替えますか？'})
+  fireEvent.click(within(confirm).getByRole('button', {name:'入れ替える'}))
+  await waitFor(() => expect(refreshed).toBe(2))
+  await waitFor(() => expect(host.textContent).toContain('ほかの操作が先にこの鍵を更新しました'))
 })

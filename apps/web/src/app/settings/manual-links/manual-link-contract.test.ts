@@ -187,7 +187,7 @@ describe('失敗の表示', () => {
 
   it('「確かめる」と「保存」の失敗を無言にしない', () => {
     expect(page).toContain('actionError')
-    expect(page).toContain('role="alert"')
+    expect(page).toContain('<Notice tone="danger"')
     expect(page).toContain('確かめられませんでした')
     expect(page).toContain('保存できませんでした')
   })

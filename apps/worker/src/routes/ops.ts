@@ -1,3 +1,4 @@
+import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -94,7 +95,7 @@ ops.get('/api/ops/me', async (c) => {
   const db = dbFor(c.env);
   const admin = await getPlatformAdminByStaffId(db, staff.id);
   const row = await getStaffById(db, staff.id);
-  const session = await getActiveImpersonation(db, staff.id);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
   // 帯に「◯◯ として閲覧中」と出すため、契約先の名前も一緒に返す。
   const impersonatedTenant = session ? await tenantById(c, session.tenant_id) : null;
   return c.json({
@@ -272,7 +273,7 @@ ops.patch('/api/ops/tenants/:id/feature-packs', requirePlatformAdminWrite(), inp
 
 ops.get('/api/ops/impersonation/current', async (c) => {
   const staff = c.get('staff');
-  const session = await getActiveImpersonation(dbFor(c.env), staff.id);
+  const session = await getActiveImpersonation(dbFor(c.env), staff.id, await adminSessionTokenHashFromRequest(c));
   if (!session) return c.json({ success: true, data: null });
   const tenant = await tenantById(c, session.tenant_id);
   return c.json({
@@ -291,7 +292,9 @@ ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), inputJsonB
   if (tenant.status === 'archived') {
     return inputError(c, { success: false, error: 'アーカイブ済みの契約先には入れません' }, 400, ["tenantId"]);
   }
-  const session = await startImpersonation(db, { staffId: staff.id, tenantId: tenant.id });
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  if (!sessionTokenHash) return c.json({ success: false, error: '代理ログインには本人のログインが必要です' }, 403);
+  const session = await startImpersonation(db, { staffId: staff.id, tenantId: tenant.id, sessionTokenHash });
   // 閲覧だけの代理ログインは契約先には見せない（要件 §3 37-5）。運営側の記録にだけ残す。
   await recordPlatformAudit(db, {
     staffId: staff.id,
@@ -309,7 +312,7 @@ ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), inputJsonB
 ops.post('/api/ops/impersonation/write', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  const session = await getActiveImpersonation(db, staff.id);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
   if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const body = await c.req.json().catch(() => null);
   const reason = reasonFrom(body);
@@ -334,7 +337,7 @@ ops.post('/api/ops/impersonation/write', requirePlatformAdminWrite(), inputJsonB
 ops.post('/api/ops/impersonation/read', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  const session = await getActiveImpersonation(db, staff.id);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
   if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   await switchImpersonationToRead(db, session.id);
   return c.json({ success: true, data: toImpersonationContext({ ...session, mode: 'read' }) });
@@ -343,7 +346,7 @@ ops.post('/api/ops/impersonation/read', requirePlatformAdminWrite(), inputJsonBo
 ops.post('/api/ops/impersonation/pii-reveal', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  const session = await getActiveImpersonation(db, staff.id);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
   if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const body = await c.req.json().catch(() => null);
   const reason = reasonFrom(body);
@@ -372,7 +375,7 @@ ops.post('/api/ops/impersonation/pii-reveal', requirePlatformAdminWrite(), input
 ops.post('/api/ops/impersonation/end', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  const session = await getActiveImpersonation(db, staff.id);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
   if (!session) return c.json({ success: true, data: null });
   await endImpersonation(db, session.id);
   const tenant = await tenantById(c, session.tenant_id);

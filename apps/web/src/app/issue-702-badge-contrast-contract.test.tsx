@@ -38,6 +38,10 @@ function tokenMap(): Map<string, string> {
     const color = [0, 2, 4].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
     map.set(match[1], '#' + color)
   }
+  for (const match of css.matchAll(/--color-([\w-]+):\s*var\(--color-([\w-]+)\)/g)) {
+    const resolved = map.get(match[2])
+    if (resolved) map.set(match[1], resolved)
+  }
   return map
 }
 
@@ -57,7 +61,7 @@ describe('Issue #702: 札の文字色と背景の組み合わせは 4.5:1 以上
     ['success', 'success-bg', '公開中バッジ（濃緑 on 薄緑）'],
     ['warning', 'warning-bg', '停止中・アーカイブ札（濃黄土 on 薄黄）'],
     ['accent-deep', 'accent-soft', '成功バッジ（濃緑 on 薄緑）'],
-    ['status-info', 'status-info-soft', '情報バッジ（濃青 on 薄青）'],
+    ['status-info-deep', 'status-info-soft', '情報バッジ（濃青 on 薄青）'],
     ['status-warn-deep', 'status-warn-soft', '注意バッジ（濃飴 on 薄飴）'],
     ['ink-faint', 'canvas-sunken', '停止中・薄い札（グレー on 沈み面）'],
   ] as const
@@ -82,22 +86,30 @@ describe('Issue #702: 危険バッジは濃い赤のトークンを指す', () =
     expect(css).toContain('color: var(--color-danger)')
     expect(css).not.toContain('color: var(--color-status-danger);')
   })
+
+  it('V8の情報札は案内の濃い青を使う（§6.5-4）', () => {
+    expect(css).toMatch(/\[data-tone='info'\][^}]*color:\s*var\(--polish-status-info-ink\)/)
+    expect(read('globals.css')).toContain('--polish-status-info-ink: #1d4ed8')
+    expect(read('globals.css')).toContain('--color-status-info-deep: #1d4ed8')
+  })
 })
 
 describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
   it('ウェビナー一覧のV8札は薄い背景＋濃い文字を使う', () => {
     const page = read('webinars/page.tsx')
-    const css = read('webinars/list-v8.module.css')
-    expect(page).toContain('className={statusPillClass(w)}')
-    for (const [name, bg, fg] of [
-      ['pillNeutral', 'shell', 'ink-secondary'],
-      ['pillActive', 'success-bg', 'success'],
-      ['pillScheduled', 'warning-bg', 'warning'],
-    ]) {
-      expect(page).toContain(`styles.${name}`)
-      const rule = css.match(new RegExp(`\\.${name}\\s*\\{[^}]*\\}`))?.[0]
-      expect(rule).toContain(`background: var(--color-${bg});`)
-      expect(rule).toContain(`color: var(--color-${fg});`)
+    const css = read('../components/shared/status-pill.module.css')
+    const globals = read('globals.css')
+    expect(page).toContain("<SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'neutral' : 'neutral'}")
+    for (const tone of ['success', 'info', 'neutral']) {
+      const ink = globals.match(new RegExp(`--polish-status-${tone}-ink:\\s*(#[0-9a-fA-F]{6})`))?.[1]
+      const bg = globals.match(new RegExp(`--polish-status-${tone}-bg:\\s*#([0-9a-fA-F]{8})`))?.[1]
+      expect(ink).toBeDefined()
+      expect(bg).toBeDefined()
+      expect(css).toContain(`var(--polish-status-${tone}-ink)`)
+      expect(css).toContain(`var(--polish-status-${tone}-bg)`)
+      const alpha = parseInt(bg!.slice(6, 8), 16) / 255
+      const blended = [0, 2, 4].map(i => Math.round(parseInt(bg!.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
+      expect(ratio(ink!.slice(1), blended), tone).toBeGreaterThanOrEqual(4.5)
     }
     expect(page).not.toMatch(/bg-(?:gray|green|amber)-100/)
   })
@@ -124,15 +136,18 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
   })
 
   it('テンプレートの種類タブ：選んだ札を明るい緑で上書きしない（濃い緑のまま）', () => {
-    const page = read('templates/page.tsx')
-    expect(page).toContain("bg-accent-deep text-on-accent'")
+    const page = read('../v8/templates/list.tsx')
+    expect(page).toContain('<Tabs')
+    expect(read('../components/shared/tabs.module.css')).toMatch(/:root \.current \{[^}]*color: var\(--color-ink\)/)
     expect(page).not.toContain("backgroundColor: 'var(--color-accent)'")
   })
 
   it('リッチメニュー編集のページ札も同じ規則（明るい緑の上書き・生の黄は使わない）', () => {
     const page = read('rich-menus/edit/page.tsx')
-    expect(page).toContain('bg-accent-deep text-on-accent')
-    expect(page).toContain('bg-warning-bg p-2 text-micro text-warning')
+    const steps = read('../components/templates/steps.module.css')
+    expect(page).toContain("import { Steps } from '@/components/templates/steps'")
+    expect(steps).toMatch(/\.dot\[data-step-dot='done'\]\s*\{[\s\S]*?background: var\(--color-accent-deep\);[\s\S]*?color: var\(--color-on-accent\);/)
+    expect(steps).toMatch(/\.dot\[data-step-dot='attention'\]\s*\{[\s\S]*?background: var\(--color-warning-bg\);[\s\S]*?color: var\(--color-warning\);/)
     expect(page).not.toContain("backgroundColor: 'var(--color-accent)'")
     expect(page).not.toContain('bg-amber-50 p-2 text-micro text-amber-700')
   })

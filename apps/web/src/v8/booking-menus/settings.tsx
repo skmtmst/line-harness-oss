@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
 /*
@@ -75,7 +77,6 @@ import {
   AccountIcon,
   StateCard,
   SkeletonRows,
-  Band,
   sortedMenus,
   type LoadStatus,
   type V8TabEdit,
@@ -189,6 +190,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   const [resources, setResources] = useState<BookingResource[] | null>(null)
   const [resourcesStatus, setResourcesStatus] = useState<LoadStatus>('loading')
   const [resourcesError, setResourcesError] = useState<string | null>(null)
+  const [resourcesRevision, setResourcesRevision] = useState(0)
   const [preview, setPreview] = useState<{
     status: LoadStatus
     slots: BookingAvailabilitySlot[]
@@ -362,7 +364,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         setResourcesError('設備を読み込めませんでした。')
       })
     return () => { cancelled = true }
-  }, [tab, accountId, resources])
+  }, [tab, accountId, resources, resourcesRevision])
 
   /* ---- 休業日タブ: 休みにした日に入っている予約の件数 ---- */
   const storeExceptions = useMemo(
@@ -469,6 +471,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   }, [])
   const retryResources = useCallback(() => {
     setResources(null)
+    setResourcesRevision((n) => n + 1)
     setResourcesError(null)
   }, [])
 
@@ -519,7 +522,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
 
         {accountId && tabReadOnly ? (
           <div className={styles.readOnlyRow} data-design="Bar">
-            <Band tone="hint">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Band>
+            <ReadOnlyNotice />
           </div>
         ) : null}
 

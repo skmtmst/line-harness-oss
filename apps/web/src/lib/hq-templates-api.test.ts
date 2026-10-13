@@ -92,6 +92,13 @@ describe('HQ template API transport', () => {
     await expect(hqTemplatesApi.list('form')).rejects.toThrow('未対応')
     request.mockRejectedValue(new Error('synthetic-private-detail')); await expect(hqTemplatesApi.list('tag')).rejects.toThrow('接続と入力内容')
   })
+  it('保存の欄ごとの理由をエラー変換後も残す', async () => {
+    const rejection = Object.assign(new transport.ApiError(422, '入力を確認してください'), { fields: { name: '名前が重複しています' } })
+    request.mockRejectedValue(rejection)
+    await expect(hqTemplatesApi.get('t1')).rejects.toMatchObject({ status: 422, fields: rejection.fields })
+    request.mockResolvedValue({ success: false, fields: { name: '名前を入力してください' } })
+    await expect(hqTemplatesApi.get('t1')).rejects.toMatchObject({ status: 422, fields: { name: '名前を入力してください' } })
+  })
   it('権限不足と競合を安全な文言へ変換する', async () => {
     request.mockRejectedValue(new transport.ApiError(403)); await expect(hqTemplatesApi.get('t1')).rejects.toThrow('権限')
     request.mockRejectedValue(new transport.ApiError(409, '最新版を読み込んでください。'))

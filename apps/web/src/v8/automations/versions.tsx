@@ -4,7 +4,7 @@
  * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
- * （app/common-actions/common-action-versions-v8.tsx）と同じ（版の履歴・公開・前の版から新版・
+ * （共通アクションの既存API）と同じ（版の履歴・公開・前の版から新版・
  * 利用先の版切り替え・月次集計・読めないときの扱い）。違いは見せ方だけ——
  * 型（DetailPage）に、戻る道・題・説明・右上の操作・4つの数のマス・版の履歴・呼び出し元の表を渡す。
  */
@@ -14,7 +14,7 @@ import { GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useManualHref } from '@/lib/use-manual-href'
+
 import { formatNumber } from '@/lib/format'
 import { DetailPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -30,6 +30,7 @@ import styles from './versions.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /** 利用先の種類（今の画面と同じ言葉）。 */
 const CONSUMER_LABELS: Record<string, string> = {
@@ -242,10 +243,7 @@ function VersionsInner() {
     >
       <div className={styles.body}>
       {summaryError ? (
-        <div className={styles.errorBand} role="alert">
-          <span>月次件数を読み込めませんでした。版と利用先は表示しています。</span>
-          <Button variant="secondary" disabled={summaryRetrying} onClick={() => void reloadSummary()}>月次件数をもう一度読み込む</Button>
-        </div>
+        <Notice tone="danger" ><span>月次件数を読み込めませんでした。版と利用先は表示しています。</span><Button variant="secondary" disabled={summaryRetrying} onClick={() => void reloadSummary()}>月次件数をもう一度読み込む</Button></Notice>
       ) : null}
 
       <div className={`${kpiStyles.strip} ${styles.cards}`}>
@@ -255,7 +253,7 @@ function VersionsInner() {
         <KpiCard presentation="cell" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
       </div>
 
-      {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" >{error}</Notice> : null}
 
       <section className={styles.historyCard} aria-labelledby="versions-history-title">
         <h2 id="versions-history-title" className={styles.cardTitle}>版の履歴</h2>
@@ -399,7 +397,7 @@ function VersionsInner() {
         <p className={styles.cardLead}>
           {`影響：実行中 ${pendingBinding?.runningCount ?? emptyValue('unknown')}件、待機中 ${pendingBinding?.waitingCount ?? emptyValue('unknown')}件は現在の版のまま完了します。`}
         </p>
-        {dialogError ? <p className={styles.errorText} role="alert">{dialogError}</p> : null}
+        {dialogError ? <Notice tone="danger" >{dialogError}</Notice> : null}
       </Dialog>
     </DetailPage>
   )

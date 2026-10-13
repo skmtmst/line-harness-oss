@@ -238,3 +238,11 @@
 .stateBox {
   padding: var(--tpl-rs-state-pad);
 }
+
+.page[data-restaurant-fusion] .bodyFlush { gap: var(--tpl-board-section-gap); margin-top: var(--tpl-board-body-top); }
+
+.page[data-restaurant-fusion] .storeTabs { margin-top: var(--tpl-board-tabs-top); }
+
+.fusionStore{width: var(--tpl-rest1-restaurant-booking-kit-shell-width-1);flex: var(--tpl-rest1-restaurant-booking-kit-shell-flex-1);}
+
+.panelBodyFusion{padding: var(--tpl-rest1-restaurant-booking-kit-shell-padding-1);}

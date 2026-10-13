@@ -1,5 +1,7 @@
 'use client'
 
+import { useActionError } from '@/lib/use-action-error'
+
 import { useCallback, useEffect, useState } from 'react'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
@@ -9,6 +11,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenuVersion } from '@/lib/api'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import Notice from '@/components/shared/notice'
 
 /**
  * T: 予約メニューの版の履歴（右から出る欄）。
@@ -38,7 +41,7 @@ export default function MenuVersionHistory({
   const [comparing, setComparing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [reverting, setReverting] = useState(false)
-  const [revertError, setRevertError] = useState<string | null>(null)
+  const { error: revertError, setError: setRevertError } = useActionError(`${accountId}:${menuId}`)
 
   /*
    * WEB051：戻すときに送る「いまの版」。開いたときの版（親の値）から始め、
@@ -47,10 +50,9 @@ export default function MenuVersionHistory({
   const [expectedVersion, setExpectedVersion] = useState(currentVersion)
   useEffect(() => { setExpectedVersion(currentVersion) }, [currentVersion])
 
-  const load = useCallback(async (options?: { keepError?: boolean }) => {
+  const load = useCallback(async () => {
     setLoadState('loading')
     // WEB051：競合の知らせは読み直しで消さない。
-    if (!options?.keepError) setRevertError(null)
     try {
       const response = await bookingApi.listMenuVersions(accountId, menuId)
       const list = Array.isArray(response.versions) ? response.versions : []
@@ -90,7 +92,7 @@ export default function MenuVersionHistory({
     if (selected == null) return
     setConfirming(false)
     setReverting(true)
-    setRevertError(null)
+    setRevertError('')
     try {
       const response = await bookingApi.revertMenuVersion(accountId, menuId, selected, expectedVersion)
       notifyToast(`第${selected}版の中身で新しい版（第${response.version}版）を作りました。`)
@@ -102,7 +104,7 @@ export default function MenuVersionHistory({
         const latest = Number((error.data as { currentVersion?: unknown } | undefined)?.currentVersion)
         if (Number.isInteger(latest) && latest > 0) setExpectedVersion(latest)
         setRevertError('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')
-        await load({ keepError: true })
+        await load()
       } else if (error instanceof ApiError && error.status === 403) {
         setRevertError(permissionDeniedMessage('store'))
       } else {
@@ -133,7 +135,7 @@ export default function MenuVersionHistory({
       ) : (
         <div className="flex flex-col gap-4">
           {revertError ? (
-            <p role="alert" className="text-danger text-xs">{revertError}</p>
+            <Notice tone="danger" >{revertError}</Notice>
           ) : null}
           <VersionHistory
             versions={history}

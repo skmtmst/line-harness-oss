@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const RAW = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
+const RAW = ['drawer.tsx', 'display.ts'].map(name => readFileSync(new URL(`../../v8/affiliates/${name}`, import.meta.url), 'utf8')).join('\n')
 
 /*
   注釈を落とす。**「なぜ直したか」を書いた文が、直したはずの字面に当たる。**
@@ -42,7 +42,7 @@ describe('紹介者の内訳は、集計が読めないときに落ちない', (
   })
 
   it('読めなかったことを0件として描かない', () => {
-    expect(TABS).toContain('この期間の集計を取得できませんでした')
+    expect(TABS).toContain('この期間の集計を読み込めませんでした')
     expect(TABS, '記録が消えたと読ませない').toContain('リンクと成果の記録は消えていません')
   })
 })

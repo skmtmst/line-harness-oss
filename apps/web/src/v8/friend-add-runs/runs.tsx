@@ -1,6 +1,48 @@
 'use client'
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+
+import { RowNameLink } from '@/components/shared/table';
 
 import SegmentedControl from '@/components/shared/segmented'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import type { FriendAddEventAttributionStatus, FriendAddEventKind, FriendAddEventRoutingStatus } from '@line-crm/shared';
+import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
+import { TriangleAlert } from 'lucide-react';
+import { DetailPage } from '@/components/templates';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { useAccount } from '@/contexts/account-context';
+import { api, type FriendAddRunList } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { describeFriendAddFailure } from '@/v8/friend-add/failure';
+import { useCursorStack } from '@/v8/friend-add/use-cursor-stack';
+import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status';
+import styles from './runs.module.css'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
@@ -11,42 +53,6 @@ import SegmentedControl from '@/components/shared/segmented'
  * 取得・操作の動き（読み直し・絞り込み・カーソルのページ送り・一時停止・CSV）は
  * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
  */
-
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type {
-  FriendAddEventAttributionStatus,
-  FriendAddEventKind,
-  FriendAddEventRoutingStatus,
-} from '@line-crm/shared'
-import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
-import { DetailPage } from '@/components/templates'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { useAccount } from '@/contexts/account-context'
-import { api, type FriendAddRunList } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
-import { describeFriendAddFailure } from '@/v8/friend-add/failure'
-import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
-import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
-import styles from './runs.module.css'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -61,7 +67,7 @@ const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
 /** CSV 書き出しの安全弁（今までと同じ：100件×50頁＝5,000件で止める）。 */
 const CSV_EXPORT_MAX_PAGES = 50
 const CSV_EXPORT_PAGE_SIZE = 100
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 const NO_MANAGE_NOTE = '閲覧のみで見ています。一時停止・もう一度実行はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
 
 function routeNameOf(item: RunItem): string {
@@ -114,7 +120,7 @@ function FriendAddRunsInner() {
   usePageTitle('実行結果：友だち追加時の配信')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useFeatureAccess('friendAdd')
   const searchParams = useSearchParams()
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
@@ -318,7 +324,10 @@ function FriendAddRunsInner() {
       if (await retryOne(item)) retried += 1
     }
     setRetrying(null)
-    setMessage(retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : 'もう一度実行できる処理はありませんでした。')
+    const failed = failedItems.length - retried
+    setMessage(failed > 0
+      ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${failed} 件をもう一度実行できませんでした。時間を置いてお試しください。`
+      : `失敗した処理を${retried} 件もう一度実行しました。`)
     await load()
   }
 
@@ -456,7 +465,7 @@ function FriendAddRunsInner() {
         </Button>
       </div>}
     >
-      {!canManage ? <p className={styles.viewerBand} role="status">{NO_MANAGE_NOTE}</p> : null}
+      {!canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div> : null}
       {ruleIdFilter ? (
         <p className={styles.hint}>
           この設定の実行結果だけを表示しています。
@@ -476,20 +485,12 @@ function FriendAddRunsInner() {
       </div>
 
       {!loading && !error && failedCount > 0 ? (
-        <div className={styles.failBand} role="alert">
-          <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
-            <p className={styles.failNote}>案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</p>
-          </div>
-          <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>
-          {canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>{canManage ? (
             <Button variant="primary" onClick={() => void retryAllFailed()} disabled={failedItems.length === 0 || retrying !== null}
               busy={retrying === 'all'} busyLabel="実行しています">
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null}
-        </div>
+          ) : null} </>} >案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">
@@ -506,13 +507,13 @@ function FriendAddRunsInner() {
           <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["perPage","limit","per_page"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(perPage)}
               onChange={(value) => { setPerPage(Number(value)); resetCursor() }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 
@@ -554,7 +555,7 @@ function FriendAddRunsInner() {
                     </Td>
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(name)}</span>
-                      <Link className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</Link>
+                      <RowNameLink className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</RowNameLink>
                     </Td>
                     <Td className={styles.colRoute}><span className={styles.route} title={route}>{route}</span></Td>
                     <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>

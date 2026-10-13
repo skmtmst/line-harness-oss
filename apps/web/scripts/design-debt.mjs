@@ -45,14 +45,21 @@ export function isDisplayClass(className) {
 }
 
 /** 共通部品のファイルの絶対パス。 */
-function partFiles() {
-  const data = JSON.parse(readFileSync(PARTS, 'utf8'))
+export function partFiles(data = JSON.parse(readFileSync(PARTS, 'utf8'))) {
   const files = new Set()
   for (const [key, part] of Object.entries(data.parts)) {
     if (key.startsWith('$')) continue
     if (part.code) files.add(join(WEB, part.code))
     for (const implementationFile of part.implementationFiles ?? []) {
       files.add(join(WEB, implementationFile))
+    }
+  }
+  // 持ち主が決まった共通部品と、画素照合が済んだ値の契約は別。
+  // 照合待ちでも登録された共通部品自身を画面の手書きとして数えない。
+  for (const part of Object.values(data.investigations ?? {})) {
+    if (part.role === 'canonical' && part.status === 'active'
+      && part.code?.startsWith('src/components/shared/') && part.components?.length) {
+      files.add(join(WEB, part.code))
     }
   }
   return files

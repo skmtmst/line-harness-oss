@@ -1,6 +1,5 @@
 'use client'
 
-/* ★V8 写し：src/app/contents/file-scan-stopped-banner.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 import { useEffect, useState } from 'react'
 import NoteBar from '@/components/shared/note-bar'

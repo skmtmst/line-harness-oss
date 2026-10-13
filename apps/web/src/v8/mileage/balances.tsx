@@ -1,21 +1,13 @@
 'use client'
 
-import { jstDateOffset } from '@/lib/jst-datetime'
+import { ListToolbarFrame } from '@/components/shared/list-toolbar'
 
-/*
- * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・
- * 消える予定・最終行動・操作（明細を見る・増減）」。承認待ちの板は今と同じ条件で出す。
- *
- * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
- * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
- */
+import { jstDateOffset } from '@/lib/jst-datetime'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -43,13 +35,26 @@ import {
   isMileageFriendsV6Overview,
   mileagePaginationTotal,
 } from './display'
-import { MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { formatMileageDate } from './display'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・
+ * 消える予定・最終行動・操作（明細を見る・増減）」。承認待ちの板は今と同じ条件で出す。
+ *
+ * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
+ * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
+ */
 
 function dateOnlyDaysAgo(days: number) {
   return jstDateOffset(-days)
@@ -378,7 +383,7 @@ export default function BalancesTab() {
       <p className={styles.approvalTitle}>承認待ちのマイル変更</p>
       <p className={styles.approvalNote}>承認待ちを読み込めませんでした。依頼があるか分からない状態です。</p>
       <div>
-        <Button onClick={() => void loadApprovals()}>もう一度読み込む</Button>
+        <Button onClick={() => loadApprovals()} busyLabel="処理中…">もう一度読み込む</Button>
       </div>
     </section>
   ) : null
@@ -404,11 +409,8 @@ export default function BalancesTab() {
   )
 
   const toolbar = (
-    <>
-      <div className={styles.fullRow}>
-        <Notice tone="info">残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。</Notice>
-      </div>
-      {approval ? <div className={styles.fullRowFlush}>{approval}</div> : null}
+    <ListToolbarFrame>
+      {approval ? <div className={styles.fullRow}>{approval}</div> : null}
       <MileageToolbar
         narrow={narrow}
         notices={<ToolbarNotices error={exportError} />}
@@ -438,20 +440,20 @@ export default function BalancesTab() {
           <PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
         </>}
       />
-    </>
+    </ListToolbarFrame>
   )
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>友だち</Th>
-            <Th className={styles.colRank}>ランク</Th>
-            <Th className={`${styles.colBalance} ${styles.num}`}>いまの残高</Th>
-            <Th className={`${styles.colChange} ${styles.num}`}>今月の増減</Th>
-            <Th className={`${styles.colBalance} ${styles.num}`}>消える予定</Th>
-            <Th className={styles.colLast}>最終行動</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>友だち</Th>
+            <Th collapseAt="narrow" className={styles.colRank} title={summary ? summary.rankCounts.length > 0 ? summary.rankCounts.map(rank => `${rank.rankName} ${formatMileageNumber(rank.friendCount)}名`).join('・') : '公開中のランクなし' : 'ランク別の人数は未取得'}>ランク</Th>
+            <Th align="right" className={styles.colBalance} title="並び順：残高が多い順">いまの残高</Th>
+            <Th align="right" className={styles.colChange}>今月の増減</Th>
+            <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
+            <Th collapseAt="narrow" className={styles.colLast}>最終行動</Th>
             <Th className={styles.colOpsBalance}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -461,7 +463,7 @@ export default function BalancesTab() {
             return (
               <Tr
                 key={member.friendId}
-                className={styles.row}
+
                 data-table-layout="columns"
                 interactive
                 onClick={(event) => {
@@ -470,18 +472,18 @@ export default function BalancesTab() {
                   router.push(href)
                 }} data-row-id={member.friendId}
               >
-                <Td className={styles.colName}>
-                  <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
-                  <span className={styles.rowSub} ><TruncatedText value={String(member.lineAccount.name ?? '')} /></span>
-                </Td>
-                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? emptyValue('unknown')}</span></Td>
-                <Td className={`${styles.colBalance} ${styles.num}`}>
+                <Td grow><FolderDotName>
+                  <span  title={member.displayName}>{member.displayName}</span>
+
+                </FolderDotName></Td>
+                <Td collapseAt="narrow" className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
+                <Td align="right" className={styles.colBalance}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
                 </Td>
-                <Td className={`${styles.colChange} ${styles.num}`}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
-                <Td className={`${styles.colBalance} ${styles.num}`}><span className={styles.cellMain}>{expiringText(member)}</span></Td>
-                <Td className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
+                <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
+                <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
+                <Td collapseAt="narrow" className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
                 <Td className={styles.colOpsBalance}>
                   <span className={styles.rowActions}>
                     <Button href={href}>明細を見る</Button>
@@ -534,6 +536,7 @@ export default function BalancesTab() {
   return (
     <MileageFrame
       help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
           <RefreshCw size={15} aria-hidden="true" /> 残高を再読み込み
@@ -558,13 +561,13 @@ export default function BalancesTab() {
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
           onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
-          <Field label="差し戻す理由"><textarea
+          <Field label="差し戻す理由"><SaveErrorField names={["rejectReason","reject_reason"]}><textarea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="例：調整の根拠となる資料を確認できませんでした"
               rows={3}
-            /></Field>
+            /></SaveErrorField></Field>
         </Dialog>
       }
     >

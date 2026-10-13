@@ -5,18 +5,19 @@
  * - 詳細の頭（参加者 uNsEy・分析 z2dgw・コメント演出 Omqd4）：戻る → 題 → 説明の行、右に操作、下にタブ。
  * - 作る手順の帯（作る型 CreatePage の steps に渡す）：5段、済みの段へ戻れる（型の共通部品 Steps）。
  */
-import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { Steps } from '@/components/templates/steps'
-import { PageHeading } from '@/components/templates/page-frame'
-import { STEPS, type PaneKey, type StepKey } from './helpers'
+/*
+ * ウェビナーの編集（V8）の頭まわり。
+ * - 詳細の頭（参加者 uNsEy・分析 z2dgw・コメント演出 Omqd4）：戻る → 題 → 説明の行、右に操作、下にタブ。
+ * - 作る手順の帯（作る型 CreatePage の steps に渡す）：5段、済みの段へ戻れる（型の共通部品 Steps）。
+ */
+import type { ReactNode } from 'react';
+import Link from '@/components/shared/list-navigation'
+import { Steps } from '@/components/templates/steps';
+import { PageHeading } from '@/components/templates/page-frame';
+import { STEPS, type PaneKey, type StepKey } from './helpers';
 import styles from './chrome.module.css'
 
-export function BackLink() {
-  return (
-    <Link href="/webinars" className={styles.back}>← ウェビナーへ</Link>
-  )
-}
+export function BackLink() { return null }
 
 const DETAIL_TABS: ReadonlyArray<{ key: PaneKey; label: string }> = [
   { key: 'basic', label: '設定' },
@@ -44,7 +45,7 @@ export function DetailHead({
 }) {
   return (
     <>
-      <PageHeading title={title} help={subtitle} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
+      <PageHeading title={title} explanationKey={`webinar:${current}`} help={<>{subtitle}{current === 'participants' ? <p>「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</p> : null}</>} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
       <div className={styles.tabsRow}>
         <nav className={styles.tabs} aria-label="設定・参加者・分析・コメント演出" data-wc-tabs="true">
           {DETAIL_TABS.map((tab) => {

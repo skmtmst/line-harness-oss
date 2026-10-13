@@ -74,7 +74,7 @@ describe('N-032 friend stats account scope integration (#664)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seedScopeFixture(testDb);
     target = createApp(testDb.db);
   });
@@ -119,6 +119,18 @@ describe('N-032 friend stats account scope integration (#664)', () => {
       stats: stats.data.total,
     };
   }
+
+  it('SCALE-02 仲間の友だち一覧と4集計も201店舗の範囲を保つ', async () => {
+    for(let i=0;i<201;i++) testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES(?,?,?,'token','secret',?)").run(`synthetic-account-${i}`,`synthetic-channel-${i}`,'人工店',DEFAULT_TENANT_ID);
+    expect((await visibleCounts('key-all')).ids).toEqual(['friend-a-1','friend-a-2','friend-b-1','friend-unassigned']);
+  });
+
+  it('SCALE-03 履歴付き101人の一覧もD1の100変数上限を超えない', async () => {
+    for(let i=0;i<101;i++) insertFriend(testDb.raw, `synthetic-${i}`, { line_account_id:'account-a' });
+    const response=await get('/api/friends?lineAccountId=account-a&limit=101&includeChatStatus=true&includeTags=false','key-all');
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as FriendListResponse).data.items).toHaveLength(101);
+  });
 
   it.each([
     {

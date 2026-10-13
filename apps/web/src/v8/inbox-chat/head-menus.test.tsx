@@ -1,3 +1,4 @@
+
 // @vitest-environment happy-dom
 /*
  * ★V8 会話の頭（M0393 XqSvX・段2「5. 会話の頭のメニュー」）。
@@ -58,15 +59,16 @@ describe('会話の頭のメニュー', () => {
     expect(onStatus).toHaveBeenCalledWith('on_hold')
   })
 
-  test('担当は1つだけ選ぶ一覧で、選ぶと変わる。未割り当ても選べる', () => {
+  test('担当は1つだけ選ぶ一覧で、選ぶと変わる。未割り当ても選べる', async () => {
     const { onOperator } = mount()
-    expect(screen.getByRole('button', { name: '担当者を変える' }).textContent).toContain('担当：Kenta')
+    expect(screen.getByRole('button', { name: '担当者を変える' }).parentElement?.textContent).toContain('Kenta')
     fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
-    const options = screen.getAllByRole('option')
-    expect(options.map((o) => o.textContent)).toEqual(['Kenta', 'Masato', '未割り当て'])
-    expect(options[0].getAttribute('aria-selected')).toBe('true')
-    fireEvent.click(options[1].querySelector('button')!)
+    const options = screen.getAllByRole('radio')
+    expect(options.map((o) => o.getAttribute('aria-label'))).toEqual(['Kenta', 'Masato', '未割り当て'])
+    expect((options[0] as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(options[1])
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
     expect(onOperator).toHaveBeenCalledWith('op-m')
   })
 

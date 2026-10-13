@@ -12,7 +12,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
-  useSearchParams: () => new URLSearchParams('tab=members'),
+  useSearchParams: () => new URLSearchParams('tab=members&id=target'),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -93,7 +93,7 @@ vi.mock('@/lib/api', () => {
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: StaffPage } = await import('./staff')
+const { StaffEditV8 } = await import('./staff')
 
 
 beforeEach(() => {
@@ -108,11 +108,8 @@ describe('V8 ログインユーザーの入力確認', () => {
     const originalScroll = HTMLElement.prototype.scrollIntoView
     HTMLElement.prototype.scrollIntoView = scroll
     try {
-      render(<StaffPage />)
-      await waitFor(() => expect(screen.getByRole('button', { name: '対象者の操作' })).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: '対象者の操作' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' }))
-      const name = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^名前/ }) as HTMLInputElement
+      render(<StaffEditV8 />)
+      const name = await screen.findByRole('textbox', { name: /^名前/ }) as HTMLInputElement
       fireEvent.change(name, { target: { value: '' } })
       fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
       expect(name.getAttribute('aria-invalid')).toBe('true')

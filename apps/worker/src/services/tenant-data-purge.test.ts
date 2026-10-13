@@ -285,4 +285,33 @@ describe('tenant data retention purge', () => {
     expect(count('form_accounts', 'form_id = ? AND line_account_id = ?', 'shared', 'acc-t1')).toBe(0);
     expect(count('form_accounts', 'form_id = ? AND line_account_id = ?', 'shared', 'acc-t2')).toBe(1);
   });
+
+  function seedDocument(tenantId: string) {
+    seedFriends(tenantId, 1); seedForm(`f-${tenantId}`, null, [`acc-${tenantId}`]);
+    sqlite.raw.prepare(`INSERT INTO form_submissions(id,form_id,friend_id,data) VALUES (?, ?, ?, '{}')`).run(`answer-${tenantId}`, `f-${tenantId}`, `u-${tenantId}-0`);
+    sqlite.raw.prepare(`INSERT INTO form_submission_files(id,line_account_id,form_id,block_id,friend_id,submission_id,file_kind,side,r2_key,filename,mime_type,size_bytes,scan_id,created_at)
+      VALUES (?, ?, ?, 'b', ?, ?, 'pdf', 'single', ?, 'a.pdf', 'application/pdf', 10, 'scan', ?)`)
+      .run(`doc-${tenantId}`, `acc-${tenantId}`, `f-${tenantId}`, `u-${tenantId}-0`, `answer-${tenantId}`, `private/form-documents/${tenantId}.pdf`, NOW);
+  }
+  test.each(['expired', 'requested'])('書類は%sの削除で実体まで消し、別の統括は守る', async reason => {
+    seedTenant('t1', reason === 'expired' ? { anchor: jst(-91) } : { requested: jst(-1) }); seedDocument('t1');
+    seedTenant('t2', { planStatus: 'active' }); seedDocument('t2');
+    const IMAGES = createR2();
+    expect((await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW })).completed).toBe(1);
+    expect(count('form_submission_files', 'id = ?', 'doc-t1')).toBe(0);
+    expect(count('form_submission_files', 'id = ?', 'doc-t2')).toBe(1);
+    expect(IMAGES.delete).toHaveBeenCalledWith(['private/form-documents/t1.pdf']);
+  });
+  test('書類をR2から消せない時は行と親を残し、次回に消し直す', async () => {
+    seedTenant('t1', { requested: jst(-1) }); seedDocument('t1');
+    const IMAGES = createR2(); IMAGES.delete.mockRejectedValueOnce(new Error('R2 offline'));
+    const first = await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW });
+    expect(first.completed).toBe(0); expect(first.failedObjects).toBe(1);
+    expect(count('form_submission_files', 'id = ?', 'doc-t1')).toBe(1);
+    expect(count('form_submissions', 'id = ?', 'answer-t1')).toBe(1);
+    expect(count('friends', 'id = ?', 'u-t1-0')).toBe(1);
+    expect((await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW })).completed).toBe(1);
+    expect(count('form_submission_files', 'id = ?', 'doc-t1')).toBe(0);
+    expect(IMAGES.delete).toHaveBeenCalledTimes(2);
+  });
 });

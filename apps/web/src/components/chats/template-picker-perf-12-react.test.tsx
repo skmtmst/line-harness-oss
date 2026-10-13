@@ -71,6 +71,7 @@ afterEach(() => {
  */
 const fakeClock = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 const debounce = async () => {
+  await act(async () => { await vi.advanceTimersByTimeAsync(300) })
   await act(async () => { await vi.advanceTimersByTimeAsync(350) })
   vi.useRealTimers()
 }
@@ -114,11 +115,8 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
 
     fakeClock()
     await act(async () => {
-      const input = screen.getByLabelText('テンプレート名・本文で検索')
-      // React が管理する input の値は setter 経由で入れる。
-      const setter = Object.getOwnPropertyDescriptor(globalThis.HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'あいさつ')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      const input = screen.getByLabelText('テンプレート名・本文で探す')
+      fireEvent.change(input, { target: { value: 'あいさつ' } })
     })
     await debounce()
     await waitFor(() => {
@@ -165,11 +163,8 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
     render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
     await waitFor(() => expect(fixture.calls.length).toBeGreaterThan(0))
     fixture.calls = []
-    // フォルダ欄を開いて「案内」を選ぶ。
-    const selectButton = document.body.querySelector('[aria-haspopup="listbox"]')!
-    await act(async () => { selectButton.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-    const option = await screen.findByRole('option', { name: /案内/ })
-    await act(async () => { option.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    const folder = await screen.findByRole('button', { name: /案内/ })
+    await act(async () => { folder.click() })
     await waitFor(() => {
       expect(fixture.calls.some((c) => c.folderId === 'f1' && c.page === 1)).toBe(true)
     })
@@ -194,10 +189,8 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
     render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
     fakeClock()
     await act(async () => {
-      const input = screen.getByLabelText('テンプレート名・本文で検索')
-      const setter = Object.getOwnPropertyDescriptor(globalThis.HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'あいさつ')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      const input = screen.getByLabelText('テンプレート名・本文で探す')
+      fireEvent.change(input, { target: { value: 'あいさつ' } })
     })
     await debounce()
     await waitFor(() => expect(screen.getAllByText('あいさつ').length).toBeGreaterThan(0))

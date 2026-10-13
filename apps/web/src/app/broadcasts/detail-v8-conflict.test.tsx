@@ -2,14 +2,16 @@
 /*
  * ★V8 `Q28Gb`（詳細の競合の帯）の描画。
  * 競合のときだけ帯と「読み直す」が出て、ふだんは出ない。
- * v7 には出さない（V8 の部品だけの話）。
+ * 現役V8の部品で、読み直しの操作を確かめる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import BroadcastDetailV8 from './detail-v8'
+import BroadcastDetailV8 from '@/v8/broadcast-detail/detail'
 import type { ApiBroadcast } from '@/lib/api'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -17,8 +19,8 @@ vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual }
 })
-vi.mock('next/navigation', async importOriginal => ({
-  ...await importOriginal<typeof import('next/navigation')>(),
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {} }),
 }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
@@ -71,6 +73,7 @@ const baseProps = {
 let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
+  rememberStaffIdentity({ role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -78,20 +81,21 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
+  forgetStaffIdentity()
 })
 
 describe('詳細の競合の帯（Q28Gb）', () => {
-  it('競合のときだけ帯・板ID・読み直すが出る', () => {
+  it('競合のときだけ帯・板ID・読み直すが出る', async () => {
     let clicked = 0
     act(() => {
       root.render(<BroadcastDetailV8 {...baseProps} conflict onConflictReload={() => { clicked += 1 }} />)
     })
     const bar = host.querySelector('[data-design-node="Q28Gb"]')
     expect(bar).not.toBeNull()
-    expect(bar?.textContent).toContain('ほかの人がこの配信を更新しました')
-    const button = Array.from(host.querySelectorAll('button')).find((el) => el.textContent === '読み直す')
+    expect(bar?.textContent).toContain('ほかの人が配信「未購入者フォロー」を更新しました')
+    const button = Array.from(host.querySelectorAll('button')).find((el) => el.textContent === '最新を読み込んで続ける')
     expect(button).toBeDefined()
-    act(() => { button?.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await act(async () => { button?.dispatchEvent(new MouseEvent('click', { bubbles: true })); await Promise.resolve() })
     expect(clicked).toBe(1)
   })
 

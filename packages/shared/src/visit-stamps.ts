@@ -35,3 +35,22 @@ export interface VisitStampEntryPage { items:VisitStampEntry[]; total:number; pa
 export interface VisitStampEntryQuery { accountId:string; from?:string; to?:string; friendId?:string; kind?:string; page?:number; pageSize?:number }
 export interface VisitStampUseResult { id:string; status:'used'; staffId:string; staffName:string; nextCardId?:string }
 export interface VisitStampPhoto { id:string; photoUrl:string; contentType:string; size:number }
+
+export interface VisitStampQrInput {
+  requestId:string; expectedQrId?:string|null; sessionId?:string; previousQrId?:string|null;
+  count?:number; amount?:number; continueAfterUse?:boolean;
+}
+export interface VisitStampQr {
+  id:string; cardId:string; accountId:string; kind:'storefront'|'staff'; url:string;
+  issuedAt:string; expiresAt:string|null; serverTime:string;
+  status:'active'|'expired'|'revoked'|'used'; generation:number; count:number; amount:number|null;
+}
+export type VisitStampQrResult =
+  | {status:'success';alreadyCounted?:boolean;card:VisitStampCard;wallet:VisitStampWallet;awarded:number;at:string;entryId:string;nextReward:VisitStampReward|null}
+  | {status:'limited';retryAt:string;dailyLimit?:boolean;card:VisitStampCard;wallet:VisitStampWallet}
+  | {status:'invalid';reason:'invalid'|'expired'|'used'|'revoked'}
+  | {status:'visit_required';visits:Array<{id:string;storeName:string;startsAt:string;arrived:boolean}>}
+  | {status:'friend_required'};
+export interface VisitStampQrStatus {
+  qr:VisitStampQr; result:(Extract<VisitStampQrResult,{status:'success'}>&{friendName:string})|null;
+}

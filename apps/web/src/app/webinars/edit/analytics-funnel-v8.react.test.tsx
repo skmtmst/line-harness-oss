@@ -1,8 +1,13 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, expect, test } from 'vitest'
-import AnalyticsFunnelV8 from './analytics-funnel-v8'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { WebinarAnalyticsPane, webinarAnalytics } from '@/test-utils/webinar-analytics'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: { participants: async () => ({ data: { items: [] } }), userComments: async () => ({ data: [] }) } }))
+
 import type { WebinarAnalytics } from '@/lib/api'
 
 /*
@@ -53,7 +58,7 @@ afterEach(() => {
 
 function renderFunnel() {
   act(() => {
-    root.render(<AnalyticsFunnelV8 summary={summary} daily={daily} />)
+    root.render(<WebinarAnalyticsPane analytics={webinarAnalytics({ summary, daily })} />)
   })
 }
 
@@ -63,46 +68,43 @@ test('数の帯に実数と補足が出る（直書きの数にしない）', ()
   // 申込124・今月の合計31（20+11）。
   expect(text).toContain('124')
   expect(text).toContain('今月 +31')
-  // 参加は申込の81%、視聴完了は参加の71%。
-  expect(text).toContain('申込の81%')
-  expect(text).toContain('参加の71%')
-  // フォーム送信は件で、CTAを押した23人のうち。
-  expect(text).toContain('CTAを押した23人のうち')
+  // 参加は申込の 81%、視聴完了は参加の 71%。
+  expect(text).toContain('申込の 81%')
+  expect(text).toContain('参加の 71%')
+  // フォーム送信は件で、CTA を押した 23 人のうち。
+  expect(text).toContain('CTA を押した 23 人のうち')
 })
 
 test('棒に5段と減り・いちばん減っている段が出る', () => {
   renderFunnel()
   const text = container.textContent ?? ''
-  for (const label of ['申込', '参加（入場）', '視聴完了', 'CTAを押した', 'フォーム送信']) {
+  for (const label of ['申込', '参加（入場）', '視聴完了', 'CTA を押した', 'フォーム送信']) {
     expect(text).toContain(label)
   }
   // 124→100（-24）、100→71（-29）、71→23（-48）、23→9（-14）。
-  expect(text).toContain('-24')
-  expect(text).toContain('-29')
-  expect(text).toContain('-48')
-  expect(text).toContain('-14')
-  // いちばん減っているのは視聴完了→CTAを押した。
-  expect(text).toContain('いちばん減っているのは「視聴完了 → CTAを押した」です')
+  expect(text).toContain('−24')
+  expect(text).toContain('−29')
+  expect(text).toContain('−48')
+  expect(text).toContain('−14')
+  // いちばん減っているのは視聴完了→CTA を押した。
+  expect(text).toContain('いちばん減っているのは「視聴完了 → CTA を押した」です')
 })
 
 test('申込が無いときは割合を「—」にする（0にしない）', () => {
   act(() => {
     root.render(
-      <AnalyticsFunnelV8
-        summary={{ ...summary, reservations: 0, viewers: 0, completed: 0, ctaClicks: 0, formSubmissions: 0 }}
-        daily={[]}
-      />,
+      <WebinarAnalyticsPane analytics={webinarAnalytics({ summary: { ...summary, reservations: 0, viewers: 0, completed: 0, ctaClicks: 0, formSubmissions: 0 }, daily: [] })} />,
     )
   })
-  expect(container.textContent).toContain('申込の—')
+  expect(container.textContent).toContain('申込の —')
 })
 
 
 test('直接参加で人数が増えた段も棒をはみ出さず増加で示す', () => {
-  act(() => { root.render(<AnalyticsFunnelV8 summary={{ ...summary, reservations: 20, viewers: 100 }} daily={[]} />) })
+  act(() => { root.render(<WebinarAnalyticsPane analytics={webinarAnalytics({ summary: { ...summary, reservations: 20, viewers: 100 }, daily: [] })} />) })
   expect(container.textContent).toContain('+80')
   expect(container.textContent).not.toContain('--80')
-  for (const bar of container.querySelectorAll<HTMLElement>('[style]')) {
+  for (const bar of container.querySelectorAll<HTMLElement>('[role="group"][aria-label="どこで人数が減っているか"] [style*="width"]')) {
     expect(parseFloat(bar.style.width)).toBeLessThanOrEqual(100)
   }
 })

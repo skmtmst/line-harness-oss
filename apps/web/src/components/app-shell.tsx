@@ -2,7 +2,6 @@
 import { usePathname } from 'next/navigation'
 import Sidebar from './layout/sidebar'
 import SettingsInnerNav, { isSettingsAreaPath } from './layout/settings-inner-nav'
-import { UpdateBanner } from './update/update-banner'
 import AuthGuard from './auth-guard'
 import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
@@ -15,6 +14,7 @@ import styles from './app-shell.module.css'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import OpsShell from './ops/ops-shell'
 import ImpersonationNotice from './ops/impersonation-notice'
+import RecoveryCodeNotice from './recovery-code-notice'
 import UnfamiliarLoginNotice from './unfamiliar-login-notice'
 import SuspendedSidebar from './layout/suspended-sidebar'
 import CommandPalette from './shared/command-palette'
@@ -24,7 +24,6 @@ import TopBar from './shared/top-bar'
 import NoteBar from './shared/note-bar'
 import PlatformNotices from './hq/platform-notices'
 import { logoutAndGoToLogin } from '@/lib/logout'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useEffect, useState } from 'react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -33,8 +32,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
    * LINEアカウントを登録（/accounts/new）。v7 は外枠の無い専用の全画面。
    * ★V8 は絵（xj3zz〜TvXII）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
    */
-  const isV8 = useAdminTheme() === 'v8'
-  const isAccountCreate = pathname === '/accounts/new' && !isV8
+
 
   if (isPublicAuthPath(pathname)) {
     return <>{children}</>
@@ -79,9 +77,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <AuthGuard suspendedSupport={suspendedSupport}>
       <AccountProvider>
         <PageChromeProvider>
-          {isAccountCreate ? (
-            <AccountCreateWorkspace>{guardedContent}</AccountCreateWorkspace>
-          ) : (
+          {(
             <div className={styles.shell}>
               {/*
                 本文へ移動（★V7 修正方針 §2）。ふだんは見えず、Tab で最初に焦点が来たときだけ
@@ -95,7 +91,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   upgrade once /admin/version + manifest resolve.
                   ★V8 では帯を出さない（移行③「黄色の版の帯を消す」）。版は
                   メニューの一番下の「Ver.」が持つ。 */}
-              <div className="v7-only"><UpdateBanner /></div>
               {/* 代理ログイン中の赤い帯（★V6 37-5）。運営マスター以外には出ない。 */}
               <ImpersonationNotice />
               {/* V-2: いつもと違う端末・場所からのログイン帯。そのログイン中だけ出る。 */}
@@ -166,26 +161,6 @@ function SuspendedSupportWorkspace({ children }: { children: React.ReactNode }) 
   )
 }
 
-/** `/accounts/new` 専用。認証とアカウント文脈を保ち、通常のナビゲーションだけを外す。 */
-function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
-  return (
-    <div className={styles.shell} data-account-create-shell="true">
-      <SessionLostNotice />
-      <UpdateBanner />
-      {/* V-2: 接続の登録はこの画面で行う大事な操作。帯はここにも出す。 */}
-      <UnfamiliarLoginNotice />
-      <main className={styles.main}>
-        <div
-          data-design-shell="account-create"
-          className={`${styles.content} ${styles.contentFull}`}
-        >
-          {children}
-        </div>
-      </main>
-    </div>
-  )
-}
-
 /**
  * 共通メニューの右側。上にトップバー、下に本文。
  *
@@ -201,11 +176,11 @@ export function Workspace({ children }: { children: React.ReactNode }) {
    * （幅208）を付ける。v7 では部品も枠組みも出さない（1画素も変えない）。
    * SSR・最初の描画は v7 の形で、レイアウト効果の中で v8 に揃える。
    */
-  const isV8 = useAdminTheme() === 'v8'
+
   // 画面がメニューを白い板の中に置いたら（settingsNavInline）、外には出さない。
   // LINEアカウントを登録（/accounts/new）は統括の画面。設定の中のメニューは付けない（絵 xj3zz〜TvXII）。
   const settingsArea = isSettingsAreaPath(pathname ?? '') && pathname !== '/accounts/new'
-  const withSettingsNav = isV8 && !fullWidth && !settingsNavInline && settingsArea
+  const withSettingsNav = !fullWidth && !settingsNavInline && settingsArea
   return (
     <div className={styles.side}>
       <AppTopBar />
@@ -222,6 +197,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
             （settingsNavInline）が出る・消えるを繰り返し、画面が落ちる。外のメニューだけを出し入れし、
             出さないときの包みは display: contents で並びに影響させない。
           */}
+          <RecoveryCodeNotice />
           {settingsArea ? (
             <div className={withSettingsNav ? styles.settingsSplit : styles.settingsPass} data-settings-split={withSettingsNav ? '' : undefined}>
               {withSettingsNav ? <SettingsInnerNav /> : null}

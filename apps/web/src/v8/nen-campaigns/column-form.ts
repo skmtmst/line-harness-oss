@@ -1,8 +1,6 @@
 /*
  * NENコラムの下書き（★V8-B `yRDwW` コラムを書く）の決めごと。
- * src/v8 からは @/app を import できないため、今の画面の
- * app/nen-campaigns/columns/new/column-form.ts を写して持つ（中身は同じ）。
- * 今の画面の決めごとを変えたら、ここも同じに直す（V8 に切り替えるまでの二重管理）。
+ * 現役の作成と一覧の日時表示が共用する。入力・保存の試験もこの実装を読む。
  */
 import type { Tag } from '@line-crm/shared'
 import type { NenColumnCreateInput } from '@/lib/api'

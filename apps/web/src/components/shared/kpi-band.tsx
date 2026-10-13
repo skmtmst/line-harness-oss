@@ -19,6 +19,7 @@ export default function KpiBand({
   presentation = 'band',
   border,
   density,
+  layout,
   ...rest
 }: {
   children: ReactNode
@@ -29,13 +30,16 @@ export default function KpiBand({
   /** 型が下の区切りを持つ帯では、上だけ内側に引く。 */
   border?: 'inset-top'
   /** 段や引き出しの中で使う小さい帯。 */
+  layout?: 'booking'
   density?: 'compact'
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className'>) {
   return (
     <div
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
+      data-kpi-layout={layout}
       data-kpi-border={border}
       data-kpi-density={density}
+      data-shared-part="kpi-band"
       data-kpi-strip
       data-kpi-presentation={presentation}
       {...rest}

@@ -262,6 +262,8 @@ export function installTestDom(): DomDocument {
   document.defaultView = view
   view.document = document
   view.window = view
+  view.addEventListener = document.addEventListener.bind(document)
+  view.removeEventListener = document.removeEventListener.bind(document)
   view.Node = DomNode
   view.Element = DomElement
   view.HTMLElement = DomElement

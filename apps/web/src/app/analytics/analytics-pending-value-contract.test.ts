@@ -1,9 +1,10 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
 
 /** 帯の1枚ぶんだけを切り出す。ファイル全体を見ると別の帯に当たって素通りする。 */
 function kpiCard(title: string): string {
@@ -60,16 +61,16 @@ describe('分析は、集計できていない値を0と書かない', () => {
 
   it('日ごとの表も、集計できていないときは0の行を並べない', () => {
     expect(PAGE).toContain(
-      "const daysShown = overview.state === 'available' || overview.state === 'partial'",
+      "const daysShown = overview !== null && (overview.state === 'available' || overview.state === 'partial')",
     )
-    expect(PAGE).toContain('{daysShown ?')
+    expect(PAGE).toContain('{daysShown')
   })
 
   it('表の桁も state を見る', () => {
-    const body = bodyOf('function MetricCell({ metric, percent, currency }: {')
+    const body = bodyOf('function MetricText({ metric')
     expect(body, 'MetricCell が見つからない').not.toBe('')
     expect(body, 'value === null しか見ておらず、集計待ちの0が実測の0と同じ濃さで出る')
-      .toContain("const shown = metric.state === 'available' || metric.state === 'partial'")
+      .toContain("metric.state === 'available' || metric.state === 'partial'")
   })
 })
 

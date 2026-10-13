@@ -13,6 +13,7 @@
  *     満たすときだけ出ること
  *   - 行に招待の期限が出て、切れているものは切れていると分かること
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
@@ -25,7 +26,8 @@ const fixture = vi.hoisted(() => ({
   fetchApi: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
@@ -35,7 +37,8 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
+vi.mock('@/v8/settings/staff/mfa-policy', () => ({ default: () => null })) // This suite tests invitations, independently of security policy loading.
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -104,7 +107,7 @@ const { default: ToastHost, clearToastsForTest } = await import('@/components/sh
 async function mount() {
   // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
   await act(async () => { render(<><StaffPage /><ToastHost /></>) })
-  await waitFor(() => expect(screen.getByText('招待された人')).toBeTruthy())
+  await waitFor(() => expect(screen.getByRole('button', { name: '招待された人の中身を見る' })).toBeTruthy())
 }
 
 function resendButtons() {
@@ -113,7 +116,7 @@ function resendButtons() {
 
 /* 再送は行の「…」の中。開いてから項目を押す。 */
 async function openRowMenu() {
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '招待された人のその他操作' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '招待された人の操作' })) })
 }
 
 beforeEach(() => {
@@ -200,17 +203,17 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     expect((resendButtons()[0] as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('行に招待の期限を出し、切れているものは切れていると分かる', async () => {
+  it('行の補足で招待の期限を確認し、切れているものは切れていると分かる', async () => {
     await mount()
-    expect(screen.getByText(/招待の期限：期限切れ（.*まででした）/)).toBeTruthy()
+    expect(screen.getByTitle(/招待の期限：期限切れ（.*まででした）/)).toBeTruthy()
 
     cleanup()
     state.members = [member({ inviteExpiresAt: RENEWED_AT })]
     state.users = [accessUser({ status: 'invited' })]
     await mount()
-    const label = screen.getByText(/招待の期限：/)
-    expect(label.textContent).toContain('まで')
-    expect(label.textContent).not.toContain('期限切れ')
+    const label = screen.getByTitle(/招待の期限：/)
+    expect(label.getAttribute('title')).toContain('まで')
+    expect(label.getAttribute('title')).not.toContain('期限切れ')
   })
 
   it('利用を始めた人には再送ボタンを出さない', async () => {
@@ -233,3 +236,6 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     expect(resendButtons()).toHaveLength(0)
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

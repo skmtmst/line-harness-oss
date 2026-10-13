@@ -1,4 +1,8 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import {accountCustomerLook} from '../services/customer-look.js';
+import {customerLookPublicSettings,DEFAULT_CUSTOMER_LOOK} from '@line-crm/shared';
 import { receiveEntryRouteCoupon } from '../services/entry-route-coupon.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
 import { Hono, type Context } from 'hono';
@@ -100,11 +104,11 @@ async function analyticsAccountScope(c: Context<Env>, lineAccountId?: string) {
       return { where: `AND ${alias}.line_account_id = ?`, binds: [lineAccountId] };
     }
     const where = scope.allowedAccountIds.length
-      ? `AND (${alias}.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${alias}.line_account_id IS NULL` : ''})`
+      ? `AND (${alias}.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ` OR ${alias}.line_account_id IS NULL` : ''})`
       : scope.canSeeUnassigned
         ? `AND ${alias}.line_account_id IS NULL`
         : 'AND 1 = 0';
-    return { where, binds: scope.allowedAccountIds };
+    return { where, binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [] };
   };
   return { ...forAlias('f'), for: forAlias };
 }
@@ -237,26 +241,10 @@ async function saveIgAccountMeta(
 ): Promise<void> {
   if (!igAccountId && !igAccountUsername) return;
   try {
-    const existing = await db
-      .prepare('SELECT metadata FROM friends WHERE id = ?')
-      .bind(friendId)
-      .first<{ metadata: string }>();
-    const meta = JSON.parse(existing?.metadata || '{}');
-    if (meta.ig_account_id || meta.ig_account_username) return; // first touch wins
-    if (igAccountId) meta.ig_account_id = igAccountId;
-    if (igAccountUsername) meta.ig_account_username = igAccountUsername.replace(/^@/, '');
-    // First-touch predicate repeated in the WHERE clause so two concurrent
-    // requests can't both pass the read check above and overwrite each other —
-    // only the first UPDATE to commit sets the ig_account_* keys.
-    await db
-      .prepare(
-        `UPDATE friends SET metadata = ?
-         WHERE id = ?
-           AND json_extract(metadata, '$.ig_account_id') IS NULL
-           AND json_extract(metadata, '$.ig_account_username') IS NULL`,
-      )
-      .bind(JSON.stringify(meta), friendId)
-      .run();
+    const patch: Record<string,string> = {};
+    if (igAccountId) patch.ig_account_id = igAccountId;
+    if (igAccountUsername) patch.ig_account_username = igAccountUsername.replace(/^@/, '');
+    await patchFriendMetadata(db, friendId, patch, { firstTouchKeys: ['ig_account_id','ig_account_username'] });
   } catch (err) {
     console.error('Failed to save IG account metadata:', err);
   }
@@ -996,15 +984,7 @@ liffRoutes.get('/auth/callback', async (c) => {
 
     // N-244差戻: 停止由来では広告ID・UTMを friends metadata へ新規保存しない。
     if (!stoppedCallbackRef && Object.keys(adMeta).length > 0) {
-      const existingMeta = await db
-        .prepare('SELECT metadata FROM friends WHERE id = ?')
-        .bind(friend.id)
-        .first<{ metadata: string }>();
-      const merged = { ...JSON.parse(existingMeta?.metadata || '{}'), ...adMeta };
-      await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-        .bind(JSON.stringify(merged), jstNow(), friend.id)
-        .run();
+      await patchFriendMetadata(db, friend.id, adMeta);
     }
 
     // X Harness token resolution: ref starting with "xh:" links X account to LINE friend
@@ -1013,16 +993,7 @@ liffRoutes.get('/auth/callback', async (c) => {
         const xhToken = ref.slice(3);
         const xhResult = await resolveXHarnessToken(xhToken, c.env);
         if (xhResult?.xUsername) {
-          const existingMeta = await db
-            .prepare('SELECT metadata FROM friends WHERE id = ?')
-            .bind(friend.id)
-            .first<{ metadata: string }>();
-          const meta = JSON.parse(existingMeta?.metadata || '{}');
-          meta.x_username = xhResult.xUsername;
-          await db
-            .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-            .bind(JSON.stringify(meta), jstNow(), friend.id)
-            .run();
+          await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
           console.log(`X Harness: linked @${xhResult.xUsername} to friend ${friend.id}`);
         }
         // Apply gate actions (tag + scenario) from X Harness
@@ -1246,6 +1217,16 @@ liffRoutes.get('/auth/callback', async (c) => {
 
 // ─── LIFF config endpoint ──────────────────────────────────────
 
+// 見た目だけの公開口。予約機能の有無に依存せず、LIFF IDで店を固定する。
+liffRoutes.get('/api/liff/customer-look',async c=>{
+ const liffId=c.req.query('liffId');if(!liffId)return c.json({success:false,error:'liffId is required'},400);
+ const account=await c.env.DB.prepare('SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1').bind(liffId).first<{id:string}>();
+ if(!account)return c.json({success:false,error:'unknown_liff'},404);
+ const stopped=await stoppedLineAccountResponse(c,account.id);if(stopped)return stopped;
+ const value=await accountCustomerLook(c.env.DB,account.id);
+ c.header('Cache-Control','no-store');
+ return c.json({success:true,data:{...value,settings:customerLookPublicSettings(value.look)}});
+});
 // GET /api/liff/config - resolve account info from LIFF ID (public, no auth)
 liffRoutes.get('/api/liff/config', async (c) => {
   try {
@@ -1289,7 +1270,7 @@ liffRoutes.get('/api/liff/config', async (c) => {
 
     return c.json({
       success: true,
-      data: { botBasicId, accountName, accountId },
+      data: { botBasicId, accountName, accountId, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
     });
   } catch (err) {
     console.error('GET /api/liff/config error:', err);
@@ -1619,16 +1600,7 @@ liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displ
           const xhToken = body.ref.slice(3);
           const xhResult = await resolveXHarnessToken(xhToken, c.env);
           if (xhResult?.xUsername) {
-            const existingMeta = await db
-              .prepare('SELECT metadata FROM friends WHERE id = ?')
-              .bind(friend.id)
-              .first<{ metadata: string }>();
-            const meta = JSON.parse(existingMeta?.metadata || '{}');
-            meta.x_username = xhResult.xUsername;
-            await db
-              .prepare('UPDATE friends SET metadata = ? WHERE id = ?')
-              .bind(JSON.stringify(meta), friend.id)
-              .run();
+            await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
             console.log(`X Harness: linked @${xhResult.xUsername} to friend ${friend.id}`);
           }
           if (xhResult) {
@@ -1709,16 +1681,7 @@ liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displ
         const xhToken = body.ref.slice(3);
         const xhResult = await resolveXHarnessToken(xhToken, c.env);
         if (xhResult?.xUsername) {
-          const existingMeta = await db
-            .prepare('SELECT metadata FROM friends WHERE id = ?')
-            .bind(friend.id)
-            .first<{ metadata: string }>();
-          const meta = JSON.parse(existingMeta?.metadata || '{}');
-          meta.x_username = xhResult.xUsername;
-          await db
-            .prepare('UPDATE friends SET metadata = ? WHERE id = ?')
-            .bind(JSON.stringify(meta), friend.id)
-            .run();
+          await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
           console.log(`X Harness: linked @${xhResult.xUsername} to friend ${friend.id}`);
         }
         if (xhResult) {

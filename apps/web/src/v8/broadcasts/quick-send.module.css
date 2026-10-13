@@ -3,24 +3,24 @@
  * この窓は「余白24・題18太字・欄の間14・選ぶ札は緑の地に青の字・見込みは灰の箱・承認は琥珀の箱・
  * キャンセルと送るは真ん中」。× は題の行に重ねる（かんたんに作る G4GejG と同じ）。値は globals.css の --tpl-ms-*。
  */
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) {
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:first-child) {
   position: relative;
   padding: var(--tpl-ms-qc-head-pad);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) > :global(button) {
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:first-child) > :global(button) {
   position: absolute;
   top: var(--tpl-ms-qc-close-inset);
   right: var(--tpl-ms-qc-close-inset);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) :global(h2) {
+:global(:root [data-design-part='dialog']):has(.body) :global(h2) {
   font-size: var(--tpl-ms-qc-title-size);
   font-weight: 700;
   line-height: var(--tpl-ms-qc-title-lh);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
   padding: var(--tpl-ms-key-content-pad);
 }
 
@@ -55,7 +55,7 @@
 }
 
 .textarea:focus-visible {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
   outline-offset: var(--tpl-ms-focus-offset);
 }
 
@@ -117,14 +117,14 @@
 }
 
 .chip[aria-checked='true'] {
-  outline-color: var(--color-action);
+  outline-color: var(--color-focus-ring);
   background: var(--color-success-bg);
   color: var(--color-action);
   font-weight: 600;
 }
 
 .chip:focus-visible {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
   outline-offset: var(--tpl-ms-focus-offset);
 }
 

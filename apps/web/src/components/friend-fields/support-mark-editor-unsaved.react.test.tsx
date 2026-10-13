@@ -1,29 +1,35 @@
 // @vitest-environment happy-dom
 import React from 'react'
+import { navigationMock } from '@/test-utils/navigation-mock'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const identity = vi.hoisted(() => ({ role: 'owner' }))
 const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
   marksList: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
+  ...navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1' }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
+    staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     supportMarks: { list: fixture.marksList },
   },
 }))
 
-import SupportMarkEditor from './support-mark-editor'
+import SupportMarkEditor from '@/v8/tags/mark-editor'
 
 beforeEach(() => {
+  identity.role = 'owner'
   fixture.marksList.mockResolvedValue({ success: true, data: [] })
 })
 
@@ -38,7 +44,7 @@ describe('R176: 対応マークの書きかけがある間の離脱確認', () =
     const nameBox = await screen.findByPlaceholderText('例：要確認')
     fireEvent.change(nameBox, { target: { value: '要対応' } })
 
-    fireEvent.click(screen.getByRole('link', { name: '対応マークへ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
     await screen.findByText('保存していない変更があります')
     expect(fixture.routerPush).not.toHaveBeenCalled()
 
@@ -52,7 +58,7 @@ describe('R176: 対応マークの書きかけがある間の離脱確認', () =
     const nameBox = await screen.findByPlaceholderText('例：要確認')
     fireEvent.change(nameBox, { target: { value: '要対応' } })
 
-    fireEvent.click(screen.getByRole('link', { name: '対応マークへ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
     await screen.findByText('保存していない変更があります')
 
     fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))

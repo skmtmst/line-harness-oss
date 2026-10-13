@@ -2,20 +2,25 @@ import { AutoFormLeaveGuard, FormLeaveGuard } from '@/components/shared/form-lea
 import type { ReactNode } from 'react'
 import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
+import PreviewLauncher from './preview-launcher'
 import styles from './page-templates.module.css'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface CreatePageProps extends PageHeadingProps {
+  readOnly?: boolean
   dirty?: boolean
   busy?: boolean
   boardId?: string
   standalone?: boolean
+  /** 短い入力は内容の高さ、長い入力は画面内に収めて本文だけを送る。 */
+  heightMode?: 'viewport' | 'content'
   children: ReactNode
   preview?: ReactNode
   /** 狭い板でプレビューを開くボタン・パネルは画面が持つ。 */
   previewToggle?: ReactNode
   /** ★V8：狭い板（白い板 1100 未満）で右の列の余白を 16 に詰める（絵 kmTab）。渡さなければ今までどおり 24。 */
   previewCompactWhenNarrow?: boolean
-  /** 白い板が 1100 未満のとき右欄を畳む。開き方は previewToggle で提供する。既定の配置は変えない。 */
+  /** 白い板が1100未満のとき右欄を畳む。見本は既存のボタンで開く。 */
   hidePreviewWhenNarrow?: boolean
   /** 板の頭のすぐ下に、入力欄と右の列の両方にまたがる幅で置く帯（同時編集の知らせなど。pvimJ）。 */
   notice?: ReactNode
@@ -35,22 +40,25 @@ export interface CreatePageProps extends PageHeadingProps {
   /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ表の頭と同じ地。 */
   previewSurface?: 'plain'
   footerActions: ReactNode
+  /** 浮いた帯が本文の末尾の余白に重なる板。入力段の中身には重ねない。 */
+  footerPlacement?: 'floating'
   /** 枠のある下部の帯を描く板だけで使う。StickyBar の既定は変えない。 */
   footerOutlined?: boolean
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ dirty, busy, boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
-  return <PageFrame kind="create" boardId={boardId} standalone={standalone} hasFooter>
+export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+  return <PageFrame kind="create" boardId={boardId} standalone={standalone} heightMode={heightMode} hasFooter>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
+    {readOnly ? <ReadOnlyNotice /> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
-    {previewToggle ? <div className={styles.asideToggle}>{previewToggle}</div> : null}
+    {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher>{preview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
       <div className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing}>{children}</div>
       {preview ? <aside className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{preview}</div></aside> : null}
     </div>
-    <div className={styles.footer} data-template-region="footer"><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>
+    <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>
   </PageFrame>
 }

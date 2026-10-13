@@ -281,7 +281,7 @@ describe('folderCreateResult', () => {
 })
 
 
-describe('左の列・選ぶ欄・閉じた欄・表でフォルダの丸をそろえる', () => {
+describe('左の列のフォルダアイコンと、選ぶ欄・表の丸の色をそろえる', () => {
   it.each([null, undefined, '', '#123456'])('色 %s のフォルダは名前からの色か保存色を全箇所へ出す', async (color) => {
     const folder = { id: 'folder-test', name: 'テスト', color }
     function ColorHost() {
@@ -294,18 +294,18 @@ describe('左の列・選ぶ欄・閉じた欄・表でフォルダの丸をそ�
     }
     render(<ColorHost />)
     const readDot = (element: Element) => element.querySelector<HTMLElement>('[data-folder-dot]')!
-    const rail = readDot(screen.getByRole('navigation'))
+    const rail = screen.getByRole('navigation').querySelector<SVGElement>('svg.lucide-folder')!
     const row = readDot(screen.getByTestId('table-name'))
-    expect(rail.style.backgroundColor).toBe(row.style.backgroundColor)
+    expect(rail.style.color).toBe(row.style.backgroundColor)
     if (!color) {
       const probe = document.createElement('span')
       probe.style.backgroundColor = folderDisplayColor(folder)
       expect(FOLDER_SELECT_COLORS.map((entry) => entry.value)).toContain(folderDisplayColor(folder))
-      expect(rail.style.backgroundColor).toBe(probe.style.backgroundColor)
+      expect(rail.style.color).toBe(probe.style.backgroundColor)
     } else {
       const probe = document.createElement('span')
       probe.style.backgroundColor = color
-      expect(rail.style.backgroundColor).toBe(probe.style.backgroundColor)
+      expect(rail.style.color).toBe(probe.style.backgroundColor)
     }
     const trigger = screen.getByRole('button', { name: '所属フォルダ' })
     fireEvent.click(trigger)
@@ -313,10 +313,10 @@ describe('左の列・選ぶ欄・閉じた欄・表でフォルダの丸をそ�
     expect(readDot(options[0]).dataset.folderDot).toBe('unfiled')
     expect(readDot(options[0]).className).toContain('unfiled')
     expect(readDot(options[0]).style.backgroundColor).toBe('')
-    expect(readDot(options[1]).style.backgroundColor).toBe(rail.style.backgroundColor)
+    expect(readDot(options[1]).style.backgroundColor).toBe(rail.style.color)
     fireEvent.click(options[1].querySelector('button')!)
     expect(screen.queryByRole('listbox')).toBeNull()
-    expect(readDot(trigger).style.backgroundColor).toBe(rail.style.backgroundColor)
+    expect(readDot(trigger).style.backgroundColor).toBe(rail.style.color)
     fireEvent.click(trigger)
     fireEvent.click(screen.getAllByRole('option')[0].querySelector('button')!)
     expect(readDot(trigger).dataset.folderDot).toBe('unfiled')

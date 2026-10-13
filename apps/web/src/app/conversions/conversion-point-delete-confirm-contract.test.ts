@@ -1,11 +1,12 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
 /* 止める窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = fs.readFileSync(path.join(__dirname, '_components', 'conversion-dialogs.tsx'), 'utf8')
+const DIALOGS = fs.readFileSync(path.join(__dirname, '../../v8/conversions', 'dialogs.tsx'), 'utf8')
 
 /** 注意書きの中の `confirm(` に当てないため、コメントを外す。 */
 function code(src: string): string {
@@ -24,26 +25,19 @@ function slice(src: string, from: string, to: string): string {
   return src.slice(a, b)
 }
 
-function dialogWith(src: string, marker: string): string {
-  const blocks = src
-    .split('<ConfirmDialog')
-    .slice(1)
-    .map((block) => `<ConfirmDialog${block.slice(0, block.indexOf('</ConfirmDialog>'))}`)
-  const found = blocks.filter((block) => block.includes(marker))
-  expect(found.length, `${marker} を持つ確認窓がちょうど1つではない`).toBe(1)
-  return found[0]
-}
+const stopPane = () => slice(PAGE, 'const stopCard = stopTarget ?', 'let listBody: ReactNode')
 
 describe('成果地点の削除確認', () => {
   it('ブラウザの confirm を使わない', () => {
     expect(code(PAGE), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
     expect(code(DIALOGS), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
-    expect(DIALOGS).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(stopPane()).toContain('<Dialog open contentLayout="form"')
+    expect(stopPane()).toContain('title={`${stopTarget.name}を止めますか？`}')
   })
 
   it('停止の本体が二度押しを止め、3操作の返事を確かめ、finally で戻す', () => {
-    const body = slice(PAGE, 'const runStop = async', '\n  const exportCsv')
-    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping || !canReverse) return')
+    const body = slice(PAGE, 'const runStop = async', 'const duplicatePoint = async')
+    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping || !canEdit || stopImpactLoading) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body).toContain('api.conversions.stopDefinition')
     expect(body).toContain('api.conversions.replaceDefinition')
@@ -53,26 +47,23 @@ describe('成果地点の削除確認', () => {
     expect(body, 'finally で処理中を戻していない').toMatch(/finally \{\s*setStopping\(false\)/)
   })
 
-  it('安全な計測停止を既定にし、設計の重ね画面を名乗る', () => {
-    const dialog = dialogWith(DIALOGS, 'open={stopTarget !== null}')
-    expect(dialog, '物理削除の赤い確認に戻っている').not.toContain('destructive')
-    expect(dialog, '設計の重ね画面のNodeが無い').toContain('designNode="d8d3Mz"')
-    expect(dialog, '処理中を窓へ渡していない').toContain('busy={stopping || stopImpactLoading}')
-    expect(dialog, '失敗を窓の中に出していない').toContain('error={stopError}')
-    for (const label of ['数えるのをやめる', '差し替えて数えるのをやめる', 'この成果地点を削除する']) {
+  it('V8の3択の欄で処理中を止め、失敗を欄内に出す', () => {
+    const dialog = stopPane()
+    expect(PAGE).toContain("action: ConversionStopAction = 'stop'")
+    expect(dialog).toContain('busy={stopping || stopImpactLoading}')
+    expect(dialog).toContain('stopError')
+    for (const label of ['止める（使う所の計測も止まる）', '別の成果地点に差し替えてから止める', '削除する']) {
       expect(dialog).toContain(label)
     }
   })
 
   it('過去記録を残し、実データの利用先件数と3つの選択肢を本文で示す', () => {
-    const dialog = dialogWith(DIALOGS, 'open={stopTarget !== null}')
-    expect(dialog).toContain('の記録と金額は、そのまま残ります。')
-    expect(dialog).toContain('stopImpact.usages.map')
-    expect(dialog).toContain('利用先は実データです。')
-    for (const choice of ['数えるのをやめる（おすすめ）', '別の成果地点に差し替えてから削除する', 'このまま削除する']) {
-      expect(dialog).toContain(choice)
-    }
-    expect(dialog).toContain('formatNumber(stopTarget.metrics.netCount')
+    const dialog = stopPane()
+    expect(dialog).toContain('過去の記録と分析は残します。')
+    expect(dialog).toContain('formatNumber(stopImpact.stopImpact.affectedUsageCount)')
+    expect(dialog).toContain('value="stop"')
+    expect(dialog).toContain('value="replace"')
+    expect(dialog).toContain('value="delete"')
     expect(dialog).toContain('stopImpact?.canDelete')
     expect(dialog).toContain('replacementCandidates')
   })

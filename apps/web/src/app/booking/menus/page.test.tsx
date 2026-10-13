@@ -13,6 +13,8 @@
  *   - 選び直した値が保存 request に載ること
  */
 import React from 'react'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -32,6 +34,8 @@ Object.defineProperty(window, 'localStorage', {
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
   activeTab: 'menus',
+  editId: null as string | null,
+  push: vi.fn(),
   tagsList: null as null | (() => Promise<unknown>),
   updateMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
   listMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
@@ -61,9 +65,9 @@ function switchAccount(id: string | null): void {
   act(() => { accountSetters.forEach((setId) => setId(id)) })
 }
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => ({ push: fixture.push, replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(fixture.editId ? `menu=${fixture.editId}` : `tab=${fixture.activeTab}`),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -96,7 +100,10 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {
     status: number
     code: string | undefined
@@ -108,11 +115,22 @@ vi.mock('@/lib/api', () => {
     }
   }
   return {
+    ...actual,
     ApiError,
     api: {
+      mileage: { rules: async () => ({ success: true, data: [] }) },
+      staff: { me: async () => ({ success: true, data: { role: window.localStorage.getItem('lh_staff_role') ?? 'owner', permissionKeys: [] } }) },
       tags: { list: (...args: unknown[]) => fixture.tagsList!(...(args as [])) },
     },
     bookingApi: {
+      listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
+      listStaffMenusBulk: async () => ({ staff: [{ staff_id: 'staff-a', matrix: ['menu-1', 'menu-2'].map((menu_id) => ({ menu_id, is_offered: 1 })) }] }),
+      listMenuVersions: async () => ({ versions: [] }),
+      putStaffMenus: async () => ({ ok: true }),
+      getStaffMenus: async () => ({ matrix: [] }),
+      getAvailabilityRules: async () => ({ rules: [] }),
+      getGoogleCalendar: async () => ({ connected: false }),
+      listRequests: async () => ({ items: [], total: 0 }),
       updateMenu: (...args: unknown[]) => fixture.updateMenu!(...args),
       listMenus: (...args: unknown[]) => fixture.listMenus!(...args),
       patchMenu: (...args: unknown[]) => fixture.patchMenu!(...args),
@@ -125,6 +143,7 @@ vi.mock('@/lib/api', () => {
 })
 
 import MenusPage from './page'
+import MenusEditor from '@/v8/booking-menus/menu-form'
 import { ApiError } from '@/lib/api'
 
 /** 同アカウントの有効タグ／同アカウントの整理済み／別アカウントの有効タグ。 */
@@ -163,12 +182,17 @@ function optionLabels(select: HTMLSelectElement): string[] {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
+  fixture.editId = null
+  fixture.push.mockReset()
   window.localStorage.setItem('lh_staff_role', 'owner')
   clearToastsForTest()
+  window.history.replaceState(null, '', '/booking/menus')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
-  fixture.updateMenu = vi.fn(async () => ({ ok: true }))
+  fixture.updateMenu = vi.fn(async () => ({ version: 4 }))
   fixture.patchMenu = vi.fn(async () => ({ ok: true }))
   fixture.listMenus = vi.fn(async () => ({ menus: [] }))
   fixture.getSettings = vi.fn(async () => ({ success: true, data: SETTINGS }))
@@ -192,90 +216,7 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-describe('既存メニューの編集窓: 共有設備の割当', () => {
-  function menu() {
-    return {
-      id: 'menu-1', name: 'カット', category_label: null, description: null,
-      duration_minutes: 60, buffer_after_minutes: 0, base_price: 8000,
-      price_mode: 'fixed', sort_order: 0, is_active: 1, auto_tag_id: null,
-      concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null,
-      cancel_deadline_hours_before: null, intake_question: null, assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
-      assigned_resources: [{
-        menuId: 'menu-1', resourceId: 'room-a', name: '個室A', type: 'room', capacity: 3,
-        quantity: 1, isActive: true, warning: null,
-      }],
-      version: 1,
-    }
-  }
-
-  async function openEditor() {
-    fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
-    render(<><MenusPage /><ToastHost /></>)
-    fireEvent.click(await screen.findByRole('button', { name: '中身を見る' }))
-    await screen.findByText('メニュー編集')
-  }
-
-  test('複数選択・quantityを独立保存し、連打しても1要求だけ送る', async () => {
-    let resolveSave!: (value: unknown) => void
-    fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
-    await openEditor()
-    await screen.findByText('席A')
-    fireEvent.click(screen.getByRole('checkbox', { name: /席A/ }))
-    fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
-    const saveButton = screen.getByRole('button', { name: '設備の割当を保存する' })
-    // 同じ描画中に2イベントを届け、disabledへの再描画ではなくuseRefの
-    // single-flight guardそのものが二重要求を止めることを確かめる。
-    act(() => {
-      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    expect(fixture.saveMenuResources).toHaveBeenCalledTimes(1)
-    expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', {
-      expectedVersion: 1,
-      resources: [{ resourceId: 'room-a', quantity: 2 }, { resourceId: 'seat-a', quantity: 1 }],
-    })
-    await act(async () => {
-      resolveSave({ success: true, data: { id: 'menu-1', version: 2, resources: [] } })
-      await Promise.resolve()
-    })
-    // 画面の中の知らせ（role=status）。置き場所の知らせの入れ物も role=status なので、全部の中から文で見る
-    expect(screen.getAllByRole('status').map((el) => el.textContent).join('\n')).toContain('設備の割当を保存しました')
-  })
-
-  test('409でも入力を保持し、最新内容の読み直しを案内する', async () => {
-    fixture.saveMenuResources = vi.fn(async () => { throw new ApiError(409, 'conflict', 'version_conflict') })
-    await openEditor()
-    const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
-    fireEvent.change(quantity, { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
-    await waitFor(() => expect(screen.getAllByRole('status').map((el) => el.textContent).join('\n')).toContain('最新の内容を読み直して'))
-    expect((quantity as HTMLInputElement).value).toBe('2')
-  })
-
-  test('account切替後に旧保存応答を画面へ反映しない', async () => {
-    let resolveSave!: (value: unknown) => void
-    fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
-    await openEditor()
-    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
-    switchAccount('account-b')
-    await act(async () => {
-      resolveSave({ success: true, data: { id: 'menu-1', version: 2, resources: [] } })
-      await Promise.resolve()
-    })
-    expect(screen.queryByText('設備の割当を保存しました。新しい予約枠から反映されます。')).toBeNull()
-    expect(screen.queryByText('メニュー編集')).toBeNull()
-  })
-
-  test('staffは割当を閲覧できるが変更・保存できない', async () => {
-    window.localStorage.setItem('lh_staff_role', 'staff')
-    await openEditor()
-    expect(await screen.findByText('設備の割当は閲覧のみです。変更は管理者へ依頼してください。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '設備の割当を保存する' })).toBeNull()
-    expect((screen.getByRole('checkbox', { name: /個室A/ }) as HTMLInputElement).disabled).toBe(true)
-  })
-})
-
-describe('R305 編集窓は共通Dialog（フォーカス・Esc・破棄確認）', () => {
+describe('R305 V8編集ページの離脱確認（フォーカス・Esc・入力保持）', () => {
   function menu() {
     return {
       id: 'menu-1',
@@ -302,181 +243,56 @@ describe('R305 編集窓は共通Dialog（フォーカス・Esc・破棄確認�
 
   async function openEditor() {
     fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
-    render(<><MenusPage /><ToastHost /></>)
-    fireEvent.click(await screen.findByRole('button', { name: '中身を見る' }))
-    await screen.findByText('メニュー編集')
+    fixture.editId = 'menu-1'
+    render(<><MenusEditor /><ToastHost /></>)
+    await screen.findByText('予約メニューを直す')
   }
 
-  test('窓はrole=dialog・aria-modalを持ち、見出しと結び付く', async () => {
+  async function openLeaveDialog() {
     await openEditor()
-    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'メニュー名' }), { target: { value: 'カラー' } })
+    const cancel = screen.getByRole('button', { name: 'キャンセル' })
+    cancel.focus()
+    fireEvent.click(cancel)
+    return await screen.findByRole('dialog', { name: '保存していない変更があります' })
+  }
+  test('離脱確認は共通Dialogのrole・aria-modalと見出しの結び付けを持つ', async () => {
+    const dialog = await openLeaveDialog()
     expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy()
   })
-
-  test('変えずにEscapeすると窓が閉じる', async () => {
+  test('変えていなければ確認なしで一覧へ戻る', async () => {
     await openEditor()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
-  })
-
-  test('名前を変えてEscapeすると破棄確認が出て、編集窓は残る', async () => {
-    await openEditor()
-    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
-    fireEvent.change(within(dialog).getByLabelText(/名前/), { target: { value: 'カラー' } })
-    fireEvent.keyDown(document, { key: 'Escape' })
-    await screen.findByText('入力を破棄しますか？')
-    // 破棄を選ぶまで編集窓は閉じない。
-    expect(screen.getByRole('dialog', { name: 'メニュー編集' })).toBeTruthy()
-  })
-
-  test('破棄確認で「破棄する」を押すと閉じ、「編集を続ける」では入力を残して戻る', async () => {
-    await openEditor()
-    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
-    const nameInput = within(dialog).getByLabelText(/名前/) as HTMLInputElement
-    fireEvent.change(nameInput, { target: { value: 'カラー' } })
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    await screen.findByText('入力を破棄しますか？')
-
-    // 戻るを選ぶと入力を残したまま編集へ戻る。
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fixture.push).toHaveBeenCalledWith('/booking/menus')
+  })
+  test('離脱確認をEscapeで閉じても入力を残し、一覧へ移らない', async () => {
+    await openLeaveDialog()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect((screen.getByRole('textbox', { name: 'メニュー名' }) as HTMLInputElement).value).toBe('カラー')
+    expect(fixture.push).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'キャンセル' }))
+  })
+  test('編集を続けると入力を残し、保存せずに移ると一覧へ戻る', async () => {
+    await openLeaveDialog()
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
-    await waitFor(() => expect(screen.queryByText('入力を破棄しますか？')).toBeNull())
-    expect(nameInput.value).toBe('カラー')
-    expect(screen.getByRole('dialog', { name: 'メニュー編集' })).toBeTruthy()
-
-    // 破棄を選ぶと窓ごと閉じる。
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect((screen.getByRole('textbox', { name: 'メニュー名' }) as HTMLInputElement).value).toBe('カラー')
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    await screen.findByText('入力を破棄しますか？')
-    fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
-    await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存せずに移る' }))
+    expect(fixture.push).toHaveBeenCalledWith('/booking/menus')
   })
-
-  test('Tabは窓の中で循環する（最後→先頭・先頭→最後）', async () => {
-    await openEditor()
-    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
-    const closeButton = within(dialog).getByRole('button', { name: '閉じる' })
-    const saveButton = within(dialog).getByRole('button', { name: '保存する' })
-
-    // 最後にいる状態でTabを押すと先頭（×）へ戻り、背後へ抜けない。
-    saveButton.focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
-    expect(document.activeElement).toBe(closeButton)
-
-    // 先頭でShift+Tabを押すと最後（保存）へ回り、背後へ抜けない。
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(saveButton)
-  })
-})
-
-describe('既存メニューの編集窓: 予約申込時に自動付与するタグ', () => {
-  function menu(overrides: Record<string, unknown> = {}) {
-    return {
-      id: 'menu-1',
-      name: 'カット',
-      category_label: null,
-      description: null,
-      duration_minutes: 60,
-      buffer_after_minutes: 0,
-      base_price: 8000,
-      price_mode: 'fixed',
-      sort_order: 0,
-      is_active: 1,
-      auto_tag_id: null as string | null,
-      concurrent_capacity: 1,
-      booking_window_days: null,
-      cutoff_hours_before: null,
-      cancel_deadline_hours_before: null,
-      intake_question: null,
-      assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
-      version: 1,
-      ...overrides,
-    }
-  }
-
-  /** 一覧を描き、「中身を見る」で編集窓まで開く。 */
-  async function openEditor(target: Record<string, unknown>) {
-    fixture.listMenus = vi.fn(async () => ({ menus: [menu(target)] }))
-    render(<><MenusPage /><ToastHost /></>)
-    const row = await screen.findByRole('button', { name: '中身を見る' })
-    await act(async () => { fireEvent.click(row) })
-    const dialog = await screen.findByText('メニュー編集')
-    return dialog.closest('div')!.parentElement as HTMLElement
-  }
-
-  function autoTagSelect(): HTMLSelectElement {
-    // 編集窓の中で「予約申込時に自動付与するタグ」の直後にあるプルダウン。
-    const label = screen.getByText('予約申込時に自動付与するタグ')
-    const field = label.parentElement as HTMLElement
-    return within(field).getByRole('combobox') as HTMLSelectElement
-  }
-
-  test('候補は対象アカウントの有効タグだけ。整理済みも別アカウントも出さない', async () => {
-    await openEditor({ auto_tag_id: null })
-    const labels = optionLabels(autoTagSelect())
-    expect(labels).toEqual(['— なし —', '予約中', '常連さん'])
-    expect(labels).not.toContain('旧キャンペーン')
-    expect(labels).not.toContain('B店のタグ')
-  })
-
-  test('アカウントを切り替えると、候補も切替先の有効タグになる', async () => {
-    /*
-     * タグ一覧の取得は初回の1度きり(依存が空)。切替のたびに取り直さないため、
-     * 絞り込みが account を見ていないと、B店を選んでいるのに A店のタグが
-     * 並んだままになる。切替後にもう一度編集窓を開いて確かめる。
-     */
-    await openEditor({ auto_tag_id: null })
-    expect(optionLabels(autoTagSelect())).toEqual(['— なし —', '予約中', '常連さん'])
-
-    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    switchAccount('account-b')
-
-    const row = await screen.findByRole('button', { name: '中身を見る' })
-    await act(async () => { fireEvent.click(row) })
-    await screen.findByText('メニュー編集')
-    expect(optionLabels(autoTagSelect())).toEqual(['— なし —', 'B店のタグ', 'B店だけの分類'])
-  })
-
-  test('設定済みのタグが整理済みなら、黙って「なし」にせず選び直させる', async () => {
-    await openEditor({ auto_tag_id: 'tag-archived' })
-    const select = autoTagSelect()
-
-    // 値は残す。勝手に「なし」へ倒して気付かないまま保存させない。
-    expect(select.value).toBe('tag-archived')
-    expect(optionLabels(select)).toContain('旧キャンペーン（今は使えません）')
-    expect(screen.getByText(
-      '設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。',
-    )).toBeTruthy()
-  })
-
-  test('設定済みのタグが別アカウントのものでも、同じように選び直させる', async () => {
-    await openEditor({ auto_tag_id: 'tag-other-account' })
-    expect(autoTagSelect().value).toBe('tag-other-account')
-    expect(screen.getByText(
-      '設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。',
-    )).toBeTruthy()
-  })
-
-  test('選び直して保存すると、新しい auto_tag_id が保存 request に載る', async () => {
-    await openEditor({ auto_tag_id: 'tag-archived' })
-    fireEvent.change(autoTagSelect(), { target: { value: 'tag-active-2' } })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    })
-
-    await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
-    expect(fixture.updateMenu).toHaveBeenCalledWith(
-      'account-a',
-      'menu-1',
-      1,
-      expect.objectContaining({ auto_tag_id: 'tag-active-2' }),
-    )
-  })
-
-  test('使えるタグが1つも無いアカウントでは、タグなしで保存できることを出す', async () => {
-    fixture.tagsList = async () => ({ success: true, data: [TAGS[3]] })
-    await openEditor({ auto_tag_id: null })
-    expect(optionLabels(autoTagSelect())).toEqual(['— なし —'])
-    expect(screen.getByText('このアカウントに使えるタグがありません。タグなしで保存できます。')).toBeTruthy()
+  test('Tabは離脱確認の中で循環する（最後→先頭・先頭→最後）', async () => {
+    const dialog = await openLeaveDialog()
+    const buttons = [...dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])')]
+    const first = buttons[0], last = buttons.at(-1)!
+    last.focus(); fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(first)
+    first.focus(); fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
   })
 })
 
@@ -486,12 +302,12 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
     // 既存行あり（保存ボタンは「変更を保存」）にする。
     fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    await screen.findByRole('combobox', { name: '受付の締め切り' })
   }
 
   test('欄を消しても0にならず、空欄のまま保存できない', async () => {
     await renderRules()
-    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' }) as HTMLInputElement
+    const cutoff = screen.getByRole('combobox', { name: '受付の締め切り' }) as HTMLInputElement
     // 読み込み直後の初期値の反映が落ち着いてから触る。DOMに出た直後は
     // 描画の反映が遅れていることがあり、そのまま欄を消すと初期化の
     // 反映と競合して揺れる（R311の安定化。空欄を0にしない意図は変えない）。
@@ -499,9 +315,8 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
     fireEvent.change(cutoff, { target: { value: '' } })
 
     // 空欄を維持し、0へ自動で変わらない。
-    expect(cutoff.value).toBe('')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
 
     expect((await screen.findByRole('alert')).textContent).toContain('空欄のまま保存できません')
@@ -510,11 +325,11 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
 
   test('明示した0だけ直前まで可能として送る', async () => {
     await renderRules()
-    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' }) as HTMLInputElement
+    const cutoff = screen.getByRole('combobox', { name: '受付の締め切り' }) as HTMLInputElement
     fireEvent.change(cutoff, { target: { value: '0' } })
     expect(cutoff.value).toBe('0')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -525,12 +340,11 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
 
   test('消したあと入れ直せばその値で保存できる', async () => {
     await renderRules()
-    const cancel = screen.getByRole('spinbutton', { name: 'キャンセルの期限' }) as HTMLInputElement
+    const cancel = screen.getByRole('combobox', { name: 'キャンセルの期限' }) as HTMLInputElement
     fireEvent.change(cancel, { target: { value: '' } })
-    expect(cancel.value).toBe('')
     fireEvent.change(cancel, { target: { value: '60' } })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -540,19 +354,21 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
   })
 })
 
+async function openExtras() {
+  fireEvent.click((await screen.findByText(/^ほかの設定/)).closest('summary')!)
+}
+
 describe('店舗共通の予約ルール', () => {
   test('行が無い店舗の既定値を編集し、version=0で初回保存する', async () => {
     fixture.activeTab = 'rules'
     render(<><MenusPage /><ToastHost /></>)
 
-    const windowDays = await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    const windowDays = await screen.findByRole('combobox', { name: '先の予約が取れる範囲' })
     expect((windowDays as HTMLInputElement).value).toBe('60')
     fireEvent.change(windowDays, { target: { value: '90' } })
-    fireEvent.change(screen.getByRole('combobox', { name: /予約の承認/ }), {
-      target: { value: 'manual' },
-    })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'お店が承認してから確定する' }))
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作る' }))
+      fireEvent.click(screen.getByRole('button', { name: 'ルールを作る' }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -562,7 +378,7 @@ describe('店舗共通の予約ルール', () => {
       approvalMode: 'manual',
       slotGranularityMinutes: 15,
     }))
-    expect((await screen.findByRole('status', { name: '知らせ' })).textContent).toContain('予約の基本ルールを保存しました。')
+    expect((await screen.findByRole('status', { name: '知らせ' })).textContent).toContain('予約のルールを保存しました。')
   })
 
   test('版競合は自動上書きせず、最新内容の読み直しを案内する', async () => {
@@ -573,9 +389,10 @@ describe('店舗共通の予約ルール', () => {
     })
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByRole('button', { name: '保存する' })
+    fireEvent.change(await screen.findByRole('combobox', { name: 'キャンセルの期限' }), { target: { value: '60' } })
+    await screen.findByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
 
     expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました。')
@@ -591,10 +408,11 @@ describe('店舗共通の予約ルール', () => {
     }))
     render(<><MenusPage /><ToastHost /></>)
 
+    await openExtras()
     const holdMinutes = await screen.findByRole('spinbutton', { name: '仮押さえの保持時間' })
     fireEvent.change(holdMinutes, { target: { value: '30' } })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -602,7 +420,7 @@ describe('店舗共通の予約ルール', () => {
       expectedVersion: 3,
       holdMinutes: 30,
     }))
-    expect((await screen.findByRole('status', { name: '知らせ' })).textContent).toContain('予約の基本ルールを保存しました。')
+    expect((await screen.findByRole('status', { name: '知らせ' })).textContent).toContain('予約のルールを保存しました。')
   })
 
   test('分・時間の入力の横に読み替えが出る（Issue #710）', async () => {
@@ -612,9 +430,11 @@ describe('店舗共通の予約ルール', () => {
     } }))
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    await screen.findByRole('combobox', { name: '受付の締め切り' })
     // 受付の締め切り・キャンセルの期限（どちらも1440分）
-    expect(screen.getAllByText('＝24時間前').length).toBe(2)
+    expect((screen.getByRole('combobox', { name: '受付の締め切り' }) as HTMLSelectElement).selectedOptions[0].textContent).toBe('24 時間前まで')
+    expect((screen.getByRole('combobox', { name: 'キャンセルの期限' }) as HTMLSelectElement).selectedOptions[0].textContent).toBe('24 時間前まで')
+    await openExtras()
     // 仮押さえの保持時間（1440分は長さなので「前」を付けない）
     expect(screen.getByText('＝1日')).toBeTruthy()
     // 当日のお知らせ（72時間前は3日前）
@@ -626,7 +446,7 @@ describe('店舗共通の予約ルール', () => {
     fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, timeZone: 'Asia/Tokoyo' } }))
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    await screen.findByRole('combobox', { name: '受付の締め切り' })
     expect(screen.getByText(/綴りを確認してください/)).toBeTruthy()
   })
 
@@ -642,13 +462,14 @@ describe('店舗共通の予約ルール', () => {
     fixture.saveSettings = vi.fn(() => new Promise((resolve) => { resolveOldSave = resolve }))
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByRole('button', { name: '基本ルールを作る' })
+    fireEvent.change(await screen.findByRole('combobox', { name: '先の予約が取れる範囲' }), { target: { value: '90' } })
+    await screen.findByRole('button', { name: 'ルールを作る' })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作る' }))
+      fireEvent.click(screen.getByRole('button', { name: 'ルールを作る' }))
     })
     switchAccount('account-b')
 
-    const currentWindowDays = await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    const currentWindowDays = await screen.findByRole('combobox', { name: '先の予約が取れる範囲' })
     await waitFor(() => { expect((currentWindowDays as HTMLInputElement).value).toBe('30') })
     await act(async () => {
       resolveOldSave({
@@ -658,7 +479,7 @@ describe('店舗共通の予約ルール', () => {
       await Promise.resolve()
     })
 
-    expect((screen.getByRole('spinbutton', { name: '何日先まで受け付けるか' }) as HTMLInputElement).value).toBe('30')
+    expect((screen.getByRole('combobox', { name: '先の予約が取れる範囲' }) as HTMLInputElement).value).toBe('30')
     // 知らせの入れ物（role=status）は最初からあるので、どの知らせも空であることで見る
     expect(screen.getAllByRole('status').map((el) => el.textContent).join('')).toBe('')
   })
@@ -666,22 +487,20 @@ describe('店舗共通の予約ルール', () => {
   test('日時を選ぶ画面の最初の形は2択で選び、保存に載る', async () => {
     fixture.activeTab = 'rules'
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    await screen.findByRole('combobox', { name: '先の予約が取れる範囲' })
 
-    // 見出しと？（お客さんは切り替えられる・ここは最初の形だけ）。
+    await openExtras()
+    // 最初の形だけを選ぶ。
     expect(screen.getByText('日時を選ぶ画面の最初の形')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '日時を選ぶ画面の最初の形の説明' }))
-    expect(screen.getByText(/お客さんは画面の上で切り替えられます/)).toBeTruthy()
+    const view = screen.getByRole('combobox', { name: '日時を選ぶ画面の最初の形' }) as HTMLSelectElement
+    expect(optionLabels(view)).toEqual(['週で見る（日付の横ならび）', 'カレンダー'])
 
-    // 既定はリスト。
-    const calendar = screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement
-    const list = screen.getByRole('radio', { name: /リスト/ }) as HTMLInputElement
-    expect(list.checked).toBe(true)
-    fireEvent.click(calendar)
-    expect(calendar.checked).toBe(true)
+    expect(view.value).toBe('list')
+    fireEvent.change(view, { target: { value: 'calendar' } })
+    expect(view.value).toBe('calendar')
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作る' }))
+      fireEvent.click(screen.getByRole('button', { name: 'ルールを作る' }))
     })
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
     expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
@@ -693,20 +512,16 @@ describe('店舗共通の予約ルール', () => {
     fixture.activeTab = 'rules'
     fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, liffDateView: 'calendar' } }))
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
-    expect((screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement).checked).toBe(true)
+    await screen.findByRole('combobox', { name: '先の予約が取れる範囲' })
+    await openExtras()
+    expect((screen.getByRole('combobox', { name: '日時を選ぶ画面の最初の形' }) as HTMLSelectElement).value).toBe('calendar')
   })
 
-  test('0分前の説明は受付・キャンセルの時間の欄の下にあり、2択の見出しより前', async () => {
+  test('直前までの説明はV8の締め切りの説明から確認できる', async () => {
     fixture.activeTab = 'rules'
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
-    const note = screen.getByText(/0分前は、開始直前まで/)
-    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' })
-    const viewHeading = screen.getByText('日時を選ぶ画面の最初の形')
-    // 文書の順番：時間の欄 → 説明 → 2択の見出し。
-    expect(cutoff.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(note.compareDocumentPosition(viewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: '受付の締め切りの説明' }))
+    expect(await screen.findByText(/「直前まで」は開始の直前まで/)).toBeTruthy()
   })
 })
 
@@ -737,10 +552,9 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
 
   async function openEditor(target: Record<string, unknown> = {}) {
     fixture.listMenus = vi.fn(async () => ({ menus: [menu(target)] }))
-    render(<><MenusPage /><ToastHost /></>)
-    const row = await screen.findByRole('button', { name: '中身を見る' })
-    await act(async () => { fireEvent.click(row) })
-    await screen.findByText('メニュー編集')
+    fixture.editId = 'menu-1'
+    render(<><MenusEditor /><ToastHost /></>)
+    await screen.findByText('予約メニューを直す')
   }
 
   function priceModeSelect(): HTMLSelectElement {
@@ -750,7 +564,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
   test('保存は読み込んだ version を expectedVersion として送る', async () => {
     await openEditor()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
     await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
     expect(fixture.updateMenu).toHaveBeenCalledWith(
@@ -765,10 +579,10 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
     await openEditor({ version: undefined })
     const callsBefore = (fixture.listMenus as ReturnType<typeof vi.fn>).mock.calls.length
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
     expect(fixture.updateMenu).not.toHaveBeenCalled()
-    expect((await screen.findByRole('alert')).textContent).toContain('最新の内容を読み直して')
+    expect((await screen.findByRole('alert')).textContent).toContain('まだ保存されていません')
     expect((fixture.listMenus as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callsBefore)
   })
 
@@ -776,43 +590,29 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
     fixture.updateMenu = vi.fn(async () => { throw new ApiError(409, 'version_conflict', 'version_conflict') })
     await openEditor()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: /ルールを作る|ルールを保存|変更を保存する/ }))
     })
 
     // 競合を出しても窓は開いたまま。文言で次の手順を案内する。
-    expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました')
-    expect(screen.getByText('メニュー編集')).toBeTruthy()
+    expect((await screen.findByRole('alert')).textContent).toContain('メニュー「カット」を保存しました')
+    expect(screen.getByText('予約メニューを直す')).toBeTruthy()
 
-    const reload = screen.getByRole('button', { name: '最新の内容を読み直す' })
+    const reload = screen.getByRole('button', { name: '最新を読み込んで続ける' })
     await act(async () => { fireEvent.click(reload) })
-    await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
-    expect(fixture.listMenus).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(screen.getByText('予約メニューを直す')).toBeTruthy()
+    expect(fixture.listMenus).toHaveBeenCalledTimes(3)
   })
 
-  test('料金モードは3択で、無料にすると金額欄を閉じて base_price=0 を送る', async () => {
+  test('無料にするとbase_price=0とfreeを送る', async () => {
     await openEditor()
-    expect(optionLabels(priceModeSelect())).toEqual(['固定料金', '無料', 'お問い合わせ'])
-    expect(priceModeSelect().value).toBe('fixed')
-
-    fireEvent.change(priceModeSelect(), { target: { value: 'free' } })
-    expect(screen.queryByRole('spinbutton', { name: '料金（円）' })).toBeNull()
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    })
-    await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
-    expect(fixture.updateMenu).toHaveBeenCalledWith(
-      'account-a',
-      'menu-1',
-      3,
-      expect.objectContaining({ price_mode: 'free', base_price: 0 }),
-    )
+    fireEvent.change(screen.getByRole('spinbutton', { name: '金額（円）' }), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-a', 'menu-1', 3, expect.objectContaining({ price_mode: 'free', base_price: 0 })))
   })
-
-  test('保存した料金モードは開き直しても選択が残る', async () => {
+  test('保存した問い合わせの料金は開き直しても空欄で保持する', async () => {
     await openEditor({ price_mode: 'inquiry', base_price: 0 })
-    expect(priceModeSelect().value).toBe('inquiry')
-    expect(screen.queryByRole('spinbutton', { name: '料金（円）' })).toBeNull()
+    expect((screen.getByRole('spinbutton', { name: '金額（円）' }) as HTMLInputElement).value).toBe('')
   })
 
   test('一覧はinquiryを「お問い合わせ」、freeだけを「無料」、fixedを「¥」で出し分ける', async () => {
@@ -827,10 +627,10 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
 
     // 名前はKPI「いちばん選ばれた」にも出るので、表の行の中で探す。
     await waitFor(() => {
-      const rows = screen.getAllByRole('row')
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-reorder-id]')]
       expect(rows.some((row) => within(row).queryByText('相談'))).toBe(true)
     })
-    const rows = screen.getAllByRole('row')
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-reorder-id]')]
     const byName = (name: string) => rows.find((row) => within(row).queryByText(name)) as HTMLElement
     expect(within(byName('相談')).getByText('お問い合わせ')).toBeTruthy()
     expect(within(byName('相談')).queryByText('無料')).toBeNull()
@@ -882,10 +682,10 @@ describe('一覧の担当欄 (#953 E-05)', () => {
     render(<><MenusPage /><ToastHost /></>)
 
     await waitFor(() => {
-      const rows = screen.getAllByRole('row')
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-reorder-id]')]
       expect(rows.some((row) => within(row).queryByText(/休止中メニュー/))).toBe(true)
     })
-    const rows = screen.getAllByRole('row')
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-reorder-id]')]
     const byName = (name: RegExp) => rows.find((row) => within(row).queryByText(name)) as HTMLElement
 
     // 割当済みなら名前が出る。「だれもいません」は一切使わない。
@@ -936,10 +736,10 @@ describe('R622 2ページ目の件数案内', () => {
     }))
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByText(/8件中 1〜6件を表示/)
+    await screen.findByText(/8件中 1〜6件/)
     fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
-    await screen.findByText(/8件中 7〜8件を表示/)
-    expect(screen.queryByText(/8件中 1〜2件を表示/)).toBeNull()
+    await screen.findByText(/8件中 7〜8件/)
+    expect(screen.queryByText(/8件中 1〜2件/)).toBeNull()
   })
 
   test('1ページ目に戻ると8件中1〜6件に戻る', async () => {
@@ -952,78 +752,38 @@ describe('R622 2ページ目の件数案内', () => {
     }))
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByText(/8件中 1〜6件を表示/)
+    await screen.findByText(/8件中 1〜6件/)
     fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
-    await screen.findByText(/8件中 7〜8件を表示/)
+    await screen.findByText(/8件中 7〜8件/)
     fireEvent.click(screen.getByRole('button', { name: '前のページ' }))
-    await screen.findByText(/8件中 1〜6件を表示/)
+    await screen.findByText(/8件中 1〜6件/)
   })
 })
 
-describe('R92 メニュー空欄は店舗設定を使う（表示と動きをそろえる）', () => {
-  function menu(overrides: Record<string, unknown> = {}) {
-    return {
-      id: 'menu-1',
-      name: 'カット',
-      category_label: null,
-      description: null,
-      duration_minutes: 60,
-      buffer_after_minutes: 0,
-      base_price: 8000,
-      price_mode: 'fixed',
-      sort_order: 0,
-      is_active: 1,
-      auto_tag_id: null,
-      concurrent_capacity: 1,
-      booking_window_days: null,
-      cutoff_hours_before: null,
-      cancel_deadline_hours_before: null,
-      intake_question: null,
-      assigned_staff: [] as Array<{ id: string; display_name: string }>,
-      version: 1,
-      ...overrides,
-    }
+describe('R92 V8メニューの空欄は店舗設定を使う', () => {
+  async function openEditor(values: Record<string, unknown> = {}) {
+    fixture.editId = 'menu-1'
+    fixture.listMenus = vi.fn(async () => ({ menus: [{ id: 'menu-1', name: 'カット', duration_minutes: 60, base_price: 8000, price_mode: 'fixed', buffer_after_minutes: 0, version: 1, is_active: 1, auto_tag_id: null, ...values }] }))
+    render(<><MenusEditor /><ToastHost /></>)
+    await screen.findByText('予約メニューを直す')
   }
-
-  async function renderRules(menus: Array<Record<string, unknown>>) {
-    fixture.activeTab = 'rules'
-    fixture.listMenus = vi.fn(async () => ({ menus }))
-    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
-    render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
-  }
-
-  test('上書き表の空欄は「制限なし」ではなく店舗設定を使うと出す', async () => {
-    /*
-     * Worker の effectiveBookingRules は空欄を店舗値で埋めるため、
-     * 「制限なし」は動きと違う。新規作成画面の案内（空欄なら店舗設定）
-     * とそろえる。
-     */
-    await renderRules([menu()])
-    expect(screen.getAllByText('店舗設定を使う').length).toBe(3)
+  test('空欄では店舗の予約のきまりと実際の値を表示する', async () => {
+    await openEditor()
+    expect(screen.getAllByText(/お店のきまり/).length).toBe(3)
+    expect(screen.getByText('お店のきまり（60日先まで）')).toBeTruthy()
     expect(screen.queryByText('制限なし')).toBeNull()
   })
-
-  test('値を入れたメニューは入れた値を出し、空欄だけ店舗設定を使うと出す', async () => {
-    await renderRules([menu({
-      id: 'menu-2',
-      name: 'カラー',
-      booking_window_days: 45,
-      cutoff_hours_before: 2,
-      cancel_deadline_hours_before: null,
-    })])
-    expect(screen.getByText('45日先まで')).toBeTruthy()
-    expect(screen.getByText('2時間前')).toBeTruthy()
-    expect(screen.getAllByText('店舗設定を使う').length).toBe(1)
+  test('メニューの上書き値を保持し、空欄だけは店舗設定を使う', async () => {
+    await openEditor({ booking_window_days: 45, cutoff_hours_before: 2, cancel_deadline_hours_before: null })
+    expect((screen.getByRole('spinbutton', { name: '先の予約が取れる範囲（日）' }) as HTMLInputElement).value).toBe('45')
+    expect((screen.getByRole('spinbutton', { name: '受付の締め切り（時間前）' }) as HTMLInputElement).value).toBe('2')
+    expect((screen.getByRole('spinbutton', { name: 'キャンセルの期限（時間前）' }) as HTMLInputElement).value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-a', 'menu-1', 1, expect.objectContaining({ booking_window_days: 45, cutoff_hours_before: 2, cancel_deadline_hours_before: null })))
   })
-
-  test('編集窓の受付条件は空欄=店舗の予約ルールと案内する', async () => {
-    fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
-    render(<><MenusPage /><ToastHost /></>)
-    const row = await screen.findByRole('button', { name: '中身を見る' })
-    await act(async () => { fireEvent.click(row) })
-    await screen.findByText('メニュー編集')
-    expect(screen.getByText(/空欄は店舗の予約ルールを使います/)).toBeTruthy()
+  test('編集の受付条件は空欄で店舗の予約ルールを使うと案内する', async () => {
+    await openEditor()
+    expect(screen.getByText('空ならお店全体のきまり（予約のルール）を使います')).toBeTruthy()
     expect(screen.queryByText(/空欄は「制限しない」/)).toBeNull()
   })
 })
@@ -1037,11 +797,11 @@ describe('R161 予約ルールの未保存変更はタブ移動で確認する',
     fixture.listMenus = vi.fn(async () => ({ menus: [] }))
     fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    await screen.findByRole('combobox', { name: '受付の締め切り' })
   }
 
   function menusTabLink(): HTMLAnchorElement {
-    const link = document.querySelector('a[href="/booking/menus?tab=menus"]')
+    const link = screen.getByRole('tab', { name: 'メニュー' })
     expect(link, 'メニュータブのリンクがある').toBeTruthy()
     return link as HTMLAnchorElement
   }
@@ -1055,7 +815,7 @@ describe('R161 予約ルールの未保存変更はタブ移動で確認する',
   test('変えていなければ確認なしで通す', async () => {
     await renderRules()
     await clickLink(menusTabLink())
-    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   test('キャンセル期限を変えてメニュータブへ行くと確認が出て、残れば入力が残る', async () => {
@@ -1064,20 +824,20 @@ describe('R161 予約ルールの未保存変更はタブ移動で確認する',
      * 1440→60 の変更が黙って消えていた。
      */
     await renderRules()
-    const cancel = screen.getByRole('spinbutton', { name: 'キャンセルの期限' }) as HTMLInputElement
+    const cancel = screen.getByRole('combobox', { name: 'キャンセルの期限' }) as HTMLInputElement
     await waitFor(() => expect(cancel.value).toBe('1440'))
     fireEvent.change(cancel, { target: { value: '60' } })
     expect(cancel.value).toBe('60')
 
     await clickLink(menusTabLink())
-    await screen.findByText('保存していない変更があります')
+    await screen.findByText('予約のルールへの変更を捨てて移りますか？')
 
     // 編集に戻れば60が残る。
-    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    fireEvent.click(screen.getByRole('button', { name: '編集に戻る' }))
     await waitFor(() => {
-      expect(screen.queryByText('保存していない変更があります')).toBeNull()
+      expect(screen.queryByRole('dialog')).toBeNull()
     })
-    expect((screen.getByRole('spinbutton', { name: 'キャンセルの期限' }) as HTMLInputElement).value).toBe('60')
+    expect((screen.getByRole('combobox', { name: 'キャンセルの期限' }) as HTMLInputElement).value).toBe('60')
     expect(fixture.saveSettings).not.toHaveBeenCalled()
   })
 })
@@ -1113,12 +873,10 @@ describe('監査 R91: メニューがあるときも見出しに作成の入口'
     render(<><MenusPage /><ToastHost /></>)
 
     await waitFor(() => {
-      const rows = screen.getAllByRole('row')
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-reorder-id]')]
       expect(rows.some((row) => within(row).queryByText('カット'))).toBe(true)
     })
-    const head = document.querySelector('[data-design="Head"]')
-    expect(head).toBeTruthy()
-    const entry = head!.querySelector('a[href="/booking/menus/new"]')
-    expect(entry?.textContent).toContain('予約メニューを作る')
+    const entry = screen.getByRole('link', { name: /メニューを作る/ })
+    expect(entry.getAttribute('href')).toBe('/booking/menus/new')
   })
 })

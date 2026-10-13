@@ -109,7 +109,7 @@ describe('V8 健康日記（src/v8/nen-health）', () => {
     await render('logs')
     await settle(80)
     expect(listCalls()).toHaveLength(1)
-    expect(String(listCalls()[0][0])).toContain('pageSize=10')
+    expect(String(listCalls()[0][0])).toContain('pageSize=20')
     expect(host.textContent).toContain('記録のあるペット 6')
     expect(host.textContent).toContain('気になる変化 2')
     expect(host.textContent).toContain('体重が減った')

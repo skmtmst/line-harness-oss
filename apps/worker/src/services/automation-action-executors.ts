@@ -1,3 +1,4 @@
+import { patchFriendMetadata } from './friend-metadata.js';
 import {
   addTagToFriend,
   getLineAccountById,
@@ -213,6 +214,9 @@ async function reserveLineOperation(
   if (reservation.kind === 'conflict') {
     throw invalid('idempotency_key_conflict', '同じ処理IDに異なる送信内容が指定されました');
   }
+  if (reservation.kind === 'unknown' || reservation.kind === 'failed') {
+    throw new AutomationActionError('delivery_unconfirmed', '送信結果は要確認です。自動では送り直しません', false);
+  }
   if (reservation.kind === 'in_progress') {
     throw new AutomationActionError('outbound_state_unavailable', '送信状態を確認できません', true);
   }
@@ -312,17 +316,10 @@ async function metadataExecutor(context: AutomationActionContext): Promise<void>
   const parsedValues = parseRecord(raw, 'metadata_invalid', '友だち情報');
   const message = typeof context.inputEvent.text === 'string' ? context.inputEvent.text : '';
   const values = replaceMessagePlaceholder(parsedValues, message) as Record<string, unknown>;
-  const current = parseRecord(friend.metadata || '{}', 'friend_metadata_invalid', '現在の友だち情報');
-  const result = await context.db.prepare(
-    `UPDATE friends SET metadata = ?, updated_at = ?
-      WHERE id = ? AND line_account_id = ?`,
-  ).bind(
-    JSON.stringify({ ...current, ...values }),
-    jstNow(),
-    friend.id,
-    context.lineAccountId,
-  ).run();
-  if ((result.meta?.changes ?? 0) !== 1) throw invalid('friend_update_failed', '友だち情報を更新できませんでした');
+  parseRecord(friend.metadata || '{}', 'friend_metadata_invalid', '現在の友だち情報');
+  if (!await patchFriendMetadata(context.db, friend.id, values, { lineAccountId: context.lineAccountId })) {
+    throw invalid('friend_update_failed', '友だち情報を更新できませんでした');
+  }
 }
 
 async function supportMarkExecutor(

@@ -1,8 +1,16 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { callFormWebhook } from '../services/form-webhook.js';
+import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
+import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
+import { inputError, inputJsonBoundary, validatedInputBody } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
+import { formAvailability } from '../services/form-availability.js';
+import { applyAccountAllergyOptions } from '../services/allergy-options.js';
+import { accountCustomerLook } from '../services/customer-look.js';
+import { resolveCustomerFormTheme } from '@line-crm/shared';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getForms,
   getFormsWithStats,
@@ -81,7 +89,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requireIrreversibleConfirmation, requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
@@ -223,7 +231,7 @@ const FORM_LIST_PAGE_FALLBACK_LIMIT = 20;
 
 /** 一覧の絞り込み。知らない値は「すべて」へ落とす（画面と同じ規則）。 */
 function validFormListFilter(value: string | undefined): FormListFilter {
-  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending'
+  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending' || value === 'archived'
     ? value
     : 'all';
 }
@@ -231,47 +239,6 @@ function validFormListFilter(value: string | undefined): FormListFilter {
 /** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
 function validFormListSort(value: string | undefined): FormListSort {
   return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer';
-}
-
-class FormArchiveBodyError extends Error {
-  constructor(readonly status: 400 | 413, message: string) {
-    super(message);
-  }
-}
-
-/** 小さい確認本文でも、宣言値と実際に読んだ量の両方へ上限を置く。 */
-async function readBoundedFormArchiveBody(request: Request): Promise<Record<string, unknown>> {
-  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
-  if (Number.isFinite(declared) && declared > FORM_ARCHIVE_BODY_MAX_BYTES) {
-    throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
-  }
-  const reader = request.body?.getReader();
-  if (!reader) return {};
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > FORM_ARCHIVE_BODY_MAX_BYTES) {
-      await reader.cancel();
-      throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
-    return parsed as Record<string, unknown>;
-  } catch {
-    throw new FormArchiveBodyError(400, '送信内容を読み取れませんでした');
-  }
 }
 
 /** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
@@ -460,13 +427,16 @@ function publicWebhookConfig(row: DbForm): {
   }
 }
 
-function serializePublicForm(row: DbForm) {
+function serializePublicForm(row: DbForm, layout = parseLayout(row.layout, row.fields)) {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    fields: JSON.parse(row.fields || '[]') as unknown[],
-    layout: parseLayout(row.layout, row.fields),
+    fields: (JSON.parse(row.fields || '[]') as Array<{name: string}>).map(field => {
+      const block = collectInputs(layout).find(block => block.name === field.name && block.fixedField === 'allergy' && block.type === 'checkbox');
+      return block ? { ...field, options: block.choices?.map(choice => choice.label), columns: 2 } : field;
+    }),
+    layout,
     isActive: Boolean(row.is_active),
     onSubmitMessageContent: row.on_submit_message_content,
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
@@ -551,7 +521,7 @@ function expectedSubmitStepNames(input: {
     && (webhookData as Record<string, unknown>).join_url) {
     steps.push('meet_link');
   }
-  steps.push('reply', 'destination_status');
+  steps.push('automation', 'reply', 'destination_status');
   return steps;
 }
 
@@ -845,7 +815,7 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
         folderScope = { folderId: folder.id };
       }
     }
-    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId], ...folderScope });
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId], status: c.req.query('filter') === 'archived' ? 'archived' : 'active', ...folderScope });
     const redactSecrets = c.get('staff')?.role === 'staff';
     const data = items.map((row) =>
       serializeForm(row, {
@@ -966,7 +936,13 @@ forms.get('/api/forms/:id', async (c) => {
       if (!draft) {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
-      return c.json({ success: true, data: { ...serializePublicForm(draft), isTest: true } });
+      const testAccounts = await getFormAccountIds(c.env.DB, id);
+      let testLayout = parseLayout(draft.layout, draft.fields);
+      const testAccountId = testAccounts.length === 1 ? testAccounts[0] : null;
+      if (testAccountId) testLayout = await applyAccountAllergyOptions(c.env.DB, testAccountId, testLayout);
+      const testLook = testAccountId ? (await accountCustomerLook(c.env.DB, testAccountId)).look : undefined;
+      testLayout = {...testLayout, options: {...testLayout.options, theme: resolveCustomerFormTheme(testLayout.options, testLook)}};
+      return c.json({ success: true, data: { ...serializePublicForm(draft, testLayout), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: testLayout, active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
     }
     // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
     // ない限り下書きを漏らさない。
@@ -978,9 +954,33 @@ forms.get('/api/forms/:id', async (c) => {
     if (adminView && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
+    let friendId: string | null = null;
+    let layout = parseLayout(form.layout, form.fields);
+    let publicAccountId: string | null = null;
+    if (!adminView && !staff && c.req.header('Authorization')) {
+      const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+      if (!identity) return c.json({ success: false, error: 'Unauthorized' }, 401);
+      if (!identity.lineAccountId || !await formBelongsToLineAccount(c.env.DB, id, identity.lineAccountId)) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      friendId = (await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId))?.id ?? null;
+      publicAccountId = identity.lineAccountId;
+    }
+    if (!adminView && !publicAccountId) {
+      const accounts = await getFormAccountIds(c.env.DB, id);
+      if (accounts.length === 1) publicAccountId = accounts[0];
+    }
+    if (publicAccountId) layout = await applyAccountAllergyOptions(c.env.DB, publicAccountId, layout);
+    if (!adminView) {
+      const look = publicAccountId ? (await accountCustomerLook(c.env.DB, publicAccountId)).look : undefined;
+      layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
+    }
     const data = adminView
       ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
-      : serializePublicForm(form);
+      : { ...serializePublicForm(form, layout), availability: await formAvailability({
+        db: c.env.DB, formId: id, layout, active: !!form.is_active,
+        submitCount: form.submit_count ?? 0, friendId,
+      }) };
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);
@@ -1138,9 +1138,9 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
     }
     // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
     if (normalized && !('error' in normalized) && normalized.layout) {
-      const createdLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const createdLayout = JSON.parse(normalized.layout) as FormLayout;
       const createContrastError = formThemeContrastError(
-        normalizeFormTheme(createdLayout.options?.theme),
+        resolveCustomerFormTheme(createdLayout.options),
       );
       if (createContrastError) {
         return inputError(c, { success: false, error: createContrastError }, 422, ["layout"]);
@@ -1369,9 +1369,9 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
       }
       // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
-      const savedLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const savedLayout = JSON.parse(normalized.layout) as FormLayout;
       const contrastError = formThemeContrastError(
-        normalizeFormTheme(savedLayout.options?.theme),
+        resolveCustomerFormTheme(savedLayout.options),
       );
       if (contrastError) {
         return inputError(c, { success: false, error: contrastError }, 422, ["layout"]);
@@ -1419,7 +1419,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
 });
 
 // GET /api/forms/:id/delete-impact — 回答・利用先・開けなくなるURLを同時に確認する。
-forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+forms.get('/api/forms/:id/delete-impact', requireDeliveryAccess('forms'), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
@@ -1437,14 +1437,32 @@ forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (
   }
 });
 
+/** 本文の解析より前に保管・保管解除の管理権限を確認する。 */
+const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
+  try {
+    if (!c.req.query('account_id')?.trim()) return inputError(c, { success: false, error: 'account_id is required' }, 400, ['account_id']);
+    const accountIds = await getFormAccountIds(c.env.DB, c.req.param('id')!);
+    const gate = await requireFormManage(c, accountIds);
+    if (gate) return gate;
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [c.req.query('account_id')!.trim()])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accountIds)) {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    await next();
+  } catch (error) {
+    console.error('form archive permission error:', error);
+    return c.json({ success: false, error: '回答フォームの権限を確認できませんでした' }, 503);
+  }
+};
+
 // POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
-forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
+forms.post('/api/forms/:id/archive', requireArchiveManage, inputJsonBoundary({}, { maxBytes: FORM_ARCHIVE_BODY_MAX_BYTES }), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
-    const archiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
-    if (archiveGate) return archiveGate;
-    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
       : Number.NaN;
@@ -1498,9 +1516,6 @@ forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (error) {
-    if (error instanceof FormArchiveBodyError) {
-      return inputError(c, { success: false, error: error.message }, error.status, []);
-    }
     console.error('POST /api/forms/:id/archive error:', error);
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
@@ -1509,13 +1524,11 @@ forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
 // POST /api/forms/:id/unarchive — 保管の取り消し（B 元に戻す）。
 // 保管中の行だけ現行へ戻す。戻した直後は受付停止のまま。版がずれていたら
 // 読み直しを促す（保管口と同じ競合守り）。
-forms.post('/api/forms/:id/unarchive', inputJsonBoundary(), async (c) => {
+forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({}, { maxBytes: FORM_ARCHIVE_BODY_MAX_BYTES }), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
-    const unarchiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
-    if (unarchiveGate) return unarchiveGate;
-    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
       : Number.NaN;
@@ -1566,9 +1579,6 @@ forms.post('/api/forms/:id/unarchive', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (error) {
-    if (error instanceof FormArchiveBodyError) {
-      return inputError(c, { success: false, error: error.message }, error.status, []);
-    }
     console.error('POST /api/forms/:id/unarchive error:', error);
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
@@ -1622,6 +1632,29 @@ forms.delete('/api/forms/:id', async (c) => {
   } catch (err) {
     console.error('DELETE /api/forms/:id error:', err);
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
+  }
+});
+
+// B-215: one answer and its private attachments; never the whole form.
+forms.delete('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-form-response'), async c => {
+  const formId = c.req.param('id'), submissionId = c.req.param('submissionId');
+  try {
+    const accountId = c.req.query('account_id');
+    if (!accountId || !await canUseFormFromAccount(c, formId, accountId)) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    const journal = await deletionJournal(c.env.DB, 'form_response', submissionId);
+    if (journal && (journal.detail.accountId !== accountId || journal.detail.formId !== formId)) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    if (journal?.action === 'deleted') return c.json({ success: true, data: { deleted: true, replayed: true } });
+    const submission = await getFormSubmissionById(c.env.DB, submissionId);
+    if (!submission || submission.form_id !== formId) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    const friend = submission.friend_id ? await getFriendById(c.env.DB, submission.friend_id) : null;
+    if (!friend && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), await getFormAccountIds(c.env.DB, formId))) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    if (friend && ((friend as unknown as { line_account_id: string | null }).line_account_id !== accountId)) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    const data = await deleteCustomerData(c.env, { kind: 'form_response', id: submissionId, formId, friendId: submission.friend_id, accountId }, c.get('staff')!.id);
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof DeletionFailure && error.code === 'deletion_schema_approval_required') return c.json({ success: false, code: error.code, error: '支払・監査の記録を残すため、データ構造の変更承認が必要です。オーナーか管理者に頼んでください。' }, 409);
+    if (error instanceof DeletionFailure) return c.json({ success: false, code: error.code, error: error.status === 409 ? '削除中です。少し待ってから、もう一度お試しください。' : '削除を完了できませんでした。同じ回答で、もう一度削除してください。' }, error.status);
+    return c.json({ success: false, code: 'deletion_retry_required', error: '削除を完了できませんでした。同じ回答で、もう一度削除してください。' }, 503);
   }
 });
 
@@ -1730,6 +1763,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
     if (!submission || submission.form_id !== formId || !submission.friend_id) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    if (await customerDeletionPending(c.env.DB, submission.friend_id, submissionId)) return c.json({ success: false, error: 'この回答は削除中です' }, 409);
     const claim = await getFormSubmitClaimBySubmissionId(c.env.DB, submissionId);
     if (!claim) {
       return c.json({
@@ -2172,9 +2206,9 @@ forms.post('/api/forms/:id/partial', inputJsonBoundary({"data":["object"]}), asy
     if (new TextEncoder().encode(mergedJson).byteLength > PARTIAL_MERGED_MAX_BYTES) {
       return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
     }
-    await c.env.DB.prepare(
-      'UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?',
-    ).bind(mergedJson, jstNow(), friend.id).run();
+    if (!await patchFriendMetadata(c.env.DB, friend.id, filtered, { maxBytes: PARTIAL_MERGED_MAX_BYTES })) {
+      return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
+    }
 
     return c.json({ success: true });
   } catch (err) {
@@ -2402,11 +2436,22 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     if (!FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       return inputError(c, { success: false, error: 'Idempotency-Key must be a UUID' }, 400, []);
     }
+    // 本文は手前の inputJsonBoundary が読んでオブジェクトだと確かめている。
+    // ここで読み直すと同じ本文を二度読むことになるので、検査済みをそのまま使う。
+    // この口を通らない組み合わせのときだけ、従来どおり読んで形を確かめる。
     let body: { data?: unknown; trackedLinkId?: unknown; testToken?: unknown };
-    try {
-      body = await c.req.json();
-    } catch {
-      return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
+    const validated = validatedInputBody(c);
+    if (validated) {
+      body = validated;
+    } else {
+      try {
+        body = await c.req.json();
+      } catch {
+        return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
+      }
     }
     // P（試し回答）：試し合言葉はヘッダ・クエリ・本文のどこからでも読む。
     // 正しければ下書きを読む（公開版が無くても・受付停止でも試せる）。
@@ -2598,7 +2643,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     //
     // layout が無い（昔のまま編集していない）フォームは、これまでどおり
     // fields の必須だけを見る。
-    const layout: FormLayout | null = form.layout ? parseLayout(form.layout) : null;
+    const layout: FormLayout | null = form.layout ? await applyAccountAllergyOptions(c.env.DB, identity.lineAccountId!, parseLayout(form.layout)) : null;
 
     const documentsError = await validateDocumentAnswers(c.env.DB, layout, submissionData, { accountId: identity.lineAccountId, formId, friendId, versionId: form.current_published_version_id ?? null, submissionId: resumeSubmissionId });
     if (documentsError) return c.json({ success: false, error: documentsError }, 400);
@@ -2898,7 +2943,8 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     // Webhook より前に置くのは、どうせ断る回答のために外部へ問い合わせを
     // 投げないため。工程(capacity)は一度きり: 再開時に二重に消費しない。
     const ensureCapacity = async (): Promise<string | null> => {
-      if (!claimCtx || claimDone('capacity') || !layout) return null;
+      if (!claimCtx || !layout) return null;
+      if (claimDone('capacity') && await getFormSubmissionById(c.env.DB, claimCtx.submissionId)) return null;
       const slots = collectCapacitySlots(layout, submissionData);
       if (slots.length === 0) {
         const lost = await claimCheckpoint('capacity');
@@ -2907,7 +2953,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
       }
       let rejectedMessage: string | null = null;
       for (const slot of slots) {
-        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit);
+        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit, slot.choice);
         if (!ok) {
           rejectedMessage = slot.message;
           break;
@@ -2928,7 +2974,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     const updateDestinationWriteResult = async (result: FormDestinationWriteResult): Promise<void> => {
       if (claimCtx && claimDone('destination_status')) {
         const current = await getFormSubmissionById(c.env.DB, submission.id);
-        if (current && current.destination_write_status !== 'pending') return;
+        if (current && ['succeeded','not_requested'].includes(current.destination_write_status)) return;
       }
       try {
         const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, result);
@@ -3145,13 +3191,6 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
           subjectKey: formId,
           occurredAt: submission.created_at,
         }),
-        dispatchAutomationEventWithLogging(c.env.DB, {
-          lineAccountId: identity.lineAccountId,
-          eventType: 'form_submitted',
-          sourceEventId: submission.id,
-          friendId,
-          eventData: { formId, submissionId: submission.id },
-        }),
         // R150: 送信Webhookの購読対象としても発火する。回答の中身は
         // 個人情報を含むので送らず、識別子とフォーム名だけ渡す。
         fireOutgoingWebhooks(c.env.DB, 'form_submitted', {
@@ -3212,6 +3251,9 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     throw err;
   }
   } catch (err) {
+    if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
+      return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
+    }
     console.error('POST /api/forms/:id/submit error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -3278,6 +3320,7 @@ async function runFormPostEffects(input: {
   const claim = input.claim;
   const now = jstNow();
   const done = (step: string) => claim?.done(step) ?? false;
+  let registrationsReady = true;
 
   if (!done('mileage')) {
     // 付与の呼び出しは失敗を握らない。DB が落ちていれば投げて、
@@ -3347,12 +3390,7 @@ async function runFormPostEffects(input: {
       run: async () => {
         const friend = await getFriendById(db, friendId);
         if (!friend) return;
-        const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
-        const merged = { ...existing, ...submissionData };
-        await db
-          .prepare(`UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?`)
-          .bind(JSON.stringify(merged), now, friendId)
-          .run();
+        if (!await patchFriendMetadata(db, friendId, submissionData)) throw new Error('friend_metadata_unavailable');
       },
     });
   }
@@ -3367,6 +3405,7 @@ async function runFormPostEffects(input: {
     // 実行した分だけを数えても重ならない。
     let layoutStats: Record<string, { attempted: number; succeeded: number; failed: number }> = {};
     if (claim) layoutStats = await claim.readLayoutStats();
+    const completedThisRun = { attempted: 0, succeeded: 0, failed: 0 };
     effectRuns.push({
       step: 'layout_effects',
       run: () => applyFormLayoutEffects({
@@ -3386,6 +3425,7 @@ async function runFormPostEffects(input: {
         skipEffect: (effectId) => done(`layout:${effectId}`),
         onEffectComplete: async (effectId, delta) => {
           if (!claim) return;
+          for (const key of ['attempted','succeeded','failed'] as const) completedThisRun[key] += delta[key];
           const prev = layoutStats[effectId] ?? { attempted: 0, succeeded: 0, failed: 0 };
           const merged = {
             attempted: prev.attempted + delta.attempted,
@@ -3442,6 +3482,9 @@ async function runFormPostEffects(input: {
           totals.succeeded += stats.succeeded;
           totals.failed += stats.failed;
         }
+        for (const key of ['attempted','succeeded','failed'] as const) {
+          totals[key] += result.destinationWrites[key] - completedThisRun[key];
+        }
         destinationWriteResult = totals;
         // 欠落した工程があれば完了にせず、再送・再実行で補完する。
         if (result.failedEffects.length > 0) {
@@ -3463,11 +3506,29 @@ async function runFormPostEffects(input: {
   if (!layout) {
     effectRuns.push({
       step: 'legacy_fields',
-      run: () => writeLegacyFriendFields(db, form as DbForm, submissionData, friendId).then((result) => {
-        destinationWriteResult = result;
-      }),
+      run: async () => {
+        if(!parseFormFields(form.fields).some(field=>field.friendFieldId&&submissionData[field.name??field.id??'']!==undefined))return;
+        await writeFormDestinationsOnce({ db, friendId, sourceKey: `form-submit:${submission.id}`, blockId: 'legacy',
+          stats: destinationWriteResult,
+          write: async (ownedDb, stats) => { Object.assign(stats, await writeLegacyFriendFields(ownedDb, form as DbForm, submissionData, friendId)); },
+        });
+      },
     });
   }
+
+  // B-249: evaluate conditions only after every customer registration succeeded.
+  // This checkpoint also gives both resubmission and staff retry the same recovery path.
+  effectRuns.push({
+    step: 'automation',
+    run: async () => {
+      if (!registrationsReady) throw new Error('form_registration_incomplete');
+      await dispatchAutomationEventWithLogging(db, {
+        lineAccountId: input.expectedLineAccountId, eventType: 'form_submitted',
+        sourceEventId: submission.id, friendId,
+        eventData: { formId: input.formId, submissionId: submission.id },
+      });
+    },
+  });
 
   // Add tag — guarded attach so a tag_added-triggered scenario fires on
   // first-time submit (and never re-fires on duplicate submits).
@@ -3651,6 +3712,7 @@ async function runFormPostEffects(input: {
       await effect.run();
     } catch (error) {
       if (error instanceof ClaimOwnershipLost) throw error;
+      if (['metadata','layout_effects','legacy_fields'].includes(effect.step)) registrationsReady = false;
       console.error('Form side-effect failed:', error);
       continue;
     }
@@ -3661,7 +3723,7 @@ async function runFormPostEffects(input: {
   const recordDestinationWrite = async (): Promise<void> => {
     if (claim?.done('destination_status')) {
       const current = await getFormSubmissionById(db, submission.id);
-      if (current && current.destination_write_status !== 'pending') return;
+      if (current && ['succeeded','not_requested'].includes(current.destination_write_status)) return;
     }
     try {
       const status = await updateFormSubmissionDestinationWriteResult(db, submission.id, destinationWriteResult);
@@ -3687,59 +3749,6 @@ async function runFormPostEffects(input: {
     'destination_status',
   ];
   return claim ? claim.settle(required) : [];
-}
-
-async function callFormWebhook(
-  form: Pick<DbForm, 'on_submit_webhook_url' | 'on_submit_webhook_headers'>,
-  submissionData: Record<string, unknown>,
-  eventId: string | null,
-): Promise<{ passed: boolean; data: unknown }> {
-  if (!form.on_submit_webhook_url) return { passed: true, data: null };
-
-  try {
-    // Replace {field_name} placeholders in URL with submitted values
-    let url = form.on_submit_webhook_url;
-    for (const [key, value] of Object.entries(submissionData)) {
-      url = url.replace(`{${key}}`, encodeURIComponent(String(value ?? '')));
-    }
-
-    // Parse headers
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    // 安定 event id。同じ送信の呼び直しは同じ値になるので、受け側は
-    // この値で重複を除ける(durable outbox の片割れ)。
-    if (eventId) headers['X-Form-Event-Id'] = eventId;
-    if (form.on_submit_webhook_headers) {
-      try {
-        const parsed = JSON.parse(form.on_submit_webhook_headers) as Record<string, string>;
-        Object.assign(headers, parsed);
-      } catch { /* ignore invalid headers */ }
-    }
-
-    // Determine method: GET if URL has {placeholders} replaced, POST otherwise
-    const isGet = form.on_submit_webhook_url.includes('{');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(url, {
-      method: isGet ? 'GET' : 'POST',
-      headers,
-      signal: controller.signal,
-      ...(isGet ? {} : { body: JSON.stringify(submissionData) }),
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      return { passed: false, data: { error: `HTTP ${res.status}` } };
-    }
-
-    const data = await res.json() as Record<string, unknown>;
-
-    // Check for eligibility — support both { eligible: bool } and { success: bool, data: { eligible: bool } }
-    const eligible = data.eligible ?? (data.data as Record<string, unknown> | undefined)?.eligible ?? data.success;
-    return { passed: Boolean(eligible), data };
-  } catch (err) {
-    console.error('Form webhook error:', err);
-    return { passed: false, data: { error: String(err) } };
-  }
 }
 
 export { forms };

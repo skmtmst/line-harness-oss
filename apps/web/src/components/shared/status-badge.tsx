@@ -2,6 +2,7 @@ import React, { type HTMLAttributes, type ReactNode } from 'react'
 import { statusLabel, type StandardStatus } from '@/lib/status-labels'
 import HelpTip from './help-tip'
 import TruncatedText from './truncated-text'
+import { normalizeStatusWord } from './status-words'
 import styles from './status-badge.module.css'
 
 export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
@@ -23,7 +24,13 @@ export default function StatusBadge({
   children?: ReactNode
   status?: StandardStatus
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact' | 'micro' | 'annotation'
+  /**
+   * ★V8 `'delivery'` はデリバリー受注の承認 v02（kDQHr・hjdqV・OzHLO・h7OeT）の札。
+   * 見た目は `'compact'` と同じで、点と字の間だけ絵のとおり 5（既定8）にする。印を持つ札
+   * （急ぎ）は絵が 3〜4 なので 3 にする。画面CSSから共通の札を削る書き方（★V8 §24で禁止）
+   * の代わりに、渡したときだけ効くこの大きさを部品側に置く。
+   */
+  size?: 'default' | 'compact' | 'micro' | 'annotation' | 'dining' | 'delivery'
   /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
   surface?: 'tinted' | 'white'
   /**
@@ -41,14 +48,15 @@ export default function StatusBadge({
    */
   dot?: boolean
 }) {
-  const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
+  const baseLabel = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
+  const label = typeof baseLabel === 'string' ? normalizeStatusWord(baseLabel) : baseLabel
+  const classes = [styles.badge, styles[tone], size === 'compact' || size === 'delivery' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
-  const heading = helpLabel ?? (typeof label === 'string' ? label : 'この状態')
+  const heading = helpLabel ? normalizeStatusWord(helpLabel) : (typeof label === 'string' ? label : 'この状態')
   return (
-    <span className={classes} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
+    <span className={classes} data-size={size} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
       {typeof label === 'string' ? <TruncatedText value={label} /> : label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>

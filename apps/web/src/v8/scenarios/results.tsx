@@ -1,4 +1,37 @@
 'use client'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation';
+import { Download, Eye, PencilLine } from 'lucide-react';
+import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared';
+import { api, ApiError, type ScenarioRuns } from '@/lib/api';
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useStaffRole } from '@/lib/staff-role';
+import { DetailPage } from '@/components/templates';
+import Button from '@/components/shared/button'
+import type { ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import NoteBar from '@/components/shared/note-bar'
+import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
+import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import styles from './results.module.css'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import Notice from '@/components/shared/notice'
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
 /*
  * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
@@ -8,35 +41,6 @@
  * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
  * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { Download, Eye, PencilLine } from 'lucide-react'
-import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
-import { api, ApiError, type ScenarioRuns } from '@/lib/api'
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { DetailPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import type { ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import NoteBar from '@/components/shared/note-bar'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import styles from './results.module.css'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -67,6 +71,7 @@ function csvCell(value: unknown): string {
 
 /** 購読の状態の札（絵：途中・送信中・止まっている・送れずに止まった・読み終えた）。 */
 function subscriptionState(sub: Subscription): { label: string; tone: StatusBadgeTone } {
+  if (sub.pauseReason === 'delivery_unconfirmed') return { label: '要確認', tone: 'warning' }
   if (sub.status === 'completed') return { label: '読み終えた', tone: 'info' }
   if (sub.status === 'delivering') return { label: '送信中', tone: 'success' }
   if (sub.status === 'paused') {
@@ -78,6 +83,7 @@ function subscriptionState(sub: Subscription): { label: string; tone: StatusBadg
 }
 
 function nextLabel(sub: Subscription): string {
+  if (sub.pauseReason === 'delivery_unconfirmed') return '—（要確認）'
   if (sub.status === 'completed') return '—'
   if (sub.status === 'paused') return '—（止めている）'
   return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : emptyValue('unknown')
@@ -89,7 +95,8 @@ export default function ScenarioResultsV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみは購読を変える操作（…）を隠す。
-  const canEdit = role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
   const [stats, setStats] = useState<ScenarioStats | null>(null)
   /*
@@ -429,7 +436,7 @@ export default function ScenarioResultsV8() {
   return (
     <DetailPage
       boardId="X4STXS"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       title={scenario ? `配信結果：${scenario.name}` : '配信結果'}
       help="始まった・読み終えた・どの通まで届いたかを見ます。"
       actions={(
@@ -527,11 +534,14 @@ export default function ScenarioResultsV8() {
                 </button>
               ) : null}
             </div>
+            {runs?.subscriptions.some(sub => sub.pauseReason === 'delivery_unconfirmed') ? (
+              <DeliveryUnconfirmedNotice action={<Button href="/chats">トークの送信記録を確認</Button>} />
+            ) : null}
             {opError && !moveTarget ? <NoteBar tone="warn">{opError}</NoteBar> : null}
             <div className={styles.tools}>
               {/* 状態の絞り込みはサーバーへ渡して全件へ掛ける（SCENARIO-12）。 */}
               <span className={styles.statusSelect}>
-                <Select
+                <SaveErrorField names={["subscriptionStatus","status","subscription_status"]}><Select
                   value={subscriptionStatus}
                   onChange={(value) => setSubscriptionStatus(value)}
                   aria-label="購読の状態で絞り込む"
@@ -542,7 +552,7 @@ export default function ScenarioResultsV8() {
                     { value: 'paused', label: '購読の状態：止まっている' },
                     { value: 'completed', label: '購読の状態：読み終えた' },
                   ]}
-                />
+                /></SaveErrorField>
               </span>
               {runs ? (
                 <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 人`}</span>
@@ -593,7 +603,7 @@ export default function ScenarioResultsV8() {
                     if (sub.status === 'active') {
                       items.push({
                         id: 'pause',
-                        label: opBusy === `${sub.id}:pause` ? '止めています…' : '止める',
+                        label: '止める',
                         disabled: opBusy !== null,
                         onSelect: () => void runSubscriptionOp(sub, 'pause'),
                       })
@@ -601,14 +611,14 @@ export default function ScenarioResultsV8() {
                     if (sub.status === 'paused') {
                       items.push({
                         id: 'resume',
-                        label: opBusy === `${sub.id}:resume` ? '再開しています…' : '再開する',
+                        label: '再開する',
                         disabled: opBusy !== null,
                         onSelect: () => void runSubscriptionOp(sub, 'resume'),
                       })
                       if (pausedByFailure) {
                         items.push({
                           id: 'retry',
-                          label: opBusy === `${sub.id}:retry` ? '再送しています…' : '失敗を再送',
+                          label: '失敗を再送',
                           disabled: opBusy !== null,
                           onSelect: () => void runSubscriptionOp(sub, 'retry'),
                         })
@@ -620,12 +630,12 @@ export default function ScenarioResultsV8() {
                       disabled: opBusy !== null,
                       onSelect: () => void openMoveDialog(sub),
                     })
-                    const showMenu = canEdit && (sub.status === 'active' || sub.status === 'paused')
+                    const showMenu = canEdit && sub.pauseReason !== 'delivery_unconfirmed' && (sub.status === 'active' || sub.status === 'paused')
                     return (
                       <div key={sub.id} className={styles.row} role="row">
                         <span className={styles.colName} role="cell" title={sub.friendName}>{sub.friendName}</span>
-                        <span className={styles.colState} role="cell">
-                          <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
+                        <span className={styles.colState} role="cell" title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
+                          {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
                         </span>
                         <span className={styles.colNow} role="cell">{`${sub.currentStepOrder} 通目まで`}</span>
                         <span className={styles.colNext} role="cell">{nextLabel(sub)}</span>
@@ -658,10 +668,8 @@ export default function ScenarioResultsV8() {
                 </div>
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
-                  <p className={styles.moreError} role="alert">
-                    {runsMoreError}
-                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button>
-                  </p>
+                  <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}
+                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button></Notice>
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className={styles.more}>
@@ -710,14 +718,12 @@ export default function ScenarioResultsV8() {
       >
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
-          <p className={styles.moreError} role="alert">
-            移し先の候補を読み込めませんでした。
+          <Notice tone="danger" className={styles.moreErrorNoticePlacement} >移し先の候補を読み込めませんでした。
             <button type="button" className={styles.sectionLink} onClick={() => void loadMoveOptions()} disabled={opBusy !== null}>
               もう一度読み込む
-            </button>
-          </p>
+            </button></Notice>
         ) : (
-          <EntityKindField
+          <SaveErrorField names={["moveScenarioId"]}><EntityKindField
             kind="scenario"
             label="移し先のシナリオ"
             value={moveScenarioId}
@@ -729,7 +735,7 @@ export default function ScenarioResultsV8() {
                 ? '（有効の他のシナリオがありません）'
                 : '（シナリオを選んでください）'}
             options={moveChoices}
-          />
+          /></SaveErrorField>
         )}
       </Dialog>
     </DetailPage>

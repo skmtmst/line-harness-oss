@@ -14,13 +14,13 @@ const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8
 
 describe('「?」の印の字', () => {
   it('V8 の印の字は Inter の変数で描き、最後に効く', () => {
-    const last = css.lastIndexOf("[data-theme='v8'] .mark {")
+    const last = css.lastIndexOf(":root .mark {")
     expect(css.slice(last)).toMatch(/font-family: var\(--tpl-ux5-help-mark-font\);/)
-    expect(globals).toMatch(/\[data-theme="v8"\] \{[^}]*--tpl-ux5-help-mark-font: var\(--font-inter\), Inter, sans-serif;/)
+    expect(globals).toMatch(/:root \{[^}]*--tpl-ux5-help-mark-font: var\(--font-inter\), Inter, sans-serif;/)
   })
 
   it('円は 16px・字は 11px のまま', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.mark \{[^}]*width: 16px;[^}]*height: 16px;/)
+    expect(css).toMatch(/:root \.mark \{[^}]*width: 16px;[^}]*height: 16px;/)
     expect(css).toMatch(/font-size: var\(--text-micro\);\s*line-height: 11px;/)
   })
 })

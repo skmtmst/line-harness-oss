@@ -1,4 +1,62 @@
 'use client'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { RowNameLink } from '@/components/shared/table';
+
+
+
+
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import type { ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Archive, Bookmark, Download, FilePen, Inbox, Plus, Radio, Video } from 'lucide-react';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import { ListPage, ListPagePagination } from '@/components/templates';
+import SearchField from '@/components/shared/search-field'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import { notifyToast } from '@/components/shared/toast';
+import { RowMenu } from '@/components/shared/row-actions';
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
+import FilterChip from '@/components/shared/filter-chip'
+import Select from '@/components/shared/select'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName, type FolderDotFolder, folderDisplayColor } from '@/components/shared/folder-dot';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import InlineEdit from '@/components/shared/inline-edit'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { publicationStateLabel } from '@/components/webinars/publication-label';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { runUndoable } from '@/lib/undoable';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview } from '@/lib/api';
+import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { kpiCells } from './overview'
 
 /*
  * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
@@ -9,96 +67,14 @@
  * 「…」と右クリックは同じ操作（参加者・分析・コメント演出・アーカイブ）。
  * 行を押すと右に詳細が出る（↑↓で次の行へ・名前はその場で直せる）。
  *
- * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ。
+ * データの口・保存の口・権限・失敗の扱いは BEHAVIOR.md に記録。
  */
-import SharedStatusPill from '@/components/shared/status-pill'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import {
-  Archive,
-  Bookmark,
-  CalendarClock,
-  Download,
-  Eye,
-  FilePen,
-  Inbox,
-  MousePointerClick,
-  Plus,
-  Radio,
-  Users,
-  Video,
-} from 'lucide-react'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
-import SearchField from '@/components/shared/search-field'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import { RowMenu } from '@/components/shared/row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
-import Select from '@/components/shared/select'
-import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import DetailPanel from '@/components/shared/detail-panel'
-import InlineEdit from '@/components/shared/inline-edit'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { publicationStateLabel } from '@/components/webinars/publication-label'
-import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { runUndoable } from '@/lib/undoable'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import {
-  ApiError,
-  webinarApi,
-  type Webinar,
-  type WebinarFolder,
-  type WebinarListItem,
-  type WebinarListParams,
-  type WebinarOverview,
-  type WebinarOverviewMetric,
-} from '@/lib/api'
-import {
-  beforeStart,
-  publicPath,
-  showsCounts,
-  statusLabel,
-  statusTone,
-  webinarListCsv,
-  webinarLoadFailure,
-  type WebinarLoadFailure,
-} from './helpers'
-import styles from './list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
 
 const UNFILED = '__unfiled__'
 const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
-/** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
-const SEARCH_DEBOUNCE_MS = 300
 
 function scheduleSummary(w: Webinar): string {
   if (w.schedule.length === 0) return '未設定'
@@ -138,49 +114,18 @@ function peopleText(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
 }
 
-function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
-  return metric && metric.state === 'available' && metric.value !== null ? metric.value : null
-}
-
-/*
- * 数の帯の4つ。口にある数だけ（無い数は「—」。0 にしない）。
- * 補足の行も口にある数だけで書く（先月比・フォーム送信は口に無い）。
- */
-function kpiCells(overview: WebinarOverview | null) {
-  const m = overview?.metrics
-  const active = metricValue(m?.activeWebinars)
-  const bookings = metricValue(m?.registrationBookings)
-  const rate = metricValue(m?.viewRate)
-  const people = metricValue(m?.ctaUniquePeople)
-  return [
-    {
-      key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? emptyValue('unknown') : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
-    },
-    {
-      key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? emptyValue('unknown') : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
-    },
-    {
-      key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
-      detail: rate === null ? emptyValue('unknown') : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
-    },
-    {
-      key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
-    },
-  ]
-}
-
 /** 行の「…」と右クリックの中身。2箇所で別々に書くとずれるので1つにする。 */
 function rowMenuItems(
   w: WebinarListItem,
   canEdit: boolean,
   go: (href: string) => void,
   onArchive: (target: WebinarListItem) => void,
+  onDuplicate: (target: WebinarListItem) => void,
+  duplicating: boolean,
 ): ActionMenuItem[] {
   const id = encodeURIComponent(w.id)
   return [
+    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicating, onSelect: () => onDuplicate(w) }] : []),
     { id: 'participants', label: '参加者を見る', onSelect: () => go(`/webinars/edit?id=${id}&pane=participants`) },
     { id: 'analytics', label: '分析を見る', onSelect: () => go(`/webinars/edit?id=${id}&pane=analytics`) },
     { id: 'comments', label: 'コメント演出を開く', onSelect: () => go(`/webinars/edit?id=${id}&pane=comments`) },
@@ -198,13 +143,13 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
 function StatusPill({ webinar }: { webinar: WebinarListItem }) {
   return (
-    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'info' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
+    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'neutral' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
   )
 }
 
@@ -363,6 +308,7 @@ interface ListSnapshot {
 }
 
 function WebinarList() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('ウェビナー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -370,7 +316,8 @@ function WebinarList() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   // jiNg0「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const featureAccess = useFeatureAccess('webinars')
+  const canEdit = featureAccess
 
   const requestGeneration = useRef(0)
   const overviewGeneration = useRef(0)
@@ -408,12 +355,16 @@ function WebinarList() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
   const snapshotRef = useRef<ListSnapshot>({ items: [], total: 0, loadedAccountId: null })
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [duplicateError, setDuplicateError] = useState('')
+  const [activeId, setActiveId] = useDetailPanelUrl('webinar')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
   const [foldersReady, setFoldersReady] = useState(false)
+  const [foldersLoadError,setFoldersLoadError]=useState(false)
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [folderFormOpen, setFolderFormOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
@@ -463,14 +414,16 @@ function WebinarList() {
       setTotal(res.data.total)
       setLoadedAccountId(accountId)
     } catch (err) {
-      if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
+      const fieldFailure = saveErrors.capture(err);
+
+      if (requestGeneration.current === generation) { if (!fieldFailure) setLoadFailure(webinarLoadFailure(err)) }
     } finally {
       if (requestGeneration.current === generation) {
         if (mode === 'initial') setLoading(false)
         else setRefreshing(false)
       }
     }
-  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey])
+  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey, saveErrors])
 
   const refreshOverview = useCallback(async () => {
     const generation = ++overviewGeneration.current
@@ -486,10 +439,14 @@ function WebinarList() {
       setOverviewAccountId(accountId)
     } catch (cause) {
       if (overviewGeneration.current !== generation) return
+      const fieldFailure = saveErrors.capture(cause)
       setOverviewAccountId(accountId)
+      { if (!fieldFailure)
       setOverviewFailure(webinarLoadFailure(cause))
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors]);
+
 
   const refreshGrandTotal = useCallback(async () => {
     if (!selectedAccountId) {
@@ -504,7 +461,8 @@ function WebinarList() {
       if (!res.data || typeof res.data.total !== 'number') return
       setGrandTotal(res.data.total)
       setGrandAccountId(accountId)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       /* 欄の件数だけの補助取得。失敗時は前の値を残す。 */
     }
     /* 札の件数（絵 UyUMw「公開中 3」「下書き 1」）。札で絞ったときと同じ口・同じ条件で数える。取れなければ数を出さない。 */
@@ -518,25 +476,31 @@ function WebinarList() {
       setChipCounts(typeof activeTotal === 'number' && typeof draftTotal === 'number'
         ? { accountId, active: activeTotal, draft: draftTotal }
         : null)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setChipCounts(null)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors]);
+
 
   const refreshFolders = useCallback(async () => {
     const generation = ++folderGeneration.current
     setFolders([])
     setFoldersReady(false)
+    setFoldersLoadError(false)
     if (!selectedAccountId) return
     try {
       const response = await webinarApi.folders(selectedAccountId)
       if (folderGeneration.current !== generation) return
-      setFolders(response.success ? response.data : [])
+      if(!response.success)throw new Error(response.error)
+      setFolders(response.data)
       setFoldersReady(response.success && Array.isArray(response.data))
-    } catch {
-      if (folderGeneration.current === generation) setFolders([])
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
+      if (folderGeneration.current === generation) setFoldersLoadError(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => { snapshotRef.current = { items, total, loadedAccountId } }, [items, total, loadedAccountId])
@@ -544,8 +508,8 @@ function WebinarList() {
   useEffect(() => { setQuery((current) => (current.trim() === view.q ? current : view.q)) }, [view.q])
   useEffect(() => {
     if (query.trim() === view.q) return
-    const timer = setTimeout(() => setView({ q: query.trim(), page: '1' }), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    // 共通SearchFieldが300ms束ねた値を受ける。ここで二重に待たせない。
+    setView({ q: query.trim(), page: '1' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
   useEffect(() => { void refreshOverview() }, [refreshOverview])
@@ -567,8 +531,11 @@ function WebinarList() {
       setFolderFormOpen(false)
       await refreshFolders()
       await refreshGrandTotal()
-    } catch {
-      setFolderError('フォルダを保存できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを保存できませんでした。もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -613,8 +580,11 @@ function WebinarList() {
       if (selectedFolder === deletingFolder.id) setSelectedFolder('')
       setDeletingFolder(null)
       await Promise.all([refresh(), refreshFolders(), refreshGrandTotal()])
-    } catch {
-      setFolderError('フォルダを削除できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -630,7 +600,7 @@ function WebinarList() {
   /* 行 → 右の詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
   const active = activeIndex >= 0 ? visibleItems[activeIndex] : null
-  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(id)) }, [])
+  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(current => current === id ? null : id)) }, [setActiveId])
   const closeDetail = useCallback(() => { withViewTransition(() => setActiveId(null)) }, [])
   const goDetail = (direction: -1 | 1) => {
     const next = visibleItems[activeIndex + direction]
@@ -656,6 +626,24 @@ function WebinarList() {
     setArchiveTarget(target)
   }, [])
 
+  const duplicateWebinar = async (item: WebinarListItem) => {
+    if (!canEdit || duplicatingId || !selectedAccountId) return
+    const accountId = selectedAccountId
+    setDuplicatingId(item.id); setDuplicateError('')
+    try {
+      const editor = await webinarApi.editor(item.id)
+      const copied = await webinarApi.duplicate(item.id, editor.data.version)
+      if (snapshotRef.current.loadedAccountId !== accountId) return
+      setHighlightedId(copied.data.id)
+      setQuery(''); setView({ q: '', status: 'draft', page: '1', sort: 'updated' })
+      setTotal((current) => current + 1)
+      setItems((current) => [{ ...copied.data, folderName: item.folderName, registrationCount: 0, viewerCount: 0 }, ...current])
+      notifyToast('複製した下書きを追加しました')
+      void refreshFolders()
+    } catch { setDuplicateError('複製できませんでした。一覧を読み直してお試しください。') }
+    finally { setDuplicatingId(null) }
+  }
+
   const archiveSelected = async () => {
     if (!archiveTarget || archiving) return
     setArchiving(true)
@@ -666,11 +654,14 @@ function WebinarList() {
       setArchiveTarget(null)
       await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
       setArchiveError(error instanceof ApiError && error.status === 409
         ? '公開中のウェビナーは、先に公開を停止してください。'
         : archiveTarget.status === 'archived'
           ? '下書きに戻せませんでした。もう一度お試しください。'
-          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。') }
     } finally {
       setArchiving(false)
     }
@@ -708,8 +699,10 @@ function WebinarList() {
       link.download = csvFileName("動画セミナー")
       link.click()
       URL.revokeObjectURL(url)
-    } catch {
-      if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (currentCsvScope.current === csvScope) { if (!fieldFailure) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
       csvLock.current = false
       setCsvBusy(false)
@@ -751,7 +744,7 @@ function WebinarList() {
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["selectedFolder","selected_folder"]}><Select
       aria-label="フォルダ"
       value={selectedFolder}
       onChange={(value) => { setSelectedFolder(value); setPage(1) }}
@@ -760,7 +753,7 @@ function WebinarList() {
         ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
         { value: UNFILED, label: 'フォルダ：未分類' },
       ]}
-    />
+    /></SaveErrorField>
   )
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = canEdit
@@ -788,7 +781,7 @@ function WebinarList() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["savedFilter","status","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
         value={savedFilter}
         onChange={(value) => { setSavedFilter(value as SavedFilter); setPage(1) }}
@@ -798,14 +791,12 @@ function WebinarList() {
           { value: 'draft', label: '下書きのみ' },
           { value: 'archived', label: 'アーカイブ済み' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。</Notice>
-    </div>
+    null
   )
   const searchBox = (
     <SearchField
@@ -817,26 +808,10 @@ function WebinarList() {
     />
   )
   /* 1152 の板（uBMuB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      {notice}
-      <div className={styles.narrowRow}>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {sortBox}
-        {savedBox}
-        {perPageBox}
-      </div>
-    </div>
-  )
+
   const wideToolbar = (
     <>
-      {notice}
+
       <ListToolbar
         search={{ placeholder: 'ウェビナー名で探す', label: 'ウェビナー名で探す', width: 240, value: query, onChange: setQuery }}
         filters={filterChips}
@@ -850,9 +825,9 @@ function WebinarList() {
   if (accountLoading || loading) {
     listBody = <ListSkeleton />
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (loadFailure && visibleItems.length === 0) {
-    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
+    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : undefined} />
   } else if (visibleItems.length === 0) {
     /* 修正案 D-2：空の一覧。 */
     listBody = (
@@ -870,10 +845,7 @@ function WebinarList() {
     listBody = (
       <>
         {loadFailure ? (
-          <div role="alert" className={styles.errorBand}>
-            <span>{loadFailure.title}</span>
-            {loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : null}
-          </div>
+          <Notice tone="danger" ><span>{loadFailure.title}</span>{loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : null}</Notice>
         ) : null}
         {refreshing ? <p role="status" className="sr-only">検索中…</p> : null}
         <div className={styles.tableWrap}>
@@ -881,34 +853,35 @@ function WebinarList() {
             <TableHead />
             <tbody>
               {visibleItems.map((w) => {
-                const menuItems = rowMenuItems(w, canEdit, go, openArchive)
+                const menuItems = [...(canEdit ? [{ id: 'edit', label: '編集する', onSelect: () => go(`/webinars/edit?id=${w.id}`) }] : []), ...rowMenuItems(w, canEdit, go, openArchive, (item) => void duplicateWebinar(item), duplicatingId !== null)]
                 const counts = showsCounts(w)
                 const period = periodSummary(w)
                 const menuLabel = `ウェビナー「${w.title}」の操作`
                 return (
                   <Tr
                     key={w.id}
+                    selected={highlightedId === w.id}
                     interactive
                     className={styles.row}
                     data-table-layout="columns"
                     data-row-id={w.id}
-                    onClick={() => openDetail(w.id)}
+                    detailKey="webinar" onOpen={() => openDetail(w.id)}
                   >
                     <Td className={styles.colName}>
                       <ContextMenu label={`「${w.title}」の操作`} items={toContextItems(menuItems)}>
                         <FolderDotName folder={folderDotOf(w)}>
-                          <button
-                            type="button"
+                          <RowNameLink
+                            href={`/webinars/edit?id=${encodeURIComponent(w.id)}`}
                             className={styles.nameButton}
                             title={w.title}
                             aria-label={`「${w.title}」の詳細を見る`}
-                            onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
+
                           >
                             {w.title}
-                          </button>
+                          </RowNameLink>
                         </FolderDotName>
                       </ContextMenu>
-                      <span className={styles.slug} ><TruncatedText value={String(publicPath(w) ?? '')} /></span>
+
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>
@@ -927,15 +900,15 @@ function WebinarList() {
                       )}
                     </Td>
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
-                    <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        {canEdit ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button> : null}
+
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === w.id}
                           onOpenChange={(next) => setOpenMenuId(next ? w.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>
@@ -949,20 +922,22 @@ function WebinarList() {
     )
   }
 
-  const pager = hasListData && pageCount > 1 ? (
+  const pager = hasListData ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り"
+        summary={paginationSummary(visibleTotal, (currentPage - 1) * pageSize + 1, (currentPage - 1) * pageSize + visibleItems.length)} />
     </ListPagePagination>
   ) : null
 
   const kpis = kpiCells(visibleOverview)
 
   return (
-    <ListPage
-      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}</>}
+    <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
+      skeleton
+      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}{kpis.map((kpi) => kpi.help).join(" ")}</>}
+      noticeSpacing="section"
+      explanation="公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。"
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"
@@ -980,15 +955,12 @@ function WebinarList() {
       stats={<>
         {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 64px 跳ねていた（動きの点検 8 番）。 */}
         {role !== null && !canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {csvError ? <div className={styles.statsNotice}><Notice tone="info">{csvError}</Notice></div> : null}
         {overviewFailure && !loadFailure ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
+            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => refreshOverview()} busyLabel="処理中…">集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
           </div>
         ) : null}
         <KpiBand>
@@ -998,7 +970,6 @@ function WebinarList() {
               presentation="band"
               title={kpi.title}
               icon={<kpi.icon size={13} aria-hidden="true" />}
-              help={kpi.help}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}
@@ -1006,10 +977,9 @@ function WebinarList() {
           ))}
         </KpiBand>
       </>}
-      folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+      folders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>
         <FolderPanel
+          createAction={createButton}
           activeId={selectedFolder}
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
           onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}
@@ -1017,11 +987,11 @@ function WebinarList() {
           addFolderDisabled={!selectedAccountId}
           rows={folderRows}
         >
-          <p className={styles.folderNote}>フォルダを消しても、中のウェビナーは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{wideToolbar}</>}
       pagination={pager}
       overlays={<>
         {archiveTarget ? (
@@ -1100,6 +1070,6 @@ function WebinarList() {
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

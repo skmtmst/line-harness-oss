@@ -1,6 +1,9 @@
 'use client'
 
+import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import React from 'react'
+import { useTableActionWidth } from './use-table-action-width'
+import { useListRowDensity } from './use-list-row-density'
 import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
@@ -9,9 +12,10 @@ import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
+import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
+import { isRowControl } from './destination-policy'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
@@ -30,9 +34,9 @@ export function TableHeadRow({
     .filter(Boolean)
     .join(' ')
   return (
-    <React.Fragment>{as === 'div' ? <div role="row" className={classes} data-table-layout="columns" data-presentation={presentation} {...rowProps as HTMLAttributes<HTMLDivElement>}>
+    <React.Fragment>{as === 'div' ? <div data-shared-part="list-head" role="row" className={classes} data-table-layout="columns" data-presentation={presentation} {...rowProps as HTMLAttributes<HTMLDivElement>}>
       {children}
-    </div> : <tr className={classes} data-presentation={presentation} {...rowProps}>
+    </div> : <tr data-shared-part="list-head" className={classes} data-presentation={presentation} {...rowProps}>
       {children}
     </tr>}</React.Fragment>
   )
@@ -92,11 +96,12 @@ export function Th({
     .join(' ')
 
   const hasHelp = help !== undefined && help !== null
+  const actionHeading = children === '操作'
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
     <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
-      {truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
+      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}
@@ -127,8 +132,8 @@ export function DataTable({
   children: ReactNode
   className?: string
   'data-design'?: string
-  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表。指定した表だけに適用する。 */
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check'
+  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -136,14 +141,16 @@ export function DataTable({
   label?: string
   'aria-label'?: string
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
-  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
+  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
 }) {
+  const actionWidthRef = useTableActionWidth<HTMLDivElement>()
+  useListRowDensity(actionWidthRef)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -159,6 +166,8 @@ export function DataTable({
         '--table-columns': grid.columns,
         '--table-compact-columns': grid.compactColumns ?? grid.columns,
         '--table-row-padding': grid.padding,
+        '--table-grid-gap':grid.gap,
+        '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
       } as CSSProperties : undefined}>{children}</table>
     </div>
@@ -172,6 +181,11 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
   selected?: boolean
   /** ★V7：指を乗せた行に薄い地を敷く。押せる行・選べる行だけに付ける。 */
   interactive?: boolean
+  /** 行の余白からも開く。名前は通常の Link のままにする。 */
+  href?: string
+  onOpen?: () => void
+  /** パネルのURLの鍵。名前から移るときも対象を戻り先へ残す。 */
+  detailKey?: string
   /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
   density?: 'standard' | 'comfortable' | 'template'
   /**
@@ -180,41 +194,60 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
    * 渡さなければ何も変わらない。
    */
   leaving?: boolean
+  highlighted?: boolean
 }
 
 /** 標準一覧の高さ58pxの行。 */
-export function Tr({ children, className, selected, interactive, density, leaving, ...rowProps }: TrProps) {
+export function Tr({ children, className, selected, interactive, href, onOpen, detailKey, density, leaving, highlighted, onClick, onKeyDown, ...rowProps }: TrProps) {
   const [listState] = useListUrlState({ highlight: '' })
   const createdHighlight = Boolean(listState.highlight && listState.highlight === (rowProps as Record<string, unknown>)['data-row-id'])
-  const classes = [
-    shell.row,
-    density === 'comfortable' && shell.rowComfortable,
-    density === 'template' && shell.rowTemplate,
-    interactive && shell.rowInteractive,
-    (selected || createdHighlight) && shell.rowSelected,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
-  return (
-    <tr
-      className={classes}
-      aria-selected={selected === undefined ? undefined : selected}
-      data-created-highlight={createdHighlight || undefined}
-      data-leaving={leaving || undefined}
-      {...rowProps}
-      onClick={(event) => {
-        if (event.defaultPrevented || (event.target as HTMLElement).closest('a,button,input,select,textarea,[role="button"],[role="checkbox"],[role="menuitem"]')) return
-        if (rowProps.onClick) { rowProps.onClick(event); return }
-        const link = event.currentTarget.querySelector<HTMLAnchorElement>('a[data-row-link],a[href]')
-        if (!link) return
-        if (event.metaKey || event.ctrlKey || event.shiftKey) window.open(link.href, '_blank', 'noopener,noreferrer')
-        else link.click()
-      }}
-    >
-      {children}
-    </tr>
-  )
+  const navigationHref = useListNavigationHref()
+  const hasLink = (nodes: ReactNode): boolean => React.Children.toArray(nodes).some(node => React.isValidElement<{ href?: string; children?: ReactNode; name?: ReactNode }>(node) && (node.type === RowNameLink || Boolean((node.props as Record<string, unknown>)['data-row-link']) || (node.type === NameCell && hasLink(node.props.name)) || hasLink(node.props.children)))
+  const rowId = (rowProps as Record<string, unknown>)['data-row-id']
+  const canOpen = Boolean(href || onOpen || onClick || hasLink(children))
+  const classes = [shell.row, density === 'comfortable' && shell.rowComfortable, density === 'template' && shell.rowTemplate,
+    interactive !== false && canOpen && shell.rowInteractive, (selected || createdHighlight) && shell.rowSelected, className].filter(Boolean).join(' ')
+  const openLink = (newTab: boolean) => {
+    if (!href) return
+    if (newTab) window.open(navigationHref(href), '_blank', 'noopener,noreferrer')
+    else window.location.assign(navigationHref(href))
+  }
+  return <RowNavigation.Provider value={detailKey && rowId ? { key: detailKey, id: String(rowId) } : null}><tr data-shared-part="list-row" data-row-open={canOpen || undefined} className={classes} aria-selected={selected === undefined ? undefined : selected}
+    data-created-highlight={createdHighlight || undefined} data-leaving={leaving || undefined} data-highlighted={highlighted || undefined}
+    {...rowProps} tabIndex={rowProps.tabIndex ?? (canOpen ? 0 : undefined)}
+    onClick={(event) => {
+      if (event.defaultPrevented || isRowControl(event.target, event.currentTarget) || window.getSelection()?.toString()) return
+      if (href && (event.metaKey || event.ctrlKey || event.shiftKey)) { openLink(true); return }
+      if (onOpen) { onOpen(); return }
+      if (onClick) { onClick(event); return }
+      if (href) { openLink(false); return }
+      const link = event.currentTarget.querySelector<HTMLAnchorElement>('a[data-row-link]')
+      if (!link) return
+      if (event.metaKey || event.ctrlKey || event.shiftKey) window.open(link.href, '_blank', 'noopener,noreferrer')
+      else link.click()
+    }} onKeyDown={(event) => {
+      onKeyDown?.(event)
+      if (event.defaultPrevented || event.target !== event.currentTarget || !canOpen || !['Enter', ' '].includes(event.key)) return
+      event.preventDefault()
+      if (onOpen) onOpen()
+      else if (href) openLink(event.metaKey || event.ctrlKey)
+      else event.currentTarget.click()
+    }}>{children}</tr></RowNavigation.Provider>
+}
+
+/** 名前はその物のページへ。件数等のリンクはこの印を付けない。 */
+export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<typeof PageLink> & { onOpen?: () => void }) {
+  return <PageLink {...props} className={[props.className, styles.rowNameLink].filter(Boolean).join(' ')} data-row-link="" data-row-local-open={onOpen ? '' : undefined} onClick={event => {
+    onClick?.(event)
+    if (!onOpen || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+    event.preventDefault()
+    onOpen()
+  }} />
+}
+
+/** 名前から既存の詳細を開く操作。行き先の切り替え方は画面が保つ。 */
+export function RowNameButton({ className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type="button" {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
 }
 
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {
@@ -236,23 +269,22 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
   return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
-/** 名前・副題・注記を同じ列にまとめる先頭セル。 */
-export function NameCell({
-  name,
-  sub,
-  memo,
-  className,
-}: {
+/** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
+export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>) {
+  return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
+}
+
+/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
+export function NameCell({ name, folder, annotation, className }: {
   name: ReactNode
-  sub?: ReactNode
-  memo?: ReactNode
+  /** 名前の横の状態札。名前やリンクの中には入れない。 */
+  annotation?: ReactNode
+  folder?: FolderDotFolder | null
   className?: string
 }) {
   return (
-    <td className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}>{typeof name === 'string' ? <TruncatedText value={name} /> : name}</div>
-      {sub ? <div className={shell.sub}>{sub}</div> : null}
-      {memo ? <div className={shell.memo}>{memo}</div> : null}
+    <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
     </td>
   )
 }
@@ -264,7 +296,7 @@ export function HandleCell({ children }: { children?: ReactNode }) {
 
 /** 行の右端に置く操作列。 */
 export function ActionCell({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={[shell.bodyCell, shell.actionCell, className].filter(Boolean).join(' ')}>{children}</td>
+  return <td data-list-action-cell="" className={[shell.bodyCell, shell.actionCell, className].filter(Boolean).join(' ')}>{children}</td>
 }
 
 export type SortDirection = 'asc' | 'desc' | 'none'
@@ -346,8 +378,7 @@ export function TableStateRow({
   retryLabel?: string
   error?: unknown
 }) {
-  const v8 = useAdminTheme() === 'v8'
-  if (kind === 'loading' && v8) return <tr><td colSpan={colSpan} aria-busy="true" aria-label={title ?? TABLE_STATE_TEXT.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton columns={colSpan} />} /></td></tr>
+  if (kind === 'loading') return <tr><td colSpan={colSpan} aria-busy="true" aria-label={title ?? TABLE_STATE_TEXT.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton columns={colSpan} />} /></td></tr>
   const text = TABLE_STATE_TEXT[kind]
   const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
   return (

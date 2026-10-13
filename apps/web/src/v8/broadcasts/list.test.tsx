@@ -67,6 +67,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
   return { ...actual, useStaffRole: () => role.current }
 })
 
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import BroadcastListV8 from './list'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
@@ -105,6 +107,7 @@ const base = {
 const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageContent: 'まだお買い物していない方へ', status: 'draft', displayStatus: 'draft', displayStatusLabel: '下書き', scheduledAt: null }
 
 beforeEach(() => {
+  forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
   role.current = 'owner'
   store.clear()
@@ -192,7 +195,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
 
   it('編集キーを持つ運用担当は作れる', async () => {
     role.current = 'staff'
-    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['broadcast.definition.edit']))
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
@@ -274,7 +277,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     const trigger = rowOf('1月の限定メニュー')?.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
     act(() => { trigger.click() })
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim())
-    expect(labels).toContain('見る')
+    expect(labels).toContain('配信の詳細を見る')
     expect(labels).toContain('複製')
     expect(labels.some((label) => label?.includes('削除'))).toBe(false)
     expect(labels.some((label) => label?.includes('編集'))).toBe(false)
@@ -301,17 +304,17 @@ it('2ページ目を含む全配信を検索し、検索結果を20件ずつ表�
   await flush()
   expect(host.textContent).toContain('検索対象100')
   expect(host.textContent).not.toContain('検索対象124')
-  expect(host.textContent).toContain('25 件中 1〜20 件')
+  expect(host.textContent).toContain('25件中 1〜20件')
   const next = host.querySelector('button[aria-label="次のページ"]') as HTMLButtonElement
   expect(next).toBeTruthy()
   act(() => next.click())
   await flush()
   expect(host.textContent).toContain('検索対象124')
-  expect(host.textContent).toContain('25 件中 21〜25 件')
+  expect(host.textContent).toContain('25件中 21〜25件')
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '見つからない' } })
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
-  expect(host.textContent).toContain('0 件')
+  expect(host.textContent).toContain('0件中 0〜0件')
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '' } })
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()

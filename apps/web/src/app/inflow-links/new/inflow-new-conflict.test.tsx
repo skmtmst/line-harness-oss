@@ -24,6 +24,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      entryRouteGenres: { ...actual.api.entryRouteGenres, list: async () => ({ success: true, data: [] }) },
+      broadcastMessageAssets: { ...actual.api.broadcastMessageAssets, list: async () => ({ success: true, data: [] }) },
       entryRoutes: { ...actual.api.entryRoutes, create: api.create, list: api.routesList },
       tags: { ...actual.api.tags, list: api.tagsList },
       scenarios: { ...actual.api.scenarios, list: api.scenariosList },
@@ -43,12 +45,12 @@ vi.mock('@/lib/qr-image', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href, ...rest }, children),
 }))
 
 const routerPush = vi.fn()
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -151,13 +153,13 @@ describe('流入リンクの作成・競合(実React)', () => {
     await render()
     await setValue(byId('ir-name'), '別の名前')
     await setValue(byId('ir-ref'), 'summer-ig')
-    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '発行して URL を受け取る'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     expect(routerPush).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('「summer-ig」は既に使われています')
+    expect(host.textContent).toContain('「summer-ig」は')
     // 保存日時と名前は実データ。誰が保存したかは口が持たないので出さない。
-    expect(host.textContent).toContain('保存の「夏のInstagram投稿」があります')
+    expect(host.textContent).toContain('「夏のInstagram投稿」で保存されています')
     expect(host.textContent).not.toContain('坂本さん')
     byExactText('button', '比べてから保存')
   })
@@ -166,36 +168,36 @@ describe('流入リンクの作成・競合(実React)', () => {
     await render()
     await setValue(byId('ir-name'), '別の名前')
     await setValue(byId('ir-ref'), 'summer-ig')
-    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '発行して URL を受け取る'))
     await click(byExactText('button', '違いを比べる'))
 
-    expect(host.textContent).toContain('いまの入力と保存されている値の違い')
-    expect(host.textContent).toContain('別の名前')
+    expect(document.body.textContent).toContain('いまの入力の違う項目だけ')
+    expect(document.body.textContent).toContain('別の名前')
     expect(host.textContent).toContain('夏のInstagram投稿')
-    expect(host.textContent).toContain('https://nen.example/summer')
+    expect(document.body.textContent).toContain('https://nen.example/summer')
   })
 
   it('vWJEm: 最新を読み込むと保存値が入力へ写る', async () => {
     await render()
     await setValue(byId('ir-name'), '別の名前')
     await setValue(byId('ir-ref'), 'summer-ig')
-    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '発行して URL を受け取る'))
     await click(byExactText('button', '最新を読み込んで続ける'))
 
     expect(byId('ir-name').value).toBe('夏のInstagram投稿')
     // 文字は競合のままなので、帯は残って文字の変更を促す。
-    expect(host.textContent).toContain('「summer-ig」は既に使われています')
+    expect(host.textContent).toContain('「summer-ig」は')
   })
 
   it('vWJEm: 文字を変えると競合が閉じて発行に戻る', async () => {
     await render()
     await setValue(byId('ir-name'), '別の名前')
     await setValue(byId('ir-ref'), 'summer-ig')
-    await click(byExactText('button', '発行してURLを受け取る'))
-    expect(host.textContent).toContain('「summer-ig」は既に使われています')
+    await click(byExactText('button', '発行して URL を受け取る'))
+    expect(host.textContent).toContain('「summer-ig」は')
 
     await setValue(byId('ir-ref'), 'summer-ig-2')
     expect(host.textContent).not.toContain('既に使われています')
-    byExactText('button', '発行してURLを受け取る')
+    byExactText('button', '発行して URL を受け取る')
   })
 })

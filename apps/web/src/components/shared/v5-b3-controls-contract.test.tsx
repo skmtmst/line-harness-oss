@@ -76,12 +76,12 @@ describe('入力・検索・選択部品の操作と安全性', () => {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)
-      const hasOuterRing = /:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)
+      const hasOuterRing = /:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/.test(css)
       if (!hasOuterRing) {
         expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)/)
       }
       expect(css, `${name} がfocus-visibleを保証していない`).toMatch(
-        /:focus-visible[^{]*\{[^}]*outline:\s*(?:revert|2px solid var\(--color-action\))/s,
+        /:focus-visible[^{]*\{[^}]*outline:\s*(?:revert|2px solid var\(--color-focus-ring\))/s,
       )
     }
   })

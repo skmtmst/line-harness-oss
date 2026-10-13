@@ -6,12 +6,14 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 const TARGETS = [
-  'affiliates/tabs.tsx',
+  '../v8/affiliates/affiliators.tsx',
+  '../v8/affiliates/offers.tsx',
+  '../v8/affiliates/approvals.tsx',
   'booking/menus/page.tsx',
   '../v8/friend-add-publish/publish.tsx',
   '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
-  'line-notifications/operator-notification-rules.tsx',
+  '../v8/settings/line-notifications/operator-tab.tsx',
   '../v8/mileage/score.tsx',
   '../v8/mileage/balances.tsx',
   '../v8/mileage/earning-rules.tsx',
@@ -19,14 +21,14 @@ const TARGETS = [
   'rich-menus/connections/page.tsx',
   // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
   '../v8/scenarios/results.tsx',
-  'tags/mark-editor-v8.tsx',
+  '../v8/tags/mark-editor.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
-  '../components/friend-fields/field-list.tsx',
-  '../components/friend-fields/mark-list.tsx',
-  '../components/friend-fields/tags-page-v4.tsx',
+  '../v8/tags/fields-tab.tsx',
+  '../v8/tags/marks-tab.tsx',
+  '../v8/tags/tags-tab.tsx',
   '../components/friends/bulk-run-dialog.tsx',
-  '../components/merged-person/merged-person-detail.tsx',
-  '../components/users/users-table.tsx',
+  '../components/merged-person/merged-person-detail-v8.tsx',
+  '../v8/friends/merged/merged.tsx',
 ] as const
 
 function failureDisplays(source: string) {
@@ -37,7 +39,8 @@ function failureDisplays(source: string) {
     ...source.matchAll(/<TableStateRow\b[\s\S]*?\/>/g),
     ...source.matchAll(/<StateCard\b[\s\S]*?\/>/g),
   ].map(([tag]) => tag)
-  return tags.filter((tag) => tag.includes('kind="error"') || tag.includes('tone="error"'))
+  // 権限不足は通信失敗と別。権限を頼む案内へ、再取得の操作を強制しない。
+  return tags.filter((tag) => (tag.includes('kind="error"') || tag.includes('tone="error"')) && !tag.includes('permissionDeniedMessage(') && !tag.includes('を見る権限がありません'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {
@@ -48,17 +51,17 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       expect(errors.length, `${target} の取得失敗表示が検査から消えています`).toBeGreaterThan(0)
 
       for (const errorState of errors) {
-        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{<Button(?:[^>]*?) onClick=/)
+        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{(?:<>)?<Button(?:[^>]*?) onClick=|action=\{<RetryButton onRetry=/)
       }
     }
   })
 
   it('V8の専用失敗表示も、その場で一覧を読み直せる', () => {
     for (const [target, message, retry] of [
-      ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
+      ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => loadList((page - 1) * pageSize)}'],
       // 一斉配信・回答フォーム・シナリオは入口が src/v8 の新しい一覧を出す（古い list-v8.tsx はもう描かれない）。
-      ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
-      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => void load()}'],
+      ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => loadForms()}'],
+      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => load()}'],
       ['../v8/scenarios/list.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
       ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
     ]) {

@@ -151,7 +151,7 @@ export function HqApprovalBlock({
       ) : gate === 'approved' ? (
         <Notice tone="success">{`${nameOf(state.approval.decidedByStaffId) ? `${nameOf(state.approval.decidedByStaffId)}さんが` : ''}承認しました。送る操作へ進めます。`}</Notice>
       ) : null}
-      {message && !requestOpen ? <p role="alert" className="text-danger text-xs">{message}</p> : null}
+      {message && !requestOpen ? <Notice tone="danger" >{message}</Notice> : null}
       <ApproverSection
         approval={state.approval}
         viewer={state.viewer}

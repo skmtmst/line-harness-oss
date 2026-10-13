@@ -3,6 +3,7 @@
 import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { TextField } from '@/components/shared/text-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** パスワードの入力欄。右端の目の印で表示と非表示を切り替える（設計の「表示切替」）。 */
 export default function PasswordField({
@@ -23,7 +24,7 @@ export default function PasswordField({
   const [shown, setShown] = useState(false)
   return (
     <div className="relative w-full">
-      <TextField
+      <SaveErrorField names={["value"]}><TextField
         id={id}
         type={shown ? 'text' : 'password'}
         value={value}
@@ -33,7 +34,7 @@ export default function PasswordField({
         placeholder={placeholder}
         aria-describedby={invalid ? `${id}-error` : undefined}
         style={{ paddingRight: 40 }}
-      />
+      /></SaveErrorField>
       <button
         type="button"
         onClick={() => setShown((current) => !current)}

@@ -6,6 +6,7 @@ import Dialog from './dialog'
 import OtpInput, { otpFailureMessage } from './otp-input'
 
 interface StepUpDialogProps {
+  presentation?: 'mfa-off'
   open: boolean
   /** 何のための再認証かを運用者の言葉で。例: '権限を変更する' */
   action: string
@@ -29,10 +30,13 @@ interface StepUpDialogProps {
  * 止まった操作の前に立てる。聞くのは本人の設定で決まり、二段階認証があれば
  * 6桁コード、なければパスワード。grant 取得と本操作のやり直しは呼び出し側。
  */
-export default function StepUpDialog({ open, action, method = 'totp', busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
+export default function StepUpDialog({ open, action, presentation, method = 'totp', busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
   const [value, setValue] = useState('')
   const labelId = useId()
   useEffect(() => { if (open) setValue('') }, [open])
+  const mfaOff = presentation === 'mfa-off'
+  // Owner decision pending: change this one value to change the off action color.
+  const offTone: 'default' | 'destructive' = 'default'
   const isTotp = method === 'totp'
   const isNone = method === 'none'
   const ready = !isNone && (isTotp ? /^\d{6}$/.test(value) : value.length > 0)
@@ -60,27 +64,29 @@ export default function StepUpDialog({ open, action, method = 'totp', busy = fal
   return (
     <Dialog
       open={open}
-      title={isTotp ? '認証アプリで本人確認' : 'パスワードで本人確認'}
-      description={isTotp
+      tone={mfaOff ? offTone : undefined} footerAlign={mfaOff ? 'start' : undefined}
+      title={mfaOff ? '二段階認証の必須をオフにしますか' : isTotp ? '認証アプリで本人確認' : 'パスワードで本人確認'}
+      description={mfaOff ? 'オフにすると、パスワードやLINEだけで入れるようになります' : isTotp
         ? `${action}には、権限を持つ本人の確認が必要です。この操作専用に、5分以内に1回だけ使える6桁コードを入力してください。`
         : `${action}には、権限を持つ本人の確認が必要です。この操作専用に、5分以内に1回だけ使える確認を発行するため、パスワードを入力してください。`}
-      confirmLabel="本人確認して実行"
+      confirmLabel={mfaOff ? 'オフにする' : '本人確認して実行'}
       busy={busy}
       error={error && isTotp ? otpFailureMessage(error) : error}
-      titleIcon={<KeyRound size={22} />}
+      titleIcon={mfaOff ? undefined : <KeyRound size={22} />}
       onConfirm={ready ? () => onSubmit(value) : undefined}
       onCancel={onCancel}
     >
+      {mfaOff ? <p>{isTotp ? '続けるには、あなたの認証アプリの6桁を入れてください。' : '続けるには、あなたのパスワードを入れてください。'}</p> : null}
       {isTotp ? (
         <>
-          <p id={labelId} className="mt-1 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p>
+          <p id={labelId} className="mt-1 block text-sm font-medium text-ink">{mfaOff ? '認証コード（6桁）' : '認証アプリに表示された6桁コード'}</p>
           {/* ★V7 共通 認証コード入力（xHzFK）。6桁目が入った瞬間に確かめる（「本人確認して実行」も残す）。 */}
           <div className="mt-2">
             <OtpInput
               value={value}
               onChange={setValue}
               labelledBy={labelId}
-              onComplete={(code) => onSubmit(code)}
+              onComplete={mfaOff ? undefined : (code) => onSubmit(code)}
               invalid={Boolean(error)}
               busy={busy}
               autoFocus
@@ -105,6 +111,7 @@ export default function StepUpDialog({ open, action, method = 'totp', busy = fal
           </div>
         </>
       )}
+      {mfaOff ? <p>自分で登録した人には、オフのあいだも確かめが出ます。オンに戻すのは、いつでもできます。</p> : null}
     </Dialog>
   )
 }

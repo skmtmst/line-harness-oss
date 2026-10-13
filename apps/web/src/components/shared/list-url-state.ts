@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 const LOCAL_EVENT = 'lh:list-url-state'
 
 function subscribe(onChange: () => void): () => void {
+  if (typeof window.addEventListener !== 'function') return () => {}
   window.addEventListener('popstate', onChange)
   window.addEventListener(LOCAL_EVENT, onChange)
   return () => {
@@ -39,13 +40,14 @@ function subscribe(onChange: () => void): () => void {
 let pending: { pathname: string; search: string } | null = null
 let scheduled = false
 
-function currentLocation(): { pathname: string; search: string; hash: string } {
+export function currentListLocation(): { pathname: string; search: string; hash: string } {
+  if (typeof window === 'undefined' || !window.location) return { pathname: '', search: '', hash: '' }
   const { pathname, hash } = window.location
   const search = pending && pending.pathname === pathname ? pending.search : window.location.search
   return { pathname, search, hash }
 }
 
-const readSearch = () => currentLocation().search
+const readSearch = () => currentListLocation().search
 
 function flushPending(): void {
   scheduled = false
@@ -78,7 +80,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => { pending = null })
   window.addEventListener('pagehide', flushListUrlState)
   document.addEventListener('click', event => {
-    if (event.target instanceof Element && event.target.closest('a[href]')) flushListUrlState()
+    if (event.target instanceof Element && event.target.closest?.('a[href]')) flushListUrlState()
   }, true)
 }
 const readServerSearch = () => ''
@@ -126,7 +128,7 @@ export function useListUrlState<T extends Record<string, string>>(defaults: T): 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const state = useMemo(() => parseListUrlState(search, defaultsRef.current), [search, defaultsKey])
   const set = useCallback((patch: Partial<T>) => {
-    const location = currentLocation()
+    const location = currentListLocation()
     const url = nextListUrl(location, defaultsRef.current, patch)
     if (url === `${location.pathname}${location.search}${location.hash}`) return
     commitUrl(url)
@@ -156,7 +158,7 @@ export function useListUrlFlag(key: string): [boolean, (next: boolean) => void] 
 /** 1 つの鍵をその場で URL に書く（空なら消す）。フックの外（ページ送りなど）から使う。 */
 export function writeListUrlParam(key: string, value: string): void {
   if (typeof window === 'undefined') return
-  const location = currentLocation()
+  const location = currentListLocation()
   const url = nextListUrl(location, { [key]: '' }, { [key]: value })
   if (url === `${location.pathname}${location.search}${location.hash}`) return
   commitUrl(url)
@@ -168,7 +170,7 @@ export function writeListUrlParam(key: string, value: string): void {
  */
 export function readListUrlParam(key: string, fallback = ''): string {
   if (typeof window === 'undefined') return fallback
-  return new URLSearchParams(currentLocation().search).get(key) ?? fallback
+  return new URLSearchParams(currentListLocation().search).get(key) ?? fallback
 }
 
 /* ── スクロール位置を戻す ─────────────────────────────── */
@@ -308,7 +310,7 @@ export function useOnAccountSwitch(accountId: string | null | undefined, onSwitc
   onSwitchRef.current = onSwitch
   useEffect(() => {
     const previous = previousRef.current
-    previousRef.current = accountId
+    if (accountId) previousRef.current = accountId
     if (previous && accountId && previous !== accountId) onSwitchRef.current()
   }, [accountId])
 }
@@ -360,4 +362,14 @@ export function useListUrlSetValue<T extends string>(key: string, initial: T[]):
   }, [setValues])
   const value = useMemo(() => new Set(values), [values])
   return [value, set]
+}
+
+/** 一覧の書きかけも含めた現在地。戻り先のリンクを描く共通口。 */
+const readLocation = () => { if (typeof window === 'undefined' || !window.location) return ''; const loc = currentListLocation(); return `${loc.pathname}${loc.search}${loc.hash}` }
+export function useListLocation(): string {
+  return useSyncExternalStore(subscribe, readLocation, () => '')
+}
+/** パネルなど、同じURLを更新する部品も一覧の購読者へ知らせる。 */
+export function notifyListLocation(): void {
+  window.dispatchEvent(new Event(LOCAL_EVENT))
 }

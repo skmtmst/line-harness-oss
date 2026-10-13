@@ -16,7 +16,7 @@ const fixture = vi.hoisted(() => ({
   myStaff: [] as Array<Record<string, unknown>>,
   putBreaks: vi.fn(), putRules: vi.fn(), putDates: vi.fn(),
   rules: [{ weekday: 1, start_time: '10:00', end_time: '19:00' }] as Array<{ weekday: number; start_time: string; end_time: string }>,
-  getRules: vi.fn(), getBreaks: vi.fn(), listMenus: vi.fn(), getAvailability: vi.fn(),
+  getRules: vi.fn(), getBreaks: vi.fn(), listMenus: vi.fn(), getAvailability: vi.fn(), getDates: vi.fn(), createException: vi.fn(),
 }))
 
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: (...args: unknown[]) => fixture.push(...args) }
@@ -48,7 +48,8 @@ vi.mock('@/lib/api', () => {
       getAvailability: (...args: unknown[]) => fixture.getAvailability(...args),
       getShifts: async () => ({ shifts: [] }),
       getBreaks: (...args: unknown[]) => fixture.getBreaks(...args),
-      getBreakDates: async () => ({ version: 'd1', breaks: [] }),
+      getBreakDates: (...args: unknown[]) => fixture.getDates(...args),
+      createException: (...args: unknown[]) => fixture.createException(...args),
       getGoogleCalendar: async () => ({ connection: null, service_account: { configured: true } }),
       putBreaks: (...args: unknown[]) => fixture.putBreaks(...args),
       putAvailabilityRules: (...args: unknown[]) => fixture.putRules(...args),
@@ -57,9 +58,9 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/components/shared/date-field', () => ({ default: (p: { value: string; onChange: (v: string) => void; 'aria-label'?: string }) => <input aria-label={p['aria-label']} value={p.value} onChange={(e) => p.onChange(e.target.value)} /> }))
 
+import { ApiError } from '@/lib/api'
 import StaffShiftsV8, { groupBreaks, shortDay, weekdaySetLabel } from './shifts'
 
 const memStorage = vi.hoisted(() => {
@@ -89,6 +90,8 @@ beforeEach(() => {
   })
   fixture.putRules.mockReset().mockResolvedValue({ ok: true })
   fixture.rules = [{ weekday: 1, start_time: '10:00', end_time: '19:00' }]
+  fixture.getDates.mockReset().mockResolvedValue({ version: 'd1', breaks: [] })
+  fixture.createException.mockReset().mockResolvedValue({ success: true, data: { id: 'ex1', dateFrom: '2026-10-12', dateTo: '2026-10-12', kind: 'closed', intervals: [] } })
   fixture.putDates.mockReset()
   fixture.putBreaks.mockReset()
   fixture.putBreaks.mockImplementation(async (_a: unknown, _s: unknown, _v: unknown, rows: Array<{ weekday: number; start_time: string; end_time: string }>) => ({
@@ -266,13 +269,13 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
 
     if (timing === '入力後に返る') {
       expect(fixture.getAvailability).toHaveBeenCalledTimes(1)
-      expect(week().getByRole('button', { name: '保存中…' }).hasAttribute('disabled')).toBe(true)
+      expect(week().getByRole('button', { name: '保存しています…' }).hasAttribute('disabled')).toBe(true)
       // 再取得が止まっている間も、休憩は編集できる。
       setTime('休憩の終わり', '12:30')
       await act(async () => { rulesReload.resolve(refreshedRules) })
     }
     await waitFor(() => expect(fixture.getAvailability).toHaveBeenCalledTimes(2))
-    expect(week().getByRole('button', { name: '保存中…' }).hasAttribute('disabled')).toBe(true)
+    expect(week().getByRole('button', { name: '保存しています…' }).hasAttribute('disabled')).toBe(true)
 
     // 保存通知やPUTの呼び出しでは終わりにしない。予約枠の再取得も返して、
     // 保存ボタンが戻った後に、取り直したDOMと実際の保存内容の両方を見る。
@@ -306,4 +309,56 @@ test('BUG-03：空きの取得失敗を満席と区別し、見本の再試行�
   await waitFor(() => expect(screen.queryByText('読み込めませんでした')).toBeNull())
   await waitFor(() => expect(within(preview).getByText('空き')).toBeTruthy())
   expect(fixture.getAvailability).toHaveBeenCalledTimes(2)
+})
+
+function setTime(label: string, value: string) {
+  const input=screen.getByRole('combobox',{name:label});fireEvent.change(input,{target:{value}});fireEvent.blur(input)
+}
+async function addSpecialDay(kind: '休憩'|'休み') {
+  fireEvent.click(await screen.findByRole('button',{name:'この日を足す'}))
+  fireEvent.click(screen.getByRole('button',{name:'足す種別'}))
+  fireEvent.click(within(await screen.findByRole('option',{name:`この日だけの${kind}`})).getByRole('button'))
+  fireEvent.change(screen.getByLabelText('この日の日付'),{target:{value:'2026-10-12'}})
+  if(kind==='休憩'){setTime('この日の始まり','12:00');setTime('この日の終わり','13:00')}
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'足す',exact:true}))})
+}
+test.each(['毎週の休憩','この日だけの休憩','休み'] as const)('SL-C01: %sの保存後は空き見本を再取得する',async kind=>{
+  fixture.listMenus.mockResolvedValue({menus:[{id:'m1',name:'人工メニュー',is_active:1}]})
+  fixture.putDates.mockResolvedValue({version:'d2',breaks:[{id:'br1',work_date:'2026-10-12',start_time:'12:00',end_time:'13:00'}]})
+  render(<StaffShiftsV8 staffId="bs-1"/>)
+  await screen.findByRole('combobox',{name:'休憩の始まり'})
+  await waitFor(()=>expect(fixture.getAvailability).toHaveBeenCalledTimes(1))
+  if(kind==='毎週の休憩') await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
+  else await addSpecialDay(kind==='休み'?'休み':'休憩')
+  await waitFor(()=>expect(fixture.getAvailability).toHaveBeenCalledTimes(2))
+})
+test('SL-C03: 毎週の休憩が409でも入力を残し、本人が最新を読むまで置き換えない',async()=>{
+  fixture.putBreaks.mockRejectedValueOnce(Object.assign(new ApiError(409),{data:{version:'v9',breaks:[{id:'other',weekday:1,start_time:'15:00',end_time:'16:00'}]}}))
+  render(<StaffShiftsV8 staffId="bs-1"/>)
+  await screen.findByRole('combobox',{name:'休憩の始まり'})
+  setTime('休憩の始まり','12:00')
+  await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
+  expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('12:00')
+  expect(fixture.getBreaks).toHaveBeenCalledTimes(1)
+  fixture.getBreaks.mockResolvedValue({version:'v10',breaks:[{id:'latest',weekday:1,start_time:'16:00',end_time:'17:00'}]})
+  fireEvent.click(screen.getByRole('button',{name:'最新を読み込んで続ける'}))
+  await waitFor(()=>expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('16:00'))
+  await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
+  expect(fixture.putBreaks.mock.calls[1][2]).toBe('v10')
+})
+test('SL-C03: 日付付き休憩も409では編集を残し、選んだ読み直しの失敗でも残す',async()=>{
+  const original={id:'b1',work_date:'2026-10-12',start_time:'13:00',end_time:'14:00'}
+  fixture.getDates.mockResolvedValue({version:'d1',breaks:[original]})
+  fixture.putDates.mockRejectedValue(Object.assign(new ApiError(409),{data:{version:'d9',breaks:[{...original,start_time:'15:00',end_time:'16:00'}]}}))
+  render(<StaffShiftsV8 staffId="bs-1"/>)
+  fireEvent.click(await screen.findByRole('button',{name:'休憩 13:00〜14:00'}))
+  setTime('10/12（月）の休憩の始まり','12:00')
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'更新する'}))})
+  expect((screen.getByRole('combobox',{name:'10/12（月）の休憩の始まり'}) as HTMLInputElement).title).toBe('12:00')
+  fixture.getDates.mockRejectedValueOnce(new Error('network'))
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'最新を読み込んで続ける'}))})
+  expect((screen.getByRole('combobox',{name:'10/12（月）の休憩の始まり'}) as HTMLInputElement).title).toBe('12:00')
+  fixture.getDates.mockResolvedValue({version:'d10',breaks:[{...original,start_time:'16:00',end_time:'17:00'}]})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'最新を読み込んで続ける'}))})
+  expect(screen.getByRole('button',{name:'休憩 16:00〜17:00'})).toBeTruthy()
 })

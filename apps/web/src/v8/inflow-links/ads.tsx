@@ -1,5 +1,45 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  manualLabel: requiredText("流入元の名前を入れてください"),
+  manualAmount: requiredText("費用を入力してください"),
+}
+
+
+import { formatDate as polishFormatDate, formatNumber, formatYen } from '@/lib/format'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AtSign, Check, Music, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
+import type { EntryRoute } from '@line-crm/shared'
+import { api, type AdPlatform } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
+import DateField from '@/components/shared/date-field'
+import Dialog from '@/components/shared/dialog'
+import { RowMenu } from '@/components/shared/row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextField } from '@/components/shared/text-field'
+import AdConnectionDialog from './ad-connection-dialog'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
+import styles from './ads.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
+
 /*
  * ★V8 広告連携（Pencil：画面 `qSTVR`・広告費を手で入れる `ZxKL5`）。
  *
@@ -12,33 +52,6 @@
  * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
-import type { EntryRoute } from '@line-crm/shared'
-import { api, type AdPlatform } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber, formatYen } from '@/lib/format'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import Button from '@/components/shared/button'
-import DateField from '@/components/shared/date-field'
-import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import { TextField } from '@/components/shared/text-field'
-import AdConnectionDialog from './ad-connection-dialog'
-import { DetailPage } from '@/components/templates'
-import { focusField } from './focus-field'
-import styles from './ads.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
 
 const PROVIDERS = [
   { key: 'google', label: 'Google広告', icon: Search },
@@ -102,11 +115,27 @@ function platformLabel(platform: Pick<AdPlatform, 'name' | 'displayName'>): stri
   return PROVIDERS.find((provider) => provider.key === platform.name)?.label ?? platform.displayName ?? platform.name
 }
 
+/** 以前の設定の金額は、費用の記録と混ぜず媒体の同じ補足で確認できる。 */
+function legacyMonthlyCost(platform: AdPlatform | undefined, rows: AdCostRow[]): string | null {
+  if (!platform || rows.some((row) => row.adPlatformId === platform.id)) return null
+  const amount = platform.config.monthly_cost
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+  const rawCurrency = platform.config.currency
+  const currency = typeof rawCurrency === 'string' ? rawCurrency.trim().toUpperCase() : ''
+  if (!/^[A-Z]{3}$/.test(currency)) return '以前の設定：通貨を確認（通貨は未設定）'
+  try {
+    return `以前の設定：${new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(amount)}（費用の記録とは別）`
+  } catch {
+    return '以前の設定：通貨を確認（通貨は未設定）'
+  }
+}
+
 export default function AdsV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('広告連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
   const { selectedAccountId } = useAccount()
   const loadGenerationRef = useRef(0)
   const latestAccountRef = useRef(selectedAccountId)
@@ -179,12 +208,14 @@ export default function AdsV8() {
         setConversionCost(null)
         setCostFailed(true)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (isCurrent()) setFailed(true)
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     setPlatforms([])
@@ -221,9 +252,9 @@ export default function AdsV8() {
     setManualError('')
     const amount = Number(manualAmount.replaceAll(',', ''))
     const errors: Record<string, string> = {}
-    if (!manualLabel.trim()) errors['ad-cost-name'] = '流入元の名前を入れてください'
+    if ((b244Requirements.manualLabel.check(manualLabel) !== null)) errors['ad-cost-name'] = '流入元の名前を入れてください'
     if (!manualDay) errors['ad-cost-day'] = '費用の日付を選んでください'
-    if (!manualAmount.trim()) errors['ad-cost-amount'] = '費用を入力してください'
+    if ((b244Requirements.manualAmount.check(manualAmount) !== null)) errors['ad-cost-amount'] = '費用を入力してください'
     else if (!Number.isInteger(amount) || amount < 0) errors['ad-cost-amount'] = '費用は0以上の整数(円)で入れてください'
     setManualFieldErrors(errors)
     if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return }
@@ -248,8 +279,11 @@ export default function AdsV8() {
       setManualDay('')
       setManualAmount('')
       void load()
-    } catch {
-      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setManualBusy(false)
     }
@@ -282,8 +316,11 @@ export default function AdsV8() {
       setCancelTarget(null)
       setSelectedEntryId(null)
       void load()
-    } catch {
-      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setCancelBusy(false)
     }
@@ -297,8 +334,11 @@ export default function AdsV8() {
       const res = await api.adPlatforms.importCost(platformId)
       if (!res.success) setImportError(res.error ?? '取り込めませんでした')
       void load()
-    } catch {
-      setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。') }
     } finally {
       setImportingId(null)
     }
@@ -322,19 +362,18 @@ export default function AdsV8() {
   const otherTotal = [...totalCostByCurrency].find(([currency]) => currency !== 'JPY') ?? null
   const routeById = new Map(entryRoutes.map((route) => [route.id, route]))
   const workerHost = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '')
-  const selectedEntry = manualEntries.find((entry) => entry.id === selectedEntryId) ?? null
 
   if (!selectedAccountId) {
-    return <ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告費だけを表示します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告費だけを表示します。" /></SaveErrorScope>
   }
 
   return (
-    <DetailPage boardId="qSTVR" title="広告連携" help="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
+    <SaveErrorScope errors={saveErrors}><DetailPage boardId="qSTVR" title="広告連携" help="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
       contentPadding="0 var(--tpl-head-pad-side)"
       actions={manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {loading && platforms.length === 0 ? (
           <ListState kind="loading" title="広告連携を読み込んでいます" />
@@ -369,9 +408,10 @@ export default function AdsV8() {
               const active = platform?.isActive === true
               const status = platform ? costPlatforms.find((item) => item.id === platform.id) : undefined
               const synced = shortJst(status?.lastSuccessAt) ?? shortJst(platform?.config.synced_at)
+              const legacyCost = legacyMonthlyCost(platform, costRows)
               const Icon = provider.icon
               return (
-                <div key={provider.key} className={styles.provider} role="listitem">
+                <Card key={provider.key} variant="aside" className={styles.provider} contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" role="listitem">
                   <div className={styles.providerHead}>
                     <Icon size={16} aria-hidden="true" className={styles.providerIcon} />
                     <span className={styles.providerName}>{provider.label}</span>
@@ -379,8 +419,8 @@ export default function AdsV8() {
                       ? <StatusBadge tone="success" size="compact">つないでいる</StatusBadge>
                       : <StatusBadge tone="neutral" size="compact">未接続</StatusBadge>}
                   </div>
-                  <p className={styles.providerSub} title={status?.lastRunStatus === 'failed' && status.lastError ? `直近は取り込めませんでした（${status.lastError}）` : undefined}>
-                    {active ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます'}
+                  <p className={styles.providerSub} title={status?.lastRunStatus === 'failed' && status.lastError ? `直近は取り込めませんでした（${status.lastError}）` : legacyCost ?? undefined}>
+                    {legacyCost ?? (active ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます')}
                   </p>
                   {manage ? (
                     <span>
@@ -400,11 +440,11 @@ export default function AdsV8() {
                       )}
                     </span>
                   ) : null}
-                </div>
+                </Card>
               )
             })}
           </div>
-          {importError ? <p className={styles.error} role="alert">{importError}</p> : null}
+          {importError ? <Notice tone="danger" >{importError}</Notice> : null}
 
           <h2 className={styles.sectionTitle} id="ads-costs">流入元ごとの費用</h2>
           {costFailed ? (
@@ -421,47 +461,47 @@ export default function AdsV8() {
               description="広告をつなぐと毎日自動で取り込みます。取り込めない分は「費用を手で入れる」から足せます。"
             />
           ) : (
-            <div className={styles.table} role="table" aria-labelledby="ads-costs">
-              <div className={styles.tableHead} role="row">
-                <span className={styles.colSource} role="columnheader">流入元</span>
-                <span className={styles.colMedia} role="columnheader">媒体</span>
-                <span className={styles.colLink} role="columnheader">計測リンク</span>
-                <span className={styles.colCost} role="columnheader">この30日の費用</span>
-                <span className={styles.colNum} role="columnheader">友だち追加</span>
-                <span className={styles.colNum} role="columnheader">1人あたり</span>
-                <span className={styles.colImport} role="columnheader">取り込み</span>
-              </div>
+            <DataTable label="流入元ごとの費用" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+              <TableHeadRow data-table-layout="columns">
+                <Th grow>流入元</Th>
+                <Th className={styles.colMedia}>媒体</Th>
+                <Th className={styles.colLink} collapseAt="narrow">計測リンク</Th>
+                <Th className={styles.colCost} align="right">この30日の費用</Th>
+                <Th className={styles.colNum} align="right">友だち追加</Th>
+                <Th className={styles.colNum} align="right">1人あたり</Th>
+                <Th className={styles.colImport}>取り込み</Th>
+              </TableHeadRow></thead><tbody>
               {costRows.map((row) => {
                 const platform = platforms.find((item) => item.id === row.adPlatformId)
                 const route = row.entryRouteId ? routeById.get(row.entryRouteId) : undefined
                 const link = route ? `${workerHost}/r/${route.refCode}` : null
                 const cost = row.totals.length === 0 ? emptyValue('unknown') : row.totals.map((total) => formatMinor(total.amountMinor, total.currency)).join(' ')
                 return (
-                  <div key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`} className={styles.tableRow} role="row">
-                    <span className={styles.colSource} role="cell"><span className={styles.cell} title={route ? `${route.name}（${row.sourceLabel}）` : row.sourceLabel}>{route?.name ?? row.sourceLabel}</span></span>
-                    <span className={styles.colMedia} role="cell"><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}</span></span>
-                    <span className={styles.colLink} role="cell"><span className={styles.cell} title={link ?? undefined}>{link ?? emptyValue('unknown')}</span></span>
-                    <span className={styles.colCost} role="cell"><span className={row.totals.length === 0 ? styles.faint : undefined}>{cost}</span></span>
-                    <span className={styles.colNum} role="cell">{row.friendAdds == null ? emptyValue('unknown') : formatNumber(row.friendAdds)}</span>
-                    <span className={styles.colNum} role="cell">
+                  <Tr key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`} data-table-layout="columns">
+                    <Td grow><span className={styles.cell} title={route ? `${route.name}（${row.sourceLabel}）` : row.sourceLabel}>{route?.name ?? row.sourceLabel}</span></Td>
+                    <Td className={styles.colMedia}><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}</span></Td>
+                    <Td className={styles.colLink} collapseAt="narrow"><span className={styles.cell} title={link ?? undefined}>{link ?? emptyValue('unknown')}</span></Td>
+                    <Td className={styles.colCost} align="right"><span className={row.totals.length === 0 ? styles.faint : undefined}>{cost}</span></Td>
+                    <Td className={styles.colNum} align="right">{row.friendAdds == null ? emptyValue('unknown') : formatNumber(row.friendAdds)}</Td>
+                    <Td className={styles.colNum} align="right">
                       <span className={row.costPerFriendMinor == null ? styles.faint : undefined}>
                         {row.costPerFriendMinor == null ? emptyValue('unknown') : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                       </span>
-                    </span>
-                    <span className={styles.colImport} role="cell">
+                    </Td>
+                    <Td className={styles.colImport}>
                       {row.source === 'manual'
                         ? <StatusBadge tone="neutral" size="compact">手入力</StatusBadge>
                         : <StatusBadge tone="success" size="compact">自動</StatusBadge>}
-                    </span>
-                  </div>
+                    </Td>
+                  </Tr>
                 )
               })}
-            </div>
+            </tbody></DataTable>
           )}
           <p className={styles.notice}>取り込んだ費用と手入力の分です。取れない日は「—」になります。秘密の鍵は画面に表示しません。中継リンクを通った人だけ広告と結びつきます。</p>
 
           {manualEntries.length > 0 ? (
-            <section className={styles.card} aria-labelledby="ads-manual">
+            <Card variant="panel" contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-labelledby="ads-manual">
               <h2 className={styles.cardTitle} id="ads-manual">手で入れた費用</h2>
               <p className={styles.lead}>行の「…」から取り消すと、その日の費用は集計から外れます。</p>
               {manualEntries.map((entry) => {
@@ -478,29 +518,18 @@ export default function AdsV8() {
                     <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? emptyValue('unknown')}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? emptyValue('unknown')}`}</span>
                     <span className={styles.entryMenu}>
                       {manage && !cancelled ? (
-                        <IconButton
-                          title={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
-                          aria-label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
-                          aria-expanded={selectedEntryId === entry.id}
-                          aria-controls="ads-entry-actions"
-                          onClick={() => setSelectedEntryId((current) => (current === entry.id ? null : entry.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
+                        <RowMenu
+                          label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
+                          open={selectedEntryId === entry.id}
+                          onOpenChange={(open) => setSelectedEntryId(open ? entry.id : null)}
+                          items={[{ id: 'cancel', label: '取り消す', icon: <XCircle size={15} aria-hidden />, onSelect: () => openCancel(entry) }]}
+                        />
                       ) : null}
                     </span>
                   </div>
                 )
               })}
-              {manage ? (
-                <div className={styles.rowActions} id="ads-entry-actions" role="group" aria-label="選んだ費用の操作">
-                  <span className={styles.rowActionsLabel}>{selectedEntry ? `「${shortDay(selectedEntry.day)} ${selectedEntry.sourceLabel}」の操作：` : '「…」を開いたとき：'}</span>
-                  <Button disabled={!selectedEntry} onClick={() => selectedEntry && openCancel(selectedEntry)}>
-                    <XCircle size={15} aria-hidden="true" />取り消す
-                  </Button>
-                </div>
-              ) : null}
-            </section>
+            </Card>
           ) : null}
         </>}
       </div>
@@ -520,29 +549,29 @@ export default function AdsV8() {
         onCancel={() => { if (!manualBusy) setManualOpen(false) }}
       >
         <div className={styles.dialogBody}>
-          <Field label="流入元の名前"><TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例：駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" />
+          <Field label="流入元の名前" requirement={b244Requirements.manualLabel}><SaveErrorField names={["manualLabel","sourceLabel","manual_label"]}><TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例：駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" /></SaveErrorField>
 {manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}</Field>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
-            <Select
+            <SaveErrorField names={["manualRouteId","entryRouteId","manual_route_id"]}><EntitySelect
               aria-label="計測リンク（分かれば）"
               size="full"
               value={manualRouteId}
               onChange={(value) => {
                 setManualRouteId(value)
                 const route = entryRoutes.find((item) => item.id === value)
-                if (route && !manualLabel.trim()) setManualLabel(route.name)
+                if (route && (b244Requirements.manualLabel.check(manualLabel) !== null)) setManualLabel(route.name)
               }}
-              options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ value: route.id, label: route.name }))]}
-            />
+              options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]}
+            /></SaveErrorField>
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <span className={styles.label}>費用の日付</span>
-              <DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" />
+              <SaveErrorField names={["manualDay","day","manual_day"]}><DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" /></SaveErrorField>
               {manualFieldErrors['ad-cost-day'] ? <span id="ad-cost-day-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-day']}</span> : null}
             </div>
-            <Field label="費用（円）"><NumberInput numericText unit="円" id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例：30000" />
+            <Field label="費用（円）" requirement={b244Requirements.manualAmount}><SaveErrorField names={["manualAmount","manual_amount"]}><NumberInput numericText unit="円" id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例：30000" /></SaveErrorField>
 {manualFieldErrors['ad-cost-amount'] ? <span id="ad-cost-amount-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-amount']}</span> : null}</Field>
           </div>
         </div>
@@ -561,7 +590,7 @@ export default function AdsV8() {
         {cancelTarget ? (
           <div className={styles.dialogBody}>
             <p className={styles.dialogLead}>{`対象: ${cancelTarget.day} ／ ${cancelTarget.sourceLabel} ／ ${formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}`}</p>
-            <Field label="取り消す理由" required><TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例：金額を間違えた" maxLength={200} />
+            <Field label="取り消す理由" required><SaveErrorField names={["cancelReason","cancel_reason"]}><TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例：金額を間違えた" maxLength={200} /></SaveErrorField>
 {cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}</Field>
           </div>
         ) : null}
@@ -577,6 +606,6 @@ export default function AdsV8() {
           onSaved={load}
         />
       ) : null}
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }

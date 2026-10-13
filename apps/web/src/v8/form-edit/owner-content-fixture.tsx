@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 import { emptyLayout, type FormInputBlock } from '@line-crm/shared'
 import { EMPTY_REFS } from '@/components/forms/form-refs'
@@ -16,3 +16,5 @@ export function mount(blocks: FormInputBlock[] = []) {
     onSelectPage={vi.fn()} onAddPage={vi.fn()} onRenamePage={() => true} onDuplicatePage={vi.fn()} onRemovePage={onRemovePage} onSelectBlock={vi.fn()} onAddBlock={vi.fn()} onPatchBlock={onPatchBlock} onMoveBlock={vi.fn()} onDuplicateBlock={vi.fn()} onRemoveBlock={vi.fn()} />)
   return { onRemovePage, onPatchBlock }
 }
+
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

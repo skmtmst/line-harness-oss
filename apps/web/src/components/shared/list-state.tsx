@@ -1,13 +1,12 @@
 'use client'
 
-import React from 'react'
-import type { ReactNode } from 'react'
-import { Inbox, Loader, Lock } from 'lucide-react'
+
+import type { HTMLAttributes, ReactNode } from 'react'
+import { Inbox, Lock } from 'lucide-react'
 import Button from './button'
 import TargetMissing from './target-missing'
 import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 
 /**
@@ -28,6 +27,11 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
  * 専用の部品が描かれたら、ここを合わせ直す。
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
+
+/** 詳細の節だけが空のときは、一覧全体の絵や操作を増やさず1行で知らせる。 */
+export function ListEmptyMessage({ children, as: Tag = 'p', ...props }: HTMLAttributes<HTMLElement> & { as?: 'p' | 'span'; children: ReactNode }) {
+  return <Tag {...props} className={styles.inlineEmpty}>{children}</Tag>
+}
 /**
  * 空の内訳。`createable` はまだ1件も無い（作る口を出す）、`readonly` は
  * 画面から作れない記録、`filtered` は絞り込みの結果が0件（R38）。
@@ -43,8 +47,7 @@ export type EmptyListPreset = 'createable' | 'readonly' | 'filtered'
  * cloud-off、見出し ink 15px 太字、副ボタン「もう一度読み込む」1つ）に
  * する。赤い三角・赤い見出しはやめた（利用者の失敗ではないため）。
  */
-const ICONS: Record<Exclude<ListStateKind, 'error'>, typeof Inbox> = {
-  loading: Loader,
+const ICONS: Record<Exclude<ListStateKind, 'error' | 'loading'>, typeof Inbox> = {
   empty: Inbox,
   forbidden: Lock,
 }
@@ -84,6 +87,7 @@ export default function ListState({
   emptyPreset = 'createable',
   className,
   'data-design': dataDesign,
+  'data-design-node': designNode,
   error,
   icon,
   loadingShape = 'list',
@@ -109,6 +113,7 @@ export default function ListState({
   className?: string
   /** 設計の節の印の受け口。共通化で印を落とさないため。 */
   'data-design'?: string
+  'data-design-node'?: string
   /**
    * 捕まえた読み込み失敗（m23m）。`error` のときだけ見る。
    * 403 は権限の案内を残し、権限変更後にも読み直せるようにする。
@@ -117,8 +122,7 @@ export default function ListState({
    */
   error?: unknown
 }) {
-  const v8 = useAdminTheme() === 'v8'
-  if (kind === 'loading' && v8) return <div data-list-state="loading" data-design={dataDesign} className={className} aria-busy="true" aria-label={title ?? PRESETS.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton shape={loadingShape} />} /></div>
+  if (kind === 'loading') return <div data-list-state="loading" data-design={dataDesign} className={className} aria-busy="true" aria-label={title ?? PRESETS.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton shape={loadingShape} />} /></div>
 
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 
@@ -128,15 +132,16 @@ export default function ListState({
   if (kind === 'error') {
     const failure = error === undefined ? null : loadFailureCopy(error, 'この画面', permissionScope)
     return (
-      <div data-list-state="error" role="alert" data-design={dataDesign}>
+      <div data-list-state="error" role="alert" data-design={dataDesign} data-design-node={designNode}>
         <TargetMissing
           kind="error"
           title={title ?? failure?.title ?? preset.title}
           description={failure && !failure.retryable ? failure.description : description ?? failure?.description ?? preset.description}
           onRetry={onRetry ?? (() => window.location.reload())}
           retrying={retrying}
+          action={onRetry ? undefined : action}
         />
-        {action}
+        {onRetry ? action : null}
       </div>
     )
   }
@@ -146,17 +151,14 @@ export default function ListState({
   // className は先に組む。JSX の中で足すと、直書きを数える仕掛け
   // （`scripts/design-debt.mjs`）から中身が見えなくなる。
   const rootClass = [styles.root, className].filter(Boolean).join(' ')
-  const iconClass = [styles.icon, kind === 'loading' && styles.spin]
-    .filter(Boolean)
-    .join(' ')
+  const iconClass = styles.icon
 
   return (
     <div
       className={rootClass}
       data-list-state={kind}
       data-design={dataDesign}
-      // 読み込み中は読み上げにも伝える。権限不足はその場で読ませる。
-      aria-busy={kind === 'loading' || undefined}
+      data-design-node={designNode}
       role={kind === 'forbidden' ? 'alert' : undefined}
     >
       <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>

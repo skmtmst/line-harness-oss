@@ -1,82 +1,71 @@
 'use client'
 
+import { useActionError } from '@/lib/use-action-error'
+
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle } from 'lucide-react';
+import type { Tag, TagGroup } from '@line-crm/shared';
+import { api, ApiError, type ListStats } from '@/lib/api';
+import { useRowLeaving } from '@/lib/use-row-leaving';
+import { RovingTbody } from '@/components/shared/row-roving';
+import { ListPageBody } from '@/components/templates';
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors';
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FolderManagementDialog } from '@/components/shared/managed-folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import StatusBadge from '@/components/shared/status-badge'
+import FilterChip from '@/components/shared/filter-chip'
+import { RowMenu } from '@/components/shared/row-actions';
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { notifyToast } from '@/components/shared/toast';
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message';
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import Select from '@/components/shared/select'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import TagPill from '@/components/shared/tag-pill'
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import PageSizeSelect from '@/components/shared/page-size-select';
+import ReorderHandle from '@/components/shared/reorder-handle'
+import { useLiveReorder } from '@/lib/use-live-reorder';
+import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils';
+import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
+import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state';
+import { DeleteTagDialog, QUICK_FILTERS, UNGROUPED, cleanupKnown, formatDate, hasLinkedActions, isThisMonth, isUnused, usageLabel } from '@/components/friend-fields/tags-page-v4';
+import styles from './list.module.css'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListPager } from '@/components/templates/list-page';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+
 /*
  * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
  * フォルダ窓 `IjVpM`、状態の板 `U0aKD`）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・フォルダへ移す・フォルダの
  * 追加/直す/並べ替え/削除・保管・CSV・行の詳細パネル・右クリック）は
- * 今の V8 タブ（app/tags/tags-tab-v8.tsx）から写した。数え方・判定は v7 と同じ関数
+ * 現役の V8 タブ（src/v8/tags/tags-tab.tsx）から写した。数え方・判定は共通の同じ関数
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  Bookmark,
-  Check,
-  CircleDashed,
-  Folder,
-  FolderOpen,
-  GripVertical,
-  Inbox,
-  Plus,
-  Sparkles,
-  Tag as TagIcon,
-  Users,
-} from 'lucide-react'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type ListStats } from '@/lib/api'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { ListPageBody } from '@/components/templates'
-import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import StatusBadge from '@/components/shared/status-badge'
-import FilterChip from '@/components/shared/filter-chip'
-import { RowMenu } from '@/components/shared/row-actions'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import TagPill from '@/components/shared/tag-pill'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderHandle from '@/components/shared/reorder-handle'
-import { useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
-import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
-import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
-import {
-  DeleteTagDialog,
-  QUICK_FILTERS,
-  UNGROUPED,
-  cleanupKnown,
-  formatDate,
-  hasLinkedActions,
-  isThisMonth,
-  isUnused,
-  usageLabel,
-} from '@/components/friend-fields/tags-page-v4'
-import styles from './list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { emptyValue } from '@/components/shared/empty-value'
 
-/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
+/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   ec: 'EC 連携',
   line_login: 'LINE ログイン',
@@ -89,7 +78,7 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options'
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -138,6 +127,8 @@ function TagFolderDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState(group?.name ?? '')
   const [color, setColor] = useState<string | null>(group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
@@ -158,22 +149,27 @@ function TagFolderDialog({
       }
       onSaved()
       onClose()
-    } catch {
-      setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+
+      setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <FolderEditorDialog open
+    <SaveErrorScope errors={saveErrors}><FolderEditorDialog open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
       colors={TAG_FOLDER_COLORS}
       placeholder="例：VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
-    />
+    /></SaveErrorScope>
   )
 }
 
@@ -192,12 +188,13 @@ export default function TagsTab({
   csvOpen: boolean
   onCsvClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
   // 操作の失敗（並び替え・フォルダ移動）。読み込みの失敗とは別物。
-  const [actionError, setActionError] = useState('')
+  const { error: actionError, setError: setActionError } = useActionError(accountId ?? '')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
   /*
@@ -232,6 +229,8 @@ export default function TagsTab({
   const [restoreError, setRestoreError] = useState('')
   const { leavingId, leave } = useRowLeaving()
   // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
+  const [manageFoldersOpen, setManageFoldersOpen] = useState(false)
+  useEffect(() => { setManageFoldersOpen(false) }, [accountId])
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -241,7 +240,7 @@ export default function TagsTab({
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?tag=<id> を残す。 */
   const [activeTagId, setActiveTagId] = useDetailPanelUrl('tag')
-  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(id))
+  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(activeTagId === id ? null : id))
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
@@ -262,9 +261,11 @@ export default function TagsTab({
       setStatus('ready')
     } catch (reason) {
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
+      saveErrors.capture(reason);
+
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture, accountId])
+  }, [fixture, accountId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /* 数の帯のサーバー側の数。一覧とは別の要求なので、失敗しても一覧は止めない（「—」）。 */
@@ -345,6 +346,8 @@ export default function TagsTab({
       const result = await api.tags.reorder(order)
       if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
     } catch (caught) {
+      saveErrors.capture(caught);
+
       const detail = japaneseDetailOf(caught)
       message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''} 通信を確かめて、もう一度お試しください。`
     }
@@ -356,6 +359,9 @@ export default function TagsTab({
         actionLabel: 'もう一度',
         onAction: () => { void applyTagOrder(order) },
       })
+    } else {
+      setItems((current) => mergeVisibleOrder(current, order.map((id) => current.find((tag) => tag.id === id)).filter((tag): tag is Tag => Boolean(tag))))
+      setActionError('')
     }
   }
 
@@ -400,9 +406,12 @@ export default function TagsTab({
         onAction: () => { void moveTagToGroup({ ...tag, groupId }, previous) },
       })
     } catch (reason) {
-      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item))
+      const fieldFailure = saveErrors.capture(reason)
+      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item));
+
       const message = reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。'
-      setActionError(message)
+      { if (!fieldFailure)
+      setActionError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -433,9 +442,12 @@ export default function TagsTab({
       if (!otherResult.success) throw new Error(otherResult.error)
       void load()
     } catch (reason) {
-      setGroups(previous)
+      const fieldFailure = saveErrors.capture(reason)
+      setGroups(previous);
+
       const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
-      setFolderError(message)
+      { if (!fieldFailure)
+      setFolderError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -458,7 +470,10 @@ export default function TagsTab({
       setDeletingGroup(null)
       void load()
     } catch (reason) {
-      setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+      setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした') }
     } finally {
       setFolderBusy(false)
     }
@@ -480,11 +495,11 @@ export default function TagsTab({
       ]
     }
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, href: `/tags/edit?id=${tag.id}`, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
-      { id: 'copy', label: '複製して作る', external: true, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
+      { id: 'edit', label: '編集', external: false, href: `/tags/edit?id=${tag.id}`, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
+      { id: 'copy', label: '複製して作る', external: false, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    if (tag.status === 'archived') return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
+    if (tag.status === 'archived') return [list[0], { id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
     list.push({
         id: 'archive',
         label: '保管する',
@@ -530,7 +545,7 @@ export default function TagsTab({
         }
         continue
       }
-      list.push({ id: item.id, label: item.label, danger: item.tone === 'danger', disabled: item.disabled, onSelect: () => item.onSelect() })
+      list.push({ id: item.id, label: item.label, danger: item.tone === 'danger', disabled: item.disabled, onSelect: () => item.onSelect?.() })
     }
     return list
   }
@@ -544,10 +559,10 @@ export default function TagsTab({
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
       color: group.color,
-      onEdit: canEdit ? () => setFolderDialog(group) : undefined,
+      onEdit: canEdit ? () => { setManageFoldersOpen(false); setFolderDialog(group) } : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
       onMoveDown: canEdit && index < groups.length - 1 ? () => void moveGroupOrder(group, 1) : undefined,
-      onDelete: canEdit ? () => setDeletingGroup(group) : undefined,
+      onDelete: canEdit ? () => { setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
@@ -575,7 +590,7 @@ export default function TagsTab({
   )
 
   const search = (
-    <span className={narrow ? styles.searchNarrow : styles.search}>
+    <ListToolbarSearchSlot>
       <SearchField
         aria-label="タグ名・用途で探す"
         placeholder="タグ名・用途で探す"
@@ -583,11 +598,11 @@ export default function TagsTab({
         onChange={setQuery}
         onClear={() => setQuery('')}
       />
-    </span>
+    </ListToolbarSearchSlot>
   )
   const archiveChip = <FilterChip selected={onlyArchived} onChange={(next) => setView({ archived: next ? '1' : '', page: '1' })}>保管</FilterChip>
   const usageSelect = (
-    <Select
+    <SaveErrorField names={["usageFilter","usage_filter"]}><Select
       aria-label="使用状態で絞り込む"
       width={145}
       value={usageFilter}
@@ -597,10 +612,10 @@ export default function TagsTab({
         { value: 'linked', label: '使用状態：連動あり' },
         { value: 'unused', label: '使用状態：未使用' },
       ]}
-    />
+    /></SaveErrorField>
   )
   const sourceSelect = (
-    <Select
+    <SaveErrorField names={["sourceFilter","source_filter"]}><Select
       aria-label="付け方で絞り込む"
       width={132}
       value={sourceFilter}
@@ -609,7 +624,7 @@ export default function TagsTab({
         { value: 'all', label: '付け方：すべて' },
         ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label: `付け方：${label}` })),
       ]}
-    />
+    /></SaveErrorField>
   )
   /* 「よく使う絞り込み」：重ねて絞れる4つ（星以外の QUICK_FILTERS）。開いたメニューで入れ切り。 */
   const quickItems: ActionMenuItem[] = [
@@ -647,29 +662,20 @@ export default function TagsTab({
   const folderNote = (
     <>
       {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
-      <p className={styles.folderNote}>フォルダを消しても、中のタグは未分類に残ります</p>
+      <FolderPanelNote>フォルダを消しても、中のタグは未分類に残ります</FolderPanelNote>
       {folderError ? (
-        <p role="alert" className={styles.folderNote}>
-          {folderError}
-          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
     </>
   )
 
+  const hasStatusColumn = liveOrder.shown.some(tag => tag.status === 'archived' || tag.cleanupReasons?.includes('duplicate_name'))
+
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを見る権限がありません</p>
-      <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
-    </div>
+    <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを読み込めませんでした</p>
-      <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -689,8 +695,7 @@ export default function TagsTab({
         <thead>
           <TableHeadRow>
             <Th className={styles.colName}>タグ</Th>
-            {/* 左にフォルダの列があるときは表にフォルダ列を置かず、名前の前に色の丸（2026-10-07 オーナー）。1152 は列を畳むので表に出す（絵 aPeD8）。 */}
-            {narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}
+            {hasStatusColumn ? <Th>状態</Th> : null}
             <Th className={styles.colCount}>人数</Th>
             <Th className={styles.colSource}>付け方</Th>
             <Th className={styles.colLink}>連動</Th>
@@ -713,16 +718,10 @@ export default function TagsTab({
                 className={styles.row}
                 leaving={leavingId === tag.id}
                 tabIndex={0}
-                onClick={() => openTagDetail(tag.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openTagDetail(tag.id)
-                  }
-                }} data-row-id={tag.id}
+                detailKey="tag" onOpen={() => openTagDetail(tag.id)}
+                data-row-id={tag.id}
               >
-                <Td className={styles.colName}>
+                <Td className={styles.colName} data-list-name-cell>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
                     <div className={styles.nameRow}>
                       <span
@@ -741,37 +740,27 @@ export default function TagsTab({
                           <span className={styles.gripSpace} aria-hidden="true" />
                         )}
                       </span>
-                      <TagPill name={tag.name} color={group ? folderDisplayColor(group) : null} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>アーカイブ</StatusBadge> : null}
-                      {tag.cleanupReasons?.includes('duplicate_name') ? (
-                        <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
-                      ) : null}
-                    </div>
-                    <p className={styles.sub}>{`${formatDate(tag.createdAt)}登録`}</p>
+                      <FolderDotName folder={group}>
+                        {canEdit ? <RowNameLink prefetch={false} href={editHref} title={tag.name} className={styles.name}>{tag.name}</RowNameLink> : <span title={tag.name}>{tag.name}</span>}
+                      </FolderDotName>
+                      </div>
+
                   </ContextMenu>
                 </Td>
-                {narrow ? (
-                  <Td className={styles.colFolder}>
-                    <span className={styles.folderCell} title={group?.name ?? '未分類'}>
-                      {group ? (
-                        <Folder className={styles.folderIcon} aria-hidden="true" color={folderDisplayColor(group)} fill={folderDisplayColor(group)} />
-                      ) : (
-                        <FolderOpen className={styles.folderIcon} aria-hidden="true" />
-                      )}
-                      <span className={styles.truncate}>{group?.name ?? '未分類'}</span>
-                    </span>
-                  </Td>
-                ) : null}
+                {hasStatusColumn ? <Td>{tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
+                      {tag.cleanupReasons?.includes('duplicate_name') ? (
+                        <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
+                      ) : null}</Td> : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
-                <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
-                  <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
+                <Td className={styles.colCount}>
+                  <Link prefetch={false} href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
                     {tag.friendCount ?? 0} 人
                   </Link>
                 </Td>
                 <Td className={styles.colSource}><span className={styles.cellText} title={sourceLabel(tag)}>{sourceLabel(tag)}</span></Td>
                 <Td className={styles.colLink}><span className={styles.cellText} title={tagLinkText(tag)}>{tagLinkText(tag)}</span></Td>
                 <Td className={styles.colUsage}><span className={styles.cellText} title={usageLabel(tag)}>{usageLabel(tag)}</span></Td>
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colMenu}>
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
                     <RowMenu
@@ -793,19 +782,15 @@ export default function TagsTab({
       </DataTable>
 
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
-      <div className={styles.pager}>
-        <span className={styles.pagerCount}>
-          {`${filtered.length} 件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)} 件`}
-        </span>
-        {pages > 1 ? (
-          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り" />
-        ) : null}
-      </div>
+      <ListPager>
+        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り"
+          summary={paginationSummary(filtered.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, filtered.length))} />
+      </ListPager>
     </DelayedSkeleton>
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {/* 数の帯（絵の4つ）。並びと線は共有の帯に任せる。 */}
       <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
@@ -823,9 +808,11 @@ export default function TagsTab({
       </KpiBand>
 
       <ListPageBody
+        skeleton
         folders={<>
-          {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
+            createAction={createButton(true)}
+            reserveCreateSpace={status !== 'forbidden'}
             activeId={folder}
             onSelect={setFolder}
             onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}
@@ -837,19 +824,19 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <Select aria-label="フォルダ" width={150} value={folder} onChange={setFolder} options={folderSelectOptions} />
+          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" width={150} value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
         </>}
         toolbar={narrow ? <>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
           {search}
           {usageSelect}
           {archiveChip}
-          <div className={styles.toolbarRow2}>
+          <ListToolbarRow>
             {sourceSelect}
             {quickButton}
             <span className={styles.toolbarSpacer} />
             {pageSizeSelect}
-          </div>
+          </ListToolbarRow>
         </> : <>
           {search}
           {usageSelect}
@@ -861,11 +848,7 @@ export default function TagsTab({
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-          </p>
+          <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>
         ) : null}
         {table}
       </ListPageBody>
@@ -910,6 +893,11 @@ export default function TagsTab({
 
       {csvOpen ? <TagCsvImportDialog open onClose={onCsvClose} onCompleted={() => void load()} /> : null}
 
+      <FolderManagementDialog open={manageFoldersOpen} rows={folderRows} activeId={folder} onSelect={setFolder}
+        onAdd={canEdit ? () => setFolderDialog('new') : undefined} onClose={() => setManageFoldersOpen(false)}>
+        {folderNote}
+      </FolderManagementDialog>
+
       {folderDialog ? (
         <TagFolderDialog
           group={folderDialog === 'new' ? undefined : folderDialog}
@@ -949,6 +937,6 @@ export default function TagsTab({
           }}
         />
       )}
-    </>
+    </></SaveErrorScope>
   )
 }

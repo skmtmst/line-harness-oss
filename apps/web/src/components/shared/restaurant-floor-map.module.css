@@ -1,0 +1,12 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.map{width:calc(100% - var(--tpl-floor-map-inset) * 2);margin:14px var(--tpl-floor-map-inset) 16px;height:auto;display:block;background:var(--color-surface-pearl);touch-action:none;}
+.outline{fill:var(--color-canvas);stroke:var(--color-ink);stroke-width:var(--tpl-floor-outline-w);}
+.fixture{fill:var(--color-surface-pearl);stroke:var(--color-control-border);}
+.table rect,.table ellipse{fill:var(--color-canvas);stroke:var(--color-control-border);}.stopped rect,.stopped ellipse{fill:var(--color-shell);stroke:var(--color-control-border);}
+.map text{font-size:var(--text-caption);fill:var(--color-ink);text-anchor:middle;dominant-baseline:middle;pointer-events:none;}.stopped{opacity:var(--tpl-floor-stopped-opacity);}
+.table,.stopped{cursor:pointer;}.table:focus-visible,.stopped:focus-visible{outline:var(--focus-ring);}
+
+.join{stroke:var(--color-accent);stroke-width:var(--tpl-floor-outline-w);pointer-events:none;}
+
+}

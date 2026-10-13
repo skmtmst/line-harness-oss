@@ -3,6 +3,7 @@
 import { RotateCw } from 'lucide-react'
 import type { DistributionResult } from '@/lib/hq-templates-api'
 import Dialog from '@/components/shared/dialog'
+import Button from '@/components/shared/button'
 import TagPill, { type TagPillProps } from '@/components/shared/tag-pill'
 import StatusBadge from '@/components/shared/status-badge'
 import { failedStatus } from './folder-distribution'
@@ -16,14 +17,15 @@ export function resultSentence(store: DistributionResult['stores'][number]): str
   if ((store.counts.reused ?? 0) > 0) return '今あるものを使いました'
   return '配りました'
 }
-export default function DistributionResultDialog({ open, title, summary, rows, tag, busy, onClose, onRetry }: {
+export default function DistributionResultDialog({ open, title, summary, rows, tag, busy, onClose, onRetry, onRefresh }: {
   open: boolean; title: string; summary: string
   rows: Array<{ key: string; name: string; tag?: Pick<TagPillProps, 'name' | 'color'>; store: DistributionResult['stores'][number] }>
   tag?: Pick<TagPillProps, 'name' | 'color'>
   busy: boolean; onClose: () => void; onRetry: () => void
+  onRefresh?: () => void
 }) {
   const failures = rows.filter((row) => failedStatus(row.store.status))
-  return <Dialog open={open} designNode="dEvJM" designWidth={640} designTop={220} title={title} designHeaderPadding="24px 24px 0"
+  return <Dialog open={open} designNode="dEvJM" designWidth={720} designTop={220} title={title} designHeaderPadding="24px 24px 0"
     busy={busy} cancelLabel="閉じる" onCancel={onClose}
     {...(failures.length ? { confirmLabel: `失敗した ${failures.length} 件をやり直す`, confirmIcon: <RotateCw size={15} />,
       onConfirm: onRetry } : {})}>
@@ -44,5 +46,6 @@ export default function DistributionResultDialog({ open, title, summary, rows, t
       })}
     </div>
     {failures.length ? <p className={styles.resultBand}>{`失敗した ${failures.length} 件だけやり直せます。各行の理由を直してから、やり直してください。`}</p> : null}
+    {onRefresh ? <Button disabled={busy} onClick={onRefresh}>結果を再確認</Button> : null}
   </Dialog>
 }

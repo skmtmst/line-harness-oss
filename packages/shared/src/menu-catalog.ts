@@ -67,6 +67,19 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     ],
   },
   {
+    id: 'booking',
+    label: '予約',
+    title: '予約',
+    items: [
+      { id: 'booking-bookings', featureKey: 'booking' },
+      { id: 'booking-menus', featureKey: 'booking' },
+      { id: 'events', featureKey: 'events' },
+      // 提案 E-7（2026-10-07）：来店スタンプ。飲食店もサロンも使う。鍵は予約と同じ（専用の鍵は無い）。
+      { id: 'visit-stamps', featureKey: 'visit_stamps' },
+      { id: 'booking-own-shifts', featureKey: 'booking' },
+    ],
+  },
+  {
     id: 'results',
     label: '成果と分析',
     title: '成果と分析',
@@ -85,19 +98,6 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     items: [
       { id: 'automations', featureKey: 'automations' },
       { id: 'webhooks', featureKey: 'external_integrations' },
-    ],
-  },
-  {
-    id: 'booking',
-    label: '予約',
-    title: '予約',
-    items: [
-      { id: 'booking-bookings', featureKey: 'booking' },
-      { id: 'booking-menus', featureKey: 'booking' },
-      { id: 'events', featureKey: 'events' },
-      // 提案 E-7（2026-10-07）：来店スタンプ。飲食店もサロンも使う。鍵は予約と同じ（専用の鍵は無い）。
-      { id: 'visit-stamps', featureKey: 'visit_stamps' },
-      { id: 'booking-own-shifts', featureKey: 'booking' },
     ],
   },
   {
@@ -140,6 +140,7 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
       { id: 'restaurant-tables', featureKey: 'restaurant_test' },
       { id: 'restaurant-inventory', featureKey: 'restaurant_test' },
       { id: 'restaurant-menu', featureKey: 'restaurant_test' },
+      { id: 'restaurant-delivery', featureKey: 'restaurant_test' },
       { id: 'restaurant-google', featureKey: 'restaurant_test' },
       { id: 'restaurant-line-followup', featureKey: 'restaurant_test' },
     ],

@@ -5,7 +5,7 @@ import { api, type EventWaitlistOfferDetail } from '../lib/api.js';
 import { formatHoldLeft, formatJstEventAt } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import Button from '../components/ui/Button.js';
-import BottomBar from '../components/ui/BottomBar.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
@@ -72,13 +72,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   return (
     <LiffLookScope className="min-h-screen bg-canvas" designNode="BjcuB">
       <LiffHeader title="イベント" />
-      <div
-        className={`mx-auto w-full max-w-md ${
-          state === 'ready' || state === 'submitting'
-            ? 'pb-[142px]'
-            : 'flex min-h-[calc(100dvh-var(--liff-header-h)-1px)] flex-col justify-center px-4 py-10'
-        }`}
-      >
+      <ConfirmDialog open surface="sheet" title="イベントの空き案内" description="" busy={state === 'submitting'} onCancel={goMine} footer={<></>}>
         {state === 'confirmed' ? (
           <div className="space-y-4">
             <StatusView
@@ -133,7 +127,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
           <>
             {/* ★V8 (BjcuB)：上の帯と下の帯の間の真ん中に、丸・題・本文・取っておく残り時間を置く。
                 案内の中身 (GET /api/liff/events/waitlist/:token) が読めないときは本文だけ。 */}
-            <div className="flex min-h-[calc(100dvh-var(--liff-header-h)-1px-142px)] flex-col items-center justify-center px-6 py-4">
+            <div className="flex flex-col items-center justify-center px-6 py-4">
               <StatusView
                 large
                 icon="party-popper"
@@ -146,17 +140,17 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
                 )}
               </StatusView>
             </div>
-            <BottomBar>
+            <div className="mt-4 flex flex-col gap-2">
               <Button variant="primary" onClick={accept} disabled={state === 'submitting'}>
                 {state === 'submitting' ? '予約を確定しています…' : 'この席を取る'}
               </Button>
               <Button variant="secondary" onClick={() => liff.closeWindow()} disabled={state === 'submitting'}>
                 今回は見送る
               </Button>
-            </BottomBar>
+            </div>
           </>
         )}
-      </div>
+      </ConfirmDialog>
     </LiffLookScope>
   );
 }

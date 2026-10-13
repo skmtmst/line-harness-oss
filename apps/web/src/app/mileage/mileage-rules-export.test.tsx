@@ -11,7 +11,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('tab=earning-rules'),
 }))
@@ -81,7 +81,7 @@ async function settle(milliseconds: number) {
 
 function csvButton(): HTMLButtonElement {
   const buttons = [...host.querySelectorAll('button')]
-  const found = buttons.find((button) => button.textContent === 'CSVで書き出す')
+  const found = buttons.find((button) => button.textContent?.trim() === 'CSVで書き出す')
   if (!(found instanceof HTMLButtonElement)) throw new Error('csv button not found')
   return found
 }

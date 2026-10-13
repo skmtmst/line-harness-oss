@@ -1,24 +1,15 @@
 'use client'
-
-/*
- * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
- *
- * 型（DetailPage）に、頭（題・戻る口・CSV・開催回の選び口）、数の帯（申込・承認待ち・キャンセル待ち・キャンセル）、
- * 申込者・キャンセル待ち・キャンセル・お知らせを送る の4枚をはめる。
- * 処理（口・確かめの窓・失敗の文）は今の V8（src/app/events/bookings/bookings-v8.tsx）から写した。
- * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
- */
-
+import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from 'lucide-react'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check, Download, Send } from 'lucide-react'
-import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
+import { api, eventsApi, type EventBookingItem, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -28,13 +19,30 @@ import { jstShort } from './shared'
 import styles from './bookings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import StatusBadge from '@/components/shared/status-badge'
+import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, EventAttendanceSummary } from '@/components/shared/event-roster'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
+import { useBookingRequests } from './booking-requests'
+import BookingRecords from './booking-records'
+
+/*
+ * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
+ *
+ * 型（DetailPage）に、頭（題・戻る口・CSV・開催回の選び口）、数の帯（申込・承認待ち・キャンセル待ち・キャンセル）、
+ * 申込者・キャンセル待ち・キャンセル・お知らせを送る の4枚をはめる。
+ * 開催回の取得・確かめる窓・操作の失敗はこの画面で扱う。
+ * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
+ */
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
 const STATUS_TONE: Record<string, ChipTone> = {
   requested: 'warning',
   confirmed: 'success',
-  waiting: 'warning',
+  waiting: 'neutral',
   offered: 'info',
   accepted: 'success',
   converted: 'success',
@@ -56,8 +64,6 @@ const STATUS_LABELS: Record<string, string> = {
   attended: '参加済',
   no_show: '無断',
 }
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
@@ -89,14 +95,17 @@ function BookingsEntry() {
 }
 
 function Bookings({ eventId }: { eventId: string }) {
+  const saveErrors = useSaveFormErrors()
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [eventStatus, setEventStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [slotsStatus, setSlotsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [slots, setSlots] = useState<EventSlot[]>([])
   const [selectedOccurrenceId, setSelectedOccurrenceId] = useState('')
   const [applicants, setApplicants] = useState<EventOccurrenceApplicants | null>(null)
   const [applicantsStatus, setApplicantsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [recordsRevision, setRecordsRevision] = useState(0)
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const [marking, setMarking] = useState<ReadonlySet<string>>(new Set())
@@ -116,59 +125,114 @@ function Bookings({ eventId }: { eventId: string }) {
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
-  const requestRef = useRef(0)
 
   usePageTitle(event?.name ? `${event.name} の申込者` : 'イベントの申込者')
 
   const scope = JSON.stringify([selectedAccountId, eventId])
+  const requests = useBookingRequests(scope)
+  const operationScope = JSON.stringify([selectedAccountId, eventId, selectedOccurrenceId])
+  const operations = useBookingRequests(operationScope)
+  const [renderedScope, setRenderedScope] = useState(scope)
+  if (renderedScope !== scope) {
+    setRenderedScope(scope)
+    setEvent(null)
+    setSlots([])
+    setSelectedOccurrenceId('')
+    setEventStatus('loading')
+    setSlotsStatus('loading')
+  }
+  const [renderedOperationScope, setRenderedOperationScope] = useState(operationScope)
+  if (renderedOperationScope !== operationScope) {
+    setRenderedOperationScope(operationScope)
+    setApplicants(null)
+    setRecordsRevision(0)
+    setApplicantsStatus('loading')
+    setActionError('')
+    setBusy(false)
+    setMarking(new Set())
+    setCsvBusy(false)
+    setCancelApplicant(null)
+    setCancelling(false)
+    setCancelError('')
+    setRejectApplicant(null)
+    setRejectReason('')
+    setRejectError('')
+    setWaitlistDialog(null)
+    setWaitlistReason('')
+    setWaitlistBusy(false)
+    setWaitlistError('')
+    setBroadcastMessage('')
+    setBroadcastPreview(null)
+    setBroadcastConfirmOpen(false)
+    setBroadcastBusy(false)
+    setBroadcastError('')
+  }
 
   const refreshEvent = useCallback(async () => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !eventId) return
+    const request = requests.start('event', true)
+    if (!request) return
     setEventStatus('loading')
     try {
       const detail = await eventsApi.getEvent(selectedAccountId, eventId)
+      if (!request.isCurrent()) return
       setEvent(detail)
       setEventStatus('ready')
-    } catch {
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      saveErrors.capture(saveFailure)
       setEvent(null)
       setEventStatus('error')
-    }
-  }, [selectedAccountId, eventId])
+    } finally { request.finish() }
+  }, [selectedAccountId, eventId, saveErrors, requests]);
+
 
   const refreshSlots = useCallback(async () => {
-    if (!selectedAccountId) {
+    setSlotsStatus('loading')
+    if (!selectedAccountId || !eventId) {
       setSlots([])
       setSelectedOccurrenceId('')
       return
     }
+    const request = requests.start('slots', true)
+    if (!request) return
     try {
       const res = await eventsApi.listOccurrenceSelector(selectedAccountId, eventId)
+      if (!request.isCurrent()) return
+      if (!Array.isArray(res?.items)) throw new Error('malformed_slots')
       setSlots(res.items)
+      setSlotsStatus('ready')
       setSelectedOccurrenceId((current) => current || res.items[0]?.id || '')
-    } catch {
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      saveErrors.capture(saveFailure)
       setSlots([])
-    }
-  }, [selectedAccountId, eventId])
+      setSlotsStatus('error')
+    } finally { request.finish() }
+  }, [selectedAccountId, eventId, saveErrors, requests]);
+
 
   const refreshApplicants = useCallback(async () => {
     if (!selectedAccountId || !selectedOccurrenceId) return
-    const requestId = ++requestRef.current
-    const startedScope = scope
+    const request = operations.start('applicants', true)
+    if (!request) return
     setApplicantsStatus('loading')
-    setActionError('')
     try {
       const data = await eventsApi.getOccurrenceApplicants(selectedAccountId, selectedOccurrenceId)
-      if (requestId !== requestRef.current || scope !== startedScope) return
+      if (!request.isCurrent()) return
+      if (!Array.isArray(data?.applicants) || !data.occurrence) throw new Error('malformed_applicants')
       setApplicants(data)
+      setRecordsRevision((value) => value + 1)
       setBroadcastPreview(null)
       setBroadcastConfirmOpen(false)
       setApplicantsStatus('ready')
-    } catch {
-      if (requestId !== requestRef.current || scope !== startedScope) return
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      saveErrors.capture(saveFailure)
       setApplicants(null)
       setApplicantsStatus('error')
-    }
-  }, [selectedAccountId, selectedOccurrenceId, scope])
+    } finally { request.finish() }
+  }, [selectedAccountId, selectedOccurrenceId, saveErrors, operations])
 
   useEffect(() => {
     void refreshEvent()
@@ -184,7 +248,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   if (!eventId) {
     return (
-      <div data-design-node="Mu8qW">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="Mu8qW">
         <TargetMissing
           kind="unspecified"
           title="どのイベントの申込かが決まっていません"
@@ -192,15 +256,15 @@ function Bookings({ eventId }: { eventId: string }) {
           backHref="/events"
           backLabel="イベント一覧へ戻る"
         />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   if (!selectedAccountId) {
     return (
-      <div data-design-node="Mu8qW">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="Mu8qW">
         <ListState kind="empty" title="LINEアカウントを選択してください" description="上のバーで運用するLINEアカウントを選んでください。" />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -212,7 +276,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const confirmedSeats = summary?.confirmedSeats ?? bookingRows.filter((row) => row.status === 'confirmed').reduce((total, row) => total + row.partySize, 0)
   const requestedSeats = summary?.requestedSeats ?? bookingRows.filter((row) => row.status === 'requested').reduce((total, row) => total + row.partySize, 0)
   const waitingSeats = summary?.waitingSeats ?? waitingRows.reduce((total, row) => total + row.partySize, 0)
-  const offeredSeats = summary?.offeredSeats ?? 0
+  const offeredSeats = summary?.offeredSeats ?? rows.filter((row) => row.source === 'waitlist' && (row.status === 'offered' || row.status === 'accepted')).reduce((total, row) => total + row.partySize, 0)
   const capacity = occurrence?.capacity ?? null
   const history = applicants?.waitlistHistory ?? []
   const cancelledCount = history.filter((entry) => entry.status === 'cancelled').length
@@ -222,58 +286,85 @@ function Bookings({ eventId }: { eventId: string }) {
 
   async function decide(applicant: EventOccurrenceApplicant, action: 'confirm' | 'reject') {
     if (!selectedAccountId || busy) return
+    const request = operations.start('decide')
+    if (!request) return
     setBusy(true)
+    setActionError('')
     try {
       await eventsApi.decideBooking(selectedAccountId, eventId, applicant.id, action, action === 'reject' ? rejectReason.trim() || undefined : undefined)
+      if (!request.isCurrent()) return
       if (action === 'reject') {
         setRejectApplicant(null)
         setRejectReason('')
         setRejectError('')
       }
       await refreshApplicants()
-    } catch {
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       if (action === 'reject') {
+        { if (!fieldFailure)
         setRejectError('予約を拒否できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+      }
       } else {
-        setActionError('予約を確定できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+        { if (!fieldFailure)
+        setActionError('予約を確定できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。') }
       }
     } finally {
-      setBusy(false)
+      if (request.isCurrent()) setBusy(false)
+      request.finish()
     }
   }
 
   async function runAdminCancel() {
     if (!cancelApplicant || cancelling) return
     if (cancelApplicant.accountId !== selectedAccountId) return
+    const request = operations.start('cancel')
+    if (!request) return
     setCancelling(true)
     setCancelError('')
     try {
       const res = await eventsApi.adminCancelBooking(cancelApplicant.accountId, eventId, cancelApplicant.applicant.id)
+      if (!request.isCurrent()) return
       if (!res?.ok) throw new Error('cancel_not_applied')
       setCancelApplicant(null)
       await refreshApplicants()
-    } catch {
-      setCancelError('この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCancelError('この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。') }
     } finally {
-      setCancelling(false)
+      if (request.isCurrent()) setCancelling(false)
+      request.finish()
     }
   }
 
   async function markStatus(applicant: EventOccurrenceApplicant, status: 'attended' | 'no_show') {
     const accountId = selectedAccountId
     if (!accountId || marking.has(applicant.id)) return
+    const request = operations.start(`mark:${applicant.id}`)
+    if (!request) return
     setMarking((current) => new Set(current).add(applicant.id))
     try {
       await eventsApi.updateBooking(accountId, eventId, applicant.id, { status })
+      if (!request.isCurrent()) return
       await refreshApplicants()
-    } catch {
-      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。') }
     } finally {
-      setMarking((current) => {
+      if (request.isCurrent()) setMarking((current) => {
         const next = new Set(current)
         next.delete(applicant.id)
         return next
       })
+      request.finish()
     }
   }
 
@@ -299,6 +390,8 @@ function Bookings({ eventId }: { eventId: string }) {
     if (!selectedAccountId || !occurrence || !waitlistDialog || waitlistBusy) return
     const trimmed = waitlistReason.trim()
     if (trimmed === '') return
+    const request = operations.start('waitlist')
+    if (!request) return
     setWaitlistBusy(true)
     setWaitlistError('')
     setActionError('')
@@ -323,33 +416,48 @@ function Bookings({ eventId }: { eventId: string }) {
           reason: trimmed,
         })
       }
+      if (!request.isCurrent()) return
       setWaitlistDialog(null)
       setWaitlistReason('')
       await refreshApplicants()
-    } catch {
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       await refreshApplicants()
-      setWaitlistError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。')
+      if (!request.isCurrent()) return
+      { if (!fieldFailure)
+      setWaitlistError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。') }
     } finally {
-      setWaitlistBusy(false)
+      if (request.isCurrent()) setWaitlistBusy(false)
+      request.finish()
     }
   }
 
   async function exportCsv() {
     if (!selectedAccountId || !applicants || csvBusy) return
+    const request = operations.start('csv')
+    if (!request) return
     setCsvBusy(true)
     setActionError('')
     try {
       await eventsApi.downloadOccurrenceApplicantsCsv(selectedAccountId, applicants.occurrence.id, applicants.snapshotId)
-    } catch {
-      setActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
-      setCsvBusy(false)
+      if (request.isCurrent()) setCsvBusy(false)
+      request.finish()
     }
   }
 
   async function previewBroadcast() {
     const message = broadcastMessage.trim()
     if (!selectedAccountId || !occurrence || !message || broadcastBusy) return
+    const request = operations.start('broadcast')
+    if (!request) return
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
@@ -358,28 +466,42 @@ function Bookings({ eventId }: { eventId: string }) {
         messageContent: message,
         snapshotId: applicants?.snapshotId ?? '',
       }, crypto.randomUUID())
+      if (!request.isCurrent()) return
       setBroadcastPreview({ broadcastId: result.broadcastId, recipientCount: result.recipientCount })
       setBroadcastConfirmOpen(true)
-    } catch {
-      setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。') }
     } finally {
-      setBroadcastBusy(false)
+      if (request.isCurrent()) setBroadcastBusy(false)
+      request.finish()
     }
   }
 
   async function sendBroadcast() {
     if (!broadcastPreview || broadcastBusy) return
+    const request = operations.start('broadcast')
+    if (!request) return
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
       await api.broadcasts.send(broadcastPreview.broadcastId)
+      if (!request.isCurrent()) return
       setBroadcastConfirmOpen(false)
       setBroadcastMessage('')
       setBroadcastPreview(null)
-    } catch {
-      setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。')
+    } catch (saveFailure) {
+      if (!request.isCurrent()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。') }
     } finally {
-      setBroadcastBusy(false)
+      if (request.isCurrent()) setBroadcastBusy(false)
+      request.finish()
     }
   }
 
@@ -389,13 +511,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   const chip = (status: string) => {
     const label = STATUS_LABELS[status] ?? status
-    switch (STATUS_TONE[status] ?? 'neutral') {
-      case 'success': return <span className={`${styles.chip} ${styles.chip_success}`}>{label}</span>
-      case 'warning': return <span className={`${styles.chip} ${styles.chip_warning}`}>{label}</span>
-      case 'info': return <span className={`${styles.chip} ${styles.chip_info}`}>{label}</span>
-      case 'danger': return <span className={`${styles.chip} ${styles.chip_danger}`}>{label}</span>
-      default: return <span className={`${styles.chip} ${styles.chip_neutral}`}>{label}</span>
-    }
+    return <StatusBadge tone={STATUS_TONE[status] ?? 'neutral'}>{label}</StatusBadge>
   }
   const historyRows = history.filter((entry) => entry.status !== 'cancelled')
   const cancelRows = history.filter((entry) => entry.status === 'cancelled')
@@ -404,27 +520,31 @@ function Bookings({ eventId }: { eventId: string }) {
   const ready = applicantsStatus === 'ready'
 
   return (
-    <DetailPage
+    <SaveErrorScope errors={saveErrors}><DetailPage
       boardId="Mu8qW"
       title={title}
-      help={(
-        <span className={styles.subLine}>
-          {subLine ? <span>{subLine}</span> : null}
-        </span>
-      )}
+      layout="event-roster"
+      help={subLine || '開催回ごとの申込・承認・キャンセル待ちを確認できます。'}
+      contentPadding="var(--tpl-roster-body-pad)"
+      stats={<KpiBand data-design="KPIs">
+        <KpiCard presentation="band" title="申込" icon={<Users size={13} />} value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
+        <KpiCard presentation="band" title="承認待ち" icon={<CalendarClock size={13} />} value={ready ? requestedSeats : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="キャンセル待ち" icon={<Armchair size={13} />} value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
+        <KpiCard presentation="band" title="キャンセル" icon={<CalendarX size={13} />} value={ready ? cancelledCount : null} unit="件" detail="" />
+      </KpiBand>}
       actions={(
         <div className={styles.headActions}>
           <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
-            <Download size={15} aria-hidden="true" />CSVで書き出す
+            <Download size={15} aria-hidden="true" />CSV を書き出す
           </Button>
           <div className={styles.occurrencePick}>
-            <Select
+            <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><EntitySelect
               size="full"
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
-              options={slots.map((slot) => ({ value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
-            />
+              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
+            /></SaveErrorField>
           </div>
         </div>
       )}
@@ -434,51 +554,31 @@ function Bookings({ eventId }: { eventId: string }) {
         <ListState
           kind="error"
           description="イベントは消えていません。開き直しても直らない場合はエラー報告へ。"
-          action={<Button onClick={() => void refreshEvent()}>開き直す</Button>}
+          action={<Button onClick={() => refreshEvent()} busyLabel="処理中…">開き直す</Button>}
         />
       ) : null}
-      {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
-      {/* 数の帯。絵（Mu8qW）は4枚のカードなので、共通の KpiCard をカードの見せ方で並べる。 */}
-      <div className={styles.kpis} data-design="KPIs">
-        <KpiCard presentation="card" density="compact" icon={null} title="申込" value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} unit="" detail="人・この回" />
-        <KpiCard presentation="card" density="compact" icon={null} title="承認待ち" value={ready ? requestedSeats : null} unit="" detail="件" />
-        <KpiCard presentation="card" density="compact" icon={null} title="キャンセル待ち" value={ready ? waitingSeats + offeredSeats : null} unit="" detail="人" />
-        <KpiCard presentation="card" density="compact" icon={null} title="キャンセル" value={ready ? cancelledCount : null} unit="" detail="件" />
-      </div>
 
-      <section className={styles.card} aria-labelledby="ev-bk-applicants">
-        <div className={styles.cardHeadSplit}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ev-bk-applicants">申込者</h2>
-            <p className={styles.cardNote}>承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます</p>
-          </div>
-          <div className={styles.attendance} aria-label="当日の受付">
-            <span className={styles.attendanceStrong}>{`参加済 ${attendance?.attendedSeats ?? 0} 人`}</span>
-            <span className={styles.attendanceDanger}>{`無断欠席 ${attendance?.noShowSeats ?? 0} 人`}</span>
-            <span>{`受付前 ${Math.max(0, confirmedSeats - (attendance?.attendedSeats ?? 0) - (attendance?.noShowSeats ?? 0))} 人`}</span>
-            <span className={styles.attendanceNote}>当日、来た人に「参加済」、来なかった人に「無断」を付けます</span>
-          </div>
-        </div>
+
+      <EventRosterCard title="申込者" id="ev-bk-applicants" splitAction
+        note="承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます"
+        action={<EventAttendanceSummary
+          attended={ready ?attendance?.attendedSeats ?? null : null}
+          noShow={ready ? attendance?.noShowSeats ?? null : null}
+          before={ready && attendance ? confirmedSeats : null}/>}>
         {applicantsStatus === 'loading' ? <ListState kind="loading" /> : applicantsStatus === 'error' ? (
           <ListState
             kind="error"
             description="申込者は消えていません。開き直しても直らない場合はエラー報告へ。"
-            action={<Button onClick={() => void refreshApplicants()}>開き直す</Button>}
+            action={<Button onClick={() => refreshApplicants()} busyLabel="処理中…">開き直す</Button>}
           />
         ) : rows.length === 0 ? (
           <p className={styles.empty}>この開催回には申込者もキャンセル待ちもいません。</p>
         ) : (
-          <div role="table" aria-label="申込者" className={styles.table}>
-            <div role="row" className={`${styles.headRow} ${styles.mainGrid}`}>
-              <span role="columnheader">申込者</span>
-              <span role="columnheader">区分・順位</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader">案内期限</span>
-              <span role="columnheader" className={styles.srOnly}>操作</span>
-            </div>
+          <EventRosterTable kind="applicants"label="申込者" headings={["申込者", "区分・順位", "状態", "案内期限"]}>
             {rows.map((row) => (
-              <div role="row" key={`${row.source}:${row.id}`} className={`${styles.row} ${styles.mainRow} ${styles.mainGrid}`}>
+              <EventRosterRow key={`${row.source}:${row.id}`}>
                 <span role="cell" className={styles.person}>
                   <span className={styles.personName} title={row.displayName ?? '友だちは未取得'}>{row.displayName ?? '友だちは未取得'}</span>
                   <span className={styles.personSub} title={participationSub(row)}>{participationSub(row)}</span>
@@ -491,10 +591,9 @@ function Bookings({ eventId }: { eventId: string }) {
                     : '申込'}
                 </span>
                 <span role="cell">{chip(row.status)}</span>
-                <span role="cell" className={styles.cellText} title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
+                <EventRosterActions deadline={<span title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
                   {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : emptyValue('unknown')}
-                </span>
-                <span role="cell" className={styles.rowActions}>
+                </span>}>
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
                       <Button onClick={() => void decide(row, 'confirm')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
@@ -544,19 +643,14 @@ function Bookings({ eventId }: { eventId: string }) {
                       title={waitingRows.length < 2 ? '並んでいる人が2人以上いるときに使えます' : undefined}
                     >待ち順を変える</Button>
                   ) : null}
-                </span>
-              </div>
+                </EventRosterActions>
+              </EventRosterRow>
             ))}
-          </div>
+          </EventRosterTable>
         )}
-      </section>
+      </EventRosterCard>
 
-      <section className={styles.card} aria-labelledby="ev-bk-waitlist">
-        <div className={styles.cardHeadSplit}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ev-bk-waitlist">キャンセル待ち</h2>
-            <p className={styles.cardNote}>空きが出たら先頭の方へ期限つきの案内を送ります。期限までに返事がなければ次の方へ</p>
-          </div>
+      <EventRosterCard title="キャンセル待ち" id="ev-bk-waitlist" note="空きが出たら先頭の方へ期限つきの案内を送ります。期限までに返事がなければ次の方へ" action={(
           <Button
             onClick={() => {
               setWaitlistReason('')
@@ -567,86 +661,105 @@ function Bookings({ eventId }: { eventId: string }) {
           >
             <Send size={15} aria-hidden="true" />次の方へ案内する
           </Button>
-        </div>
-        <div role="table" aria-label="キャンセル待ち" className={styles.table}>
-          <div role="row" className={`${styles.headRow} ${styles.waitGrid}`}>
-            <span role="columnheader">友だち</span>
-            <span role="columnheader">結果</span>
-            <span role="columnheader">並んだ日時</span>
-            <span role="columnheader">案内日時</span>
-            <span role="columnheader">終了日時</span>
-          </div>
+        )}>
+          <EventRosterTable kind="waitlist" label="キャンセル待ち" headings={["友だち", "結果", "並んだ日時", "案内日時", "終了日時"]}>
           {rows.filter((row) => row.source === 'waitlist').map((row) => (
-            <div role="row" key={`now:${row.id}`} className={`${styles.row} ${styles.waitGrid}`}>
+            <EventRosterRow key={`now:${row.id}`}>
               <span role="cell" className={styles.cellName} title={row.displayName ?? '友だちは未取得'}>{row.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip(row.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.appliedAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.offeredAt)}</span>
               <span role="cell" className={styles.cellText}>{emptyValue('unknown')}</span>
-            </div>
+            </EventRosterRow>
           ))}
           {historyRows.map((entry) => (
-            <div role="row" key={`done:${entry.id}`} className={`${styles.row} ${styles.waitGrid}`}>
+            <EventRosterRow key={`done:${entry.id}`}>
               <span role="cell" className={styles.cellName} title={entry.displayName ?? '友だちは未取得'}>{entry.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip(entry.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.createdAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.offeredAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.updatedAt)}</span>
-            </div>
+            </EventRosterRow>
           ))}
           {waitingRows.length === 0 && historyRows.length === 0 && !rows.some((row) => row.source === 'waitlist') ? (
             <p className={styles.empty}>キャンセル待ちはいません。</p>
           ) : null}
-        </div>
-      </section>
+        </EventRosterTable>
+      </EventRosterCard>
 
-      <section className={styles.card} aria-labelledby="ev-bk-cancel">
-        <h2 className={styles.cardTitle} id="ev-bk-cancel">キャンセル</h2>
-        <div role="table" aria-label="キャンセル" className={styles.table}>
-          <div role="row" className={`${styles.headRow} ${styles.cancelGrid}`}>
-            <span role="columnheader">友だち</span>
-            <span role="columnheader">結果</span>
-            <span role="columnheader">記録日時</span>
-          </div>
+      <EventRosterCard title="キャンセル" id="ev-bk-cancel"><EventRosterTable kind="cancel"label="キャンセル" headings={["友だち", "結果", "記録日時"]}>
           {cancelRows.map((entry) => (
-            <div role="row" key={entry.id} className={`${styles.row} ${styles.cancelGrid}`}>
+            <EventRosterRow key={entry.id}>
               <span role="cell" className={styles.cellName} title={entry.displayName ?? '友だちは未取得'}>{entry.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip('cancelled')}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.updatedAt)}</span>
-            </div>
+            </EventRosterRow>
           ))}
           {cancelRows.length === 0 ? <p className={styles.empty}>キャンセルはありません。</p> : null}
-        </div>
-      </section>
+        </EventRosterTable>
+      </EventRosterCard>
 
       {canBroadcast ? (
-        <section className={`${styles.card} ${styles.cardPadded}`} aria-labelledby="ev-bk-broadcast">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ev-bk-broadcast">お知らせを送る</h2>
-            <p className={styles.cardNote}>この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）</p>
-          </div>
+        <EventRosterCard title="お知らせを送る" id="ev-bk-broadcast" note="この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）">
           <div className={styles.field}><Field label="申込者へ送るメッセージ" htmlFor="ev-bk-message"><div className={styles.broadcastRow}>
-              <input
+              <SaveErrorField names={["broadcastMessage","messageContent","broadcast_message"]}><TextField
+                className={styles.messageInput}
                 id="ev-bk-message"
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
-                className={styles.input}
-              />
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確かめています…">
+              /></SaveErrorField>
+              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確認中…">
                 送る
               </Button>
             </div></Field></div>
-          {broadcastError ? <p className={styles.error} role="alert">{broadcastError}</p> : null}
-        </section>
+          {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
+        </EventRosterCard>
       ) : null}
+      {selectedOccurrenceId ? <BookingRecords accountId={selectedAccountId} eventId={eventId} occurrenceId={selectedOccurrenceId} questionsJson={event?.questions_json} revision={`${applicants?.snapshotId}:${recordsRevision}`} renderActions={(booking) => {
+        const row: EventOccurrenceApplicant = {
+          source: 'booking', id: booking.id, friendId: booking.friend_id,
+          displayName: booking.friend_display_name ?? booking.friend_name ?? null,
+          pictureUrl: null, status: booking.status, partySize: 1 + (booking.companion_count ?? 0),
+          appliedAt: booking.requested_at ?? booking.created_at ?? '', answers: null,
+          firstParticipation: { isFirst: booking.is_first_time == null ? null : booking.is_first_time === 1, attendedCount: null, checkedAt: null },
+          offeredAt: null, offerExpiresAt: null,
+        }
+        return booking.status === 'confirmed' ? <>
+          <Button data-booking-id={booking.id} data-booking-action="attended" onClick={() => void markStatus(row, 'attended')} disabled={marking.has(booking.id)}>参加済</Button>
+          <Button data-booking-id={booking.id} data-booking-action="no_show" onClick={() => void markStatus(row, 'no_show')} disabled={marking.has(booking.id)}>無断</Button>
+          <Button onClick={() => { setCancelError(''); setCancelApplicant({ applicant: row, accountId: selectedAccountId }) }} disabled={busy}>キャンセルにする</Button>
+        </> : booking.status === 'requested' ? <>
+          <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
+          <Button onClick={() => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }} disabled={busy}>断る</Button>
+        </> : null
+      }}>
+        {ready ? <>
+          <p>{`申込 ${confirmedSeats + requestedSeats}人（確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人）・キャンセル待ち ${waitingSeats}人・案内中 ${offeredSeats}人 / ${capacity === null ? '定員の上限なし' : occurrence && occurrence.activeSeats >= capacity ? `満席（定員 ${capacity}人）` : `残席 ${Math.max(0, capacity - (occurrence?.activeSeats ?? 0))}席（定員 ${capacity}人）`}`}</p>
+          {attendance ? attendance.entries.length ? <EventRosterTable kind="cancel" label="当日の受付記録" headings={['友だち', '結果', '記録日時']}>
+            {attendance.entries.map((entry) => <EventRosterRow key={entry.id}>
+              <span role="cell" className={styles.cellName}>{entry.displayName ?? '友だちは未取得'}</span>
+              <span role="cell">{chip(entry.status)}</span>
+              <span role="cell" className={styles.cellText}>{jstShort(entry.markedAt)}</span>
+            </EventRosterRow>)}
+          </EventRosterTable> : null : <p>受付の記録はまだ読み込めていません。</p>}
+          {applicants?.waitlistHistory === undefined ? <p>履歴はまだ読み込めていません。</p> : null}
+          {rows.filter((row) => row.source === 'waitlist').map((row) => <Field key={row.id} label={row.displayName ?? '友だちは未取得'}>
+            <Button href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>個別トーク</Button>
+            {row.status === 'waiting' ? <Button onClick={() => {
+              setWaitlistReason(''); setWaitlistError(''); setWaitlistDialog({ kind: 'skip', waitlistId: row.id, name: row.displayName ?? '待機中の方' })
+            }} disabled={waitlistBusy}>見送る</Button> : null}
+          </Field>)}
+        </> : null}
+      </BookingRecords> : null}
       </div>
 
       <ConfirmDialog
+        key={`cancel:${operationScope}`}
         open={cancelApplicant !== null}
         destructive
         title={`「${cancelApplicant?.applicant.displayName ?? '友だちは未取得'}」の予約をキャンセルしますか？`}
-        description="友だちへLINEでお知らせが届き、枠が空きます。空いた枠はキャンセル待ちの方へ回ります。この操作は元に戻せません。"
+        description="友だちへLINEでお知らせが届き、枠が空きます。空いた枠はキャンセル待ちの方へ回ります。この予約の通知予定も停止し、送信済みの記録は残ります。送ったお知らせは取り消せません。この操作は元に戻せません。"
         confirmLabel="キャンセルする"
         busy={cancelling}
         error={cancelError}
@@ -659,10 +772,11 @@ function Bookings({ eventId }: { eventId: string }) {
       />
 
       <ConfirmDialog
+        key={`reject:${operationScope}`}
         open={rejectApplicant !== null}
         destructive
         title={`「${rejectApplicant?.displayName ?? '友だちは未取得'}」の申込を断りますか？`}
-        description="理由は内部にだけ残り、友だちには送りません。断ると枠が空きます。"
+        description="理由は内部にだけ残り、友だちには送りません。友だちには決まったお知らせの文が届き、断ると枠が空きます。"
         confirmLabel="断る"
         busy={busy}
         error={rejectError}
@@ -675,16 +789,16 @@ function Bookings({ eventId }: { eventId: string }) {
         }}
       >
         {rejectApplicant ? (
-          <Field label="断る理由（・内部メモ）"><textarea
+          <Field label="断る理由（・内部メモ）"><SaveErrorField names={["rejectReason","reject_reason"]}><TextArea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
-              className={styles.textarea}
-            /></Field>
+            /></SaveErrorField></Field>
         ) : null}
       </ConfirmDialog>
 
       <ConfirmDialog
+        key={`waitlist:${operationScope}`}
         open={waitlistDialog !== null}
         title={
           waitlistDialog?.kind === 'promote'
@@ -702,6 +816,7 @@ function Bookings({ eventId }: { eventId: string }) {
         }
         confirmLabel={waitlistDialog?.kind === 'reorder' ? '入れ替える' : '実行する'}
         busy={waitlistBusy}
+        confirmDisabled={waitlistReason.trim() === ''}
         error={waitlistError}
         onConfirm={() => runWaitlistOperation()}
         onCancel={() => {
@@ -755,17 +870,17 @@ function Bookings({ eventId }: { eventId: string }) {
                 </Button>
               </div>
             ) : null}
-            <Field label="理由（・記録に残ります）" required><textarea
+            <Field label="理由（・記録に残ります）" required><SaveErrorField names={["waitlistReason","reason","waitlist_reason"]}><TextArea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
-                className={styles.textarea}
-              /></Field>
+              /></SaveErrorField></Field>
           </>
         ) : null}
       </ConfirmDialog>
 
       <ConfirmDialog
+        key={`broadcast:${operationScope}`}
         open={broadcastConfirmOpen && broadcastPreview !== null}
         title={`${broadcastPreview?.recipientCount ?? 0} 人に送りますか？`}
         description="この回の申込者へLINEでまとめて送ります。送ったお知らせは取り消せません。"
@@ -779,6 +894,6 @@ function Bookings({ eventId }: { eventId: string }) {
           setBroadcastConfirmOpen(false)
         }}
       />
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }

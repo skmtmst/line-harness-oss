@@ -11,7 +11,7 @@ import {
   listUnfinishedFriendTagSideEffectRuns,
   markFriendTagSideEffectCompleted,
   markFriendTagSideEffectFailed,
-  openFriendTagSideEffectRuns,
+  friendTagSideEffectOpenStatements,
   FRIEND_TAG_SIDE_EFFECT_STEPS,
   type FriendTagSideEffectStep,
 } from '@line-crm/db';
@@ -209,7 +209,6 @@ async function claimAndRunStep(
   step: FriendTagSideEffectStep,
   assignedAt: string,
   push: ImmediatePushContext | undefined,
-  options: { runWhenLedgerMissing: boolean },
 ): Promise<{ outcome: StepOutcome; error: unknown | null }> {
   let claim;
   try {
@@ -221,17 +220,12 @@ async function claimAndRunStep(
       `tag side effect claim failed (step=${step} friend=${friendId} tag=${tagId}):`,
       error,
     );
-    return { outcome: 'skipped', error: null };
+    return { outcome: 'failed', error };
   }
 
   if (claim === 'not_claimable') return { outcome: 'skipped', error: null };
   if (claim === 'missing') {
-    if (!options.runWhenLedgerMissing) return { outcome: 'skipped', error: null };
-    // 台帳が開けなかった。ここで止めると付与だけが残って以前より悪くなるので、
-    // 従来どおり走らせる。予約なしなので、記録を残しておく。
-    console.error(
-      `tag side effect ledger row missing; running unfenced (step=${step} friend=${friendId} tag=${tagId})`,
-    );
+    return { outcome: 'failed', error: new Error('タグ付与後の工程記録が見つかりません。処理を確認してください') };
   }
 
   try {
@@ -296,7 +290,6 @@ export async function retryFriendTagSideEffects(
       run.step_key,
       run.assigned_at,
       push,
-      { runWhenLedgerMissing: false },
     );
     if (outcome === 'skipped') continue;
     result.retried += 1;
@@ -312,13 +305,13 @@ export async function attachTagAndFireSideEffects(
   push?: ImmediatePushContext,
 ): Promise<{ added: boolean }> {
   const assignedAt = jstNow();
-  const result = await db
-    .prepare(
-      `INSERT OR IGNORE INTO friend_tags (friend_id, tag_id, assigned_at)
-       VALUES (?, ?, ?)`,
-    )
-    .bind(friendId, tagId, assignedAt)
-    .run();
+  // 付与と工程宣言を1つのbatchへ入れる。中断・保存失敗で台帳なしの新規タグを残さない。
+  const results = await db.batch([
+    db.prepare(`INSERT OR IGNORE INTO friend_tags(friend_id,tag_id,assigned_at) VALUES (?,?,?)`)
+      .bind(friendId,tagId,assignedAt),
+    ...friendTagSideEffectOpenStatements(db,{friendId,tagId,assignedAt},true),
+  ]);
+  const result = results[0];
   const added = (result.meta?.changes ?? 0) > 0;
 
   if (!added) {
@@ -328,20 +321,11 @@ export async function attachTagAndFireSideEffects(
     return { added: false };
   }
 
-  // 副作用を1本も走らせる前に、工程を3本まとめて開く。1本目で落ちても
-  // 「何が未了か」が残る。台帳が書けなかった場合でも副作用は従来どおり
-  // 走らせる — ここで止めると付与だけが残り、以前より悪くなる。
-  await recordLedger('open', () =>
-    openFriendTagSideEffectRuns(db, { friendId, tagId, assignedAt }),
-  );
-
   // 1本落ちても残りは走らせる。工程どうしは独立していて、シナリオ登録が
   // 落ちたことを理由に tag_change まで止める必要はない。
   let propagated: unknown | null = null;
   for (const step of FRIEND_TAG_SIDE_EFFECT_STEPS) {
-    const { error } = await claimAndRunStep(db, friendId, tagId, step, assignedAt, push, {
-      runWhenLedgerMissing: true,
-    });
+    const { error } = await claimAndRunStep(db, friendId, tagId, step, assignedAt, push);
     if (error !== null && STEP_DEFINITIONS[step].propagatesFailure && propagated === null) {
       propagated = error;
     }
@@ -377,7 +361,9 @@ export async function detachTagAndFireSideEffects(
   db: D1Database,
   friendId: string,
   tagId: string,
+  sourceEventId?: string,
 ): Promise<{ removed: boolean }> {
+  if (sourceEventId) return detachTagWithReceipt(db, friendId, tagId, sourceEventId);
   const result = await db
     .prepare(`DELETE FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)
     .bind(friendId, tagId)
@@ -387,4 +373,52 @@ export async function detachTagAndFireSideEffects(
 
   await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'remove' } });
   return { removed: true };
+}
+
+
+/** フォーム工程の再開では、解除済みとイベントの結果不明を区別する（B-241/B-248）。 */
+async function detachTagWithReceipt(db: D1Database, friendId: string, tagId: string, sourceEventId: string): Promise<{ removed: boolean }> {
+  const sourceId = JSON.stringify([friendId,tagId,sourceEventId]);
+  const read = () => db.prepare(`SELECT id,line_account_id,json_extract(after_json,'$.status') AS status
+    FROM audit_events WHERE source_kind='friend_tag_detach' AND source_id=?`)
+    .bind(sourceId).first<{id:string;line_account_id:string|null;status:string}>();
+  let receipt = await read();
+  let removed = false;
+  if (!receipt) {
+    const result = await db.batch([
+      db.prepare('DELETE FROM friend_tags WHERE friend_id=? AND tag_id=?').bind(friendId,tagId),
+      db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,line_account_id,category,actor_role,action,target_kind,target_id,result,after_json)
+        SELECT ?,'friend_tag_detach',?,COALESCE(a.tenant_id,'00000000-0000-4000-8000-000000000001'),f.line_account_id,
+          'business','system','tag.detach','friend',f.id,'success','{"status":"pending"}'
+        FROM friends f LEFT JOIN line_accounts a ON a.id=f.line_account_id WHERE f.id=? AND changes()=1`)
+        .bind(crypto.randomUUID(),sourceId,friendId),
+    ]);
+    removed = (result[0].meta?.changes ?? 0) > 0;
+    receipt = await read();
+    if (!receipt) return {removed:false};
+  }
+  if (receipt.status === 'completed') return {removed};
+  const hold = async () => {
+    await db.batch([
+      db.prepare(`UPDATE audit_events SET result='failed',reason='タグ解除後の通知結果が不明です' WHERE id=?`).bind(receipt!.id),
+      db.prepare(`INSERT OR IGNORE INTO notifications(id,event_type,title,body,channel,category,line_account_id,metadata,created_at)
+        VALUES (?,'friend_tag_detach_stuck','タグ解除後の処理を確認してください',
+          'タグは外れましたが、後続処理の結果を確認できません。二重実行を避けるため自動ではやり直しません。',
+          'dashboard','error',?,?,?)`)
+        .bind(`tag-detach:${receipt!.id}`,receipt!.line_account_id,JSON.stringify({friendId,tagId,receiptId:receipt!.id}),jstNow()),
+    ]);
+    throw new Error('タグ解除後の処理結果が不明です。通知センターで確認してください');
+  };
+  const claimed = await db.prepare(`UPDATE audit_events SET after_json='{"status":"running"}'
+    WHERE id=? AND json_extract(after_json,'$.status')='pending'`).bind(receipt.id).run();
+  if (!(claimed.meta?.changes ?? 0)) return hold();
+  try {
+    await fireEvent(db,'tag_change',{friendId,eventData:{tagId,action:'remove'}});
+    await db.prepare(`UPDATE audit_events SET after_json='{"status":"completed"}',result='success',reason=NULL WHERE id=?`)
+      .bind(receipt.id).run();
+  } catch {
+    // 部分送信・加点済みかもしれない。失敗理由に顧客本文を載せず、明示的な確認待ちへ。
+    return hold();
+  }
+  return {removed};
 }

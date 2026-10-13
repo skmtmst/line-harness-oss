@@ -7,7 +7,7 @@
  * 呼ぶ口・合計の出し方・CSV は今の画面（RoutesOverviewTab）と同じ。
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ArrowRight, Download, Target, TrendingUp, UserPlus, Wallet } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'

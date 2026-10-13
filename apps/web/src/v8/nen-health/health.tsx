@@ -1,5 +1,36 @@
 'use client'
 
+import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state';
+
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react';
+import { ListPage } from '@/components/templates';
+import Button from '@/components/shared/button'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import FilterChip from '@/components/shared/filter-chip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { Tabs } from '@/components/shared/tabs';
+import { usePageCrumbs } from '@/components/shell/page-chrome';
+import { ApiError } from '@/lib/api';
+import { nenPetsApi, petAnimalTypeLabel, type NenHealthKpis, type NenHealthListData, type NenHealthRow, type NenHealthSort, type NenHealthSummaryData } from '@/lib/nen-pets-api';
+import HealthItemsV8 from './items'
+import SummaryDrawerV8, { SummarySheet } from './summary';
+import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts';
+import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+
 /*
  * ★V8-B 健康日記（Pencil「★V8-B 画面の地図」専用機能の組：
  * 一覧 `mIwA4`・30日のまとめ（引き出し）`BVuYh`・記録の項目 `z2tvtX`）。
@@ -9,45 +40,11 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { useListUrlJsonValue } from '@/components/shared/list-url-state'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import FilterChip from '@/components/shared/filter-chip'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
-import { usePageCrumbs } from '@/components/shell/page-chrome'
-import { ApiError } from '@/lib/api'
-import {
-  nenPetsApi,
-  petAnimalTypeLabel,
-  type NenHealthKpis,
-  type NenHealthListData,
-  type NenHealthRow,
-  type NenHealthSort,
-  type NenHealthSummaryData,
-} from '@/lib/nen-pets-api'
-import HealthItemsV8 from './items'
-import SummaryDrawerV8, { SummarySheet } from './summary'
-import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts'
-import styles from './health.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
 
 export type { HealthTabKey } from './parts'
 
 const BOARD: Record<HealthTabKey, string> = { logs: 'mIwA4', concern: 'mIwA4', items: 'z2tvtX' }
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 type SummaryState = { accountId: string; petId: string; data: NenHealthSummaryData }
 
@@ -176,10 +173,12 @@ export default function HealthV8({
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD[tab]}
       headingSize="regular"
       title="健康日記"
       help="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
+      explanation="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。"
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
           <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
@@ -238,7 +237,7 @@ function HealthListV8({
   const [data, setData] = useState<NenHealthListData | null>(null)
   const [draft, setDraft] = useState(filters.q)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
   const requestRef = useRef(0)
@@ -297,14 +296,12 @@ function HealthListV8({
 
   return (
     <>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。" />
-      </div>
 
-      <div className={styles.toolsRow} data-design="ListControls">
-        <span className={styles.searchBox}>
+
+      <ListToolbarRow data-design="ListControls">
+        <ListToolbarSearchSlot>
           <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={(value: string) => { setDraft(value); onFiltersChange({ ...filters, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onFiltersChange({ ...filters, q: '' }); setPage(1) }} />
-        </span>
+        </ListToolbarSearchSlot>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う札">
             <FilterChip selected={filters.change === 'concern'} onChange={(next) => set({ change: next ? 'concern' : '' })} icon={<Columns2 size={13} aria-hidden="true" />} title="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します">
@@ -318,7 +315,7 @@ function HealthListV8({
             </FilterChip>
           </span>
         )}
-        <span className={styles.toolsTail}>
+        <ListToolbarEnd>
           <span ref={savedRef} className={styles.savedBox}>
             <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
               <Bookmark size={15} aria-hidden="true" />よく使う絞り込み
@@ -328,12 +325,12 @@ function HealthListV8({
               onClose={() => setSavedOpen(false)}
               anchorRef={savedRef}
               ariaLabel="よく使う絞り込み"
-              items={savedItems.map((item) => ({ ...item, onSelect: () => { setSavedOpen(false); item.onSelect() } }))}
+              items={savedItems.map((item) => ({ ...item, onSelect: () => { setSavedOpen(false); item.onSelect?.() } }))}
             />
           </span>
-          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
-        </span>
-      </div>
+          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} /></SaveErrorField>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="健康日記を読み込んでいます" />
@@ -395,8 +392,8 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
     { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
-    { id: 'owner', label: '飼い主を開く', external: true, href: `/friends/detail?id=${friendId}`, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
-    { id: 'talk', label: '飼い主にトークで声をかける', external: true, href: `/chats?friend=${friendId}`, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
+    { id: 'owner', label: '飼い主を開く', external: false, href: `/friends/detail?id=${friendId}`, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
+    { id: 'talk', label: '飼い主にトークで声をかける', external: false, href: `/chats?friend=${friendId}`, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]
   return (
     <Tr className={styles.row} data-table-layout="columns">

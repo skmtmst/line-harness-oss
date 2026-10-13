@@ -1,15 +1,6 @@
 'use client'
-
-/*
- * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
- *
- * app/emergency/page.tsx の HealthPanel・OperationAlertsPanel を写し（src/v8 は @/app を読めない）、
- * 見た目だけ絵に合わせた：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
- * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
- * 古い確認と未確認の言い分け・アカウント切替の見張り）は同じ。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -19,6 +10,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import {
   api,
   ApiError,
+  type LineWebhookRecoveryEvent,
   type OperationAlert,
   type OperationHealthCheckKey,
   type OperationHealthSnapshot,
@@ -27,12 +19,25 @@ import {
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { onlyWhenVisible } from '@/lib/visible-polling'
-// 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
+import Notice from '@/components/shared/notice'
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
+ *
+ * 現役の健全性と異常の受領・通知をここに集める。絵の並びは：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
+ * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
+ * 古い確認と未確認の言い分け・アカウント切替の見張り）は同じ。
+ */
+
+// 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -166,7 +171,7 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
 }
 
 /** 表の上の「開いている異常」。受領（メモつき）・通知のやり直し。異常なしと「読めない」を混同しない。 */
-function OpenAlerts({
+export function OpenAlerts({
   alerts,
   failed,
   busyId,
@@ -216,7 +221,7 @@ function OpenAlerts({
               <div className={styles.alertLine}>
                 <StatusPill severity={alert.severity} />
                 <p className={styles.alertText} title={detail}>{`${checkTitle}：${alert.summary}${formatDetectedSince(alert.firstDetectedAt)}`}</p>
-                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : null}
+                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : alert.status === 'resolved' ? <span className={styles.status} data-tone="info">解消済み</span> : null}
                 {response ? <Link href={response.href} className={styles.srOnly}>対象画面へ</Link> : null}
                 {canManage && alert.status === 'open' ? (
                   <Button variant="secondary" disabled={busy} busy={busy} onClick={() => {
@@ -233,13 +238,13 @@ function OpenAlerts({
                 ) : null}
               </div>
               {openNoteId === alert.id && alert.status === 'open' ? (
-                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><input
+                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><SaveErrorField names={["notes"]}><input
                     id={`operation-alert-note-${alert.id}`}
                     value={notes[alert.id] ?? ''}
                     maxLength={500}
                     onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))}
                     disabled={busy}
-                  /></Field>
+                  /></SaveErrorField></Field>
               ) : null}
             </div>
           )
@@ -277,6 +282,7 @@ export function HealthPanelV8({
   const [loading, setLoading] = useState(true)
   const hasLoaded = useRef(false)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
+  const [loginSecurityNotice, setLoginSecurityNotice] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
   const [alerts, setAlerts] = useState<OperationAlert[]>([])
   const [stats, setStats] = useState<{ stops: number; longest: string; version: string } | null>(null)
@@ -288,7 +294,56 @@ export function HealthPanelV8({
   const currentAccountIdRef = useRef(accountId)
   currentAccountIdRef.current = accountId
 
+  const [lineReceipts, setLineReceipts] = useState<LineWebhookRecoveryEvent[]>([])
+  const [lineReceiptsFailed, setLineReceiptsFailed] = useState(false)
+  const [lineRetryId, setLineRetryId] = useState<string | null>(null)
+  const lineRetryLock = useRef(false)
+  const receiptGeneration = useRef(0)
+  const loadLineReceipts = useCallback(async () => {
+    const generation = ++receiptGeneration.current
+    const requestedAccountId = accountId
+    if (!canManage || !accountId) { setLineReceipts([]); setLineReceiptsFailed(false); return }
+    try {
+      const response = await api.operations.lineReceipts(accountId)
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      if (!response.success) throw new Error(response.error)
+      setLineReceipts(response.data.filter((item) => item.lineAccountId === accountId))
+      setLineReceiptsFailed(false)
+    } catch {
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      setLineReceiptsFailed(true)
+    }
+  }, [accountId, canManage])
+  useEffect(() => {
+    setLineReceipts([])
+    setLineReceiptsFailed(false)
+    void loadLineReceipts()
+    const timer = window.setInterval(onlyWhenVisible(() => { void loadLineReceipts() }), 5 * 60 * 1000)
+    return () => { ++receiptGeneration.current; window.clearInterval(timer) }
+  }, [loadLineReceipts, manualRunRequest])
+  const retryLineReceipt = async (item: LineWebhookRecoveryEvent) => {
+    if (!canManage || !item.canRetry || item.recoveryStatus === 'needs_review' || lineRetryLock.current) return
+    const requestedAccountId = accountId
+    const generation = receiptGeneration.current
+    lineRetryLock.current = true
+    setLineRetryId(item.webhookEventId)
+    try {
+      const response = await api.operations.retryLineReceipt(item.webhookEventId)
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      if (!response.success) throw new Error(response.reason ?? '受信の工程をやり直せませんでした。履歴を確認してください。')
+      setAlertNotice({ tone: 'success', text: '保存済みの受信から、残っていた工程をやり直しました。' })
+    } catch (error) {
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      setAlertNotice({ tone: 'warning', text: japaneseDetailOf(error) || describeApiFailure(error, '受信のやり直し') })
+    } finally {
+      lineRetryLock.current = false
+      setLineRetryId(null)
+      if (generation === receiptGeneration.current && requestedAccountId === currentAccountIdRef.current) await loadLineReceipts()
+    }
+  }
+
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
+    setLoginSecurityNotice(snapshot.loginSecurity?.notice ?? null)
     const results = snapshot.latestRun?.results ?? []
     const snapshotStale = snapshot.overallStatus === 'stale'
     setChecks(CHECK_DEFINITIONS.map((definition) => {
@@ -467,10 +522,11 @@ export function HealthPanelV8({
 
   useEffect(() => { if (hasLoaded.current) onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
-  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved')
+  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved' || alert.notification.failed + alert.notification.unconfigured > 0)
 
   return (
     <>
+      {loginSecurityNotice ? <Notice tone="warn" message={loginSecurityNotice} /> : null}
       <div className={styles.banner} data-tone={banner.tone} role="status">
         <BannerIcon className={styles.bannerIcon} aria-hidden="true" />
         <div className={styles.bannerText}>
@@ -492,6 +548,27 @@ export function HealthPanelV8({
           onAcknowledge={acknowledgeAlert}
           onRetry={retryAlertNotifications}
         />
+        {canManage && accountId && lineReceiptsFailed ? <Notice tone="danger" action={<Button variant="secondary" onClick={() => void loadLineReceipts()}>読み直す</Button>}>LINE受信の失敗を読み込めませんでした。失敗なしとは扱いません。</Notice> : null}
+        {canManage && !lineReceiptsFailed && lineReceipts.some((item) => item.lineAccountId === accountId) ? (
+          <section className={styles.alerts} aria-label="LINE受信の失敗">
+            <h2 className={styles.alertsTitle}>LINE受信の失敗</h2>
+            <div className={styles.alertRows}>
+              {lineReceipts.filter((item) => item.lineAccountId === accountId).map((item) => (
+                <div className={styles.alertRow} key={item.webhookEventId}>
+                  <div className={styles.alertLine}>
+                    <StatusBadge tone="warning">{item.recoveryStatus === 'needs_review' ? '要確認' : '未完了'}</StatusBadge>
+                    <p className={styles.alertText} title={item.webhookEventId}>受信：{formatOperationDate(item.receivedAt)}</p>
+                    {item.canRetry === true && item.recoveryStatus !== 'needs_review' ? <Button variant="secondary" disabled={lineRetryId !== null} busy={lineRetryId === item.webhookEventId} onClick={() => void retryLineReceipt(item)}>やり直す</Button> : null}
+                  </div>
+                  <Notice tone="warn">
+                    {item.recoveryReason ?? (item.canRetry ? '保存済みの受信から、やり直せる工程が残っています。' : 'やり直せる工程を確認できません。受信と処理の履歴を照らしてください。')}
+                    履歴を照らし、必要なら受信箱から担当者が返信するか、お客さまに送り直しを頼んでください。
+                  </Notice>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
         <GridTable label="確かめていること" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-sb-hc-col-judge) var(--tpl-sb-hc-col-time) var(--tpl-sb-hc-col-how)', gap: 'var(--tpl-sb-ec-gap)', rowPadding: 'var(--tpl-sb-hc-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)', fontSize: 'var(--tpl-sb-band-text)', headFontSize: 'var(--tpl-sb-row-sub)', headLineHeight: 'var(--tpl-sb-row-sub-lh)', headBackground: 'var(--color-surface-pearl)' }}>
           <div role="rowgroup">
             <GridHeadRow>

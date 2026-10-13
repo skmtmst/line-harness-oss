@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /*
  * テンプレート編集画面を、実際に mount して確かめる。
  *
@@ -17,16 +18,14 @@
  */
 import React from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  click,
-  findById,
-  findByLabel,
-  findByText,
-  installTestDom,
-  isDisabled,
-  type DomDocument,
-  type DomElement,
-} from './test-dom'
+import { fireEvent } from '@testing-library/react'
+type DomDocument = Document
+type DomElement = HTMLElement
+const click = (element: HTMLElement) => fireEvent.click(element)
+const findById = (container: HTMLElement, id: string) => container.querySelector<HTMLInputElement>(`#${id}`)
+const findByText = (container: HTMLElement, tag: string, text: string) => Array.from(container.querySelectorAll<HTMLElement>(tag)).find(element => element.textContent === text) ?? null
+const isDisabled = (element: HTMLElement | null) => element === null || (element as HTMLButtonElement).disabled
+
 
 /* --------------------------------------------------- 画面まわりの置き換え */
 
@@ -40,7 +39,7 @@ const routing = vi.hoisted(() => ({
   push: (_href: string) => {},
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: (href: string) => routing.push(href),
     replace: (href: string) => routing.push(href),
@@ -94,7 +93,7 @@ const CSRF = 'mount-csrf'
 
 beforeAll(async () => {
   // DOM は `react-dom/client` より先。読み込み時に window.document を見る。
-  document = installTestDom()
+  document = globalThis.document
   const view = globalThis as unknown as Record<string, unknown>
   view.IS_REACT_ACT_ENVIRONMENT = true
   /*
@@ -178,6 +177,7 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
 
   await held.get(path)?.promise
 
+  if (path === '/api/staff/me') return jsonResponse({ success: true, data: { role: 'owner', permissionKeys: [], accountScope: 'all' } })
   if (path === '/api/line-accounts') {
     return jsonResponse({ success: true, data: [
       lineAccount('account-a', 'A店'),
@@ -307,15 +307,22 @@ async function navigateTo(search: string) {
   await settle()
 }
 
-const saveButton = () => findByText(container, 'button', '保存する')
+const saveButton = () => findByText(container, 'button', '下書きを保存')
 /*
  * 見比べるのは値だけにする。DOM の節をそのまま `expect` へ渡すと、
  * 落ちたときに節の中身を延々と書き出そうとして、**どの条件で落ちたのかが
  * 読めなくなる。**
  */
 const hasSaveButton = () => saveButton() !== null
-const nameValue = () => findById(container, 'tp-name')?.value ?? null
-const insertOptions = () => findByLabel(container, '友だち情報を差し込む')?.textContent ?? null
+const nameValue = () => findById(container, 'te-name')?.value ?? null
+const insertOptions = async () => {
+  const trigger = findByText(container, 'button', '友だち情報')
+  if (!trigger || isDisabled(trigger)) return ''
+  await act(async () => { click(trigger) })
+  const text = document.body.textContent ?? ''
+  await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+  return text
+}
 const screenText = () => container.textContent
 
 beforeEach(() => {
@@ -365,8 +372,8 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
      * ここが差し戻しの中身。**保存の口が開いていると、画面に残った
      * 1本目の本文を `PUT /api/templates/tmpl-a2` へ送れてしまう。**
      */
-    expect(hasSaveButton()).toBe(false)
-    expect(screenText()).toContain('読み込み中')
+    expect(isDisabled(saveButton())).toBe(true)
+    expect(screenText()).toMatch(/読み込んでいます/)
     // 1本目の中身が1文字も残っていない。残っていれば、それが送られる元になる。
     expect(screenText()).not.toContain('A店の定期便')
     expect(nameValue()).toBeNull()
@@ -393,7 +400,8 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
       messageContent: 'A店の再入荷の本文 {{field.a_pet}}',
     })
     expect(writes.some((write) => write.path === '/api/templates/tmpl-a1')).toBe(false)
-    expect(pushed).toEqual(['/templates'])
+    expect(pushed).toEqual([])
+    expect(nameValue()).toBe('A店の再入荷のお知らせ')
   })
 
   it('id を替えた直後の一瞬にも、前の本文と新しい送り先が並ばない', async () => {
@@ -404,10 +412,10 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
     // 効果より前、描き直した直後の画面。ここで既に前の中身が消えている。
     renderWithoutEffects('?id=tmpl-a2')
 
-    expect(hasSaveButton()).toBe(false)
+    expect(isDisabled(saveButton())).toBe(true)
     expect(nameValue()).toBeNull()
     expect(screenText()).not.toContain('A店の定期便')
-    expect(screenText()).toContain('読み込み中')
+    expect(screenText()).toMatch(/読み込んでいます/)
 
     await settle()
     expect(writes).toEqual([])
@@ -421,7 +429,7 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
     await navigateTo('?id=tmpl-b')
 
     // 取得中は口そのものが無い。
-    expect(hasSaveButton()).toBe(false)
+    expect(isDisabled(saveButton())).toBe(true)
     expect(writes).toEqual([])
 
     pending.release()
@@ -438,24 +446,24 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
 
   it('差し込み候補も、次のテンプレートが返るまで前のものを出さない', async () => {
     await mountAt('?id=tmpl-a1')
-    expect(insertOptions()).toContain('A店のペット名')
+    expect(await insertOptions()).toContain('A店のペット名')
 
     const pending = hold('/api/templates/tmpl-b')
     await navigateTo('?id=tmpl-b')
-    expect(insertOptions()).toBeNull()
+    expect(await insertOptions()).toBe('')
 
     pending.release()
     await settle()
 
-    expect(insertOptions()).toContain('B店のコース')
-    expect(insertOptions()).not.toContain('A店のペット名')
+    expect(await insertOptions()).toContain('B店のコース')
+    expect(await insertOptions()).not.toContain('A店のペット名')
   })
 
   it('遅れて届いた前のテンプレートの応答が、いまの画面を書き換えない', async () => {
     // 1本目を保留したまま開き、返らないうちに2本目へ替える。
     const pendingFirst = hold('/api/templates/tmpl-a1')
     await mountAt('?id=tmpl-a1')
-    expect(hasSaveButton()).toBe(false)
+    expect(isDisabled(saveButton())).toBe(true)
 
     await navigateTo('?id=tmpl-a2')
     expect(nameValue()).toBe('A店の再入荷のお知らせ')
@@ -507,7 +515,7 @@ describe('上のバーでアカウントを替える', () => {
     expect(screenText()).toContain(Testing.ACCOUNT_MISMATCH_MESSAGE)
     expect(screenText()).toContain('このテンプレートは「A店」のものです')
     expect(isDisabled(saveButton())).toBe(true)
-    expect(insertOptions()).toContain('A店のペット名')
+    expect(await insertOptions()).toContain('A店のペット名')
 
     // 押しても通信は出ない。塞いだ見た目だけでなく、送る口も閉じている。
     await act(async () => { click(saveButton()!) })
@@ -529,6 +537,9 @@ describe('新しく作る', () => {
     expect(nameValue()).toBe('')
     expect(hasSaveButton()).toBe(true)
     expect(isDisabled(saveButton())).toBe(false)
-    expect(insertOptions()).toContain('A店のペット名')
+    expect(await insertOptions()).toContain('A店のペット名')
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

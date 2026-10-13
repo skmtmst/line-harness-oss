@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { api } from '@/lib/api'
 import { canManageRole } from '@/lib/staff-role'

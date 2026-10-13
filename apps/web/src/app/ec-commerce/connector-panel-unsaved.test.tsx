@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options { "url": "http://localhost/ec-commerce?tab=connector" }
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -20,7 +20,7 @@ const routerPush = vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
   return vi.fn()
 })
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush, replace: vi.fn(), refresh: vi.fn() }),
 }))
 
@@ -40,7 +40,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api } from '@/lib/api'
-import ConnectorPanel from './connector-panel'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import ConnectorPanel from '@/v8/settings/ec-commerce/connector'
 
 const mockConnector = api.ecCommerce.connector as unknown as ReturnType<typeof vi.fn>
 const mockUpdate = api.ecCommerce.updateConnector as unknown as ReturnType<typeof vi.fn>
@@ -75,6 +76,8 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  clearToastsForTest()
   mockConnector.mockReset()
   mockUpdate.mockReset()
   routerPush.mockReset()
@@ -84,26 +87,27 @@ beforeEach(() => {
 
 afterEach(async () => {
   cleanup()
+  delete document.documentElement.dataset.theme
   document.body.innerHTML = ''
   vi.clearAllMocks()
 })
 
 async function mountReady(overrides: Record<string, unknown> = {}) {
   mockConnector.mockResolvedValue({ success: true, data: overview(overrides) })
-  render(<ConnectorPanel accountId="account-a" />)
+  render(<><ToastHost /><ConnectorPanel accountId="account-a" /></>)
   await screen.findByRole('button', { name: '設定を保存する' })
 }
 
 describe('#948 N-320: 影響件数の明示とやり直し規定の常時表示', () => {
   it('止まる設定とアカウント全体の記録数を行ごとに区別し、やり直しかたを常に出す', async () => {
     await mountReady()
-    // EC起点の設定には「ECの出来事がきっかけ」、全体の記録数には「アカウント全体」。
-    expect(screen.getAllByText('ECの出来事がきっかけ')).toHaveLength(3)
-    expect(screen.getAllByText('アカウント全体')).toHaveLength(2)
-    // やり直しかたは retryPolicy の値に依らず常に出る(実行単位の手動やり直しへの行き先)。
-    expect(screen.getByText(/失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います/)).toBeTruthy()
-    // 止めても変わらないものを影響と混ぜない案内。
-    expect(screen.getByText(/コンバージョンと分析はアカウント全体の記録数です/)).toBeTruthy()
+    const links = screen.getByText(/つながる先：/)
+    expect(links.getAttribute('title')).toContain('タグ 4 件（ECの出来事がきっかけ）')
+    expect(links.getAttribute('title')).toContain('分析 0 件（アカウント全体）')
+    expect(document.querySelector('a[href="/nen-campaigns"]')?.getAttribute('title')).toContain('ECの出来事がきっかけ 2 件')
+    expect(document.querySelector('a[href="/conversions"]')?.getAttribute('title')).toContain('アカウント全体 3 件')
+    expect(links.getAttribute('title')).toContain('失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。')
+    expect(links.getAttribute('title')).toContain('コンバージョンと分析はアカウント全体の記録数です。')
   })
 })
 
@@ -111,7 +115,7 @@ describe('#948 N-322: 取り込みを止めるは保存必須であることを�
   it('押した直後に未保存であることを警告し、保存するまでAPIを呼ばない', async () => {
     await mountReady()
     fireEvent.click(screen.getByRole('button', { name: '取り込みを止める' }))
-    expect(await screen.findByText(/まだ止まっていません。「設定を保存」を押すと止まります/)).toBeTruthy()
+    expect(await screen.findByText(/まだ止まっていません。「設定を保存する」を押すと止まります/)).toBeTruthy()
     expect(mockUpdate).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '設定を保存する' }))
@@ -135,7 +139,7 @@ describe('#948 N-322: 取り込みを止めるは保存必須であることを�
     expect(routerPush).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '設定に戻る' }))
-    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
 
     await act(async () => { link.click() })
     fireEvent.click(await screen.findByRole('button', { name: '保存せずに移る' }))
@@ -143,24 +147,30 @@ describe('#948 N-322: 取り込みを止めるは保存必須であることを�
   })
 })
 
-describe('#948 N-326: 保存できない理由を表示する', () => {
-  it('ショップのアドレスが空のとき、理由を出して保存を押せなくする', async () => {
+describe('#948 N-326: 保存を送れない理由を表示する', () => {
+  it('ショップのアドレスが空のとき、欄の理由を出し、保存を送らない', async () => {
     await mountReady()
     const domain = document.querySelector('input[placeholder="nen-store.myshopify.com"]') as HTMLInputElement
     fireEvent.change(domain, { target: { value: '' } })
     const save = screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement
-    expect(save.disabled).toBe(true)
-    expect(await screen.findByText('ショップのアドレスを入れると保存できます。')).toBeTruthy()
+    fireEvent.click(save)
+    expect(mockUpdate).not.toHaveBeenCalled()
+    expect(await screen.findByText(/ショップのドメインを入れてください/)).toBeTruthy()
+    expect(document.activeElement).toBe(domain)
 
     fireEvent.change(domain, { target: { value: 'shop.example.com' } })
     expect((screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement).disabled).toBe(false)
-    expect(screen.queryByText('ショップのアドレスを入れると保存できます。')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '設定を保存する' }))
+    await screen.findByText('つなぎ先の設定を保存しました。')
+    expect(mockUpdate).toHaveBeenCalledWith('account-a', expect.objectContaining({ shopDomain: 'shop.example.com' }))
   })
 
   it('鍵が未設定のつなぎ先では、32文字未満の理由を出す', async () => {
     await mountReady({ connector: { secretConfigured: false, secretLastFour: null, secretUpdatedAt: null } })
     const save = screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement
-    expect(save.disabled).toBe(true)
-    expect(await screen.findByText('はじめてつなぐときは、32文字以上の鍵を入れてください。')).toBeTruthy()
+    fireEvent.click(save)
+    expect(mockUpdate).not.toHaveBeenCalled()
+    expect(await screen.findByText('32文字以上の鍵を入れてください。')).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByLabelText('つなぐための鍵'))
   })
 })

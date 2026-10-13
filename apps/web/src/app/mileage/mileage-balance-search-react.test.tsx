@@ -17,9 +17,9 @@ import { AccountProvider } from '@/contexts/account-context'
 import MileagePage from './page'
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams('tab=balances'),
   usePathname: () => '/mileage',
 }))
 
@@ -182,7 +182,7 @@ async function settle(ticks = 6) {
 async function waitForSearchInput(): Promise<HTMLInputElement> {
   for (let i = 0; i < 40; i += 1) {
     await act(async () => { await Promise.resolve() })
-    const input = container.querySelector('input[placeholder="友だちの名前で検索"]')
+    const input = container.querySelector('input[placeholder="友だちの名前で探す"]')
     if (input) return input as HTMLInputElement
   }
   throw new Error('検索欄が出ませんでした')

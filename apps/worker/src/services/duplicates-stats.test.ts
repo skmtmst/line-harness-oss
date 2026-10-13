@@ -101,13 +101,13 @@ describe('computeDuplicatesStats', () => {
     // 3本の問い合わせすべてに絞りが入る。
     expect(seen).toHaveLength(4);
     for (const query of seen) {
-      expect(query.sql).toContain('IN (?)');
+      expect(query.sql).toContain('IN (SELECT value FROM json_each(?))');
       expect(query.sql).not.toContain('1 = 0');
     }
     // TOTALS と perAccount は絞りを2か所に持つ。
-    expect(seen[0].binds).toEqual(['account-a', 'account-a']);
-    expect(seen[1].binds).toEqual(['account-a', 'account-a']);
-    expect(seen[2].binds).toEqual(['account-a']);
+    expect(seen[0].binds).toEqual([JSON.stringify(['account-a']), JSON.stringify(['account-a'])]);
+    expect(seen[1].binds).toEqual([JSON.stringify(['account-a']), JSON.stringify(['account-a'])]);
+    expect(seen[2].binds).toEqual([JSON.stringify(['account-a'])]);
   });
 
   test('accountIds 未指定は従来どおり絞り無し、空配列は0件の集計', async () => {
@@ -127,7 +127,7 @@ describe('computeDuplicatesStats', () => {
     } as unknown as D1Database;
 
     await computeDuplicatesStats(db);
-    expect(seen.join('\n')).not.toContain('IN (?)');
+    expect(seen.join('\n')).not.toContain('json_each(?)');
 
     seen.length = 0;
     await computeDuplicatesStats(db, { accountIds: [], forceRefresh: true });

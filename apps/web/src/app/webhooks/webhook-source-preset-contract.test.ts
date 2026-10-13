@@ -1,10 +1,12 @@
+import { join } from 'node:path'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const OVERVIEWS = fs.readFileSync(path.join(__dirname, 'webhook-overviews.tsx'), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
 /** 注釈を落とす。「なぜ直したか」を書いた文が、直したはずの字面に当たるのを避ける。 */
 function code(src: string): string {
@@ -31,19 +33,20 @@ describe('外部連携の「どこから来るか」は、見本から選べる'
 
   it('見本ごとに、何を受け取るのかが書いてある', () => {
     expect(CODE).toContain("hint: '予約の確定・変更・取り消しを受け取ります'")
-    expect(CODE).toContain('{selectedPreset.hint}')
+    expect(CODE).toContain('{sample.hint}')
   })
 
   it('自由入力の道も残っている', () => {
     expect(CODE).toContain("const SOURCE_OTHER = '__other__'")
     expect(CODE).toContain('その他（自分で書く）')
-    expect(CODE).toContain('{sourceIsOther ?')
+    expect(CODE).toContain('createSource === SOURCE_OTHER ?')
   })
 
   it('自由入力中は見本の説明を混ぜず、保存後は見本選択へ戻す', () => {
-    expect(CODE).toContain('const selectedPreset = sourceIsOther')
-    expect(CODE).toContain('? null\n    : SOURCE_PRESETS.find')
-    expect(CODE).toMatch(/setInForm\(\{ name: '', sourceType: '', secret: '' \}\)\s+setSourceIsOther\(false\)\s+setShowCreate\(false\)/)
+    expect(CODE).toContain('createSource === SOURCE_OTHER ? createSourceFree.trim() : createSource')
+    expect(CODE).toContain('setCreateSource(SOURCE_PRESETS[0].value)')
+    expect(CODE).toContain("setCreateSourceFree('')")
+    expect(CODE).toContain('setShowCreate(false)')
   })
 
   it('内部の語を見出しに出さない', () => {
@@ -53,6 +56,6 @@ describe('外部連携の「どこから来るか」は、見本から選べる'
 
   it('未設定を半角ハイフンで書かない', () => {
     expect(CODE, "'-' のまま出している").not.toContain("wh.sourceType || '-'")
-    expect(CODE).toContain("?? value ?? '送信元未設定'")
+    expect(CODE).toContain("?? (value || 'その他')")
   })
 })

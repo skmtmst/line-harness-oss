@@ -36,11 +36,19 @@ describe('下書きを仕上げる：担当へ知らせるを保つ', () => {
     const form = draftDetailToForm(detail)
     const payload = form.actions.map((row, index) => actionDraftToPayload(row, index))
     expect(payload[1]).toEqual({
-      id: 'step-2',
+      id: 'a2',
       type: 'notify_staff',
       params: { notificationRuleId: 'rule-1', message: '河野・坂本に LINE で' },
       onFailure: 'stop',
     })
     expect(payload[0]).toMatchObject({ type: 'add_tag', params: { tagId: 'tag-1' } })
+  })
+
+  it('既存の処理を消して足しても、残った処理のIDと新しい処理のIDが重ならない', () => {
+    const form = draftDetailToForm({ ...detail, actions: [{ ...detail.actions[0], id: 'step-2' }] })
+    const rows = [form.actions[0], { ...form.actions[0], key: form.actions[0].key + 100, sourceId: undefined }]
+    const payload = rows.map(actionDraftToPayload)
+    expect(payload.map(row => row.id)).toEqual(['step-2', 'step-3'])
+    expect(payload[0].params).toEqual({ tagId: 'tag-1' })
   })
 })

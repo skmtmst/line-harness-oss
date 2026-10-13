@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import KpiCard from './kpi-card'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MoreHorizontal } from 'lucide-react'
+import KpiCard, { type KpiCardProps } from './kpi-card'
 
 /**
  * #1005: 長い理由・定義は説明アイコンのポップオーバーへ。
@@ -23,7 +24,7 @@ describe('KpiCardの説明ポップオーバー', () => {
     host.remove()
   })
 
-  async function render() {
+  async function render(overrides: Partial<KpiCardProps> = {}) {
     await act(async () => {
       root.render(
         <KpiCard
@@ -32,6 +33,7 @@ describe('KpiCardの説明ポップオーバー', () => {
           unit="人"
           detail="未取得"
           description="実際に見た区間の記録をまだ集計できないため"
+          {...overrides}
         />,
       )
       await Promise.resolve()
@@ -77,5 +79,45 @@ describe('KpiCardの説明ポップオーバー', () => {
       await Promise.resolve()
     })
     expect(host.textContent).not.toContain('実際に見た区間の記録をまだ集計できないため')
+  })
+
+  it('titleだけの旧い説明も押して読め、Escで閉じられる', async () => {
+    await render({ description: undefined, menu: <button type="button" title="見た区間の定義" aria-label="旧い説明"><MoreHorizontal size={16} aria-hidden="true" /></button> })
+    expect(host.querySelector('[aria-label="旧い説明"]')).toBeNull()
+    const button = host.querySelector('button[aria-label="視聴の説明"]') as HTMLButtonElement
+    await act(async () => { button.click() })
+    expect(host.textContent).toContain('見た区間の定義')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(host.textContent).not.toContain('見た区間の定義')
+    expect(document.activeElement).toBe(button)
+  })
+
+  it('操作を持つメニューの押下を保つ', async () => {
+    const onClick = vi.fn()
+    await render({ description: undefined, menu: <button type="button" title="内訳を開く" aria-label="操作" onClick={onClick}>…</button> })
+    await act(async () => { (host.querySelector('[aria-label="操作"]') as HTMLButtonElement).click() })
+    expect(onClick).toHaveBeenCalledOnce()
+    expect(host.querySelector('[aria-label="視聴の説明"]')).toBeNull()
+  })
+
+  it('無効な操作を説明の押し口へ変えない', async () => {
+    await render({ description: undefined, menu: <button type="button" title="管理者だけの操作" aria-label="管理操作" disabled>…</button> })
+    expect((host.querySelector('[aria-label="管理操作"]') as HTMLButtonElement).disabled).toBe(true)
+    expect(host.querySelector('[aria-label="視聴の説明"]')).toBeNull()
+  })
+
+  it('図柄に操作がある場合もその押下を保つ', async () => {
+    const onClick = vi.fn()
+    await render({ description: undefined, menu: <button type="button" title="内訳" aria-label="図柄の操作"><MoreHorizontal size={16} aria-hidden="true" onClick={onClick} /></button> })
+    await act(async () => { host.querySelector('[aria-label="図柄の操作"] svg')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(onClick).toHaveBeenCalledOnce()
+    expect(host.querySelector('[aria-label="視聴の説明"]')).toBeNull()
+  })
+
+  it('すでに説明があるときは、別のtitleの情報も残す', async () => {
+    await render({ help: '集計の定義', menu: <button type="button" title="別の補足" aria-label="別の説明">…</button> })
+    expect(host.querySelector('[aria-label="別の説明"]')?.getAttribute('title')).toBe('別の補足')
+    await act(async () => { (host.querySelector('[aria-label="視聴の説明"]') as HTMLButtonElement).click() })
+    expect(host.textContent).toContain('集計の定義')
   })
 })

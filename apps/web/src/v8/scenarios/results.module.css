@@ -263,7 +263,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-sc2-tools-gap);
-  margin: 0;
   color: var(--color-status-danger);
   font-size: var(--text-caption);
   line-height: var(--tpl-sc2-text-lh);
@@ -283,3 +282,5 @@
   padding: var(--tpl-sc2-row-pad);
   box-shadow: var(--tpl-sc2-line-t);
 }
+
+.moreError, .moreErrorNoticePlacement { margin: 0; }

@@ -14,6 +14,7 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from './focus-field'
 import { isImeComposing } from '@/components/shared/ime'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function GenreDialog({
   genre,
@@ -24,6 +25,7 @@ export default function GenreDialog({
   onClose: () => void
   onSaved: (genre: EntryRouteGenre, previousName: string | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [name, setName] = useState(genre?.name ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -49,15 +51,19 @@ export default function GenreDialog({
       }
       onSaved(response.data, genre?.name ?? null)
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err)
       setSubmitting(false)
       if (err instanceof ApiError && err.status === 409) {
-        setNameError('同じ名前のフォルダが既にあります。')
+        { if (!fieldFailure)
+        setNameError('同じ名前のフォルダが既にあります。') }
         focusField(inputId)
-      } else setError('フォルダを保存できませんでした。')
+      } else { if (!fieldFailure) setError('フォルダを保存できませんでした。')
     }
+  }
   }
 
   return (
+    <SaveErrorScope errors={saveErrors}>
     <Dialog
       open
       title={genre ? 'フォルダ名を変更' : 'フォルダを追加'}
@@ -70,6 +76,7 @@ export default function GenreDialog({
       onConfirm={() => save()}
     >
       <Field label="フォルダ名" htmlFor={inputId} error={nameError}>
+      <SaveErrorField names={["name"]}>
       <TextField
         id={inputId}
         autoFocus
@@ -82,7 +89,8 @@ export default function GenreDialog({
         maxLength={80}
         placeholder="例：A店"
       />
+      </SaveErrorField>
       </Field>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

@@ -10,7 +10,6 @@ vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOrigina
  *         ボタン付きテキストはボタンまで保存内容どおりに見える。
  *         下書きには未送信と添える。
  */
-vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'

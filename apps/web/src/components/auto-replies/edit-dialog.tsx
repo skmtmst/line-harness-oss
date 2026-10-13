@@ -1472,11 +1472,7 @@ export default function EditDialog({
             <InlineActionList
               actions={actions}
               onChange={setActions}
-              tags={actionOptions.tags}
-              fields={actionOptions.fields}
-              marks={actionOptions.marks}
-              scenarios={actionOptions.scenarios}
-              vars={actionOptions.vars}
+              {...actionOptions}
             />
           </div>
 

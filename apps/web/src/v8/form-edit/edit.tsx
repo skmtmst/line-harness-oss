@@ -1,4 +1,49 @@
 'use client'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { notifySaved } from '@/components/shared/toast';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation';
+import { FlaskConical, Smartphone, Upload } from 'lucide-react';
+import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
+import { CreatePage } from '@/components/templates';
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import { Tabs } from '@/components/shared/tabs';
+import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message';
+import { validateFormLayoutForSave } from '@/components/forms/form-definition-validation';
+import { normalizeSectionName } from '@/components/forms/section-name';
+import { takenFormAnswerNames, uniqueFormCopyName } from '@/components/forms/form-definition-operations';
+import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs';
+import { api, ApiError, bookingApi, fetchApi } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { useStaffRole } from '@/lib/staff-role';
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave';
+import { requestUnsavedAction } from '@/lib/unsaved-action';
+import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter';
+import type { FormEditHost } from './host';
+import { conflictMessage, conflictTitle, describeConflictDiff, describePublishChanges, firstInputBlockId, formSavedContentMatches, ogImageUrlError, readPage, readTab, type ConflictSide, type EditTab, type FormSavedContent } from './model';
+import { ContentTab } from './content-tab';
+import { AfterTab } from './after-tab';
+import { AppearanceTab, formNameRequirement } from './appearance-tab';
+import { FormEditAttemptContext } from './field-issues';
+import { focusFieldById } from '@/lib/use-form-errors';
+import { useCustomerLook } from '@/components/shared/use-customer-look';
+import { FormPhone } from './phone';
+import styles from './edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format';
+import TextLink from '@/components/shared/text-link'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * 回答フォームの編集（★V8）。板：中身 m1cWEy・1152 ITBAB・予約を入れるブロック ijxur・
@@ -9,71 +54,6 @@
  * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { notifySaved } from '@/components/shared/toast'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
-import {
-  emptyLayout,
-  formThemeContrastError,
-  newBlockId,
-  normalizeFormTheme,
-  validateFormForPublish,
-  type FormBlock,
-  type FormLayout,
-  type FormOptions,
-  type FormSection,
-} from '@line-crm/shared'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import Notice from '@/components/shared/notice'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import { Tabs } from '@/components/shared/tabs'
-import { notifyToast } from '@/components/shared/toast'
-import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
-import { validateFormLayoutForSave } from '@/components/forms/form-definition-validation'
-import { normalizeSectionName } from '@/components/forms/section-name'
-import { takenFormAnswerNames, uniqueFormCopyName } from '@/components/forms/form-definition-operations'
-import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
-import { api, ApiError, bookingApi, fetchApi } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
-import { requestUnsavedAction } from '@/lib/unsaved-action'
-import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter'
-import type { FormEditHost } from './host'
-import {
-  conflictMessage,
-  conflictTitle,
-  describeConflictDiff,
-  describePublishChanges,
-  firstInputBlockId,
-  formSavedContentMatches,
-  ogImageUrlError,
-  readPage,
-  readTab,
-  type ConflictSide,
-  type EditTab,
-  type FormSavedContent,
-} from './model'
-import { ContentTab } from './content-tab'
-import { AfterTab } from './after-tab'
-import { AppearanceTab } from './appearance-tab'
-import { FormEditAttemptContext } from './field-issues'
-import { focusFieldById } from '@/lib/use-form-errors'
-import { FormPhone } from './phone'
-import styles from './edit.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import TextLink from '@/components/shared/text-link'
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -96,16 +76,19 @@ type Snapshot = {
 }
 
 function FormEditInner({ host }: { host?: FormEditHost }) {
+  const saveErrors = useSaveFormErrors()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   /* 統括のひな形から使うとき（host.ts）。読み込み・保存は呼ぶ側。 */
   const hostRef = useRef(host)
   hostRef.current = host
   const { selectedAccount, selectedAccountId } = useAccount()
+  const customerLook = useCustomerLook(host ? null : selectedAccountId)
   const narrow = useNarrowViewport()
   const role = useStaffRole()
-  const canEdit = host ? !host.readOnly : canManageRole(role)
-  const readOnly = host ? Boolean(host.readOnly) : role !== null && !canEdit
+  const featureAccess = useFeatureAccess('forms')
+  const canEdit = host ? !host.readOnly : featureAccess
+  const readOnly = host ? Boolean(host.readOnly) : !canEdit
 
   /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
   const liffId = selectedAccount?.liffId ?? null
@@ -137,6 +120,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [formLoaded, setFormLoaded] = useState(Boolean(host))
   const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [bookingStaffError,setBookingStaffError]=useState(false)
+  const [referencesError,setReferencesError]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
@@ -233,8 +218,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     try {
       await loadForm()
       setNotice('最新の内容を読み込みました')
-    } catch {
-      setError('読み込みに失敗しました。もう一度読み込んでください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('読み込みに失敗しました。もう一度読み込んでください。') }
     }
   }
 
@@ -255,12 +244,15 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         setPublishedSide(res.success && res.data?.layout
           ? { name: res.data.name ?? '', description: res.data.description ?? '', layout: res.data.layout }
           : null)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure);
+
         if (alive) setPublishedSide(null)
       }
-    })()
+    })();
+
     return () => { alive = false }
-  }, [showPublish, id, publishedVersionId, contentRevision])
+  }, [showPublish, id, publishedVersionId, contentRevision, saveErrors])
 
   useEffect(() => {
     setFormLoadFailed(null)
@@ -299,12 +291,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           api.reminders.list(accountFilter),
           api.templates.list(undefined, selectedAccountId ?? undefined),
         ])
+        if(!tagRes.success || !ffRes.success || !scenarioRes.success || !reminderRes.success || !templateRes.success){setReferencesError(true);throw new Error('references unavailable')}
         setRefs({
-          tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
-          friendFields: ffRes.success ? ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster })) : [],
-          scenarios: scenarioRes.success ? scenarioRes.data.map((s) => ({ id: s.id, name: s.name })) : [],
-          reminders: reminderRes.success ? reminderRes.data.map((r) => ({ id: r.id, name: r.name })) : [],
-          templates: templateRes.success ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })) : [],
+          tags: tagRes.data.map((t) => ({ id: t.id, name: t.name })),
+          friendFields: ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster })),
+          scenarios: scenarioRes.data.map((s) => ({ id: s.id, name: s.name })),
+          reminders: reminderRes.data.map((r) => ({ id: r.id, name: r.name })),
+          templates: templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })),
           bookingMenus: [],
           bookingMenuStaff: {},
         })
@@ -323,10 +316,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         const ok = await loadForm()
         if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
       } catch (caught) {
+        const fieldFailure = saveErrors.capture(caught);
+
         if (caught instanceof ApiError && caught.status === 404) setFormLoadFailed('missing')
         else if (classifyApiFailure(caught) === 'forbidden') setFormLoadFailed('forbidden')
         else {
-          setError('読み込みに失敗しました。もう一度読み込んでください。')
+          { if (!fieldFailure)
+          setError('読み込みに失敗しました。もう一度読み込んでください。') }
           setFormLoadFailed('error')
         }
       } finally {
@@ -335,11 +331,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     })()
     // loadForm は params を読むが、読み込み直すのは id・アカウント・再試行のときだけ。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, reloadKey, selectedAccountId])
+  }, [id, reloadKey, selectedAccountId, saveErrors])
 
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
-    if (hostRef.current || !selectedAccountId) return
+    if (hostRef.current || !selectedAccountId || bookingStaffError) return
     const menuIds = new Set<string>()
     for (const section of layout.sections) {
       for (const b of section.blocks) {
@@ -350,23 +346,21 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (missing.length === 0) return
     let cancelled = false
     void (async () => {
-      const entries = await Promise.all(
-        missing.map(async (menuId) => {
-          try {
-            const res = await bookingApi.listMenuStaff(selectedAccountId, menuId)
-            return [menuId, res.staff.map((s) => ({ id: s.id, name: s.display_name }))] as const
-          } catch {
-            return [menuId, []] as const
-          }
-        }),
-      )
-      if (cancelled) return
-      setRefs((prev) => ({ ...prev, bookingMenuStaff: { ...(prev.bookingMenuStaff ?? {}), ...Object.fromEntries(entries) } }))
+      try {
+        const entries = await Promise.all(missing.map(async(menuId)=>{
+          const res=await bookingApi.listMenuStaff(selectedAccountId,menuId)
+          return [menuId,res.staff.map(s=>({id:s.id,name:s.display_name}))] as const
+        }))
+        if(cancelled)return
+        setRefs(prev=>({...prev,bookingMenuStaff:{...(prev.bookingMenuStaff??{}),...Object.fromEntries(entries)}}))
+      }catch{
+        if(!cancelled)setBookingStaffError(true)
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, layout, refs.bookingMenuStaff])
+  }, [selectedAccountId, layout, refs.bookingMenuStaff,bookingStaffError])
 
   /* ---------------- ページとブロック ---------------- */
 
@@ -375,7 +369,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const tabErrors: Record<EditTab, number> = attempted ? {
     content: layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
     after: 0,
-    appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(normalizeFormTheme(layout.options?.theme)) ? 1 : 0),
+    appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined)) ? 1 : 0),
   } : { content: 0, after: 0, appearance: 0 }
   const setBlocks = (next: FormBlock[]) =>
     setLayout((prev) => ({ ...prev, sections: prev.sections.map((s, i) => (i === page ? { ...s, blocks: next } : s)) }))
@@ -513,7 +507,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       const url = new URL(window.location.href)
       url.searchParams.set('tab', next)
       window.history.replaceState(window.history.state, '', url.toString())
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       /* URL を書けない環境（試験）では画面だけ替える */
     }
   }
@@ -528,7 +523,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   type SaveProblem = { message: string; name?: boolean; tab?: EditTab; target?: string; page?: number; blockId?: string; inline?: boolean }
   const saveProblem = (publishAfter: boolean): SaveProblem | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
-    if (!name.trim()) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
+    if (formNameRequirement.check(name)) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
     const untitledPage = layout.sections.findIndex((s) => s.blocks.some((b) => b.kind === 'input' && !b.label.trim()))
     if (untitledPage >= 0) {
@@ -550,7 +545,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const ogImageError = ogImageUrlError(ogImageUrl)
     if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
-    const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    const contrastError = formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined))
     if (contrastError) return { message: contrastError, tab: 'appearance', target: 'fe-colors', inline: true }
     // 公開に進むときだけ、公開前の検査（分岐の循環・消えた行き先など）を通す。
     if (publishAfter) {
@@ -636,7 +631,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           ogImageUrl: latest.data.ogImageUrl,
         }
         return formSavedContentMatches(sentContent, actual) ? latest.data.contentRevision : null
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure);
+
         return null
       }
     }
@@ -648,8 +645,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       try {
         res = await api.forms.update(id, selectedAccountId, { ...sentContent, expectedContentRevision: expectedRevision })
       } catch (updateError) {
+        saveErrors.capture(updateError);
+
         if (!(updateError instanceof ApiError) || updateError.status !== 409) throw updateError
-        const ownRevision = await confirmOwnSave()
+        const ownRevision = await confirmOwnSave();
+
         if (ownRevision === null) throw updateError
         reconciledOwnSave = true
         res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
@@ -692,18 +692,21 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       return true
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
       // ほかの人が先に保存していた（409）。入力はそのまま残し、読み直すかは運用者が決める。
       if (e instanceof ApiError && e.status === 409) {
         const data = e.data as { updatedAt?: unknown } | null
         const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''
         saveConflict.mark(updatedAt)
-        setError(conflictMessage(updatedAt))
+        { if (!fieldFailure)
+        setError(conflictMessage(updatedAt)) }
         return false
       }
       if (silent) return false
+      { if (!fieldFailure)
       setError(describeApiFailure(e, '保存', {
         scope: 'store',
-      }))
+      })) }
       return false
     } finally {
       saveInFlight.current = null
@@ -734,8 +737,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       const res = await api.forms.issueTestToken(id, selectedAccountId)
       if (!res.success) throw new Error(res.error)
       setTestToken(res.data.token)
-    } catch {
-      setTestError('試し合言葉を作れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setTestError('試し合言葉を作れませんでした。もう一度お試しください。') }
     } finally {
       setTestBusy(false)
     }
@@ -746,17 +752,17 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* ---------------- 対象が無いとき ---------------- */
 
   if (!host && !id) {
-    return <TargetMissing kind="unspecified" title="編集する回答フォームが指定されていません" description="一覧から編集するフォームを選び直してください。" backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="編集する回答フォームが指定されていません" description="一覧から編集するフォームを選び直してください。" backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" /></SaveErrorScope>
   }
   if (!host && !loading && !selectedAccountId) {
-    return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="選ぶとフォームを編集できます。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINE公式アカウントを選んでください" description="選ぶとフォームを編集できます。" /></SaveErrorScope>
   }
   if (!loading && formLoadFailed === 'missing') {
-    return <TargetMissing kind="not-found" title="このフォームは見つかりません" description="削除されたか、リンクが古くなっています。一覧から選び直してください。" accountName={selectedAccount?.name} backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このフォームは見つかりません" description="削除されたか、リンクが古くなっています。一覧から選び直してください。" accountName={selectedAccount?.name} backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" /></SaveErrorScope>
   }
   if (!loading && formLoadFailed === 'error' && !formLoaded) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="フォームを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
@@ -764,11 +770,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           setLoading(true)
           setReloadKey((k) => k + 1)
         }}
-      />
+      /></SaveErrorScope>
     )
   }
   if (!loading && formLoadFailed === 'forbidden' && !formLoaded) {
-    return <TargetMissing kind="not-found" title="このフォームを開く権限がありません" description="選んでいるアカウントでは開けません。アカウントを選び直すか、管理者に権限を確認してください。" accountName={selectedAccount?.name} backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このフォームを開く権限がありません" description="選んでいるアカウントでは開けません。アカウントを選び直すか、管理者に権限を確認してください。" accountName={selectedAccount?.name} backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" /></SaveErrorScope>
   }
 
   /* ---------------- 画面 ---------------- */
@@ -778,6 +784,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     : dirty || (publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision)
       ? '下書き・公開中の版と違うところがあります'
       : '公開中の版と同じです'
+  const saveStatus = host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
+    ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
+    : dirty ? '保存していない変更があります' : undefined
 
   const savedSide: ConflictSide | null = (() => {
     if (!savedSnapshot.current) return null
@@ -787,7 +796,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
-    <FormPhone layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
+    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
   )
 
   const preview = (
@@ -822,7 +831,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
                 </Button>
               </div>
             ) : null}
-            {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
+            {testError ? <Notice tone="danger" className={styles.urlErrorNoticePlacement} >{testError}</Notice> : null}
             {testUrl ? (
               <TextLink external href={testUrl}   className={styles.urlLink}>試しのURLを開く</TextLink>
             ) : null}
@@ -888,46 +897,27 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   ) : undefined
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
-      identity={(
-        /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
-        host ? (
-          <Link
-            href={host.backHref}
-            className={styles.backLink}
-            onClick={(event) => {
-              event.preventDefault()
-              requestUnsavedAction(host.onCancel)
-            }}
-          >
-            {'← 回答フォームへ'}
-          </Link>
-        ) : (
-          <Link href="/form-submissions" className={styles.backLink}>
-            {'← 回答フォームへ'}
-          </Link>
-        )
-      )}
+      help="回答フォームの内容・回答後の動作・受付条件を設定します。"
+      stepsSpacing="compact"
       steps={(
         <div className={styles.tabs}>
-          {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
-          <p className={styles.status}>{statusLine}</p>
           <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
-      notice={readOnly ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : undefined}
+      notice={readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : undefined}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
-        ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
-        : dirty ? '保存していない変更があります' : undefined} dirty={false}
+      status={<><span role="note">{statusLine}</span>{saveStatus ? <> · {saveStatus}</> : null}</>} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
         {host?.notice}
+        {referencesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>{setReferencesError(false);setError('');setReloadKey(value=>value+1)}}/>:null}
+        {bookingStaffError?<ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffError(false)}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
@@ -948,6 +938,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRenamePage={renameSection}
             onDuplicatePage={duplicateSection}
             onRemovePage={removeSection}
+            canUndoPageRemoval
             onSelectBlock={setSelectedBlockId}
             onAddBlock={addBlock}
             onPatchBlock={patchBlock}
@@ -961,6 +952,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <AppearanceTab
             readOnly={!canEdit}
             options={layout.options}
+            accountLook={customerLook.look}
+            accountLookError={customerLook.error}
             accountId={host ? null : selectedAccountId}
             portable={Boolean(host)}
             name={name}
@@ -974,6 +967,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
               setName(next)
               if (next.trim()) setNameError(null)
             }}
+            onBlurName={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
             onChangeDescription={setDescription}
             onChangeOgTitle={setOgTitle}
             onChangeOgDescription={setOgDescription}
@@ -1057,7 +1051,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <Dialog open={previewOpen} title="LINEでの見え方" description="お客さまのスマホに出る形です。" onCancel={() => setPreviewOpen(false)}>
         <div className={styles.phoneDialog}>{phone}</div>
       </Dialog>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 

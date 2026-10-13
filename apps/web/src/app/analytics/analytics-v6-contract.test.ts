@@ -1,7 +1,8 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 機能20 分析', () => {
@@ -28,7 +29,7 @@ describe('V6 機能20 分析', () => {
     ]) expect(API).toContain(path)
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('Google Analytics')
-    expect(PAGE).toContain('Search Consoleを見る')
+    expect(PAGE).toContain('Search Console を見る')
   })
 
   it('未取得の数値を0にせず、定義と結果を分けて保存する', () => {
@@ -37,13 +38,13 @@ describe('V6 機能20 分析', () => {
     expect(API).toContain('/api/analytics/saved/${id}/snapshots?account_id=')
     expect(PAGE).toContain('条件の定義と集計結果を分けて保存しています')
     expect(PAGE).toContain('保存時点の結果は書き換わりません')
-    expect(PAGE).toContain('定期レポートはこの下の一覧で止めたり変えたりできます')
+    expect(PAGE).toContain('定期レポートは下の一覧で止めたり変えたりできます')
     expect(PAGE).toContain('api.analytics.reportSchedules')
-    expect(PAGE).toContain('REPORT_SCHEDULE_STATUS_LABELS[schedule.status]')
+    expect(PAGE).toContain('REPORT_STATUS_LABELS[schedule.status]')
     expect(PAGE).toContain('`/analytics/reports/new?id=${schedule.id}`')
     expect(PAGE).not.toContain('保存した分析はまだ接続されていません')
-    expect(PAGE).toContain('DateTimeMetricCell metric={item.lastUsedAt}')
-    expect(PAGE).toContain('<Th>集計状態</Th>')
+    expect(PAGE).toContain('shortWhen(item.lastUsedAt.value)')
+    expect(PAGE).toContain('SAVED_STATE_LABELS[item.latestSnapshot.state]')
     expect(PAGE).toContain('SAVED_STATE_LABELS[item.latestSnapshot.state]')
   })
 
@@ -53,16 +54,16 @@ describe('V6 機能20 分析', () => {
       '手作業が減った時間', '気づいたこと', '中身を見る', '片づける',
       '利用関係を最後に確認',
     ]) expect(PAGE).toContain(text)
-    expect(PAGE).toContain('overview.summary.estimatedHoursSaved.value')
-    expect(PAGE).toContain('overview.summary.estimatedHoursSaved.reason')
+    expect(PAGE).toContain('const hours = overview.summary.estimatedHoursSaved')
+    expect(PAGE).toContain('hours.reason')
     expect(PAGE).toContain('canTidyUsage(item)')
   })
 
   it('保存と個人一覧への移動は閲覧権限と分ける', () => {
-    expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
-    expect(PAGE).toContain('結果の保存と個人一覧への移動は、統括・管理者だけが行えます。')
-    expect(PAGE).toContain('canManage && <Button onClick={() => void prepareCrossAudience()}')
-    expect(PAGE).toContain('canManage && <Button onClick={() => void prepareFunnelAudience()}')
+    expect(PAGE).toContain("const canManage = canManageRole(role)")
+    expect(PAGE).toContain('結果の保存と対象者づくりは、統括・管理者だけが行えます。')
+    expect(PAGE).toContain('picked && canManage ?')
+    expect(PAGE).toContain('{canManage ? <>')
   })
 
   it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
@@ -87,7 +88,7 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain("kind: 'events'")
     // N-288: 期間切替は選択状態を持ち、棒・段は名前を持つ。
     expect(readFileSync(new URL('../../components/shared/segmented.tsx', import.meta.url), 'utf8')).toContain('aria-pressed={option.value === value}')
-    expect(PAGE).toContain('aria-describedby={`funnel-step-')
+    expect(PAGE).toContain('label="全体の流れ" disabled={!measurable}')
   })
 
   it('一覧の取得失敗は空表示と分け、再読込の導線と実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {
@@ -115,6 +116,8 @@ describe('V6 機能20 分析', () => {
 
   it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
     expect(PAGE).toContain('setNoRun')
-    expect(PAGE).toContain('まだ集計がありません。「この{funnelDays}日を再集計」を押してください')
+    expect(PAGE).toContain('<AggregationStatus')
+    expect(PAGE).toContain("{ kind: 'empty' }")
+    expect(PAGE).toContain('onRun={() => void runNow()}')
   })
 })

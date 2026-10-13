@@ -290,7 +290,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     const slots = [...document.querySelectorAll('[role="dialog"] [role="group"] input')] as HTMLInputElement[]
     expect(slots).toHaveLength(6)
     for (const [index, slot] of slots.entries()) await type(slot, String(index + 1))
-    await click(buttons('本人確認してアーカイブする')[0])
+    await settle()
     expect(sent.find((s) => s.url.includes('/auth/step-up'))?.body).toMatchObject({ code: '123456', purpose: 'line_account.archive' })
     expect(sent.find((s) => s.url.endsWith('/archive'))?.stepUp).toBe('grant-1')
   })

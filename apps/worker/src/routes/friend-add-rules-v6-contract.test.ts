@@ -268,10 +268,10 @@ describe('V6 friend-add rule data contracts', () => {
     });
   });
 
-  it('権限不足と別アカウントは存在を隠し、staffはフォルダを作れない', async () => {
+  it('別アカウントは存在を隠し、鍵のないstaffはフォルダを作れない', async () => {
     const hidden = await app(testDb.db).request('/api/friend-add-runs?account_id=account-2');
     expect(hidden.status).toBe(404);
-    const forbidden = await app(testDb.db, staff).request('/api/friend-add-rules/folders', json(
+    const forbidden = await app(testDb.db, { ...staff, permissionKeys: [] }).request('/api/friend-add-rules/folders', json(
       'POST', { accountId: 'account-1', name: '紹介' }, 'friend-add-folder-0001',
     ));
     expect(forbidden.status).toBe(403);

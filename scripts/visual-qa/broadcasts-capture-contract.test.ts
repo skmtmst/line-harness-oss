@@ -37,7 +37,7 @@ describe('一斉配信の画面確認契約', () => {
     expect(MOCK_API).toContain("query.get('kind') === 'broadcast'")
     // 旧一覧（v7）の撮影用の口 qaOpen は、入口が V8 の一覧だけになったので見ない（mainB で v7 の分岐を削除）。
     expect(screen('xkRDb')?.steps).toContainEqual(expect.objectContaining({ qaOpen: 'xkRDb' }))
-    for (const label of ['名前を変更', '色を変える', '並び順を上へ', '並び順を下へ', 'フォルダを削除']) {
+    for (const label of ['名前を変える', '色を変える', '並べ替える（上へ）', '並べ替える（下へ）', '消す']) {
       expect(FOLDER_PANEL).toContain(label)
     }
     expect(FOLDER_DIALOG).toContain('const folderUpdates = { name: trimmed, color }')

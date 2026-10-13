@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenCampaignSetting, NenColumn, NenDeliveryList, NenFlowMetrics } from '@/lib/api'
 
@@ -105,6 +105,53 @@ async function render(props: NenCampaignsListProps) {
 const rowNames = () => [...host.querySelectorAll('tbody tr')].map((row) => row.querySelector('td')?.textContent ?? '')
 const button = (name: string) => [...document.querySelectorAll('button')].find((b) => (b.textContent ?? '').trim() === name || b.getAttribute('aria-label') === name)
 
+it('旧一覧のヘッダー操作を残し、閲覧のみでは隠す', async () => {
+  const action = vi.fn()
+  const props = baseProps({ tab: 'columns', topAction: <button onClick={action}>ECのコラムを取り込む</button> })
+  await render(props)
+  await act(async () => { button('ECのコラムを取り込む')!.click() })
+  expect(action).toHaveBeenCalledTimes(1)
+  role.value = 'viewer'
+  await render(props)
+  expect(button('ECのコラムを取り込む')).toBeUndefined()
+})
+
+it('コラムの見本は書きかけの紹介文と記事を見せ、ペット名を共通の代わりの名前にする', async () => {
+  const props = baseProps({ tab: 'columns', selectedColumnId: 'c-1', introDraft: '{{pet_name}}への書きかけ', columns: [{ ...COLUMNS[0], excerpt: '{{pet_name}}の食事', imageUrl: 'https://example.test/article.jpg' }] })
+  await render(props)
+  await act(async () => { button('「秋の食事、量はどれくらい？」の操作')!.click() })
+  await act(async () => { button('LINEでの見え方')!.click() })
+  const dialog = document.querySelector('[role="dialog"][aria-label="コラムのLINEでの見え方"]') ?? Array.from(document.querySelectorAll('[role="dialog"]')).find((node) => node.textContent?.includes('コラムのLINEでの見え方'))
+  expect(dialog?.textContent).toContain('大切なご家族への書きかけ')
+  expect(dialog?.textContent).toContain('大切なご家族の食事')
+  expect(dialog?.querySelector('img')?.src).toBe('https://example.test/article.jpg')
+  expect(props.onDeliverColumn).not.toHaveBeenCalled()
+  expect(props.onTestColumn).not.toHaveBeenCalled()
+})
+
+it('今月の補足に先月・注文・届かなかった数を残し、未取得は0にしない', async () => {
+  await render(baseProps({ kpis: { monthLabel: '10月', sentThisMonth: 8, sentLastMonth: 4, openRate: null, orders: 3, orderAmount: 900, undelivered: 2, blocked: 1, unfollowed: 0 } }))
+  await act(async () => { button('今月送ったの説明')!.click() })
+  expect(document.body.textContent).toContain('先月 4通')
+  expect(document.body.textContent).toContain('配信からの注文 3件')
+  expect(document.body.textContent).toContain('届かなかった 2通')
+  expect(document.body.textContent).toContain('友だち解除 0・ブロック 1')
+  await render(baseProps({ kpis: null, kpisFailed: true }))
+  expect(document.body.textContent).toContain('届かなかった —通')
+  expect(document.body.textContent).not.toContain('届かなかった 0通')
+})
+
+it('下書きの配信したい日時を日本時間で残し、予約済みと混ぜない', async () => {
+  const props = baseProps({ tab: 'columns', columns: [{ ...COLUMNS[0], deliveryStatus: 'draft', deliveryAt: '2099-05-01T01:30:00.000Z' }] })
+  await render(props)
+  const row = host.querySelector('tbody')
+  expect(row?.textContent).toContain('未配信・')
+  expect(row?.textContent).toContain('10:30')
+  expect(row?.textContent).toContain('に出したい')
+  expect(row?.textContent).not.toContain('予約中')
+  expect(props.onDeliverColumn).not.toHaveBeenCalled()
+})
+
 describe('V8 NEN配信の一覧', () => {
   it('V8 のテーマで、自動配信の表に止めている配信も今月多く送った順で並び、コラムは並ばない', async () => {
     await render(baseProps())
@@ -134,6 +181,9 @@ describe('V8 NEN配信の一覧', () => {
     expect(items).toEqual(expect.arrayContaining(['編集', 'テスト送信', 'クーポンの決めごと', '止める', '送った履歴を見る']))
     const stop = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '止める') as HTMLElement
     await act(async () => { fireEvent.click(stop) })
+    expect(props.onToggleSetting).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog').textContent).toContain('この自動配信を送りません')
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める', exact: true })) })
     expect(props.onToggleSetting).toHaveBeenCalledWith(expect.objectContaining({ campaignKey: 'birthday_coupon' }))
   })
 

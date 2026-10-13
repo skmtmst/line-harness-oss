@@ -5,7 +5,7 @@
  *
  * そろっている一覧（一斉配信・回答フォーム・テンプレート・タグ・友だち情報・ウェビナー・統括のホーム）と同じ形：
  *   ［作る］ボタン（列の上）→「フォルダ」の見出し → すべて → 各フォルダ（色の丸・数・「…」）→ 未分類
- *   →「フォルダを追加」→「フォルダを消しても、中の〇〇は未分類に残ります」
+ *   →「フォルダを追加」。削除後の扱いは操作直前の確認窓で説明する（B-245）。
  * 「…」の中は 名前を変える・色を変える・並べ替える（上へ・下へ）・消す（共通の useFolderRowActions）。
  *
  * 保存先は共通の `/api/folders`（kind ごと・packages/db/src/folders.ts の FOLDER_KINDS）。
@@ -19,6 +19,7 @@ import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import FolderAddDialog from './folder-add-dialog'
+import Dialog from './dialog'
 import { useFolderRowActions } from './folder-row-actions'
 import styles from './managed-folder-panel.module.css'
 
@@ -83,6 +84,22 @@ export interface ManagedFolderControl {
   startAdd: () => void
   startEdit: (folder: Folder) => void
   startDelete: (folder: Folder) => void
+}
+
+/** 畳んだフォルダ列を開く窓。既存の保存先と行の操作をそのまま受け取る。 */
+export function FolderManagementDialog({ open, rows, activeId, onSelect, onAdd, onClose, children }: {
+  open: boolean
+  rows: FolderPanelRow[]
+  activeId: string
+  onSelect: (id: string) => void
+  onAdd?: () => void
+  onClose: () => void
+  children?: ReactNode
+}) {
+  return <Dialog open={open} title="フォルダを管理" onCancel={onClose} footer={null}>
+    <FolderPanel rows={rows} activeId={activeId} onSelect={id => { onSelect(id); onClose() }}
+      onAddFolder={onAdd ? () => { onClose(); onAdd() } : undefined} addFolderLabel="フォルダを追加">{children}</FolderPanel>
+  </Dialog>
 }
 
 export interface ManagedFolderPanelProps {
@@ -176,7 +193,7 @@ export default function ManagedFolderPanel({
   unfiledCount = null,
   countOf,
   createAction,
-  reserveCreateSpace,
+  reserveCreateSpace = canManage && Boolean(createAction),
   onDeleted,
   error,
   placeholder,
@@ -239,7 +256,6 @@ export default function ManagedFolderPanel({
         disabled={disabled}
       >
         {error ? <p role="alert" className={styles.note}>{error}</p> : null}
-        {managed ? <p className={styles.note}>{managedFolderNote(itemLabel)}</p> : null}
         {children}
       </FolderPanel>
       {adding && kind ? (

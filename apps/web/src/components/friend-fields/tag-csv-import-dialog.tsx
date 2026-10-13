@@ -23,6 +23,7 @@ import {
 } from './tag-csv-import'
 import styles from './tag-csv-import-dialog.module.css'
 import { formatYmd } from '@/lib/format'
+import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const PREVIEW_ROW_STEP = 100
 
@@ -65,6 +66,8 @@ export default function TagCsvImportDialog({
   onClose: () => void
   onCompleted: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [mounted, setMounted] = useState(false)
   const [phase, setPhase] = useState<Phase>('select')
   const [rows, setRows] = useState<TagCsvImportInputRow[]>([])
@@ -106,7 +109,9 @@ export default function TagCsvImportDialog({
     try {
       setRows(parseTagCsv(await file.text()))
     } catch (reason) {
-      setError(reason instanceof TagCsvParseError ? reason.message : 'CSVを読み取れませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(reason instanceof TagCsvParseError ? reason.message : 'CSVを読み取れませんでした') }
     }
   }
 
@@ -131,7 +136,9 @@ export default function TagCsvImportDialog({
       setShownRows(PREVIEW_ROW_STEP)
       setPhase('preview')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '取り込む内容を確認できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : '取り込む内容を確認できませんでした') }
     }
   }
 
@@ -146,8 +153,10 @@ export default function TagCsvImportDialog({
       setPhase(response.data.outcome === 'success' ? 'success' : 'partial')
       if (response.data.summary.created > 0) onCompleted()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       setPhase('preview')
-      setError(reason instanceof Error ? reason.message : 'タグを登録できませんでした')
+      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : 'タグを登録できませんでした') }
     }
   }
 

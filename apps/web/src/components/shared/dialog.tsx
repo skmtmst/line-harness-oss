@@ -1,6 +1,6 @@
 'use client'
 
-import { dialogWidth } from './panel-sizes'
+
 import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
 import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -10,11 +10,13 @@ import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 import { useFormInputDirty } from './form-input-dirty'
-import { useOverlayDiscard } from './overlay-discard'
+import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
+import { dialogWidth } from './destination-policy'
 
 export type DialogProps = {
   open: boolean
+  contentLayout?: 'form'
   /** V8 の幅。v7 の寸法は維持する。 */
   size?: 'small' | 'medium' | 'large' | 'wide'
   /**
@@ -26,6 +28,8 @@ export type DialogProps = {
   /** 確認のボタンを先に置く板だけで指定する。 */
   confirmFirst?: boolean
   designWidth?: number
+  /** B-165の共通選択窓だけ640pxの幅を使う。 */
+  widthPreset?: 'picker'
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
   /**
@@ -48,6 +52,14 @@ export type DialogProps = {
   footerLeadFlexible?: boolean
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
+  /** 題の下に小さく置く補足（絵の窓の頭が題＋1行のとき）。渡さないときは今までどおり出ない。 */
+  titleNote?: ReactNode
+  /*
+   * ★V8：題の段の形を絵の値にする。渡さない窓は今までどおり（上そろえ・間8・太さ600）。
+   * `'mark'`：絵（dgeTy・XCVGd）の確認の窓のように、左の丸い印と題を縦の中央でそろえ、
+   * 間を 12 にして題を 18/700 にする。
+   */
+  designTitleRow?: 'mark'
   /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
   layout?: 'continuous' | 'account-inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
@@ -73,6 +85,8 @@ export type DialogProps = {
   confirmDisabled?: boolean
   error?: string
   confirmLabel?: string
+  /** 実行中の文字。Buttonのbusyへ渡す。 */
+  busyLabel?: string
   cancelLabel?: string
   onConfirm?: () => void
   onCancel: () => void
@@ -91,6 +105,8 @@ export type DialogProps = {
   designNode?: string
   /** ConfirmDialog の構造。重要操作でも説明を赤帯へ入れない。 */
   confirmation?: boolean
+  /** 見た目を変えず、重要操作の読み上げの役割を保つ。 */
+  role?: 'dialog' | 'alertdialog'
   /** 本文を持たない短い確認窓。 */
   compact?: boolean
   /**
@@ -108,8 +124,10 @@ export type DialogProps = {
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
 export default function Dialog({
   open,
+  contentLayout,
   size = 'medium',
   designWidth,
+  widthPreset,
   designLayout,
   confirmFirst,
   designTop,
@@ -120,6 +138,8 @@ export default function Dialog({
   footerDivider = true,
   footerLeadFlexible = true,
   titleHelp,
+  titleNote,
+  designTitleRow,
   layout,
   steps,
   stepKey,
@@ -133,6 +153,7 @@ export default function Dialog({
   initialFocusId,
   error,
   confirmLabel = '保存する',
+  busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
   onConfirm,
@@ -144,6 +165,7 @@ export default function Dialog({
   modal = true,
   designNode,
   confirmation = false,
+  role: suppliedRole,
   compact = false,
   primaryAction = 'confirm',
   footerAlign,
@@ -229,6 +251,7 @@ export default function Dialog({
     <>
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
+      {titleNote ? <p className={styles.titleNote}>{titleNote}</p> : null}
       {designLayout === 'stacked' ? null : descriptionNode}
     </>
   )
@@ -237,9 +260,9 @@ export default function Dialog({
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
       onChangeCapture={formInput.onChangeCapture}
       onInputCapture={formInput.onChangeCapture}
-      onClickCapture={formInput.onClickCapture}
+      onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
-      role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
+      role={suppliedRole ?? (tone === 'destructive' ? 'alertdialog' : 'dialog')}
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
@@ -258,9 +281,10 @@ export default function Dialog({
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
+      data-design-title-row={designTitleRow}
       style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        '--dialog-design-width': `${dialogWidth(designWidth ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
+        '--dialog-design-width': `${widthPreset === 'picker' ? 640 : dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
@@ -285,14 +309,9 @@ export default function Dialog({
       </div>
       {designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
+      {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
-      <div className={styles.footer} onClickCapture={(event) => {
-        const button = (event.target as Element).closest?.('button')
-        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
-          event.preventDefault(); event.stopPropagation(); discard.requestClose()
-        }
-      }}>
+      <div className={styles.footer}>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
@@ -318,7 +337,7 @@ export default function Dialog({
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={runConfirm}
-            disabled={busy || confirmDisabled} busy={busy} busyLabel="処理中…">
+            disabled={busy || confirmDisabled} busy={busy} busyLabel={busyLabel}>
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
             {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
           </Button>
@@ -353,4 +372,9 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
       </button>
     </React.Fragment>)}
   </nav>
+}
+
+/** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
+export function DialogActions({ children }: { children: ReactNode }) {
+  return <div className={styles.actions}>{children}</div>
 }

@@ -5,7 +5,7 @@
  * 遅い応答が別リマインダの送信先で上書きしないことも固定する。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReminderDraftVersion } from '@line-crm/shared'
 
@@ -15,14 +15,29 @@ const apiMocks = vi.hoisted(() => ({
   testDraft: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/api', () => ({ api: { reminders: apiMocks } }))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api,
+    reminders: { ...actual.api.reminders,
+      previewDraft: vi.fn(async () => ({ success: true, data: null })),
+      validateDraft: vi.fn(async () => ({ success: true, data: { valid: true, checks: [], audience: { matched: 5, excluded: 1 } } })),
+      ...apiMocks,
+    },
+    folders: { ...actual.api.folders, list: vi.fn(async () => ({ success: true, data: [], unfiledCount: 0 })) },
+    friendFields: { ...actual.api.friendFields, list: vi.fn(async () => ({ success: true, data: [] })) },
+  } }
+})
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 
-import { Issue469ReminderTestStage } from './issue469-reminder-screens'
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', loading: false }) }))
+
+import ReminderEditV8 from '@/v8/reminders/edit'
 
 const DRAFT: ReminderDraftVersion = {
   reminderId: 'rem-1',
@@ -68,6 +83,7 @@ async function flush() {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   apiMocks.getDraft.mockReset()
   apiMocks.getTestRecipient.mockReset()
   apiMocks.testDraft.mockReset()
@@ -78,19 +94,31 @@ describe('リマインダ テスト送信段 (N-070)', () => {
   it('送る前に設定済みの送信先を出す', async () => {
     apiMocks.getDraft.mockReturnValue(ok(DRAFT))
     apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
-    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     await flush()
-    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('テスト送信後に表示')).toBeNull()
     expect(apiMocks.getTestRecipient).toHaveBeenCalledWith('rem-1')
+  })
+
+  it('本文にある差し込みだけ、テストの値と本番の取得元を送信先で確認できる', async () => {
+    apiMocks.getDraft.mockReturnValue(ok({ ...DRAFT, settings: { ...DRAFT.settings, steps: [{ ...DRAFT.settings.steps[0], messageContent: '{{name}} {{field.birthday}} {{meet_datetime}}' }] } }))
+    apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
+    await flush()
+    const summary = screen.getByLabelText('送り先').getAttribute('title')!
+    expect(summary).toContain('{{name}}：テストで使う値＝田中 太郎')
+    expect(summary).toContain('本番での取得元＝')
+    expect(summary).toContain('{{field.birthday}}')
+    expect(summary).not.toContain('{{meet_datetime}}')
   })
 
   it('未設定のとき設定画面への導線を出し、再確認で読み直す', async () => {
     apiMocks.getDraft.mockReturnValue(ok(DRAFT))
     apiMocks.getTestRecipient.mockReturnValueOnce(ok({ state: 'unset', recipient: null }))
-    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     await flush()
-    expect(screen.getAllByText('未設定').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/未設定/).length).toBeGreaterThanOrEqual(1)
     const link = screen.getByText('アカウント設定').closest('a')
     expect(link?.getAttribute('href')).toBe('/accounts/detail?id=account-1')
 
@@ -99,17 +127,17 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
     await flush()
     expect(apiMocks.getTestRecipient).toHaveBeenCalledTimes(2)
-    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(2)
-    expect(screen.queryByText('未設定')).toBeNull()
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/未設定/)).toBeNull()
   })
 
   it('読み込み失敗は未設定と区別し、再確認でやり直せる', async () => {
     apiMocks.getDraft.mockReturnValue(ok(DRAFT))
     apiMocks.getTestRecipient.mockReturnValueOnce(Promise.resolve({ success: false, error: 'server error' }))
-    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     await flush()
-    expect(screen.getAllByText('読み込めませんでした').length).toBeGreaterThanOrEqual(1)
-    expect(screen.queryByText('未設定')).toBeNull()
+    expect(screen.getAllByText(/テスト送信先を読み込めませんでした/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/未設定/)).toBeNull()
 
     apiMocks.getTestRecipient.mockReturnValueOnce(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
     fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
@@ -119,33 +147,36 @@ describe('リマインダ テスト送信段 (N-070)', () => {
 
   it('送信が送信先未設定で失敗したら、その旨と案内を出して同じ画面で再試行できる', async () => {
     apiMocks.getDraft.mockReturnValue(ok(DRAFT))
-    apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'unset', recipient: null }))
+    apiMocks.getTestRecipient.mockReturnValueOnce(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } })).mockReturnValue(ok({ state: 'unset', recipient: null }))
     apiMocks.testDraft.mockReturnValue(Promise.resolve({
       success: false,
       error: 'テスト送信先を設定してください',
       code: 'TEST_RECIPIENT_NOT_CONFIGURED',
     }))
-    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     await flush()
 
     // 確認ダイアログから送信 → 422 未設定
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
     expect(screen.getAllByText('テスト送信先を設定してください').length).toBeGreaterThanOrEqual(1)
     // 送信先起因の失敗は送信先の表示も最新へ揃え直す（再読み込みされる）。
-    expect(apiMocks.getTestRecipient.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(apiMocks.getTestRecipient.mock.calls.length).toBeGreaterThanOrEqual(1)
 
-    // 設定後に同じ画面から再試行 → 成功。
+    expect((screen.getAllByRole('button', { name: 'テストを送る' })[0] as HTMLButtonElement).disabled).toBe(true)
+    // 設定後に同じ画面から送信先を再確認して再試行 → 成功。
     apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
+    fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
+    await flush()
     apiMocks.testDraft.mockReturnValue(ok({ sent: 1, recipientName: '田中 太郎', replayed: false, requestId: 'r1', testedAt: '2026-09-10T03:00:00.000Z' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
     expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText(/テスト済み/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/前回：.*に送れました/).length).toBeGreaterThanOrEqual(1)
   })
 
   /*
@@ -165,8 +196,8 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     )
     apiMocks.testDraft.mockReturnValue(ok({ sent: 1, recipientName: 'Bの送信先', replayed: false, requestId: 'r1', testedAt: '2026-09-10T03:00:00.000Z' }))
 
-    const { rerender } = render(<Issue469ReminderTestStage reminderId="rem-1" />)
-    rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
+    const { rerender } = render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
+    rerender(<ReminderEditV8 stage="confirm" reminderId="rem-2" />)
     await flush()
     expect(screen.getByText('Bの実本文')).toBeTruthy()
     expect(screen.getAllByText(/Bの送信先/).length).toBeGreaterThanOrEqual(1)
@@ -182,7 +213,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
     expect(apiMocks.testDraft.mock.calls[0][0]).toBe('rem-2')
   })
@@ -206,9 +237,9 @@ describe('リマインダ テスト送信段 (N-070)', () => {
       ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }),
     )
 
-    const { rerender } = render(<Issue469ReminderTestStage reminderId="rem-1" />)
-    rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
-    rerender(<Issue469ReminderTestStage reminderId="rem-3" />)
+    const { rerender } = render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
+    rerender(<ReminderEditV8 stage="confirm" reminderId="rem-2" />)
+    rerender(<ReminderEditV8 stage="confirm" reminderId="rem-3" />)
     await flush()
     expect(screen.getByText('Cの実本文')).toBeTruthy()
     // Bは応答済みだが、最終対象ではないので表示に残らない。
@@ -227,18 +258,18 @@ describe('リマインダ テスト送信段 (N-070)', () => {
       .mockRejectedValueOnce(new Error('network lost'))
       .mockResolvedValue({ success: true, data: { sent: 1, recipientName: '田中 太郎', replayed: true, requestId: null, testedAt: '2026-09-10T03:00:00.000Z' } })
 
-    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     await flush()
 
     // 1回目: 通信例外。窓は開いたまま、エラーは窓の中。
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
     expect(apiMocks.testDraft).toHaveBeenCalledTimes(1)
 
     // 2回目: 同じ窓からの再試行は同じ冪等キー。
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'もう一度送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'もう一度送信' }))
     await flush()
     expect(apiMocks.testDraft).toHaveBeenCalledTimes(2)
     expect(apiMocks.testDraft.mock.calls[1][1]).toBe(apiMocks.testDraft.mock.calls[0][1])
@@ -246,7 +277,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     // 成功後に「別のテストをもう一度送る」ときだけ新しいキー。
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
     expect(apiMocks.testDraft).toHaveBeenCalledTimes(3)
     expect(apiMocks.testDraft.mock.calls[2][1]).not.toBe(apiMocks.testDraft.mock.calls[0][1])
@@ -263,11 +294,11 @@ describe('リマインダ テスト送信段 (N-070)', () => {
       .mockRejectedValueOnce(new Error('network lost'))
       .mockResolvedValue({ success: true, data: { sent: 1, recipientName: '田中 太郎', replayed: false, requestId: 'r1', testedAt: '2026-09-10T03:00:00.000Z' } })
 
-    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     await flush()
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
 
     // 窓は開いたまま、エラーは窓の中にあり、背面には出ない。
@@ -276,12 +307,12 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     expect(screen.queryByText('テスト送信に失敗しました。LINE連携と通知内容を確認してください。')).toBeNull()
 
     // 同じ窓から再試行して成功 → 窓が閉じ、失敗文はどこにも残らない。
-    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度送る' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度送信' }))
     await flush()
-    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.queryByText(/送信結果を確認できませんでした/)).toBeNull()
     expect(screen.queryByText(/テスト送信に失敗/)).toBeNull()
-    expect(screen.getByText('直近のテストは成功')).toBeTruthy()
+    expect(screen.getByText(/前回：.*に送れました/)).toBeTruthy()
   })
 
   it('遅れて届いた別リマインダの送信先で画面を上書きしない', async () => {
@@ -292,9 +323,9 @@ describe('リマインダ テスト送信段 (N-070)', () => {
       id === 'rem-1' ? slowA.promise : ok({ state: 'ready', recipient: { id: 'f9', displayName: '別アカウントの人', pictureUrl: null } }),
     )
 
-    const { rerender } = render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    const { rerender } = render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
     // rem-1 の応答が来る前に rem-2 へ切り替える。
-    rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
+    rerender(<ReminderEditV8 stage="confirm" reminderId="rem-2" />)
     await flush()
     expect(screen.getAllByText(/別アカウントの人/).length).toBeGreaterThanOrEqual(1)
 

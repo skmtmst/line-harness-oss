@@ -19,11 +19,11 @@
 }
 
 .map[aria-pressed='true'] {
-  outline-color: var(--color-action);
+  outline-color: var(--color-focus-ring);
 }
 
 .map:focus-visible {
-  outline-color: var(--color-action);
+  outline-color: var(--color-focus-ring);
 }
 
 .joined {

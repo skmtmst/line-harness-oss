@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
- *
- * 板の頭（題・説明・右上に店舗を選ぶ欄）→ 検証環境の帯 → 中身。
- * 寸法は Pencil の板（メニュー管理 MJoJR ほか）の書き出しから読む。
- * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
- * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
- */
 import { notifySaved } from '@/components/shared/toast'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -24,11 +16,21 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+
+/*
+ * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
+ *
+ * 板の頭（題・説明・右上に店舗を選ぶ欄）→ 検証環境の帯 → 中身。
+ * 寸法は Pencil の板（メニュー管理 MJoJR ほか）の書き出しから読む。
+ * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
+ * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
+ */
 
 export interface RestaurantV8Context {
   data: RestaurantSnapshot
@@ -78,12 +80,13 @@ export function BoundaryBanner() {
 }
 
 /** 数の並び。compact は予約台帳の今日（小さい帯・数字20）。 */
-export function StatRow({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
-  return <KpiBand density={compact ? 'compact' : undefined}>{children}</KpiBand>
+export function StatRow({ children, compact = false, fusion = false }: { children: ReactNode; compact?: boolean; fusion?: boolean }) {
+  return <KpiBand data-restaurant-fusion={fusion||undefined} density={compact ? 'compact' : undefined}>{children}</KpiBand>
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */
-export function Panel({ title, description, aside, flush = false, children }: {
+export function Panel({ title, description, aside, flush = false, children,fusion=false }: {
+  fusion?:boolean
   title: ReactNode
   description?: ReactNode
   aside?: ReactNode
@@ -93,8 +96,8 @@ export function Panel({ title, description, aside, flush = false, children }: {
 }) {
   return (
     <Card layout="vertical" surface="inset" overflow="hidden">
-      <CardHeader size="panel" title={title} meta={description} action={aside} />
-      {flush ? children : <div className={styles.panelBody}>{children}</div>}
+      <CardHeader size={fusion?'restaurant':'panel'} title={title} meta={description} action={aside} />
+      {flush ? children : <div className={fusion?styles.panelBodyFusion:styles.panelBody}>{children}</div>}
     </Card>
   )
 }
@@ -109,12 +112,13 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, children }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
   /** 説明の行。店舗によって変わるとき（休業日・貸切の「然-NEN 本店 ・ 総数 26席」）は ctx から作る関数を渡す。 */
   description: string | ((ctx: RestaurantV8Context | null) => string)
+  explanation?: ReactNode
   query?: ReservationQuery
   /**
    * 板の頭の右に置く物（予約台帳の見方の切り替え・主ボタンなど）。店舗を選ぶ欄は2つ目の引数で渡すので、
@@ -137,6 +141,8 @@ export default function RestaurantShell({ boardId, title, description, query, he
   boundary?: boolean
   /** 板の頭の大きさ。compact は E 系の板（題 20・説明の行 20）。 */
   templateHeading?: boolean
+  /** 既存の頭の内側余白。頭を持つ器の中では none を渡す。 */
+  headingInset?: 'none'
   headSize?: 'compact'
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
@@ -152,22 +158,26 @@ export default function RestaurantShell({ boardId, title, description, query, he
   const [loadError, setLoadError] = useState<unknown>(null)
 
   /* 見方・絞り込みを続けて変えたとき、先に出した古い問い合わせの返事が後から来て新しい結果を上書きしないように、最後の1件だけを使う。 */
+  const [savedButUnread, setSavedButUnread] = useState(false)
   const latest = useRef(0)
   const load = useCallback(async () => {
     const ticket = ++latest.current
-    if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return }
+    if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return false }
     setLoading(true)
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId, query)
-      if (ticket !== latest.current) return
+      if (ticket !== latest.current) return false
       setSnapshot(res.data)
       setLoadError(null)
+      setSavedButUnread(false)
       setSelectedStoreId((current) => (res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || ''))
+      return true
     } catch (caught) {
-      if (ticket !== latest.current) return
+      if (ticket !== latest.current) return false
       setLoadError(caught)
+      return false
     } finally {
       if (ticket === latest.current) setLoading(false)
     }
@@ -178,8 +188,9 @@ export default function RestaurantShell({ boardId, title, description, query, he
     setBusy(true)
     try {
       await action()
-      await load()
-      notifySaved(success)
+      const refreshed = await load()
+      if (refreshed) notifySaved(success)
+      else setSavedButUnread(true)
       return true
     } catch (error) {
       if (error instanceof QuietError) { setNotice(null); return false }
@@ -198,7 +209,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     [snapshot, selectedStoreId],
   )
   const ctx: RestaurantV8Context | null = snapshot?.organization
-    ? { data: snapshot, store, selectedStoreId, busy, mutate, reload: load }
+    ? { data: snapshot, store, selectedStoreId, busy, mutate, reload: async () => { await load() } }
     : null
 
   const content = loading && !snapshot ? (
@@ -210,24 +221,14 @@ export default function RestaurantShell({ boardId, title, description, query, he
   ) : (
     children(ctx)
   )
-  const storePicker = snapshot && snapshot.stores.length > 0 ? (
-    <span>
-      <StoreFilterTabs
-
-
-        value={selectedStoreId}
-        onChange={setSelectedStoreId}
-        options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
-      />
-    </span>
-  ) : null
-  const noticeBand = notice ? (
+  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect size="full" aria-label="店舗" noun="店舗" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
+  const noticeBand = loadError !== null && snapshot?.organization ? <ListState kind="error" title={savedButUnread ? "保存しましたが、最新の表示を読み込めませんでした" : "最新の表示を読み込めませんでした"} error={loadError} onRetry={()=>void load()}/> : notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
 
   if (bare) {
     return (
-      <div data-design-node={boardId} className={styles.page}>
+      <div data-design-node={boardId} className={styles.page} data-list-skeleton={layout === 'ledger' ? 'templates' : undefined}>
         {noticeBand}
         {content}
       </div>
@@ -235,16 +236,17 @@ export default function RestaurantShell({ boardId, title, description, query, he
   }
 
   const page = (
-    <div data-design-node={boardId} className={styles.page}>
+    <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} data-list-skeleton={layout === 'ledger' && !templateHeading ? 'templates' : undefined} className={styles.page}>
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
-        help={typeof description === 'function' ? description(ctx) : description}
+        subtitle={typeof description === 'function' ? description(ctx) : ctx?.store?.name}
+        help={<>{typeof description === 'function' ? '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}{explanation ? <p>{explanation}</p> : null}</>}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <PageHeading title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
+          <PageHeading inset={headingInset} title={title} help={typeof description === 'function' ? description(ctx) : description} explanation={explanation} />
 
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}

@@ -96,6 +96,23 @@ const buttonByLabel = (label: string) =>
   [...document.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === label) as HTMLButtonElement | undefined
 
 describe('V8 ウェビナー一覧', () => {
+  it('未取得の視聴数は横線にし、理由を実際の補足へ一度だけ出す', async () => {
+    const originalFetch = globalThis.fetch
+    const reason = '視聴区間の記録をまだ集計できないため'
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input)).pathname.endsWith('/overview')) return Promise.resolve(json({ data: { state: 'partial', registrationMode: 'people', metrics: { viewers: { value: null, state: 'unavailable', reason }, viewRate: { value: null, state: 'unavailable', reason } } } }))
+      return originalFetch(input, init)
+    })
+    await render()
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="ウェビナーの説明"]')!
+    const viewers = [...host.querySelectorAll('[data-kpi-presentation]')].find(card => card.querySelector('[data-kpi-label]')?.textContent?.includes('視聴'))
+    expect(viewers?.textContent).toContain('—')
+    await act(async () => help.click())
+    const note = document.querySelector('[role="note"][id]')!
+    expect(note.textContent?.match(/視聴区間の記録をまだ集計できないため/g)).toHaveLength(1)
+    expect(note.textContent).not.toContain('視聴人数:')
+  })
+
   it('行の「…」から「アーカイブする」を選ぶと、対象を言う確かめの窓（VXZ6T）が開く', async () => {
     await render()
     const more = buttonByLabel('ウェビナー「旧機能説明会」の操作')
@@ -126,7 +143,7 @@ describe('V8 ウェビナー一覧', () => {
     await render()
     const row = host.querySelector('[data-row-id="webinar-5"]')
     expect(row?.textContent).toContain('非公開')
-    expect(row?.textContent).toContain('/webinar/old')
+    expect(row?.querySelector('[data-list-name]')?.textContent).not.toContain('/webinar/old')
   })
 
   it('状態の札に、同じ条件で数えた件数が出る', async () => {
@@ -144,4 +161,20 @@ describe('V8 ウェビナー一覧', () => {
     await act(async () => {})
     expect(buttonByLabel('フォルダ「セミナー」の操作')).toBeTruthy()
   })
+})
+
+it('B-241：フォルダ取得失敗と空を分け、読み直して分類を復帰する',async()=>{
+ const fixtureFetch=globalThis.fetch
+ let reads=0
+ vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+   if(new URL(String(input)).pathname.includes('/folders')) {reads++;if(reads===1)throw new Error('fixture failure')}
+   return fixtureFetch(input,init)
+ })
+ await render()
+ expect(host.textContent).toContain('フォルダを読み込めませんでした')
+ await act(async()=>{(host.querySelector('[data-list-state="error"] button') as HTMLButtonElement).click()})
+ await act(async()=>{})
+ expect(host.textContent).not.toContain('フォルダを読み込めませんでした')
+ expect(host.textContent).toContain('セミナー')
+ expect(reads).toBe(2)
 })

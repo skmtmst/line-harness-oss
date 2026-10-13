@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 色を選ぶ（Pencil ★V8 `KVkPg` / ★BG-2 `P8ZUj`・`d6PU4a`）。
@@ -35,7 +35,6 @@
   height: 36px;
   /* 左 4・右 8（Pencil `KVkPg` の実寸。見本の左は詰める） */
   padding: 0 8px 0 4px;
-  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   cursor: pointer;
@@ -49,8 +48,6 @@
 .swatch {
   width: 56px;
   height: 28px;
-  border-radius: var(--radius-tile-sm);
-  box-shadow: inset 0 0 0 1px var(--color-board-line);
 }
 
 /* 色なし（指定なし）のときは斜線で示す */
@@ -98,10 +95,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-panel);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
   animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
 }
 
@@ -246,11 +240,6 @@
   gap: 2px;
 }
 
-.hexMark {
-  color: var(--color-ink-faint);
-  font-size: 12px;
-}
-
 .unit {
   color: var(--color-ink-faint);
   font-size: 10px;
@@ -285,7 +274,7 @@
 .saved:focus-visible,
 .clear:focus-visible,
 .apply:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 1px;
 }
 
@@ -352,7 +341,6 @@
   height: 28px;
   border: 0;
   border-radius: var(--radius-mini);
-  box-shadow: inset 0 0 0 1px var(--color-board-line);
   cursor: pointer;
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }
@@ -411,12 +399,12 @@
 }
 
 /* V8 ではコントロールの枠を濃くする */
-[data-theme='v8'] .well,
-[data-theme='v8'] .hexField,
-[data-theme='v8'] .alphaField,
-[data-theme='v8'] .dropper,
-[data-theme='v8'] .plane,
-[data-theme='v8'] .clear {
+:root .well,
+:root .hexField,
+:root .alphaField,
+:root .dropper,
+:root .plane,
+:root .clear {
   border-color: var(--color-control-border);
 }
 
@@ -425,15 +413,15 @@
    大きさは承認済み ★BG-2 `P8ZUj` が正しい形なので上書きしない:
    ピッカー本体 288px・見本は 8 列の可変幅・スポイト `TvFgh` は 28×28・
    HEX 欄 `Ayckb` は残り幅いっぱい。ここで 226px や 16px に戻すと承認と食い違う。 */
-[data-theme='v8'] .well { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); }
-[data-theme='v8'] .swatch { border-radius: 7px; box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
-[data-theme='v8'] .pop { border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; border-radius: var(--polish-radius-dialog); box-shadow: var(--shadow-controls-pop); }
-[data-theme='v8'] .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
-[data-theme='v8'] .cell[aria-selected='true'] { outline: 2px solid var(--color-accent-deep); outline-offset: -1px; box-shadow: var(--shadow-controls-selected); }
-[data-theme='v8'] .dropper svg { width: 16px; height: 16px; }
-[data-theme='v8'] .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; border-radius: var(--polish-radius-control); }
-[data-theme='v8'] .hexMark, [data-theme='v8'] .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 12px; font-weight: 400; line-height: normal; }
-[data-theme='v8'] .well:focus-visible, [data-theme='v8'] .cell:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
-[data-theme='v8'] .swatch, [data-theme='v8'] .cell { gap: 0; }
-[data-theme='v8'] .cell, [data-theme='v8'] .dropper { min-height: 0; }
+:root .well { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); }
+:root .swatch { border-radius: 7px; box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
+:root .pop { border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; border-radius: var(--polish-radius-dialog); box-shadow: var(--shadow-controls-pop); }
+:root .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
+:root .cell[aria-selected='true'] { outline: 2px solid var(--color-accent-deep); outline-offset: -1px; box-shadow: var(--shadow-controls-selected); }
+:root .dropper svg { width: 16px; height: 16px; }
+:root .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; border-radius: var(--polish-radius-control); }
+:root .hexMark, :root .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 12px; font-weight: 400; line-height: normal; }
+:root .well:focus-visible, :root .cell:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .swatch, :root .cell { gap: 0; }
+:root .cell, :root .dropper { min-height: 0; }
 }

@@ -13,15 +13,14 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 /**
  * #985 LAY-18: 一覧の操作をアプリ全体で同じルールにする。
  *
- * - 「詳細」は操作欄の先頭、「編集」はその次。どちらも枠付きの
- *   補助ボタン（共通 Button）で、文字は1行。
- * - 複製・停止・アーカイブなどは「⋯」メニューへ集約する。
+ * - 「詳細」は操作欄の先頭の補助ボタン。文字は1行。
+ * - 編集・複製・停止・アーカイブなどは「⋯」メニューへ集約する（B-193）。
  * - 削除など元に戻せない操作は区切りの後・赤で必ず最後。
  * - 押せない操作は無効状態と具体的な理由を示す。
  * - タッチ端末では操作領域44px以上を確保する。
  */
 describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => {
-  it('「詳細」→「編集」→「⋯」の順で出す', () => {
+  it('詳細と「…」を出し、編集は閉じた行に出さない', () => {
     const html = renderToStaticMarkup(
       <RowActions
         subjectName="来店お礼"
@@ -30,25 +29,20 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
         menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]}
       />,
     )
-    const detailAt = html.indexOf('詳細')
-    const editAt = html.indexOf('編集')
-    const moreAt = html.indexOf('来店お礼のその他操作')
-    expect(detailAt).toBeGreaterThan(-1)
-    expect(editAt).toBeGreaterThan(-1)
-    expect(moreAt).toBeGreaterThan(-1)
-    expect(detailAt).toBeLessThan(editAt)
-    expect(editAt).toBeLessThan(moreAt)
+    expect(html).toContain('詳細')
+    expect(html).not.toContain('編集')
+    expect(html).toContain('来店お礼のその他操作')
     // 「⋯」は閉じた状態で aria-expanded="false" を持つ。
     expect(html).toContain('aria-expanded="false"')
   })
 
-  it('権限で許可されない操作は呼び出し側が渡さず、行は詰まる', () => {
+  it('権限で許可されない編集は出さず、全行にその他操作の入口を残す', () => {
     const html = renderToStaticMarkup(
       <RowActions subjectName="閲覧のみ" detail={{ href: '/x' }} />,
     )
     expect(html).toContain('詳細')
     expect(html).not.toContain('編集')
-    expect(html).not.toContain('その他操作')
+    expect(html).toContain('その他操作')
   })
 
   it('行き先が役割と違うときはラベルを明記できる', () => {
@@ -63,7 +57,7 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     const src = read('row-actions.tsx')
     expect(src).toContain("'use client'")
     expect(src).toContain("import Button from './button'")
-    expect(src).toContain("import ActionMenu, { type ActionMenuItem } from './action-menu'")
+    expect(src).toContain("import ActionMenu, { orderActionMenuItems, type ActionMenuItem } from './action-menu'")
     // 「⋯」は既存の MoreAction トリガーを使い回す。
     expect(src).toContain('<MoreAction')
     // 機能ごとの裸の button 装飾や文字リンクを新たに作らない。
@@ -76,7 +70,7 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     // 並べ替えと区切りは「…」の部品（RowMenu の orderRowMenuItems）が持つ。動きは row-menu.react.test.tsx。
     expect(src).toContain('items={orderRowMenuItems(items)}')
     // destructiveItem を menuItems の後ろへ連結する（途中に挟まない）。
-    expect(src).toContain('[...menuItems, { ...destructiveItem')
+    expect(src).toContain('[...normalItems, { ...destructiveItem')
   })
 
   it('押せない操作は無効状態と具体的な理由をメニューに出す', () => {
@@ -114,35 +108,12 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*32px/s)
   })
 
-  it('「⋯」が無い行でも同じ幅の場所を取り、主ボタンの位置を全行でそろえる', () => {
-    /*
-     * 一斉配信の送信済み行は「⋯」が無く、主ボタン「詳細」だけが
-     * 右へずれて行ごとにそろわなかった。メニュー無しでも「⋯」
-     * と同じ幅の場所取りを置き、詳細の位置をそろえる。
-     * （CSSは実ブラウザで効く。vitestはCSSを読まないため、
-     * 場所取りの有無は描画結果・大きさはCSS文面で見る。）
-     */
-    const without = renderToStaticMarkup(
-      <RowActions subjectName="送信済みの配信" detail={{ href: '/broadcasts/detail?id=s1' }} />,
-    )
-    const withMenu = renderToStaticMarkup(
-      <RowActions
-        subjectName="下書きの配信"
-        detail={{ href: '/broadcasts/detail?id=d1' }}
-        menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]}
-      />,
-    )
-    // メニュー無しでも場所取りがある（見せない・読ませない）。
-    expect(without).toContain('data-more-placeholder')
-    expect(without).toContain('aria-hidden="true"')
-    // 本物の「⋯」がある行には場所取りを置かない（二重に幅を取らない）。
-    expect(withMenu).toContain('その他操作')
-    expect(withMenu).not.toContain('data-more-placeholder')
-    // 場所取りは「⋯」ボタンと同じ大きさ（32px・指では44px）。
-    const css = read('row-actions.module.css')
-    expect(css).toMatch(/\.morePlaceholder\s*{[^}]*width:\s*32px/s)
-    expect(css).toMatch(/\.morePlaceholder\s*{[^}]*height:\s*32px/s)
-    expect(css).toMatch(/@media \(pointer: coarse\)\s*{[\s\S]*?\.morePlaceholder\s*{[^}]*width:\s*44px/s)
-    expect(css).toMatch(/@media \(pointer: coarse\)\s*{[\s\S]*?\.morePlaceholder\s*{[^}]*height:\s*44px/s)
+  it('B-199：項目がない行も同じその他操作の入口を持つ', () => {
+    const without = renderToStaticMarkup(<RowActions subjectName="送信済み" detail={{ href: '/broadcasts/detail?id=s1' }} />)
+    const withMenu = renderToStaticMarkup(<RowActions detail={{ href: '/broadcasts/detail?id=d1' }} menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]} />)
+    for (const html of [without, withMenu]) {
+      expect(html).toContain('data-row-menu')
+      expect(html).not.toContain('data-more-placeholder')
+    }
   })
 })

@@ -6,15 +6,24 @@ import type { BroadcastBubble } from '@line-crm/shared'
 vi.mock('@/components/scenarios/insert-toolbar', () => ({ default: () => null }))
 vi.mock('@/components/scenarios/message-kind-fields', () => ({ default: () => null, emptyMessageKindState: () => ({}) }))
 vi.mock('./message-composer-media', () => ({ default: () => null }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 import Composer, { ComposerCarouselPreview } from './message-composer'
+import { HqInsertRow, insertHqToken } from './hq-message-inserts'
 afterEach(cleanup)
 const make = (id: string): BroadcastBubble => ({ id, type: 'text', content: { text: id } })
-function Harness({ count = 2 }: { count?: number }) {
+function Harness({ count = 2, hq = false }: { count?: number; hq?: boolean }) {
   const [bubbles, setBubbles] = useState(Array.from({ length: count }, (_, i) => make(`本文${i + 1}`)))
-  return <Composer bubbles={bubbles} accountId={null} unavailable={{ intro: '準備中です' }} onChange={(index, next) => setBubbles(items => items.map((item, i) => i === index ? next : item))} onMove={(index, direction) => setBubbles(items => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next })} onDelete={index => setBubbles(items => items.filter((_, i) => i !== index))} onAdd={() => setBubbles(items => [...items, make('新しい本文')])} onPickTemplate={() => {}} onSaveTemplate={() => {}} onCompose={() => {}} />
+  return <Composer bubbles={bubbles} accountId={null} inserts={hq ? (ref, value, change) => <HqInsertRow count={value.length} onInsert={token => insertHqToken(ref, value, change, token)} /> : undefined} unavailable={{ intro: '準備中です' }} onChange={(index, next) => setBubbles(items => items.map((item, i) => i === index ? next : item))} onMove={(index, direction) => setBubbles(items => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next })} onDelete={index => setBubbles(items => items.filter((_, i) => i !== index))} onAdd={() => setBubbles(items => [...items, make('新しい本文')])} onPickTemplate={() => {}} onSaveTemplate={() => {}} onCompose={() => {}} />
 }
 describe('共通メッセージ composer', () => {
+  it('統括の差し込みは1行と1つの文字数を持ち、選んだ本文へ挿入する', () => {
+    const { container } = render(<Harness count={1} hq />)
+    expect(container.querySelectorAll('[data-message-insert-row]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-message-character-count]')).toHaveLength(1)
+    expect(screen.getAllByText('差し込む')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '店名', exact: true }))
+    expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toContain('{{account.name}}')
+  })
+
   it('カルーセルの見本は実際の全カードとボタンを表示し、壊れたJSONは送信内容と混ぜない', () => {
     const content = { columnsJson: JSON.stringify([{ title: '商品A', actions: [{ label: '購入する' }] }, { title: '商品B', actions: [{ label: '予約する' }] }, { title: '商品C', actions: [{ label: '詳細を見る' }] }]) }
     const { rerender } = render(<ComposerCarouselPreview bubble={{ id: 'c', type: 'carousel', content }} />)

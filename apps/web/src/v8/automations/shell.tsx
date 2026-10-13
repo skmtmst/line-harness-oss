@@ -9,9 +9,10 @@
  * v7 の画面（app/automations/page.tsx の v7 の枝）は触らない。データの口は同じ。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Eye } from 'lucide-react'
+
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { useStaffRole } from '@/lib/staff-role'
 import {
   canExportAutomationRuns,
@@ -22,7 +23,8 @@ import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './shell.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type AutomationTabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
@@ -33,33 +35,27 @@ export const AUTOMATIONS_DESCRIPTION = '「〇〇したら △△する」を決
 export const READONLY_REASON = '閲覧のみのため、この操作はできません'
 
 function readPermissionKeys(): string[] {
-  try {
-    const raw = window.localStorage.getItem('lh_staff_permissions')
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []
-  } catch {
-    return []
-  }
+  return readStaffIdentity()?.permissionKeys ?? []
 }
 
 /*
  * ルールを変えられるか。役割はサーバ（/api/staff/me）から読む（手元の保存値は書き換えられる）。
  * staff は権限キー `/automations` を持つときだけ変えられる（サーバの requireAutomationPermission と同じ条件）。
- * 役割が読めるまでは null（呼ぶ側は今までどおり操作を出す。最後の守りはサーバの 403）。
+ * 役割が読めるまでは false（操作を隠す。最後の守りはサーバの 403）。
  */
 export function useAutomationManage(): boolean | null {
   const role = useStaffRole()
-  if (role === null) return null
+  if (role === null) return false
   return canManageAutomationRole(role, typeof window === 'undefined' ? [] : readPermissionKeys())
 }
 
 /*
  * 動いた記録の操作（もう一度やる・取りやめる＝automation.run.retry、CSV＝automation.run.export）。
- * 役割はサーバから読む。読めるまでは null（今までどおり出す）。
+ * 役割はサーバから読む。読めるまでは 操作を隠す。
  */
 export function useAutomationRunManage(): { canOperate: boolean; canExport: boolean } | null {
   const role = useStaffRole()
-  if (role === null) return null
+  if (role === null) return { canOperate: false, canExport: false }
   const keys = typeof window === 'undefined' ? [] : readPermissionKeys()
   return { canOperate: canOperateAutomationRun(role, keys), canExport: canExportAutomationRuns(role, keys) }
 }
@@ -98,10 +94,7 @@ export function AutomationTabs({ active, counts }: { active: AutomationTabKey; c
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <div className={styles.viewerBand} role="status">
-        <Eye size={16} aria-hidden="true" />
-        <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-      </div>
+      <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
     </div>
   )
 }
@@ -147,13 +140,14 @@ export interface AutomationTabCounts {
  * タブの件数を読む口（ルールの一覧・共通アクションの一覧・見本の一覧）。
  * ルールの数は一覧を読む画面が持っているときは渡してもらう（同じ口を2回読まない）。
  */
-export function useAutomationTabCounts(rulesFromPage?: number | null): AutomationTabCounts {
+export function useAutomationTabCounts(rulesFromPage?: number | null, commonActionsFromPage?: number | null): AutomationTabCounts {
   const { selectedAccountId } = useAccount()
   const generationRef = useRef(0)
   const [rules, setRules] = useState<number | null>(null)
   const [commonActions, setCommonActions] = useState<number | null>(null)
   const [templates, setTemplates] = useState<number | null>(null)
   const needRules = rulesFromPage === undefined
+  const needCommonActions = commonActionsFromPage === undefined
 
   const load = useCallback(async () => {
     const generation = ++generationRef.current
@@ -163,16 +157,16 @@ export function useAutomationTabCounts(rulesFromPage?: number | null): Automatio
     if (!selectedAccountId) return
     const [rulesResult, commonResult, templatesResult] = await Promise.allSettled([
       needRules ? api.automations.list({ accountId: selectedAccountId }) : Promise.resolve(null),
-      api.commonActions.list({ accountId: selectedAccountId }),
+      needCommonActions ? api.commonActions.list({ accountId: selectedAccountId }) : Promise.resolve(null),
       api.automations.templates(selectedAccountId),
     ])
     if (generationRef.current !== generation) return
     if (rulesResult.status === 'fulfilled' && rulesResult.value && rulesResult.value.success) setRules(rulesResult.value.data.length)
-    if (commonResult.status === 'fulfilled' && commonResult.value.success) setCommonActions(commonResult.value.data.length)
+    if (commonResult.status === 'fulfilled' && commonResult.value && commonResult.value.success) setCommonActions(commonResult.value.data.length)
     if (templatesResult.status === 'fulfilled' && templatesResult.value.success) setTemplates(templatesResult.value.data.length)
-  }, [selectedAccountId, needRules])
+  }, [selectedAccountId, needRules, needCommonActions])
 
   useEffect(() => { void load() }, [load])
 
-  return { rules: needRules ? rules : rulesFromPage ?? null, commonActions, templates }
+  return { rules: needRules ? rules : rulesFromPage ?? null, commonActions: needCommonActions ? commonActions : commonActionsFromPage ?? null, templates }
 }

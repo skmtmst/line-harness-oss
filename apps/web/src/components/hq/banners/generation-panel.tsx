@@ -33,6 +33,7 @@ import {
   type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 使い方の説明に添える印。★BG-B `R6MBHf` の子の icon そのまま（lucide・14px・`$ink-secondary`）。
@@ -165,7 +166,7 @@ export default function GenerationPanel({
                     <p className="truncate text-label font-medium text-ink">{name}</p>
                     <p className="truncate text-micro text-ink-faint">{image ? tileCaption(image, presets) : `${index + 1}枚目`}</p>
                   </div>
-                  <Select
+                  <SaveErrorField names={[`references.${index}.mode`,"mode","entry.mode"]}><Select
                     aria-label={`${name}の使い方`}
                     className="w-44"
                     value={entry.mode}
@@ -179,7 +180,7 @@ export default function GenerationPanel({
                       )
                     }
                     options={BANNER_REFERENCE_MODES.map((mode) => ({ value: mode, label: BANNER_REFERENCE_MODE_LABEL[mode] }))}
-                  />
+                  /></SaveErrorField>
                   <Button
                     disabled={disabled || referenceBusy}
                     aria-label={`${name}を外す`}
@@ -270,7 +271,7 @@ export default function GenerationPanel({
             {value.textLines.map((line, i) => (
               <div key={i} className={v8Layout ? styles.v8TextRow : "flex items-center gap-2"}>
                 <span className={v8Layout ? styles.v8LineNumber : "w-3 text-micro font-semibold text-ink-faint"} aria-hidden="true">{i + 1}</span>
-                <TextField
+                <SaveErrorField names={["line","lines"]}><TextField
                   aria-label={`テキスト ${i + 1}行目`}
                   value={line}
                   maxLength={TEXT_LINE_LENGTH_MAX}
@@ -282,7 +283,7 @@ export default function GenerationPanel({
                     setLines(next, value.emphasisLines)
                   }}
                   className="min-w-0 flex-1"
-                />
+                /></SaveErrorField>
                 <EmphasisToggle
                   v8Layout={v8Layout}
                   index={i}
@@ -341,12 +342,12 @@ export default function GenerationPanel({
             */}
           <fieldset className="flex items-center gap-5" disabled={disabled}>
             <legend className="sr-only">人物</legend>
-            <Radio name={`${uid}-person`} value="without" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'without'} onChange={() => set('personOption', 'without')}>
+            <SaveErrorField names={["personOption","value.personOption"]}><Radio name={`${uid}-person`} value="without" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'without'} onChange={() => set('personOption', 'without')}>
               入れない
-            </Radio>
-            <Radio name={`${uid}-person`} value="with" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'with'} onChange={() => set('personOption', 'with')}>
+            </Radio></SaveErrorField>
+            <SaveErrorField names={["personOption","value.personOption"]}><Radio name={`${uid}-person`} value="with" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'with'} onChange={() => set('personOption', 'with')}>
               入れる
-            </Radio>
+            </Radio></SaveErrorField>
           </fieldset>
         </Field>
 
@@ -361,7 +362,7 @@ export default function GenerationPanel({
             たたんだ高さを板に合わせるだけで、`.multi` の `resize: vertical` は残るので
             長い指示は引き伸ばして書ける。
           */}
-          <TextArea
+          <SaveErrorField names={["customPrompt","value.customPrompt","custom_prompt","value.custom_prompt"]}><TextArea
             id={`${uid}-custom`}
             rows={1}
             style={v8Layout ? { minHeight: 0, height: 50, padding: "8px 10px", fontSize: 12, lineHeight: "18px" } : { minHeight: 0 }}
@@ -371,7 +372,7 @@ export default function GenerationPanel({
             placeholder="例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気"
             onChange={(event) => set('customPrompt', event.target.value)}
             className="w-full"
-          />
+          /></SaveErrorField>
         </Field>
 
         {/*
@@ -390,7 +391,7 @@ export default function GenerationPanel({
             * aria-label="枚数" を持つので、外側に fieldset+legend「枚数」を
             * 重ねない（group が2つになる）。操作停止は disabled で渡す。
             */}
-          <SegmentedControl
+          <SaveErrorField names={["count","value.count"]}><SegmentedControl
             aria-label="枚数"
             size="panel"
             equalWidth={v8Layout}
@@ -401,7 +402,7 @@ export default function GenerationPanel({
             }))}
             value={String(value.count)}
             onChange={(next) => set('count', Number(next))}
-          />
+          /></SaveErrorField>
         </Field>
 
         {monthRemaining ? <p className="text-caption text-ink-secondary" aria-live="polite">{`今月の残り ${usage?.month.remaining ?? '—'}枚`}</p> : null}
@@ -595,7 +596,7 @@ function OutputSize({
         <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
         <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
-      <RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-1.5'}>
+      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-1.5'}>
         {[...line, ...(showOthers ? others : [])].map((preset) => (
           <RadioCard
             key={preset.key}
@@ -610,7 +611,7 @@ function OutputSize({
             note={presetSizeLabel(preset)}
           />
         ))}
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
       {showOthers ? null : (
         <Button
           variant="secondary"

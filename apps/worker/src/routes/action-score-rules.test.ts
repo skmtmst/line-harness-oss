@@ -5,6 +5,7 @@ const dbMocks = {
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async () => null),
   getPlatformAdminRecord: vi.fn(async () => null),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getActionScoreBandOverview: vi.fn(),
   getActionScoreRuleConfiguration: vi.fn(),

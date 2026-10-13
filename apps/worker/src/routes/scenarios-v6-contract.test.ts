@@ -141,7 +141,7 @@ describe('scenario V6 routes', () => {
   });
 
   it('scenario.definition.editを持つstaffは下書きを保存できる', async () => {
-    const response = await app('staff', ['scenario.definition.edit']).request(
+    const response = await app('staff', ['/scenarios', 'scenario.definition.edit']).request(
       '/api/scenarios/scenario-1/draft',
       json('PUT', { lineAccountId: 'account-1', expectedVersion: 0, afterActions: [] }),
     );

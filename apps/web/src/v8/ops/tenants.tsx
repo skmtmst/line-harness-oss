@@ -1,20 +1,19 @@
 'use client'
-
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
-import { formatDate, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
+import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -28,6 +27,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
@@ -155,12 +155,12 @@ export default function OpsTenantsV8() {
         )}
       />
       <div className={parts.stack}>
-        <div className={`${parts.kpis} ${kpiStyles.strip}`}>
+        <KpiBand>
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<CreditCard size={13} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Pause size={13} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
-        </div>
+        </KpiBand>
 
         <div className={styles.tools}>
           <div className={styles.search}>
@@ -207,15 +207,15 @@ export default function OpsTenantsV8() {
                     <Link href={tenantDetailHref(row.id)} className={parts.link} ><TruncatedText value={String(row.name ?? '')} /></Link>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell"><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>
+                  <span className={`${parts.fixed} ${styles.col90}`} role="cell" title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${PLAN_STATUS_LABEL[row.plan_status] ?? row.plan_status}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>
                   <span className={`${parts.num} ${styles.colStores}`} role="cell">{row.account_count}</span>
                   <span className={`${parts.num} ${styles.colStaff}`} role="cell">{row.staff_count}</span>
                   <span className={`${parts.fixed} ${styles.colBilling} ${styles.billing}`} role="cell">
                     <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
-                    <span className={styles.billingSub}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
+                    <span className={styles.billingSub} title={`トライアル期限 ${formatDateTime(row.trial_ends_at)}・次回請求 ${formatDateTime(row.current_period_ends_at)}`}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{formatDate(row.created_at).replace(/-/g, '/')}</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell">{monthDay(row.last_login_at)}</span>
+                  <span className={`${parts.fixed} ${styles.col90}`} role="cell" title={formatDateTime(row.last_login_at)}>{monthDay(row.last_login_at)}</span>
                   <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</span>
                 </div>
               )
@@ -239,11 +239,11 @@ export default function OpsTenantsV8() {
         onCancel={closeCreate}
       >
         <div className={parts.dialogBody}>
-          <Field label="統括名（会社名）"><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></Field>
+          <Field label="統括名（会社名）"><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
           <div className={styles.field}>
             <span className={styles.smallLabel}>飲食店機能</span>
             <div className={styles.fullSelect}>
-              <Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} />
+              <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
             </div>
           </div>
           <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>

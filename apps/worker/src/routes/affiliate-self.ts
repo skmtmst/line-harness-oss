@@ -31,7 +31,7 @@ import {
   type AffiliateLink,
   type AffiliateLinkStat,
 } from '@line-crm/db';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { affiliateBankFields, DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
 import type { Env } from '../index.js';
@@ -518,18 +518,17 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
       accountNumber?: unknown; accountHolderName?: unknown; expectedVersion?: unknown;
     };
     const body = await c.req.json<BankBody>().catch((): BankBody => ({}));
-    if (!isValidIdempotencyKey(key) || typeof body.lineAccessToken !== 'string'
-      || typeof body.bankCode !== 'string' || !/^\d{4}$/.test(body.bankCode)
-      || typeof body.bankName !== 'string' || !body.bankName.trim() || body.bankName.length > 100
-      || typeof body.branchCode !== 'string' || !/^\d{3}$/.test(body.branchCode)
-      || typeof body.branchName !== 'string' || !body.branchName.trim() || body.branchName.length > 100
-      || (body.accountType !== 'ordinary' && body.accountType !== 'checking')
-      || typeof body.accountNumber !== 'string' || !/^\d{1,8}$/.test(body.accountNumber)
-      || typeof body.accountHolderName !== 'string' || !body.accountHolderName.trim()
-      || body.accountHolderName.length > 64 || !Number.isInteger(body.expectedVersion)
-      || Number(body.expectedVersion) < 0) {
-      return inputError(c, { success: false, error: '振込先、版、再実行キーを確認してください' }, 400, ["accountId","expectedVersion"]);
+    const fields = affiliateBankFields(body);
+    if (Object.keys(fields).length) {
+      return c.json({ success: false, error: '振込先を確認してください', fields }, 400);
     }
+    if (!isValidIdempotencyKey(key) || typeof body.lineAccessToken !== 'string'
+      || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+      return inputError(c, { success: false, error: '版、再実行キーを確認してください' }, 400, ['expectedVersion']);
+    }
+    // 欄の検証後に型を固定する。秘密値は応答・ログに含めない。
+    const bank = body as BankBody & { bankCode: string; bankName: string; branchCode: string;
+      branchName: string; accountNumber: string; accountHolderName: string };
     const resolved = await resolveFriendFromLineToken(c.env, body.lineAccessToken);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
@@ -538,17 +537,17 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
     const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
     if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     const canonical = {
-      bankCode: body.bankCode, bankName: body.bankName.trim(), branchCode: body.branchCode,
-      branchName: body.branchName.trim(), accountType: body.accountType as 'ordinary' | 'checking',
-      accountNumber: body.accountNumber, accountHolderName: body.accountHolderName.trim(),
+      bankCode: bank.bankCode, bankName: bank.bankName.trim(), branchCode: bank.branchCode,
+      branchName: bank.branchName.trim(), accountType: body.accountType as 'ordinary' | 'checking',
+      accountNumber: bank.accountNumber, accountHolderName: bank.accountHolderName.trim(),
       expectedVersion: Number(body.expectedVersion),
     };
     const result = await saveAffiliateBankProfile(c.env.DB, {
       tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId,
       affiliateId: affiliate.id, ...canonical,
-      encryptedAccountNumber: await encryptCredential(body.accountNumber, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
-      accountLast4: body.accountNumber.slice(-4),
-      accountFingerprint: await sha256Hex(body.accountNumber),
+      encryptedAccountNumber: await encryptCredential(bank.accountNumber, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+      accountLast4: bank.accountNumber.slice(-4),
+      accountFingerprint: await sha256Hex(bank.accountNumber),
       idempotencyKey: key,
       requestFingerprint: await sha256Hex(JSON.stringify(canonical)),
     });

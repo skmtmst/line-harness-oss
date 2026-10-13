@@ -3,6 +3,7 @@ import React, { type HTMLAttributes, type ReactNode } from 'react'
 import type { StatusBadgeTone } from './status-badge'
 import TruncatedText from './truncated-text'
 import styles from './status-pill.module.css'
+import { normalizeStatusWord } from './status-words'
 
 export type SupportStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 export const SUPPORT_STATUS_TONES: Record<SupportStatus, StatusBadgeTone> = {
@@ -20,8 +21,8 @@ export default function StatusPill({ children, tone = 'neutral', color, ...props
   tone?: StatusBadgeTone
   color?: string | null
 }) {
-  return <span className={styles.pill} {...props} data-tone={tone}>
+  return <span className={styles.pill} {...props} data-status-pill="" data-tone={tone}>
     <StatusDot tone={tone} color={color} />
-    {typeof children === 'string' ? <TruncatedText className={styles.name} value={statusLabel(children)} /> : <span className={styles.name}>{children}</span>}
+    {typeof children === 'string' ? <TruncatedText className={styles.name} value={normalizeStatusWord(statusLabel(children))} /> : <span className={styles.name}>{children}</span>}
   </span>
 }

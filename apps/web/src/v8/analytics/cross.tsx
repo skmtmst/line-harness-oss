@@ -1,17 +1,8 @@
 'use client'
 
-/*
- * ★V8 分析「クロス分析」（Pencil `u5CuB8`）。
- * 数の帯 → 選ぶ段（数えるもの・たての軸・よこの軸・期間・集計する・この分析を保存）
- * → 左に掛け合わせの表（濃さはその表の最大が基準・マスを押して選ぶ・凡例）、
- *   右に選んだマス（対象者を開く・この対象者へ配信を作成）とこの表から読めること → 見かたの注意。
- * 集計は重いので開いただけでは走らせない（「集計する」で受け付け、結果は待ち順で届く）。
- * 呼ぶ口・待ち順の確認（打ち切り・再接続・控え）・世代の守り・CSV は今の画面（CrossTab）と同じ。
- * よこの軸は友だち情報だけでなく、流入経路・タグなど口が受け付ける軸を選べる（絵どおり）。
- */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Grid2x2, HelpCircle, Send, Square, Users } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import KpiBand from '@/components/shared/kpi-band'
@@ -27,6 +18,20 @@ import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+import AggregationStatus from '@/components/shared/aggregation-status'
+
+/*
+ * ★V8 分析「クロス分析」（Pencil `u5CuB8`）。
+ * 数の帯 → 選ぶ段（数えるもの・たての軸・よこの軸・期間・集計する・この分析を保存）
+ * → 左に掛け合わせの表（濃さはその表の最大が基準・マスを押して選ぶ・凡例）、
+ *   右に選んだマス（対象者を開く・この対象者へ配信を作成）とこの表から読めること → 見かたの注意。
+ * 集計は重いので開いただけでは走らせない（「集計する」で受け付け、結果は待ち順で届く）。
+ * 呼ぶ口・待ち順の確認（打ち切り・再接続・控え）・世代の守り・CSV は今の画面（CrossTab）と同じ。
+ * よこの軸は友だち情報だけでなく、流入経路・タグなど口が受け付ける軸を選べる（絵どおり）。
+ */
 
 type CrossQueueStatus = { state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'; queuePosition: number | null; pendingAhead: number; estimatedWaitMs: number | null; nextTickAt: string | null }
 export type CrossSaveSlot = (props: { sourceResultId: string; defaultName: string }) => ReactNode
@@ -90,6 +95,7 @@ function axisOf(value: string): AnalyticsCrossAxis {
 }
 
 export default function CrossV8({ accountId, canManage, renderSave }: { accountId: string; canManage: boolean; renderSave?: CrossSaveSlot }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [fields, setFields] = useState<FriendField[]>([])
   const [fieldsError, setFieldsError] = useState('')
@@ -102,6 +108,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const { days: crossDays, setDays: setCrossDays, customRange, setRange } = useReportPeriod()
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
   const [crossRunId, setCrossRunId] = useState('')
+  const [startedAt, setStartedAt] = useState<string | null>(null)
   const [crossResultId, setCrossResultId] = useState('')
   const [crossQueue, setCrossQueue] = useState<CrossQueueStatus | null>(null)
   const [crossAutoStopped, setCrossAutoStopped] = useState(false)
@@ -132,7 +139,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   // 同じアカウントの実行中の集計だけを、hydration の後に一度だけ復元する。
   useEffect(() => {
     const stored = readStoredCrossRun(accountId)
-    if (stored) { setCrossRunId(stored.id); setCrossResultId(stored.id); setLoading(true); setRestoredCrossRun(true) }
+    if (stored) { setStartedAt(new Date(stored.createdAt).toISOString()); setCrossRunId(stored.id); setCrossResultId(stored.id); setLoading(true); setRestoredCrossRun(true) }
     setCrossStorageRestored(true)
   }, [accountId])
   useEffect(() => {
@@ -186,20 +193,33 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         }
       } catch (caught) {
         if (!active) return
+        const fieldFailure = saveErrors.capture(caught);
+
         if (caught instanceof ApiError && caught.status === 401) {
           setCrossAutoStopped(true)
-          setError('ログインを確認できません。ログインし直した後、同じ集計を確認できます')
+          { if (!fieldFailure)
+
+
+          setError('ログインを確認できません。ログインし直した後、同じ集計を確認できます') }
           setLoading(false)
           return
         }
         if (caught instanceof ApiError && [400, 403, 404, 410].includes(caught.status)) {
           clearCrossRun()
-          setError('前回のクロス分析は利用できません。もう一度集計してください')
+          if (caught.status === 404) {
+            setError('')
+            setCrossResult(null)
+            setLoading(false)
+            return
+          }
+          { if (!fieldFailure)
+          setError('前回のクロス分析は利用できません。もう一度集計してください') }
           setLoading(false)
           return
         }
         pollErrors += 1
-        setError('クロス分析を確認できませんでした。確認を続けています')
+        { if (!fieldFailure)
+        setError('クロス分析を確認できませんでした。確認を続けています') }
         if (stopIfDeadlinePassed()) return
         timer = window.setTimeout(() => void check(), CROSS_POLL_ERROR_BACKOFF_MS * Math.min(pollErrors, 3))
         return
@@ -210,7 +230,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
     }
     void check()
     return () => { active = false; if (timer !== undefined) window.clearTimeout(timer) }
-  }, [accountId, clearCrossRun, crossRunId, crossRecheck, crossStorageRestored])
+  }, [accountId, clearCrossRun, crossRunId, crossRecheck, crossStorageRestored, saveErrors])
 
   const recheckCross = () => {
     if (!crossStorageRestored || !crossRunId) return
@@ -223,6 +243,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const runCross = async () => {
     if (!crossStorageRestored || sameAxis || crossRunId || crossStartInFlight.current) return
     crossStartInFlight.current = true
+    setStartedAt(new Date().toISOString())
     const generation = viewGeneration.current
     setLoading(true); setError(''); setPickedKey(null); setCrossResult(null); setCrossQueue(null); setCrossAutoStopped(false); setRestoredCrossRun(false)
     setResultAxes({ row: axisLabel(rowAxis), column: axisLabel(columnAxis), unit: measureKind === 'events' ? '回' : '人' })
@@ -244,8 +265,13 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       setCrossRunId(response.data.id)
     } catch (caught) {
       if (viewGeneration.current !== generation) return
+      const fieldFailure = saveErrors.capture(caught);
+
       const code = caught instanceof Error ? caught.message : ''
-      setError(explainStartError(code, code || 'クロス分析を開始できませんでした'))
+      { if (!fieldFailure)
+
+
+      setError(explainStartError(code, code || 'クロス分析を開始できませんでした')) }
       setLoading(false)
     } finally {
       crossStartInFlight.current = false
@@ -314,7 +340,11 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       router.push(to === 'friends' ? `/friends?audienceId=${id}` : `/broadcasts/new?audienceId=${id}`)
     } catch (caught) {
       if (viewGeneration.current !== generation) return
-      setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure)
+
+
+      setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした') }
     } finally { setAudienceBusy(false) }
   }
 
@@ -328,8 +358,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
     <KpiCard presentation="band" title="未入力" icon={<HelpCircle size={13} aria-hidden="true" />} value={null} unit="人" detail="値がまだ無い人（表に出ない）" />
   </KpiBand>
 
-  if (fieldsLoading) return <>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="loading" title="友だち情報欄を読み込んでいます" /></div></>
-  if (fieldsError) return <>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="error" title="友だち情報欄を読み込めませんでした。" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setFieldsReload((n) => n + 1)} /></div></>
+  if (fieldsLoading) return <SaveErrorScope errors={saveErrors}><>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="loading" title="友だち情報欄を読み込んでいます" /></div></></SaveErrorScope>
+  if (fieldsError) return <SaveErrorScope errors={saveErrors}><>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="error" title="友だち情報欄を読み込めませんでした。" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setFieldsReload((n) => n + 1)} /></div></></SaveErrorScope>
 
   const axisOptions = (kinds: readonly string[]) => [
     ...kinds.map((kind) => ({ value: kind, label: AXIS_LABELS[kind] })),
@@ -337,21 +367,20 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   ]
   const tableTitle = resultAxes ? `何を掛け合わせるか：${resultAxes.row} × ${resultAxes.column}` : `何を掛け合わせるか：${axisLabel(rowAxis)} × ${axisLabel(columnAxis)}`
 
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     {kpis}
     <div className={styles.body} data-gap="tab">
       <div className={styles.controls}>
-        <Field label="数えるもの"><Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} /></Field>
-        {measureKind === 'events' ? <Field label="数えるイベント"><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></Field> : null}
-        <Field label="たての軸"><Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></Field>
-        <Field label="よこの軸"><Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></Field>
-        <PeriodPicker days={crossDays} onChange={setCrossDays} customRange={customRange} onRangeChange={setRange} />
-        <Button variant="primary" onClick={() => void runCross()} disabled={loading || !crossStorageRestored || sameAxis || Boolean(crossRunId)} busy={loading} busyLabel="集計中" title={sameAxis ? 'たてとよこに同じ軸は選べません' : '期間や軸を変えた場合は、新しい結果として集計します'}>集計する</Button>
+        <Field label="数えるもの"><SaveErrorField names={["measureKind","measure_kind"]}><Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} /></SaveErrorField></Field>
+        {measureKind === 'events' ? <Field label="数えるイベント"><SaveErrorField names={["measureEventType","eventType","measure_event_type"]}><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></SaveErrorField></Field> : null}
+        <Field label="たての軸"><SaveErrorField names={["rowAxis","row_axis"]}><EntitySelect aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></SaveErrorField></Field>
+        <Field label="よこの軸"><SaveErrorField names={["columnAxis","column_axis"]}><EntitySelect id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></SaveErrorField></Field>
+        <SaveErrorField names={["crossDays","cross_days"]}><PeriodPicker days={crossDays} onChange={setCrossDays} customRange={customRange} onRangeChange={setRange} /></SaveErrorField>
         <span className={styles.spacer} />
         {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}
       </div>
       {sameAxis ? <p className={styles.warnText}>たてとよこに同じ軸は選べません</p> : null}
-      {error ? <p className={styles.inlineError} role="alert">{error}</p> : null}
+      <AggregationStatus state={error ? { kind: 'failed', reason: error } : crossRunId || loading ? { kind: 'running', startedAt } : crossResult ? { kind: 'complete', dataAt: crossResult.dataCutoffAt } : { kind: 'empty' }} onRun={() => crossRunId ? recheckCross() : void runCross()} disabled={!crossStorageRestored || sameAxis} />
       {crossResult?.stateReason ? <p className={styles.warnText}>{crossResult.stateReason}</p> : null}
 
       {loading ? <div className={styles.waitBox} role="status">
@@ -413,5 +442,5 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       {crossResult ? <p className={styles.noteBox} title={periodCaption(crossResult.periodFrom, crossResult.periodTo, crossResult.dataCutoffAt)}>見かたの注意：「未記録」は、その項目にまだ値が入っていない人です。いまは表に出ません。マスの色は、その表の中でいちばん多い数を基準にした濃さです。1人が複数のタグを持つ場合、それぞれの行に数えられます。数えているのは、こちらで観測できたことだけです。</p>
         : <p className={styles.noteBox}>数えているのは、こちらで観測できたことだけです。LINEで開かれたかどうかは取れないため、この画面には出しません。集計結果はその時点のデータで固定します。</p>}
     </div>
-  </>
+  </></SaveErrorScope>
 }

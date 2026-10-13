@@ -2,9 +2,9 @@ import { expect, test } from 'vitest'
 import { FIXED_FRIEND_FIELDS, emptyLayout } from '@line-crm/shared'
 import { ADD_GROUPS } from './model'
 import { hqFormEditorToDefinition, hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter'
-test('store and HQ definitions keep all seven keys, full-width images and alternative text',()=>{
+test('store and HQ definitions keep all ten keys, full-width images and alternative text',()=>{
   const cards=ADD_GROUPS.flatMap(g=>g.cards)
-  const blocks=['name','kana','birthday','age','contact','tel','address'].map((key,i)=>cards.find(c=>c.key===key)!.make(i))
+  const blocks=['name','kana','birthday','age','contact','tel','address','allergy','anniversary','seat_preference'].map((key,i)=>cards.find(c=>c.key===key)!.make(i))
   expect(blocks.map(b=>b.kind==='input'?b.fixedField:null)).toEqual(FIXED_FRIEND_FIELDS.map(f=>f.key))
   const image=cards.find(c=>c.key==='image')!.make(7)
   expect(image).toMatchObject({kind:'image',size:'full',alt:''})

@@ -310,6 +310,7 @@ affiliatePayouts.post(
       if (result.kind === 'changed' || result.kind === 'idempotency_conflict') {
         return c.json({ success: false, error: '支払バッチまたは再実行キーが競合しました', code: 'VERSION_CONFLICT' }, 409);
       }
+      c.set('outputAudit', { count: exportData.lines.length, accountId: lineAccountId, targetId: batchId, phase: 'requested' });
       return c.json({
         success: true,
         data: {
@@ -339,6 +340,7 @@ affiliatePayouts.get(
       tenantId: tenantId(c), lineAccountId, batchId, tokenHash: await sha256Hex(token),
     });
     if (!file) return c.json({ success: false, error: '出力ファイルが見つからないか期限切れです' }, 404);
+    c.set('outputAudit', { count: file.lineCount, accountId: lineAccountId, targetId: batchId });
     const object = await c.env.IMAGES.get(file.objectKey);
     if (!object) return c.json({ success: false, error: '出力ファイルが見つかりません' }, 404);
     return new Response(object.body, {

@@ -1,19 +1,10 @@
 'use client'
-
-/*
- * ★V8 オートメーションの動いた記録（Pencil `g98F9`）。
- *
- * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
- * （app/automations/runs-v8.tsx）と同じ（一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・
- * 中身・もう一度やる・取りやめ・?run= の直リンク）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
- * 中身は右の詳細パネルで開く。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Activity, Bookmark, Download, Filter, Layers, TriangleAlert } from 'lucide-react'
 import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -25,11 +16,11 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -45,6 +36,18 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 オートメーションの動いた記録（Pencil `g98F9`）。
+ *
+ * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
+ * （app/automations/runs-v8.tsx）と同じ（一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・
+ * 中身・もう一度やる・取りやめ・?run= の直リンク）。違いは見せ方だけ——
+ * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
+ * 中身は右の詳細パネルで開く。
+ */
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -183,7 +186,13 @@ export default function AutomationRunsV8() {
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [selectedRun, setSelectedRun] = useState<AutomationRunRow | null>(null)
+  const [runId, setRunId] = useDetailPanelUrl('run')
+  const [selectedRun, setSelectedRunState] = useState<AutomationRunRow | null>(null)
+  const setSelectedRun = (run: AutomationRunRow | null | ((current: AutomationRunRow | null) => AutomationRunRow | null)) => {
+    if (typeof run === 'function') { setSelectedRunState(run); return }
+    setRunId(run?.id ?? null)
+    setSelectedRunState(run)
+  }
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<null | 'error' | 'forbidden'>(null)
@@ -220,7 +229,7 @@ export default function AutomationRunsV8() {
   useEffect(() => {
     loadGeneration.current += 1
     detailGeneration.current += 1
-    setSelectedRun(null)
+    setSelectedRunState(null)
     setSelectedDetail(null)
     setDetailError(null)
     setDeepLinkRunId(null)
@@ -375,8 +384,8 @@ export default function AutomationRunsV8() {
 
   /* ?run=<id> の直リンク：その記録の中身を開く。 */
   useEffect(() => {
-    const runId = new URLSearchParams(window.location.search).get('run')
-    if (!runId) return
+    if (!runId) { setSelectedRunState(null); setDeepLinkRunId(null); return }
+    if (selectedRun?.id === runId) return
     setDeepLinkRunId(runId)
     const accountAtStart = selectedAccountRef.current
     let cancelled = false
@@ -387,7 +396,7 @@ export default function AutomationRunsV8() {
         if (cancelled || selectedAccountRef.current !== accountAtStart) return
         if (!response.success) { setDeepLinkError('error'); return }
         const detail = response.data
-        setSelectedRun({
+        setSelectedRunState({
           id: detail.id,
           automationId: detail.automationId,
           occurredAt: detail.occurredAt,
@@ -415,11 +424,11 @@ export default function AutomationRunsV8() {
       })
       .finally(() => { if (!cancelled && selectedAccountRef.current === accountAtStart) setDeepLinkLoading(false) })
     return () => { cancelled = true }
-  }, [deepLinkReloadKey])
+  }, [runId, deepLinkReloadKey, selectedAccountId])
 
   /* 行の「…」：中身を見る・もう一度やる（やり直せる失敗のとき）・ルールを開く・トークを開く。 */
   const rowMenuItems = (run: AutomationRunRow): ActionMenuItem[] => [
-    { id: 'open', label: '中身を見る', onSelect: () => setSelectedRun(run) },
+    { id: 'open', label: "実行の記録を見る", onSelect: () => setSelectedRun(run) },
     ...(canOperate && run.canRetry
       ? [{ id: 'retry', label: 'もう一度やる', disabled: retryingId !== null, onSelect: () => void retryRun(run) }]
       : []),
@@ -450,7 +459,7 @@ export default function AutomationRunsV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["saved"]}><Select
         aria-label="よく使う絞り込み"
         value={saved}
         onChange={(value) => setSaved(value as SavedKey)}
@@ -458,14 +467,14 @@ export default function AutomationRunsV8() {
           { value: '', label: 'よく使う絞り込み' },
           { value: 'include-test', label: 'テスト実行も見る' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const toolbar = (
     <>
-      <div className={styles.noticeRow}>
-        <Notice tone="info">「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。</Notice>
-      </div>
+      {canExport && data && data.pagination.total > 5000 ? (
+        <div className={styles.noticeRow}><Notice tone="warn">CSVは5,000件までしか出ません。期間や絞り込みで分けて出してください。</Notice></div>
+      ) : null}
       {notice ? <div className={styles.noticeRow}><Notice tone="info" role="status">{notice}</Notice></div> : null}
       <ListToolbar
         search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で探す', width: 240, value: query, onChange: changeQuery }}
@@ -510,7 +519,7 @@ export default function AutomationRunsV8() {
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
                 const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
                 return (
-                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id}>
+                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
                     <Td className={styles.colWhen}>
                       <button type="button" className={styles.subject} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
@@ -540,7 +549,7 @@ export default function AutomationRunsV8() {
                           label={menuLabel}
                           open={openMenuId === run.id}
                           onOpenChange={(next) => setOpenMenuId(next ? run.id : null)}
-                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>
@@ -578,6 +587,8 @@ export default function AutomationRunsV8() {
   return (
     <ListPage
       help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
+      noticeSpacing="section"
+      explanation="「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。"
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"
@@ -591,7 +602,7 @@ export default function AutomationRunsV8() {
       pagination={pager}
       overlays={<>
         {deepLinkMessage ? (
-          <DetailPanel open title="実行記録の中身" onClose={() => setDeepLinkRunId(null)}>
+          <DetailPanel open title="実行記録の中身" onClose={() => { setDeepLinkRunId(null); setRunId(null) }}>
             <p className={styles.panelText}>{deepLinkMessage}</p>
             {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読み込む</Button> : null}
           </DetailPanel>

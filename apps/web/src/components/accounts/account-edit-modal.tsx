@@ -11,6 +11,7 @@ import {
 } from './account-form-fields'
 import AccountSetupUrls from './account-setup-urls'
 import Button from '@/components/shared/button'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 interface Props {
   accountId: string
@@ -57,6 +58,8 @@ export default function AccountEditModal({
   onClose,
   onSaved,
 }: Props) {
+  const saveErrors = useSaveFormErrors()
+
   const [state, setState] = useState<AccountFormState>({
     ...emptyAccountFormState,
     name: initialName,
@@ -175,19 +178,21 @@ export default function AccountEditModal({
         setError(res.error || '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: (token) => handleSave(e, token) })
         return
       }
-      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      { if (!fieldFailure) setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div
+    <SaveErrorScope errors={saveErrors}><div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-2 sm:p-4"
       onClick={onClose}
     >
@@ -215,18 +220,18 @@ export default function AccountEditModal({
         <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">アカウント名</label>
-            <input
+            <SaveErrorField names={["name","state.name"]}><input
               value={state.name}
               onChange={(e) => update({ name: e.target.value })}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               required
-            />
+            /></SaveErrorField>
           </div>
 
           {initialTimezone !== undefined && initialSection === 'basic' && (
             <label className="block text-xs font-medium text-ink-secondary">
               タイムゾーン
-              <input aria-label="タイムゾーン" value={timezone} onChange={(e) => setTimezone(e.target.value)} required className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm" />
+              <SaveErrorField names={["timezone"]}><input aria-label="タイムゾーン" value={timezone} onChange={(e) => setTimezone(e.target.value)} required className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>
             </label>
           )}
           <AccountFormSections
@@ -253,7 +258,7 @@ export default function AccountEditModal({
                   上限
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
+                  <SaveErrorField names={["friendCapacity","friend_capacity"]}><input
                     id="acc-capacity"
                     type="number"
                     min={1}
@@ -261,7 +266,7 @@ export default function AccountEditModal({
                     onChange={(e) => setFriendCapacity(e.target.value)}
                     placeholder="管理しない"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
-                  />
+                  /></SaveErrorField>
                   <span className="text-ink-faint whitespace-nowrap text-xs">人</span>
                 </div>
               </div>
@@ -270,7 +275,7 @@ export default function AccountEditModal({
                   警告を出す人数
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
+                  <SaveErrorField names={["capacityWarnAt","capacity_warn_at"]}><input
                     id="acc-warn"
                     type="number"
                     min={1}
@@ -278,7 +283,7 @@ export default function AccountEditModal({
                     onChange={(e) => setCapacityWarnAt(e.target.value)}
                     placeholder="警告しない"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
-                  />
+                  /></SaveErrorField>
                   <span className="text-ink-faint whitespace-nowrap text-xs">人</span>
                 </div>
               </div>
@@ -290,14 +295,14 @@ export default function AccountEditModal({
               <label htmlFor="acc-icon" className="text-ink-faint mb-1 block text-xs font-medium">
                 アイコンのURL
               </label>
-              <input
+              <SaveErrorField names={["iconUrl","icon_url"]}><input
                 id="acc-icon"
                 type="url"
                 value={iconUrl}
                 onChange={(e) => setIconUrl(e.target.value)}
                 placeholder="https://example.com/icon.png"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              />
+              /></SaveErrorField>
               <p className="text-ink-faint mt-1 text-xs">
                 管理画面の一覧で使います。共有時に出る画像（OGP）とは別の欄です。
               </p>
@@ -331,6 +336,6 @@ export default function AccountEditModal({
         </form>
       </div>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div>
+    </div></SaveErrorScope>
   )
 }

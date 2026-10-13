@@ -8,8 +8,10 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import BroadcastDetailV8 from './detail-v8'
+import BroadcastDetailV8 from '@/v8/broadcast-detail/detail'
 import { api, type ApiBroadcast } from '@/lib/api'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -18,8 +20,8 @@ vi.mock('@/lib/api', async importOriginal => {
   return { ...actual }
 })
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
-vi.mock('next/navigation', async importOriginal => ({
-  ...await importOriginal<typeof import('next/navigation')>(),
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {} }),
 }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
@@ -72,6 +74,7 @@ const baseProps = {
 let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
+  rememberStaffIdentity({ role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -79,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
+  forgetStaffIdentity()
   vi.restoreAllMocks()
 })
 

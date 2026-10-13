@@ -59,6 +59,8 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) =>
     React.createElement('a', { href, ...rest }, children),
@@ -79,21 +81,21 @@ afterEach(() => {
 
 describe('R180 独自マークの保管（使用0人）', () => {
   test('候補なしでも「保管する」が押せ、置換先なしで送られる', async () => {
-    const { default: SupportMarkList } = await import('./mark-list')
-    render(<SupportMarkList accountId="a1" />)
+    const { default: SupportMarkList } = await import('@/v8/tags/marks-tab')
+    render(<SupportMarkList accountId="a1" canEdit />)
     // 表とスマホカードの両方に同じ行が出る。表側で操作する。
     const table = await screen.findByRole('table')
     within(table).getByText('独自マーク')
 
     // 行の「…」から保管を開く。
     await act(async () => {
-      fireEvent.click(within(table).getByRole('button', { name: '独自マークのその他操作' }))
+      fireEvent.click(within(table).getByRole('button', { name: '対応マーク「独自マーク」の操作' }))
     })
     await act(async () => {
       fireEvent.click(screen.getByRole('menuitem', { name: '保管する' }))
     })
 
-    const dialog = await screen.findByRole('alertdialog', { name: '対応マーク「独自マーク」を保管しますか？' })
+    const dialog = await screen.findByRole('alertdialog', { name: '「独自マーク」を保管しますか' })
     expect(dialog.textContent).toContain('そのまま保管できます')
     // 置き換え先の選択欄は出ない（0人には要らない）。
     expect(dialog.textContent).not.toContain('置き換え先')

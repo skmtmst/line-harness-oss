@@ -184,7 +184,7 @@ export default function MediaPickerDialog({
                     type="button"
                     role="option"
                     aria-selected={false}
-                    className="hover:bg-canvas-sunken focus:bg-canvas-sunken flex w-full items-center gap-3 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+                    className="hover:bg-canvas-sunken focus:bg-canvas-sunken flex w-full items-center gap-3 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
                     onClick={() => onSelect(item)}
                   >
                     {item.kind === 'image' && accountId ? (

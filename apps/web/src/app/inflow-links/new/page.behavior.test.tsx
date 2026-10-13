@@ -25,6 +25,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      entryRouteGenres: { ...actual.api.entryRouteGenres, list: async () => ({ success: true, data: [] }) },
+      broadcastMessageAssets: { ...actual.api.broadcastMessageAssets, list: async () => ({ success: true, data: [] }) },
       entryRoutes: { ...actual.api.entryRoutes, create: api.create },
       tags: { ...actual.api.tags, list: api.tagsList },
       scenarios: { ...actual.api.scenarios, list: api.scenariosList },
@@ -44,12 +46,12 @@ vi.mock('@/lib/qr-image', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href, ...rest }, children),
 }))
 
 const routerPush = vi.fn()
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -130,14 +132,14 @@ describe('流入リンクの新規作成(実React)', () => {
     await render()
     await setValue(byId('ir-name'), '夏の投稿')
     await setValue(byId('ir-ref'), 'r39-summer')
-    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '発行して URL を受け取る'))
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
       name: '夏の投稿',
       refCode: 'r39-summer',
       lineAccountId: 'account-1',
     }))
-    expect(routerPush).toHaveBeenCalledWith('/inflow-links/detail?id=route-1')
+    expect(routerPush).toHaveBeenCalledWith('/inflow-links?highlight=route-1')
   })
 
   it('R39: アカウント未選択では送らず理由を出す', async () => {
@@ -145,7 +147,7 @@ describe('流入リンクの新規作成(実React)', () => {
     await render()
     await setValue(byId('ir-name'), '夏の投稿')
     await setValue(byId('ir-ref'), 'r39-summer')
-    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '発行して URL を受け取る'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
@@ -155,6 +157,7 @@ describe('流入リンクの新規作成(実React)', () => {
 
   it('R39: 所属するアカウントが画面で分かる', async () => {
     await render()
+    await click(host.querySelector('button[aria-label="友だちの追加先の説明"]')!)
     expect(host.textContent).toContain('所属するLINEアカウント')
     expect(host.textContent).toContain('然-NEN- TEST')
   })
@@ -185,14 +188,14 @@ describe('流入リンクの新規作成(実React)', () => {
     await render()
     await setValue(byId('ir-name'), '夏の投稿')
     await setValue(byId('ir-ref'), 'bad ref!')
-    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '発行して URL を受け取る'))
 
     expect(api.create).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('refコードは、半角英数字・_・ハイフンで1〜64文字にしてください')
+    expect(host.textContent).toContain('半角英数字・_・ハイフンで1〜64文字にしてください')
 
     await setValue(byId('ir-ref'), 'audit-sample')
 
-    expect(host.textContent).not.toContain('refコードは、半角英数字')
+    expect(host.textContent).not.toContain('半角英数字')
     expect(host.textContent).toContain('/r/audit-sample')
     expect(api.create).not.toHaveBeenCalled()
   })

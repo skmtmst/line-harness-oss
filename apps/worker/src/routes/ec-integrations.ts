@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { savePublicationDailyViews } from '@line-crm/db';
 import type { PublicationViewSample } from '@line-crm/shared';
 import { Hono } from 'hono';
@@ -202,8 +203,7 @@ export function validateEvent(value: unknown): value is EcEvent {
       if (!pet || typeof pet !== 'object' || typeof pet.name !== 'string' || !pet.name.trim() || pet.name.length > 80) return false;
       if (pet.animal_type && !['dog', 'cat', 'other'].includes(pet.animal_type)) return false;
       if (pet.gender && !['male', 'female', 'unknown'].includes(pet.gender)) return false;
-      if (pet.birthday != null && (typeof pet.birthday !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(pet.birthday)
-        || !Number.isFinite(Date.parse(`${pet.birthday}T00:00:00Z`)))) return false;
+      if (pet.birthday != null && !isExistingCalendarDate(pet.birthday)) return false;
     }
   }
   return true;
@@ -624,6 +624,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         `SELECT id, status FROM ec_events WHERE source = ? AND external_event_id = ?`,
       ).bind(source, event.event_id).first<{ id: string; status: string }>();
   if (!row) return c.json({ success: false, error: 'Event ledger failure' }, 500);
+  if (row.status === 'processed' || row.status === 'skipped') {
+    return c.json({ success: true, duplicate: true, status: row.status });
+  }
+
   try {
     await upsertEcEventReadModels(c.env.DB, {
       eventId: row.id,
@@ -647,6 +651,24 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     console.error(`[ec-event] read model failed event=${event.event_id}`, error);
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }
+
+  // 取り込み停止中は、受信の保存までは済ませたうえで動作を止める。
+  // 通知・タグ・シナリオ開始などの副作用は一切起こさない。再開時は
+  // 止めていた分を待ち行列へ戻す（コネクタ更新口が担う）。
+  const connector = await c.env.DB.prepare(
+    `SELECT status FROM ec_connectors WHERE line_account_id = ?`,
+  ).bind(lineAccountId).first<{ status: string }>();
+  if (connector?.status === 'paused') {
+    await c.env.DB.prepare(
+      `UPDATE ec_events SET status = 'skipped', error_message = 'connector_paused', updated_at = ? WHERE id = ?`,
+    ).bind(now, row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'skipped',
+      errorCode: 'connector_paused', errorMessageSafe: '取り込みは停止中のため処理しませんでした', now,
+    });
+    return c.json({ success: true, status: 'paused' }, 202);
+  }
+
 
   /*
    * IDEA-21: 注文の取り消し・返金が届いたら、その注文を起点に待っている
@@ -673,9 +695,6 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     } catch (followUpError) {
       console.error(`[ec-event] follow-up stop failed event=${event.event_id}`, followUpError);
     }
-  }
-  if (row.status === 'processed' || row.status === 'skipped') {
-    return c.json({ success: true, duplicate: true, status: row.status });
   }
 
   // 受注は運用者へ知らせる。LINEの友だちが見つからなくても受注自体は起きて
@@ -711,22 +730,6 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: true, status: 'identity_pending' }, 202);
   }
 
-  // 取り込み停止中は、受信の保存までは済ませたうえで動作を止める。
-  // 通知・タグ・シナリオ開始などの副作用は一切起こさない。再開時は
-  // 止めていた分を待ち行列へ戻す（コネクタ更新口が担う）。
-  const connector = await c.env.DB.prepare(
-    `SELECT status FROM ec_connectors WHERE line_account_id = ?`,
-  ).bind(lineAccountId).first<{ status: string }>();
-  if (connector?.status === 'paused') {
-    await c.env.DB.prepare(
-      `UPDATE ec_events SET status = 'skipped', error_message = 'connector_paused', updated_at = ? WHERE id = ?`,
-    ).bind(now, row.id).run();
-    await setEcActionExecutionStatus(c.env.DB, {
-      eventId: row.id, lineAccountId, status: 'skipped',
-      errorCode: 'connector_paused', errorMessageSafe: '取り込みは停止中のため処理しませんでした', now,
-    });
-    return c.json({ success: true, status: 'paused' }, 202);
-  }
 
   /*
    * F-20: 公式サイトの掲載閲覧数。友だちの突き合わせは要らない（回数だけ数える）

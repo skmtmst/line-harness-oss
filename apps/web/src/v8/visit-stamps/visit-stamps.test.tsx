@@ -30,6 +30,7 @@ vi.mock('next/navigation', async () => {
 })
 vi.mock('@/lib/visit-stamps-api', () => ({
   visitStampsApi: {
+    storefrontQr:vi.fn(async()=>({success:true,data:null})),
     cards: fx.cards, save: fx.save, create: fx.create, paperRequests: fx.paperRequests, reviewPaper: fx.reviewPaper,
     wallet: fx.wallet, grant: fx.grant, reverse: fx.reverse, setPin: fx.setPin, entries: fx.entries, paperPhoto: fx.paperPhoto,
   },
@@ -213,7 +214,9 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 20 })
     expect(await screen.findByText('2 件中 1〜2 件')).toBeTruthy()
-    expect(screen.queryByRole('navigation', { name: '記録のページ送り' })).toBeNull()
+    const pager = screen.getByRole('navigation', { name: '記録のページ送り' })
+    expect(pager.querySelector('[aria-current="page"]')?.textContent).toBe('1')
+    expect((pager.querySelector('[aria-label="次のページ"]') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('閲覧のみは記録タブでも手入力欄を出さず、移行タブで承認・却下を隠す', async () => {

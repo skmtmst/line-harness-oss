@@ -1,20 +1,15 @@
 'use client'
 
-/*
- * ★V8 マイル「使い道」（板 `S35pO`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-rewards-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・状態・
- * 操作（中身を見る・…）」。止める／出すは行の「…」。頭の CSV は見えている
- * 表の中身を出す。要対応の交換（届かなかった分のやり直し）は表の下に残す。
- *
- * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
- * 見え方の切り替えとして持つ（保存はしない）。
- */
+import StatusBadge from '@/components/shared/status-badge'
+import { mileageStatusTone } from './parts'
+
+import { ListToolbarOptional } from '@/components/shared/list-toolbar'
+
+import { createAccountTracker, createMileageRewardsFetchGuards, createSingleFlightLock } from './redemption-request-guard'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
@@ -23,6 +18,7 @@ import {
   api,
   fetchApi,
   type MileageRewardKind,
+  type MileageRewardReachMetric,
   type MileageRewardStatus,
   type MileageRewardSummary,
 } from '@/lib/api'
@@ -44,7 +40,7 @@ import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
 import { formatMileageDate, formatMileageNumber } from './display'
-import { CreateButton, MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
@@ -52,6 +48,19 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「使い道」（板 `S35pO`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-rewards-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・状態・
+ * 操作（中身を見る・…）」。止める／出すは行の「…」。頭の CSV は見えている
+ * 表の中身を出す。要対応の交換（届かなかった分のやり直し）は表の下に残す。
+ *
+ * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
+ * 見え方の切り替えとして持つ（保存はしない）。
+ */
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -94,7 +103,7 @@ function benefitSub(reward: MileageRewardSummary): string | null {
   const version = reward.currentVersion
   if (!version) return null
   const parts: string[] = []
-  if (reward.availableCodeCount !== null) {
+  if (reward.availableCodeCount != null) {
     parts.push(`残り ${formatNumber(reward.availableCodeCount)}`)
   } else if (version.stockLimit !== null) {
     parts.push('残り数は取れていません')
@@ -136,12 +145,15 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 export default function RewardsTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow, setCount } = useMileageShell()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
   const router = useRouter()
   const [rewards, setRewards] = useState<MileageRewardSummary[]>([])
   const [reachMetrics, setReachMetrics] = useState<Array<{ rewardId: string; reachableFriendCount: number }>>([])
+  const [rankBenefits, setRankBenefits] = useState<MileageRewardReachMetric[]>([])
+  const [neverRedeemedFriendCount, setNeverRedeemedFriendCount] = useState<number | null>(null)
   const [redeemedMiles, setRedeemedMiles] = useState<number | null>(null)
   const [exchangedCount, setExchangedCount] = useState<number | null>(null)
   const [popularName, setPopularName] = useState<string | null>(null)
@@ -170,12 +182,25 @@ export default function RewardsTab() {
   const [preset, setPreset] = useState('default')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
-  const requestRef = useRef(0)
+  const [fetchGuards] = useState(createMileageRewardsFetchGuards)
+  const { overview: overviewGuard, redemptions: redemptionsGuard } = fetchGuards
+  const [accountTracker] = useState(createAccountTracker)
+  const [retryLock] = useState(createSingleFlightLock)
+  const redemptionsPageRef = useRef(1)
+  useEffect(() => { redemptionsPageRef.current = redemptionsPage }, [redemptionsPage])
+  useEffect(() => {
+    accountTracker.track(accountId)
+    retryLock.reset()
+    setRetryingId(null)
+    setRetryError('')
+    setRetryNotice('')
+    setRedemptionsPage(1)
+  }, [accountId, accountTracker, retryLock])
 
   const load = useCallback(async () => {
-    const request = ++requestRef.current
+    const requestId = overviewGuard.issue()
     if (!accountId) {
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       setRewards([])
       setStatus('ready')
       return
@@ -183,7 +208,7 @@ export default function RewardsTab() {
     setStatus('loading')
     try {
       const response = await api.mileage.rewards(accountId)
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.rewards)) throw new Error('malformed')
       const list = response.data.rewards
@@ -196,14 +221,18 @@ export default function RewardsTab() {
       setPopularName(redeemedCount ? (overviewSummary?.mostRedeemedRewardName ?? null) : null)
       setPopularCount(redeemedCount)
       setReachMetrics(Array.isArray(response.data.reachMetrics) ? response.data.reachMetrics : [])
+      setRankBenefits(Array.isArray(response.data.rankBenefits) ? response.data.rankBenefits : [])
+      setNeverRedeemedFriendCount(overviewSummary?.neverRedeemedFriendCount ?? null)
       setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
-      if (request !== requestRef.current) return
-      setRewards([])
+      if (!overviewGuard.isCurrent(requestId)) return
+      saveErrors.capture(reason)
+      setRewards([]);
+
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors, overviewGuard])
 
   useEffect(() => {
     if (accountLoading) return
@@ -211,7 +240,9 @@ export default function RewardsTab() {
   }, [accountLoading, load])
 
   const loadFailed = useCallback(async (pageNumber: number) => {
+    const requestId = redemptionsGuard.issue()
     if (!accountId) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
       setFailed([])
       setRedemptionsVisible(false)
       setRedemptionsLoad('loading')
@@ -225,6 +256,7 @@ export default function RewardsTab() {
         `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`
         + `&limit=${REDEMPTIONS_PAGE_SIZE}&offset=${offset}`,
       )
+      if (!redemptionsGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.items)) throw new Error('malformed')
       setFailed(response.data.items.filter(
@@ -238,13 +270,16 @@ export default function RewardsTab() {
       setRedemptionsVisible(true)
       setRedemptionsLoad('ready')
     } catch (reason) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
+      saveErrors.capture(reason)
       setFailed([])
       setRedemptionsVisible(true)
-      setRedemptionsTotal(0)
+      setRedemptionsTotal(0);
+
       const forbidden = reason instanceof ApiError && (reason.status === 403 || reason.code === 'forbidden')
       setRedemptionsLoad(forbidden ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors, redemptionsGuard])
 
   useEffect(() => {
     void loadFailed(redemptionsPage)
@@ -260,14 +295,23 @@ export default function RewardsTab() {
 
   const retryRedemption = async (item: FailedRedemption) => {
     if (!accountId || retryingId) return
+    if (!retryLock.acquire(item.id)) return
+    const startedAccountId = accountId
+    const operation = accountTracker.track(startedAccountId)
     setRetryingId(item.id)
     setRetryError('')
     setRetryNotice('')
+    const reloadLists = async () => {
+      await loadFailed(redemptionsPageRef.current)
+      if (!accountTracker.isCurrent(operation)) return
+      await load()
+    }
     try {
       const response = await fetchApi<{ success: boolean; data?: { message?: string | null; redemption?: { status?: string } }; error?: string }>(
         `/api/mileage/redemptions/${encodeURIComponent(item.id)}/retry-fulfillment`,
-        { method: 'POST', body: JSON.stringify({ accountId }) },
+        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
       )
+      if (!accountTracker.isCurrent(operation)) return
       const redemptionStatus = response.data?.redemption?.status
       const serverMessage = typeof response.data?.message === 'string' && response.data.message.trim()
         ? response.data.message
@@ -279,13 +323,17 @@ export default function RewardsTab() {
       } else if (!response.success) {
         throw new Error(response.error)
       }
-      await loadFailed(redemptionsPage)
-      await load()
-    } catch {
-      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
-      await loadFailed(redemptionsPage)
+      await reloadLists()
+    } catch (saveFailure) {
+      if (!accountTracker.isCurrent(operation)) return
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。') }
+      await loadFailed(redemptionsPageRef.current)
     } finally {
-      setRetryingId(null)
+      retryLock.release(item.id)
+      if (accountTracker.isCurrent(operation)) setRetryingId(null)
     }
   }
 
@@ -314,15 +362,18 @@ export default function RewardsTab() {
         if (saved && typeof saved === 'object' && saved.id === reward.id) {
           setRewards((current) => current.map((item) => (item.id === reward.id ? { ...item, ...saved } : item)))
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure);
+
         setStatus(before)
+        { if (!fieldFailure)
         notifyToast(before === 'published'
           ? `「${reward.name}」を止められませんでした。元に戻しました。`
           : `「${reward.name}」をまた出せませんでした。元に戻しました。`, {
           tone: 'error',
           actionLabel: 'もう一度',
           onAction: () => { void changeState({ ...reward, status: before }) },
-        })
+        }) }
       } finally {
         setBusyId(null)
       }
@@ -339,8 +390,11 @@ export default function RewardsTab() {
       )
       if (!response.success) throw new Error(response.error)
       await load()
-    } catch {
-      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。') }
     } finally {
       setBusyId(null)
     }
@@ -359,8 +413,11 @@ export default function RewardsTab() {
       setMenuNotice(response.data?.canDeliver
         ? 'この内容で交換できます。残高・在庫は動いていません。'
         : (warning || 'この内容では交換できません。内容を確認してください。'))
-    } catch {
-      setActionError('交換のテストができませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('交換のテストができませんでした。もう一度お試しください。') }
     } finally {
       setTestBusyId(null)
     }
@@ -397,8 +454,11 @@ export default function RewardsTab() {
       if (!response.success) throw new Error(response.error)
       setMenuNotice(`「${reward.name} のコピー」を下書きで作りました。`)
       await load()
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setDuplicateId(null)
     }
@@ -477,10 +537,14 @@ export default function RewardsTab() {
       anchor.download = csvFileName("マイルの特典")
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionError('CSVを書き出せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('CSVを書き出せませんでした。もう一度お試しください。') }
     }
-  }, [canExport, shown])
+  }, [canExport, shown, saveErrors]);
+
 
   const ready = status === 'ready'
   const failedReason = failed[0] ? (failed[0].failureMessage || failed[0].rewardName) : null
@@ -493,7 +557,7 @@ export default function RewardsTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? rewards.length : null}
         unit="件"
-        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}
+        detail={<span title={neverRedeemedFriendCount == null ? '1回も使っていない人の数は未取得' : `1回も使っていない人 ${formatNumber(neverRedeemedFriendCount)} 人`}>{ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}</span>}
       />
       <KpiCard
         presentation="band"
@@ -510,7 +574,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : emptyValue('unknown')}
+        detail={ready ? (popularCount == null ? '交換の回数は未取得' : popularCount === 0 ? 'まだ交換されていません' : popularName ? `今月 ${formatMileageNumber(popularCount)}件` : '使い道の名前は未取得') : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -527,12 +591,20 @@ export default function RewardsTab() {
    * 左の列は共通の ManagedFolderPanel。使い道のフォルダの口（mileage_reward_folders）はまだ使えるようになっていないので
    * 「すべて」だけ。口ができたら kind を渡すだけで、追加・「…」（名前・色・並べ替え・消す）・未分類が出る。
    */
+  const createButton = (full: boolean) => (
+    <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
+      <Plus size={15} aria-hidden="true" /> 使い道を作る
+    </CreateButton>
+  )
+
   const folderPanel = (
     <ManagedFolderPanel
       kind={null}
       folders={[]}
       onChanged={() => undefined}
       canManage={!readonly}
+      createAction={createButton(true)}
+      reserveCreateSpace={false}
       itemLabel="使い道"
       activeId="all"
       onSelect={() => undefined}
@@ -541,20 +613,16 @@ export default function RewardsTab() {
   )
   const kindSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["folder","page"]}><Select
         aria-label="種類"
         value={folder}
         options={FOLDERS.map((key) => ({ value: key, label: key === 'すべて' ? '種類：すべて' : `${key === '未分類' ? 'そのほか' : key} ${formatMileageNumber(folderCounts.get(key) ?? 0)}` }))}
         onChange={(value) => { setPage(1); setFolder(value as Folder) }}
-      />
+      /></SaveErrorField>
     </div>
   )
 
-  const createButton = (full: boolean) => (
-    <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
-      <Plus size={15} aria-hidden="true" /> 使い道を作る
-    </CreateButton>
-  )
+
 
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
@@ -599,7 +667,7 @@ export default function RewardsTab() {
           if (!value) { setSearch(''); setPage(1) }
         },
       }}
-      chips={narrow ? chips : <>{kindSelect}{chips}</>}
+      chips={<><ListToolbarOptional compact label="種類">{kindSelect}</ListToolbarOptional>{chips}</>}
       narrowLead={<>
         {createButton(false)}
         {kindSelect}
@@ -640,7 +708,7 @@ export default function RewardsTab() {
             {
               id: 'open',
               label: readonly ? '中身を見る' : '編集',
-              external: true,
+              external: false,
               href: `/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`, onSelect: () => router.push(`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`),
             },
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
@@ -675,13 +743,13 @@ export default function RewardsTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>使い道</Th>
-            <Th className={`${styles.colNeed} ${styles.num}`}>必要なマイル</Th>
-            <Th className={styles.colGives}>交換すると渡るもの</Th>
-            <Th className={`${styles.colMonth} ${styles.num}`}>今月 交換された</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>使い道</Th>
+            <Th align="right" className={styles.colNeed}>必要なマイル</Th>
+            <Th collapseAt="narrow" className={styles.colGives} title={rankBenefits.length === 0 ? 'ランクの使い道はまだありません' : rankBenefits.map((rank) => `${rank.rewardName}・${formatNumber(rank.requiredMiles)} マイルから・今すぐ届く人 ${formatNumber(rank.reachableFriendCount)} 人・交換済み ${formatNumber(rank.redeemedFriendCount)} 人`).join('／')}>交換すると渡るもの</Th>
+            <Th align="right" collapseAt="narrow" className={styles.colMonth}>今月 交換された</Th>
             <Th className={styles.colStateWide}>状態</Th>
             <Th className={styles.colOpsWide}>操作</Th>
           </TableHeadRow>
@@ -692,33 +760,28 @@ export default function RewardsTab() {
             const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
             const sub = benefitSub(reward)
             return (
-              <Tr key={reward.id} className={styles.row} data-table-layout="columns" data-row-id={reward.id}>
-                <Td className={styles.colName}>
+              <Tr key={reward.id} data-table-layout="columns" data-row-id={reward.id}>
+                <Td grow>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
-                    <span className={styles.rowName} ><TruncatedText value={String(reward.name ?? '')} /></span>
+                    <span title={reach ? `今すぐ届く人 ${formatNumber(reach.reachableFriendCount)} 人` : '届く人数は未取得'}><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
-                  <span className={`${styles.rowSub} ${styles.dotIndent}`}>
-                    {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
-                  </span>
+
                 </Td>
-                <Td className={`${styles.colNeed} ${styles.num}`}>
+                <Td align="right" className={styles.colNeed}>
                   <span className={styles.cellMain}>{formatMileageNumber(reward.currentVersion?.requiredMiles)}</span>
                 </Td>
-                <Td className={styles.colGives}>
+                <Td collapseAt="narrow" className={styles.colGives}>
                   <span className={styles.cellMain}>
                     {reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind]}
                   </span>
                   {sub ? <span className={styles.cellSub}>{sub}</span> : null}
                 </Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}>
+                <Td align="right" collapseAt="narrow" className={styles.colMonth}>
                   <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)} 件`}</span>
                 </Td>
                 <Td className={styles.colStateWide}>
-                  <span className={styles.pill} data-tone={pill.tone}>
-                    <span className={styles.pillDot} aria-hidden="true" />
-                    {pill.text}
-                  </span>
+                  <StatusBadge tone={mileageStatusTone(pill.tone)}>{pill.text}</StatusBadge>
                 </Td>
                 <Td className={styles.colOpsWide}>
                   <span className={styles.rowActions}>
@@ -749,21 +812,21 @@ export default function RewardsTab() {
           onRetry={redemptionsLoad === 'error' ? () => void loadFailed(redemptionsPage) : undefined}
         />
       ) : (
-        <DataTable className={styles.table}>
+        <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
           <thead>
-            <TableHeadRow className={styles.headRow} data-table-layout="columns">
-              <Th className={styles.colName}>使い道</Th>
+            <TableHeadRow data-table-layout="columns">
+              <Th grow>使い道</Th>
               <Th className={styles.colStateWide}>状態</Th>
-              <Th className={styles.colGives}>届かなかった理由</Th>
-              <Th className={`${styles.colMonth} ${styles.num}`}>試した回数</Th>
-              <Th className={styles.colGives}>最後の更新</Th>
+              <Th collapseAt="narrow" className={styles.colGives}>届かなかった理由</Th>
+              <Th align="right" collapseAt="narrow" className={styles.colMonth}>試した回数</Th>
+              <Th collapseAt="narrow" className={styles.colGives}>最後の更新</Th>
               <Th className={styles.colOpsWide}>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
             {failed.map((item) => (
-              <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
-                <Td className={styles.colName}><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></Td>
+              <Tr data-row-id={item.id} key={item.id} data-table-layout="columns">
+                <Td grow><FolderDotName><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></FolderDotName></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (
                     <span className={styles.cellMain}>
@@ -776,9 +839,9 @@ export default function RewardsTab() {
                     <span className={styles.cellMain}>届いていない</span>
                   )}
                 </Td>
-                <Td className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
-                <Td className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
+                <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
+                <Td align="right" collapseAt="narrow" className={styles.colMonth}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
+                <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
                 <Td className={styles.colOpsWide}>
                   {!readonly ? (
                     <Button
@@ -843,7 +906,7 @@ export default function RewardsTab() {
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
@@ -851,13 +914,14 @@ export default function RewardsTab() {
         </Button>
       }
       stats={stats}
-      folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folders={folderPanel}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >
       {body}
+      {!failedSection && retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
       {failedSection}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }

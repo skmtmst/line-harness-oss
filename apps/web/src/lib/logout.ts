@@ -1,3 +1,4 @@
+import { forgetStaffIdentity } from './staff-identity-state'
 import { adminSessionHeaders, clearAdminSession } from './admin-session'
 import { resetAuthSelectionCleared } from './hq-navigation'
 import { clearCommonCaches } from './common-caches'
@@ -34,6 +35,7 @@ export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<
   } catch {
     // ストレージが使えなくても、行き先だけは変える
   }
+  forgetStaffIdentity()
   clearAdminSession()
   // 読み直しで中身を先に出す印も捨てる（ログアウト後に画面を出さない）。
   forgetAuthCheck()

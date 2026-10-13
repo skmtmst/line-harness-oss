@@ -1,13 +1,15 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -177,7 +179,7 @@ export default function SavedViewDialog({
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
                 <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
-              <input
+              <SaveErrorField names={["name"]}><input
                 id="saved-view-name"
                 value={name}
                 onChange={(event) => { setName(event.target.value); setNameTouched(true); setError('') }}
@@ -192,7 +194,7 @@ export default function SavedViewDialog({
                 aria-invalid={nameInvalid}
                 aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
                 className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${nameInvalid ? 'border-danger' : 'border-hairline'}`}
-              />
+              /></SaveErrorField>
             </div>
 
             <div>
@@ -267,14 +269,14 @@ export default function SavedViewDialog({
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">担当</dt>
                   <dd className="w-40">
-                    <Combobox
+                    <EntitySelect clearable size="full"
                       aria-label="保存する担当者"
                       placeholder="すべて"
                       value={assignee === 'all' ? '' : assignee}
                       onChange={(next) => setAssignee(next || 'all')}
                       options={[
                         { value: 'unassigned', label: '未割り当て' },
-                        ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                        ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name })),
                       ]}
                       className="w-full"
                     />

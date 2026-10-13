@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { readFolderAssignment, FolderAssignmentError } from '@line-crm/db';
 import { resolveCommonActionVersion } from './automation-engine.js';
 import { buildSegmentWhere, parseCondition, type SegmentCondition } from './segment-query.js';
@@ -15,6 +16,14 @@ export type AutomationDraftTriggerType =
   | 'form_submitted'
   | 'link_clicked'
   | 'calendar_booked'
+  | 'restaurant.reservation.created'
+  | 'restaurant.reservation.changed'
+  | 'restaurant.reservation.cancelled'
+  | 'restaurant.arrived'
+  | 'restaurant.arrival_undone'
+  | 'restaurant.departed'
+  | 'restaurant.departure_undone'
+  | 'restaurant.waitlist.invited'
   | 'datetime'
   | 'daily'
   | 'weekly'
@@ -410,6 +419,14 @@ async function validateTriggerConfig(
     form_submitted: new Set(['formId']),
     link_clicked: new Set(['trackedLinkId']),
     calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
+    'restaurant.reservation.created': new Set(['storeId']),
+    'restaurant.reservation.changed': new Set(['storeId']),
+    'restaurant.reservation.cancelled': new Set(['storeId']),
+    'restaurant.arrived': new Set(['storeId']),
+    'restaurant.arrival_undone': new Set(['storeId']),
+    'restaurant.departed': new Set(['storeId']),
+    'restaurant.departure_undone': new Set(['storeId']),
+    'restaurant.waitlist.invited': new Set(['storeId']),
     datetime: new Set(['at', 'friendIds']),
     daily: new Set(['time', 'friendIds']),
     weekly: new Set(['time', 'weekdays', 'friendIds']),
@@ -418,6 +435,11 @@ async function validateTriggerConfig(
   const unknown = Object.keys(config).find((key) => !allowed[eventType].has(key));
   if (unknown) throw new AutomationDraftError('trigger_config_invalid', 'きっかけの設定を確認してください', unknown);
 
+  if (eventType.startsWith('restaurant.')) {
+    const storeId=optionalString(config.storeId,'storeId');
+    if(storeId)await requireScopedId(db,{sql:'SELECT id FROM rt_stores WHERE id=? AND line_account_id=?',binds:[storeId,lineAccountId],field:'storeId',label:'お店'});
+    return storeId?{storeId}:{};
+  }
   if (eventType === 'tag_change') {
     const tagId = requiredString(config.tagId, 'triggerTagId', 'きっかけのタグ');
     await requireResource(db, 'tags', tagId, lineAccountId, 'triggerTagId', 'きっかけのタグ');
@@ -476,10 +498,10 @@ async function validateTriggerConfig(
       throw new AutomationDraftError('trigger_config_invalid', '対象の友だちは1〜100人で選んでください', 'friendIds');
     }
     const friendIds = [...new Set(config.friendIds as string[])];
-    const placeholders = friendIds.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(friendIds).sql;
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`,
-    ).bind(lineAccountId, ...friendIds).first<{ count: number }>();
+    ).bind(lineAccountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).first<{ count: number }>();
     if (Number(count?.count ?? 0) !== friendIds.length) {
       throw new AutomationDraftError('resource_not_found', '対象の友だちを選び直してください', 'friendIds');
     }
@@ -863,6 +885,7 @@ export async function updateAutomationDraft(
   const allowedTriggers = new Set<AutomationDraftTriggerType>([
     'friend_add', 'tag_change', 'message_received', 'form_submitted', 'link_clicked',
     'calendar_booked', 'datetime', 'daily', 'weekly', 'ec.order.confirmed',
+    'restaurant.reservation.created', 'restaurant.reservation.changed', 'restaurant.reservation.cancelled', 'restaurant.arrived', 'restaurant.arrival_undone', 'restaurant.departed', 'restaurant.departure_undone', 'restaurant.waitlist.invited',
   ]);
   const eventType = requiredString(input.eventType, 'eventType', 'きっかけ');
   if (!allowedTriggers.has(eventType as AutomationDraftTriggerType)) {

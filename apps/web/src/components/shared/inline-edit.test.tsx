@@ -33,7 +33,7 @@ describe('InlineEdit（その場の書き換え・C②）', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('失敗したら元の値に戻して理由を出す', async () => {
+  it('失敗したら下書きを保持して理由を出す', async () => {
     const onSave = vi.fn(async () => {
       throw new Error('no')
     })
@@ -44,7 +44,7 @@ describe('InlineEdit（その場の書き換え・C②）', () => {
       fireEvent.keyDown(screen.getByRole('textbox', { name: '配信名' }), { key: 'Enter' })
     })
     expect(screen.getByRole('alert').textContent).toContain('保存できませんでした')
-    expect(screen.getByRole('textbox', { name: '配信名' }).getAttribute('value')).toBe('秋の案内')
+    expect(screen.getByRole('textbox', { name: '配信名' }).getAttribute('value')).toBe('冬の案内')
   })
 
   it('変わっていなければ保存を呼ばない', async () => {

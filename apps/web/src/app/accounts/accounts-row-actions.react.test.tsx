@@ -26,11 +26,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, ...props }: React.ComponentProps<'a'>) =>
+    React.createElement('a', props, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/accounts',
@@ -40,12 +40,13 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
   usePageChrome: () => ({}),
 }))
 
 import AccountsPage from './page'
+vi.mock('@/lib/staff-role', async original => ({ ...await original(), useStaffRole: () => 'owner' }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -53,6 +54,8 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'
+  window.history.replaceState(null,'','/accounts')
   push.mockClear()
   listAccounts.mockImplementation(async () => ({
     success: true,
@@ -80,6 +83,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  document.documentElement.removeAttribute('data-theme')
 })
 
 async function flush() {
@@ -118,9 +122,11 @@ describe('V7vn3 LINEアカウント一覧の行操作', () => {
       expect(body, `メニューに「${label}」がありません`).toContain(label)
     }
 
-    const detail = [...document.body.querySelectorAll('button')].find((el) => el.textContent === '詳細')
+    const detail = [...document.body.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '詳細') as HTMLElement | undefined
     expect(detail).toBeTruthy()
+    expect(detail?.getAttribute('href')).toBe('/accounts/detail?id=account-a')
     await act(async () => { detail?.click() })
-    expect(push).toHaveBeenCalledWith('/accounts/detail?id=account-a')
+    await flush()
+    expect(host.querySelector('[aria-label="本店アカウントの操作"]')?.getAttribute('aria-expanded')).toBe('false')
   })
 })

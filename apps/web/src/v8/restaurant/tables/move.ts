@@ -4,9 +4,10 @@
  * 同じ時間に重なる予約がある卓は外す（サーバも重なりを 409 で断る）。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
+import {seatBoardEntry,reservationOccupies} from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 
-const INACTIVE = new Set(['cancelled', 'no_show', 'completed', 'visited'])
+const INACTIVE = new Set(['cancelled', 'no_show', 'completed'])
 
 export function overlaps(a: RestaurantReservation, b: RestaurantReservation): boolean {
   const aFrom = new Date(a.starts_at).getTime()
@@ -24,7 +25,7 @@ export function pickMoveTarget(
 ): RestaurantTable | null {
   const fits = candidates
     .filter((table) => table.is_active && table.max_capacity >= reservation.guest_count && table.min_capacity <= reservation.guest_count)
-    .filter((table) => !taken.some((item) => item.table_id === table.id && item.id !== reservation.id && !INACTIVE.has(item.status) && overlaps(item, reservation)))
+    .filter((table) => !taken.some((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && item.id !== reservation.id && reservationOccupies(item.status,item.hold_expires_at??null,Date.now(),item.departed_at??null) && overlaps(item, reservation)))
     .sort((a, b) => (a.max_capacity - reservation.guest_count) - (b.max_capacity - reservation.guest_count) || a.code.localeCompare(b.code))
   return fits[0] ?? null
 }

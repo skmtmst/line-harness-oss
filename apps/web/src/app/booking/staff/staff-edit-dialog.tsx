@@ -5,15 +5,15 @@
  * 担当スタッフタブ（menus/settings-v8.tsx）の両方から使う。
  * 見た目・入力検査（parseBookingStaffInput）・紐づけ候補の取り方は変えない。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import ImageUploader from '@/components/shared/image-uploader'
-import Select from '@/components/shared/select'
+
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type BookingStaff } from '@/lib/api'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -39,9 +39,8 @@ export function StaffEditModal({
 }) {
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
-  /* V8 のときだけボタンの内側の保存中表示へ。v7 は従来の文字のまま。 */
-  const adminTheme = useAdminTheme()
-  const busySave = adminTheme === 'v8' ? saving : undefined
+  /* 保存中は共通ボタンの内側に進捗を表示する。 */
+  const busySave = saving
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
   const panelRef = useOverlayFocus(true, onClose, saving)
@@ -157,14 +156,14 @@ export function StaffEditModal({
             onCheckedChange={(checked) => set('is_active', checked ? 1 : 0)}
           >有効（顧客に表示する）</Checkbox>
           <Field label="ログインユーザー（本人の勤務）">
-            <Select
+            <EntitySelect
               aria-label="ログインユーザーとの紐づけ"
               size="full"
               value={form.staff_member_id ?? ''}
               onChange={(v) => set('staff_member_id', v || null)}
               options={[
                 { value: '', label: '紐づけない' },
-                ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+                ...members.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
               ]}
             />
             <span className="text-ink-faint mt-1 block text-xs">

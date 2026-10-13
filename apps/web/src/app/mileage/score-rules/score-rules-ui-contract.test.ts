@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const ADJUSTMENT = readFileSync(
-  join(HERE, '..', 'friends', 'detail', 'mileage-adjustment-dialog.tsx'),
+  join(HERE, '..', '..', '..', 'v8', 'mileage', 'adjust-dialog.tsx'),
   'utf8',
 )
 

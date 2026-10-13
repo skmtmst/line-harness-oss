@@ -24,3 +24,11 @@ describe('回答の書類', () => {
     expect(await screen.findByTitle('申込.pdf')).toBeTruthy()
   })
 })
+
+it('検査中と危ない書類を分け、どちらも取得させない', () => {
+  render(<FormFileAttachments value={[{ fileId: 'pending', state: 'pending' }, { fileId: 'unsafe', state: 'quarantined' }]} />)
+  expect(screen.getByText('検査中です')).toBeTruthy()
+  expect(screen.getByText('危ないファイルのため開けません')).toBeTruthy()
+  expect(fetchApiBlob).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button')).toBeNull()
+})

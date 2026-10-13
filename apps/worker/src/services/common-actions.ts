@@ -781,7 +781,7 @@ const COMMON_ACTION_RUN_METRICS_SQL = `
 
 export async function listCommonActions(
   db: D1Database,
-  input: { lineAccountId: string; status?: string; query?: string; limit?: number; offset?: number },
+  input: { lineAccountId: string; status?: string; query?: string; folderId?: string; limit?: number; offset?: number },
 ): Promise<{ items: CommonActionSummary[]; total: number }> {
   const where = [`ca.line_account_id = ?`];
   const binds: unknown[] = [input.lineAccountId];
@@ -803,6 +803,8 @@ export async function listCommonActions(
     // 監査 R480: 通常一覧（すべて）から保管済みを外す。保管タブで見る。
     where.push(`ca.status <> 'archived'`);
   }
+  if (input.folderId === '__unfiled__') where.push('ca.folder_id IS NULL');
+  else if (input.folderId) { where.push('ca.folder_id = ?'); binds.push(input.folderId); }
   if (input.query?.trim()) {
     /*
      * 監査 R124: 画面は「アクション名・中の処理で探す」と案内しているので、

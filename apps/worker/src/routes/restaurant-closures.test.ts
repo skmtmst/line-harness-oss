@@ -15,6 +15,7 @@ import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const authMocks = vi.hoisted(() => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async () => null),
   getStaffByAdminSession: vi.fn(async () => null),
   lineAccounts: [] as Array<Record<string, unknown>>,
@@ -102,6 +103,9 @@ function get(path: string) {
 }
 
 function patch(path: string, body: unknown) {
+  const id=path.match(/^\/api\/restaurant-test\/reservations\/([^/?]+)(?:\?|$)/)?.[1];
+  if(id&&body&&typeof body==='object'&&!('expectedVersion' in body))body={...body,expectedVersion:((testDb.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(id)) as {customer_version:number}|undefined)?.customer_version??1};
+
   return app().request(`${path}?account_id=account-1`, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
@@ -125,7 +129,7 @@ beforeEach(() => {
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-9', name: 'S店', is_active: 1, channel_access_token: 'token-s' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
     endpoint: 'https://worker.example.test/webhook',
     active: true,
@@ -300,7 +304,7 @@ test('重なり409のdataに相手の名前と日付が入り、previewに電話
  await create({...closureInput,memo:'設備の交換'});const res=await create();expect(res.body).toMatchObject({code:'closure_overlap',data:{conflicts:[expect.objectContaining({name:'設備の交換',startDate:'2026-11-10',endDate:'2026-11-10'})]}});
 });
 test('連絡済みは作成後に担当者が手動送信した重なる予約だけを数え、同じ予約は一度',async()=>{
- for(const id of ['r1','r2','r3'])seedReservation(id);
+ seedReservation('r1');seedReservation('r2','confirmed','table-2');seedReservation('r3','confirmed',null);
  testDb.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f1','u1','account-9'),('f2','u2','account-9'),('f3','u3','account-9');UPDATE rt_reservations SET line_uid=CASE id WHEN 'r1' THEN 'u1' WHEN 'r2' THEN 'u2' ELSE 'u3' END;");
  const saved=await create(),id=saved.body.data.closure.id;
  testDb.raw.prepare("UPDATE rt_closures SET created_at='2026-10-07 01:00:00' WHERE id=?").run(id);

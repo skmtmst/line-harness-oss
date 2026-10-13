@@ -1,3 +1,4 @@
+import { csvRecordCount } from '../middleware/output-audit.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -22,7 +23,7 @@ import {
   type CommonVarExportJobMeta,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
@@ -176,7 +177,7 @@ commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', '
   }
 });
 
-commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"folderId":["null","string"],"ungrouped":["boolean"]}), async (c) => {
+commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonVars', 'export'), inputJsonBoundary({"accountId":["string"],"folderId":["null","string"],"ungrouped":["boolean"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; folderId?: string | null; ungrouped?: boolean }>();
     const accountId = body.accountId?.trim();
@@ -217,6 +218,7 @@ commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'),
       await task;
     }
     const fresh = await getCommonVarExportJob(c.env.DB, job.id);
+    c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 201);
   } catch (error) {
     console.error(JSON.stringify({ event: 'common_var_export_create_failed', error: String(error) }));
@@ -240,7 +242,7 @@ commonVarExports.get('/api/common-vars/exports/:id', requireRole('owner', 'admin
   }
 });
 
-commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.get('/api/common-vars/exports/:id/download', requireDeliveryAccess('commonVars', 'export'), async (c) => {
   const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
   if (!job) {
     auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: c.req.param('id') }, { result: 'denied' });
@@ -263,6 +265,7 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   }
   auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: job.id },
     { result: 'success', lineAccountId: job.line_account_id });
+  c.set('outputAudit', { count: csvRecordCount(fresh.csv_text), accountId: job.line_account_id, targetId: job.id });
   return new Response(`\uFEFF${fresh.csv_text}`, {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
@@ -272,7 +275,7 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   });
 });
 
-commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDeliveryAccess('commonVars', 'export'), inputJsonBoundary(), async (c) => {
   try {
     const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!job) return c.json({ success: false, error: 'Not found' }, 404);

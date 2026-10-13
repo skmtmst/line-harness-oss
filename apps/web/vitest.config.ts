@@ -28,7 +28,10 @@ export default defineConfig({
     jsx: 'automatic',
   },
   test: {
+    // 全画面のソースを読む見張りの試験は、CI が混むと既定の 5 秒を超える。待つ上限だけ伸ばす（速さの見張りは別の検査）。
+    testTimeout: 30_000,
     environment: 'node',
+    setupFiles: ['./src/test-utils/test-environment.ts', './src/test-utils/local-network.ts'],
     globals: false,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },

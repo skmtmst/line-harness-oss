@@ -50,7 +50,7 @@ describe('N-040 注目切替の競合検知 (#808)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seed(testDb);
     target = createApp(testDb.db);
   });

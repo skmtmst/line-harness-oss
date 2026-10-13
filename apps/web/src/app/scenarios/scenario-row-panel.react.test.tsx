@@ -47,7 +47,7 @@ function handler(url: URL, init?: RequestInit) {
   if (url.pathname === '/api/scenarios') {
     return response({ success: true, data: { items: [row('s1', '一つ目'), row('s2', '二つ目')], total: 2, limit: 50, sort: [] } })
   }
-  if (url.pathname === '/api/staff/me') return response({ success: false, error: 'not needed' })
+  if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'owner' } })
   if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
   if (url.pathname === '/api/list-stats') return response({ success: false, error: 'not needed' })
   return response({ success: true, data: {} })
@@ -65,6 +65,7 @@ async function eventually(check: () => void, timeout = 3000) {
   }
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/scenarios')
   pushes.length = 0
   puts.length = 0
   document.documentElement.dataset.theme = 'v8'
@@ -115,7 +116,11 @@ test('パネルの「開く」は詳細へ進む', async () => {
   const open = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '開く')
   if (!open) throw new Error('no open button')
   await act(async () => { open.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-  expect(pushes).toEqual(['/scenarios/detail?id=s1'])
+  expect(pushes).toHaveLength(1)
+  const destination = new URL(pushes[0], window.location.origin)
+  expect(destination.pathname).toBe('/scenarios/detail')
+  expect(destination.searchParams.get('id')).toBe('s1')
+  expect(destination.searchParams.get('returnTo')).toBe('/scenarios?scenario=s1')
 })
 
 test('パネルで名前を変えると保存口へ送る', async () => {

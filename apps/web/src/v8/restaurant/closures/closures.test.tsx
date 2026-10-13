@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), closures: vi.fn(), openingHours: vi.fn(), channelCloseTasks: vi.fn(), mediaLinks: vi.fn(),
   previewClosure: vi.fn(), createClosure: vi.fn(), updateClosure: vi.fn(), deleteClosure: vi.fn(), completeChannelCloseTask: vi.fn(),
@@ -40,6 +46,8 @@ const task = (id: string, channel: string, status: string) => ({
 })
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
   window.history.replaceState(null, '', '/restaurant-test/inventory?tab=closures')
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
@@ -63,7 +71,7 @@ beforeEach(() => {
   google.profile.mockResolvedValue({ profile: { specialHours: [] } })
   google.proposeClosureHours.mockResolvedValue({ success: true, change: {} })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('UVnvR 休業日・貸切', () => {
   it('?tab=closures で開き、頭の説明・カレンダーの札・定休・右の列・上の知らせを出す', async () => {
@@ -225,4 +233,13 @@ describe('休業日・貸切の数え方', () => {
     expect(inputError({ ...base, endDate: '2026-10-19' }, '2026-10-07')).toContain('おわりの日')
     expect(inputError({ ...base, allDay: false, startTime: '22:00', endTime: '18:00' }, '2026-10-07')).toContain('始まりより後')
   })
+})
+
+it.each(['tasks','media'])('B-241 closure auxiliary %s failure is visible and retryable',async(kind)=>{
+ const call=kind==='tasks'?fixture.channelCloseTasks:fixture.mediaLinks
+ call.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<InventoryPage />)
+ const error=await screen.findByText(kind==='tasks'?'枠を閉じる知らせを読み込めませんでした':'予約媒体を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText(kind==='tasks'?'枠を閉じる知らせを読み込めませんでした':'予約媒体を読み込めませんでした')).toBeNull())
 })

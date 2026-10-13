@@ -46,7 +46,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 閲覧のみの人には、保存・時間帯の足し引き・発行などの押せないボタンを置かない（2026-10-06 オーナー）。 */
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const today = todayIn(ctx.store?.timezone)
   const tabs = (
     <Tabs
@@ -75,7 +75,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
         accountId={selectedAccountId}
         today={today}
         canWrite={canWriteRole(role)}
-        canGoogle={role === null || canManageRole(role)}
+        canGoogle={canManageRole(role)}
         dialog={dialog}
         onDialog={onDialog}
       />
@@ -108,6 +108,7 @@ export default function InventoryPage() {
       storeTab="inventory"
       boardId={closures ? 'UVnvR' : 'Y8SjT2'}
       title="予約枠・在庫"
+      explanation={tab === 'stock' ? 'ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。' : undefined}
       description={closures ? closuresDescription : '時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。'}
       boundary={!closures}
       headSize={closures ? 'compact' : undefined}

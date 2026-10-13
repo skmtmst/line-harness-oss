@@ -1,20 +1,17 @@
 'use client'
 
-/*
- * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
- *
- * 型（CreatePage）に、4つの段（どこに置くか・どのアカウントか・友だちになったとき・発行される URL）と、
- * 右の列（お客さまの進む順・スマホの見え方）、下の帯を渡す。
- *
- * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/inflow-links/new/page.tsx）と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ：
- * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
- * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
- */
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("リンク名を入力してください"),
+}
+
+
+import Toggle from '@/components/shared/toggle';
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
@@ -26,10 +23,11 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
-import ListState from '@/components/shared/list-state'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
@@ -41,7 +39,23 @@ import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
 import CouponSettings, { type CouponSettingsValue } from '../coupon-settings'
 import styles from './create.module.css'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ActionList from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
+ *
+ * 型（CreatePage）に、4つの段（どこに置くか・どのアカウントか・友だちになったとき・発行される URL）と、
+ * 右の列（お客さまの進む順・スマホの見え方）、下の帯を渡す。
+ *
+ * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/inflow-links/new/page.tsx）と同じ
+ * （BEHAVIOR.md）。違うのは見せ方だけ：
+ * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
+ * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
+ */
 
 /* ref は口（entry-routes.ts）と同じ `[A-Za-z0-9_-]{1,64}`。 */
 const REF_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
@@ -70,6 +84,7 @@ export default function InflowCreateV8() {
 }
 
 function InflowCreate() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('流入リンクを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const router = useRouter()
@@ -84,6 +99,9 @@ function InflowCreate() {
   const [genre, setGenre] = useState('')
   const [newGenre, setNewGenre] = useState('')
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
+  const [candidatesError,setCandidatesError]=useState(false)
+  const [candidatesLoading,setCandidatesLoading]=useState(true)
+  const [candidatesRetry,setCandidatesRetry]=useState(0)
   const [refCode, setRefCode] = useState(initialRef || suggestRef(initialName))
   const [refTouched, setRefTouched] = useState(initialRef !== '')
   const [tagId, setTagId] = useState('')
@@ -95,14 +113,10 @@ function InflowCreate() {
   const [redirectUrl, setRedirectUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
-  const [tagGroups, setTagGroups] = useState<TagGroup[]>([])
-  const tagOptionGroups = useMemo(() => groupTagsByFolder(tags, tagGroups), [tags, tagGroups])
+  const [, setTagGroups] = useState<TagGroup[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
-  const [showTagPick, setShowTagPick] = useState(false)
-  const [showIntroPick, setShowIntroPick] = useState(false)
-  const [showScenarioPick, setShowScenarioPick] = useState(false)
   const [pruneNotice, setPruneNotice] = useState<string | null>(null)
   /* 発行が 409（見分けるための文字が使用中）で返り、同じ文字の発行済みリンクが見つかったときだけ立つ。 */
   const [conflict, setConflict] = useState<EntryRoute | null>(null)
@@ -112,7 +126,11 @@ function InflowCreate() {
     clearConflict()
     setCoupon({ couponEnabled: false, couponAssetId: null, couponAudience: 'new_friends' })
     setCouponOptions([])
+  },[selectedAccountId])
+  useEffect(()=>{
     let cancelled = false
+    setCandidatesError(false)
+    setCandidatesLoading(true)
     /* プールは補助データ。機能がオフでも発行画面は止めない。有効と分からない限り口を呼ばない。 */
     const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
       ok ? api.pools.list({ suppressFeatureDisabledEvent: true }) : { success: false as const, error: 'feature_disabled' },
@@ -125,9 +143,12 @@ function InflowCreate() {
       poolsRequest,
       api.templates.list(undefined, selectedAccountId ?? undefined),
       api.tagGroups.list(selectedAccountId),
-      api.entryRouteGenres.list().catch(() => ({ success: false as const, data: [] as EntryRouteGenre[] })),
+      api.entryRouteGenres.list(),
     ]).then(([t, s, p, tp, tg, g]) => {
       if (cancelled) return
+      setCandidatesLoading(false)
+      const required=[t,s,tp,tg,g]
+      if(required.some(result=>result.status==='rejected'||!result.value.success)||p.status==='rejected'||(!p.value.success&&p.value.error!=='feature_disabled')){setCandidatesError(true);return}
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
       if (tg.status === 'fulfilled' && tg.value.success) setTagGroups(tg.value.data)
       if (s.status === 'fulfilled' && s.value.success) setScenarios(s.value.data)
@@ -137,8 +158,7 @@ function InflowCreate() {
     })
     return () => { cancelled = true }
     // 候補はアカウントごとに違う。切替後に古い候補のまま保存しないよう取り直す（入力は残す）。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId])
+  }, [selectedAccountId,candidatesRetry])
 
   /* 新しい候補にない選択は外し、外したときだけ帯で知らせる。 */
   useEffect(() => {
@@ -168,15 +188,18 @@ function InflowCreate() {
 
   /* 発行の失敗は原文のまま出さない（403 は権限、409 は重複の立て直し、ほかは再試行の案内）。 */
   const doSave = async () => {
+    if(candidatesError || candidatesLoading)return
     setSaveError(null)
     const errors: Record<string, string> = {}
-    if (!name.trim()) errors['ir-name'] = 'リンク名を入力してください'
+    if ((b244Requirements.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
     if (!validRef) errors['ir-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (redirectUrl.trim()) {
       try {
         const url = new URL(redirectUrl.trim())
         if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
-      } catch { errors['ir-redirect'] = 'http または https で始まる URL を入力してください' }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure);
+ errors['ir-redirect'] = 'http または https で始まる URL を入力してください' }
     }
     if (coupon.couponEnabled && !coupon.couponAssetId) { setSaveError('渡すクーポンを選んでください'); return }
     setFieldErrors(errors)
@@ -208,19 +231,23 @@ function InflowCreate() {
       if (!res.success) throw new Error(res.error)
       router.push(createPageReturnHref('/inflow-links', res.data.id))
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 409) {
         /* 見分けるための文字が使用中。同じ文字の発行済みリンクを探して比べられるようにする。 */
         const existing = await findRouteByRef(refCode.trim(), selectedAccountId)
         if (existing) {
           setConflict(existing)
           setShowCompare(false)
-          setSaveError(null)
+          { if (!fieldFailure)
+          setSaveError(null) }
           return
         }
       }
+      { if (!fieldFailure)
       setSaveError(describeApiFailure(error, '発行', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       setSaving(false)
     }
@@ -237,7 +264,8 @@ function InflowCreate() {
       }
       const all = await api.entryRoutes.list()
       if (all.success) return pick(all.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 探せないときは競合にしない。通常の失敗文を出す。
     }
     return null
@@ -332,12 +360,14 @@ function InflowCreate() {
   const preview = (
     <div className={styles.side}>
       <h2 className={styles.sideTitle}>お客さまはこの順に進みます</h2>
+      <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)">
       <ol className={styles.steps}>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">1</span><span>QR コード・URL を開く</span></li>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">2</span><span>LINE で友だちになる（この経路で数える）</span></li>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">3</span><span>{tagName ? `タグ「${tagName}」が付く` : 'タグは付かない'}</span></li>
         <li className={styles.step}><span className={`${styles.stepNum} ${styles.stepNumNow}`} aria-hidden="true">4</span><span>{step4}</span></li>
       </ol>
+      </Card>
       <div>
         <LinePreview title={null} accountName={selectedAccount?.name ?? '公式アカウント'} caption="登録した日 10:00">
           <LinePreviewMessage accountName={selectedAccount?.name ?? '公式アカウント'} avatar={(selectedAccount?.name ?? '公').slice(0, 1)} time="10:00">
@@ -348,65 +378,38 @@ function InflowCreate() {
     </div>
   )
 
-  const actionRow = (opts: {
-    title: string
-    value: string | null
-    on: boolean
-    onOff: () => void
-    open: boolean
-    onToggleOpen: () => void
-    pickLabel: string
-    picker: ReactNode
-    /** 選ぶ窓（EntityKindDialog）を開くだけの行。下の段を出さない。 */
-    dialog?: boolean
-  }) => (
-    <div className={styles.actionItem}>
-      <div className={styles.actionRow}>
-        <SettingCheckbox checked={opts.on} label={opts.title} onChange={(next) => { if (!next) opts.onOff(); else if (!opts.on) opts.onToggleOpen() }} />
-        <div className={styles.actionText}>
-          <span className={styles.actionTitle}>{opts.title}</span>
-          <span className={styles.actionValue}>{opts.value ?? 'まだ決めていません'}</span>
-        </div>
-        <Button variant="text" onClick={opts.onToggleOpen} aria-expanded={opts.open} aria-label={`${opts.pickLabel}を${opts.value ? '変える' : '決める'}`}>
-          {opts.value ? '変える' : '決める'}
-        </Button>
-      </div>
-      {opts.open ? opts.dialog ? opts.picker : <div className={styles.actionPick}>{opts.picker}</div> : null}
-    </div>
-  )
-
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
+      hidePreviewWhenNarrow
       boardId="KMaMk"
       title="流入リンクを作る"
-      help="発行すると URL と QR コードができます。友だちになった人を、この経路で数えます。"
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}
-      hidePreviewWhenNarrow
       footerActions={(
         <>
           <Button href="/inflow-links">キャンセル</Button>
           {conflict ? (
             <Button variant="primary" onClick={() => setShowCompare(true)} disabled={saving}><ArrowLeftRight size={15} aria-hidden="true" />比べてから保存</Button>
           ) : (
-            <Button variant="primary" onClick={() => void doSave()} disabled={saving} busy={saving} busyLabel="発行しています…">
+            <Button variant="primary" onClick={() => void doSave()} disabled={saving || candidatesError || candidatesLoading} busy={saving} busyLabel="発行しています…">
               <Link2 size={15} aria-hidden="true" />発行して URL を受け取る
             </Button>
           )}
         </>
       )} dirty={false}
     >
+      {candidatesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setCandidatesRetry(value=>value+1)}/>:null}
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}
 
-      <section className={styles.card} aria-labelledby="ir-new-where">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-where">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-where">どこに置くリンクですか</h2>
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
         <div className={styles.fieldRow}>
-          <Field label="名前"><TextField
+          <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
               value={name}
@@ -419,11 +422,11 @@ function InflowCreate() {
               placeholder="夏のInstagram投稿"
               aria-invalid={Boolean(fieldErrors['ir-name'])}
               aria-describedby={fieldErrors['ir-name'] ? 'ir-name-error' : undefined}
-            />
-{fieldErrors['ir-name'] ? <span id="ir-name-error" className={styles.fieldError} role="alert">{fieldErrors['ir-name']}</span> : null}</Field>
+            /></SaveErrorField>
+<FieldError id="ir-name-error">{fieldErrors['ir-name']}</FieldError></Field></div>
           <div className={styles.field}>
-            <span className={styles.pickLabel}>フォルダ</span>
-            <Select
+            <Field label="フォルダ">
+            <SaveErrorField names={["genre"]}><Select
               id="ir-genre"
               value={genre}
               onChange={(next) => setGenre(next)}
@@ -434,22 +437,22 @@ function InflowCreate() {
                 ...genres.map((item) => ({ value: item.name, label: item.name })),
                 { value: '__new', label: '新しいフォルダ…' },
               ]}
-            />
+            /></SaveErrorField></Field>
           </div>
         </div>
         {genre === '__new' ? (
-          <TextField
+          <SaveErrorField names={["newGenre","new_genre"]}><TextField
             type="text"
             value={newGenre}
             onChange={(event) => setNewGenre(event.target.value)}
             placeholder="新しいフォルダの名前"
             aria-label="新しいフォルダの名前"
-          />
+          /></SaveErrorField>
         ) : null}
         <Field label={<><span className={styles.labelRow}>
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
 
-          </span></>}><TextField
+          </span></>}><SaveErrorField names={["redirectUrl","mine","redirect_url"]}><TextField
             id="ir-redirect"
             type="url"
             value={redirectUrl}
@@ -457,9 +460,9 @@ function InflowCreate() {
             placeholder="（空欄）"
             aria-invalid={Boolean(fieldErrors['ir-redirect'])}
             aria-describedby={fieldErrors['ir-redirect'] ? 'ir-redirect-error' : undefined}
-          />
-{fieldErrors['ir-redirect'] ? <span id="ir-redirect-error" className={styles.fieldError} role="alert">{fieldErrors['ir-redirect']}</span> : null}</Field>
-        <Field label="見分けるための文字（URL の最後に付く）"><TextField
+          /></SaveErrorField>
+<FieldError id="ir-redirect-error">{fieldErrors['ir-redirect']}</FieldError></Field>
+        <Field label="見分けるための文字（URL の最後に付く）"><SaveErrorField names={["refCode","refTouched","ref_code","ref_touched"]}><TextField
             id="ir-ref"
             type="text"
             value={refCode}
@@ -467,11 +470,11 @@ function InflowCreate() {
             placeholder="summer-ig"
             aria-invalid={Boolean(fieldErrors['ir-ref']) || (refCode !== '' && !validRef)}
             aria-describedby={fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? 'ir-ref-error' : undefined}
-          />
-{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <span id="ir-ref-error" className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}</Field>
-      </section>
+          /></SaveErrorField>
+{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <FieldError id="ir-ref-error">半角英数字・_・ハイフンで1〜64文字にしてください</FieldError> : null}</Field>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-account">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-account">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-account">どの LINE アカウントに入れますか</h2>
           <p className={styles.cardNote}>友だちになる先のアカウント</p>
@@ -485,7 +488,7 @@ function InflowCreate() {
                 : '画面上部でLINEアカウントを選んでください。'}
             </HelpTip>
           </span>
-          <Select
+          <SaveErrorField names={["poolId","pool_id"]}><EntitySelect
             id="ir-pool"
             value={poolId}
             onChange={(next) => setPoolId(next)}
@@ -493,86 +496,40 @@ function InflowCreate() {
             size="full"
             options={[
               { value: '', label: 'メインプールで自動振り分け' },
-              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+              ...pools.map((pool) => ({ ...entityOptionMetadata(pool), value: pool.id, label: pool.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="クーポン QR">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-label="クーポン QR">
         <CouponSettings accountId={selectedAccountId} value={coupon} onChange={setCoupon} onOptionsLoaded={setCouponOptions} disabled={saving} />
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-after">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-after">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-after">友だちになったときにすること</h2>
           <p className={styles.cardNote}>何も決めないと「動きが未設定」になり、数えるだけになります</p>
         </div>
-        {actionRow({
-          title: 'タグを付ける',
-          value: tagName,
-          on: tagId !== '',
-          onOff: () => setTagId(''),
-          open: showTagPick,
-          onToggleOpen: () => setShowTagPick((current) => !current),
-          pickLabel: '付けるタグ',
-          picker: (
-            <Select
-              id="ir-tag"
-              value={tagId}
-              onChange={(next) => { setTagId(next); setShowTagPick(false) }}
-              aria-label="付けるタグ"
-              size="full"
-              options={[
-                { value: '', label: '（付けない）' },
-                ...tagOptionGroups.flatMap((group) => group.tags.map((tag) => ({ value: tag.id, label: group.label ? `${group.label} / ${tag.name}` : tag.name }))),
-              ]}
-            />
-          ),
-        })}
-        {actionRow({
-          title: 'メッセージを送る',
-          value: introTemplate ? `テンプレート「${introTemplate.name}」` : null,
-          on: introTemplateId !== '',
-          onOff: () => setIntroTemplateId(''),
-          open: showIntroPick,
-          onToggleOpen: () => setShowIntroPick((current) => !current),
-          pickLabel: '送るメッセージ',
-          dialog: true,
-          picker: (
-            <EntityKindDialog
-              kind="template"
-              options={templates}
-              initialId={introTemplateId}
-              accountId={selectedAccountId}
-              onConfirm={(next) => { setIntroTemplateId(next); setShowIntroPick(false) }}
-              onCancel={() => setShowIntroPick(false)}
-            />
-          ),
-        })}
-        {actionRow({
-          title: 'シナリオ配信を始める',
-          value: scenarioName ? `シナリオ「${scenarioName}」` : null,
-          on: scenarioId !== '',
-          onOff: () => setScenarioId(''),
-          open: showScenarioPick,
-          onToggleOpen: () => setShowScenarioPick((current) => !current),
-          pickLabel: '始めるシナリオ',
-          dialog: true,
-          picker: (
-            <EntityKindDialog
-              kind="scenario"
-              options={scenarios}
-              initialId={scenarioId}
-              accountId={selectedAccountId}
-              onConfirm={(next) => { setScenarioId(next); setShowScenarioPick(false) }}
-              onCancel={() => setShowScenarioPick(false)}
-            />
-          ),
-        })}
-      </section>
+            <SaveErrorField names={["tagId","tag_id"]}><ActionList<{ kind: string;
+              id: string }>
+              value={[
+          ...(tagId ? [{ kind: 'tag', id: tagId }] : []), ...(introTemplateId ? [{ kind: 'template', id: introTemplateId }] : []), ...(scenarioId ? [{ kind: 'scenario', id: scenarioId }] : []),
+        ]} idOf={action => action.kind} kindOf={action => action.kind === 'tag' ? 'タグを付ける' : action.kind === 'template' ? 'メッセージを送る' : 'シナリオ配信を始める'} titleOf={action => (action.kind === 'tag' ? tags : action.kind === 'template' ? templates : scenarios).find(item => item.id === action.id)?.name ?? '未設定'}
+              onChange={next => { setTagId(next.find(action => action.kind === 'tag')?.id ?? ''); setIntroTemplateId(next.find(action => action.kind === 'template')?.id ?? ''); setScenarioId(next.find(action => action.kind === 'scenario')?.id ?? '') }}
+          choices={([
+                { id: 'tag', label: 'タグを付ける', items: tags, selected: tagId },
+            { id: 'template', label: 'メッセージを送る', items: templates, selected: introTemplateId },
+            { id: 'scenario', label: 'シナリオ配信を始める', items: scenarios, selected: scenarioId },
+          ]).filter(kind => !kind.selected).map(kind => ({ id: kind.id, label: kind.label, make: () =>({ kind: kind.id, id: '' }),
+          picker:{ title: `${kind.label}対象を選ぶ`, items: kind.items, apply:(action, ids) =>({ ...action, id: ids[0] }) }}))}
+          reorderable={false}
+          renderEditor={(action, update) => <EntityPickerField label="操作の対象" noun="対象" value={action.id} items={action.kind === 'tag' ? tags : action.kind === 'template' ? templates : scenarios} onChange={id => update({ ...action, id })}
+            />}
+            /></SaveErrorField>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-url">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="ir-new-url">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ir-new-url">発行される URL</h2>
           <p className={styles.cardNote}>発行したあと、一覧の「…」から QR コードと URL をコピーできます</p>
@@ -587,7 +544,7 @@ function InflowCreate() {
         ) : null}
         {/* 絵には無いが、公開オフで仕込む口は残す（URL の発行の話なのでこの段の最後に置く）。 */}
         <div className={styles.actionRow}>
-          <SettingCheckbox checked={isActive} label="発行したらすぐ使えるようにする" onChange={(next) => setIsActive(next)} />
+          <SaveErrorField names={["isActive","is_active"]}><SettingCheckbox checked={isActive} label="発行したらすぐ使えるようにする" onChange={(next) => setIsActive(next)} /></SaveErrorField>
           <div className={styles.actionText}>
             <span className={styles.actionTitle}>発行したらすぐ使えるようにする</span>
             <span className={styles.actionValue}>
@@ -595,7 +552,7 @@ function InflowCreate() {
             </span>
           </div>
         </div>
-      </section>
+      </Card>
 
       <Dialog
         open={conflict !== null && showCompare}
@@ -638,6 +595,6 @@ function InflowCreate() {
         </p>
       </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

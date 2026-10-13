@@ -19,7 +19,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(searchParams.value),
 }))
 
@@ -33,7 +33,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -94,12 +94,18 @@ describe('U お客様表示の確認', () => {
     searchParams.value = ''
     await renderPage()
     expect(host.textContent).toContain('確認するイベントが指定されていません')
+    expect(getEvent).not.toHaveBeenCalled()
+    expect(listSlots).not.toHaveBeenCalled()
   })
 
   it('読み込みに失敗したら開き直しを出す', async () => {
     getEvent.mockRejectedValueOnce(new Error('down'))
     await renderPage()
     expect(host.textContent).toContain('開き直す')
+    const retry = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === '開き直す')!
+    await act(async () => { retry.click() })
+    expect(host.textContent).toContain('秋のしつけ教室')
+    expect(getEvent).toHaveBeenCalledTimes(2)
   })
 
   it('お客様に見える内容だけを出し、URLの扱いを注記する', async () => {
@@ -111,5 +117,12 @@ describe('U お客様表示の確認', () => {
     expect(host.textContent).not.toContain('https://example.test/room')
     expect(host.textContent).toContain('オンラインのURLは確定後に案内します')
     expect(host.textContent).toContain('時間を選ぶ')
+  })
+
+  it('非公開の枠は出さず、選べる枠がない状態を表示する', async () => {
+    listSlots.mockResolvedValue({ items: [{ id: 'inactive', is_active: 0, capacity: 123, starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z' }] })
+    await renderPage()
+    expect(host.textContent).toContain('選べる時間がありません。')
+    expect(host.textContent).not.toContain('定員 123人')
   })
 })

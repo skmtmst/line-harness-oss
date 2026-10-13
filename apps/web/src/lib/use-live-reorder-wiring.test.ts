@@ -27,21 +27,21 @@ describe('並べ替えのある一覧は付いてくる動きを使う', () => {
     // 共通の並び替え（components/shared/reorder-handle の useReorder）に乗った画面は、
     // 付いてくる動きを部品の中で使う（下の「共通の並び替え」で部品側を確かめる）。
     if (source.includes("from '@/components/shared/reorder-handle'") && /useReorder\(/.test(source)) {
-      expect(source).toMatch(/\.shown\.map\(/)
+      expect(source).toMatch(/(?:\.shown\.map\(|duplicateFeedback\.order\(\w+\.shown)/)
       expect(source).toMatch(/\.rowProps\(/)
       expect(source).toMatch(/\.handleProps\(/)
-      expect(source).toMatch(/reorderKey=\{\w+\.shown|useFlipRows\(/)
+      expect(source).toMatch(/reorderKey=\{(?:\w+\.shown|duplicateFeedback\.order\(\w+\.shown)|useFlipRows\(/)
       return
     }
     expect(source).toContain("from '@/lib/use-live-reorder'")
     expect(source).toMatch(/useLiveReorder\(/)
-    expect(source).toMatch(/liveOrder\.shown\.map\(/)
+    expect(source).toMatch(/(?:liveOrder\.shown\.map\(|duplicateFeedback\.order\(liveOrder\.shown)/)
     expect(source).toMatch(/data-reorder-id=\{/)
     expect(source).toMatch(/onDragEnter=\{\(\) => [^}]*liveOrder\.enter\(/)
     expect(source).toMatch(/liveOrder\.dropTarget\(/)
     expect(source).toContain('onDragEnd={() => setDragId(null)}')
     // 表の本体が滑らかに動く（RovingTbody の reorderKey か、useFlipRows のどちらか）
-    expect(source).toMatch(/reorderKey=\{liveOrder\.shown|useFlipRows\(/)
+    expect(source).toMatch(/reorderKey=\{(?:liveOrder\.shown|duplicateFeedback\.order\(liveOrder\.shown)|useFlipRows\(/)
   })
 })
 

@@ -5,10 +5,15 @@ import { useSearchParams } from 'next/navigation'
 import { TEMPLATE_TYPES, type TemplateType } from '@/lib/hq-templates-api'
 import HqTemplatesV8 from '@/v8/hq-templates/console'
 import TemplateDefinitionEditor from './template-definition-editor'
+import HqDeliveryConsole from '@/v8/hq-deliveries/console'
+import { HQ_DELIVERY_TEMPLATE_TYPES, type HqDeliveryTemplateType } from '@line-crm/shared'
 
 /** `/hq/templates?type=...` は旧URLとして残し、新しい正規画面へ同じ内容を出す。 */
 function Content() {
   const requested = useSearchParams().get('type')
+  if (requested && HQ_DELIVERY_TEMPLATE_TYPES.includes(requested as HqDeliveryTemplateType)) {
+    return <HqDeliveryConsole type={requested as HqDeliveryTemplateType} />
+  }
   const type = requested && TEMPLATE_TYPES.includes(requested as TemplateType)
     ? requested as TemplateType
     : 'template'

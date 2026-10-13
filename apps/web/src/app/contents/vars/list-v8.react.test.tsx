@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -92,6 +94,7 @@ function ensureStorage() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ensureStorage()
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -159,7 +162,7 @@ async function renderPage() {
 }
 
 test('v8 では新しい一覧（FM94M）が出て、v7 は出ない', async () => {
-  window.localStorage.setItem('lh_staff_role', 'admin')
+  window.localStorage.setItem('lh_staff_role', 'admin'); rememberStaffIdentity({ role: 'admin' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   // 2026-10-06 入口は新しい一覧（src/v8/common-vars）。板の印は幅で FM94M（広い）か XIzkJ（1152）のどちらか。
@@ -171,7 +174,7 @@ test('v8 では新しい一覧（FM94M）が出て、v7 は出ない', async () 
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
 test('staff では閲覧のみの帯が出て、作る操作は出さない', async () => {
-  window.localStorage.setItem('lh_staff_role', 'staff')
+  window.localStorage.setItem('lh_staff_role', 'staff'); rememberStaffIdentity({ role: 'staff' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   expect(host?.textContent).toContain('閲覧のみで見ています')
@@ -180,15 +183,15 @@ test('staff では閲覧のみの帯が出て、作る操作は出さない', as
   expect(createButtons).toHaveLength(0)
 })
 
-test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {
+test('旧テーマ属性が残っていてもV8の一覧が出る', async () => {
   document.documentElement.dataset.theme = 'v7'
   await renderPage()
-  expect(host?.querySelector('[data-design-node="WuKzU"]')).not.toBeNull()
-  expect(host?.querySelector('[data-design-node~="FM94M"]')).toBeNull()
+  expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
+  expect(host?.querySelector('[data-design-node~="FM94M"],[data-design-node~="XIzkJ"]')).not.toBeNull()
 })
 
 test('止める窓は予約中の配信の帯を出す（Hhl9M）', async () => {
-  window.localStorage.setItem('lh_staff_role', 'admin')
+  window.localStorage.setItem('lh_staff_role', 'admin'); rememberStaffIdentity({ role: 'admin' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const trigger = Array.from(host?.querySelectorAll('button') ?? [])

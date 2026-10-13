@@ -1,0 +1,163 @@
+{
+  "affiliate_payout_batch_lines": [
+    {
+      "parent": "affiliates",
+      "columns": [
+        {
+          "column": "affiliate_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "affiliate_payout_results": [
+    {
+      "parent": "affiliates",
+      "columns": [
+        {
+          "column": "affiliate_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "affiliate_settlement_lines": [
+    {
+      "parent": "affiliate_adjustments",
+      "columns": [
+        {
+          "column": "adjustment_id",
+          "parentColumn": "id"
+        }
+      ]
+    },
+    {
+      "parent": "affiliate_reward_entries",
+      "columns": [
+        {
+          "column": "entry_id",
+          "parentColumn": "id"
+        }
+      ]
+    },
+    {
+      "parent": "affiliates",
+      "columns": [
+        {
+          "column": "affiliate_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "affiliate_settlements": [
+    {
+      "parent": "affiliates",
+      "columns": [
+        {
+          "column": "affiliate_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "affiliate_statements": [
+    {
+      "parent": "affiliates",
+      "columns": [
+        {
+          "column": "affiliate_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "booking_audit_logs": [
+    {
+      "parent": "bookings",
+      "columns": [
+        {
+          "column": "booking_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "booking_payments": [
+    {
+      "parent": "bookings",
+      "columns": [
+        {
+          "column": "booking_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "mileage_adjustment_approval_events": [
+    {
+      "parent": "mileage_adjustment_approval_requests",
+      "columns": [
+        {
+          "column": "request_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "nen_photo_assessment_runs": [
+    {
+      "parent": "nen_photo_submissions",
+      "columns": [
+        {
+          "column": "photo_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "nen_photo_original_download_audit": [
+    {
+      "parent": "nen_photo_submissions",
+      "columns": [
+        {
+          "column": "photo_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "nen_photo_original_download_grants": [
+    {
+      "parent": "nen_photo_submissions",
+      "columns": [
+        {
+          "column": "photo_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "nen_photo_review_events": [
+    {
+      "parent": "nen_photo_submissions",
+      "columns": [
+        {
+          "column": "photo_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ],
+  "nen_photo_risk_assessments": [
+    {
+      "parent": "nen_photo_submissions",
+      "columns": [
+        {
+          "column": "photo_id",
+          "parentColumn": "id"
+        }
+      ]
+    }
+  ]
+}

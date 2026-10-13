@@ -12,6 +12,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  role: 'owner',
   update: vi.fn(),
   get: vi.fn(),
   addTag: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/api', async () => {
   return {
     ...actual,
     api: {
+      staff: { me: async () => ({ success: true, data: { role: mocks.role, permissionViewKeys: ['/chats', '/friends'] } }) },
       friends: {
         get: (id: string) => ok({
           id, originalId: 'friend-0', displayName: 'Kyohei Yamamoto', pictureUrl: null, isFollowing: true, metadata: {},
@@ -92,14 +94,21 @@ async function renderPanel(notes: string | null = '前のメモ', friendId = 'fr
     )
   })
   await eventually(() => {
-    if (document.documentElement.dataset.theme === 'v8') expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
-    else expect(host.textContent).toContain('次の対応')
+    expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
   })
+  // ふだんは値を読む形。以前からの保存・失敗・競合の検証は編集を開いて行う。
+  {
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="対応を編集"]')?.click()
+      host.querySelector<HTMLButtonElement>('button[aria-label="メモを編集"]')?.click()
+    })
+  }
 }
 
 beforeEach(() => {
+  mocks.role = 'owner'
   clearToastsForTest()
-  Object.values(mocks).forEach((m) => m.mockReset())
+  Object.values(mocks).forEach((m) => { if (typeof m !== 'string') m.mockReset() })
   mocks.orders.mockResolvedValue({ success: true, data: { items: [] } })
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const values = new Map<string, string>()
@@ -127,10 +136,10 @@ describe('B-26 右の欄でその場で直す', () => {
     await renderPanel()
     const picker = () => document.getElementById('inbox-panel-tag-picker')!
     expect(picker().hidden).toBe(true)
-    await act(async () => { button('＋ 追加')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     expect(picker().hidden).toBe(false)
     expect(document.querySelector('[aria-label="タグを探して付ける"]')).toBeTruthy()
-    await act(async () => { button('＋ 追加')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     expect(picker().hidden).toBe(true)
     document.activeElement instanceof HTMLElement && document.activeElement.blur()
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })) })
@@ -175,7 +184,7 @@ describe('B-26 右の欄でその場で直す', () => {
     mocks.removeTag.mockResolvedValue({ success: true, data: null })
     mocks.addTag.mockResolvedValue({ success: true, data: null })
     await renderPanel()
-    await eventually(() => { expect(document.querySelector('button[aria-label="未契約を外す"]')).toBeTruthy() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     expect(mocks.removeTag).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('『未契約』を外しますか？')
@@ -189,6 +198,7 @@ describe('B-26 右の欄でその場で直す', () => {
 
   it('タグを外す確認をキャンセルすると、タグも保存先も変えない', async () => {
     await renderPanel()
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     await act(async () => { button('キャンセル')!.click() })
     expect(mocks.removeTag).not.toHaveBeenCalled()
@@ -198,20 +208,24 @@ describe('B-26 右の欄でその場で直す', () => {
 
   it('確認中に友だちを切り替えたら確認を閉じ、別の友だちから外さない', async () => {
     await renderPanel()
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     await act(async () => { root.render(<FriendInfoSidebar friendId="friend-1" chatId="chat-1" />) })
     expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
     expect(mocks.removeTag).not.toHaveBeenCalled()
   })
 
-  it('v7 は今までの札と付け外しの動きを保つ', async () => {
+  it('旧テーマ属性でもタグを外す前にV8の確認を挟む', async () => {
     document.documentElement.dataset.theme = 'v7'
     mocks.removeTag.mockResolvedValue({ success: true, data: null })
     await renderPanel()
-    expect(document.querySelector('[role="group"][aria-label="タグ「未契約」"]')).toBeNull()
+    expect(document.querySelector('[role="group"][aria-label="タグ「未契約」"]')).toBeTruthy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
+    expect(mocks.removeTag).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('『未契約』を外しますか？')
+    await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((b) => b.textContent === '外す')!.click() })
     expect(mocks.removeTag).toHaveBeenCalledWith('friend-0', 'tag-a')
-    expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
   })
 
   describe('メモの同時編集（最後に直した方を残す）', () => {
@@ -283,12 +297,14 @@ describe('購入のAPIの形と宛先（WEB242）', () => {
       { id:'other',friendId:'friend-b',orderNumber:'注文B',totalAmount:9000,orderedAt:'2026-10-02T00:00:00Z' }
     ] } })
     await renderPanel()
+    await act(async () => { button('顧客情報をすべて表示')!.click() })
     await eventually(() => { expect(host.textContent).toContain('1,200') })
     expect(mocks.orders).toHaveBeenCalledWith(expect.objectContaining({ lineAccountId:'account-a' }))
     expect(host.textContent).not.toContain('10,200')
   })
   it('取得失敗を購入0件と出さず、再試行を出す', async () => {
     mocks.orders.mockRejectedValue(new Error('down'));await renderPanel()
+    await act(async () => { button('顧客情報をすべて表示')!.click() })
     await eventually(() => { expect(host.textContent).toContain('購入を読み込めませんでした') })
     expect(document.querySelector('[aria-label="購入をもう一度読み込む"]')).toBeTruthy()
   })
@@ -296,6 +312,7 @@ describe('購入のAPIの形と宛先（WEB242）', () => {
 
 
 it('閲覧のみでは対応・担当・メモ・タグを変える操作を隠す', async () => {
+  mocks.role = 'staff'
   window.localStorage.setItem('lh_staff_role', 'staff')
   window.localStorage.setItem('lh_staff_view_permissions', '["/chats","/friends"]')
   await renderPanel()
@@ -305,3 +322,6 @@ it('閲覧のみでは対応・担当・メモ・タグを変える操作を隠�
   expect(button('＋ 追加')).toBeUndefined()
   expect(document.querySelector('[aria-label="未契約を外す"]')).toBeNull()
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

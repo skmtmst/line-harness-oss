@@ -9,11 +9,11 @@ import {
   matchesQuery,
   parentName,
   webhookLabel,
-} from './account-list-view'
+} from '@/v8/settings/accounts/view'
 import type { LineAccount } from '@line-crm/shared'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
 
 const account = (over: Partial<LineAccount> = {}): LineAccount => ({
   id: 'a1', channelId: '2007123456', name: '然-NEN- TEST',
@@ -32,7 +32,7 @@ const account = (over: Partial<LineAccount> = {}): LineAccount => ({
  */
 describe('V7vn3 LINEアカウント一覧', () => {
   it('板 V7vn3 の骨組みで作る', () => {
-    expect(PAGE).toContain('ReadonlyDesignNode node="V7vn3"')
+    expect(PAGE).toContain('boardId="V7vn3"')
     expect(PAGE).not.toContain('data-design-node="QT91v"')
   })
 
@@ -92,18 +92,15 @@ describe('V7vn3 LINEアカウント一覧', () => {
     expect(parentName(account(), [])).toBe('—')
   })
 
-  it('数は稼働中・停止中・アーカイブの3枚だけ', () => {
-    // 板に無い「接続に問題」の4枚目は置かない。
-    expect(PAGE).toContain('title="稼働中"')
-    expect(PAGE).toContain('title="停止中"')
-    expect(PAGE).toContain('title="アーカイブ"')
-    expect(PAGE).not.toContain('title="接続に問題"')
+  it('数は採用済みV8の接続数・有効・問題・友だちの4枚', () => {
+    for (const title of ['つないでいる','有効','接続に問題','友だちの合計']) expect(PAGE).toContain(`title="${title}"`)
+    expect(PAGE.match(/<KpiCard\b/g)).toHaveLength(4)
   })
 
-  it('絵に無い塊は出さない（友だち列・既定列・並び順・締めの一言）', () => {
-    expect(PAGE).not.toContain('account.stats.friendCount')
-    expect(PAGE).not.toContain('account.isDefault')
-    expect(PAGE).not.toContain('AccountOrdering')
+  it('現役の表と既定の印を使い、並び替えは窓の中だけ', () => {
+    expect(PAGE).toContain('<DataTable')
+    expect(PAGE).toContain('account.isDefault')
+    expect(PAGE).toContain('{orderingOpen ? <AccountOrdering')
     expect(PAGE).not.toContain('ここで見えること')
   })
 

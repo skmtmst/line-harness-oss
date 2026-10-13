@@ -1,26 +1,26 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
-.root { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 3px; margin: -3px; }
-.input { appearance: none; width: 18px; height: 18px; flex: none; margin: 0; background: var(--color-canvas); border: 1.5px solid var(--color-ink-faint); border-radius: var(--radius-pill); cursor: inherit; }
+.root { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.input { appearance: none; width: 18px; height: 18px; flex: none; margin: 0; background: var(--color-canvas); cursor: inherit; }
 .input:checked { border: 5px solid var(--color-accent-deep); }
-.input:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 .root:has(.input:disabled) { opacity: 0.5; cursor: not-allowed; }
 .label { color: var(--color-ink); font-size: var(--text-label); line-height: 20px; font-weight: 400; }
 .root[data-fill] { display: flex; width: 100%; min-width: 0; }
 .root[data-fill] .label { flex: 1; min-width: 0; }
 .root[data-fill]::before { pointer-events: none; }
-[data-theme='v8'] .root { position: relative; padding: 0; margin: 0; }
-[data-theme='v8'] .root::before { content: ''; position: absolute; inset: -3px; }
-[data-theme='v8'] .input { border: 0; outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
-[data-theme='v8'] .input:checked { outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; }
-[data-theme='v8'] .input:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; box-shadow: inset 0 0 0 5px var(--color-accent-deep); }
-[data-theme='v8'] .input:not(:checked):focus-visible { box-shadow: none; }
-[data-theme='v8'] .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .input { gap: 0; border-radius: var(--polish-radius-pill); }
+:root .root { position: relative; padding: 0; margin: 0; }
+:root .root::before { content: ''; position: absolute; inset: -3px; }
+:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .input { gap: 0; border-radius: var(--polish-radius-pill); }
 /*
  * 小さい字（★BG-B `z14gEG` 人物2択）。文 12/17。
- * 丸 18・間隔 8・選択中の 5px は行内ラジオと同じまま。
+ * 丸と点は B-203（16・輪1.5・点8）、間隔8は行内ラジオと同じ。
  * 板がこの2択のラベルを 12px で描くため（docs/v8-design-rules.md §1 の2）。
  */
-[data-theme='v8'] .root[data-size='small'] .label { font-size: var(--text-caption); line-height: 17px; }
+:root .root[data-size='small'] .label { font-size: var(--text-caption); line-height: 17px; }
 }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+:root .input { width: var(--choice-size); height: var(--choice-size); outline: var(--choice-ring) solid transparent; outline-offset: -0.75px; border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); box-shadow: none; }
+:root .input:checked { border: var(--choice-ring) solid var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+:root .input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); border-color: var(--color-selection-border); }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -32,7 +33,6 @@ import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-p
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
 import BroadcastDetailV8 from '@/v8/broadcast-detail/detail'
 
 function BroadcastDetailInner() {
@@ -50,7 +50,7 @@ function BroadcastDetailInner() {
   )
   // 閲覧のみ（夕18）：V8 の詳細で変える操作を押せない形にする。
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canEditFeature('broadcast.definition.edit')
+  const canEdit = useFeatureAccess('broadcasts')
   const [insight, setInsight] = useState<(BroadcastInsight & { suppressedByAudienceSize: boolean }) | null>(null)
   // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
   // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。

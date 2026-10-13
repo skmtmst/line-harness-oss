@@ -135,6 +135,7 @@ export function handleRowKey(body: HTMLTableSectionElement, event: KeyboardEvent
       return
     }
     case ' ': {
+      if (target === row && row.hasAttribute('data-row-open')) return
       if (target !== row && target !== rowPrimary(row, items)) return
       const box = row.querySelector<HTMLInputElement>('input[type="checkbox"]:not([disabled])')
       if (!box) return

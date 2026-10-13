@@ -9,9 +9,9 @@
  * データの口（settings・members・saveRanks・saveMilestones・deleteRank・resync）は今の画面と同じ。
  * 動きの一覧は BEHAVIOR.md。
  */
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useState, type ReactNode } from 'react'
-import { Download, Eye, History, CircleHelp, Undo2 } from 'lucide-react'
+import { Download, History, CircleHelp, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -27,10 +27,11 @@ import MembersListV8 from './list'
 import RankSettingsV8 from './ranks'
 import LifetimeV8 from './lifetime'
 import { csvLine, yen, type LoadStatus, type MemberTab, type SavedHandler } from './parts'
-import Notice from '@/components/shared/notice'
+
 import styles from './members.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type { LoadStatus, MemberTab } from './parts'
 
@@ -59,7 +60,7 @@ export default function MembersV8({
   onChangeTab: (next: MemberTab) => void
 }) {
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
   /* ★V8 の上の帯は「ホーム › 会員」。画面名は枠が付ける。 */
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
@@ -70,7 +71,6 @@ export default function MembersV8({
 
   const tabs = <>
     <Tabs
-      className={styles.tabs}
       label="会員の切り替え"
       items={[
         { label: '会員一覧', count: kpis?.members, current: tab === 'members', onClick: () => onChangeTab('members') },
@@ -80,7 +80,7 @@ export default function MembersV8({
       ]}
     />
     {readonly ? (
-      <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。ランクや節目を変える操作は管理者に頼んでください。" /></div>
+      <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ランクや節目を変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
     ) : null}
     {tab === 'ranks' ? topBand : null}
   </>
@@ -89,15 +89,16 @@ export default function MembersV8({
   if (!accountId) {
     body = <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、会員を見るLINEアカウントを選びます。" />
   } else if (tab === 'ranks') {
-    body = <RankSettingsV8 key={accountId} accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} onTopBand={setTopBand} />
+    body = <RankSettingsV8 accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} onTopBand={setTopBand} />
   } else if (tab === 'lifetime') {
-    body = <LifetimeV8 key={accountId} accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} />
+    body = <LifetimeV8 accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} />
   } else {
     body = <MembersListV8 key={accountId} accountId={accountId} settings={settings} />
   }
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD_NODE[tab]}
       title="会員"
       help="ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。"
@@ -114,7 +115,7 @@ export default function MembersV8({
  * 数の帯。白い板の左右いっぱいに4つ（★V8 の共通部品 KpiBand）。
  * 「○○以上」は上から2ランク（描いた板は ゴールド以上＝プラチナとゴールド）。
  */
-function MembersKpiBand({
+export function MembersKpiBand({
   kpis,
   ranks,
   loading,
@@ -130,7 +131,7 @@ function MembersKpiBand({
   const petPercent = kpis && kpis.members > 0 ? Math.round(((kpis.petMembers ?? 0) / kpis.members) * 100) : null
   const pending = loading || !kpis
   return (
-    <KpiBand className={styles.band} aria-label="会員の数の帯">
+    <KpiBand className={styles.band} aria-label="会員の数の帯" title={pending ? undefined : `通年の購入 合計 ${yen(kpis.annualTotalYen)}・ライフタイム 合計 ${yen(kpis.lifetimeTotalYen)}・マイル残高 ${formatNumber(kpis.balanceTotal)}・今月使ったマイル ${formatNumber(kpis.usedThisMonth)}`}>
       <KpiCard presentation="band" title="会員" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? emptyValue('unknown') : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
       <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={13} aria-hidden="true" />} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : emptyValue('unknown')} />
       <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={13} aria-hidden="true" />} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? emptyValue('unknown') : `会員の ${petPercent}%`} />
@@ -195,9 +196,9 @@ function CsvExportButton({ accountId }: { accountId: string }) {
   const { exportCsv, busy, error } = useMembersCsv(accountId)
   return (
     <span className={styles.csvWrap}>
-      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="書き出しています…">
         <Download size={15} aria-hidden="true" />
-        {busy ? '書き出しています…' : 'CSVで書き出す'}
+        CSVで書き出す
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>

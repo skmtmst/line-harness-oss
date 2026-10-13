@@ -76,7 +76,7 @@
 
 .viewerIcon {
   flex-shrink: 0;
-  color: var(--color-status-info);
+  color: var(--color-action);
 }
 
 /* 本体：設定の中のメニュー｜一覧｜右の補足。 */
@@ -312,25 +312,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* 役割の札。 */
-.roleChip {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--tpl-sa-chip-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-micro);
-  font-weight: 700;
-  line-height: var(--tpl-sa-label-lh);
-  white-space: nowrap;
-}
-
-.roleChip[data-role='owner'] { background: var(--color-ink); color: var(--color-on-accent); }
-.roleChip[data-role='administrator'] { background: var(--color-success-bg); color: var(--color-accent-deep); }
-.roleChip[data-role='operations'] { background: var(--color-status-info-soft); color: var(--color-status-info); }
-.roleChip[data-role='reception'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.roleChip[data-role='view_only'],
-.roleChip[data-role='custom'] { background: var(--color-v8-pill-off); color: var(--color-ink-faint); }
 
 /* 行の「…」（28 角）：開いたメニューの目印が行の中で段を取らないよう、箱で包む。 */
 .menuBox {

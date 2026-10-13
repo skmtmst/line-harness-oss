@@ -122,6 +122,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
         lineAccountId: id,
         status: c.req.query('status'),
         query: c.req.query('query'),
+        folderId: c.req.query('folder_id'),
         ...(format === 'csv' ? {} : { limit, offset }),
       }),
       // 札・KPI用の集計。絞り込みに依らずアカウント全体で数える。
@@ -129,6 +130,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
       format === 'csv' ? null : getCommonActionsSummary(c.env.DB, id),
     ]);
     if (format === 'csv') {
+      c.set('outputAudit', { count: result.items.length, accountId: id });
       return c.body(commonActionsCsv(result.items), 200, {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': 'attachment; filename="common-actions.csv"',

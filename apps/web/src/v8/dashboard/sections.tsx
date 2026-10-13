@@ -1,12 +1,13 @@
 'use client'
 
 import StatusPill from '@/components/shared/status-pill'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
 import type { NotificationCenterItem } from '@line-crm/shared'
 import { api, fetchApi, type BookingRequest, type DashboardOverview, type DashboardUpcoming, type DeliveryFailureOrigins } from '@/lib/api'
 import SectionHeader from './head'
+import { DashboardAsideSection } from '@/components/templates/dashboard-page'
 import ActivityItem from '@/components/shared/activity-item'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
@@ -109,9 +110,9 @@ export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }
       linkLabel="配信設定へ"
     />
   )
-  if (overviewFailed) return <div className={styles.asideBlock}>{head}<Unavailable onRetry={onRetry} /></div>
+  if (overviewFailed) return <DashboardAsideSection>{head}<Unavailable onRetry={onRetry} /></DashboardAsideSection>
   return (
-    <div className={styles.asideBlock}>
+    <DashboardAsideSection>
       {head}
       {loading ? <Loading label="送信枠" /> : (
         <p className={styles.quota}>
@@ -147,7 +148,7 @@ export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }
           {quotaText}
         </p>
       )}
-    </div>
+    </DashboardAsideSection>
   )
 }
 
@@ -163,8 +164,9 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
 }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
+  const twoFactorText = `・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${twoFactor.total}人`}`
   return (
-    <div className={styles.asideBlock}>
+    <DashboardAsideSection>
       <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態を見る" />
       <p className={styles.alertHead}>
         <span className={failed || count === null ? styles.faintStrong : styles.strong}>
@@ -173,9 +175,9 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
         {!failed && count !== null ? <Tag tone={count > 0 ? 'warning' : 'success'}>{count > 0 ? '要確認' : '正常'}</Tag> : null}
       </p>
       <p className={styles.item}>{`・最も古い未対応：${oldestWaitMinutes === null ? emptyValue('unknown') : formatWaitRough(oldestWaitMinutes)}`}</p>
-      <p className={styles.item}>{`・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${twoFactor.total}人`}`}</p>
+      <p className={styles.item} title={twoFactorText}>{twoFactorText}</p>
       <Updated>{dashboardLocalUpdatedAt(updatedAt)}</Updated>
-    </div>
+    </DashboardAsideSection>
   )
 }
 
@@ -189,7 +191,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
   ] as const
   const autoText = `メッセージ受信時の自動変更：${autoOnInbound === null ? emptyValue('unknown') : autoOnInbound ? '有効' : '無効'}`
   return (
-    <div className={styles.asideBlock}>
+    <DashboardAsideSection>
       <SectionHeader
         title="現在の対応状況"
         help="現在の件数。選択中のアカウントのLINE（友だち単位）と、すべてのMAIL（メール単位）の合計。受信箱の絞り込みと同じ数。"
@@ -201,14 +203,14 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
         <KeyValue
           key={row.label}
           label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
-          value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)}件`}
+          value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)} 件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
           title={`${row.label}で絞った受信箱を開く`}
         />
       ))}
       <p className={styles.caption} title={autoText}>{autoText}</p>
-    </div>
+    </DashboardAsideSection>
   )
 }
 
@@ -268,7 +270,7 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
   }
   const showCheck = canRun && (state.label !== '正常' || checking)
   return (
-    <div className={styles.asideBlock}>
+    <DashboardAsideSection>
       <SectionHeader title="接続状態" />
       <div className={styles.kvWithAction}>
         <KeyValue label="LINE Webhook" value={webhookLabel} dot={webhookDot} />
@@ -278,11 +280,11 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
           </button>
         ) : null}
       </div>
-      {state.label === '要確認' && state.reason && !checking ? <p className={styles.stale} title={state.reason.title}>{state.reason.text}</p> : null}
+      {state.label === '要確認' && state.reason && !checking ? <p className={`${styles.stale} ${styles.connectionReason}`} title={state.reason.title}>{state.reason.text}</p> : null}
       {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
-      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : `${formatNumber(activeFriends)}人`} />
-    </div>
+      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : `${formatNumber(activeFriends)} 人`} />
+    </DashboardAsideSection>
   )
 }
 

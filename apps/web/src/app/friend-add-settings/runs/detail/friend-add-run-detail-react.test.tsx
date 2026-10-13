@@ -13,7 +13,6 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: (crumbs: Array<{label: string; href: string}>) => { state.crumbs = crumbs }, usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ children, ...props }: any) => <button {...props}>{children}</button> }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
-vi.mock('@/components/shared/notice', () => ({ default: ({ children }: { children: React.ReactNode }) => <div role="note">{children}</div> }))
 vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span data-badge>{children}</span> }))
 vi.mock('@/lib/api', () => ({ api: { friendAddRules: apiMocks } }))
 

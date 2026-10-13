@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { GoogleCalendarClient, type BusyInterval } from './google-calendar.js';
 import {
   getGoogleServiceAccountToken,
@@ -81,6 +82,8 @@ export async function syncConfirmedBookingToGoogle(
   db: D1Database,
   credentials: GoogleServiceAccountCredentials,
   bookingId: string,
+  /** 確定の回収では同じ操作行のIDを使い、応答消失後も外部予定を重ねない。 */
+  recoveryEventId?: string,
 ): Promise<{ synced: boolean; eventId?: string; calendarId?: string }> {
   const row = await db
     .prepare(
@@ -114,7 +117,7 @@ export async function syncConfirmedBookingToGoogle(
       auth_type: string | null;
       access_token: string | null;
     }>();
-  if (!row || row.external_event_id || !row.connection_id || !row.calendar_id || !row.auth_type) {
+  if (!row || (row.external_event_id && row.external_event_id !== recoveryEventId) || !row.connection_id || !row.calendar_id || !row.auth_type) {
     return { synced: false };
   }
 
@@ -129,15 +132,15 @@ export async function syncConfirmedBookingToGoogle(
    * 作成に失敗したら置き場を空けて、次の再試行が作れる状態に戻す。
    * ID は Google 側の文字種 (a〜v と数字) に収まる形で採番する。
    */
-  const reservedEventId = `lh${crypto.randomUUID().replaceAll('-', '')}`;
+  const reservedEventId = recoveryEventId ?? `lh${crypto.randomUUID().replaceAll('-', '')}`;
   const claim = await db
     .prepare(
       `UPDATE bookings
           SET external_event_id = ?, external_calendar_id = ?,
               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND external_event_id IS NULL AND status = 'confirmed'`,
+        WHERE id = ? AND (external_event_id IS NULL OR external_event_id = ?) AND status = 'confirmed'`,
     )
-    .bind(reservedEventId, row.calendar_id, bookingId)
+    .bind(reservedEventId, row.calendar_id, bookingId, recoveryEventId ?? null)
     .run();
   if ((claim.meta?.changes ?? 0) === 0) {
     const current = await db
@@ -166,8 +169,8 @@ export async function syncConfirmedBookingToGoogle(
     auth_type: row.auth_type,
     access_token: row.access_token,
   };
-  const client = await clientForConnection(connection, credentials);
   try {
+    const client = await clientForConnection(connection, credentials);
     const created = await client.createEvent({
       id: reservedEventId,
       summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
@@ -397,11 +400,11 @@ export async function processPendingCalendarDeleteOperations(
   // ここで 0 行になり、二重に外部を呼ばない。
   const claimed = await db.prepare(
     `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
-      WHERE id IN (${runnableIds.map(() => '?').join(', ')})
+      WHERE id IN (${sqlIdSet(runnableIds).sql})
         AND ${dueWhere}
         AND NOT ${bookingOff}
       RETURNING id, booking_id, line_account_id`,
-  ).bind(nowIso, nowIso, ...runnableIds, staleCutoff)
+  ).bind(nowIso, nowIso, ...(runnableIds.length ? sqlIdSet(runnableIds).binds : []), staleCutoff)
     .all<{ id: string; booking_id: string; line_account_id: string }>();
   for (const op of claimed.results ?? []) {
     result.processed++;

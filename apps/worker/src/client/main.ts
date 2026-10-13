@@ -19,6 +19,7 @@
  */
 
 import { initBooking } from './booking.js';
+import {applyCustomerLook} from './customer-look.js';
 import { initForm } from './form.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
 import { restoreLiffStateInCurrentUrl } from './liff-query.js';
@@ -69,6 +70,8 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 function getPage(): string | null {
   const path = window.location.pathname.replace(/^\/+/, '');
   if (path === 'book') return 'book';
+  if (path === 'booking' || path === 'booking/history') return 'salon-book';
+  if (/^restaurant\/reserve\/[^/]+$/.test(path)) return 'restaurant';
   const params = new URLSearchParams(window.location.search);
   return params.get('page');
 }
@@ -112,6 +115,7 @@ function escapeHtml(str: string): string {
 // ─── UI States ──────────────────────────────────────────
 
 function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
+  const returnUrl = window.location.href;
   const container = document.getElementById('app')!;
   const friendAddUrl = BOT_BASIC_ID
     ? `https://line.me/R/ti/p/${BOT_BASIC_ID}`
@@ -135,11 +139,16 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
   // 一度発火したら listener を外して、ユーザーが LIFF をフォアグラウンド復帰するたびに
   // 重複 push が走らないようにする（送信後にアプリ切り替えで再発火する事故を防ぐ）
   let formLinkSent = false;
+  let checking = false;
   const onVisibilityChange = async () => {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible' || checking) return;
+    checking = true;
     try {
       const { friendFlag } = await liff.getFriendship();
       if (!friendFlag) return;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      // 入口と引数を追加前のまま戻す。各画面の読み出しは通常の入口に任せる。
+      window.history.replaceState(window.history.state, '', returnUrl);
 
       // Re-link now that the friends row exists. For first-time users the
       // pre-add POST in linkAndAddFlow ran before the follow webhook created
@@ -194,11 +203,12 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
           });
         } catch { /* best-effort */ }
       }
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      if (new URLSearchParams(window.location.search).get('couponRef')) await initSalonBooking('entry-coupon');
+      if (getPage() || new URLSearchParams(window.location.search).get('couponRef')) await openPage();
       else showCompletion(profile, false);
-    } catch {
-      // ignore
+    } catch (err) {
+      showError(customerMessage(err, '画面を開けませんでした。LINE から、もう一度開いてください。'));
+    } finally {
+      checking = false;
     }
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -356,7 +366,9 @@ async function linkAndAddFlow() {
 
 // ─── Salon Booking (React, dynamic-imported) ─────────────
 
-async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' = 'salon-book'): Promise<void> {
+export async function initRestaurantForm(): Promise<void> { await initSalonBooking('form'); }
+
+async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' | 'restaurant' | 'form' = 'salon-book'): Promise<void> {
   // 既存 linkAndAddFlow と同じ初期化シーケンスを踏む:
   //   ① profile + idToken + friendFlag を並列取得
   //   ② /api/liff/link で UUID 確定 (ref/ig 含む) — booking エンドポイントが
@@ -429,6 +441,12 @@ async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-cou
     showError('mount target #app が見つかりません');
     return;
   }
+  if (page === 'restaurant' || page === 'form') {
+    if (!await linked) { showError('画面を開けませんでした。もう一度お試しください。'); return; }
+    const { mountRestaurant } = await import('./restaurant/main.js');
+    mountRestaurant(container,{liffId:LIFF_ID,lineUserId:profile.userId,idToken,sdk:liff},page);
+    return;
+  }
   if (page === 'entry-coupon') {
     if (!await linked) { showError('クーポンを開けませんでした。時間をおいて、もう一度開いてください。'); return; }
     const { mountEntryRouteCoupon } = await import('./entry-route-coupon/main.js');
@@ -449,6 +467,7 @@ async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-cou
     liffId: LIFF_ID,
     lineUserId: profile.userId,
     idToken,
+    sdk: liff,
   });
 }
 
@@ -655,6 +674,7 @@ async function initAffiliate(): Promise<void> {
     liffId: LIFF_ID,
     lineUserId: profile.userId,
     lineAccessToken: accessToken,
+    idToken: liff.getIDToken() ?? undefined,
   });
 }
 
@@ -721,33 +741,14 @@ function forceReloginForStaleToken(): boolean {
   return true;
 }
 
-async function main() {
-  try {
-    await liff.init({ liffId: LIFF_ID });
-
-    if (!liff.isLoggedIn()) {
-      liff.login({ redirectUri: window.location.href });
-      return;
-    }
-
-    if (forceReloginForStaleToken()) return;
-
-    // Resolve bot basic ID from API (multi-account support)
-    try {
-      const configRes = await fetch(`/api/liff/config?liffId=${encodeURIComponent(LIFF_ID)}`);
-      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string } };
-      if (configJson.success && configJson.data?.botBasicId) {
-        BOT_BASIC_ID = configJson.data.botBasicId;
-      }
-    } catch {
-      // fallback: BOT_BASIC_ID remains empty, friend-add URL won't auto-redirect
-    }
-
+async function openPage(): Promise<void> {
     const page = getPage();
     if (new URLSearchParams(window.location.search).get('couponRef')) {
       await initSalonBooking('entry-coupon');
     } else if (page === 'book') {
       await initBooking();
+    } else if (page === 'restaurant') {
+      await initSalonBooking('restaurant');
     } else if (page === 'salon-book') {
       await initSalonBooking();
     } else if (page === 'visit-stamps') {
@@ -765,14 +766,39 @@ async function main() {
     } else if (page === 'nen-member') {
       await initNenMember();
     } else if (page === 'form') {
-      const params = new URLSearchParams(window.location.search);
-      const formId = params.get('id');
-      await initForm(formId);
+      await initForm(new URLSearchParams(window.location.search).get('id'));
     } else if (!page) {
       await linkAndAddFlow();
     } else {
       await linkAndAddFlow();
     }
+}
+
+async function main() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: window.location.href });
+      return;
+    }
+
+    if (forceReloginForStaleToken()) return;
+
+    // Resolve bot basic ID from API (multi-account support)
+    applyCustomerLook(undefined);
+    try {
+      const configRes = await fetch(`/api/liff/config?liffId=${encodeURIComponent(LIFF_ID)}`);
+      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string; customerLook?: unknown } };
+      if (configJson.success && configJson.data?.customerLook) applyCustomerLook(configJson.data.customerLook);
+      if (configJson.success && configJson.data?.botBasicId) {
+        BOT_BASIC_ID = configJson.data.botBasicId;
+      }
+    } catch {
+      // fallback: BOT_BASIC_ID remains empty, friend-add URL won't auto-redirect
+    }
+
+    await openPage();
   } catch (err) {
     showError(customerMessage(err, '画面を開けませんでした。LINE から、もう一度開いてください。'));
   }

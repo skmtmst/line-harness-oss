@@ -159,7 +159,7 @@ describe('画像＋本文の結合送信', () => {
     })
     net.calls.length = 0
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '送信' }))
+      fireEvent.click(screen.getByRole('button', { name: '送信する' }))
     })
     await waitFor(() => {
       expect(net.calls.filter((c) => c === 'POST /api/chats/chat-1/send-combined')).toHaveLength(1)

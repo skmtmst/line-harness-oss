@@ -1,27 +1,20 @@
 'use client'
-
 import { HorizontalBarChart } from '@/components/shared/charts'
-
-/*
- * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
- *
- * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
- * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, Search, User } from 'lucide-react'
 import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
 import { csvCell } from '@/lib/presentation'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Notice from '@/components/shared/notice'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage, DetailColumns } from '@/components/templates'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
@@ -30,21 +23,28 @@ import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import TargetMissing from '@/components/shared/target-missing'
-import { TableHeadRow, Th } from '@/components/shared/table'
+import { ActionCell, DataTable, DateCell, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Card, { CardHeader } from '@/components/shared/card'
+import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
 import ListRange from '@/components/ui/list-range'
-import {
-  postActionStepLabel,
-  ratingAverageText,
-  type DestinationWrite,
-  type FormSubmissionSummary,
-  type SubmissionPostActions,
-} from './summary'
+import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
 import styles from './responses.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { RowMenu } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useCustomerDeletion } from '@/lib/use-customer-deletion'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
+ *
+ * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
+ * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
+ */
 
 type Submission = {
   id: string
@@ -137,7 +137,8 @@ export default function FormResponsesV8() {
 
 function Responses() {
   const role = useStaffRole()
-  const canEditForm = role ? canManageRole(role) || (role === 'staff' && !isOwnerOrAdmin() && canEditFeature('/form-submissions')) : canEditFeature('/form-submissions')
+  const canDeleteResponse = canManageRole(role)
+  const canEditForm = useFeatureAccess('forms')
   const canRetry = canEditForm
   const searchParams = useSearchParams()
   const formId = searchParams.get('id') ?? ''
@@ -206,6 +207,12 @@ function Responses() {
       if (request === loadRequest.current) setLoading(false)
     }
   }, [formId, selectedAccountId])
+
+  const deletion = useCustomerDeletion(async () => { await load(page, pageSize) })
+  const openDeletion = (item: Submission) => {
+    if (!canDeleteResponse || !selectedAccountId) return
+    deletion.open({ id: item.id, name: `${item.friendName ?? '不明'}（${formatDateTime(item.createdAt)}）の回答`, kind: 'form_response', path: `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}` })
+  }
 
   useEffect(() => {
     void load(1, 20)
@@ -379,8 +386,9 @@ function Responses() {
   const rail = (
     <div className={styles.rail}>
       {view === 'rows' && selected ? (
-        <section className={styles.railCard} aria-label={`回答の詳細：${selected.friendName ?? '不明'}`}>
+        <Card variant="aside" gap="var(--polish-space-row)" aria-label={`回答の詳細：${selected.friendName ?? '不明'}`}>
           <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
+          {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
           <dl className={styles.detailList}>
             <div className={styles.detailRow}>
               <dt>答えた日時</dt>
@@ -422,7 +430,7 @@ function Responses() {
               <Button href={`/chats?friend=${encodeURIComponent(selected.friendId)}`}><User size={15} aria-hidden="true" />友だちを開く</Button>
             ) : null}
           </div>
-        </section>
+        </Card>
       ) : null}
       <div className={styles.railButtonsWide}>
         {canEditForm ? <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}><Pencil size={15} aria-hidden="true" />フォームを編集</Button> : null}
@@ -432,17 +440,17 @@ function Responses() {
       </div>
       {exportError ? <p className={styles.error}>{exportError}</p> : null}
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
-      <section className={styles.railCard} aria-labelledby="fr-filter">
+      <Card variant="aside" aria-labelledby="fr-filter">
         <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
         <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
-        <Field label={<><Search size={15} aria-hidden="true" /></>}><input
+        <Field label={<><Search size={15} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="名前・答えで探す（全件から）"
             aria-label="名前・答えで探す（全件から）"
-          /></Field>
-      </section>
+          /></SaveErrorField></Field>
+      </Card>
     </div>
   )
 
@@ -450,7 +458,7 @@ function Responses() {
     <DetailPage
       boardId={view === 'summary' ? 'v0SbYR' : 'MKQyJ'}
       tabSpacing="compact"
-      identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
+      identity={<></>}
       title={`集まった回答：${form.name}`}
       help={headLine}
       tabs={(
@@ -464,7 +472,7 @@ function Responses() {
         />
       )}
     >
-      {!canEditForm && !canRetry ? <Notice tone="info" message="閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。" /> : null}
+      {!canEditForm && !canRetry ? <ReadOnlyNotice >閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。</ReadOnlyNotice> : null}
       <DetailColumns aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
           {total === 0 && !query.trim() ? (
             <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
@@ -500,7 +508,7 @@ function Responses() {
                 const top = values.slice(0, 6)
                 const max = Math.max(0, ...top.map(([, count]) => count))
                 return (
-                  <section key={fieldSummary.key} className={styles.card} aria-label={labels[fieldSummary.key] ?? fieldSummary.key}>
+                  <Card key={fieldSummary.key} variant="form" padding="roomy" aria-label={labels[fieldSummary.key] ?? fieldSummary.key}>
                     <div className={styles.cardHead}>
                       <h2 className={styles.cardTitle}>{labels[fieldSummary.key] ?? fieldSummary.key}</h2>
                       <p className={styles.cardNote}>{sub}</p>
@@ -508,13 +516,13 @@ function Responses() {
                     {answered > 0 ? (
                       <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
                     ) : null}
-                  </section>
+                  </Card>
                 )
               })}
               {longKey ? (() => {
                 const recents = items.filter((item) => String((item.data as Record<string, unknown>)[longKey] ?? '').trim() !== '')
                 return (
-                  <section className={`${styles.card} ${styles.quoteCard}`} aria-label={labels[longKey] ?? longKey}>
+                  <Card variant="form" padding="roomy" gap="var(--polish-space-row)" aria-label={labels[longKey] ?? longKey}>
                     <div className={styles.cardHead}>
                       <h2 className={styles.cardTitle}>{labels[longKey] ?? longKey}</h2>
                       <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)} 件`}</p>
@@ -533,29 +541,27 @@ function Responses() {
                     <div className={styles.cardFoot}>
                       <Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button>
                     </div>
-                  </section>
+                  </Card>
                 )
               })() : null}
             </>
           ) : items.length === 0 ? (
-            <div className={styles.card}>
+            <Card variant="form" padding="roomy">
               <p className={styles.cardTitle}>条件に合う回答はありません</p>
               <p className={styles.cardNote}>検索語を変えてください。</p>
               <div><Button onClick={() => setQuery('')}>× 条件を外す</Button></div>
-            </div>
+            </Card>
           ) : (
-            <section className={styles.card} aria-labelledby="fr-rows">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle} id="fr-rows">回答</h2>
-                <p className={styles.cardNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件`}</p>
-              </div>
-              <table className={styles.table}>
+            <Card variant="records" aria-labelledby="fr-rows">
+              <CardHeader size="stacked" title="回答" titleId="fr-rows" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件`} />
+              <DataTable label="集まった回答">
                 <thead>
                   <TableHeadRow presentation="embedded">
                     <Th className={styles.colWhen}>答えた日時</Th>
-                    <Th className={styles.colWho}>答えた人</Th>
-                    <Th truncate>{firstKey ? (labels[firstKey] ?? firstKey) : '回答'}</Th>
+                    <Th>答えた人</Th>
+                    <Th className={styles.colAnswer} truncate>{firstKey ? (labels[firstKey] ?? firstKey) : '回答'}</Th>
                     <Th className={styles.colState}>後処理</Th>
+                    {canDeleteResponse ? <Th className={styles.colActions}>操作</Th> : null}
                   </TableHeadRow>
                 </thead>
                 <tbody>
@@ -564,38 +570,43 @@ function Responses() {
                     const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey], blockByKey(firstKey)) : emptyValue('unknown')
                     const isSelected = selected?.id === item.id
                     return (
-                      <tr
+                      <Tr
                         key={item.id}
-                        className={isSelected ? styles.rowSelected : undefined}
+                        selected={isSelected}
+                        interactive
                         aria-selected={isSelected}
                         onClick={() => selectAnswer(item.id)}
                       >
-                        <td className={styles.when}>{shortWhen(item.createdAt)}</td>
-                        <td>
-                          <button type="button" className={styles.who} title={item.friendName ?? '不明'}  onClick={() => selectAnswer(item.id)}>
+                        <DateCell>{shortWhen(item.createdAt)}</DateCell>
+                        <NameCell name={
+                          <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
                             {item.friendName ?? '不明'}
                           </button>
-                        </td>
-                        <td className={styles.ellipsis} title={first}>{first}</td>
-                        <td>
+                        } />
+                        <Td className={styles.ellipsis} title={first}>{first}</Td>
+                        <Td>
                           {incomplete === null ? <span className={styles.faint}>{emptyValue('unknown')}</span>
-                            : incomplete ? <span className={`${styles.chip} ${styles.chipNg}`}>未完</span>
-                              : <span className={`${styles.chip} ${styles.chipOk}`}>済み</span>}
-                        </td>
-                      </tr>
+                            : <StatusBadge tone={incomplete ? 'danger' : 'success'}>{incomplete ? '未完' : '済み'}</StatusBadge>}
+                        </Td>
+                        {canDeleteResponse ? <ActionCell><RowMenu size="row" label={`回答 ${item.id} の操作`} items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(item) }]} /></ActionCell> : null}
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-              <div className={styles.pager}>
+              </DataTable>
+              <div className={styles.pager} data-card-footer="">
                 <span className={styles.range}>
                   {total === null ? emptyValue('unknown') : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
                 </span>
                 <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
               </div>
-            </section>
+            </Card>
           )}
       </DetailColumns>
+      <ConfirmDialog open={deletion.target !== null} title="回答を削除しますか？" deleteName="この回答"
+        description={`${deletion.target?.name ?? 'この回答'}と添付した写真・PDF・本人確認書類を削除します。元に戻せません。すでに行った送信やタグの変更は取り消されません。`}
+        destructive confirmDisabled={deletion.blocked} busy={deletion.busy} busyLabel="削除中…" error={deletion.error}
+        onConfirm={deletion.confirm} onCancel={deletion.close} />
     </DetailPage>
   )
 }

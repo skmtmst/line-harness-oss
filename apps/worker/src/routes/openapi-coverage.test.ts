@@ -44,10 +44,19 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (method === 'ALL' || method === 'OPTIONS') return false;
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
   if (path.startsWith('/api/restaurant-test') && ![
+    '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
     '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
     '/api/restaurant-test/opening-hours', '/api/restaurant-test/reservation-link',
+    '/api/restaurant-test/followups/:storeId',
+    '/api/restaurant-test/followups/:storeId/review-history',
+    '/api/restaurant-test/followups/:storeId/bindings/:stepId',
+    '/api/restaurant-test/followups/:storeId/request-start',
+    '/api/restaurant-test/followups/:storeId/stop',
+    '/api/restaurant-test/reservations/:id',
+    '/api/restaurant-test/reservations/:id/confirmations',
+
   ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
   if (path.startsWith('/admin/update')) return false;
@@ -133,6 +142,48 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/auth/two-factor/policy',
+  'GET /api/auth/two-factor/self',
+  'POST /api/auth/two-factor/recovery',
+  'PUT /api/auth/two-factor/policy',
+  'GET /api/images/{key}',
+  'GET /api/account-settings/allergy-options',
+  'PUT /api/account-settings/allergy-options',
+  'GET /api/account-settings/customer-look',
+  'PUT /api/account-settings/customer-look',
+  'GET /api/liff/customer-look',
+  'GET /api/liff/restaurant/courses',
+  'GET /api/liff/restaurant/referrals',
+  'POST /api/liff/restaurant/referrals',
+  'POST /api/liff/restaurant/form-booking',
+  'GET /api/restaurant-test/store-groups',
+  'POST /api/restaurant-test/store-groups',
+  'PATCH /api/restaurant-test/store-groups/{id}/members/{storeId}',
+  'PUT /api/restaurant-test/stores/{id}/referral-location',
+  'PATCH /api/restaurant-test/reservations/{id}',
+  'GET /api/restaurant-test/followups/{storeId}',
+  'GET /api/restaurant-test/followups/{storeId}/review-history',
+  'POST /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
+  'PATCH /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
+  'DELETE /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
+  'POST /api/restaurant-test/followups/{storeId}/request-start',
+  'POST /api/restaurant-test/followups/{storeId}/stop',
+  'GET /api/restaurant-test/reservations/{id}',
+  'GET /api/restaurant-test/reservations/{id}/confirmations',
+  'POST /api/liff/restaurant/confirmations/{requestId}/respond',
+
+  'GET /api/traffic-pools/{id}',
+  'PUT /api/traffic-pools/{id}',
+  'DELETE /api/visit-stamps/staff-qr/{id}',
+  'GET /api/visit-stamps/cards/{id}/storefront-qr',
+  'GET /api/visit-stamps/staff-qr/{id}',
+  'POST /api/liff/visit-stamps/qr/redeem',
+  'POST /api/visit-stamps/cards/{id}/staff-qr',
+  'POST /api/visit-stamps/cards/{id}/storefront-qr',
+  'DELETE /api/forms/{id}/submissions/{submissionId}',
+  'DELETE /api/friends/{id}/data',
+  'GET /api/booking/admin/board',
+  'PATCH /api/booking/admin/board/{id}',
   'POST /api/tags/{id}/restore',
   'POST /api/support-marks/{id}/restore',
   'POST /api/automations/{id}/restore',
@@ -146,6 +197,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/entry-routes/{id}/qr-image',
   'POST /api/liff/entry-route-coupon',
   'POST /api/liff/entry-route-coupon/use',
+  'POST /api/events/admin/events/{id}/duplicate',
+  'POST /api/friend-add-rules/{id}/duplicate',
+  'POST /api/friend-add-rules/{id}/unarchive',
   "GET /api/hq/banners/folders",
   "POST /api/hq/banners/folders",
   "PATCH /api/hq/banners/folders/{id}",
@@ -1553,7 +1607,6 @@ const ALLOWLIST = new Set<string>([
   'GET /api/traffic-pools/{id}/accounts',
   'POST /api/traffic-pools',
   'POST /api/traffic-pools/{id}/accounts',
-  'PUT /api/traffic-pools/{id}',
   'PUT /api/traffic-pools/{id}/accounts/{accountId}',
 
   // system：署名検証する外部受信経路（OpenAPI未記載・順次記載）（9件）
@@ -1889,7 +1942,11 @@ describe('OpenAPIと公開APIの同期', () => {
       if (!entry) continue;
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
-      if (classification?.kind === 'public') {
+      // These LIFF handlers verify the account's LINE ID token themselves.
+      const verifiedLiff = ['/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
+      if (verifiedLiff) {
+        if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);
+      } else if (classification?.kind === 'public') {
         if (JSON.stringify(operation?.security ?? null) !== '[]') {
           problems.push(`${key}: 認証なし公開口なのに security: [] が無い`);
         }

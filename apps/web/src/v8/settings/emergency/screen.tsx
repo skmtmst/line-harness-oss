@@ -21,6 +21,9 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { HealthPanelV8 } from './health'
 import UpdateHistoryV8 from './history'
 import styles from './screen.module.css'
+import { RowActions } from '@/components/shared/row-actions'
+import HistoryDetails, { type HistoryDetail } from './history-details'
+import Notice from '@/components/shared/notice'
 
 /** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
 const TABS = [
@@ -44,9 +47,10 @@ export default function EmergencyScreen({
   renderControl?: (accounts: LineAccount[], controlRef: RefObject<EmergencyControlHandle | null>) => ReactNode
 }) {
   const tab = useMergedTab(TABS)
+  const [historyDetail, setHistoryDetail] = useState<HistoryDetail>(null)
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canManage = staffRole ? canManageRole(staffRole) : true
+  const canManage = canManageRole(staffRole)
   const [, setSeverity] = useState<OperationSeverity>('unknown')
   const [manualRunRequest, setManualRunRequest] = useState(0)
   /* 手動確認の連打・同時実行を止める（N-458）。終わったら外す。 */
@@ -78,12 +82,15 @@ export default function EmergencyScreen({
   const controlRef = useRef<EmergencyControlHandle | null>(null)
 
   const actions = tab === 'health'
-    ? <Button variant="secondary" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>
-        <RefreshCw className={styles.btnIcon} aria-hidden="true" />{manualBusy ? '確認中…' : 'いますぐ確かめる'}
+    ? <Button variant="secondary" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy} busy={manualBusy} busyLabel="確認中…">
+        <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
     : tab === 'control' && canManage
       ? <Button variant="danger" type="button" onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
-      : undefined
+      : tab === 'history' ? <RowActions subjectName="履歴" menuItems={[
+        { id: 'incidents', label: '止めた・戻した記録を見る', onSelect: () => setHistoryDetail('incidents') },
+        { id: 'updates', label: '更新内容を見る', onSelect: () => setHistoryDetail('updates') },
+      ]} /> : undefined
   const description = tab === 'health'
     ? `musubo とつながる先が動いているかを、9 つの項目を5分ごとに自動で確かめます。おかしいときはここから止められます。`
     : tab === 'control'
@@ -100,10 +107,7 @@ export default function EmergencyScreen({
     >
       <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={TABS.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
-        <div className={styles.warnBand} role="alert">
-          <p>アカウント一覧を読み込めませんでした。個別のアカウントを選べず、全体が対象になります。</p>
-          <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読み込む</button>
-        </div>
+        <Notice tone="danger" action={<> <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読み込む</button> </>} >アカウント一覧を読み込めませんでした。個別のアカウントを選べず、全体が対象になります。</Notice>
       ) : null}
       {tab === 'health' ? (
         <HealthPanelV8
@@ -117,6 +121,7 @@ export default function EmergencyScreen({
       ) : null}
       {tab === 'control' ? renderControl?.(accounts, controlRef) : null}
       {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 />) : null}
+      <HistoryDetails panel={historyDetail} onClose={() => setHistoryDetail(null)} />
     </SbSettingsScreen>
   )
 }

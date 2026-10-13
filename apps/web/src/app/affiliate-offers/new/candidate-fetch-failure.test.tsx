@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R524: 案件作成でタグ・シナリオの候補取得に失敗したら「（なし）」に
  * 化けさせず、失敗と再試行を出す。取り直すまで保存させない。
  */
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -28,6 +30,7 @@ let failScenarios: boolean
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
     const text = String(url)
+      if (text.includes('/api/tag-groups') || text.includes('/api/folders')) return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
     if (text.includes('/api/tags')) {
       if (failTags) throw new Error('network down')
       return { ok: true, status: 200, json: async () => ({ success: true, data: [
@@ -63,11 +66,11 @@ async function openOptions(buttonId: string) {
   const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
   if (toggle && !toggle.checked) await act(async () => { toggle.click() })
   // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-  const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag button[aria-haspopup="dialog"]' : `#${buttonId}`)
+  const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag' : `#${buttonId}`)
   expect(button).toBeTruthy()
   await act(async () => { button!.click() })
   if (buttonId === 'of-tag') {
-    const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')].map((el) => el.getAttribute('aria-label') ?? '')
+    const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')].map((el) => el.getAttribute('aria-label') ?? '')
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     return labels
   }
@@ -76,6 +79,7 @@ async function openOptions(buttonId: string) {
 
 describe('R524 候補の取得失敗は空と区別して再試行を出す', () => {
   beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
     failTags = false
     failScenarios = false
     stubFetch()
@@ -126,6 +130,7 @@ describe('R524 候補の取得失敗は空と区別して再試行を出す', ()
   it('正常な0件は失敗表示にならない', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
       const text = String(url)
+      if (text.includes('/api/tag-groups') || text.includes('/api/folders')) return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
       if (text.includes('/api/tags')) {
         return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
       }

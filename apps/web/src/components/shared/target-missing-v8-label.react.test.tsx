@@ -16,7 +16,7 @@ afterEach(() => {
  * 失敗の題も v8 は絵どおり「読み込めませんでした」（「〇〇を表示できませんでした」も言い換える）。
  */
 describe('開き先がない 再試しの文言', () => {
-  it('v7は「もう一度読み込む」', () => {
+  it('指定がなくても「もう一度読み込む」', () => {
     render(<TargetMissing kind="error" title="t" description="d" onRetry={() => {}} />)
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
   })
@@ -27,15 +27,15 @@ describe('開き先がない 再試しの文言', () => {
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
   })
 
-  it('v8の失敗の題は「読み込めませんでした」。v7は「表示できませんでした」のまま', () => {
+  it('旧テーマの指定が残っていても失敗の題は「読み込めませんでした」', () => {
     document.documentElement.dataset.theme = 'v8'
     const view = render(<TargetMissing kind="error" title="表示できませんでした" description="d" />)
     expect(screen.getByText('読み込めませんでした')).not.toBeNull()
     view.rerender(<TargetMissing kind="error" title="投稿を表示できませんでした" description="d" />)
     expect(screen.getByText('投稿を読み込めませんでした')).not.toBeNull()
     cleanup()
-    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.dataset.theme = 'v7'
     render(<TargetMissing kind="error" title="表示できませんでした" description="d" />)
-    expect(screen.getByText('表示できませんでした')).not.toBeNull()
+    expect(screen.getByText('読み込めませんでした')).not.toBeNull()
   })
 })

@@ -5,8 +5,9 @@ import React, { act } from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ReminderRegistrantsPanel } from './registrants-panel'
+import { RegistrantsTab } from '@/v8/reminders/detail'
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -36,7 +37,8 @@ vi.mock('@/components/shared/select', () => ({
 }))
 const account = vi.hoisted(() => ({ selectedAccountId: 'account-a' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.selectedAccountId }) }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: { reminders: {
     get: apiMock.get,
     registrants: {
@@ -61,6 +63,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   account.selectedAccountId = 'account-a'
   apiMock.list.mockResolvedValue({ success: true, data: [registrant] })
   apiMock.updateTargetDate.mockResolvedValue({ success: true, data: { id: registrant.id, friendId: registrant.friendId, targetDate: '2026-10-08T00:00:00.000Z', status: 'active', reminderVersionId: 'snapshot-1', lockVersion: 5, replayed: false } })
@@ -80,7 +83,7 @@ afterEach(async () => {
 
 async function render() {
   await act(async () => {
-    root.render(<ReminderRegistrantsPanel reminderId="reminder-1" />)
+    root.render(<RegistrantsTab canManage reminderId="reminder-1" />)
     await Promise.resolve()
     await Promise.resolve()
   })
@@ -131,12 +134,9 @@ async function pickTargetDate(label: string, iso: string) {
   })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
-    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
-    hourSelect.value = hour
-    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
-    minuteSelect.value = minute
-    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const timeInput = reopened.querySelector('input') as HTMLInputElement
+    fireEvent.change(timeInput, { target: { value: `${hour}:${minute}` } })
+    fireEvent.blur(timeInput)
     await Promise.resolve()
     await Promise.resolve()
   })
@@ -160,7 +160,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     await render()
     expect(host.textContent).toContain('田中 花子')
     await pickTargetDate('田中 花子の基準日', '2026-10-08T09:00')
-    await click('基準日を保存する')
+    await click('基準日を保存')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', expect.stringMatching(/^2026-10-08T/), 4)
     expect(host.textContent).toContain('未送信分だけ新しい日程で組み直します。')
   })
@@ -184,7 +184,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     root = createRoot(host)
     apiMock.list.mockResolvedValueOnce({ success: false, error: 'not found' })
     await render()
-    expect(host.textContent).toContain('登録者を表示できませんでした')
+    await waitFor(() => expect(host.textContent).toContain('登録者を読み込めませんでした'))
   })
 
   it('アカウント切替では前の登録者を残さず、対象を読み直す', async () => {
@@ -193,7 +193,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     expect(host.textContent).toContain('田中 花子')
     account.selectedAccountId = 'account-b'
     await act(async () => {
-      root.render(<ReminderRegistrantsPanel reminderId="reminder-1" />)
+      root.render(<RegistrantsTab canManage reminderId="reminder-1" />)
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -202,15 +202,16 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     expect(host.textContent).not.toContain('田中 花子')
   })
 
-  it('端末がJST以外でも、UTCの基準日をJSTで表示し同じ瞬間を保存する', async () => {
+  it('端末がJST以外でも、UTCの基準日をJSTで表示し選んだ瞬間を保存する', async () => {
     const jstRegistrant = { ...registrant, targetDate: '2026-09-16T01:00:00.000Z' }
     apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
     await render()
     const trigger = document.querySelector('button[aria-label="田中 花子の基準日"]')
     // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（日本語の見せ方）。
     expect(trigger?.textContent).toContain('2026年9月16日（水）10:00')
-    await click('基準日を保存する')
-    expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:00:00.000Z', 4)
+    await pickTargetDate('田中 花子の基準日', '2026-09-16T10:30')
+    await click('基準日を保存')
+    expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:30:00.000Z', 4)
   })
 })
 

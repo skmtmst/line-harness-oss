@@ -1,3 +1,5 @@
+import { formatYmd } from '@/lib/format'
+
 /*
  * 飲食店テスト（在庫・予約台帳・座席・メニュー）の試験で使う固定データ。
  * restaurantTestApi.snapshot が返す形。
@@ -21,10 +23,10 @@ export const menuItems = [
 ]
 
 const at = (dayOffset: number, hour: number, minute = 0) => {
-  const d = new Date()
-  d.setDate(d.getDate() + dayOffset)
-  d.setHours(hour, minute, 0, 0)
-  return d.toISOString()
+  const d = new Date(`${formatYmd(new Date())}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + dayOffset)
+  const day = d.toISOString().slice(0, 10)
+  return new Date(`${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`).toISOString()
 }
 
 export function reservation(id: string, over: Record<string, unknown>) {

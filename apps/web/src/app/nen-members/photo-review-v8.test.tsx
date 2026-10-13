@@ -5,8 +5,9 @@
  * 板の印・札・カードの操作・見送る窓・掲載の表を見る。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { setTimeControl } from '@/test-utils/time-control'
 
 const fetchPhotos = vi.hoisted(() => vi.fn())
 const nenMembers = vi.hoisted(() => ({
@@ -26,17 +27,14 @@ const nenMembers = vi.hoisted(() => ({
 }))
 const staffMe = vi.hoisted(() => ({ me: vi.fn() }))
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
-}))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error { status?: number; code?: string },
   api: { staff: staffMe, nenMembers },
   fetchApi: (...args: unknown[]) => fetchPhotos(...args),
 }))
 
-import PhotoReviewV8 from './photo-review-v8'
+import PhotoReviewV8 from '@/v8/nen-posts/review'
 
 const flush = () => act(async () => { await Promise.resolve() })
 
@@ -97,7 +95,7 @@ function mockAll() {
   })
 }
 
-afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.clearAllMocks() })
+afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.clearAllMocks(); vi.useRealTimers() })
 
 describe('投稿 V8', () => {
   it('審査待ちは TkA4D の印でカードと操作を出す', async () => {
@@ -118,7 +116,8 @@ describe('投稿 V8', () => {
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     expect(container.querySelector('[data-design-node="Jn95h"]')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'こむぎの写真を採用する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'こむぎの写真を採用する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'こむぎの写真を見送る' })).toBeNull()
   })
 
   it('見送るを押すと ujcar の窓が開く', async () => {
@@ -138,6 +137,7 @@ describe('投稿 V8', () => {
     render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     fireEvent.click(screen.getByRole('button', { name: 'こむぎの写真を見送る' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'ほかの人の顔が写っています' }))
     fireEvent.click(screen.getByRole('radio', { name: '暗くて見えにくいです' }))
     const supplement = '明るいところで、もう一度お願いできますか。'
     const preview = screen.getByText('お写真をご投稿いただきありがとうございます。', { exact: false })
@@ -160,16 +160,24 @@ describe('投稿 V8', () => {
     expect(screen.getByText('出すときの決めごと')).toBeTruthy()
   })
   it('履歴の保存は採用報酬と版を送り、予約日時を日本時間で送る', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-10T15:09:00Z'))
     staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
     mockAll()
     nenMembers.createPhotoRewardPolicyVersion.mockResolvedValue({ success: true, data: { version: { versionNumber: 4 } } })
     render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     fireEvent.click(screen.getByRole('button', { name: '版の履歴を見る' }))
-    await screen.findByText('引き出し：新しい版を作る')
+    fireEvent.click(await screen.findByRole('button', { name: '新しい版を作る' }))
+    await screen.findByRole('dialog', { name: '新しい版を作る' })
     fireEvent.change(screen.getByLabelText('採用したら（マイル）'), { target: { value: '120' } })
     fireEvent.change(screen.getByLabelText('ひとこと（なぜ変えるか）'), { target: { value: '10月の報酬' } })
-    fireEvent.change(screen.getByLabelText('使い始め（日本時間・空ならすぐ）'), { target: { value: '2026-10-15T00:00' } })
+    fireEvent.click(screen.getByLabelText('使い始め（日本時間・空ならすぐ）'))
+    const dateTime = await screen.findByRole('dialog', { name: '日時を選ぶ' })
+    fireEvent.click(within(dateTime).getByRole('button', { name: '日付' }))
+    fireEvent.click(await screen.findByRole('button', { name: '2026年10月15日（木）' }))
+    await setTimeControl(within(dateTime).getByRole('combobox', { name: '時刻' }), '00:00')
+    fireEvent.click(within(dateTime).getByRole('button', { name: '閉じる' }))
     fireEvent.click(screen.getByRole('button', { name: '版を予約する' }))
     await flush()
     expect(nenMembers.createPhotoRewardPolicyVersion).toHaveBeenCalledWith({ points: 120, publicationPoints: 0, summary: '10月の報酬', effectiveFrom: '2026-10-15T00:00:00+09:00', expectedVersion: 3 })

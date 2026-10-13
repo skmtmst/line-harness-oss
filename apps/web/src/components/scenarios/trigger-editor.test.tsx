@@ -28,6 +28,8 @@ const fetchTags = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', () => ({
   api: {
+    tags: { list: fetchTags },
+    tagGroups: { list: vi.fn(async () => ({ success: true, data: [] })) },
     scenarios: {
       triggers: { list: listTriggers, add: addTrigger, remove: removeTrigger },
       simulate,
@@ -280,3 +282,6 @@ it('WEB268: A→B→Aに戻っても最初のAの保存完了で今の窓を閉�
   expect(onClose).not.toHaveBeenCalled()
   expect(screen.getByText('友だち追加時')).toBeTruthy()
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

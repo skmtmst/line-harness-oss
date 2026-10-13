@@ -1,17 +1,5 @@
 'use client'
 
-/**
- * ブロック1つぶんの設定。
- *
- * 種類ごとに出す項目が違う。共通で出せるもの（タイトル・必須・非表示）は
- * 上に固定し、その種類にしかないもの（入力制限・選択肢・リマインダ）を
- * 下に足していく。並びを固定しているのは、ブロックを見比べるときに
- * 目が同じ位置を追えるようにするため。
- *
- * 「回答の登録先」は複数選べる。同じ回答を本名と情報欄の両方に入れたい、
- * という運用が実際にあるため。
- */
-
 import type {
   FormBlock,
   FormInputBlock,
@@ -26,6 +14,21 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { describeInputUpdates } from './form-update-summary'
 import { cellInput, fieldInput, type FormRefs } from './form-refs'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+
+/**
+ * ブロック1つぶんの設定。
+ *
+ * 種類ごとに出す項目が違う。共通で出せるもの（タイトル・必須・非表示）は
+ * 上に固定し、その種類にしかないもの（入力制限・選択肢・リマインダ）を
+ * 下に足していく。並びを固定しているのは、ブロックを見比べるときに
+ * 目が同じ位置を追えるようにするため。
+ *
+ * 「回答の登録先」は複数選べる。同じ回答を本名と情報欄の両方に入れたい、
+ * という運用が実際にあるため。
+ */
 
 export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; group: string }[] = [
   { kind: 'image', label: '画像', group: '飾り' },
@@ -150,16 +153,16 @@ export default function BlockEditor({
             <div className="flex flex-wrap items-end gap-3">
               <label className="min-w-[16rem] flex-1">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">見出し</span>
-                <input
+                <SaveErrorField names={["text","block.text"]}><input
                   type="text"
                   value={block.text}
                   onChange={(e) => onChange({ text: e.target.value } as Partial<FormBlock>)}
                   className={fieldInput}
-                />
+                /></SaveErrorField>
               </label>
               <label>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">大きさ</span>
-                <Select
+                <SaveErrorField names={["level","block.level"]}><Select
                   aria-label="大きさ"
                   value={String(block.level ?? 2)}
                   onChange={(value) =>
@@ -170,7 +173,7 @@ export default function BlockEditor({
                     { value: '2', label: '見出し2' },
                     { value: '3', label: '見出し3' },
                   ]}
-                />
+                /></SaveErrorField>
               </label>
             </div>
           )}
@@ -178,12 +181,12 @@ export default function BlockEditor({
           {block.kind === 'text' && (
             <label className="block">
               <span className="text-ink-secondary mb-1 block text-xs font-medium">本文</span>
-              <textarea
+              <SaveErrorField names={["text","block.text"]}><textarea
                 rows={3}
                 value={block.text}
                 onChange={(e) => onChange({ text: e.target.value } as Partial<FormBlock>)}
                 className={`${fieldInput} resize-y`}
-              />
+              /></SaveErrorField>
             </label>
           )}
 
@@ -193,17 +196,17 @@ export default function BlockEditor({
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像のURL
                 </span>
-                <input
+                <SaveErrorField names={["mediaUrl","block.mediaUrl","media_url","block.media_url"]}><input
                   type="url"
                   value={block.mediaUrl}
                   onChange={(e) => onChange({ mediaUrl: e.target.value } as Partial<FormBlock>)}
                   placeholder="https://..."
                   className={fieldInput}
-                />
+                /></SaveErrorField>
               </label>
               <label>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">幅</span>
-                <Select
+                <SaveErrorField names={["size","block.size"]}><Select
                   aria-label="幅"
                   value={block.size ?? 'normal'}
                   onChange={(value) =>
@@ -213,18 +216,18 @@ export default function BlockEditor({
                     { value: 'normal', label: '通常' },
                     { value: 'full', label: '画面いっぱい' },
                   ]}
-                />
+                /></SaveErrorField>
               </label>
               <label className="min-w-[14rem] flex-1">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   押したときに開くURL（任意）
                 </span>
-                <input
+                <SaveErrorField names={["linkUrl","block.linkUrl","link_url","block.link_url"]}><input
                   type="url"
                   value={block.linkUrl ?? ''}
                   onChange={(e) => onChange({ linkUrl: e.target.value } as Partial<FormBlock>)}
                   className={fieldInput}
-                />
+                /></SaveErrorField>
               </label>
             </div>
           )}
@@ -235,26 +238,26 @@ export default function BlockEditor({
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   ボタンの文字
                 </span>
-                <input
+                <SaveErrorField names={["label","block.label"]}><input
                   type="text"
                   value={block.label}
                   onChange={(e) => onChange({ label: e.target.value } as Partial<FormBlock>)}
                   className={fieldInput}
-                />
+                /></SaveErrorField>
               </label>
               <label className="min-w-[16rem] flex-1">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">開くURL</span>
-                <input
+                <SaveErrorField names={["url","block.url"]}><input
                   type="url"
                   value={block.url}
                   onChange={(e) => onChange({ url: e.target.value } as Partial<FormBlock>)}
                   placeholder="https://..."
                   className={fieldInput}
-                />
+                /></SaveErrorField>
               </label>
               <label>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">見た目</span>
-                <Select
+                <SaveErrorField names={["style","block.style"]}><Select
                   aria-label="見た目"
                   value={block.style ?? 'default'}
                   onChange={(value) =>
@@ -266,7 +269,7 @@ export default function BlockEditor({
                     { value: 'default', label: '塗り' },
                     { value: 'outline', label: '枠のみ' },
                   ]}
-                />
+                /></SaveErrorField>
               </label>
             </div>
           )}
@@ -277,7 +280,7 @@ export default function BlockEditor({
               <div className="flex flex-wrap items-end gap-3">
                 <label>
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">タイプ</span>
-                  <Select
+                  <SaveErrorField names={["type","block.type"]}><Select
                     aria-label="タイプ"
                     value={block.type}
                     onChange={(value) => changeInputType(value as FormInputType)}
@@ -285,20 +288,20 @@ export default function BlockEditor({
                       value: t,
                       label: INPUT_TYPE_LABEL[t],
                     }))}
-                  />
+                  /></SaveErrorField>
                 </label>
 
                 <label className="min-w-[16rem] flex-1">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">
                     タイトル
                   </span>
-                  <input
+                  <SaveErrorField names={["label","block.label"]}><input
                     type="text"
                     value={block.label}
                     onChange={(e) => patchInput({ label: e.target.value })}
                     placeholder="質問の見出し"
                     className={fieldInput}
-                  />
+                  /></SaveErrorField>
                 </label>
 
                 {block.type === 'date' && (
@@ -306,7 +309,7 @@ export default function BlockEditor({
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">
                       入力の形
                     </span>
-                    <Select
+                    <SaveErrorField names={["dateStyle","block.dateStyle","date_style","block.date_style"]}><Select
                       aria-label="入力の形"
                       value={block.dateStyle ?? 'calendar'}
                       onChange={(value) =>
@@ -316,7 +319,7 @@ export default function BlockEditor({
                         { value: 'calendar', label: 'カレンダー' },
                         { value: 'ymd', label: '年月日を入力' },
                       ]}
-                    />
+                    /></SaveErrorField>
                   </label>
                 )}
 
@@ -328,7 +331,7 @@ export default function BlockEditor({
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         予約メニュー
                       </span>
-                      <Select
+                      <SaveErrorField names={["menuId","block.booking?.menuId","booking?.menuId","menu_id","block.booking?.menu_id","booking?.menu_id"]}><EntitySelect kind="booking_menu"
                         aria-label="予約メニュー"
                         value={block.booking?.menuId ?? ''}
                         onChange={(value) =>
@@ -342,18 +345,18 @@ export default function BlockEditor({
                         }
                         options={[
                           { value: '', label: '選んでください' },
-                          ...(refs.bookingMenus ?? []).map((menu) => ({
+                          ...(refs.bookingMenus ?? []).map((menu) => ({ ...entityOptionMetadata(menu),
                             value: menu.id,
                             label: `${menu.name}・${menu.durationMinutes}分`,
                           })),
                         ]}
-                      />
+                      /></SaveErrorField>
                     </label>
                     <label className="block">
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         担当
                       </span>
-                      <Select
+                      <SaveErrorField names={["staffId","block.booking?.staffId","booking?.staffId","staff_id","block.booking?.staff_id","booking?.staff_id"]}><EntitySelect
                         aria-label="担当"
                         value={block.booking?.staffId ?? ''}
                         disabled={!block.booking?.menuId}
@@ -371,15 +374,15 @@ export default function BlockEditor({
                           ...(block.booking?.menuId
                             ? (refs.bookingMenuStaff?.[block.booking.menuId] ?? [])
                             : []
-                          ).map((staff) => ({ value: staff.id, label: staff.name })),
+                          ).map((staff) => ({ ...entityOptionMetadata(staff), value: staff.id, label: staff.name })),
                         ]}
-                      />
+                      /></SaveErrorField>
                     </label>
                     <label className="block">
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         選べる期間（今日から）
                       </span>
-                      <Select
+                      <SaveErrorField names={["daysAhead","block.booking?.daysAhead","booking?.daysAhead","days_ahead","block.booking?.days_ahead","booking?.days_ahead"]}><Select
                         aria-label="選べる期間"
                         value={String(block.booking?.daysAhead ?? 14)}
                         onChange={(value) =>
@@ -397,7 +400,7 @@ export default function BlockEditor({
                           { value: '30', label: '30日' },
                           { value: '60', label: '60日' },
                         ]}
-                      />
+                      /></SaveErrorField>
                     </label>
                     <p className="text-ink-faint text-xs">
                       予約は「未承認」で入り、店が承認します。公開にはメニューが必要です。
@@ -416,7 +419,7 @@ export default function BlockEditor({
                   テンプレートで差し込めます。
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Select
+                  <EntitySelect
                     value=""
                     onChange={(value) => {
                       if (!value) return
@@ -432,7 +435,7 @@ export default function BlockEditor({
                     aria-label="友だち情報欄を足す"
                     options={[
                       { value: '', label: '＋ 友だち情報欄' },
-                      ...refs.friendFields.map((f) => ({
+                      ...refs.friendFields.map((f) => ({ ...entityOptionMetadata(f),
                         value: f.id,
                         label: f.ecIsMaster ? `${f.name}（EC側が正）` : f.name,
                         disabled: f.ecIsMaster,
@@ -513,13 +516,13 @@ export default function BlockEditor({
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">
                     説明文
                   </span>
-                  <input
+                  <SaveErrorField names={["description","block.description"]}><input
                     type="text"
                     value={block.description ?? ''}
                     onChange={(e) => patchInput({ description: e.target.value })}
                     placeholder="例：西暦でご入力ください"
                     className={fieldInput}
-                  />
+                  /></SaveErrorField>
                 </label>
 
                 {(block.type === 'text' || block.type === 'textarea') && (
@@ -527,12 +530,12 @@ export default function BlockEditor({
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">
                       うすい文字（プレースホルダ）
                     </span>
-                    <input
+                    <SaveErrorField names={["placeholder","block.placeholder"]}><input
                       type="text"
                       value={block.placeholder ?? ''}
                       onChange={(e) => patchInput({ placeholder: e.target.value })}
                       className={fieldInput}
-                    />
+                    /></SaveErrorField>
                   </label>
                 )}
 
@@ -544,28 +547,28 @@ export default function BlockEditor({
                 {block.type === 'textarea' ? (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <textarea
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><textarea
                       rows={2}
                       value={block.defaultValue ?? ''}
                       onChange={(e) => patchInput({ defaultValue: e.target.value })}
                       placeholder="はじめから入れておく値"
                       className={`${fieldInput} resize-y`}
-                    />
+                    /></SaveErrorField>
                   </label>
                 ) : block.type === 'date' ? (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <input
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><input
                       type="date"
                       value={block.defaultValue ?? ''}
                       onChange={(e) => patchInput({ defaultValue: e.target.value })}
                       className={fieldInput}
-                    />
+                    /></SaveErrorField>
                   </label>
                 ) : block.type === 'prefecture' ? (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <Select
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><Select
                       aria-label="初期値"
                       value={block.defaultValue ?? ''}
                       onChange={(value) => patchInput({ defaultValue: value })}
@@ -573,14 +576,14 @@ export default function BlockEditor({
                         { value: '', label: '— 入れない —' },
                         ...PREFECTURES.map((name) => ({ value: name, label: name })),
                       ]}
-                    />
+                    /></SaveErrorField>
                   </label>
                 ) : block.type === 'rating' ? (
                   // F-11：5段階評価の初期値。1〜5のちょうどの数だけ
                   // （"3.0" は保存・平均の数え方と合わないため入れない）。
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <Select
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><Select
                       aria-label="初期値"
                       value={block.defaultValue ?? ''}
                       onChange={(value) => patchInput({ defaultValue: value })}
@@ -592,7 +595,7 @@ export default function BlockEditor({
                         { value: '4', label: '★4' },
                         { value: '5', label: '★5' },
                       ]}
-                    />
+                    /></SaveErrorField>
                   </label>
                 ) : block.type === 'address' ? (
                   // F-11：住所の初期値は入れない。文字列の初期値を置くと
@@ -603,13 +606,13 @@ export default function BlockEditor({
                 ) : (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <input
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><input
                       type="text"
                       value={block.defaultValue ?? ''}
                       onChange={(e) => patchInput({ defaultValue: e.target.value })}
                       placeholder="はじめから入れておく値"
                       className={fieldInput}
-                    />
+                    /></SaveErrorField>
                   </label>
                 )}
               </div>
@@ -624,7 +627,7 @@ export default function BlockEditor({
                     {block.type === 'text' && (
                       <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
                         形式
-                        <Select
+                        <SaveErrorField names={["format","block.limit?.format","limit?.format"]}><Select
                           aria-label="形式"
                           value={block.limit?.format ?? 'none'}
                           onChange={(value) =>
@@ -633,11 +636,11 @@ export default function BlockEditor({
                             })
                           }
                           options={FORMATS.map((f) => ({ value: f.value, label: f.label }))}
-                        />
+                        /></SaveErrorField>
                       </label>
                     )}
                     <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                      <input
+                      <SaveErrorField names={["min","block.limit?.min","limit?.min"]}><input
                         type="number"
                         min={0}
                         value={block.limit?.min ?? ''}
@@ -651,9 +654,9 @@ export default function BlockEditor({
                         }
                         className={`${cellInput} w-20`}
                         placeholder="下限"
-                      />
+                      /></SaveErrorField>
                       〜
-                      <input
+                      <SaveErrorField names={["max","block.limit?.max","limit?.max"]}><input
                         type="number"
                         min={0}
                         value={block.limit?.max ?? ''}
@@ -667,17 +670,17 @@ export default function BlockEditor({
                         }
                         className={`${cellInput} w-20`}
                         placeholder="上限"
-                      />
+                      /></SaveErrorField>
                       文字
                     </label>
-                    <Checkbox
+                    <SaveErrorField names={["hideCounter","block.limit?.hideCounter","limit?.hideCounter","hide_counter","block.limit?.hide_counter","limit?.hide_counter"]}><Checkbox
                       checked={block.limit?.hideCounter ?? false}
                       onCheckedChange={(checked) =>
                         patchInput({ limit: { ...block.limit, hideCounter: checked } })
                       }
                     >
                       文字数を出さない
-                    </Checkbox>
+                    </Checkbox></SaveErrorField>
                   </div>
                 </div>
               )}
@@ -700,7 +703,7 @@ export default function BlockEditor({
 
                   {block.reminder && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Select
+                      <SaveErrorField names={["reminderId","block.reminder.reminderId","reminder.reminderId","reminder_id","block.reminder.reminder_id","reminder.reminder_id"]}><EntitySelect kind="reminder"
                         aria-label="リマインダ"
                         value={block.reminder.reminderId}
                         onChange={(value) =>
@@ -710,9 +713,9 @@ export default function BlockEditor({
                         }
                         options={[
                           { value: '', label: '— リマインダ —' },
-                          ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
+                          ...refs.reminders.map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name })),
                         ]}
-                      />
+                      /></SaveErrorField>
                       <span className="text-ink-faint text-xs">
                         友だちが入力した日付を起点にします
                       </span>
@@ -723,26 +726,26 @@ export default function BlockEditor({
 
               {/* 共通のチェック */}
               <div className="border-hairline flex flex-wrap gap-4 border-t pt-3">
-                <Checkbox
+                <SaveErrorField names={["required","block.required"]}><Checkbox
                   checked={block.required ?? false}
                   onCheckedChange={(checked) => patchInput({ required: checked })}
                 >
                   必須
-                </Checkbox>
+                </Checkbox></SaveErrorField>
                 {(block.type === 'radio' || block.type === 'checkbox') && (
-                  <Checkbox
+                  <SaveErrorField names={["inline","block.inline"]}><Checkbox
                     checked={block.inline ?? false}
                     onCheckedChange={(checked) => patchInput({ inline: checked })}
                   >
                     横並び
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 )}
-                <Checkbox
+                <SaveErrorField names={["hidden","block.hidden"]}><Checkbox
                   checked={block.hidden ?? false}
                   onCheckedChange={(checked) => patchInput({ hidden: checked })}
                 >
                   非表示
-                </Checkbox>
+                </Checkbox></SaveErrorField>
                 <span className="text-ink-faint ml-auto text-xs">
                   回答データの見出し：{block.name}
                 </span>

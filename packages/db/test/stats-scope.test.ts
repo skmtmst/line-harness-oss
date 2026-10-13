@@ -27,8 +27,8 @@ const scope = { allowedAccountIds: ['account-a', 'account-b'], includeUnassigned
 function expectScoped(queries: Query[], fragment: string): void {
   const matches = queries.filter(({ sql }) => sql.includes(fragment));
   expect(matches.length).toBeGreaterThan(0);
-  expect(matches.every(({ sql }) => sql.includes('IN (?, ?)'))).toBe(true);
-  expect(matches.every(({ binds }) => binds.includes('account-a') && binds.includes('account-b'))).toBe(true);
+  expect(matches.every(({ sql }) => sql.includes('IN (SELECT value FROM json_each(?))'))).toBe(true);
+  expect(matches.every(({ binds }) => binds.includes(JSON.stringify(scope.allowedAccountIds)))).toBe(true);
 }
 
 describe('tenant-scoped dashboard aggregations', () => {
@@ -38,10 +38,9 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expect(queries.length).toBeGreaterThanOrEqual(17);
     const accountQueries = queries.filter(({ sql }) => !sql.includes('friend_daily_snapshots'));
-    expect(accountQueries.every(({ sql }) => sql.includes('IN (?, ?)'))).toBe(true);
+    expect(accountQueries.every(({ sql }) => sql.includes('IN (SELECT value FROM json_each(?))'))).toBe(true);
     expect(accountQueries.every(({ binds }) => {
-      const a = binds.indexOf('account-a');
-      return a >= 0 && binds[a + 1] === 'account-b';
+      return binds.includes(JSON.stringify(scope.allowedAccountIds));
     })).toBe(true);
 
     /*
@@ -49,9 +48,9 @@ describe('tenant-scoped dashboard aggregations', () => {
      * 旧アカウント移行(account_migrations)の件数と混ぜない。
      */
     const migrations = queries.find(({ sql }) => sql.includes('FROM uid_migration_runs'));
-    expect(migrations?.binds).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
+    expect(migrations?.binds).toEqual([JSON.stringify(scope.allowedAccountIds), JSON.stringify(scope.allowedAccountIds)]);
     const broadcasts = queries.find(({ sql }) => sql.includes('FROM broadcasts b'));
-    expect(broadcasts?.binds.slice(-4)).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
+    expect(broadcasts?.binds.slice(-2)).toEqual([JSON.stringify(scope.allowedAccountIds), JSON.stringify(scope.allowedAccountIds)]);
   });
 
   test('getFriendStats scopes friend totals, monthly additions, unanswered and resolved chats', async () => {
@@ -60,8 +59,8 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expectScoped(queries, 'FROM friends WHERE');
     const inbox = queries.find(({ sql }) => sql.includes('FROM chats c') && sql.includes('AS unanswered'));
-    expect(inbox?.sql).toContain('f.line_account_id IN (?, ?)');
-    expect(inbox?.binds).toEqual(['account-a', 'account-b']);
+    expect(inbox?.sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(inbox?.binds).toEqual([JSON.stringify(scope.allowedAccountIds)]);
   });
 
   test('getInboxStats scopes waiting, assigned, incoming and first-reply aggregations', async () => {

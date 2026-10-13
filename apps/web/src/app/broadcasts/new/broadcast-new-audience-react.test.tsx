@@ -289,7 +289,7 @@ describe('タグ候補の取得失敗と再試行(R581)', () => {
     const input = host.querySelector('[aria-label="どのタグ"]') as HTMLInputElement | null
     expect(input?.disabled).toBe(false)
     await act(async () => {
-      input!.focus()
+      input!.click()
     })
     await flush()
     expect(document.body.textContent).toContain('VIP')

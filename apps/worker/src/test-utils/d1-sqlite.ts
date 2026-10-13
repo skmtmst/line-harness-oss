@@ -11,6 +11,7 @@ import Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { useSqliteClock } from './sqlite-clock.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DB_PKG_ROOT = join(__dirname, '../../../../packages/db')
@@ -80,9 +81,10 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
  * `attach` を渡した場合は既にあるDBへ繋ぐだけで、schemaは流さない。
  */
 export function createTestD1(
-  options?: { foreignKeys?: boolean; file?: string; attach?: boolean },
+  options?: { loginPolicy?: 'off'; foreignKeys?: boolean; file?: string; attach?: boolean; now?: () => Date },
 ): SqliteD1 {
   const raw = new Database(options?.file ?? ':memory:')
+  if (options?.now) useSqliteClock(raw, options.now)
   if (options?.file) {
     /*
      * 実DBと同じ見え方のまま、テストのディスク待ちだけ削る。
@@ -111,12 +113,26 @@ export function createTestD1(
   // ただし外部キーに関わる不整合 (誤った通 ID の保存など) は OFF では隠れる。
   // その種の回帰テストは { foreignKeys: true } で作り、実 D1 と同じ制約で確かめる。
   raw.pragma(`foreign_keys = ${options?.foreignKeys ? 'ON' : 'OFF'}`)
+  // Legacy route-authorization tests explicitly choose the supported Off mode.
+  // Default fixtures retain the product's default-On policy. This changes real
+  // settings rows, never the authentication implementation or its allow rules.
+  if (options?.loginPolicy === 'off') {
+    raw.exec(`INSERT OR REPLACE INTO platform_settings(key,value)
+      SELECT 'auth.mfa.required:'||id,'false' FROM tenants;
+      CREATE TEMP TRIGGER fixture_login_policy_off AFTER INSERT ON tenants BEGIN
+        INSERT OR REPLACE INTO platform_settings(key,value) VALUES ('auth.mfa.required:'||NEW.id,'false');
+      END;`)
+  }
+
 
   let batchTail:Promise<unknown>=Promise.resolve();
   const db = {
     prepare: (sql: string) => ({
       // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
-      bind: (...args: unknown[]) => ({ ...wrap(raw, sql, args), sql }),
+      bind: (...args: unknown[]) => {
+        if (args.length > 100) throw new Error(`D1 bind limit exceeded: ${args.length} > 100`)
+        return { ...wrap(raw, sql, args), sql }
+      },
       sql,
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),

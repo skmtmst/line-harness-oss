@@ -2,6 +2,7 @@
  * 予約台帳（l9NlC0・Z3FoM・rm92Y・xzCK6）の表示の形。今の画面
  * （app/restaurant-test/v8/reservations.tsx・reservation-phone.tsx）から写し、絵の書き方に合わせた。
  */
+import { formatDate, formatYmd } from '@/lib/format'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 
 export type LedgerView = 'today' | 'week' | 'month' | 'list'
@@ -41,37 +42,52 @@ export function pad2(value: number): string {
 }
 
 export function toYmd(day: Date): string {
-  return `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`
+  return formatYmd(day)
 }
 
 export function hm(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getHours()}:${pad2(date.getMinutes())}`
+  return formatDate(date,{style:'time'})
 }
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
+/** 日本時間の暦日だけを計算する。端末の時間帯や夏時間を使わない。 */
+function civilDay(day: Date): Date {
+  return new Date(`${toYmd(day)}T00:00:00Z`)
+}
+
+export function addDays(day: Date, offset: number): Date {
+  const date = civilDay(day)
+  date.setUTCDate(date.getUTCDate() + offset)
+  return new Date(`${date.toISOString().slice(0, 10)}T00:00:00+09:00`)
+}
+
 /** 「10月2日（金）」 */
 export function dayTitle(day: Date): string {
-  return `${day.getMonth() + 1}月${day.getDate()}日（${WEEKDAY[day.getDay()]}）`
+  const date = civilDay(day)
+  return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日（${WEEKDAY[date.getUTCDay()]}）`
 }
 
 /** 「10月2日」 */
 export function dayShort(day: Date): string {
-  return `${day.getMonth() + 1}月${day.getDate()}日`
+  const date = civilDay(day)
+  return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`
 }
 
 /** 「10/2 18:00」 */
 export function mdhm(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getMonth() + 1}/${date.getDate()} ${hm(date)}`
+  const civil = civilDay(date)
+  return `${civil.getUTCMonth() + 1}/${civil.getUTCDate()} ${hm(date)}`
 }
 
 /** 「10/2（金）」 */
 export function mdWeek(day: Date): string {
-  return `${day.getMonth() + 1}/${day.getDate()}（${WEEKDAY[day.getDay()]}）`
+  const date = civilDay(day)
+  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}（${WEEKDAY[date.getUTCDay()]}）`
 }
 
 /** 電話番号は真ん中を伏せる（「090-****-1234」）。 */
@@ -83,25 +99,24 @@ export function maskPhone(phone: string | null): string {
 }
 
 export function dayRange(day: Date): { from: string; to: string } {
-  const from = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0)
-  const to = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0)
-  return { from: from.toISOString(), to: to.toISOString() }
+  return { from: new Date(`${toYmd(day)}T00:00:00+09:00`).toISOString(), to: addDays(day, 1).toISOString() }
 }
 
 export function monthRange(day: Date): { from: string; to: string } {
-  const from = new Date(day.getFullYear(), day.getMonth(), 1, 0, 0, 0, 0)
-  const to = new Date(day.getFullYear(), day.getMonth() + 1, 1, 0, 0, 0, 0)
-  return { from: from.toISOString(), to: to.toISOString() }
+  const date = civilDay(day)
+  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
+  const next = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1))
+  const midnight = (date: Date) => new Date(`${date.toISOString().slice(0, 10)}T00:00:00+09:00`).toISOString()
+  return { from: midnight(first), to: midnight(next) }
 }
 
 export function weekRange(day: Date): { from: string; to: string } {
-  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate() - ((day.getDay() + 6) % 7), 0, 0, 0, 0)
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7, 0, 0, 0, 0)
-  return { from: start.toISOString(), to: end.toISOString() }
+  const start = addDays(day, -((civilDay(day).getUTCDay() + 6) % 7))
+  return { from: start.toISOString(), to: addDays(start, 7).toISOString() }
 }
 
 export function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  return toYmd(a) === toYmd(b)
 }
 
 /** 卓の並び：座席・卓管理のフロアの並び（行→列）。 */
@@ -111,7 +126,8 @@ export function floorOrder(a: RestaurantTable, b: RestaurantTable): number {
 
 export function minutesOf(value: string): number {
   const date = new Date(value)
-  return date.getHours() * 60 + date.getMinutes()
+  const jst=new Date(date.getTime()+9*3600000)
+  return jst.getUTCHours() * 60 + jst.getUTCMinutes()
 }
 
 export function slotLabel(minutes: number): string {

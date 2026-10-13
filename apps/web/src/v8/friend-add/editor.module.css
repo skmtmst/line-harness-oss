@@ -90,13 +90,13 @@
   line-height: var(--tpl-chip-label-lh);
 }
 /* 選ぶ行は共通のチェックのカード。絵の行（余白10/12・角10・名前13/600）に合わせて寸法だけ当てる。 */
-:global([data-theme='v8']) label.routeCard {
+:global(:root) label.routeCard {
   align-items: center;
   min-height: 0;
   padding: var(--tpl-fa-ed-route-pad);
   border-radius: var(--radius-control);
 }
-:global([data-theme='v8']) label.routeCard > span:last-child > span:first-child {
+:global(:root) label.routeCard > span:last-child > span:first-child {
   font-size: var(--text-label);
   font-weight: 600;
   line-height: var(--tpl-row-name-lh);
@@ -393,15 +393,7 @@
   white-space: nowrap;
 }
 
-.viewerBand {
-  margin: 0;
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
+.viewerBand { margin: 0; }
 
 /* 右の列（1152・xHpkS）：絵の列は型の中身より広い（左右に少し出す）。ボタンは列の上の余白に寄せる。 */
 .narrowSide {

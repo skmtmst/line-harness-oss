@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 ファイルの検査（Pencil `PfA4o`、状態は `bR6a1`）。
- *
- * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
- * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
- * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
- */
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -29,6 +21,16 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import styles from './screen.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 ファイルの検査（Pencil `PfA4o`、状態は `bR6a1`）。
+ *
+ * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
+ * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
+ * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
+ */
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
@@ -58,7 +60,6 @@ export default function FileScanScreen() {
     page,
     setPage,
     actionError,
-    setActionError,
     actionDone,
     releaseTarget,
     setReleaseTarget,
@@ -81,6 +82,7 @@ export default function FileScanScreen() {
     secretRef,
     setSecretRef,
     configBusy,
+    configFields,
     stopExternal,
     setStopExternal,
     stopError,
@@ -98,33 +100,6 @@ export default function FileScanScreen() {
     changeStatusFilter,
   } = useFileScan()
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const providerRef = useRef<HTMLInputElement>(null)
-  const endpointRef = useRef<HTMLInputElement>(null)
-  const [configErrors, setConfigErrors] = useState<{ provider?: string; endpoint?: string }>({})
-  const configServerError = actionError === '宛先は https にし、提供元と宛先の両方を入れてください。' ? actionError : ''
-  const saveExternalConfig = () => {
-    const errors: { provider?: string; endpoint?: string } = {}
-    if (endpoint.trim() && !provider.trim()) errors.provider = '提供元を入力してください'
-    if (provider.trim() && !endpoint.trim()) errors.endpoint = '送り先を入力してください'
-    if (endpoint.trim()) {
-      try { if (new URL(endpoint.trim()).protocol !== 'https:') errors.endpoint = 'https:// で始まる送り先を入力してください' }
-      catch { errors.endpoint = '送り先の URL を確かめてください（https:// から）' }
-    }
-    setConfigErrors(errors)
-    setActionError('')
-    if (errors.provider || errors.endpoint) {
-      const field = errors.provider ? providerRef.current : endpointRef.current
-      field?.focus()
-      field?.scrollIntoView({ block: 'center' })
-      return
-    }
-    void saveConfig()
-  }
-  useEffect(() => {
-    if (!configServerError) return
-    endpointRef.current?.focus()
-    endpointRef.current?.scrollIntoView({ block: 'center' })
-  }, [configServerError])
   const releaseReasonRef = useRef<HTMLTextAreaElement>(null)
   const releaseReasonError = releaseError === '理由を入力してください' ? releaseError : ''
   useEffect(() => {
@@ -160,14 +135,14 @@ export default function FileScanScreen() {
           }}
         >
           <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
-            <TextArea
+            <SaveErrorField names={["releaseReason","release_reason"]}><TextArea
               ref={releaseReasonRef}
               id="file-scan-release-reason"
               aria-required="true"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
-            />
+            /></SaveErrorField>
           </Field>
         </ConfirmDialog>
       ) : null}
@@ -214,7 +189,8 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
+      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -241,13 +217,16 @@ export default function FileScanScreen() {
   const menuItems = (item: FileScanItem): ActionMenuItem[] => [
     { id: 'delete', label: '削除する', tone: 'danger', icon: <Trash2 size={14} aria-hidden="true" />, onSelect: () => openDelete(item) },
   ]
-  const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
+  const externalConfigured = Boolean(config?.externalProvider || config?.externalEndpointUrl || config?.externalSecretRef)
+  const externalOn = config?.externalEnabled === true
+  const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
-      <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
+      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
 
-      {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}
+
+      {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
 
       <div className={styles.toolbar}>
@@ -347,11 +326,13 @@ export default function FileScanScreen() {
             <h2 className={styles.externalTitle}>外の検査サービス</h2>
             <p className={styles.externalNote}>
               {externalOn
-                ? `使っています。送り先：${config?.externalEndpointUrl}`
-                : 'いまは内蔵の簡易検査だけです。外の検査サービスには送っていません。'}
+                ? '外の検査への送信は有効です。接続先の稼働状況を確認した表示ではありません。'
+                : externalConfigured && config?.externalEnabled === undefined
+                  ? '外の検査への送信状態を確認できません。読み直してください。'
+                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'}
             </p>
           </div>
-          {externalOn ? (
+          {externalConfigured ? (
             <Button variant="secondary" type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>
               外の検査を止める
             </Button>
@@ -361,19 +342,21 @@ export default function FileScanScreen() {
             {configOpen ? '設定を閉じる' : '設定を編集'}
           </Button>
         </div>
+        {legacySecret ? <Notice tone="warn">古い鍵の名前は使えません。運営が用意した検査専用の鍵の名前へ変更してください。</Notice> : null}
+        {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}
         {configOpen ? (
           <div className={styles.form}>
-            <Field label="提供元" htmlFor="file-scan-provider" error={configErrors.provider}>
-              <TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" />
+            <Field label="提供元" htmlFor="file-scan-provider" requirement={configFields.requirement('externalProvider')} error={configFields.error('externalProvider')}>
+              <SaveErrorField names={["externalProvider","provider"]}><TextField {...configFields.bind('externalProvider')} id="file-scan-provider" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="例：example-scan" /></SaveErrorField>
             </Field>
-            <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configErrors.endpoint || configServerError || undefined}>
-              <TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" />
+            <Field label="送り先（https）" htmlFor="file-scan-endpoint" requirement={configFields.requirement('externalEndpointUrl')} error={configFields.error('externalEndpointUrl')} note="運営が許可した送り先と鍵の名前の組だけ使えます。転送する宛先は使えません。">
+              <SaveErrorField names={["externalEndpointUrl","endpoint"]}><TextField {...configFields.bind('externalEndpointUrl')} id="file-scan-endpoint" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://example.com/scan" /></SaveErrorField>
             </Field>
-            <Field label="鍵の名前" htmlFor="file-scan-secret-ref">
-              <TextField id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_API_KEY" />
+            <Field label="鍵の名前" htmlFor="file-scan-secret-ref" requirement={configFields.requirement('externalSecretRef')} error={configFields.error('externalSecretRef')} note="FILE_SCAN_SECRET_ で始まる大文字・数字・下線、120文字以内。送り先と同じ組の名前を指定します。鍵の値は入力しません。">
+              <SaveErrorField names={["externalSecretRef","secretRef","secret_ref"]}><TextField {...configFields.bind('externalSecretRef')} id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_SECRET_PRIMARY" /></SaveErrorField>
             </Field>
             <div>
-              <Button type="button" variant="primary" disabled={configBusy} onClick={saveExternalConfig} busy={configBusy} busyLabel="保存しています…">
+              <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">
                 外の検査の設定を保存する
               </Button>
             </div>

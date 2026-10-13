@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -45,7 +46,7 @@ import type {
   DeliveryMode,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole, requirePermission } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requirePermission } from '../middleware/role-guard.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
@@ -64,24 +65,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import { getWorkflowStep } from '@line-crm/db';
 const scenarios = new Hono<Env>();
 
-function scenarioPermission(
-  permission: 'view' | 'edit',
-) {
-  return async (c: Context<Env>, next: () => Promise<void>) => {
-    const staff = c.get('staff');
-    const allowed = staff && (
-      staff.role === 'owner'
-      || staff.role === 'admin'
-      || (permission === 'view'
-        ? staff.permissionKeys?.some((key) => key === '/scenarios' || key === 'scenario.version.view')
-        : staff.permissionKeys?.includes('scenario.definition.edit'))
-    );
-    if (!allowed) {
-      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
-    }
-    await next();
-  };
-}
+const scenarioPermission = (operation: 'view' | 'edit') => requireDeliveryAccess('scenarios', operation);
 
 function scenarioContractError(c: Context<Env>, error: unknown): Response {
   if (error instanceof ScenarioContractError) {
@@ -112,7 +96,7 @@ async function requireScenarioAccountScope(c: Context<Env>, lineAccountId: strin
  *
  * owner/adminは従来どおり通す。一般staffはシナリオ行のaccountをDB解決し、
  * 共通土台へ渡す。表示権限だけのstaff・readOnly・範囲外は止める。
- * 存在しない行はここでは通し、後段の404に任せる。
+ * 存在しない行と、別のシナリオに属する通は404で止める。
  */
 const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
   const staff = c.get('staff');
@@ -121,10 +105,7 @@ const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
     return;
   }
   const scenario = await getScenarioById(c.env.DB, c.req.param('id') ?? '');
-  if (!scenario) {
-    await next();
-    return;
-  }
+  if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
   const accountId = (scenario as { line_account_id?: string | null }).line_account_id ?? null;
   const decision = await resolveRequestBoundary(c.env.DB, staff, accountId, {
     requiredPermissionKey: 'scenario.definition.edit',
@@ -134,6 +115,13 @@ const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
     return c.json({ success: false, error: 'Scenario not found' }, 404);
+  }
+  // スタッフが別のシナリオの通をIDだけで更新・削除しないようにする。
+  const stepId = c.req.param('stepId');
+  if (stepId) {
+    const step = await c.env.DB.prepare('SELECT id FROM scenario_steps WHERE id = ? AND scenario_id = ?')
+      .bind(stepId, scenario.id).first();
+    if (!step) return c.json({ success: false, error: 'Step not found' }, 404);
   }
   await next();
 }
@@ -150,7 +138,7 @@ async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>
   await next();
 }
 
-scenarios.get('/api/scenarios/:id/question-answers', requireRole('owner','admin'), requireVisibleScenario, async(c)=>{
+scenarios.get('/api/scenarios/:id/question-answers', requireDeliveryAccess('scenarios'), requireVisibleScenario, async(c)=>{
   const scenario=await getScenarioById(c.env.DB,c.req.param('id'));
   await registerLegacyQuestionAnswers(c.env.DB,scenario!.id,accountId=>canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId]));
   const rows=await c.env.DB.prepare(`SELECT scope_id,subject_id,status,error_code,input_json,updated_at FROM workflow_steps
@@ -162,7 +150,7 @@ scenarios.get('/api/scenarios/:id/question-answers', requireRole('owner','admin'
   return c.json({success:true,data:visible.map(row=>({executionId:row.subject_id,status:row.status,errorCode:row.error_code,
     friendId:JSON.parse(row.input_json).friendId,updatedAt:new Date(row.updated_at).toISOString()}))});
 });
-scenarios.post('/api/scenarios/:id/question-answers/:executionId/resume',requireRole('owner','admin'),requireVisibleScenario,inputJsonBoundary(), async(c)=>{
+scenarios.post('/api/scenarios/:id/question-answers/:executionId/resume',requireDeliveryAccess('scenarios'),requireVisibleScenario,inputJsonBoundary(), async(c)=>{
   if(c.get('staff')?.readOnly) return c.json({success:false,error:'閲覧のみの権限では再開できません'},403);
   const body=await c.req.json().catch(()=>null);
   if(!body || typeof body.reason!=='string' || !body.reason.trim() || body.reason.length>500)
@@ -458,7 +446,7 @@ function validScenarioPublishKey(value: string | undefined): value is string {
  * 経路が /api/scenarios/:id より前にあるのは、:id に "reorder" として
  * 食われないようにするため。
  */
-scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+scenarios.patch('/api/scenarios/reorder', requireDeliveryAccess('scenarios'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
@@ -466,6 +454,17 @@ scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), inputJs
     }
     if (body.ids.length > 500) {
       return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
+    }
+    // 編集できるスタッフでも、担当外の並びをIDだけで変更できない。
+    if (c.get('staff').role === 'staff') {
+      for (const id of body.ids as string[]) {
+        const target = await getScenarioById(c.env.DB, id);
+        if (!target) return c.json({ success: false, error: 'Scenario not found' }, 404);
+        const decision = await resolveRequestBoundary(c.env.DB, c.get('staff'), target.line_account_id ?? null, {
+          requiredPermissionKey: 'scenario.definition.edit',
+        });
+        if (!decision.allowed) return c.json({ success: false, error: 'Scenario not found' }, 404);
+      }
     }
     await reorderScenarios(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
@@ -497,8 +496,8 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
     } else {
       const accountClauses: string[] = [];
       if (scope.allowedAccountIds.length > 0) {
-        accountClauses.push(`s.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})`);
-        binds.push(...scope.allowedAccountIds);
+        accountClauses.push(`s.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
+        binds.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
       }
       if (scope.canSeeUnassigned) accountClauses.push('s.line_account_id IS NULL');
       clauses.push(accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '0 = 1');
@@ -556,8 +555,8 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
       const scenarioIds = items.map((item) => item.id);
       const accountIds = lineAccountId ? [lineAccountId] : scope.allowedAccountIds;
       if (scenarioIds.length > 0 && accountIds.length > 0) {
-        const scenarioPlaceholders = scenarioIds.map(() => '?').join(',');
-        const accountPlaceholders = accountIds.map(() => '?').join(',');
+        const scenarioPlaceholders = sqlIdSet(scenarioIds).sql;
+        const accountPlaceholders = sqlIdSet(accountIds).sql;
         const rows = await c.env.DB
           .prepare(
           `SELECT scenario_id,
@@ -569,7 +568,7 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
               AND f.line_account_id IN (${accountPlaceholders})
             GROUP BY scenario_id`,
           )
-          .bind(...scenarioIds, ...accountIds)
+          .bind(...sqlIdSet(scenarioIds).binds, ...(accountIds.length ? sqlIdSet(accountIds).binds : []))
           .all<{ scenario_id: string; active_count: number; completed_count: number }>();
         for (const r of rows.results) {
           counts.set(r.scenario_id, {
@@ -631,7 +630,7 @@ scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
 });
 
 // POST /api/scenarios - create
-scenarios.post('/api/scenarios', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"lineAccountId":["null","string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"]}), async (c) => {
+scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"lineAccountId":["null","string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -835,7 +834,7 @@ scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), a
 // R250: 終了後の移動先にされていた場合、参照元の終了後の処理は
 // 「一時停止」へ戻る（deleteScenario が同じ batch で直す）。
 // 「移動先のない移動」は残らない。
-scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => {
+scenarios.delete('/api/scenarios/:id', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, async (c) => {
   try {
     const id = c.req.param('id');
     await deleteScenario(c.env.DB, id);
@@ -851,7 +850,7 @@ scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) 
 });
 
 // POST /api/scenarios/:id/steps - add step
-scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), async (c) => {
+scenarios.post('/api/scenarios/:id/steps', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{
@@ -978,7 +977,7 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), inputJ
 });
 
 // PUT /api/scenarios/:id/steps/:stepId - update step (accepts camelCase)
-scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'), inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), async (c) => {
+scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const stepId = c.req.param('stepId');
@@ -1195,7 +1194,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
 });
 
 // DELETE /api/scenarios/:id/steps/:stepId - delete step
-scenarios.delete('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
+scenarios.delete('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, async (c) => {
   try {
     const stepId = c.req.param('stepId');
     await deleteScenarioStep(c.env.DB, stepId);
@@ -1207,7 +1206,7 @@ scenarios.delete('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin
 });
 
 // POST /api/scenarios/:id/steps/reorder - bulk update step_order
-scenarios.post('/api/scenarios/:id/steps/reorder', requireRole('owner', 'admin'), inputJsonBoundary({"orders":["array"]}), async (c) => {
+scenarios.post('/api/scenarios/:id/steps/reorder', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"orders":["array"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ orders: { stepId: string; stepOrder: number }[] }>();
@@ -1533,7 +1532,7 @@ scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), inputJsonB
 });
 
 // POST /api/scenarios/:id/enroll/:friendId - manually enroll friend
-scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+scenarios.post('/api/scenarios/:id/enroll/:friendId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary(), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const friendId = c.req.param('friendId');
@@ -1768,7 +1767,7 @@ scenarios.get('/api/scenarios/:id/actions', scenarioPermission('view'), async (c
 });
 
 // POST /api/scenarios/:id/actions — アクションを1つ足す
-scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), async (c) => {
+scenarios.post('/api/scenarios/:id/actions', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<ActionBody>();
@@ -1867,7 +1866,7 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), inpu
 });
 
 // PUT /api/scenarios/:id/actions/:actionId — 中身と並び順を変える
-scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admin'), inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), async (c) => {
+scenarios.put('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const actionId = c.req.param('actionId');
@@ -1941,7 +1940,7 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admi
 });
 
 // DELETE /api/scenarios/:id/actions/:actionId
-scenarios.delete('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admin'), async (c) => {
+scenarios.delete('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, async (c) => {
   try {
     await c.env.DB.prepare(`DELETE FROM scenario_actions WHERE id = ? AND scenario_id = ?`)
       .bind(c.req.param('actionId'), c.req.param('id'))
@@ -2034,13 +2033,13 @@ async function runTestSend(
   }
 }
 
-scenarios.post('/api/scenarios/:id/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) =>
+scenarios.post('/api/scenarios/:id/test-send', requireDeliveryAccess('scenarios', 'test'), requireScenarioEditBoundary, inputJsonBoundary(), async (c) =>
   runTestSend(c, c.req.param('id'), null),
 );
 
 scenarios.post(
   '/api/scenarios/:id/steps/:stepId/test-send',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('scenarios', 'test'), requireScenarioEditBoundary,
   inputJsonBoundary(), async (c) => runTestSend(c, c.req.param('id'), c.req.param('stepId')),
 );
 
@@ -2134,7 +2133,8 @@ scenarios.get('/api/scenarios/:id/draft', scenarioPermission('view'), async (c) 
 
 scenarios.delete(
   '/api/scenarios/:id/triggers/:triggerId',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('scenarios'),
+  requireScenarioEditBoundary,
   async (c) => {
     try {
       await removeScenarioTrigger(c.env.DB, c.req.param('id'), c.req.param('triggerId'));

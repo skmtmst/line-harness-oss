@@ -6,68 +6,68 @@ const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('タグ V4 contract', () => {
-  it('タグ作成で本人・紹介者マイルと倍率を同時に設定できる', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    const page = read('components/friend-fields/new-tag-page-v4.tsx')
-    expect(editor).toContain('本人へのマイル付与')
-    expect(editor).toContain('紹介者へのマイル付与')
-    expect(editor).toContain('今後のマイル倍率')
-    expect(editor).toContain('タグを外して付け直したときの扱い')
-    expect(page).toContain('applyToExisting: false')
+  it('連動は現役の編集で設定でき、複製作成は本人・紹介者マイルと倍率を引き継ぐ', () => {
+    const editor = read('v8/tag-edit/edit-form.tsx')
+    const page = read('v8/tags/create.tsx')
+    for (const label of ['本人へのマイル付与', '紹介者へのマイル付与', '今後のマイル倍率', 'タグを外して付け直したときの扱い']) expect(editor).toContain(label)
+    expect(page).toContain('作ったあとの編集で足します')
+    for (const field of ['self: source?.mileageReward', 'referrer: source?.referralMileageReward', 'multiplier: source?.mileageMultiplierBps']) expect(page).toContain(field)
   })
 
   it('タグ編集の遡及付与は初期OFFで専用確認を通す', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    const page = read('components/friend-fields/edit-tag-page-v4.tsx')
-    expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
-    expect(editor).toContain('すでに付いている人への反映')
+    const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
+    const page = read('v8/tag-edit/edit.tsx')
+    expect(editor).toContain("useState(retroactiveReference)")
+    expect(editor).toContain('今付いている人にもさかのぼって積む')
     expect(editor).toContain('さかのぼってマイルを積みますか？')
-    expect(editor).toContain('max-w-[670px] -translate-y-7')
-    expect(editor).toContain('<Coins size={21}')
+    expect(editor).toContain('<Dialog open size="large"')
+    expect(editor).not.toContain('max-w-[670px] -translate-y-7')
+    expect(editor).toContain('titleIcon={<Coins aria-hidden="true" />')
     expect(editor).toContain('新規作成のときはこのダイアログは出ません')
     expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 
   it('公開・下書き版が無いタグの削除確認は設計どおり5行にする', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     expect(source).toContain('if (impact?.linkedActions.length)')
     expect(source).toContain("rows.push({ name: '使用中の版'")
   })
 
   it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    const markList = read('components/friend-fields/mark-list.tsx')
-    expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
-    expect(editor).toContain('取り消せない操作です')
-    expect(markList).toContain('選んだマークへ置き換えて履歴を残します')
+    const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
+    const markList = (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx'))
+    expect(editor).toContain('このタグを消すと、上の配信やフォームの条件から外れます')
+    expect(editor).toContain('この操作は取り消せません')
+    expect(markList).toContain('人は下で選んだマークへ置き換え、履歴に残します')
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
   it('タグ作成・編集は画面名をトップバーだけに置き、V6の操作を下部へまとめる', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    expect(editor).toContain("usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')")
-    expect(editor).toContain('<StickyBar')
+    const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
+    expect(editor).toContain("title={host?.title ?? (tag.name || 'タグを編集')}")
+    expect(editor).toContain('<CreatePage')
     expect(editor).not.toContain('text-[32px] font-bold tracking-tight')
     expect(editor).not.toContain('友だちを分類するタグを作ります。タグが付いた瞬間の連動')
-    expect(editor).toContain('番目のアクションを複製')
-    expect(editor).toContain("action.type === 'タグ追加' || action.type === 'タグ解除'")
+    expect(editor).toContain("label: '複製する'")
+    expect(editor).toContain("def.resource ?")
     // マイル設定だけを根拠に、存在しない連動アクションを作って表示しない。
     expect(editor).not.toContain("id: 'sample-1'")
   })
 
   it('タグの複製はリンクだけで終わらず、既存データを作成画面へ引き継ぐ', () => {
-    const page = read('components/friend-fields/new-tag-page-v4.tsx')
+    const page = read('v8/tags/create.tsx')
     expect(page).toContain("const copyId = params.get('copy')")
     expect(page).toContain('api.tags.definition(copyId, selectedAccountId)')
-    expect(page).toContain('name: `${copySource.tag.name} のコピー`')
-    expect(page).toContain('rewardMiles: copySource.tag.mileageReward ?? 0')
+    expect(page).toContain('setName(`${definition.data.tag.name} のコピー`)')
+    expect(page).toContain('self: source?.mileageReward ?? 0')
     expect(page).toContain('.map((action) => linkedActionFromDefinition(')
     expect(page).toContain('copySource.tag.linkedActions?.find')
   })
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
-    expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
+    expect(source).toContain('EXTENDED_PAGE_SIZES as PAGE_SIZES')
+    expect(read('components/shared/page-size-options.ts')).toContain('[10, 20, 30, 40, 50]')
     // 2026-08-26: ページ送りは共通部品 `Pagination`（設計 `Blot6`）へ寄せた。
     // 自前で組むと、高さ38・角丸・現在ページの緑がほかの一覧とずれる。
     expect(source).toContain('<Pagination')
@@ -77,24 +77,26 @@ describe('タグ V4 contract', () => {
     // いつでも並び替えられるようにした（`docs/v8-design-rules.md` §5）。
     // N-049: つまみはドラッグ専用の印ではなく ReorderGrip（↑↓キーでも動く）。
     expect(source).not.toContain('並び替えを終了')
-    expect(source).toContain('ReorderGrip')
+    expect(source).toContain('<ReorderHandle')
     expect(source).not.toContain('min-w-[1180px]')
   })
 
   it('情報欄と対応マークもPC画面で横スクロールを要求しない', () => {
     const sources = [
-      read('components/friend-fields/field-list.tsx'),
-      read('components/friend-fields/mark-list.tsx'),
+      (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
+      (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')),
     ]
     for (const source of sources) {
-      expect(source).toContain('table-fixed')
+      if (source.includes('<DataTable')) {
+        expect(read('v8/tags/list.module.css')).toContain('table-layout: fixed')
+      } else expect(source).toContain('table-fixed')
       expect(source).not.toMatch(/min-w-\[/)
       expect(source).not.toContain('overflow-x-auto')
     }
   })
 
   it('友だち情報欄はV8でも確認・実行・応答逆転の守りを保つ', () => {
-    const list = read('components/friend-fields/field-list.tsx')
+    const list = (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx'))
     const create = read('app/tags/fields/new/page.tsx')
     const migrate = read('app/tags/fields/migrate/page.tsx')
     expect(list).toContain('/tags/fields/migrate?id=')
@@ -126,32 +128,31 @@ describe('タグ V4 contract', () => {
   })
 
   it('友だち情報欄の読込失敗を空状態や作成導線と混ぜない', () => {
-    const source = read('components/friend-fields/field-list.tsx')
-    const empty = source.indexOf('まだ友だち情報欄がありません')
+    const source = (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx'))
+    const empty = source.indexOf('まだ項目はありません')
     expect(empty).toBeGreaterThan(-1)
     expect(source.slice(0, empty).lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
     /*
       #1014 ATTR-22: 「＋ 項目を作る」はタブ行の右に1個だけ。
-      一覧部品は作成ボタンを持たない。
+      現役V8は左のフォルダ列・狭い幅の同じ作る入口を使う。
       #1014 ATTR-02: 操作の失敗は読み込みの失敗（error）とは別の
       actionError に載せる。再読込で消えて「成功に見える」を防ぐ。
     */
-    const tabsPage = read('components/friend-fields/tags-page-v4.tsx')
-    expect(tabsPage).toContain('href="/tags/fields/new"')
-    expect(source).not.toContain('href="/tags/fields/new"')
-    expect(source).toContain('status === \'ready\' && actionError')
+    expect(source).toContain("href: '/tags/fields/new'")
+    expect(source).toContain('<FolderPanel')
+    expect(source).toContain('{actionError ? (')
     expect(source).toContain('onRetry={() => void load()}')
     expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')
   })
 
   it('使用人数を取得できない項目を0人として削除しない', () => {
-    const source = read('components/friend-fields/field-list.tsx')
+    const source = (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx'))
     expect(source).toContain('function knownUsageCount(field: FriendField)')
     expect(source).toContain('function fieldDeletionBlockedReason(field: FriendField)')
     expect(source).toContain('使用人数を確認できないため削除できません。再読み込みしてください。')
-    expect(source).toContain('disabled={fieldDeletionBlockedReason(field) !== null}')
-    expect(source).toContain('const blockedReason = fieldDeletionBlockedReason(field)')
+    expect(source).toContain('disabled: blocked !== null')
+    expect(source).toContain('const blocked = fieldDeletionBlockedReason(field)')
     expect(source).not.toContain('disabled={(field.usageCount ?? 0) > 0}')
   })
 
@@ -160,9 +161,9 @@ describe('タグ V4 contract', () => {
       read('components/friend-fields/tags-page-v4.tsx'),
       read('components/friend-fields/tag-editor-v4.tsx'),
       read('components/friend-fields/edit-tag-page-v4.tsx'),
-      read('components/friend-fields/field-list.tsx'),
-      read('components/friend-fields/mark-list.tsx'),
-      read('components/friend-fields/saved-search-list.tsx'),
+      (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
+      (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')),
+      (read('v8/tags/searches-tab.tsx') + read('components/friend-fields/saved-search-list.tsx')),
     ]
     for (const source of sources) {
       expect(source).not.toMatch(/\bconfirm\s*\(/)
@@ -170,12 +171,13 @@ describe('タグ V4 contract', () => {
   })
 
   it('空・読込・エラー・権限不足を言い分ける', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     // 設計 ★V6 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。
     expect(source).toContain("import ListState from '@/components/shared/list-state'")
-    for (const kind of ['loading', 'forbidden', 'error', 'empty']) {
-      expect(source, `${kind} を出していない`).toContain(`kind="${kind}"`)
-    }
+    expect(source).toContain('<DelayedSkeleton loading={!ready}')
+    expect(source).toContain("status === 'forbidden'")
+    expect(source).toContain("status === 'error'")
+    expect(source).toContain('<EmptyList')
     // 403 は「壊れた」ではなく「見せてよい人ではない」。同じ扱いにしない。
     expect(source).toContain("reason.status === 403 ? 'forbidden' : 'error'")
     // 読み込めなかったときに「ありません」と言い切らない（PR #216 と同じ壊れ方）。
@@ -185,13 +187,13 @@ describe('タグ V4 contract', () => {
     expect(before.lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
     // 中身を出せていないあいだは数を出さない。0件と出すと消えたように見える。
     expect(source).toContain("const ready = status === 'ready'")
-    expect(source).toContain('countsKnown={ready}')
+    expect(source).toContain('count: ready ? items.length : null')
     // 権限が無いときは作る操作を出さない。
-    expect(source).toContain("status === 'forbidden' ? null : (")
+    expect(source).toContain("status === 'forbidden' || !canEdit ? null : (")
   })
 
   it('取れていない値を「0件」や「手動」で埋めない', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     // 自動付与のもと。サーバーは断定できないものを省く（`getTagsWithUsage`）。
     // ここで「手動」と埋めると、断定できなかったものを断定したことになる。
     expect(source).toContain("tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'")
@@ -203,7 +205,7 @@ describe('タグ V4 contract', () => {
      * 編集画面の「所属フォルダ」で変える。絞りは編集画面の読み込み時に行う。
      */
     expect(source).not.toContain('<FolderSelect')
-    const edit = read('components/friend-fields/edit-tag-page-v4.tsx')
+    const edit = read('v8/tag-edit/edit.tsx')
     expect(edit).toContain('folders.data.filter((group) => group.accountId === selectedAccountId)')
     expect(source).toContain("if (!tag.usedIn) return 'なし'")
     /*
@@ -214,10 +216,10 @@ describe('タグ V4 contract', () => {
     expect(source).toContain('return !tag.usedIn && (tag.friendCount ?? 0) === 0')
     expect(source).toContain('const unused = isUnused(tag)')
     // 連動の「他N」。0件のときサーバーは省くので「他0」は出ない。
-    expect(source).toContain('if (tag.otherActionCount) chips.push(')
+    expect(source).toContain('if (tag.otherActionCount) parts.push(')
     // 整理候補は「未使用＋重複名」。未取得は `—`（value: null）、
     // 取得できて0件は `0件`。単位の出し分けで見分ける。
-    expect(source).toContain("{ title: '整理候補', value: cleanupCount")
+    expect(source).toContain("{ title: '整理の候補', icon: Sparkles, value: cleanupCount")
     // 削除の確認に固定値を書かない。
     expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)
     // 積んだマイルは口を待たず、「そのまま残る」で固定（2026-08-26）。
@@ -226,7 +228,7 @@ describe('タグ V4 contract', () => {
   })
 
   it('整理候補と未使用は、サーバーの cleanupReasons だけを数える', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     /*
       同じ画面でKPI・絞り込み・使用先が別々に数えると、数が食い違った
       理由を誰も追えなくなる。数え方は1つに寄せる。
@@ -236,7 +238,7 @@ describe('タグ V4 contract', () => {
     expect(source).not.toMatch(/\$\{stats\.tags\.unused\}/)
     expect(source).not.toMatch(/value:\s*stats\.tags\.unused/)
     expect(source).toContain("tag.cleanupReasons.includes('unused')")
-    expect(source).toContain("cleanupItems.filter((tag) => tag.cleanupReasons?.includes('unused')).length")
+    expect(source).toContain("items.filter((tag) => tag.cleanupReasons?.includes('unused')).length")
     // 整理候補は「理由が1つでもある」タグ。両方に当たっても1つと数える。
     expect(source).toContain('(tag.cleanupReasons?.length ?? 0) > 0')
     // **1件でも欠けたら未取得。** 揃わないまま数えると少なく出る。
@@ -248,23 +250,23 @@ describe('タグ V4 contract', () => {
     // 未取得は `—`、取得できて0件は `0件`。
     // 未使用の数は KPI の「未使用」カードが受け持つ（タグ総数の重ね書きをやめた跡）。
     expect(source).toContain("value: unusedCount,")
-    expect(source).toContain("unit: cleanupCount === null ? '' : '件'")
+    expect(source).toContain("unit={kpi.value == null ? '' : kpi.unit}")
   })
 
-  it('「よく使う」は設計の5つで、どれも絞り込みに効く', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
-    for (const label of ['未使用のタグ', '今月増えたタグ', '自動付与あり', '連動あり', '★のみ表示']) {
+  it('「よく使う」はV8の4つで、どれも絞り込みに効く', () => {
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
+    for (const label of ['未使用のタグ', '今月増えたタグ', '自動付与あり', '連動あり']) {
       expect(source, `よく使うに「${label}」が無い`).toContain(label)
     }
     // 2026-08-26: 「今月増えた」は札だけあって、絞り込みに枝が無く
     // **押しても何も起きなかった**。5つとも枝があることを見る。
-    for (const key of ['unused', 'recent', 'auto', 'linked', 'starred']) {
+    for (const key of ['unused', 'recent', 'auto', 'linked']) {
       expect(source, `よく使う「${key}」に絞り込みの枝が無い`).toContain(`key === '${key}'`)
     }
   })
 
   it('CSV一括登録は選択・確認・完了・一部失敗を同じ操作で通す', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     const dialog = read('components/friend-fields/tag-csv-import-dialog.tsx')
     expect(source).toContain('<TagCsvImportDialog')
     expect(source).toContain('CSVで一括登録')
@@ -284,7 +286,7 @@ describe('タグ V4 contract', () => {
   })
 
   it('使用中のタグは削除せず、影響確認後に履歴を残してアーカイブする', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     // アーカイブ前に実参照と版を返す正本の口を叩く。
     expect(source).toContain('api.tags.dependencies(tag.id, accountId)')
     /*
@@ -299,7 +301,8 @@ describe('タグ V4 contract', () => {
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
     expect(source).toContain('api.tags.archive(tag.id, accountId')
-    expect(source).toContain('max-w-[670px] -translate-y-5')
+    expect(source).toContain('<Dialog open size="large"')
+    expect(source).not.toContain('max-w-[670px] -translate-y-5')
     expect(source).toContain('gap-3 px-4 py-3')
     expect(source).toContain('expectedVersion: impact.tag.version')
     expect(source).toContain('impactRevision: impact.revision')
@@ -314,7 +317,7 @@ describe('タグ V4 contract', () => {
   })
 
   it('参照先は0件のものを出さず、取れないときは「0」と書かない', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
     // 18種類すべてに呼び名がある。取りこぼすと、参照があるのに出ない。
     const keys = [
       'broadcasts', 'forms', 'scenarios', 'autoReplies', 'savedSearches',
@@ -334,7 +337,7 @@ describe('タグ V4 contract', () => {
   })
 
   it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {
-    const source = read('components/friend-fields/edit-tag-page-v4.tsx')
+    const source = read('components/friend-fields/edit-tag-page-v4.tsx') + read('v8/tag-edit/edit.tsx')
     // `load()` で取った `dependencies` を窓へ渡す。固定値を書かない。
     expect(source).toContain('api.tags.dependencies(tagId, selectedAccountId)')
     expect(source).toContain('dependencies={dependencies} dependenciesStatus={dependenciesStatus}')

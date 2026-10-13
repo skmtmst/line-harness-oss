@@ -1,18 +1,10 @@
 'use client'
 
-/*
- * ★V8 LINEアカウントの乗り換え（Pencil `x2dSNv`）。
- *
- * 白い板の頭（乗り換え（元 → 先）・説明・右に「アカウントの詳細へ戻る」）→ 左に設定の中のメニュー →
- * 4つの段の札 → どこからどこへ／事前確認の結果 → 要確認の判断の表 → 保存していない書き換えの帯 →
- * 戻せること／気をつけること → 下の行（未判断の数・引き継ぎをやめる・本実行する）。
- * データの口・守り（確認の窓・本人確認・二重押し防止・閲覧のみ・切り戻し）は今の画面
- * （app/accounts/handover の page.tsx・handover-v8.tsx）と同じ。動きの一覧は BEHAVIOR.md。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Eye, Play, RotateCcw } from 'lucide-react'
+import { Play, RotateCcw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type AccountHandover, type AccountHandoverDecision } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -26,7 +18,6 @@ import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -42,6 +33,18 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 LINEアカウントの乗り換え（Pencil `x2dSNv`）。
+ *
+ * 白い板の頭（乗り換え（元 → 先）・説明・右に「アカウントの詳細へ戻る」）→ 左に設定の中のメニュー →
+ * 4つの段の札 → どこからどこへ／事前確認の結果 → 要確認の判断の表 → 保存していない書き換えの帯 →
+ * 戻せること／気をつけること → 下の行（未判断の数・引き継ぎをやめる・本実行する）。
+ * データの口・守り（確認の窓・本人確認・二重押し防止・閲覧のみ・切り戻し）は今の画面
+ * （app/accounts/handover の page.tsx・handover-v8.tsx）と同じ。動きの一覧は BEHAVIOR.md。
+ */
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -63,6 +66,7 @@ function apiMessage(caught: unknown, fallback: string): string {
 }
 
 export default function AccountHandoverV8() {
+  const saveErrors = useSaveFormErrors()
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
   const staffRole = useStaffRole()
@@ -114,13 +118,17 @@ export default function AccountHandoverV8() {
       if (!res.success) { setAccountsFailed(true); return }
       setAccounts(res.data)
       setAccountsFailed(false)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setAccountsFailed(true)
     }
-  }, [])
+  }, [saveErrors]);
+
 
   const retryAccounts = useCallback(async () => {
-    if (accountsRetrying) return
+    if (accountsRetrying)
+
+ return
     setAccountsRetrying(true)
     try { await loadAccounts() } finally { setAccountsRetrying(false) }
   }, [accountsRetrying, loadAccounts])
@@ -154,14 +162,18 @@ export default function AccountHandoverV8() {
       setDecisionEdits({})
       setStatus('ready')
     } catch (caught) {
+      saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
-        setMissing(true)
-        setStatus('ready')
+        setMissing(true);
+
+        setStatus('ready');
+
         return
       }
       setStatus('error')
     }
-  }, [id, loadAccounts])
+  }, [id, loadAccounts, saveErrors])
 
   useEffect(() => { void load() }, [load])
   usePageTitle('乗り換え')
@@ -201,8 +213,11 @@ export default function AccountHandoverV8() {
       const res = await api.accountHandovers.issue(account.id)
       if (!res.success) throw new Error(res.error)
       await load()
-    } catch {
-      setExecuteError('引き継ぎコードを発行できませんでした。しばらくおいてから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setExecuteError('引き継ぎコードを発行できませんでした。しばらくおいてから、もう一度お試しください。') }
     } finally {
       setIssuing(false)
     }
@@ -225,7 +240,10 @@ export default function AccountHandoverV8() {
       }
       await load()
     } catch (caught) {
-      setLinkError(apiMessage(caught, 'コードを読めませんでした。期限（72時間）を過ぎていないか、書き写しを確かめてください。'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setLinkError(apiMessage(caught, 'コードを読めませんでした。期限（72時間）を過ぎていないか、書き写しを確かめてください。')) }
     } finally {
       setLinking(false)
     }
@@ -253,7 +271,10 @@ export default function AccountHandoverV8() {
         setDecisionEdits({})
       }
     } catch (caught) {
-      setDecisionError(apiMessage(caught, '判断を保存できませんでした。しばらくおいてから、もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setDecisionError(apiMessage(caught, '判断を保存できませんでした。しばらくおいてから、もう一度お試しください。')) }
     } finally {
       setSavingDecisions(false)
     }
@@ -274,7 +295,10 @@ export default function AccountHandoverV8() {
       if (detail.success) setHandover(detail.data as HandoverView)
       notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)} 人を元のアカウントへ戻しました。`)
     } catch (caught) {
-      setRollbackError(apiMessage(caught, '切り戻せませんでした。期限（7日間）を過ぎていないか確かめてください。'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setRollbackError(apiMessage(caught, '切り戻せませんでした。期限（7日間）を過ぎていないか確かめてください。')) }
     } finally {
       setRollingBack(false)
     }
@@ -289,15 +313,16 @@ export default function AccountHandoverV8() {
       if (!res.success) throw new Error(res.error)
       setCancelOpen(false)
       await load()
-    } catch {
-      setExecuteError('取り消せませんでした。しばらくおいてから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setExecuteError('取り消せませんでした。しばらくおいてから、もう一度お試しください。') }
       setCancelOpen(false)
     } finally {
       setCancelling(false)
     }
   }
-
-
 
   /** 段5。本実行。確認の窓と本人確認を済ませてから進める（X-3）。 */
   const executeHandover = async () => {
@@ -317,8 +342,11 @@ export default function AccountHandoverV8() {
       if (detail.success) setHandover(detail.data as HandoverView)
       const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
       notifyToast(result.data.failureReason ?? `本実行が終わりました。${formatNumber(moved)} 人を移しました。`)
-    } catch {
-      setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。') }
     } finally {
       setExecuting(false)
     }
@@ -368,7 +396,7 @@ export default function AccountHandoverV8() {
   }
 
   const viewerBand = !canManage ? (
-    <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>{NO_MANAGE_NOTE}</Notice>
+    <ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice>
   ) : null
 
   // 段1・段2の入口。出す側と受け取る側の両方の口を出す。
@@ -391,11 +419,11 @@ export default function AccountHandoverV8() {
             <p className={styles.list}>移し元のアカウントで発行した引き継ぎコードを入れてください。読んだだけでは友だちは動きません。あとで事前確認をします。</p>
             {canManage ? (
               <div className={styles.inlineForm}>
-                <TextField placeholder="引き継ぎコード" aria-label="引き継ぎコード" value={linkCode} onChange={(event) => setLinkCode(event.target.value)} disabled={linking} />
+                <SaveErrorField names={["linkCode","link_code"]}><TextField placeholder="引き継ぎコード" aria-label="引き継ぎコード" value={linkCode} onChange={(event) => setLinkCode(event.target.value)} disabled={linking} /></SaveErrorField>
                 <Button type="button" variant="primary" disabled={linking || !linkCode.trim()} busy={linking} busyLabel="確認中…" onClick={() => void submitLinkCode()}>コードを読む</Button>
               </div>
             ) : null}
-            {linkError ? <p role="alert" className={styles.error}>{linkError}</p> : null}
+            {linkError ? <Notice tone="danger" >{linkError}</Notice> : null}
           </Card>
         </div>
       </>
@@ -414,7 +442,7 @@ export default function AccountHandoverV8() {
   const executeDisabled = unresolved > 0 || handover.status === 'completed' || editCount > 0 || declaredMismatch
   const destinationName = destination?.name ?? '受け取り先'
 
-  return frame(`乗り換え（${account.name} → ${destination?.name ?? emptyValue('unknown')}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
+  return <SaveErrorScope errors={saveErrors}>{frame(`乗り換え（${account.name} → ${destination?.name ?? emptyValue('unknown')}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
     <>
       <HandoverSteps current={pill} />
       {viewerBand}
@@ -454,7 +482,7 @@ export default function AccountHandoverV8() {
           <p className={styles.boxValue}>{countsAreComplete && handover.counts ? countsLine(handover.counts) : '事前確認の合計が元の友だちの数と合わないので、数を出していません'}</p>
           {canManage && declaredOpen ? (
             <div className={styles.declared}><Field label="移し元のシステムが言う友だちの数（分からなければ空欄）。違うままでは本実行しません。" htmlFor="acd-declared"><div className={styles.inlineForm}>
-                <NumberInput id="acd-declared" type="number" min={0} placeholder="例：14" value={declaredTotalInput} onChange={(event) => setDeclaredTotalInput(event.target.value)} disabled={refreshing || !handover.counts} />
+                <SaveErrorField names={["declaredTotalInput","declared_total_input"]}><NumberInput id="acd-declared" type="number" min={0} placeholder="例：14" value={declaredTotalInput} onChange={(event) => setDeclaredTotalInput(event.target.value)} disabled={refreshing || !handover.counts} /></SaveErrorField>
                 <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>事前確認をやり直す</Button>
               </div></Field></div>
           ) : null}
@@ -480,19 +508,19 @@ export default function AccountHandoverV8() {
           const editable = canManage && (decision.bucket === 'review' || decision.bucket === 'lookalike')
           const name = decision.sourceName ?? decision.from_friend_id
           return (
-            <Tr key={decision.id} data-row-id={decision.id}>
-              <Td className={styles.colName}><div className={styles.nameStack}>
-                <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
-                <span className={styles.sub}>元の友だち</span>
-              </div></Td>
-              <Td className={styles.colName}><div className={styles.nameStack}>
+            <Tr data-row-id={decision.id} key={decision.id}>
+              <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
+                <span className={styles.name} title={name}>{name}</span>
+
+              </div></FolderDotName></Td>
+              <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
                 <span className={styles.name}>{decision.candidateName ?? '候補なし'}</span>
-                <span className={styles.sub}>受け取り先の候補</span>
-              </div></Td>
-              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? emptyValue('unknown')}</Td>
+
+              </div></FolderDotName></Td>
+              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? '—'}</Td>
               <Td className={styles.colChoice}>
                 {editable ? (
-                  <Select
+                  <SaveErrorField names={["shown","decisionEdits","decision_edits"]}><Select
                     width={150}
                     aria-label={`${name}の判断`}
                     value={shown}
@@ -503,7 +531,7 @@ export default function AccountHandoverV8() {
                       { value: 'new', label: '新しく作る' },
                       { value: 'skip', label: '引き継がない' },
                     ]}
-                  />
+                  /></SaveErrorField>
                 ) : (
                   <span className={styles.fixed}>{decisionLabel(shown)}</span>
                 )}
@@ -516,7 +544,7 @@ export default function AccountHandoverV8() {
       {canManage && (editCount > 0 || decisionError) ? (
         <div className={styles.pendingBand}>
           {decisionError
-            ? <p role="alert" className={styles.pendingText}>{decisionError}</p>
+            ? <Notice tone="danger" className={styles.pendingTextNoticePlacement} >{decisionError}</Notice>
             : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す
@@ -582,7 +610,7 @@ export default function AccountHandoverV8() {
         open={confirmOpen}
         title="本実行しますか？"
         description={`要確認はすべて決めました。本実行すると、決めた内容で友だちが「${destinationName}」へ移ります。元のアカウントの友だち・履歴・配信は消しません。`}
-        confirmLabel={executing ? '実行中…' : '本実行する'}
+        confirmLabel="本実行する" busyLabel="実行中…"
         busy={executing}
         error={executeError}
         onConfirm={() => executeHandover()}
@@ -592,7 +620,7 @@ export default function AccountHandoverV8() {
         open={cancelOpen}
         title="この引き継ぎを取り消しますか？"
         description="進行中の引き継ぎをやめます。コードは使えなくなり、決めた内容は破棄されます。元のアカウントの友だちは変わりません。"
-        confirmLabel={cancelling ? '取り消し中…' : '引き継ぎを取り消す'}
+        confirmLabel="引き継ぎを取り消す" busyLabel="取り消し中…"
         destructive
         busy={cancelling}
         onConfirm={() => runCancel()}
@@ -602,7 +630,7 @@ export default function AccountHandoverV8() {
         open={rollbackOpen}
         title="移した友だちを元へ戻しますか？"
         description={`本実行で「${destinationName}」へ移した友だちを、元の「${account.name}」へ戻します。移したあとで人が動かした人は戻しません。`}
-        confirmLabel={rollingBack ? '戻し中…' : '切り戻す'}
+        confirmLabel="切り戻す" busyLabel="戻し中…"
         destructive
         busy={rollingBack}
         error={rollbackError}
@@ -610,7 +638,7 @@ export default function AccountHandoverV8() {
         onCancel={() => { if (!rollingBack) { setRollbackOpen(false); setRollbackError('') } }}
       />
     </>
-  ))
+  ))}</SaveErrorScope>
 }
 
 /** 乗り換えの段（型の共通部品 Steps・Fa8ED）。題と説明のすぐ下・左寄せ・1行。段は押せない。 */

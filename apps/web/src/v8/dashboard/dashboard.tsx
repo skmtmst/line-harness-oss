@@ -1,14 +1,13 @@
 'use client'
-
+import SegmentedControl from '@/components/shared/segmented'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import dynamic from 'next/dynamic'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Eye, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
+import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import SectionHeader from './head'
@@ -27,22 +26,7 @@ import { FirstStepsCard, useFirstSteps } from './first-steps'
 import { FriendTrend, trendRangeNote } from './trend'
 import { InboxSection } from './inbox'
 import { FriendAddLink } from './friend-add'
-import {
-  ConnectionStatus,
-  DeliveryFailures,
-  FriendStatus,
-  Loading,
-  Metric,
-  MonthlyDelivery,
-  OperationalAlerts,
-  RecentActivity,
-  RecentResults,
-  SendQuota,
-  SupportStatus,
-  Tag,
-  Unavailable,
-  Upcoming,
-} from './sections'
+import { ConnectionStatus, DeliveryFailures, FriendStatus, Loading, Metric, MonthlyDelivery, OperationalAlerts, RecentActivity, RecentResults, SendQuota, SupportStatus, Tag, Unavailable, Upcoming } from './sections'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -77,11 +61,6 @@ export function headline(asOf: string | null | undefined, risk: 'normal' | 'warn
   return time ? `更新 ${time} ・ ${health}` : health
 }
 
-/** 「…」のメニュー。数のマスごとに1つ。 */
-function CellMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
-  return <RowMenu className={styles.cellMenu} label={`${title}の操作`} items={items} />
-}
-
 /* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
 const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {
   'friend-trend': ['send-quota', 'operational-alerts'],
@@ -100,7 +79,7 @@ export default function DashboardV8() {
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
@@ -110,16 +89,7 @@ export default function DashboardV8() {
 
   /* ── 数の帯（今日やること） ─────────────────────── */
   const todayCell = (id: DashboardCardId): { node: ReactNode; detail: ReactNode } | null => {
-    const menu = (title: string, href: string, label: string) => (
-      <CellMenu
-        title={title}
-        items={[
-          { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
-          { id: 'go', label, external: true, href: href, onSelect: () => router.push(href) },
-          ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
-        ]}
-      />
-    )
+    const valueAction = (title: string) => ({ label: `${title}の内訳${openDetail === id ? 'を閉じる' : 'を見る'}`, expanded: openDetail === id, onClick: () => setOpenDetail((current) => current === id ? null : id) })
     if (id === 'today-inbox') {
       const total = d.pendingTotal
       return {
@@ -128,7 +98,7 @@ export default function DashboardV8() {
           presentation="band"
           title="対応が必要な受信"
           icon={<Inbox size={13} aria-hidden="true" />}
-          menu={menu('対応が必要な受信', '/chats?status=unread', '受信箱を開く')}
+          valueAction={valueAction('対応が必要な受信')}
           value={total}
           unit="件"
           loading={d.pendingDetailState === 'loading'}
@@ -158,7 +128,7 @@ export default function DashboardV8() {
           presentation="band"
           title="写真審査"
           icon={<ImageIcon size={13} aria-hidden="true" />}
-          menu={menu('写真審査', href, action)}
+          valueAction={valueAction('写真審査')}
           value={forbidden ? null : value}
           unit="件"
           loading={state === 'loading'}
@@ -185,7 +155,7 @@ export default function DashboardV8() {
           presentation="band"
           title="今日の予約"
           icon={<Calendar size={13} aria-hidden="true" />}
-          menu={menu('今日の予約', '/booking/bookings?view=day', '予約を見る')}
+          valueAction={valueAction('今日の予約')}
           value={value}
           unit="件"
           loading={value === null && !d.bookingsFailed}
@@ -206,7 +176,7 @@ export default function DashboardV8() {
           presentation="band"
           title="出荷予定（今日・明日）"
           icon={<Package size={13} aria-hidden="true" />}
-          menu={menu('出荷予定', '/ec-commerce', 'ECを見る')}
+          valueAction={valueAction('出荷予定')}
           value={state === 'ready' ? (s?.soon ?? null) : null}
           unit="件"
           loading={state === 'loading'}
@@ -328,7 +298,7 @@ export default function DashboardV8() {
   ]
   for (let index = 0; index < columnIds.length; index += 4) {
     const chunk = columnIds.slice(index, index + 4)
-    rows.push(<DashboardColumns key={`cols-${index}`}>{chunk.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</DashboardColumns>)
+    rows.push(<DashboardColumns layout="overview" key={`cols-${index}`}>{chunk.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</DashboardColumns>)
   }
 
   function trendOf() {
@@ -341,7 +311,7 @@ export default function DashboardV8() {
     return <><SectionHeader title="友だち数の推移" /><Unavailable section={data?.sections?.trend} onRetry={() => void d.load()} /></>
   }
 
-  const viewer = role !== null && !canManageRole(role)
+  const viewer = !canManageRole(role)
   /* 部品の中で自分のエラーを出すものは帯に重ねない。出し先の無いものだけ日本語の名前で帯に出す。 */
   const shownCardIds = new Set<string>([
     ...d.preferences.main.filter((item) => item.visible).map((item) => item.id),
@@ -351,24 +321,18 @@ export default function DashboardV8() {
   const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <ReadOnlyNotice />
       ) : null}
       {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
-        <div className={styles.errorBand} role="alert">
-          <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
-        </div>
+        <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
       {looseFailures.length ? (
         <Notice
           tone="warn"
           role="status"
           message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
-          action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}
+          action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}
         />
       ) : null}
     </div>

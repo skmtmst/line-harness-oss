@@ -7,8 +7,8 @@
  * このテストは「営業時間タブに無名ボタンが戻らないこと」を固定する。
  */
 import React, { act } from 'react'
-import { render, waitFor } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { buttonsWithoutAccessibleName } from '@/test-utils/accessible-name'
 
@@ -28,19 +28,18 @@ const fixture = vi.hoisted(() => ({
   checkAvailability: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useSearchParams: () => new URLSearchParams({ tab: 'hours' }),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/booking/staff/shifts',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false }) }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false }) }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: fixture.selectedAccountId,
     selectedAccount: fixture.selectedAccountId ? { id: 'account-a', name: '本店', liffId: 'liff-x' } : null,
   }),
 }))
-vi.mock('./staff-detail', () => ({ default: () => <div>担当者別</div> }))
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
     status: number
@@ -52,6 +51,8 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     bookingApi: {
+      listStaffMenusBulk: async () => ({ staff: [] }),
+      listRequests: async () => ({ bookings: [], total: 0 }),
       getSettings: (...a: unknown[]) => fixture.getSettings(...a),
       saveSettings: (...a: unknown[]) => fixture.saveSettings(...a),
       listMenus: (...a: unknown[]) => fixture.listMenus(...a),
@@ -74,7 +75,14 @@ vi.mock('@/lib/staff-capability', () => ({
   canViewFeature: () => true,
 }))
 
-import StaffShiftsPage from './page'
+import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import BookingSettingsV8 from '@/v8/booking-menus/settings'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -91,6 +99,7 @@ describe('Issue #637 /booking/staff/shifts 全ボタンにアクセシブルな�
       },
     })
     window.localStorage.setItem('lh_staff_role', 'owner')
+    forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
     fixture.getSettings.mockImplementation(async (accountId: string) => ({
       success: true,
       data: {
@@ -109,11 +118,11 @@ describe('Issue #637 /booking/staff/shifts 全ボタンにアクセシブルな�
     fixture.getAvailability.mockResolvedValue({ by_staff: [] })
     fixture.listStaff.mockResolvedValue({ staff: [] })
 
-    const { container } = render(<StaffShiftsPage />)
-    await waitFor(() => {
-      expect(container.querySelector('section')).toBeTruthy()
-    })
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)) })
+    const { container } = render(<BookingSettingsV8 accountId={fixture.selectedAccountId} />)
+    // タブと右の写しは別々の動的 import。両方の応答と描画を待つ。
+    await screen.findByRole('heading', { name: '開ける時間' })
+    await screen.findByText('設備はまだありません。')
+    await screen.findByText('この期間に空きはありません。')
     const unnamed = buttonsWithoutAccessibleName(container)
     expect(
       unnamed.map((b) => b.outerHTML.slice(0, 160)),

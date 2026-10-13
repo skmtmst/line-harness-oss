@@ -9,6 +9,7 @@
  *   3. 書きかけのまま「一覧に戻る」を押すと確認が出て、
  *      「保存して移る」は保存が通ったときだけ離れる。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -98,10 +99,7 @@ function unmount() {
 }
 
 function setValue(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
-  const setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value')!.set!
-  setter.call(el, value)
-  el.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(el, value)
 }
 
 function titleInput(): HTMLInputElement {
@@ -109,7 +107,7 @@ function titleInput(): HTMLInputElement {
 }
 
 function messageInput(): HTMLTextAreaElement {
-  return container.querySelector('textarea[placeholder="テキストを入力"]') as HTMLTextAreaElement
+  return container.querySelector('[role="textbox"][placeholder="テキストを入力"]') as HTMLTextAreaElement
 }
 
 function clickButton(label: string) {
@@ -177,7 +175,7 @@ describe('一斉配信の下書き自動保存（★V7 sTJsh §5）', () => {
     await act(async () => { setValue(titleInput(), '秋の案内') })
     await act(async () => { setValue(messageInput(), '本文') })
 
-    await act(async () => { clickButton('← 一斉配信一覧') })
+    await act(async () => { clickButton('キャンセル') })
     // 離れず、確認の窓が出ている
     expect(onCancelSpy).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('保存していない変更があります')
@@ -195,7 +193,7 @@ describe('一斉配信の下書き自動保存（★V7 sTJsh §5）', () => {
     // 通せる形にするため本文も入れる（タイトルだけだと保存自体が検査で止まる）
     await act(async () => { setValue(messageInput(), '本文') })
 
-    await act(async () => { clickButton('← 一斉配信一覧') })
+    await act(async () => { clickButton('キャンセル') })
     expect(document.body.textContent).toContain('保存していない変更があります')
 
     await act(async () => { clickButton('保存して移る') })
@@ -259,9 +257,7 @@ describe('自動保存の競合（R625/R626/R627）', () => {
 
   async function enter(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
     await act(async () => {
-      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
-      Object.getOwnPropertyDescriptor(proto.prototype, 'value')!.set!.call(el, value)
-      el.dispatchEvent(new Event('input', { bubbles: true }))
+      setTextControlValue(el, value)
     })
     await flushFake()
   }

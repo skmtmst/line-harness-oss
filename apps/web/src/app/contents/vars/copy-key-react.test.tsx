@@ -38,7 +38,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: vi.fn(), replace: vi.fn(), refresh: vi.fn(),
     back: vi.fn(), forward: vi.fn(), prefetch: vi.fn(),
@@ -95,8 +95,9 @@ describe('共通情報の一覧: 差し込みキーのコピー（#665）', () =
     })
 
     render(<CommonVarsPage />)
-
-    await screen.findByRole('button', {
+    const menu = await screen.findByRole('button', { name: '共通情報「監査用の共通情報」の操作' })
+    await act(async () => { fireEvent.click(menu) })
+    await screen.findByRole('menuitem', {
       name: '監査用の共通情報の差し込みキーをコピー',
     })
 
@@ -105,7 +106,7 @@ describe('共通情報の一覧: 差し込みキーのコピー（#665）', () =
     // ボタンが作り直され、コピー済みの表示が捨てられてしまう。
     // 待ち時間ではなく処理の順番で待つので、混み合った機械でも結果は変わらない。
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
-    const button = screen.getByRole('button', {
+    const button = screen.getByRole('menuitem', {
       name: '監査用の共通情報の差し込みキーをコピー',
     })
 
@@ -123,7 +124,7 @@ describe('共通情報の一覧: 差し込みキーのコピー（#665）', () =
 
       // 一時表示であること自体も、止めた時計を進めて確かめる。
       await act(async () => { vi.advanceTimersByTime(1600) })
-      expect(button.textContent).toBe('コピー')
+    expect(button.textContent).toBe('差し込みキーをコピー')
     } finally {
       vi.useRealTimers()
     }

@@ -1,7 +1,7 @@
 /*
  * ★V8「枠線の色」`--color-control-border`（B-150 案1：黒12%＋薄い影）の固定。
  *
- *   - V8（`[data-theme="v8"]`）のときだけ効くトークンであること
+ *   - V8（`:root`）のときだけ効くトークンであること
  *   - 操作する部品（入力・選ぶ欄・探す欄・チェック・ラジオ・
  *     トグルのオフ・OTP・色を選ぶ・カードの中の印）に効くこと
  *   - カード・表・外側の板の枠は hairline のままであること
@@ -16,16 +16,15 @@ const SHARED = join(WEB, 'src/components/shared')
 const css = (name: string) => readFileSync(join(SHARED, name), 'utf8')
 const globals = readFileSync(join(WEB, 'src/app/globals.css'), 'utf8')
 
-const V8 = String.raw`\[data-theme=['"]?v8['"]?\]`
+const V8 = ':root'
 
 describe('★V8 枠線の色（--color-control-border）', () => {
   it('トークンが v8 の下にだけ定義されている', () => {
-    const v8Block = globals.match(/\[data-theme="v8"\]\s*\{([^}]*)\}/)
+    const v8Block = globals.match(/:root\s*\{([^}]*--color-control-border: #1d1d1f1f[^}]*)\}/)
     expect(v8Block?.[1]).toContain('--color-control-border: #1d1d1f1f')
     expect(v8Block?.[1]).toContain('--control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06)')
     expect(v8Block?.[1]).toContain('--color-choice-border: #c9ced6')
-    const rootBlock = globals.slice(0, globals.indexOf('[data-theme'))
-    expect(rootBlock).not.toContain('--color-control-border')
+    expect(globals.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\[data-theme=/)
   })
 
   it.each([

@@ -25,7 +25,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/hq/templates',
 }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: selectAccount, loading: false }) }))
 import { PageChromeProvider, usePageChrome, usePageCrumbs, type PageCrumb } from '@/components/shell/page-chrome'
 let crumbs: PageCrumb[] | null = null
@@ -45,6 +45,7 @@ const detail = (definition: unknown = message) => ({ template: { id: 't-1', name
 const listRow = { ...detail().template, kind: 'message', content_summary: '本文', distributed_account_count: 4, distributed_account_names: ['然 -NEN- 本店', '然 -NEN- 渋谷店', '2025年イベント'], distributed_account_more: 1 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/hq/templates')
   window.sessionStorage.clear()
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([listRow])
@@ -94,7 +95,8 @@ describe('実際の統括編集とパンくずの所有', () => {
     await waitFor(() => expect(crumbs?.find((item) => item.href === '/')?.label).toBe('ホーム'))
     fireEvent.click(screen.getByRole('checkbox', { name: /本店/ }))
     fireEvent.click(screen.getByRole('button', { name: '1 アカウントへ配る' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await screen.findByRole('heading', { name: 'アカウントへ配る：案内' })
+    expect(document.querySelector('[data-page-template="distribution"]')).toBeTruthy()
     await waitFor(() => expect(crumbs?.find((item) => item.href === '/hq/templates')?.onSelect).toBeTypeOf('function'))
     act(() => crumbs!.find((item) => item.href === '/hq/templates')!.onSelect!())
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

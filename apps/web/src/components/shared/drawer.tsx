@@ -1,6 +1,5 @@
 'use client'
 
-import { drawerWidth } from './panel-sizes'
 
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -9,7 +8,8 @@ import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-util
 import styles from './drawer.module.css'
 import Dialog from './dialog'
 import { useFormInputDirty } from './form-input-dirty'
-import { useOverlayDiscard } from './overlay-discard'
+import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
+import { drawerWidth } from './destination-policy'
 
 export type DrawerDetail = { label: string; value: ReactNode }
 
@@ -18,6 +18,7 @@ export type DrawerProps = {
   title: string
   titleAccessory?: ReactNode
   description?: ReactNode
+  contentSpacing?: 'sections'
   dirty?: boolean
   busy?: boolean
   error?: string
@@ -51,6 +52,7 @@ export default function Drawer({
   title,
   titleAccessory,
   description,
+  contentSpacing,
   dirty,
   busy = false,
   error,
@@ -93,7 +95,7 @@ export default function Drawer({
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
       onChangeCapture={formInput.onChangeCapture}
       onInputCapture={formInput.onChangeCapture}
-      onClickCapture={formInput.onClickCapture}
+      onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${modal ? '' : styles.inline}`}
       role="dialog"
       aria-modal={modal || undefined}
@@ -104,7 +106,7 @@ export default function Drawer({
       data-width={width}
       data-layout={layout}
       data-design-width=""
-      style={{ '--drawer-design-width': `${drawerWidth(designWidth ?? (width === 'editor' || width === 'order' || width === 'composer' ? 540 : 480))}px` } as CSSProperties}
+      style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"
@@ -124,17 +126,12 @@ export default function Drawer({
           {closeButton}
         </header>
       )}
-      <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`}>
+      <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`} data-content-spacing={contentSpacing}>
         {details ? <dl className={styles.rows}>{details.map((detail) => <div className={styles.row} key={detail.label}><dt>{detail.label}</dt><dd className={styles.rowValue}>{detail.value}</dd></div>)}</dl> : children}
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
-      {footer ? <footer className={styles.footer} onClickCapture={(event) => {
-        const button = (event.target as Element).closest?.('button')
-        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
-          event.preventDefault(); event.stopPropagation(); discard.requestClose()
-        }
-      }}>{footer}</footer> : null}
+      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </aside>
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null

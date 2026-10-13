@@ -9,6 +9,7 @@
  *   R208: テキストのまま削除・上下移動ができ、本文を保って並べ替わる。
  *   R209: ボタンの編集欄は1つだけ（2通目を直すと全通に反映されていた）。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
@@ -99,12 +100,7 @@ function unmount() {
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = element instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 function titleInput(): HTMLInputElement | null {
@@ -112,7 +108,7 @@ function titleInput(): HTMLInputElement | null {
 }
 
 function textareas(): HTMLTextAreaElement[] {
-  return [...container.querySelectorAll<HTMLTextAreaElement>('textarea[placeholder="テキストを入力"]')]
+  return [...container.querySelectorAll<HTMLTextAreaElement>('[role="textbox"][placeholder="テキストを入力"]')]
 }
 
 function buttonByText(label: string): HTMLButtonElement | undefined {
@@ -264,8 +260,8 @@ it('WEB256: テンプレートを足しても3通目以降の入力を捨てな�
     await act(async () => textareas().forEach((el, i) => setNativeValue(el, `元の本文${i}`)))
     const choice = container.querySelector<HTMLInputElement>('input[value="template"]')!
     await act(async () => choice.click()); await flush()
-    await act(async () => (container.querySelector('.broadcast-template-row') as HTMLButtonElement).click()); await flush()
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('このテンプレートを使用'))!.click()); await flush()
+    await act(async () => (document.querySelector('[role="dialog"] input[type="radio"]') as HTMLInputElement).click()); await flush()
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '選ぶ')!.click()); await flush()
     expect(textareas().map(t => t.value)).toEqual(['元の本文0', '元の本文1', '元の本文2', '元の本文3', '追加する本文'])
   } finally { unmount() }
 })
@@ -286,7 +282,7 @@ it('WEB259: テンプレートを開いただけでは確認したと表示し�
  await renderForm()
  const picker=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('テンプレートから選ぶ'))!
  await act(async()=>picker.click());await flush()
- const template=[...document.querySelectorAll('button')].find(button=>button.textContent?.includes('お礼'))!
+ const template=document.querySelector<HTMLInputElement>('[role="dialog"] input[type="radio"][aria-label="お礼"]')!
  await act(async()=>template.click());await flush()
  const dialog=document.querySelector('[role="dialog"]')!
  expect(dialog.textContent).not.toContain('確認しました')

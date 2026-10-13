@@ -260,3 +260,7 @@ describe('今日の予約', () => {
     expect(badDate.status).toBe(400);
   });
 });
+
+test.each(['date=2026-02-30','date=2026-03-01&from=2026-02-30','date=2026-03-01&to=2026-02-30'])('API-02 rejects %s before booking lookup',async query=>{
+ const {app,env}=makeApp(db,bookingRoute);expect((await app.request(`/api/booking/admin/today?account_id=account-a&${query}`,{},env)).status).toBe(400);
+});

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
@@ -6,7 +6,8 @@ const PAGE = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.ur
 describe('V6 dqFft シナリオ全体を削除する確認', () => {
   it('ブラウザ標準confirmを使わず安定した押し口から共通窓を開く', () => {
     expect(PAGE).not.toContain('if (!confirm(message)) return')
-    expect(PAGE).toContain('data-qa-open="dqFft-scenario"')
+    expect(PAGE).toContain("id: 'delete'")
+    expect(PAGE).toContain('setDeleteScenarioOpen(true)')
     expect(PAGE).toContain('open={deleteScenarioOpen && scenario !== null}')
     expect(PAGE).toContain('confirmLabel="このシナリオを削除する"')
     expect(PAGE).toContain('destructive')

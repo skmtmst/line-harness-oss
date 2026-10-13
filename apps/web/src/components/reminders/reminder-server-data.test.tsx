@@ -2,10 +2,10 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ReminderValidationResult } from '@line-crm/shared'
-import { reminderAudienceCounts } from './reminder-publish-flow'
+import { reminderAudienceCounts } from '../../v8/reminders/edit'
 
-const FLOW = readFileSync(join(process.cwd(), 'src/components/reminders/reminder-publish-flow.tsx'), 'utf8')
-const ISSUE_469 = readFileSync(join(process.cwd(), 'src/app/reminders/edit/issue469-reminder-screens.tsx'), 'utf8')
+const FLOW = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
+const ISSUE_469 = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
 const LIST_PAGE = readFileSync(join(process.cwd(), 'src/app/reminders/list-v8.tsx'), 'utf8')
 
@@ -18,9 +18,10 @@ describe('リマインダ公開フローの実データ表示', () => {
     }
     expect(reminderAudienceCounts(validation)).toEqual({ matched: 17, excluded: 3, total: 20 })
 
-    expect(FLOW).toContain("value={countLabel(audience.total, '人')}")
-    expect(FLOW).toContain("value={countLabel(audience.matched, '人')}")
-    expect(FLOW).toContain("value={countLabel(audience.excluded, '人')}")
+    expect(FLOW).toContain('reminderAudienceCounts(validation)')
+    expect(FLOW).toContain("countLabel(total, '人')")
+    expect(FLOW).toContain("countLabel(matched, '人')")
+    expect(FLOW).toContain("countLabel(excluded, '人')")
     expect(FLOW).not.toContain('426人')
   })
 
@@ -31,8 +32,8 @@ describe('リマインダ公開フローの実データ表示', () => {
       expect(source).not.toContain('8/23 01:30')
       expect(source).not.toContain('Kenta Kawano')
       // 実装に無い差し込み名・架空の例値を「取得元」付きで並べない
-      expect(source).toContain('{placeholder.testValue}')
-      expect(source).toContain('{placeholder.source}')
+      expect(source).toContain('placeholder.testValue')
+      expect(source).toContain('placeholder.source')
     }
   })
 

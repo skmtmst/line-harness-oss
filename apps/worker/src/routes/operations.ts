@@ -1,3 +1,4 @@
+import { mfaConfiguration } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
@@ -320,7 +321,7 @@ operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c
     return c.json({ success: false, error: 'このアカウントの運用状態を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   try {
-    return c.json({ success: true, data: staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)) });
+    return c.json({ success: true, data: { ...staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)), loginSecurity: mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY) } });
   } catch (error) {
     console.error('GET /api/operations/health error:', error);
     return c.json({ success: false, error: '運用状態を取得できませんでした' }, 500);
@@ -344,7 +345,7 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), in
       actorId: c.get('staff')!.id,
       deps: { r2: c.env.IMAGES, queue: c.env.CODEX_MENTION_QUEUE },
     });
-    return c.json({ success: true, duplicate: checked.duplicate, data: staleHealth(checked.run) }, checked.duplicate ? 200 : 201);
+    return c.json({ success: true, duplicate: checked.duplicate, data: { ...staleHealth(checked.run), loginSecurity: mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY) } }, checked.duplicate ? 200 : 201);
   } catch (error) {
     console.error('POST /api/operations/health/runs error:', error);
     return c.json({ success: false, error: '運用状態を確認できませんでした' }, 500);

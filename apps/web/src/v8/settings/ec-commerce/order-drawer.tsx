@@ -11,7 +11,7 @@
  * 届き済みの出来事は1行に畳み、止まった・失敗したものだけ下に理由を足す。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Link2, ExternalLink } from 'lucide-react'
 import { ecEventLabel } from '@line-crm/shared'
 import Button from '@/components/shared/button'

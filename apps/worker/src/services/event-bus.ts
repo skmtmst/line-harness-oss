@@ -1,3 +1,4 @@
+import { patchFriendMetadata } from './friend-metadata.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 
@@ -73,6 +74,9 @@ export interface EventPayload {
   /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
   conversionAmountInMinorUnit?: boolean;
   replyToken?: string;
+  /** Recovery must never turn a missing reply token into a billable push. */
+  recoveryWithoutReply?: boolean;
+  onRecoveryReview?: (code: 'reply_input_unavailable' | 'delivery_unknown') => void;
 }
 
 function toAdConversionAmount(value: unknown): number | undefined {
@@ -133,6 +137,7 @@ export async function fireEvent(
    * 待ち行列に残して定期 drain に任せる（旧行の平文はそのまま送る）。
    */
   credentialKey?: string,
+  options?: { internalOnly?: boolean },
 ): Promise<void> {
   db = execution?.db ?? db;
   let outgoingWebhookLineAccountId = lineAccountId;
@@ -146,12 +151,12 @@ export async function fireEvent(
 
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
   const phase1: Promise<unknown>[] = [
-    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution),
+    ...(options?.internalOnly ? [] : [fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution)]),
     replayStep(execution, 'event:scoring', () => processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken, execution)),
   ];
   const mappedEcSource = (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received')
     && outgoingWebhookLineAccountId && await hasMappedEcConversionSource(db, outgoingWebhookLineAccountId);
-  const adConversion = payload.friendId && !mappedEcSource ? adConversionForEvent(eventType, payload) : null;
+  const adConversion = !options?.internalOnly && payload.friendId && !mappedEcSource ? adConversionForEvent(eventType, payload) : null;
   if (payload.friendId && adConversion) {
     phase1.push(
       sendAdConversions(db, payload.friendId, adConversion.eventName, adConversion.value, {
@@ -421,7 +426,7 @@ export async function fireOutgoingWebhooks(
 }
 
 /** スコアリングルール適用 */
-async function processScoring(
+export async function processScoring(
   db: D1Database,
   eventType: string,
   payload: EventPayload,
@@ -495,14 +500,21 @@ async function processAutomations(
         )) break;
         try {
           await replayStep(execution, `event:legacy:${automation.id}:${index}`, async () => {
+            if (payload.recoveryWithoutReply && ['send_message', 'send_webhook', 'switch_rich_menu', 'remove_rich_menu'].includes(action.type)) {
+              payload.onRecoveryReview?.(action.type === 'send_message' ? 'reply_input_unavailable' : 'delivery_unknown');
+              throw new Error('line_recovery_external_review');
+            }
             const idempotencyKey = execution
               ? await stableWebhookStepId(execution.sourceEventId, `legacy:${automation.id}:${index}`) : undefined;
-            await executeAction(db, action, payload, lineAccessToken, lineAccountId, idempotencyKey, automation.id, eventType);
+            const actionDb = execution && 'mutationDb' in execution
+              ? (execution as import('./workflow-execution.js').WorkflowExecution).mutationDb(`event:legacy:${automation.id}:${index}`) : db;
+            await executeAction(actionDb, action, payload, lineAccessToken, lineAccountId, idempotencyKey, automation.id, eventType);
           });
           results.push({ action: action.type, success: true });
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           results.push({ action: action.type, success: false, error: errorMsg });
+          if (payload.recoveryWithoutReply && errorMsg === 'line_recovery_external_review') continue;
           if (execution) throw err;
         }
       }
@@ -761,11 +773,6 @@ async function executeAction(
 
     case 'set_metadata': {
       if (!friendId) break;
-      const existing = await db
-        .prepare('SELECT metadata FROM friends WHERE id = ?')
-        .bind(friendId)
-        .first<{ metadata: string }>();
-      const current = JSON.parse(existing?.metadata || '{}') as Record<string, unknown>;
       // {{message}} を受信メッセージ内容に置換してからパース
       // JSON文字列内に埋め込むため、JSON仕様に準拠して全制御文字をエスケープ
       const escapeForJsonString = (s: string): string =>
@@ -780,11 +787,7 @@ async function executeAction(
       const raw = (action.params.data || '{}')
         .replace(/\{\{message\}\}/g, escapeForJsonString(messageText));
       const patch = JSON.parse(raw) as Record<string, unknown>;
-      const merged = { ...current, ...patch };
-      await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-        .bind(JSON.stringify(merged), jstNow(), friendId)
-        .run();
+      if (!await patchFriendMetadata(db, friendId, patch)) throw new Error('friend_metadata_unavailable');
       break;
     }
 

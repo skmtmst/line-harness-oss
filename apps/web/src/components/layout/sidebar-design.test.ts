@@ -3,15 +3,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-/**
- * サイドバーが Pencil の V6正式共通メニュー（J33xq）と一致していることを確かめる。
- *
- * 設計（★V6 260画面の共通サイドバー）が出どころで、
- * 区分・並び・呼び名を勝手に変えないための歯止め。
- *
- * 画面を足すときに「ついでにサイドバーへ」とやると、設計から静かにずれる。
- * ずれてよいと決めたときは、この一覧のほうを直す。そのとき
- * 「設計を更新したのか、実装が勝手にずれたのか」が差分に残る。
+/** V8の部品の正本の並びと、承認済み追加項目・行き先を守る。
+ * 2026-10-11 司令塔: 予約はコンテンツの直後。N-411の権限は別の動きの試験で守る。
  */
 
 const SIDEBAR = join(dirname(fileURLToPath(import.meta.url)), 'sidebar.tsx');
@@ -23,7 +16,7 @@ const MENU = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'm
 const MENU_START = 'export const MENU_SECTIONS: MenuSection[] = [';
 const MENU_END = '/** 区分の目印から中身を引く。 */';
 
-/** Pencil V6を基本に、運用中の承認済み追加機能を含めた区分と項目。 */
+/** Pencil V8の並びと、承認済み追加機能を含めた区分と項目。 */
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 毎日開く4項目は、先頭の「メイン」区分にまとめる。
   { section: 'メイン', items: ['ダッシュボード', '受信箱', '友だち', 'タグ'] },
@@ -47,15 +40,15 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     section: 'コンテンツ',
     items: ['テンプレート', 'リッチメニュー', '回答フォーム', '共通情報', '登録メディア一覧'],
   },
+  // 2026-10-03（N-411 #866）: 「自分の勤務」は staff 専用。予約スタッフと
+  // 紐づいたログインユーザーのシフト・休憩・外部連携の入口。
+  // 2026-10-07（提案 E-7・オーナー）: 来店スタンプは飲食店もサロンも使うので「予約」の組に足す。
+  { section: '予約', items: ['予約管理', '予約設定', 'イベント予約', '来店スタンプ', '自分の勤務'] },
   {
     section: '成果と分析',
     items: ['成果とアフィリエイト', 'マイル', '流入と計測', 'コンバージョン', '分析'],
   },
   { section: '自動化', items: ['オートメーション', '外部連携'] },
-  // 2026-10-03（N-411 #866）: 「自分の勤務」は staff 専用。予約スタッフと
-  // 紐づいたログインユーザーのシフト・休憩・外部連携の入口。
-  // 2026-10-07（提案 E-7・オーナー）: 来店スタンプは飲食店もサロンも使うので「予約」の組に足す。
-  { section: '予約', items: ['予約管理', '予約設定', 'イベント予約', '来店スタンプ', '自分の勤務'] },
   // 2026-09-16（Masato の決定）: 専用機能は「会員／投稿／NEN配信」。写真審査は「投稿」に改名。
   // EC連携・LINE通知は「ECとLINEをつなぐ配管の点検口」なので「設定」へ移した。
   // 2026-09-16 採用（★V6 37-3／37-4）: 会員の次に「マイペット」「健康日記」。
@@ -72,7 +65,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     section: '飲食店向け（テスト）',
     items: [
       '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Googleビジネス', 'LINE来店フォロー',
+      '予約枠・在庫', 'メニュー管理', 'デリバリー受注', 'Googleビジネス', 'LINE来店フォロー',
     ],
   },
 ];
@@ -150,11 +143,12 @@ const ROUTES: Record<string, string> = {
   '座席・卓管理': '/restaurant-test/tables',
   '予約枠・在庫': '/restaurant-test/inventory',
   メニュー管理: '/restaurant-test/menu',
+  デリバリー受注: '/restaurant-test/delivery',
   'Googleビジネス': '/restaurant-test/google',
   LINE来店フォロー: '/restaurant-test/line-followup',
 };
 
-describe('サイドバーが V6正式共通メニューの契約と一致する', () => {
+describe('サイドバーが V8の共通メニューの契約と一致する', () => {
   const actual = readSidebar();
 
   it('区分の数と並びが設計どおり', () => {
@@ -179,7 +173,9 @@ describe('サイドバーが V6正式共通メニューの契約と一致する'
     // 2026-09-16 採用: 「マイペット」「健康日記」（★V6 37-3／37-4）を足して 48。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
     // 2026-10-07 提案 E-7: 「予約」の組に「来店スタンプ」を足して 49。
-    expect(total).toBe(49);
+    // 2026-10-09 承認（デリバリー受注_v02.pen）: 「飲食店向け（テスト）」に
+    // 「デリバリー受注」を足して 50。
+    expect(total).toBe(50);
   });
 
   it('項目の行き先が仕様どおり', () => {
@@ -264,17 +260,17 @@ describe('V8 左メニューの1行は36px（殻合わせ）', () => {
   const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.module.css'), 'utf8');
 
   it('.item は高さ36・上下余白0（V8）', () => {
-    expect(css).toMatch(/\[data-theme="v8"\] \.item \{[^}]*height:\s*36px/s);
-    expect(css).toMatch(/\[data-theme="v8"\] \.item \{[^}]*padding-top:\s*0/s);
-    expect(css).toMatch(/\[data-theme="v8"\] \.item \{[^}]*padding-bottom:\s*0/s);
+    expect(css).toMatch(/:root \.item \{[^}]*height:\s*36px/s);
+    expect(css).toMatch(/:root \.item \{[^}]*padding-top:\s*0/s);
+    expect(css).toMatch(/:root \.item \{[^}]*padding-bottom:\s*0/s);
   });
 
   it('.section の間は 2px（V8）', () => {
-    expect(css).toMatch(/\[data-theme="v8"\] \.section \{[^}]*gap:\s*2px/s);
+    expect(css).toMatch(/:root \.section \{[^}]*gap:\s*2px/s);
   });
 
   it('畳んだ形は40pxのまま・低い画面は nav だけ縦に送る', () => {
-    expect(css).toMatch(/\[data-theme="v8"\] \.desktop\[data-collapsed\] \.item \{[^}]*height:\s*40px/s);
+    expect(css).toMatch(/:root \.desktop\[data-collapsed\] \.item \{[^}]*height:\s*40px/s);
     expect(css).toMatch(/\.nav \{[^}]*overflow-y:\s*auto/s);
   });
 });

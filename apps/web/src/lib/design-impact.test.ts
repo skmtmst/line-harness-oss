@@ -73,100 +73,56 @@ describe('共通部品の影響範囲', () => {
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
     expect(directImporters(files, pagination, importIndex).filter((file) => rendered.has(file)).map((file) => relative(SRC, file)).sort()).toEqual([
       // m15c: 手書きのページ送りを共通 Pagination へ置き換えた10画面を足す。
-      'app/accounts/migration.tsx',
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
       'app/accounts/uid-migration-v8.tsx',
       // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
-      'app/automations/page.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
-      'app/automations/runs/page.tsx',
       'app/booking/bookings/page.tsx',
-      // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
-      'app/booking/menus/page.tsx',
+      // 予約設定の入口は現役v8/booking-menus/settingsを読む。ページ送りの利用先は下の本体で数える。
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
-      'app/common-actions/page.tsx',
-      'app/contents/media-replacement-dialog.tsx',
-      'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
-      'app/contents/vars/impact-review.tsx',
-      'app/contents/vars/page.tsx',
       // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
-      'app/conversions/conversion-points-v8.tsx',
-      'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       // ★V8 重複しているかも（hn6Y8）。v7 と同じくサーバ総数でページ送り。
       'app/duplicates/duplicates-v8.tsx',
-      'app/duplicates/page.tsx',
       // #572: EC連携の取り込み記録が先頭20件しか出ず、21件目以降の失敗に
       // 届かなかった。状態絞りをサーバへ移し、共通へ寄せた。
-      'app/ec-commerce/page.tsx',
       // #731: 定期便の一覧が 100 件で頭打ちのまま、101件目から先へ行く手立てが
       // 無かった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
-      'app/ec-commerce/subscriptions-panel.tsx',
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
-      'app/events/bookings/page.tsx',
-      'app/events/page.tsx',
-      'app/form-submissions/responses/page.tsx',
       // 統括の入口は src/v8/hq/home.tsx に統一した。旧一覧は利用先に数えない。
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
-      'app/inflow-links/_components/ref-orders.tsx',
       // ★V8-B 広告への送信履歴（p0kA3）。表の下にページ送りを置く。
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
-      'app/inflow-links/ad-integration.tsx',
+
       // ★V8-B 流入と計測の詳細（Q5le3）。友だちの表の下にページ送りを置く。
-      'app/inflow-links/detail/page.tsx',
-      'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
-      'app/mileage/action-score-tab.tsx',
-      'app/mileage/mileage-history-tab.tsx',
       // R365: 要対応の交換が21件以上あっても残りを出せるよう、20件ずつのページ送りに寄せた。
-      'app/mileage/mileage-rewards-tab.tsx',
-      'app/mileage/page.tsx',
       // 2026-09-18: NEN配信のコラム一覧（★V6 37-6-A）。8本ずつのページ送り。
-      'app/nen-campaigns/nen-overview.tsx',
       // 2026-09-16 採用: 然の健康日記（★V6 37-4）とマイペット（★V6 37-3）。20頭ずつのページ送り。
-      'app/nen/health/health-tab.tsx',
       // ★V8-B 健康日記一覧（mIwA4）の古い health-v8.tsx は描かれなくなった。入口は src/v8/nen-health（ページ送りは型が持つ）。
       // 2026-09-16: 然の会員一覧（★V6 37-1）。20人ずつのページ送り。
-      'app/nen/members/members-tab.tsx',
-      'app/nen/pets/pets-tab.tsx',
       // ★V8-B マイペット一覧（wTIej）の古い pets-v8.tsx は描かれなくなった。入口は src/v8/nen-pets（ページ送りは型が持つ）。
-      'app/ops/audit/page.tsx',
       // mainB: リマインダ詳細・登録者の旧本体は描かれなくなった。V8本体の利用先だけを下に残す。
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
-      'app/restaurant-test/google/google-business.tsx',
-      // Googleビジネス第3段: 投稿一覧（GB-4 MAozg）の表の下にページ送りがある。
-      'app/restaurant-test/google/google-posts.tsx',
-      // Googleビジネス第2段: 変更履歴（GB-17 w7ZTml）の表の下にページ送りがある。
-      'app/restaurant-test/google/google-profile.tsx',
+      // Googleは現役の口コミ・投稿・変更履歴だけがページ送りを持つ。旧本体/写しは除去。
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
-      'app/restaurant-test/restaurant-console.tsx',
-      'app/rich-menus/page.tsx',
-      'app/staff/page.tsx',
       // タグV8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
-      'app/webhooks/webhook-interactions.tsx',
-      'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
-      'app/webinars/edit/participants-v8.tsx',
-      'app/webinars/list-v8.tsx',
-      'components/friend-fields/tags-page-v4.tsx',
 
-      'components/line-notifications/notification-run-list.tsx',
-      'components/ops/knowledge-list.tsx',
       // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
       'components/shared/media-picker-dialog.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
-      'components/users/users-table.tsx',
       /*
        * 2026-10-07: 入口が src/v8 の新しい画面を出すようになり、描かれなくなった古い画面ファイル
        * （成果とアフィリエイト・オートメーション・共通アクション・予約設定のタブ・登録メディア・共通情報・
@@ -194,6 +150,7 @@ describe('共通部品の影響範囲', () => {
       'v8/forms/list.tsx',
       // ★V8 友だち追加時の配信の実行結果（REIxB）：表の下のページ送りに共通 Pagination。
       'v8/friend-add-runs/runs.tsx',
+      'v8/friend-add/list.tsx',
       // ★V8 LINE通知の送れなかったもの・記録（DrwMm・PZBVb）。src/v8 に一から書いた表の下のページ送り。
       'v8/settings/line-notifications/runs-tab.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
@@ -255,6 +212,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8 Googleビジネスの口コミ・投稿（j0Wcg・Cfed0）。2ページ以上のときだけ表の下にページ送り。
       'v8/restaurant/google/reviews.tsx',
       'v8/restaurant/google/posts.tsx',
+      'v8/restaurant/google/profile-history.tsx',
       // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
       'v8/restaurant/reservations/list.tsx',
       // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。
@@ -276,6 +234,7 @@ describe('共通部品の影響範囲', () => {
       'v8/form-responses/responses.tsx',
       // ★V8 イベント予約の一覧（e2ekFu）。新しい置き場（src/v8）に一から書いた。
       'v8/events/list.tsx',
+      'v8/events/booking-records.tsx',
       // ★V8 登録メディア一覧（O7hUt7）と、写した差し替えの窓（候補のページ送り）。
       'v8/contents/list.tsx',
       'v8/contents/media-replacement-dialog.tsx',

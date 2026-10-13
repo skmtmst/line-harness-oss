@@ -1,15 +1,4 @@
 'use client'
-
-/*
- * ★V8-B `w1W8h`：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
- *
- * 外側は取り込みの記録（GmVR5）と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
- * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
- * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
- * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、
- * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
- * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
- */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -20,6 +9,8 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
+import Drawer from '@/components/shared/drawer'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import { IdentityEvidenceList, IdentityHistoryList, IdentityImpactList, IdentitySubjectCard } from '@/components/identity/identity-parts'
 import { IdentityStateBlock } from '@/components/identity/identity-state'
@@ -37,6 +28,19 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B `w1W8h`：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
+ *
+ * 外側は取り込みの記録（GmVR5）と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
+ * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
+ * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
+ * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、
+ * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
+ * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
+ */
 
 type View = 'all' | 'candidate' | 'none' | 'conflict'
 type Sort = 'newest' | 'confidence'
@@ -75,8 +79,10 @@ function confidenceTone(label: string): StatusBadgeTone {
 export default function EcIdentityCandidatesScreen() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
+  const [candidateId, setCandidateId] = useDetailPanelUrl('candidate')
+  useEffect(() => { if (candidateId && candidateId !== review.selectedId) review.select(candidateId) }, [candidateId, review.selectedId, review.select])
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
@@ -186,16 +192,16 @@ export default function EcIdentityCandidatesScreen() {
 
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
-            <ListToolbarSort aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} />
+            <SaveErrorField names={["sort"]}><ListToolbarSort aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} /></SaveErrorField>
           </span>
           {/* 絵に無い絞り込み（候補あり・候補なし・同じ人が2人いる疑い）は、並びの横に小さく残す。 */}
           <span className={styles.sortBox}>
-            <Select
+            <SaveErrorField names={["view"]}><Select
               aria-label="候補の絞り込み"
               value={view}
               onChange={(value) => setView(value as View)}
               options={VIEW_OPTIONS.map((option) => ({ value: option.value, label: viewCount[option.value] == null ? option.label : `${option.label} ${formatNumber(viewCount[option.value] ?? 0)}` }))}
-            />
+            /></SaveErrorField>
           </span>
           <span className={shared.spacer} />
           <span className={styles.note}>結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。</span>
@@ -237,7 +243,7 @@ export default function EcIdentityCandidatesScreen() {
                 <Td><span className={styles.ops}>
                   {hasCandidate ? (
                     <>
-                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => review.select(item.id)}>候補を見る</Button>
+                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-expanded={selected} onClick={() => { setCandidateId(item.id); review.select(item.id) }}>候補を見る</Button>
                       {canEdit ? <Button type="button" data-qa-open="ELayY" onClick={() => review.openDialog(item.id)}>決める</Button> : null}
                     </>
                   ) : (
@@ -262,7 +268,8 @@ export default function EcIdentityCandidatesScreen() {
         </p>
 
         {detail ? (
-          <section className={styles.detail} aria-label="「候補を見る」で開いた中身">
+          <>
+          <Drawer contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />
@@ -272,6 +279,7 @@ export default function EcIdentityCandidatesScreen() {
               <IdentityImpactList impact={detail.impact} />
             </div>
             <IdentityHistoryList history={detail.history} />
+          </Drawer>
             <IdentityDecisionDialog
               open={canEdit && review.dialogOpen}
               candidate={detail}
@@ -280,7 +288,7 @@ export default function EcIdentityCandidatesScreen() {
               onCancel={review.closeDialog}
               onSubmit={review.decide}
             />
-          </section>
+          </>
         ) : null}
       </>
     )

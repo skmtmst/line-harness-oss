@@ -297,7 +297,7 @@ export default function PendingInboxCard({
                 {items.map((item) => (
                   // 行の高さ 61px は設計のまま（共通 Tr の既定 58px ではない）。
                   // Tailwind v4 は層（utilities）のため部品CSSに負ける。style で保つ。
-                  <Tr key={item.id} interactive className="h-[61px]" style={{ height: 61 }}>
+                  <Tr key={item.id} interactive className="h-[61px]" style={{ height: 61 }} href={inboxItemHref(item)}>
                     <Td className="overflow-hidden whitespace-nowrap">
                       <ChannelBadge channel={item.channel} />
                       <Link

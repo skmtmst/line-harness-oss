@@ -1,11 +1,12 @@
-import { fetchApi } from './api';
+import { ApiError, fetchApi } from './api';
 import type { HqDeliveryTemplateDefinition, HqDeliveryTemplateType, HqTemplateListDisplay, HqDeliveryTemplateInput } from '@line-crm/shared';
+import type { ApiFieldErrors } from '@line-crm/shared';
 import type { Preflight, Resolution, DistributionResult } from './hq-templates-api';
 export type HqDeliveryTemplate = { id:string;name:string;description:string|null;template_type:HqDeliveryTemplateType;revision:number;folder_id?:string|null } & HqTemplateListDisplay;
 export interface HqDeliveryTemplateDetail { template:HqDeliveryTemplate;definition:HqDeliveryTemplateDefinition }
 async function request<T>(path:string,method='GET',body?:unknown):Promise<T> {
-  const result=await fetchApi<{success:true;data:T}|{success:false;error:string;code?:string}>(`/api/hq/templates${path}`,{method,...(body===undefined?{}:{body:JSON.stringify(body)})});
-  if(!result.success) throw new Error(result.error);
+  const result=await fetchApi<{success:true;data:T}|{success:false;error:string;code?:string;fields?:ApiFieldErrors}>(`/api/hq/templates${path}`,{method,...(body===undefined?{}:{body:JSON.stringify(body)})});
+  if(!result.success) throw new ApiError(422,result.error,result.code,undefined,undefined,undefined,result.fields);
   return result.data;
 }
 const path=(id:string)=>`/${encodeURIComponent(id)}`;

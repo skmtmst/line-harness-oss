@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/detail.tsx'), 'utf8')
 // 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
-const DIALOG = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const DIALOG = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/detail.tsx'), 'utf8')
 
 /**
  * V6 流入リンク詳細の数字の契約（#514 重大3）。
@@ -30,7 +30,8 @@ describe('V6 流入リンク詳細の数字の契約', () => {
   it('取れない段は「—」+理由か、設定の有無で言い分ける', () => {
     expect(PAGE).toContain('割合は集計できません')
     expect(PAGE).toContain('集計を取得できていません')
-    expect(PAGE).toContain('取得できません')
+    expect(PAGE).toContain("emptyValue('unknown')")
+    expect(readFileSync(join(import.meta.dirname, '../../../components/shared/empty-value.tsx'), 'utf8')).toContain("unknown: '—'")
     expect(PAGE).toContain('動きが未設定')
   })
 

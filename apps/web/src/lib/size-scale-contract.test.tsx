@@ -1,3 +1,4 @@
+import { globalTokens, resolveValue } from '../../scripts/card-shape-contract.mjs'
 // @vitest-environment happy-dom
 /*
  * ★V8 §6の文字・角丸を固定する。余白は4px単位。
@@ -7,16 +8,22 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..')
 const GLOBALS = readFileSync(join(SRC, 'app/globals.css'), 'utf8')
 
+const CURRENT_TOKENS = globalTokens(GLOBALS)
 function token(name: string): string {
-  const hit = GLOBALS.match(new RegExp(`--${name}:\\s*([^;]+);`))
-  return hit ? hit[1].trim() : '(未定義)'
+  if (!CURRENT_TOKENS.has(`--${name}`)) throw new Error(`Missing CSS token: ${name}`)
+  return resolveValue(`var(--${name})`, CURRENT_TOKENS).trim()
 }
 
 function sourceFiles(dir: string): string[] {
@@ -71,7 +78,7 @@ describe('#704 正規のサイズトークンがある', () => {
     expect(token('radius-control')).toBe('10px')
     // 中身のカードは12px。窓の16pxと混ぜない。
     expect(token('radius-card')).toBe('12px')
-    expect(token('radius-pill')).toBe('9999px')
+    expect(token('radius-pill')).toBe('999px')
   })
 
   it('余白の正規5段（4/8/12/16/24）は gap-1/2/3/4/6 で読む', () => {
@@ -83,13 +90,13 @@ describe('#704 正規のサイズトークンがある', () => {
     // 補助文字・大きな数の役割も、写しの値を守る。
     expect(token('text-micro')).toBe('11px')
     expect(token('text-label')).toBe('12px')
-    expect(token('text-heading')).toBe('18px')
+    expect(token('text-heading')).toBe('15px')
     expect(token('text-metric')).toBe('28px')
     expect(token('text-display')).toBe('22px')
     // 角丸: 設計固定テストが値を pin している画面があるので残す。
     expect(token('radius-icon')).toBe('6px')
     expect(token('radius-panel')).toBe('16px')
-    expect(token('radius-large')).toBe('18px')
+    expect(token('radius-large')).toBe('16px')
   })
 })
 

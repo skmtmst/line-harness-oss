@@ -15,13 +15,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 import type { BookingMenu } from '@/lib/api'
 
+const deleteMenu = vi.hoisted(() => vi.fn())
 const updateMenu = vi.hoisted(() => vi.fn())
 const reorderMenus = vi.hoisted(() => vi.fn())
 const toasts = vi.hoisted(() => [] as string[])
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, bookingApi: { ...actual.bookingApi, updateMenu, reorderMenus } }
+  return { ...actual, bookingApi: { ...actual.bookingApi, updateMenu, reorderMenus, deleteMenu } }
 })
 vi.mock('@/components/shared/toast', () => ({ notifyToast: (message: string) => { toasts.push(message) }, notifySaved: (message: string) => { toasts.push(message) } }))
 vi.mock('next/navigation', () => ({
@@ -70,6 +71,7 @@ beforeEach(() => {
   failOnCall = 0
   calls = 0
   toasts.length = 0
+  deleteMenu.mockReset()
   updateMenu.mockReset()
   reorderMenus.mockReset().mockImplementation(async (_account: string, body: { changes: Array<{ id: string; expectedVersion: number; sortOrder: number }> }) => {
     calls += 1
@@ -193,3 +195,18 @@ describe('一括並べ替えの失敗（WEB052）', () => {
      expect.objectContaining({ id: 'b', expectedVersion: 1 }),
    ]) }))
  })
+
+
+it('予約メニューの削除は確認まで送らず、予約がある場合の理由を窓に残す', async () => {
+  deleteMenu.mockRejectedValue(Object.assign(new Error('menu_has_bookings'), { status: 409 }))
+  render(<Harness />)
+  fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(deleteMenu).not.toHaveBeenCalled()
+  const dialog = screen.getByRole('alertdialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
+  await flush()
+  expect(deleteMenu).toHaveBeenCalledWith('account-a', 'a')
+  expect(dialog.textContent).toContain('予約が付いているため削除できません')
+  expect(server).toHaveLength(3)
+})

@@ -3,18 +3,7 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 100%;
-  padding: 2px 8px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-support-hold-bg);
-  color: var(--color-support-hold);
   font-family: inherit;
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: 18px;
   vertical-align: middle;
 }
 .dot {
@@ -29,14 +18,14 @@
 .dot[data-tone='success'] { background: var(--color-support-resolved-dot); }
 .dot[data-tone='danger'] { background: var(--color-support-unread-dot); }
 .dot[data-tone='neutral'] { background: var(--color-support-hold-dot); }
-.pill[data-tone='info'], [data-theme='v8'] .pill.control[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-status-info); }
-.pill[data-tone='warning'], [data-theme='v8'] .pill.control[data-tone='warning'] { background: var(--color-support-progress-bg); color: var(--color-support-progress); }
-.pill[data-tone='success'], [data-theme='v8'] .pill.control[data-tone='success'] { background: var(--color-support-resolved-bg); color: var(--color-support-resolved); }
-.pill[data-tone='danger'], [data-theme='v8'] .pill.control[data-tone='danger'] { background: var(--color-support-unread-bg); color: var(--color-support-unread); }
-.pill[data-tone='neutral'], [data-theme='v8'] .pill.control[data-tone='neutral'] { background: var(--color-support-hold-bg); color: var(--color-support-hold); }
+.pill[data-tone='info'], :root .pill.control[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.pill[data-tone='warning'], :root .pill.control[data-tone='warning'] { background: var(--color-support-progress-bg); color: var(--color-support-progress); }
+.pill[data-tone='success'], :root .pill.control[data-tone='success'] { background: var(--color-support-resolved-bg); color: var(--color-support-resolved); }
+.pill[data-tone='danger'], :root .pill.control[data-tone='danger'] { background: var(--color-support-unread-bg); color: var(--color-support-unread); }
+.pill[data-tone='neutral'], :root .pill.control[data-tone='neutral'] { background: var(--color-support-hold-bg); color: var(--color-support-hold); }
 .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 単一選択の操作は Select に任せ、札の外形だけを共通にする。 */
-[data-theme='v8'] .pill.control {
+:root .pill.control {
   height: 36px;
   gap: 6px;
   padding: 0 10px 0 12px;
@@ -47,11 +36,11 @@
   font-size: var(--text-label);
   font-weight: 600;
 }
-[data-theme='v8'] .pill.control:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+:root .pill.control:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 }
 
 /* B-152・仕上げ4 */
-[data-theme='v8'] .pill {
+:root .pill {
   --status-dot: var(--polish-status-neutral-dot);
   --status-bg: var(--polish-status-neutral-bg);
   --status-ink: var(--polish-status-neutral-ink);
@@ -61,10 +50,15 @@
   font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
   max-width: 100%; min-width: 0;
 }
-[data-theme='v8'] .pill[data-tone='success'] { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
-[data-theme='v8'] .pill[data-tone='warning'] { --status-dot: var(--polish-status-warning-dot); --status-bg: var(--polish-status-warning-bg); --status-ink: var(--polish-status-warning-ink); }
-[data-theme='v8'] .pill[data-tone='danger'] { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
-[data-theme='v8'] .pill[data-tone='info'] { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
-[data-theme='v8'] .pill[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
-[data-theme='v8'] .pill .dot { width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); background: var(--status-dot); }
-[data-theme='v8'] .pill.control[data-tone] { background: var(--status-bg); color: var(--status-ink); }
+:root .pill[data-tone='success'] { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
+:root .pill[data-tone='warning'] { --status-dot: var(--polish-status-warning-dot); --status-bg: var(--polish-status-warning-bg); --status-ink: var(--polish-status-warning-ink); }
+:root .pill[data-tone='danger'] { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
+:root .pill[data-tone='info'] { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
+:root .pill[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
+:root .pill .dot { width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); background: var(--status-dot); }
+:root .pill.control[data-tone] { background: var(--status-bg); color: var(--status-ink); }
+
+/* B-191/192：4文字の状態を数文字に切らない。列の中で縮めない。 */
+html:root .pill { flex-shrink: 0; min-width: max-content; }
+/* 状態の隣の短い対応マークも、札の幅を確保した分だけ切らない。 */
+html:root .pill + [title^='対応マーク：'] { flex-shrink: 0; }

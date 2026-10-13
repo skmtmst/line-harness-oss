@@ -258,12 +258,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Guard shared pattern ownership (B-172)
+        env:
+          PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PATTERN_BASE_SHA" ]; then
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --base "$PATTERN_BASE_SHA" --out "$RUNNER_TEMP/pattern-ownership"
+          else
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --out "$RUNNER_TEMP/pattern-ownership"
+          fi
       - name: Build shared packages
         run: >-
           pnpm
@@ -354,6 +367,10 @@ jobs:
           VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
         run: pnpm --filter worker build
+      - name: Install browser for deployed LIFF entry guard
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
+        run: node scripts/codex/revfix-c-liff-browser.mjs
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -377,6 +394,9 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
+      - run: node apps/web/scripts/verify-entity-pickers.mjs
+      - name: Reject restored legacy admin appearance
+        run: node apps/web/scripts/verify-v8-only.mjs
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
@@ -524,6 +544,15 @@ jobs:
         run: >-
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
+      - name: MFA auth input and button behavior at three widths
+        run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+      - name: Upload MFA browser failure context
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: train30-mfa-browser-failure
+          path: apps/web/test-results/train30-mfa/
+          retention-days: 7
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。
@@ -534,20 +563,11 @@ jobs:
           node apps/web/src/app/form-submissions/form-submissions-browser-behavior.mjs
 
   v8-screen-guard:
-    name: V8 screen guard (layout and v7 pixels)
+    name: V8 screen guard
     needs: changes
     if: needs.changes.outputs.full_suite == 'true'
     runs-on: ubuntu-latest
-    # V8 の積み替えで崩さないための見張り（2026-10-01）。V6 は「絵の幅の数字を写して
-    # 1152 で崩れる」「v7 の見た目が気づかずに変わる」が統合後に見つかった。
-    #   1. 7ページを v7/v8 × 1152・1440・1920 で開き、はみ出し・板の外・… で全文なし・
-    #      ページの横スクロールが 0 であること（今の開発用で 0。1つでも出たら止める）
-    #   2. 統合先の版と PR の版を同じモックAPIで書き出して撮り、v7 の写真が同じこと
-    #      （Mac と Linux で文字の描き方が違うので、手元の写真は基準にしない）
-    # 道具は apps/web/scripts/v8-guard/。対照（わざと壊すと止まる）は各道具の頭に書いた。
-    # 2 は PRの題名・本文かコミットのことばに [v7の見た目を変える] と書いたときだけ
-    # 飛ばせる（製品名の言い換えなど、わざと v7 の文字を変えるとき）。書かなければ
-    # 今までどおり止まる。1（崩れの確認）は飛ばさない。
+    # Check the current V8 screens at 1152, 1440 and 1920.
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
       NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
@@ -555,49 +575,23 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Decide whether the screens can change
+      - name: Decide whether to run the screen guard
         id: scope
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "diff=false" >> "$GITHUB_OUTPUT"
-            echo "手動実行のため、崩れだけを見ます（v7 の比べる相手がありません）。"
+            echo "compare=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          # この見張りが止めたいのは「気づかずに v7 の見た目が変わる」ことで、
-          # 製品名の言い換えのように**わざと v7 の文字を変える**ことは別。
-          # [v7の見た目を変える] と書いたときだけ、写真の比べを飛ばす。
-          # 書かなければ今までどおり 1 画素でも違えば止まる。崩れの確認は
-          # 飛ばさない（崩れはどちらにしても直すべきもの）。
-          #
-          # 印は PRの題名・本文と、この PR のコミットのことばのどこでもよい。
-          # CIが見る PR本文は「CIが動いた時点の写し」なので、あとから本文に
-          # 印を足しても再実行では見えない。コミットのことばに書いておけば
-          # 再実行でも残るので、そちらを推奨する。
-          COMMIT_MSGS="$(git log --format=%B "$BASE_SHA..$HEAD_SHA")"
-          case "$PR_TITLE$PR_BODY$COMMIT_MSGS" in
-            *"[v7の見た目を変える]"*)
-              echo "run=true" >> "$GITHUB_OUTPUT"
-              echo "diff=false" >> "$GITHUB_OUTPUT"
-              echo "::notice::[v7の見た目を変える] があるため、v7 の写真の比べを飛ばしました（崩れの確認は行います）。"
-              exit 0
-              ;;
-          esac
+          echo "compare=true" >> "$GITHUB_OUTPUT"
           if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
             | grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "diff=true" >> "$GITHUB_OUTPUT"
-            echo "画面に関わる変更があるため、V8 の見張りを行います。"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "diff=false" >> "$GITHUB_OUTPUT"
-            echo "画面に関わる変更がないため、V8 の見張りは行いません。"
           fi
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         if: steps.scope.outputs.run == 'true'
@@ -615,7 +609,7 @@ jobs:
           pnpm --filter web build
           mv apps/web/out /tmp/head-out
       - name: Build the base admin against the same mock API
-        if: steps.scope.outputs.diff == 'true'
+        if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -627,36 +621,72 @@ jobs:
       - name: Install Chromium for the V8 screen guard
         if: steps.scope.outputs.run == 'true'
         run: pnpm exec playwright install --with-deps chromium
-      - name: Start the mock API and serve the built admins
+      - name: Start the mock API and serve the built admin
         if: steps.scope.outputs.run == 'true'
         run: |
           node scripts/visual-qa/mock-api.mjs > /tmp/mock-api.log 2>&1 &
           node apps/web/scripts/v8-guard/serve-out.mjs /tmp/head-out 4310 > /tmp/serve-head.log 2>&1 &
-          if [ "${{ steps.scope.outputs.diff }}" = "true" ]; then
+          if [ "${{ steps.scope.outputs.compare }}" = "true" ]; then
             node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
           fi
+          ready=false
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:4310/login > /dev/null && break
+            if curl -sf http://127.0.0.1:4310/friends > /dev/null \
+              && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
+              && { [ "${{ steps.scope.outputs.compare }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
+              ready=true
+              break
+            fi
             sleep 1
           done
-      - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
+          if [ "$ready" != "true" ]; then
+            cat /tmp/mock-api.log /tmp/serve-head.log
+            echo "::error::速度・画面検査のサーバーが起動しませんでした"
+            exit 1
+          fi
+      - name: No V8 layout breaks at 1152, 1440 and 1920
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
+      - name: Broken fixtures must fail the V8 layout guard
+        if: steps.scope.outputs.run == 'true'
+        run: node --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs
+      - name: Train 17 waitlist failure and inflow mouse regressions
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
+      - name: Booking preview date agrees through settings and preview tabs
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
+      - name: No new V8 layout or owner-rule defects (B-191 through B-218)
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
+      - name: List row rules (B-190/193/194/195/198, with negative controls)
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node apps/web/scripts/list-row-audit.mjs
+          node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
+          node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
       # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
-      # 主要10画面を V8 で開き、1画面3回測った真ん中で比べる。
-      # 落とすのは悪化だけ：時間は基準より20%、JS は1KB超の増加。
+      # 主要10画面を V8 で開き、1画面5回測った中央値で比べる。
+      # 落とすのは悪化だけ：時間は基準より20%×CI倍率1.30、JS は1KB超の増加。
       # ただし同じ PR で基準表を更新していれば JS 超過は通す
       # （機能追加で JS は増える。理由は PR に書くこと）。
       # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
       # 道具の対照は speed-budget.mjs の頭に書いた。
-      - name: Speed budget on V8 (10 screens on a real browser)
+      - name: Speed measurement and reference policy controls
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
+      - name: Common V8 speed checks (11 scenes, five medians)
+        id: speed_budget
         # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
         continue-on-error: true
-        if: steps.scope.outputs.run == 'true'
+        # 画面の必須検査が落ちても、速度は別に測って原因を分ける。
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
+          V8_SPEED_PROFILE: ci
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -666,21 +696,56 @@ jobs:
             allow_js=1
             echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
           fi
-          ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
-      - name: v7 screens are pixel-identical to the base
-        # オーナー決定（V8 へ完全切替）：共通部品が V8 になったので v7 の画素は変わる。比べた結果は残すが止めない。
+          ALLOW_JS_BASELINE_UPDATE="$allow_js" pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: Train 17 absolute targets (reference)
         continue-on-error: true
-        if: steps.scope.outputs.diff == 'true'
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
+      - name: 2000 friends meet absolute speed targets (reference)
+        id: stress_speed
+        # 速度だけ参考。測れなかったときも失敗を残し、次の工程で警告する。
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          V8_SPEED_PROFILE: ci
+        run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
+      - name: PERF-01 fixed list speed targets (reference)
+        id: perf3_targets
+        # タグ1秒・長い処理65ms。既存の倍率付き判定とは別に固定目標を残す。
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
+      - name: Report speed reference results (including incomplete measurements)
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          SPEED_BUDGET_OUTCOME: ${{ steps.speed_budget.outcome }}
+          STRESS_SPEED_OUTCOME: ${{ steps.stress_speed.outcome }}
+          PERF3_TARGETS_OUTCOME: ${{ steps.perf3_targets.outcome }}
+        run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
+      - name: Virtual table selection, keyboard and layout
+        if: steps.scope.outputs.run == 'true'
         run: |
-          node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base v7
-          node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head v7
-          node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base /tmp/v8-guard/head /tmp/v8-guard/v7-diff
+          node --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
+          node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
       - name: Upload V8 screen guard results
-        if: failure()
+        if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v8-screen-guard
-          path: /tmp/v8-guard/
+          path: |
+            /tmp/v8-guard/
+            /tmp/mock-api.log
+            /tmp/serve-head.log
+            /tmp/serve-base.log
+          retention-days: 7
+
+      - name: Upload separate speed diagnosis traces
+        if: always() && steps.scope.outputs.run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v8-speed-diagnosis
+          path: /tmp/v8-guard/speed.json.diagnosis/
+          if-no-files-found: ignore
           retention-days: 7
 
   required-pr-gate:

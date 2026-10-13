@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConversionsPage from './page'
+import EditPage from './edit/page'
+const editNavigation = vi.hoisted(() => ({ query: '' }))
 
 /*
  * N-252 #658: 成果地点を編集する導線を、本物のReactで確かめる。
@@ -22,9 +24,9 @@ const net = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: () => null }))
 // N-264: 一覧は ?highlight= を読む。試験ではクエリ無しとして返す。
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: () => {}, push: () => {} }),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useSearchParams: () => new URLSearchParams(editNavigation.query),
+  useRouter: () => ({ replace: () => {}, push: (href: string) => { editNavigation.query = href.split('?')[1] ?? '' } }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
@@ -158,12 +160,16 @@ async function type(node: HTMLInputElement, value: string) {
 
 /** 一覧から詳細を開き、編集の窓まで進める。詳細は行の「その他操作」メニューの中。 */
 async function openEditDialog() {
-  await click(byLabel('購入のその他操作'))
-  await click(byText('中身を見る'))
+  await click(byLabel('成果地点「購入」の操作'))
+  await click(byText('成果地点の詳細を見る'))
   await click(byText('編集'))
+  expect(editNavigation.query).toContain('id=')
+  await act(async () => { root.render(React.createElement(EditPage)) })
+  await act(async () => { await Promise.resolve() })
 }
 
 beforeEach(() => {
+  editNavigation.query = ''
   net.calls = []
   net.reviseStatus = 200
   net.reviseBody = null
@@ -290,16 +296,19 @@ describe('編集も起点に合う金額の決め方にする', () => {
   }
 
   async function openEditDialogFor(name: string) {
-    await click(byLabel(`${name}のその他操作`))
-    await click(byText('中身を見る'))
+    await click(byLabel(`成果地点「${name}」の操作`))
+    await click(byText('成果地点の詳細を見る'))
     await click(byText('編集'))
+  expect(editNavigation.query).toContain('id=')
+  await act(async () => { root.render(React.createElement(EditPage)) })
+  await act(async () => { await Promise.resolve() })
   }
 
   /** 金額の決め方欄の知らせ。窓が開いていないときは落ちる。 */
   function amountNotice(): string | null {
     const trigger = byLabel('金額の決め方')
     expect(trigger, '編集の窓が開いていません').toBeTruthy()
-    return trigger!.closest('label')?.querySelector('[role="status"]')?.textContent ?? null
+    return trigger!.closest('[data-label-size]')?.querySelector('[role="status"]')?.textContent ?? null
   }
 
   /** 金額の決め方の候補を開いて文字を全部読む。 */
@@ -405,8 +414,8 @@ describe('停止済み成果地点の編集導線', () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
     await mount()
-    await click(byLabel('購入のその他操作'))
-    await click(byText('中身を見る'))
+    await click(byLabel('成果地点「購入」の操作'))
+    await click(byText('成果地点の詳細を見る'))
     // 詳細は開いている（この判定が空振りしないことを先に確かめる）。
     // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
     expect(byLabel('閉じる')).toBeTruthy()

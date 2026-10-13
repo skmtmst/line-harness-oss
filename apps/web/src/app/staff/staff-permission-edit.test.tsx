@@ -7,6 +7,7 @@
  *   - 操作権限を外すと操作だけ外れ、表示権限は残ること
  *   - 一覧の権限要約に操作権限の名前が出て、既存の表示が崩れないこと
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
@@ -18,17 +19,18 @@ const fixture = vi.hoisted(() => ({
   updated: [] as Array<{ id: string; data: unknown }>,
 }))
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: (await import('@/test-utils/staff-navigation-mock')).staffTestRouter,
   usePathname: () => '/staff',
-  useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -91,17 +93,18 @@ vi.mock('@/lib/api', () => {
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: StaffPage } = await import('./page')
+const { default: StaffPage } = await import('@/test-utils/staff-test-routes')
 
 async function openEdit(expectOp = true) {
   await act(async () => { render(<StaffPage />) })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '変更する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /の操作$/ })).toBeTruthy()
   })
   await act(async () => {
-    // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
-    fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+    // B-193: 変更するは「…」から開く。
+    fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
   })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })
   await waitFor(() => {
     expect(screen.getByRole('button', { name: '✓ 保存する' })).toBeTruthy()
   })
@@ -172,3 +175,6 @@ describe('既存スタッフの成果承認権限', () => {
     expect(payload.permissionKeys).toBeUndefined()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

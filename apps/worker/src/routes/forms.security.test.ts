@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
+  getVersionedAccountSetting: vi.fn(async()=>null),
   // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
@@ -140,8 +142,8 @@ const baseForm = {
 };
 
 function env() {
-  const run = vi.fn(async () => ({ success: true }));
-  const bind = vi.fn((..._args: unknown[]) => ({ run }));
+  const run = vi.fn(async () => ({ success: true,meta:{changes:1} }));
+  const bind = vi.fn((..._args: unknown[]) => ({ run,all:async()=>({results:[]}) }));
   const prepare = vi.fn((_sql: string) => ({ bind }));
   return {
     bindings: {
@@ -153,6 +155,16 @@ function env() {
     prepare,
     bind,
   };
+}
+
+const metadataFixtures:SqliteD1[]=[];
+afterEach(()=>{for(const f of metadataFixtures.splice(0))f.raw.close()});
+function metadataEnv(metadata:string){
+ const f=createTestD1();metadataFixtures.push(f);
+ f.raw.prepare('INSERT INTO friends(id,line_user_id,metadata) VALUES(?,?,?)').run('friend-real','U-real',metadata);
+ f.raw.prepare('INSERT INTO friends(id,line_user_id,metadata) VALUES(?,?,?)').run('victim-friend','U-victim',JSON.stringify({untouched:true}));
+ const result=env();result.bindings.DB=f.db;
+ return {...result,readMetadata:(id:string)=>JSON.parse((f.raw.prepare('SELECT metadata FROM friends WHERE id=?').get(id) as {metadata:string}).metadata)};
 }
 
 function app(asAdmin = false, role: 'owner' | 'staff' = 'owner') {
@@ -842,7 +854,7 @@ describe('LIFF identity enforcement', () => {
       id: 'friend-real',
       metadata: JSON.stringify({ existing: true }),
     });
-    const { bindings, bind } = env();
+    const { bindings, readMetadata } = metadataEnv(JSON.stringify({existing:true}));
 
     const res = await app().request('/api/forms/form-1/partial', {
       method: 'POST',
@@ -859,11 +871,8 @@ describe('LIFF identity enforcement', () => {
       'line-real',
       'account-a',
     );
-    expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ existing: true, x_username: 'alice' }),
-      '2026-08-04T12:00:00+09:00',
-      'friend-real',
-    );
+    expect(readMetadata('friend-real')).toEqual({ existing: true, x_username: 'alice' });
+    expect(readMetadata('victim-friend')).toEqual({untouched:true});
   });
 
   test('drops partial keys that are not part of the form definition', async () => {
@@ -872,7 +881,7 @@ describe('LIFF identity enforcement', () => {
       id: 'friend-real',
       metadata: JSON.stringify({ existing: true }),
     });
-    const { bindings, bind } = env();
+    const { bindings, readMetadata } = metadataEnv(JSON.stringify({existing:true}));
 
     const res = await app().request('/api/forms/form-1/partial', {
       method: 'POST',
@@ -883,11 +892,8 @@ describe('LIFF identity enforcement', () => {
     }, bindings);
 
     expect(res.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ existing: true, x_username: 'alice' }),
-      '2026-08-04T12:00:00+09:00',
-      'friend-real',
-    );
+    expect(readMetadata('friend-real')).toEqual({ existing: true, x_username: 'alice' });
+    expect(readMetadata('victim-friend')).toEqual({untouched:true});
   });
 
   test('rejects oversized partial writes instead of growing the row', async () => {
@@ -916,7 +922,7 @@ describe('LIFF identity enforcement', () => {
       id: 'friend-real',
       metadata: 'not-json{{{',
     });
-    const { bindings, bind } = env();
+    const { bindings, readMetadata } = metadataEnv('broken-json');
 
     const res = await app().request('/api/forms/form-1/partial', {
       method: 'POST',
@@ -927,11 +933,8 @@ describe('LIFF identity enforcement', () => {
     }, bindings);
 
     expect(res.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ x_username: 'bob' }),
-      '2026-08-04T12:00:00+09:00',
-      'friend-real',
-    );
+    expect(readMetadata('friend-real')).toEqual({ x_username: 'bob' });
+    expect(readMetadata('victim-friend')).toEqual({untouched:true});
   });
 
   test('rejects submit without a valid LINE ID token even when a friendId is supplied', async () => {
@@ -1084,4 +1087,80 @@ describe('GET /api/forms の件数つき応答（#578 L5）', () => {
     const body = await res.json() as { data: unknown };
     expect(Array.isArray(body.data)).toBe(true);
   });
+});
+
+// T12-F1: 最終413だけでなく、実ルートが読む順番と量を確かめる。
+describe('保管の本文境界の順番', () => {
+  test.each(['archive', 'unarchive'])('%s: 宣言上限を超えるJSONはcloneも本文読み込みもせず413', async operation => {
+    const { bindings } = env();
+    const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': '131107' },
+      body: JSON.stringify({ expectedRevision: 4, padding: 'x'.repeat(128 * 1024) }),
+    });
+    const clone = vi.spyOn(request, 'clone');
+    const getReader = vi.spyOn(request.body!, 'getReader');
+    const response = await app(true).fetch(request, bindings);
+    expect(response.status).toBe(413);
+    expect(clone).not.toHaveBeenCalled();
+    expect(getReader).not.toHaveBeenCalled();
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+    expect(mocks.getFormDeleteImpact).not.toHaveBeenCalled();
+  });
+
+  test.each(['archive', 'unarchive'])('%s: 権限なしは壊れた大本文を読まず403', async operation => {
+    const { bindings } = env();
+    const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{'.repeat(128 * 1024),
+    });
+    const clone = vi.spyOn(request, 'clone');
+    const getReader = vi.spyOn(request.body!, 'getReader');
+    const response = await app().fetch(request, bindings);
+    expect(response.status).toBe(403);
+    expect(clone).not.toHaveBeenCalled();
+    expect(getReader).not.toHaveBeenCalled();
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+  });
+
+  test.each(['archive', 'unarchive'])('%s: 長さの申告なしでも超過後は残りを読まない', async operation => {
+    const { bindings } = env();
+    let reads = 0;
+    const cancel = vi.fn();
+    const stream = new ReadableStream({
+      pull(controller) { if (reads === 32) { controller.close(); return; } reads++; controller.enqueue(new Uint8Array(8192).fill(32)); },
+      cancel,
+    }, { highWaterMark: 0 });
+    const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': '1' },
+      body: stream, duplex: 'half',
+    } as RequestInit);
+    const clone = vi.spyOn(request, 'clone');
+    const response = await app(true).fetch(request, bindings);
+    expect(response.status).toBe(413);
+    expect(reads).toBe(3);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(clone).not.toHaveBeenCalled();
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+  });
+});
+
+test.each(['archive', 'unarchive'])('%s: 全利用先の権限確認も本文より先に行う', async operation => {
+  mocks.canAccessAllLineAccounts.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+  const { bindings } = env();
+  const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{',
+  });
+  const getReader = vi.spyOn(request.body!, 'getReader');
+  const response = await app(true).fetch(request, bindings);
+  expect(response.status).toBe(403);
+  expect(getReader).not.toHaveBeenCalled();
+  expect(mocks.getFormDeleteImpact).not.toHaveBeenCalled();
+});
+
+test('Content-Typeの申告なしでも保管本文の上限を守る', async () => {
+  const { bindings } = env();
+  const response = await app(true).request('/api/forms/form-1/archive?account_id=account-a', {
+    method: 'POST', body: JSON.stringify({ expectedRevision: 4, padding: 'x'.repeat(17 * 1024) }),
+  }, bindings);
+  expect(response.status).toBe(413);
+  expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
 });

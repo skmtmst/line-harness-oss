@@ -3,14 +3,14 @@
  *
  * - 画面確認用のモックAPI（scripts/visual-qa/mock-api.mjs）に向けて書き出した
  *   `out` を開く前提。ログインと選択中アカウントは localStorage で与える
- * - `lh-admin-theme` で v7 / v8 を切り替える（app/layout.tsx の THEME_BOOT）
+ * - 見た目は現在のV8固定。ブラウザの保存値で選ばない。
  * - 撮影を毎回同じ絵にするため、時計を固定し、動きを止め、カーソルの点滅を消す。
  *   同じ版を2回撮って差が出たのを確かめてから入れた（2026-10-01、時刻表示と動きの途中）
  */
 export const ROUTES = {
   dashboard: '/',
   friends: '/friends',
-  'friend-detail': '/friends/detail?id=f-1',
+  'friend-detail': '/friends/detail?id=friend-1',
   'scenario-detail': '/scenarios/detail?id=scenario-0-paused',
   inbox: '/chats',
   'broadcast-new': '/broadcasts/new',
@@ -33,37 +33,48 @@ const SESSION = {
   lh_selected_account: 'visual-qa-account',
 }
 
-export async function openPage(browser, { baseUrl, route, width, theme, stable = false }) {
+export async function openPage(browser, { baseUrl, route, width, stable = false, settleMs = 2500, onPageError, requireSuccess = false }) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     ...(stable ? { reducedMotion: 'reduce' } : {}),
   })
-  if (stable) await page.clock.setFixedTime(new Date('2026-10-01T05:00:00Z'))
-  await page.addInitScript(([session, t]) => {
-    for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
-    localStorage.setItem('lh_auth_selection_cleared', '1')
-    localStorage.setItem('lh-admin-theme', t)
-  }, [SESSION, theme])
-  await page.goto(new URL(route, baseUrl).toString())
-  if (stable) {
-    await page.addStyleTag({
-      /*
-       * タブ帯の「続きがある」ぼかし（`data-scroll-hint`・`data-tab-fade`）は、
-       * はみ出しの実測で出る・出ないが決まる。タブ名の幅が書体で1px前後
-       * するため、撮る時刻で出たり出なかったりし、v7 友だち詳細の右上だけ
-       * 違う誤検知になっていた（c-base/c-head）。飾りで判定に要らないので
-       * 比較撮影では隠す。はみ出し自体の見張りは layout-overflow が担う。
-       */
-      content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}[data-scroll-hint],[data-tab-fade]{display:none!important}',
-    })
-  }
-  await page.waitForTimeout(2500)
-  // Webフォントの読み込み待ち。来る前と来た後で文字の濃さが変わり、
-  // 画素比べがぶれる（v7 友だち詳細の右上の「マイ」など時々違う）。
   try {
-    await page.evaluate(() => document.fonts.ready.then(() => true))
-  } catch {
-    /* フォントなし環境では待たない */
+    if (process.env.V8_GUARD_STUB_API === '1') {
+      const { stubApi } = await import('./speed-budget.mjs')
+      const { mockFetch } = await import('./mock-local.mjs')
+      await stubApi(page, mockFetch)
+    }
+    if (onPageError) page.on('pageerror', onPageError)
+    if (stable) await page.clock.setFixedTime(new Date('2026-10-01T05:00:00Z'))
+    await page.addInitScript((session) => {
+      for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
+      localStorage.setItem('lh_auth_selection_cleared', '1')
+    }, SESSION)
+    const response = await page.goto(new URL(route, baseUrl).toString())
+    if (requireSuccess && (!response || !response.ok())) throw new Error(`指定画面のHTTP応答が正常ではありません: ${response?.status() ?? 'なし'}`)
+    if (stable) {
+      await page.addStyleTag({
+        /*
+         * タブ帯の「続きがある」ぼかし（`data-scroll-hint`・`data-tab-fade`）は、
+         * はみ出しの実測で出る・出ないが決まる。タブ名の幅が書体で1px前後
+         * するため、撮る時刻で出たり出なかったりし、v7 友だち詳細の右上だけ
+         * 違う誤検知になっていた（c-base/c-head）。飾りで判定に要らないので
+         * 比較撮影では隠す。はみ出し自体の見張りは layout-overflow が担う。
+         */
+        content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}[data-scroll-hint],[data-tab-fade]{display:none!important}',
+      })
+    }
+    await page.waitForTimeout(settleMs)
+    // Webフォントの読み込み待ち。来る前と来た後で文字の濃さが変わり、
+    // 画素比べがぶれる（v7 友だち詳細の右上の「マイ」など時々違う）。
+    try {
+      await page.evaluate(() => document.fonts.ready.then(() => true))
+    } catch {
+      /* フォントなし環境では待たない */
+    }
+    return page
+  } catch (error) {
+    await page.close()
+    throw error
   }
-  return page
 }

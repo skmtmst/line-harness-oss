@@ -13,7 +13,7 @@
  * 不正: 口へ渡さず別人も開かず、案内を出す。
  * 別物: 存在しない・別アカウント・選択中と違うアカウントは別人を開かず案内。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'

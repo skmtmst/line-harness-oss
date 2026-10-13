@@ -1,5 +1,69 @@
 'use client'
 
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ArrowUpDown, Check, Copy, Eye, Lock, X } from 'lucide-react';
+import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared';
+import { api, ApiError, type CommonVarReplacementCandidate, type CommonVarReplacementImpact } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { clampSearchQuery } from '@/lib/search-query';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage } from '@/components/templates';
+import SearchField from '@/components/shared/search-field'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import IconButton from '@/components/shared/icon-button'
+import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import FilterChip from '@/components/shared/filter-chip'
+import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel';
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Pagination from '@/components/shared/pagination'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import BulkBar from '@/components/shared/bulk-bar'
+import { RowMenu } from '@/components/shared/row-actions';
+import { withViewTransition } from '@/components/shared/view-transition';
+import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
+import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { reasonRequirement, typedKeyRequirement, blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
+import VarsExportPanel from './export-panel'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+
 /*
  * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
  * 一覧 `FM94M`、一覧（1152）`XIzkJ`、一覧（閲覧のみ）`OxSw8`、
@@ -12,94 +76,6 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
-import SharedStatusPill from '@/components/shared/status-pill'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Archive,
-  ArrowRight,
-  ArrowUpDown,
-  Braces,
-  CalendarClock,
-  CalendarX,
-  Check,
-  CircleDashed,
-  Copy,
-  Eye,
-  FolderCog,
-  Link2,
-  Lock,
-  Pause,
-  Plus,
-  TriangleAlert,
-  X,
-} from 'lucide-react'
-import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type CommonVarReplacementCandidate,
-  type CommonVarReplacementImpact,
-} from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { clampSearchQuery } from '@/lib/search-query'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
-import SearchField from '@/components/shared/search-field'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
-import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Pagination from '@/components/shared/pagination'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import BulkBar from '@/components/shared/bulk-bar'
-import { RowMenu } from '@/components/shared/row-actions'
-import { withViewTransition } from '@/components/shared/view-transition'
-import Select from '@/components/shared/select'
-import HelpTip from '@/components/shared/help-tip'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
-import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
-import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
-import { formatDay, formatNumber } from '@/lib/format'
-import {
-  blockedReason,
-  canDelete as canDeleteVar,
-  checkedAtText,
-  consequenceText,
-  filterAndSortCommonVars,
-  placeholderText,
-  splitItems,
-  unavailableText,
-  usageText,
-  type CommonVarFilter,
-  type CommonVarOrder,
-} from './model'
-import VarsExportPanel from './export-panel'
-import styles from './list.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -113,7 +89,6 @@ const MAX_BATCH_DELETE_COUNT = 20
 
 /** 期限が近い帯の幅。7日以内に期限切れになるものを数える。 */
 const EXPIRING_SOON_MS = 7 * 24 * 3600_000
-
 
 /*
  * 道具の段の絞り込み（板 `FM94M`：空のまま・期限つき・使われていない・
@@ -182,12 +157,10 @@ function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' 
   }
 }
 
-/** 差し込み名の右のコピーの印（絵：キーの横の小さな印）。押すと印が「✓」に変わる。 */
-function CopyKeyButton({ value, label }: { value: string; label: string }) {
-  return <CopyTextButton value={value} aria-label={label} />
-}
+
 
 function CommonVarsListInner() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('共通情報')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -203,13 +176,13 @@ function CommonVarsListInner() {
    * 書き込みの口（作成・更新・削除・状態切替・フォルダ操作）は
    * `requireRole('owner', 'admin')` で閉じている。staff へ操作を見せると
    * 押しても 403 になるだけなので、閲覧のみの帯を出して押せない形にする
-   * （板 `OxSw8`）。一覧・CSVで書き出す・差し込み名のコピーは使える。
-   * 役割はサーバ（/api/staff/me）で確かめ、答えが来るまでは手元の値で決める。
+   * （板 `OxSw8`）。一覧・差し込み名のコピーは使える。CSVは管理者だけ。
+   * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
    */
-  const [localCanWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const staffRole = useStaffRole()
-  const canWrite = staffRole === null ? localCanWrite : canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('commonVars')
+  const canWrite = featureAccess
+  const canExport = useFeatureAccess('commonVars', 'export')
 
   const [items, setItems] = useState<CommonVar[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
@@ -242,7 +215,6 @@ function CommonVarsListInner() {
     samePageUrl.replace(id ? `/contents/vars?folder=${encodeURIComponent(id)}` : '/contents/vars')
   }
 
-
   const loadFolders = useCallback(async () => {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
@@ -263,11 +235,13 @@ function CommonVarsListInner() {
         setFolderFailure(new ApiError(500, folderList.error))
       }
     } catch (caught) {
-      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+      const fieldFailure = saveErrors.capture(caught);
+
+      if (accountAtRequest === latestAccountRef.current) { if (!fieldFailure) setFolderFailure(caught) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -290,16 +264,22 @@ function CommonVarsListInner() {
         setError('読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (accountAtRequest === latestAccountRef.current) {
-        setListFailure(e)
+        { if (!fieldFailure)
+        setListFailure(e) }
+        { if (!fieldFailure)
+
         setError(e instanceof ApiError && e.status === 403
           ? permissionDeniedMessage('store')
           : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
+    }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -431,7 +411,7 @@ function CommonVarsListInner() {
   const applyStatus = async () => {
     if (!statusTarget || !selectedAccountId || statusBusy) return
     const reason = statusReason.trim()
-    if (!reason) {
+    if (reasonRequirement.check(reason)) {
       setStatusError(statusAction === 'stop' ? '止める理由を入力してください' : '再開する理由を入力してください')
       return
     }
@@ -451,11 +431,14 @@ function CommonVarsListInner() {
       setStatusReason('')
       await load()
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
       setStatusError(
         e instanceof ApiError && e.status === 409
           ? '別の担当者が先に更新しました。最新内容を読み直してください。'
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setStatusBusy(false)
     }
@@ -546,14 +529,18 @@ function CommonVarsListInner() {
       if (!preview.success) throw new Error('replacement_impact_failed')
       setReplacementImpact(preview.data)
       setReplacementPhase('ready')
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrentRequest()) return
+      saveErrors.capture(saveFailure)
       setReplacementPhase('error')
     }
   }
 
   const selectReplacement = async (nextId: string) => {
-    if (!deleteTarget || !selectedAccountId) return
+    if (!deleteTarget || !selectedAccountId)
+
+
+ return
     setReplacementId(nextId)
     setReplacementImpact(null)
     if (!nextId) {
@@ -573,7 +560,9 @@ function CommonVarsListInner() {
       if (!res.success) throw new Error('replacement_impact_failed')
       setReplacementImpact(res.data)
       setReplacementPhase('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (deleteRequestRef.current.generation === request.generation) setReplacementPhase('error')
     }
   }
@@ -607,7 +596,7 @@ function CommonVarsListInner() {
 
   const confirmReplacement = async () => {
     if (!deleteTarget || !selectedAccountId || !replacementImpact?.canReplace || deleteBusy) return
-    if (!deleteReason.trim()) {
+    if (reasonRequirement.check(deleteReason)) {
       setDeleteError('消した理由を入力してください。')
       return
     }
@@ -632,11 +621,15 @@ function CommonVarsListInner() {
       await load()
     } catch (caught) {
       if (deleteRequestRef.current.generation !== request.generation) return
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
-        setDeleteError('使用先が変わりました。影響をもう一度確認してください。')
+        { if (!fieldFailure)
+        setDeleteError('使用先が変わりました。影響をもう一度確認してください。') }
         await selectReplacement(replacementImpact.replacement.id)
       } else {
-        setDeleteError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。')
+        { if (!fieldFailure)
+        setDeleteError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。') }
       }
     } finally {
       if (deleteRequestRef.current.generation === request.generation) setDeleteBusy(false)
@@ -665,18 +658,24 @@ function CommonVarsListInner() {
       await load()
     } catch (e) {
       if (!isCurrentRequest()) return
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof ApiError && e.status === 409) {
-        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+        { if (!fieldFailure)
+        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
         try {
           const again = await api.commonVars.deleteImpact(request.itemId, request.accountId)
           if (!isCurrentRequest()) return
           if (again.success) setDeleteImpact(again.data)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure);
+
           if (isCurrentRequest()) setDeletePhase('error')
         }
         return
       }
-      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      { if (!fieldFailure)
+      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       if (isCurrentRequest()) setDeleteBusy(false)
     }
@@ -685,7 +684,7 @@ function CommonVarsListInner() {
   /** 「消さずに止める」を選んだとき。理由を止める理由として使う。 */
   const confirmStopInstead = async () => {
     if (!deleteTarget || !selectedAccountId || deleteBusy) return
-    if (!deleteReason.trim()) {
+    if (reasonRequirement.check(deleteReason)) {
       setDeleteError('止める理由を入力してください。')
       return
     }
@@ -702,8 +701,11 @@ function CommonVarsListInner() {
       }
       resetDeleteState()
       await load()
-    } catch {
-      setDeleteError('止められませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('止められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setDeleteBusy(false)
     }
@@ -722,9 +724,15 @@ function CommonVarsListInner() {
   /* 行の「…」の中身。右クリックでも同じものを出す。 */
   const rowMenuItems = (item: CommonVar): ActionMenuItem[] => {
     const stopped = (item.status ?? 'active') === 'stopped'
-    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
-    if (!canWrite) return []
+    const copyKey: ActionMenuItem = {
+      id: 'copy-key',
+      label: '差し込みキーをコピー',
+      content: <CopyTextButton role="menuitem" value={placeholderText(item.varKey)} label="差し込みキーをコピー" aria-label={`${item.name}の差し込みキーをコピー`} />,
+    }
+    // 閲覧のみでもコピーは使える。変更の項目は隠す。
+    if (!canWrite) return [copyKey]
     return [
+      copyKey,
       {
         id: 'edit',
         label: '編集',
@@ -774,7 +782,7 @@ function CommonVarsListInner() {
       label: entry.label,
       danger: entry.tone === 'danger',
       disabled: entry.disabled,
-      onSelect: () => entry.onSelect(),
+      onSelect: () => entry.onSelect?.(),
     }))
     : []
 
@@ -809,15 +817,22 @@ function CommonVarsListInner() {
         setError(`${blocked.length} 件は、合計${references}か所で使用中のため削除できません。`)
         return
       }
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrentRequest()) return
-      setError('使用先を確認できないため削除できません。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+
+      setError('使用先を確認できないため削除できません。もう一度お試しください。') }
       return
     }
 
-    if (!isCurrentRequest()) return
+    if (!isCurrentRequest())
+
+
+ return
     const targets = items.filter((item) => selected.has(item.id))
     if (targets.length !== selected.size) {
+      if (!saveErrors.fail("selected", '選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。'))
       setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
       return
     }
@@ -827,7 +842,7 @@ function CommonVarsListInner() {
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
-    if (!batchReason.trim()) {
+    if (reasonRequirement.check(batchReason)) {
       setDeleteBatchError('消した理由を入力してください。')
       return
     }
@@ -847,14 +862,21 @@ function CommonVarsListInner() {
       try {
         const result = await api.commonVars.delete(target.id, request.accountId, batchReason.trim())
         if (!result.success) throw new Error(result.error)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         failed.push(target)
       }
-      if (!isCurrentRequest()) return
+      if (!isCurrentRequest())
+
+
+ return
     }
 
     try {
-      if (!isCurrentRequest()) return
+      if (!isCurrentRequest())
+
+
+ return
       if (failed.length > 0) {
         setDeleteTargets(failed)
         setSelected(new Set(failed.map((item) => item.id)))
@@ -890,18 +912,13 @@ function CommonVarsListInner() {
   /* ===== フォルダの列 ===== */
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
   const folderFailureNote = folderFailure ? (
-    <div role="alert" className={styles.folderAlert}>
-      <p className={styles.folderNote}>
-        {folderForbidden
-          ? permissionDeniedMessage('store')
-          : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}
-      </p>
-      {folderForbidden ? null : (
+    <Notice tone="danger" action={<> {folderForbidden ? null : (
         <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
           {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
         </Button>
-      )}
-    </div>
+      )} </>} >{folderForbidden
+          ? permissionDeniedMessage('store')
+          : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}</Notice>
   ) : null
 
   /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
@@ -911,13 +928,19 @@ function CommonVarsListInner() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
-  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED })
+  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED }).map(row => ({ ...row,
+    leadingActions: canWrite && selectedUserFolder?.id === row.id ? [
+      { id: 'edit-folder', label: 'フォルダ名を変える', onSelect: () => folderControlRef.current?.startEdit(selectedUserFolder) },
+      { id: 'delete-folder', label: 'フォルダを削除する', tone: 'danger' as const, onSelect: () => folderControlRef.current?.startDelete(selectedUserFolder) },
+    ] : [],
+  }))
   const folderOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
     { value: UNGROUPED, label: '未分類' },
   ]
-  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+
 
   /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
   const createButton = (full: boolean) => canWrite ? (
@@ -980,7 +1003,7 @@ function CommonVarsListInner() {
   const orderBox = <ListToolbarSort value={order} onChange={(value) => { setOrder(value as typeof order); setPage(1) }} options={ORDER_OPTIONS} />
   const perPageBox = (
     <div className={styles.perPageBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
@@ -989,7 +1012,7 @@ function CommonVarsListInner() {
           setPage(1)
         }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -997,72 +1020,10 @@ function CommonVarsListInner() {
    * 1152 の板（`XIzkJ`）：1段目「作る・フォルダ・探す … 件数」、2段目「札」。
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
-  const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>
-          <Select
-            aria-label="フォルダ"
-            value={folderFilter}
-            onChange={(value) => setFolderFilter(value)}
-            options={folderOptions}
-          />
-        </div>
-        <div className={styles.narrowSearch}>
-          <SearchField
-            aria-label="共通情報を検索"
-            placeholder="名前・差し込み名・中身"
-            value={query}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </div>
-        {canWrite ? (
-          <>
-            <IconButton
-              title="フォルダの操作"
-              aria-label="フォルダの操作"
-              aria-haspopup="menu"
-              aria-expanded={folderMenuOpen}
-              onClick={(event) => {
-                folderMenuAnchorRef.current = event.currentTarget
-                setFolderMenuOpen((open) => !open)
-              }}
-            >
-              <FolderCog size={15} aria-hidden="true" />
-            </IconButton>
-            <ActionMenu
-              open={folderMenuOpen}
-              onClose={() => setFolderMenuOpen(false)}
-              anchorRef={folderMenuAnchorRef}
-              ariaLabel="フォルダの操作"
-              items={[
-                { id: 'add', label: 'フォルダを追加する', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startAdd() } },
-                ...(selectedUserFolder ? [
-                  { id: 'rename', label: 'フォルダ名を変える', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startEdit(selectedUserFolder) } },
-                  {
-                    id: 'delete',
-                    label: 'フォルダを削除する',
-                    tone: 'danger' as const,
-                    dividerBefore: true,
-                    onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startDelete(selectedUserFolder) },
-                  },
-                ] : []),
-              ]}
-            />
-          </>
-        ) : null}
-        <span className={styles.spacer} aria-hidden="true" />
-        {orderBox}
-        {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{filterChips}</div>
-    </div>
-  )
+
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・差し込み名・中身',
@@ -1073,7 +1034,7 @@ function CommonVarsListInner() {
         filters={filterChips}
         trailing={<>{orderBox}{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* 空のまま使われているときの黄色の帯（絵：表の列の上・道具の段の上）。 */
@@ -1097,14 +1058,7 @@ function CommonVarsListInner() {
         </div>
       ) : null}
       {error && !listFailed ? (
-        <div className={styles.alertBand} data-tone="danger" role="alert">
-          <TriangleAlert size={16} aria-hidden="true" />
-          <span className={styles.alertText}>{error}</span>
-          <span className={styles.alertSpacer} aria-hidden="true" />
-          <IconButton title="閉じる" aria-label="お知らせを閉じる" onClick={() => setError('')}>
-            <X size={14} aria-hidden="true" />
-          </IconButton>
-        </div>
+        <Notice tone="danger" onClose={() => setError('')}>{error}</Notice>
       ) : null}
     </>
   )
@@ -1122,27 +1076,12 @@ function CommonVarsListInner() {
         ))}
     </div>
   ) : !selectedAccountId ? (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon}><Braces size={18} aria-hidden="true" /></span>
-      <p className={styles.stateTitle}>LINEアカウントを選択してください</p>
-      <p className={styles.stateDesc}>共通情報はLINEアカウントごとに管理します。</p>
-    </div>
+    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。"  icon={<Braces size={18} aria-hidden="true" />} />
   ) : listFailed ? (
     isForbidden(listFailure) ? (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><Lock size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>共通情報を見る権限がありません</p>
-        <p className={styles.stateDesc}>オーナーか管理者に、共通情報を見られるよう頼んでください。</p>
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-        <Button href="/staff" variant="secondary">できることを確かめる</Button>
-      </div>
+      <ListState kind="error" title="共通情報を見る権限がありません" description="オーナーか管理者に、共通情報を見られるよう頼んでください。"  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button><Button href="/staff" variant="secondary">できることを確かめる</Button></>} />
     ) : (
-      <div className={styles.stateCard} data-design-node="RqO7O">
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>共通情報を読み込めませんでした</p>
-        <p className={styles.stateDesc}>{error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'}</p>
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="共通情報を読み込めませんでした" description={error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'} data-design-node="RqO7O" action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )
   ) : filtered.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
@@ -1177,7 +1116,7 @@ function CommonVarsListInner() {
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
                   {canWrite ? (
-                    <Checkbox
+                    <SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && someOnPageSelected}
                       onCheckedChange={() =>
@@ -1191,7 +1130,7 @@ function CommonVarsListInner() {
                         })
                       }
                       aria-label="このページの共通情報をすべて選ぶ"
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Th>
                 <Th className={styles.headCell}>共通情報（差し込み名）</Th>
@@ -1202,7 +1141,7 @@ function CommonVarsListInner() {
               </TableHeadRow>
             </thead>
             <tbody>
-              {current.map((item) => {
+              {current.map((item, saveFieldIndex) => {
                 const badge = stateBadge(item)
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
@@ -1215,48 +1154,33 @@ function CommonVarsListInner() {
                     className={styles.rowClick}
                     tabIndex={0}
                     title={updateTitle}
-                    onClick={() => setActiveId(item.id)}
+                    detailKey="row" onOpen={() => setActiveId(activeId === item.id ? null : item.id)}
                     onContextMenuCapture={() => setContextId(item.id)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        setActiveId(item.id)
-                      }
-                    }}
+
                   >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canWrite ? (
-                        <Checkbox
+                        <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
                           onCheckedChange={() => toggle(item.id)}
                           aria-label={`${item.name}を選ぶ`}
-                        />
+                        /></SaveErrorField>
                       ) : null}
                     </Td>
-                    <NameCell
-                      name={
+                    <NameCell name={
                         <div className={styles.dotLine}>
-                          <FolderDotName folder={folderDotOf(item)}>
-                            <Link
+                          <>
+                            <RowNameLink
                               href={`/contents/vars/edit?id=${item.id}`}
 
                               className={styles.nameLink}
                               onClick={(event) => event.stopPropagation()}
                             >
                               <TruncatedText value={String(item.name ?? '')} />
-                            </Link>
-                          </FolderDotName>
+                            </RowNameLink>
+                          </>
                         </div>
-                      }
-                      sub={
-                        <span className={narrow ? styles.keyRow : `${styles.keyRow} ${styles.dotIndent}`}>
-                          <code title={placeholderText(item.varKey)} className={styles.keyCode}>
-                            {placeholderText(item.varKey)}
-                          </code>
-                          <CopyKeyButton value={placeholderText(item.varKey)} label={`${item.name}の差し込みキーをコピー`} />
-                        </span>
-                      }
+                      } folder={folderDotOf(item)}
                     />
                     <Td className={styles.valueCell} title={valueText || '（空）'}>
                       {valueText || <span className={styles.valueEmpty}>（空）</span>}
@@ -1265,7 +1189,7 @@ function CommonVarsListInner() {
                       <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
                     </Td>
                     {!narrow && (
-                      <Td onClick={(event) => event.stopPropagation()}>
+                      <Td>
                         {item.usageCount === undefined ? (
                           <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                         ) : item.usageCount === 0 ? (
@@ -1281,10 +1205,10 @@ function CommonVarsListInner() {
                         )}
                       </Td>
                     )}
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
-                      {canWrite ? <div className={styles.menuBox}>
+                      <div className={styles.menuBox}>
                         <RowMenu
                           className={styles.rowMenuButton}
                           label={`共通情報「${item.name}」の操作`}
@@ -1292,7 +1216,7 @@ function CommonVarsListInner() {
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                         />
-                      </div> : null}
+                      </div>
                     </Td>
                   </Tr>
                 )
@@ -1305,7 +1229,7 @@ function CommonVarsListInner() {
       {/* まとめての帯（選ぶと表の下に出る）。 */}
       {canWrite ? <BulkBar count={selected.size} total={filtered.length} onSelectAll={() => setSelected(new Set(filtered.map(item => item.id)))} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
         <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
-        <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
+        <Button type="button" variant="danger" onClick={() => prepareRemoveSelected()} busyLabel="処理中…">選択した共通情報を削除</Button>
       </BulkBar> : null}
     </>
   )
@@ -1410,12 +1334,12 @@ function CommonVarsListInner() {
             ) : null}
             <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
-              </span></>}><input
+              </span></>} requirement={reasonRequirement} error={statusError && reasonRequirement.check(statusReason)}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
-              /></Field>
+              /></SaveErrorField></Field>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
               <p className={styles.dialogWarn} role="note">
                 <TriangleAlert size={14} aria-hidden="true" />
@@ -1451,14 +1375,15 @@ function CommonVarsListInner() {
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              <input
+              <span>{reasonRequirement.required ? <RequiredBadge /> : null}<SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                aria-required={reasonRequirement.required}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
                 placeholder="理由（必須・記録に残ります）"
                 aria-label="消した理由・止める理由（記録に残ります）"
                 title="消した理由・止める理由（記録に残ります）"
                 className={styles.footerReason}
-              />
+              /></SaveErrorField></span>
             ) : <span aria-hidden="true" />}
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
@@ -1516,11 +1441,15 @@ function CommonVarsListInner() {
             {deletePhase === 'loading' ? (
               <p className={styles.dialogLead}>使われている場所を確認しています…</p>
             ) : deletePhase === 'error' ? (
-              <p className={styles.dialogError} role="alert">
-                使用先を確認できませんでした。読み直してから、もう一度お試しください。
-              </p>
+              <Notice tone="danger" >使用先を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             ) : deleteImpact ? (
               <>
+                {splitItems(deleteImpact.items).historical.length > 0 ? (
+                  <p className={styles.dialogHint}>
+                    送信済みの配信はこれから変わりません（削除を止める理由には含めません）。
+                    {splitItems(deleteImpact.items).historical.map((usage) => `${usage.kindLabel}「${usage.name}」`).join('、')}
+                  </p>
+                ) : null}
                 {deleteImpact.canDelete ? (
                   <>
                     <p className={styles.dialogLead}>{usageText(deleteImpact)}</p>
@@ -1591,19 +1520,19 @@ function CommonVarsListInner() {
                     </div>
                     {deleteChoice === 'replace' ? (
                       <>
-                        <Select
+                        <SaveErrorField names={["replacementId","replacement_id"]}><EntitySelect
                           size="full"
                           value={replacementId}
                           disabled={deleteBusy || replacementCandidates.length === 0}
                           onChange={(value) => void selectReplacement(value)}
                           aria-label="差し替え先"
                           options={replacementCandidates.length > 0
-                            ? replacementCandidates.map((candidate) => ({
+                            ? replacementCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate),
                               value: candidate.id,
                               label: `差し替え先：${candidate.name} ${placeholderText(candidate.varKey)}`,
                             }))
                             : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
-                        />
+                        /></SaveErrorField>
                         {replacementPhase === 'loading' ? (
                           <p className={styles.dialogHint}>差し替え後の影響を確認しています…</p>
                         ) : replacementPhase === 'error' ? (
@@ -1645,21 +1574,21 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                <Field label="消した理由（記録に残ります）"><input
+                <Field label="消した理由（記録に残ります）" requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
                     className={styles.dialogInput}
-                  /></Field>
+                  /></SaveErrorField></Field>
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                  <Field label="削除する場合は、差し込みキーを入力してください"><input
+                  <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
                       className={styles.dialogInput}
-                    /></Field>
+                    /></SaveErrorField></Field>
                 ) : null}
 
                 {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
@@ -1697,12 +1626,12 @@ function CommonVarsListInner() {
           setDeleteTargets([])
         }}
       >
-        <Field label="消した理由" required><input
+        <Field label="消した理由" requirement={reasonRequirement}><SaveErrorField names={["batchReason","batch_reason"]}><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
             className={styles.dialogInput}
-          /></Field>
+          /></SaveErrorField></Field>
       </ConfirmDialog>
 
       {activeItem ? (
@@ -1724,7 +1653,7 @@ function CommonVarsListInner() {
                 type="button"
                 variant="primary"
                 onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))}
-              >
+               busyLabel="移動中…">
                 編集する
               </Button>
               {canWrite ? (
@@ -1740,8 +1669,8 @@ function CommonVarsListInner() {
                 <Button
                   type="button"
                   variant="danger"
-                  onClick={() => void openDelete(activeItem)}
-                >
+                  onClick={() => openDelete(activeItem)}
+                 busyLabel="処理中…">
                   削除する
                 </Button>
               ) : null}
@@ -1789,27 +1718,25 @@ function CommonVarsListInner() {
                   {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
                 </p>
                 <div className={styles.panelBody}>
-                  <input
+                  <SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
                     value={statusReason}
                     onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                     placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                     aria-label={statusAction === 'stop' ? '止める理由' : '再開する理由'}
                     disabled={statusBusy}
                     className={styles.dialogInput}
-                  />
+                  /></SaveErrorField>
                   <Button
                     type="button"
                     variant="primary"
                     disabled={statusBusy}
                     busy={statusBusy}
                     onClick={() => void applyStatus()}
-                  >
-                    {statusBusy
-                      ? (statusAction === 'stop' ? '止めています…' : '再開しています…')
-                      : (statusAction === 'stop' ? '止める' : '再開する')}
+                   busyLabel={(statusAction === 'stop' ? '止めています…' : '再開しています…')}>
+                    {(statusAction === 'stop' ? '止める' : '再開する')}
                   </Button>
                 </div>
-                {statusError ? <p className={styles.dialogError} role="alert">{statusError}</p> : null}
+                {statusError ? <Notice tone="danger" >{statusError}</Notice> : null}
               </>
             ) : null}
           </div>
@@ -1819,24 +1746,22 @@ function CommonVarsListInner() {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'XIzkJ' : canWrite ? 'FM94M' : 'OxSw8'}
       headingSize="regular"
       title="共通情報"
       help="会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。"
       actions={
-        <VarsExportPanel
+        canExport ? <VarsExportPanel
           accountId={selectedAccountId}
           folderId={folderFilter && folderFilter !== UNGROUPED ? folderFilter : null}
           ungrouped={folderFilter === UNGROUPED}
-        />
+        /> : null
       }
       tabs={canWrite ? undefined : (
         /* 閲覧のみの帯（`OxSw8`）。数の帯の上。 */
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
       stats={
         <KpiBand data-design="KPIs" aria-label="共通情報の集計" className={styles.kpiStrip}>
@@ -1862,17 +1787,17 @@ function CommonVarsListInner() {
         </KpiBand>
       }
       /* 1281〜1339 の幅は板が狭いのに 1152 用の道具の段にならない。そこだけ型が作る・フォルダを出す。 */
-      folderNav={narrow ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
         {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}
-        {narrow ? narrowToolbar : wideToolbar}
+        {wideToolbar}
       </>}
       pagination={listPager}
       overlays={overlays}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 

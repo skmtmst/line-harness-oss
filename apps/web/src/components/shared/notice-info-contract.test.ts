@@ -17,22 +17,22 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 describe('帯/案内（ThDed）の数値', () => {
   it('案内の地・文・印の色は絵の値', () => {
     const css = read('notice.module.css')
-    const info = css.match(/\[data-theme='v8'\]\s*\.info\s*{[^}]*}/s)
+    const info = css.match(/:root\s*\.info\s*{[^}]*}/s)
     expect(info, '案内の地の指定がありません').toBeTruthy()
     expect(info![0]).toContain('var(--color-status-info-soft)')
-    const icon = css.match(/\[data-theme='v8'\]\s*\.info\s*\.icon\s*{[^}]*}/s)
+    const icon = css.match(/:root\s*\.info\s*\.icon\s*{[^}]*}/s)
     expect(icon, '案内の印の色指定がありません').toBeTruthy()
-    expect(icon![0]).toContain('var(--color-action)')
+    expect(icon![0]).toContain('var(--color-status-info)')
     // トークン自体が絵の値（地 #2563eb1a・文 #4a5565・印 #2563eb）。
     const tokens = read('../../app/globals.css')
     expect(tokens).toMatch(/--color-status-info-soft:\s*#2563eb1a/)
     expect(tokens).toMatch(/--color-ink-secondary:\s*#4a5565/)
-    expect(tokens).toMatch(/--color-action:\s*#2563eb/)
+    expect(tokens).toMatch(/--color-status-info:\s*var\(--color-focus-ring\)/)
   })
 
   it('案内の余白・間・角丸・文は絵の値', () => {
     const css = read('notice.module.css')
-    const notice = css.match(/\[data-theme='v8'\]\s*\.notice\s*{[^}]*}/s)
+    const notice = css.match(/:root\s*\.notice\s*{[^}]*}/s)
     expect(notice, 'V8 の帯の指定がありません').toBeTruthy()
     expect(notice![0]).toMatch(/gap:\s*10px/)
     expect(notice![0]).toMatch(/padding:\s*10px 14px/)

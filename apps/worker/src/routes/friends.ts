@@ -1,3 +1,6 @@
+import { idChunks, sqlIdSet } from '@line-crm/db/id-queries';
+import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../services/form-documents.js';
 import { getFriendSummary } from '@line-crm/db';
@@ -5,6 +8,7 @@ import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getFriends,
+  getFriendListFieldValues,
   getFriendById,
   getFriendWithFirstTrackedLinkName,
   getFriendAddBreakdown,
@@ -32,12 +36,12 @@ import {
   SAVED_SEARCH_LIMIT,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess, FriendFormSubmission } from '@line-crm/db';
-import type { SavedSearchConditions } from '@line-crm/shared';
+import { BASIC_FRIEND_FIELDS, DEFAULT_TENANT_ID, type SavedSearchConditions } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requireIrreversibleConfirmation, requireRole, hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { listResponse } from '../lib/list-etag.js';
@@ -55,15 +59,35 @@ import { listLimit, listOffset } from './list-pagination.js';
 
 const friends = new Hono<Env>();
 
+// B-215: customer-requested erasure. Unfollow never calls this route.
+friends.delete('/api/friends/:id/data', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-friend-data'), async c => {
+  const id = c.req.param('id');
+  try {
+    const journal = await deletionJournal(c.env.DB, 'friend_data', id);
+    if (journal && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [journal.detail.accountId])) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+    if (journal?.action === 'deleted') return c.json({ success: true, data: { deleted: true, replayed: true } });
+    const friend = await getFriendById(c.env.DB, id);
+    const accountId = friend ? (friend as unknown as { line_account_id: string | null }).line_account_id : null;
+    if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+    const data = await deleteCustomerData(c.env, { kind: 'friend_data', id, friendId: id, accountId, lineUserId: friend.line_user_id }, c.get('staff')!.id);
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof DeletionFailure && error.code === 'deletion_schema_approval_required') return c.json({ success: false, code: error.code, error: '支払・監査の記録を残すため、データ構造の変更承認が必要です。オーナーか管理者に頼んでください。' }, 409);
+    if (error instanceof DeletionFailure) return c.json({ success: false, code: error.code, error: error.status === 409 ? '削除中です。少し待ってから、もう一度お試しください。' : '削除を完了できませんでした。同じ友だちで、もう一度削除してください。' }, error.status);
+    return c.json({ success: false, code: 'deletion_retry_required', error: '削除を完了できませんでした。同じ友だちで、もう一度削除してください。' }, 503);
+  }
+});
+
+
 async function adminAccountScope(c: Context<Env>, alias = '') {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const column = `${alias}line_account_id`;
   const where = scope.allowedAccountIds.length
-    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    ? `(${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
     : scope.canSeeUnassigned
       ? `${column} IS NULL`
       : '1 = 0';
-  return { scope, where };
+  return { scope, where, binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [] };
 }
 
 /**
@@ -308,6 +332,15 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
 // GET /api/friends - list with pagination
 friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const requestedColumns = c.req.query('fieldColumns');
+    let fieldColumns: string[] = [];
+    if (requestedColumns) {
+      if (requestedColumns.length > 2_000) return c.json({success:false,error:'表示項目が多すぎます'},422);
+      try { const parsed: unknown = JSON.parse(requestedColumns);
+        if (!Array.isArray(parsed) || parsed.length > 7 || parsed.some(key => typeof key !== 'string' || !(BASIC_FRIEND_FIELDS.some(field => key === `fixed:${field.key}`) || /^field:[a-zA-Z0-9_-]{1,128}$/.test(key)))) throw new Error();
+        fieldColumns = [...new Set(parsed)];
+      } catch { return c.json({success:false,error:'表示項目の指定を確認してください'},422); }
+    }
     const rawConditions = c.req.query('conditions');
     let directConditions: SavedSearchConditions | undefined;
     if (rawConditions) {
@@ -421,9 +454,9 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       conditions.push('f.line_account_id = ?');
       binds.push(lineAccountId);
     } else {
-      const { scope, where } = await adminAccountScope(c, 'f.');
+      const { binds: scopeBinds, where } = await adminAccountScope(c, 'f.');
       conditions.push(where);
-      binds.push(...scope.allowedAccountIds);
+      binds.push(...scopeBinds);
     }
     if (savedSearchId) {
       if (!lineAccountId) {
@@ -690,6 +723,9 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     }
     const listResult = await listStmt.bind(...listBinds).all<DbFriend>();
     const items = listResult.results;
+    const fieldValues = await getFriendListFieldValues(db, {friendIds:items.map(friend => friend.id),columns:fieldColumns,
+      tenantId:c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID,
+      canSeePersonal:hasStaffPermission(c,'attribute.personal_info.view') || hasStaffPermission(c,'attribute.personal_info.edit')});
 
     // 表示ページ分のタグを1回で取得する。友だちごとの問い合わせは行わない。
     // includeTags=false のオートコンプリート経路では、この1回も省略する。
@@ -699,6 +735,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     let itemsWithTags = items.map((friend) => ({
       ...serializeFriendListRow(friend, includeChatStatus),
       tags: (tagsByFriendId.get(friend.id) ?? []).map(serializeTag),
+      ...(fieldColumns.length ? {fieldValues:fieldValues.get(friend.id) ?? {}} : {}),
     }));
 
     // Optional: hydrate chat status (latest in/out message, active scenario,
@@ -707,13 +744,17 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     // row per friend; SQLite supports window functions on D1.
     if (includeChatStatus && items.length > 0) {
       const ids = items.map((f) => f.id);
-      const placeholders = ids.map(() => '?').join(',');
 
       type IncomingRow = { friend_id: string; content: string; message_type: string; created_at: string };
       type OutgoingRow = { friend_id: string; max_at: string };
       type ScenarioRow = { friend_id: string; scenario_name: string; status: string };
 
-      const [incomingRes, outgoingRes, scenarioRes] = await Promise.all([
+      const incomingRes: { results: IncomingRow[] } = { results: [] };
+      const outgoingRes: { results: OutgoingRow[] } = { results: [] };
+      const scenarioRes: { results: ScenarioRow[] } = { results: [] };
+      for (const chunk of idChunks(ids)) {
+      const placeholders = chunk.map(() => '?').join(',');
+      const [incoming, outgoing, scenario] = await Promise.all([
         db
           .prepare(
             `SELECT friend_id, content, message_type, created_at FROM (
@@ -723,7 +764,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
                WHERE direction = 'incoming' AND friend_id IN (${placeholders})
              ) WHERE rn = 1`,
           )
-          .bind(...ids)
+          .bind(...chunk)
           .all<IncomingRow>(),
         db
           .prepare(
@@ -738,7 +779,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
                AND friend_id IN (${placeholders})
              GROUP BY friend_id`,
           )
-          .bind(...ids)
+          .bind(...chunk)
           .all<OutgoingRow>(),
         db
           .prepare(
@@ -751,9 +792,13 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
              JOIN scenarios s ON s.id = fs.scenario_id
              WHERE fs.rn = 1`,
           )
-          .bind(...ids)
+          .bind(...chunk)
           .all<ScenarioRow>(),
       ]);
+      incomingRes.results.push(...incoming.results);
+      outgoingRes.results.push(...outgoing.results);
+      scenarioRes.results.push(...scenario.results);
+      }
 
       const incomingByFriend = new Map(incomingRes.results.map((r) => [r.friend_id, r]));
       const outgoingByFriend = new Map(outgoingRes.results.map((r) => [r.friend_id, r.max_at]));
@@ -873,9 +918,9 @@ friends.get('/api/friends/count', async (c) => {
         .bind(lineAccountId).first<{ count: number }>();
       count = row?.count ?? 0;
     } else {
-      const { scope, where } = await adminAccountScope(c);
+      const { binds: scopeBinds, where } = await adminAccountScope(c);
       const row = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND ${where}`)
-        .bind(...scope.allowedAccountIds).first<{ count: number }>();
+        .bind(...scopeBinds).first<{ count: number }>();
       count = row?.count ?? 0;
     }
     return c.json({ success: true, data: { count } });
@@ -894,7 +939,7 @@ friends.get('/api/friends/ref-stats', async (c) => {
     }
     const accountScope = lineAccountId ? null : await adminAccountScope(c);
     const where = lineAccountId ? 'line_account_id = ?' : accountScope!.where;
-    const binds = lineAccountId ? [lineAccountId] : accountScope!.scope.allowedAccountIds;
+    const binds = lineAccountId ? [lineAccountId] : accountScope!.binds;
     const stmt = c.env.DB.prepare(
       `SELECT ref_code, COUNT(*) as count FROM friends WHERE ${where} AND ref_code IS NOT NULL GROUP BY ref_code ORDER BY count DESC`,
     );
@@ -1434,11 +1479,8 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
     // 指定なしは従来どおり無条件更新（既存互換）。
     const expectedUpdatedAt = c.req.query('expectedUpdatedAt')?.trim() || null;
     if (expectedUpdatedAt) {
-      const applied = await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ? AND updated_at = ?')
-        .bind(JSON.stringify(merged), now, friendId, expectedUpdatedAt)
-        .run();
-      if ((applied.meta?.changes ?? 0) === 0) {
+      const applied = await patchFriendMetadata(db, friendId, body, { deleteNull: true, expectedUpdatedAt });
+      if (!applied) {
         const current = await getFriendById(db, friendId);
         if (!current) {
           return c.json({ success: false, error: 'Friend not found' }, 404);
@@ -1451,10 +1493,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
         }, 409);
       }
     } else {
-      await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-        .bind(JSON.stringify(merged), now, friendId)
-        .run();
+      await patchFriendMetadata(db, friendId, body, { deleteNull: true });
     }
 
     const updated = await getFriendById(db, friendId);

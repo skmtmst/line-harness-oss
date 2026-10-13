@@ -8,7 +8,6 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => '/hq',
@@ -27,10 +26,13 @@ const READ_STATE = {
   startedAt: '2026-10-15T15:20:00+09:00',
 } as const
 
+const mounted: Array<{ root: Root; host: HTMLElement }> = []
+
 function render(): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  mounted.push({ root, host })
   act(() => {
     root.render(<ImpersonationBar initial={{ ...READ_STATE, mode: 'read' }} />)
   })
@@ -42,8 +44,12 @@ describe('代理ログイン帯のV8（VtJQ6）', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
   })
 
-  afterEach(() => {
-    document.body.innerHTML = ''
+  afterEach(async () => {
+    await act(async () => {
+      for (const { root } of mounted) root.unmount()
+    })
+    for (const { host } of mounted) host.remove()
+    mounted.length = 0
     vi.clearAllMocks()
     vi.unstubAllGlobals()
   })

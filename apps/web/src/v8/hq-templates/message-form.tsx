@@ -1,12 +1,11 @@
 'use client'
 
-/*
- * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 X4JcOf）。
- * 左に「ひな形の中身」（名前・分類・画像・タイトル・本文・ボタン）、右に LINE での見え方。
- * 保存する中身（HqMessageCard と template 本体）・画像の受け取り・ボタンの参照先は今の画面
- * （app/hq/templates/template-definition-editor.tsx の CardEditor・template-message-v8.tsx）と同じ。
- * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
- */
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  button_label: requiredText("ボタンの文字を入力してください"),
+}
+
+import HqMessageBody from '@/components/shared/hq-message-inserts'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PlayCircle, Plus } from 'lucide-react'
 import { tapExtrasError } from '@line-crm/shared'
@@ -29,6 +28,16 @@ import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 X4JcOf）。
+ * 左に「ひな形の中身」（名前・分類・画像・タイトル・本文・ボタン）、右に LINE での見え方。
+ * 保存する中身（HqMessageCard と template 本体）・画像の受け取り・ボタンの参照先は今の画面
+ * （app/hq/templates/template-definition-editor.tsx の CardEditor・template-message-v8.tsx）と同じ。
+ * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
+ */
 
 /*
  * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
@@ -79,7 +88,7 @@ export interface MessageFormProps {
 function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | null {
   const extrasError = tapExtrasError(button.tapExtras)
   if (extrasError) return extrasError
-  if (!button.label.trim()) return 'ボタンの文字を入力してください'
+  if ((b244Requirements.button_label.check(button.label) !== null)) return 'ボタンの文字を入力してください'
   if (!button.value.trim()) return button.action === 'form' ? '回答フォームを選んでください' : button.action === 'scenario' ? 'シナリオを選んでください' : button.action === 'message' ? '送る文を入力してください' : 'URLを入力してください'
   if (button.action === 'url') {
     try {
@@ -113,9 +122,9 @@ export default function MessageForm({
     return () => { alive = false }
   }, [])
 
-  fields?.define('name', 'ひな形の名前', () => (name.trim() ? null : 'ひな形の名前を入力してください'))
-  fields?.define('body', '配信する本文', () => ((usesCard ? card.body : current.messageContent).trim() ? null : '配信する本文を入力してください'))
-  if (usesCard && card.format === 'flex') card.buttons.forEach((button, index) => fields?.define(`button-${button.id}`, `ボタン${index + 1}`, () => cardButtonProblem(button)))
+  fields?.define('name', 'ひな形の名前', () => (name.trim() ? null : 'ひな形の名前を入力してください'), { required: true })
+  fields?.define('body', '配信する本文', () => ((usesCard ? card.body : current.messageContent).trim() ? null : '配信する本文を入力してください'), { required: true })
+  if (usesCard && card.format === 'flex') card.buttons.forEach((button, index) => fields?.define(`button-${button.id}`, `ボタン${index + 1}`, () => cardButtonProblem(button), { required: true }))
   const bindField = (key: string, id: string) => (fields ? { ...fields.bind(key), 'aria-invalid': fields.invalid(key) || undefined, 'aria-describedby': fields.invalid(key) ? `${id}-error` : undefined } : {})
 
   const updateCard = (next: HqMessageCard) => onChange(withMessageCard(value, next))
@@ -131,13 +140,13 @@ export default function MessageForm({
         {current.messageType === 'flex' || current.messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
         <h2 className={styles.editTitle}>ひな形の中身</h2>
         <div className={styles.twoCol}>
-          <Field label="ひな形の名前"><input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+          <Field label="ひな形の名前" requirement={fields?.requirement('name')}><SaveErrorField names={["name"]}><input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></SaveErrorField>
 <FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError></Field>
-          <Field label="分類"><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></Field>
+          <Field label="分類"><SaveErrorField names={["category","current.category"]}><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></SaveErrorField></Field>
         </div>
         <div className={styles.field}>
           <span className={styles.folderPick}>
-            <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={onCreateFolder} />
+            <SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={onCreateFolder} /></SaveErrorField>
           </span>
         </div>
 
@@ -156,19 +165,19 @@ export default function MessageForm({
               {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? emptyValue('unknown')}×${image.height ?? emptyValue('unknown')}`}</span> : null}
             </div>
           )}
-          <Field label="タイトル"><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></Field>
-          <Field label="本文"><textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+          <Field label="タイトル"><SaveErrorField names={["title","card.title"]}><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></SaveErrorField></Field>
+          <Field label="本文" requirement={fields?.requirement('body')}><SaveErrorField names={["body","card.body"]}><HqMessageBody value={card.body} label="配信する本文" max={card.format === 'flex'?2000:5000} readOnly={disabled} onChange={body=>updateCard({...card,body})}/></SaveErrorField>
 <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError></Field>
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
               <span className={styles.smallLabel}>ボタン <small className={styles.optional}>最大 3 つ</small></span>
-              {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => void loadReferences()}>参照先を再読み込み</Button>} />}
+              {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
-                  <Field label="ボタンの文字"><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></Field>
+                  <Field label="ボタンの文字" requirement={b244Requirements.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
-                    <TapActionField allowExtras accountId={null} extrasError={fields?.error(`button-${button.id}`)}
+                    <SaveErrorField names={["button"]}><TapActionField allowExtras accountId={null} extrasError={fields?.error(`button-${button.id}`)}
                       name={`ボタン${index + 1}`}
                       kindLabel={`ボタン${index + 1}を押したとき`}
                       value={cardTapValue(button)}
@@ -187,7 +196,7 @@ export default function MessageForm({
                       sources={referenceError ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
                       renderBody={(kind) => kind !== 'scenario' ? undefined : (
                         /* 統括の参照先はアカウントをまたぐので、店のフォルダは読まず行を直接渡す（選ぶ窓 dJZ7Q）。 */
-                        <EntityPickerField
+                        <SaveErrorField names={[`buttons.${index}.value`,"value","button.value"]}><EntityPickerField
                           label={`ボタン${index + 1}の参照先`}
                           noun={ENTITY_KINDS.scenario.noun}
                           icon={ENTITY_KINDS.scenario.icon}
@@ -195,9 +204,9 @@ export default function MessageForm({
                           items={references.filter((row) => row.kind === 'scenario').map((row) => ({ id: row.id, name: row.name, meta: row.accountName, keywords: row.accountName }))}
                           value={button.value}
                           onChange={(next) => updateButton(button.id, { value: next })}
-                        />
+                        /></SaveErrorField>
                       )}
-                    />
+                    /></SaveErrorField>
                   </div>
                   <FieldError id={`hq-msg-button-${button.id}-error`}>{fields?.error(`button-${button.id}`)}</FieldError>
                 </div>
@@ -211,7 +220,7 @@ export default function MessageForm({
           )}
         </> : (
           <div {...(fields ? fields.bind('body') : {})}>
-          <MessageTemplateEditor
+          <MessageTemplateEditor hqInserts
             value={{ messageType: current.messageType, messageContent: current.messageContent }}
             onChange={(next) => onChange({ ...value, template: { ...current, messageType: next.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: next.messageContent } })}
             targetDate={targetDate}
@@ -281,7 +290,7 @@ function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt
     }
   }
   return (
-    <MediaSlot
+    <SaveErrorField names={["value"]}><MediaSlot
       title="画像を追加"
       value={value}
       accept="image/png,image/jpeg"
@@ -291,6 +300,6 @@ function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt
       disabled={disabled}
       onFile={(file) => void upload(file)}
       onRemove={onRemove}
-    />
+    /></SaveErrorField>
   )
 }

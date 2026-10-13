@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import Select from './select'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -16,6 +16,7 @@ const OPTIONS = [
 
 afterEach(() => {
   cleanup()
+  delete document.documentElement.dataset.theme
 })
 
 /**
@@ -23,6 +24,21 @@ afterEach(() => {
  * 渡さない限り見た目は変わらない。
  */
 describe('選ぶ欄の幅と枠なし', () => {
+  it('狭い段の印だけでも名前を読み上げ、キーで同じ候補を選べる', () => {
+    document.documentElement.dataset.theme = 'v8'
+    const change = vi.fn()
+    render(<Select aria-label="よく使う絞り込み" value="new" onChange={change} options={OPTIONS}
+      icon={<svg aria-hidden="true" />} iconOnly showChevron={false} />)
+    const button = screen.getByRole('button', { name: 'よく使う絞り込み' })
+    expect(button.getAttribute('data-icon-only')).toBe('true')
+    expect(button.querySelector('[class*="chevron"]')).toBeNull()
+    fireEvent.keyDown(button, { key: 'ArrowDown' })
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.keyDown(button, { key: 'ArrowDown' })
+    fireEvent.keyDown(button, { key: 'Enter' })
+    expect(change).toHaveBeenCalledWith('old')
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+  })
   it('width を渡すと箱の幅になる', () => {
     const { container } = render(
       <Select aria-label="タグ" value="new" onChange={() => {}} options={OPTIONS} width={130} />,
@@ -65,8 +81,8 @@ describe('選ぶ欄の幅と枠なし', () => {
     )
     expect(screen.getByText('新しい順')).toBeTruthy()
     const css = read('select.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.textTrigger\s*\{[^}]*border:\s*0/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.textTrigger \.chevron\s*\{\s*display:\s*none;/s)
+    expect(css).toMatch(/:root \.textTrigger\s*\{[^}]*border:\s*0/s)
+    expect(css).toMatch(/:root \.textTrigger \.chevron\s*\{\s*display:\s*none;/s)
     expect(container.querySelector('[class*="directionIcon"]')).not.toBeNull()
   })
 })

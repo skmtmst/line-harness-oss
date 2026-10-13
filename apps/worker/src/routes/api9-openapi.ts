@@ -508,6 +508,8 @@ export const api9Schemas: Record<string, Schema> = {
       holdExpiresAt: { type: ['string', 'null'] },
       ...customerDetails,
       seatType: {type:['string','null']},
+      courseId:{type:['string','null']},
+      courseName:{type:['string','null']},
     },
   },
   AutoReplyUnmatchedSettings: {
@@ -600,4 +602,10 @@ api9Paths['/api/restaurant-test/opening-hours']={
 documentResponse('/api/restaurant-test/opening-hours','get',{type:'object',properties:{storeId:string,hours:{...hours,type:['array','null']},version:integer,updatedBy:{type:['string','null']},updatedAt:{type:['string','null']},lateArrivalPolicy:{...lateArrivalPolicy,type:['object','null']}}});
 documentResponse('/api/restaurant-test/opening-hours','put',{type:'object',properties:{storeId:string,hours,version:integer}});
 api9Paths['/api/restaurant-test/reservation-link']={post:operation('店舗自身のLIFF IDで席予約リンクを発行。未設定・停止アカウントは503',[],{type:'object',required:['storeId'],properties:{storeId:string}},{account_id:string})};
-documentResponse('/api/restaurant-test/reservation-link','post',{type:'object',required:['url','html','available'],properties:{url:{type:'string',format:'uri',description:'https://liff.line.me/<店舗のLIFF ID>/restaurant/reserve/<token>'},html:string,available:{type:'boolean',const:true}}});
+documentResponse('/api/restaurant-test/reservation-link','post',{type:'object',required:['url','html','available'],properties:{url:{type:'string',format:'uri',description:'https://liff.line.me/<店舗のLIFF ID>?page=restaurant&token=<token>'},html:string,available:{type:'boolean',const:true}}});
+
+for (const endpoint of ['/api/liff/restaurant/holds','/api/liff/restaurant/reservations/{id}/reschedule']) {
+ const op=api9Paths[endpoint] as any;
+ op.post.requestBody.content['application/json'].schema.properties.courseId={type:['string','null'],description:'同じ店舗の公開コース。未指定は席のみ120分'};
+}
+(api9Paths['/api/liff/restaurant/availability'] as any).get.parameters.push({name:'courseId',in:'query',required:false,schema:{type:'string'}});

@@ -4,7 +4,6 @@ import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source
 const PAGE = [
   'page.tsx',
   'use-friend-migrations.ts',
-  'migrations-v8.tsx',
 ].map((name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')).join('\n')
 
 /**
@@ -40,6 +39,6 @@ describe('M015/M016 UID・顧客データ移行の失敗表示', () => {
 
   it('owner/admin 専用の操作はボタンの近くに理由を出す（M016）', () => {
     expect(PAGE).toContain('書き出し・取り込みの操作はオーナーか管理者だけができます')
-    expect(PAGE).toContain("localStorage.getItem('lh_staff_role')")
+    expect(PAGE).toContain('useStaffRole()')
   })
 })

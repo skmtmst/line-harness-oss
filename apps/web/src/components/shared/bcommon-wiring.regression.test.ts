@@ -2,20 +2,21 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { expect, it } from 'vitest'
 const read = (path: string) => readFileSync(`src/${path}`, 'utf8')
 it('WEB-006: 枠なしの選ぶ欄も焦点を消さない', () => {
-  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-action\)/)
+  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-focus-ring\)/)
 })
 it('WEB-019: 自動応答の未接続のつまみを描かない', () => {
   expect(read('components/auto-replies/inline-action-rows-v8.tsx')).not.toContain('<GripVertical')
 })
 it('共通点検1: 未分類は開いたフォルダ', () => {
   // 選ぶ窓のフォルダの列は共通の FolderPanel（pickfold）。未分類の印は部品が開いたフォルダで描く。
-  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<FolderPickerShell')
+  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<EntityPickerDialog')
+  expect(read('components/shared/entity-picker.tsx')).toContain('<FolderPanel')
   expect(read('components/shared/folder-picker-shell.tsx')).toContain('<FolderPanel readOnly')
   expect(read('components/shared/folder-panel.tsx')).toMatch(/kind === 'unfiled' \? <FolderOpen/)
 })
-it('共通点検2: タグ編集の切替は共通Toggle', () => {
-  const source = read('components/friend-fields/tag-editor-v4.tsx')
-  expect(source).toContain("from '@/components/shared/toggle'")
+it('共通点検2: タグ編集の切替は共通の設定Checkbox', () => {
+  const source = read('v8/tag-edit/edit-form.tsx')
+  expect(source).toContain('<SettingCheckbox')
   expect(source).not.toContain('h-7 w-12')
 })
 it('共通点検3: 会話右欄のタグは共通TagPill', () => {
@@ -42,10 +43,12 @@ it('共通点検8: 共通情報のまとめ操作はBulkBar', () => {
   expect(source).toContain('<BulkBar')
   expect(source).not.toContain('className={styles.bulkRow}')
 })
-it('共通点検9: 紹介者の右面は620幅の共通Drawer', () => {
+it('共通点検9: 紹介者の右面は共通Drawerの編集幅540', () => {
   const source = read('v8/affiliates/drawer.tsx')
   expect(source).toContain('<Drawer')
-  expect(source).toContain('designWidth={620}')
+  const drawerTag = source.match(/<Drawer\b[^>]*>/)?.[0] ?? ''
+  expect(drawerTag).toContain('width="editor"')
+  expect(drawerTag).not.toContain('designWidth=')
   expect(source).not.toContain('className={styles.drawer}')
 })
 
@@ -53,7 +56,7 @@ it('共通点検5: 小さい行のボタンはブラウザ既定の余白を足�
   expect(read('components/shared/icon-button.module.css')).toMatch(/\.button\s*\{[^}]*padding: 0;/s)
 })
 it('WEB253: span内の旧SVGにもV8のアイコン寸法を渡す', () => {
-  expect(read('components/layout/sidebar.tsx')).toContain('<NavIcon className={isV8 ? styles.v8NavIcon : undefined}')
+  expect(read('components/layout/sidebar.tsx')).toContain('<NavIcon className={styles.v8NavIcon}')
 })
 
 it('共通点検4・5: 同じCSSを使う残りの3タブも消した札とボタンの上書きを見ない', () => {

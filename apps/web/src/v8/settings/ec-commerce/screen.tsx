@@ -1,20 +1,10 @@
 'use client'
-
-/*
- * ★V8 EC連携（Pencil `GmVR5`。つなぎ先は `iLJmw`、定期便は `wqC8x`）。
- *
- * 取り込みの記録（出来事ごとの処理）の動きは今までの画面（app/ec-commerce/page.tsx の EventsPanel）と同じ：
- * アカウントと一体で持つ値（#685）・サーバ側の絞り込みとページ送り・検索の遅らせ・もう一度やる（409 の読み直し）・
- * 注文の状況のパネル。処理はここへ写した（src/v8 は @/app を読めない）。
- * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -53,6 +43,18 @@ import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 EC連携（Pencil `GmVR5`。つなぎ先は `iLJmw`、定期便は `wqC8x`）。
+ *
+ * 取り込みの記録（出来事ごとの処理）の動きは今までの画面（app/ec-commerce/page.tsx の EventsPanel）と同じ：
+ * アカウントと一体で持つ値（#685）・サーバ側の絞り込みとページ送り・検索の遅らせ・もう一度やる（409 の読み直し）・
+ * 注文の状況のパネル。処理はここへ写した（src/v8 は @/app を読めない）。
+ * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -122,8 +124,6 @@ function actionDone(action: EcActionExecution): string {
   }
   return ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`
 }
-
-
 
 /** 一覧の日時（年なし・例 9/30 10:12、日本時間）。壊れた値は「—」。 */
 function dateTime(value: string | null): string {
@@ -334,13 +334,13 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
     const friendId = action.friendId ?? order?.friendId ?? null
     return [
       friendId
-        ? { id: 'friend', label: '中身を見る', onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`) }
+        ? { id: 'friend', label: "友だちの詳細を見る", onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`) }
         : { id: 'identity', label: 'つき合わせる', onSelect: () => router.push('/ec-commerce/identity-candidates') },
       ...(order ? [{ id: 'order', label: '注文の状況を見る', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }] : []),
       ...(canEdit && action.retryAvailable
         ? [{
             id: 'retry',
-            label: retryingId === action.id ? '戻しています…' : 'もう一度やる',
+            label: 'もう一度やる',
             disabled: retryingId === action.id,
             onSelect: () => void retry(action),
           }]
@@ -363,7 +363,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
           {overviewState === 'forbidden'
             ? permissionDeniedMessage('store')
             : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
-          {overviewState === 'error' ? <Button variant="text" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
+          {overviewState === 'error' ? <Button variant="text" onClick={() => loadOverview(false)} busyLabel="処理中…">集計をもう一度読む</Button> : null}
         </p>
       ) : null}
       {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
@@ -391,7 +391,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         ))}
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
-          <ListToolbarSort
+          <SaveErrorField names={["sort"]}><ListToolbarSort
             aria-label="取り込みの並び順"
             value={sort}
             onChange={(value) => setSort(value as typeof sort)}
@@ -399,7 +399,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
               { value: 'newest', label: '新しい順' },
               { value: 'oldest', label: '古い順' },
             ]}
-          />
+          /></SaveErrorField>
         </span>
       </div>
 
@@ -551,7 +551,7 @@ export default function EcCommerceScreen({
 }) {
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const actions = <Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={styles.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>
   return (
     <SbSettingsScreen

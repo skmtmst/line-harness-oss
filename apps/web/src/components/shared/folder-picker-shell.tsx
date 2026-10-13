@@ -11,7 +11,7 @@ export default function FolderPickerShell({ title, onClose, rows, activeId, onFo
 }) {
   return <Dialog open busy={busy} onCancel={onClose} title={title} designWidth={640} designHeaderPadding="var(--tpl-inbox-tp-head-pad)" footer={<>
     <div className={styles.body}>
-      <div className={styles.side}><FolderPanel readOnly rows={rows} activeId={activeId} onSelect={onFolder} />{sideNote}</div>
+      <div className={styles.side}><FolderPanel readOnly reserveCreateSpace={false} rows={rows} activeId={activeId} onSelect={onFolder} />{sideNote}</div>
       <div className={styles.list}>{search}{children}</div>
     </div>
     {beforeFooter}

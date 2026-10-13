@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, test, vi } from 'vitest'
 import UriTapActionField from './uri-tap-action-field'
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 const account = vi.hoisted(() => ({ value: { selectedAccountId: 'a1', selectedAccount: { id: 'a1', liffId: 'L-1' }, accounts: [{ id: 'a1', liffId: 'L-1' }, { id: 'a2', liffId: null }] } }))
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => account.value }))
 vi.mock('@/lib/api', () => ({ api: { forms: { list: async () => ({ success: true, data: [] }) } }, bookingApi: { listMenus: async () => ({ menus: [] }) } }))

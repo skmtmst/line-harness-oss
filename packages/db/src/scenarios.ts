@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
 import { refreshScenarioReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
@@ -418,8 +419,8 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
     ...(referrerIds.length > 0
       ? [
         db.prepare(
-          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${referrerIds.map(() => '?').join(',')})`,
-        ).bind(...referrerIds),
+          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${sqlIdSet(referrerIds).sql})`,
+        ).bind(...(referrerIds.length ? sqlIdSet(referrerIds).binds : [])),
       ]
       : []),
   ]);
@@ -1732,6 +1733,7 @@ export async function enrollFriendInScenario(
   friendId: string,
   scenarioId: string,
   sourceEnrollmentId?: string,
+  options: { replacingScenarioId?: string | null } = {},
 ): Promise<FriendScenario | null> {
   const id = sourceEnrollmentId ?? crypto.randomUUID();
   if (sourceEnrollmentId) {
@@ -1781,9 +1783,10 @@ export async function enrollFriendInScenario(
       .prepare(
         `SELECT 1 FROM friend_scenarios
           WHERE friend_id = ? AND scenario_id != ? AND status = 'active'
+            AND (? IS NULL OR scenario_id != ?)
           LIMIT 1`,
       )
-      .bind(friendId, scenarioId)
+      .bind(friendId, scenarioId, options.replacingScenarioId ?? null, options.replacingScenarioId ?? null)
       .first<{ 1: number }>();
     if (other) return null;
   }

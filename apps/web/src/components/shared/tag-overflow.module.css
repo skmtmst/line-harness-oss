@@ -1,0 +1,11 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.line { position: relative; display: flex; align-items: center; gap: var(--tpl-tag-overflow-gap); min-width: 0; width: 100%; white-space: nowrap; }
+.item { display: inline-flex; flex: none; min-width: 0; max-width: var(--tpl-tag-overflow-max); }
+.more { flex: none; border: 1px solid var(--color-control-border); border-radius: var(--radius-pill); padding: var(--tpl-tag-overflow-pad); background: var(--color-canvas); color: var(--color-ink-secondary); font: inherit; font-size: var(--text-caption); cursor: pointer; white-space: nowrap; }
+.more:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.measure { position: fixed; inset-inline-end: 100%; inset-block-start: 0; display: flex; gap: var(--tpl-tag-overflow-gap); visibility: hidden; pointer-events: none; width: max-content; height: 0; overflow: hidden; }
+.sampleMore { position: fixed; inset-inline-end: 100%; inset-block-start: 0; visibility: hidden; pointer-events: none; }
+.all { display: flex; flex-wrap: wrap; gap: var(--tpl-tag-overflow-gap); min-width: 0; }
+
+}

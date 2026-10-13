@@ -101,7 +101,7 @@ beforeEach(() => {
   fixture.scenariosList.mockResolvedValue({ success: true, data: [] })
   fixture.foldersList.mockResolvedValue({ success: true, data: [folder], unfiledCount: 0 })
   fixture.savedViewsList.mockResolvedValue({ success: true, data: [] })
-  fixture.staffMe.mockResolvedValue({ success: false, error: 'not needed' })
+  fixture.staffMe.mockResolvedValue({ success: true, data: { role: 'owner' } })
   fixture.dashboardOverview.mockResolvedValue({ success: false, error: 'not needed' })
   fixture.getInsight.mockResolvedValue({ success: false, error: 'not needed' })
   host = document.createElement('div')

@@ -107,9 +107,9 @@ test('v8 では DxAAA の書き出しカードと記録の表が出る', async (
   expect(board?.textContent).toContain('完了')
 })
 
-test('v7 では従来の Sheets タブが出て DxAAA は出ない', async () => {
+test('旧テーマ属性でも現役の Sheets タブが出て DxAAA が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="DxAAA"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="DxAAA"]')).not.toBeNull()
 })
 
 test('v8 の読み込み中は連携の形の骨組みが出て「読み込み中」の文字は無い', async () => {

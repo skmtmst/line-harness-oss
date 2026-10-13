@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import type {
   DecideIdentityCandidateRequest,
   IdentityCandidateDetail,
@@ -376,11 +377,11 @@ export async function listIdentityCandidates(
       statusCounts: {}, lowConfidenceCount: 0,
     };
   }
-  const placeholders = input.allowedAccountIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(input.allowedAccountIds).sql;
   const scopeSql = `left_line_account_id IN (${placeholders}) AND right_line_account_id IN (${placeholders})`;
   const baseBindings = [
     input.tenantId, input.kind,
-    ...input.allowedAccountIds, ...input.allowedAccountIds,
+    ...sqlIdSet(input.allowedAccountIds).binds, ...sqlIdSet(input.allowedAccountIds).binds,
   ];
   const baseWhere = `tenant_id = ? AND kind = ? AND ${scopeSql}`;
 

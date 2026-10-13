@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import styles from './settings-screen.module.css'
@@ -19,8 +19,11 @@ export function SbSettingsScreen({
   boardId,
   title,
   help,
+  explanation,
+  explanationKey,
   actions,
   children,
+  preview,
   saveActions,
   saveStatus,
   savePlacement,
@@ -34,10 +37,13 @@ export function SbSettingsScreen({
   boardId?: string
   title: ReactNode
   help?: ReactNode
+  explanation?: ReactNode
+  explanationKey?: string
   /** @deprecated ★V8 では板の頭に戻るを描かない（オーナー 2026-10-08）。戻るのは上の帯のパンくず。 */
   identity?: ReactNode
   actions?: ReactNode
   children: ReactNode
+  preview?: ReactNode
   saveActions?: ReactNode
   saveStatus?: ReactNode
   savePlacement?: 'content'
@@ -48,8 +54,12 @@ export function SbSettingsScreen({
       boardId={boardId}
       title={title}
       help={help}
+      explanation={explanation}
+      explanationKey={explanationKey}
       actions={actions}
       navigation={<SettingsInnerNav inline />}
+      preview={preview}
+      previewLayout={preview ? 'cards' : undefined}
       saveActions={saveActions}
       saveStatus={saveStatus}
       savePlacement={savePlacement}
@@ -61,5 +71,5 @@ export function SbSettingsScreen({
 
 /** 板の頭の戻るリンク（「← 機能設定へ」13/600・青）。 */
 export function SbBackLink({ href, label }: { href: string; label: string }) {
-  return <Link href={href} className={styles.back}>{`← ${label}`}</Link>
+  return <></>
 }

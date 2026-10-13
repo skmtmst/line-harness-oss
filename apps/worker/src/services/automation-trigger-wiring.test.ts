@@ -23,10 +23,15 @@ describe('V6オートメーションの発生元配線', () => {
   it('予約は確定経路だけが予約IDで発火する', () => {
     const salon = source('routes/booking.ts');
     const event = source('routes/events.ts');
-    // 確定経路は3つ：承認・代理作成の承認・承認なし確定のその場確定。
-    expect(salon.match(/eventType: 'calendar_booked'/g)).toHaveLength(3);
+    const confirmed = source('services/booking-confirmed-effects.ts');
+    const payment = source('services/booking-payment-recovery.ts');
+    // 新規・承認・代理登録と決済回収は、同じ確定処理の入口を通る。
+    expect(salon.match(/await runConfirmedBookingSideEffects\(/g)).toHaveLength(3);
+    expect(payment).toContain('await runConfirmedBookingSideEffects(');
+    expect(confirmed.match(/dispatchAutomationEventWithLogging\(db,/g)).toHaveLength(1);
+    expect(confirmed).toContain(`eventType: 'calendar_booked'`);
     expect(event.match(/eventType: 'calendar_booked'/g)).toHaveLength(3);
-    expect(salon).toContain(`sourceEventId: bookingId`);
+    expect(confirmed).toContain(`sourceEventId: bookingId`);
     expect(salon).toContain(`sourceEventId: id`);
     expect(event).toContain(`sourceEventId: booking.id`);
     expect(event).toContain(`sourceEventId: result.bookingId`);

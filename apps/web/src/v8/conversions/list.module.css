@@ -3,122 +3,14 @@
  * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  */
 
-/* 案内の帯と道具の段：この板は表より一段内側（左右に 24 足す）。 */
-.wideTools {
-  display: flex;
-  flex-basis: 100%;
-  flex-direction: column;
-  min-width: 0;
-  margin-bottom: var(--tpl-cn-tools-after);
-  padding: 0 var(--tpl-cn-tools-indent);
-}
-.wideTools :global([data-toolbar-layout]) {
-  row-gap: var(--tpl-cn-toolbar-row-gap);
-}
-.viewerTools {
-  padding: 0;
-  margin-bottom: 0;
-}
-/* 札は1つずつ帯に並べる（入りきらない札だけが2段目へ回る。札の束ごと落とさない）。 */
-:global([data-theme='v8']) .wideTools [role='group'] {
-  display: contents;
-}
-.noticeRow {
-  flex-basis: 100%;
-  margin-bottom: var(--tpl-cn-notice-after);
-}
-
-/* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16）。表は左右 24 の内側に、細い枠と角丸 12。 */
-.tableWrap {
-  min-width: 0;
-  margin: var(--tpl-cn-table-margin);
-  border-radius: var(--tpl-cn-table-radius);
-  box-shadow: var(--tpl-cn-table-ring);
-  overflow: hidden;
-}
-.tableWrapNarrow {
-  margin: 0;
-  border-radius: var(--radius-none);
-  box-shadow: none;
-}
-.tableWrapViewer {
-  margin: 0;
-}
-.table {
-  border: 0;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-cn-col-gap);
-  height: var(--tpl-cn-head-h);
-  padding: var(--tpl-cn-head-pad);
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-cn-col-gap);
-  height: auto;
-  min-height: var(--tpl-cn-row-h);
-  padding: var(--tpl-cn-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-  cursor: pointer;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colValue,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colValue {
-  padding-right: var(--tpl-cn-num-pad-end);
-  text-align: right;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
-  flex: 1 1 0;
-  min-width: 0;
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colTrigger,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colUsage {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-cn-cell-gap);
-}
+/* 外側の余白と道具の畳み方は一覧型・共通の道具列が持つ。 */
+.wideTools { display: flex; flex-basis: 100%; flex-direction: column; min-width: 0; gap: var(--polish-space-card); }
+.tableWrap { min-width: 0; }
 .colTrigger { width: var(--tpl-cn-col-trigger); min-width: 0; }
 .colCount { width: var(--tpl-cn-col-count); }
 .colValue { width: var(--tpl-cn-col-value); }
 .colUsage { width: var(--tpl-cn-col-usage); min-width: 0; }
-.colOps { width: var(--tpl-cn-col-ops); }
-
-/* 名前（緑の 13/600）。 */
-.nameButton {
-  max-width: 100%;
-  min-height: 0;
-  height: auto;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-accent-deep);
-  font: inherit;
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-name-lh);
-  text-align: left;
-  /* 絵どおり、列に入りきらない名前は2行まで折り返す（3行目からは省略。全文は title）。 */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  cursor: pointer;
-}
-.nameButton:hover {
-  text-decoration: underline;
-}
+.colOps { width: var(--tpl-cn-control-h); }
 
 /* 何が起きたら数えるか・使われている場所（1行目 12・2行目 11）。 */
 .cellMain,
@@ -135,10 +27,10 @@
   white-space: nowrap;
 }
 .usageMain {
-  display: -webkit-box;
+  display: block;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .cellSub {
   display: block;
@@ -174,7 +66,7 @@
 .createSpace {
   display: block;
   height: var(--tpl-cn-control-h);
-  margin-bottom: var(--tpl-cn-create-after);
+
 }
 .createSpaceRow {
   display: block;
@@ -255,11 +147,7 @@
   flex-direction: column;
   gap: var(--tpl-cn-field-gap);
 }
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 /* 表の下の案内。 */
 .footNote {
@@ -330,22 +218,7 @@
 .spacer { flex: 1 1 0; }
 
 /* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-cn-ro-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-cn-ro-margin); }
 .statsNotice {
   padding: var(--tpl-cn-stats-notice-pad);
 }
@@ -359,3 +232,6 @@
   display: block;
   padding-left: var(--tpl-folder-dot-indent);
 }
+
+/* B-199：状態は固定の列。操作列の幅は共通ActionCellに任せる。 */
+.colState { flex: none; width: var(--tpl-list-state-w); }

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R579: 本人勤務の担当者取得の失敗と「紐づけ無し」を言い分ける。
  *
@@ -20,12 +22,12 @@ const fixture = vi.hoisted(() => ({
 // 試験でも同じにして、参照の変わり目での余計な再取得を起こさない。
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: vi.fn() }
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => stableRouter,
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -33,7 +35,6 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('./staff-detail', () => ({ default: () => <div>担当者別</div> }))
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -70,10 +71,13 @@ const memStorage = vi.hoisted(() => {
 vi.stubGlobal('localStorage', memStorage)
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'staff' } as StaffMember);
   // staff ロールで店舗の閲覧権限なし。本人解決だけが頼りになる条件。
   memStorage.setItem('lh_staff_role', 'staff')
   fixture.listMyStaff = async () => ({ staff: [] })
   fixture.replace.mockClear()
+  window.history.replaceState({}, '', '/booking/staff/shifts')
+  window.dispatchEvent(new PopStateEvent('popstate'))
 })
 
 afterEach(() => {
@@ -88,7 +92,7 @@ describe('R579 本人勤務の取得失敗と紐づけ無しを言い分ける',
     render(<StaffShiftsPage />)
 
     expect(await screen.findByText('自分の勤務を読み込めませんでした')).toBeTruthy()
-    expect(screen.queryByText('紐づく予約スタッフがありません')).toBeNull()
+    expect(screen.queryByText('ひも付いた予約スタッフがありません')).toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     expect(fixture.replace).not.toHaveBeenCalled()
   })
@@ -97,7 +101,7 @@ describe('R579 本人勤務の取得失敗と紐づけ無しを言い分ける',
     fixture.listMyStaff = async () => ({ staff: [] })
     render(<StaffShiftsPage />)
 
-    expect(await screen.findByText('紐づく予約スタッフがありません')).toBeTruthy()
+    expect(await screen.findByText('ひも付いた予約スタッフがありません')).toBeTruthy()
     expect(screen.queryByText('自分の勤務を読み込めませんでした')).toBeNull()
     expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
   })
@@ -115,7 +119,7 @@ describe('R579 本人勤務の取得失敗と紐づけ無しを言い分ける',
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => {
-      expect(fixture.replace).toHaveBeenCalledWith('/booking/staff/shifts?staff_id=staff-1')
+      expect(window.location.pathname + window.location.search).toBe('/booking/staff/shifts?staff_id=staff-1')
     })
   })
 })

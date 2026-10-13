@@ -1,5 +1,26 @@
 'use client'
 
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react';
+import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { CreatePage } from '@/components/templates';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import { formatNumber } from '@/lib/format';
+import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis';
+import styles from './connections.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value';
+
 /*
  * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
  *
@@ -10,24 +31,6 @@
  * 右の列に操作（編集する・切替のつながり・…）と「いまの状態」。
  * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
  */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
-import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import Button from '@/components/shared/button'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import { formatNumber } from '@/lib/format'
-import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis'
-import styles from './connections.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
 
 const MAX_PAGES = 10
 
@@ -166,7 +169,7 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    { id: 'open', label: 'メニューを開く', external: true, href: editHref, onSelect: () => router.push(editHref) },
+    { id: 'open', label: 'メニューを開く', external: false, href: editHref, onSelect: () => router.push(editHref) },
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -194,7 +197,7 @@ function Connections() {
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
       help="タブで行き来できるメニューの関係"
-      identity={<Link href="/rich-menus" className={styles.backLink}>← リッチメニューへ</Link>}
+
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>

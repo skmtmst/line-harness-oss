@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const fx = vi.hoisted(() => ({ cards: vi.fn(), card: vi.fn(), showReward: vi.fn(), useReward: vi.fn(), requestPaper: vi.fn(), paperRequests: vi.fn(), uploadPaperPhoto: vi.fn() }));
 vi.mock('../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountId: 'acc-1', accountName: '然 - NEN - 銀座店', botBasicId: '@x' } }),
     bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   },
@@ -45,7 +45,7 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
     expect(await screen.findByText('然 来店スタンプカード')).toBeTruthy();
     expect(fx.cards).toHaveBeenCalledWith('acc-1');
     expect(fx.card).not.toHaveBeenCalled();
-    expect(fx.paperRequests).toHaveBeenCalledWith('acc-1', 'c1');
+    await waitFor(() => expect(fx.paperRequests).toHaveBeenCalledWith('acc-1', 'c1'));
   });
   it('ページを開き直すと、ゴールで受け取った次のカードを表示する', async () => {
     const previous = { ...card, settings: { ...card.settings, completion: 'next_card' as const, nextCardId: 'gold' } };
@@ -161,4 +161,21 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
     expect(paperPhotoProblem({ type: 'image/png', size: 6 * 1024 * 1024 })).toContain('5MB');
     expect(paperPhotoProblem({ type: 'image/webp', size: 10 })).toBe('');
   });
+});
+
+it('カードを開いた時点で倍率と初回ボーナスを知らせる', async () => {
+  const configured = { ...card, settings: { ...card.settings, firstVisitBonus: 2, multipliers: [{ name: '週末', multiplier: 2, weekdays: [0, 6] }] } };
+  fx.cards.mockResolvedValue({ success: true, data: [{ card: configured, wallet: wallet(3) }] });
+  render(<VisitStamps />);
+  expect(await screen.findByText('初回の来店は2個追加')).toBeTruthy();
+  expect(screen.getByText('週末：2倍（日・土曜日）')).toBeTruthy();
+});
+
+it('B-241: 紙のカードの履歴取得失敗を新規申請とせず、もう一度で確認待ちに戻る', async () => {
+  fx.paperRequests.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ success: true, data: [{ id: 'p', status: 'pending', stamps: 3, createdAt: '2026-10-11T00:00:00Z' }] });
+  render(<VisitStamps />);
+  fireEvent.click(await screen.findByRole('button', { name: '紙のカードを移す' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }));
+  await screen.findByText('確認待ち');
+  expect(fx.requestPaper).not.toHaveBeenCalled();
 });

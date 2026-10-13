@@ -7,10 +7,12 @@
  * 今の画面（app/notifications/page.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
+import Card from '@/components/shared/card'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CheckCheck, Sparkles, TriangleAlert } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -44,9 +46,9 @@ export default function NotificationsV8() {
   const filter: DashboardNotificationFilter =
     categoryParam === 'error' || categoryParam === 'update' ? categoryParam : 'all'
   const [items, setItems] = useState<NotificationCenterItem[]>([])
-  // 未読が先・新しい順。口が作成日の新しい順で返すので、未読と既読に分けるだけ（それぞれの中は口の順のまま）。
+  // 読み込んだ範囲を未読が先・新しい順にする。追加取得後も同じ順を保つ。
   const orderedItems = useMemo(
-    () => [...items.filter((row) => !row.isRead), ...items.filter((row) => row.isRead)],
+    () => [...items].sort((a, b) => a.isRead !== b.isRead ? (a.isRead ? 1 : -1) : b.createdAt.localeCompare(a.createdAt)),
     [items],
   )
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
@@ -220,7 +222,7 @@ export default function NotificationsV8() {
           />
         ) : null}
 
-        <div className={styles.box}>
+        <Card padding="rows" surface="inset" overflow="hidden" aria-label="通知一覧">
           {listFailed ? (
             <ListState
               kind="error"
@@ -261,7 +263,7 @@ export default function NotificationsV8() {
             </ul>
           )}
           {loading ? <p className={styles.loading}>{STATE_TEXT.loading}…</p> : null}
-        </div>
+        </Card>
 
         <div className={styles.foot}>
           <p className={styles.note}>

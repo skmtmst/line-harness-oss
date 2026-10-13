@@ -1,4 +1,37 @@
 'use client'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { CalendarClock, Check, Timer } from 'lucide-react';
+import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared';
+import { ApiError, api } from '@/lib/api';
+import { CreatePage } from '@/components/templates';
+import { Steps } from '@/components/templates/steps';
+import { notifyToast } from '@/components/shared/toast';
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
+import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import HelpTip from '@/components/shared/help-tip'
+import { TextField } from '@/components/shared/text-field';
+import { RequiredBadge } from '@/components/shared/form-controls';
+import { isForbiddenOrRateLimited, loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import TargetMissing from '@/components/shared/target-missing'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { useStaffRole } from '@/lib/staff-role';
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
+import styles from './create.module.css'
+import DeliveryModeDiagram from './delivery-mode-diagram'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
@@ -11,42 +44,9 @@
  * `id` なしで開いたときはまだ行を作らない。方式の確定か
  * 「あとで決める」ではじめて作成する（N-055）。
  */
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { CalendarClock, Check, Timer } from 'lucide-react'
-import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
-import { ApiError, api } from '@/lib/api'
-import { CreatePage } from '@/components/templates'
-import { Steps } from '@/components/templates/steps'
-import { notifyToast } from '@/components/shared/toast'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
-import {
-  forgetNewScenarioDraftKey,
-  newScenarioDraftKey,
-  scenarioDraftKey,
-  useScenarioDraft,
-} from '@/v8/autosave/use-scenario-draft'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import HelpTip from '@/components/shared/help-tip'
-import { TextField } from '@/components/shared/text-field'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
-import TargetMissing from '@/components/shared/target-missing'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import styles from './create.module.css'
-import DeliveryModeDiagram from './delivery-mode-diagram'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export default function ScenarioCreateV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('シナリオを作成')
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
@@ -55,7 +55,8 @@ export default function ScenarioCreateV8() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみと分かったら作る操作を隠す。
-  const canEdit = role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
   const [scenario, setScenario] = useState<Scenario | null>(null)
   // id なしは「これから作る」。読み込む行が無いので最初から入力できる。
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
@@ -106,8 +107,13 @@ export default function ScenarioCreateV8() {
         setFolderId(res.data.folderId ?? '')
         return true
       } catch (cause) {
-        setError(scenarioSaveError(cause))
-        setFolderId(scenario.folderId ?? '')
+        const fieldFailure = saveErrors.capture(cause)
+
+        { if (!fieldFailure)
+
+        setError(scenarioSaveError(cause)) }
+        setFolderId(scenario.folderId ?? '');
+
         return false
       } finally {
         setDetailsSaving(false)
@@ -259,7 +265,11 @@ export default function ScenarioCreateV8() {
       // 3段目へ。手順の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
-      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       setSaving(null)
     }
   }
@@ -278,9 +288,12 @@ export default function ScenarioCreateV8() {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
         // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
-        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       } finally {
         setDetailsSaving(false)
       }
@@ -359,11 +372,11 @@ export default function ScenarioCreateV8() {
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -400,7 +413,7 @@ export default function ScenarioCreateV8() {
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
         {!canEdit ? (
-          <p className={styles.viewerBand} role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
         ) : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (
@@ -434,7 +447,7 @@ export default function ScenarioCreateV8() {
         <div className={styles.infoRow}>
           <div className={styles.nameField} ref={nameWrapRef}>
             <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
@@ -443,13 +456,13 @@ export default function ScenarioCreateV8() {
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-            />
+            /></SaveErrorField>
             {nameError ? <span id="scenario-name-error" className={styles.fieldError}>{nameError}</span> : null}
           </div>
           <div className={styles.folderField}>
             <span className={styles.fieldLabelStrong}>フォルダ</span>
             <span title={selectedFolderName} className={styles.folderSelect}>
-              <FolderSelect
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
                 onChange={(value) => {
@@ -466,7 +479,7 @@ export default function ScenarioCreateV8() {
                 onCreate={canEdit && !locked
                   ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
-              />
+              /></SaveErrorField>
             </span>
             {folderState !== 'ready' || detailsSaving ? (
               <span className={styles.fieldHint}>
@@ -492,7 +505,7 @@ export default function ScenarioCreateV8() {
           <h2 className={styles.cardTitle}>配信方式</h2>
           <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>
         </div>
-        <RadioCardGroup legend="配信方式" className={styles.modeRow}>
+        <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
             value="absolute_time"
@@ -517,9 +530,9 @@ export default function ScenarioCreateV8() {
           >
             <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
           </RadioCard>
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </Card>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 

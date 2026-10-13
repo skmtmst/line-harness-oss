@@ -164,7 +164,7 @@ export default function ChatThreadWindow<M extends ThreadMessage>({
         tabIndex={i === win.end - 1 ? 0 : -1}
         /* 行の間 8px は行の中に持つ（外の余白だと測った高さに入らない）。 */
         style={{ display: 'flow-root', paddingTop: i === 0 ? 0 : rowGap }}
-        className="rounded-mini focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+        className="rounded-mini focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
         {renderMessage(message, i, messages)}
       </div>,

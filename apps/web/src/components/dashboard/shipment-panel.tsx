@@ -192,7 +192,7 @@ export default function ShipmentPanel({
                   {rows.map((row) => {
                     const { label, tone } = formatShipDate(row.shipDate, data.today, data.tomorrow)
                     return (
-                      <Tr key={row.id}>
+                      <Tr key={row.id} href={`/chats?friend=${row.friendId}`}>
                         <Td className="text-ink-faint font-mono text-xs whitespace-nowrap">
                           {row.orderNumber || '—'}
                         </Td>

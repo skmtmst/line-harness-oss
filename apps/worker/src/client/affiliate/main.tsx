@@ -11,9 +11,18 @@
 import React, { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
+import '../../../../liff/src/embedded.css';
+import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
+import LiffLookScope from '../../../../liff/src/components/LiffLookScope.js';
+import { LOAD_FAILED_MESSAGE } from '../../../../liff/src/lib/user-message.js';
+import MileageRewards from '../../../../liff/src/components/MileageRewards.js';
+import AffiliatePayments from '../../../../liff/src/components/AffiliatePayments.js';
+import { setLiffContext } from '../../../../liff/src/lib/liff-auth.js';
+import { setAffiliateAccessToken } from '../../../../liff/src/lib/affiliate-self-api.js';
 
 export interface AffiliateContext {
   liffId: string;
+  idToken?: string;
   lineUserId: string;
   /** LINE access token (liff.getAccessToken()); auth for the affiliate API. */
   lineAccessToken: string;
@@ -133,7 +142,7 @@ async function fetchMe(
 async function fetchOffers(token: string): Promise<OfferData[]> {
   const url = `/api/liff/affiliate/offers?lineAccessToken=${encodeURIComponent(token)}`;
   const res = await fetch(url);
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error('案件を読み込めませんでした。');
   const data = (await res.json()) as { offers: OfferData[] };
   return data.offers;
 }
@@ -689,7 +698,7 @@ function OfferCard({
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="af-badge" style={{ background: '#ecfdf5', color: '#06C755' }}>
+          <span className="af-badge" style={{ background: '#ecfdf5', color: 'var(--customer-primary, #06C755)' }}>
             {rewardText(offer.rewardAmount)}
           </span>
           {offer.rewardMiles > 0 && (
@@ -746,13 +755,13 @@ function App({ ctx }: { ctx: AffiliateContext }) {
       if (result.registered) {
         // Fetch offers in parallel; fall back to [] on error so a transient
         // offers failure never blocks the main registered view.
-        const offers = await fetchOffers(token).catch(() => []);
+        const offers = await fetchOffers(token);
         setState({ phase: 'registered', affiliate: result.affiliate, links: result.links, offers });
       } else {
         setState({ phase: 'not_registered' });
       }
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     }
   }, [token]);
 
@@ -766,10 +775,10 @@ function App({ ctx }: { ctx: AffiliateContext }) {
     setRegisterBusy(true);
     try {
       const data = await postRegister(token);
-      const offers = await fetchOffers(token).catch(() => []);
+      const offers = await fetchOffers(token);
       setState({ phase: 'registered', affiliate: data.affiliate, links: data.links, offers });
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     } finally {
       // Release on both success and failure: success repaints to the registered
       // view (button gone), failure repaints to the error view whose retry path
@@ -788,16 +797,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
     );
   }
 
-  if (state.phase === 'error') {
-    return (
-      <div className="af-fade-in max-w-md mx-auto p-4">
-        <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{state.message}</div>
-        <button onClick={loadMe} className="mt-3 text-sm af-line-green-text font-semibold underline">
-          再読み込み
-        </button>
-      </div>
-    );
-  }
+  if (state.phase === 'error') return <LiffLookScope className="min-h-screen bg-canvas"><LoadErrorView message={state.message} onRetry={() => void loadMe()} /></LiffLookScope>;
 
   if (state.phase === 'not_registered') {
     return (
@@ -868,7 +868,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
   }
 
   return (
-    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: '#f7f8fa', minHeight: '100vh' }}>
+    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: 'var(--customer-background, #f7f8fa)', minHeight: '100vh' }}>
       <div>
         <h1 className="text-lg font-bold text-gray-900">マイル・紹介</h1>
         <p className="text-xs text-gray-500 mt-1">あなたの活動と紹介成果をまとめて確認できます</p>
@@ -878,6 +878,8 @@ function App({ ctx }: { ctx: AffiliateContext }) {
 
       {wallet && <MileageOpportunities items={wallet.opportunities} />}
 
+      <MileageRewards onChanged={loadMe} />
+      <AffiliatePayments editable={state.affiliate.isActive} />
       <ReferralSummary links={links} />
 
       {/* 参加中の案件 — 案件ごとにリンクをまとめる */}
@@ -951,6 +953,8 @@ export function mountAffiliate(container: HTMLElement, ctx: AffiliateContext): v
   // body.af-active gates the namespaced preflight reset + #app inline override.
   // Add it synchronously before createRoot so the first paint isn't the browser
   // default (black button borders, list disc) — same rationale as salon-booking.
+  if (ctx.idToken) setLiffContext({ ...ctx, idToken: ctx.idToken });
+  setAffiliateAccessToken(ctx.lineAccessToken);
   document.body.classList.add('af-active');
 
   if (_root) {
@@ -971,5 +975,6 @@ export function unmountAffiliate(): void {
     _root.unmount();
     _root = null;
   }
+  setAffiliateAccessToken(null);
   document.body.classList.remove('af-active');
 }

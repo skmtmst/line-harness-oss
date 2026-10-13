@@ -57,6 +57,7 @@ async function render(node: React.ReactElement) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/tags')
   role.value = 'owner'
   narrow.value = false
   replaceMock.mockReset()
@@ -78,13 +79,19 @@ describe('V8 タグ タグの一覧', () => {
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
     // 左にフォルダの列があるので表にフォルダ列は置かない（2026-10-07 オーナー）。
     expect(heads).toEqual(['タグ', '人数', '付け方', '連動', '使っている所', '操作'])
-    expect(container.querySelectorAll('tbody [role="group"][aria-label^="タグ「"]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
+    expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
       expect(screen.getAllByRole('tab', { name: label }).length).toBeGreaterThan(0)
     }
     expect(container.querySelector('[data-design-node="I1E7Bt"]')).not.toBeNull()
     expect(screen.getByText('EC顧客連携済み')).toBeTruthy()
-    expect(screen.getAllByText('1月13日（火）登録').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
+    expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('登録')
+  })
+
+  it('空の状態列を外しても、名前が重なったタグの注意は出す', async () => {
+    await render(<TagsList fixture={{ ...fixture, items: fixture.items.map((tag, index) => index === 0 ? { ...tag, cleanupReasons: ['duplicate_name' as const] } : tag) }} />)
+    expect(screen.getByRole('columnheader', { name: '状態' })).toBeTruthy()
+    expect(screen.getByText('名前が重なっている')).toBeTruthy()
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
@@ -92,9 +99,9 @@ describe('V8 タグ タグの一覧', () => {
     narrow.value = true
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="aPeD8"]')).not.toBeNull()
-    // 1152 でもタグ札の形は同じ。フォルダ列の出し入れは今のまま。
-    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).toContain('フォルダ')
-    expect(container.querySelectorAll('tbody [role="group"][aria-label^="タグ「"]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
+    // B-217：1152でも名前の色の丸でフォルダを伝え、重複の列を置かない。
+    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).not.toContain('フォルダ')
+    expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     await act(async () => root.unmount())
     root = createRoot(container)
     role.value = 'staff'

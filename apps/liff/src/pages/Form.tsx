@@ -1,16 +1,22 @@
+import { useRequestGeneration } from '../lib/use-request-generation.js';
+import SeatBookingBlock from '../components/SeatBookingBlock.js';
+import { restaurantBookingApi } from '../lib/api.js';
+import FormReception, { choiceReceptionLabel } from '../components/FormReception.js';
 import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/forms/controls.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import liff from '@line/liff';
+import liff from '../lib/liff-runtime.js';
 import {
   PREFECTURES,
   collectInputs,
   isOtherFreeText,
+  formChoiceIsSelected,
   nextSectionIndex,
   normalizeBookingValue,
   normalizeFormTheme,
   normalizeRatingValue,
   validateAnswer,
+  type FormAvailability,
   type FormBlock,
   type FormBookingValue,
   type FormInputBlock,
@@ -63,14 +69,16 @@ import { LiffInput } from '../components/forms/controls.js'
 type Answers = Record<string, unknown>;
 
 /** 選択肢を選んだ状態から、はじめの値を作る。 */
-function initialAnswers(layout: FormLayout): Answers {
+function initialAnswers(layout: FormLayout, availability?: FormAvailability): Answers {
   const answers: Answers = {};
   for (const block of collectInputs(layout)) {
-    if (block.defaultValue) {
-      answers[block.name] = block.defaultValue;
+    const limited = availability?.choices[block.name] ?? {};
+    const defaultValue = block.defaultValue;
+    if (defaultValue && !(block.choices ?? []).some(c => limited[c.id]?.full && formChoiceIsSelected(block, c, [defaultValue]))) {
+      answers[block.name] = defaultValue;
       continue;
     }
-    const preselected = (block.choices ?? []).filter((c) => c.defaultSelected);
+    const preselected = (block.choices ?? []).filter((c) => c.defaultSelected && !limited[c.id]?.full);
     if (preselected.length === 0) continue;
     answers[block.name] =
       block.type === 'checkbox' ? preselected.map((c) => c.label) : preselected[0].label;
@@ -111,8 +119,9 @@ function OtherTextInput({
 }
 
 export default function Form() {
-  const { id } = useParams<{ id: string }>();
+  const route = useParams<{ id: string }>();
   const [search] = useSearchParams();
+  const id = route.id ?? search.get('id') ?? undefined;
   /**
    * P（試し回答）：管理画面の試しURLに付く合言葉。あるときは下書きを試す。
    * 試しの回答は集計に入らず、回答後の動作も動かない。
@@ -126,6 +135,7 @@ export default function Form() {
   const [sectionIndex, setSectionIndex] = useState(0);
   /** 通ってきたページ。「前へ」で分岐を逆にたどるために覚える */
   const [trail, setTrail] = useState<number[]>([]);
+  const request = useRequestGeneration(JSON.stringify([id, testToken, sectionIndex]));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -152,7 +162,7 @@ export default function Form() {
       try {
         const data = await api.getForm(id, testToken ?? undefined);
         if (cancelled) return;
-        const defaults = initialAnswers(data.layout);
+        const defaults = initialAnswers(data.layout, data.availability);
         setForm(data);
         setAnswers(defaults);
         // タブの題は上の帯（LiffHeader）が pageTitle・フォーム名から付ける。
@@ -163,10 +173,18 @@ export default function Form() {
           try {
             const latest = await api.getMyLatestFormAnswer(id);
             if (!cancelled && latest?.answers) {
-              const restored = { ...latest.answers };
-              // A document belongs to one answer. Restore other inputs; reselect attachments.
-              collectInputs(data.layout).filter(block => block.type === 'file').forEach(block => { delete restored[block.name]; });
-              setAnswers((prev) => ({ ...prev, ...restored }));
+              setAnswers((prev) => {
+                const next = { ...prev, ...latest.answers };
+                // 添付は回答ごとに選び直す。
+                collectInputs(data.layout).filter(block => block.type === 'file').forEach(block => { delete next[block.name]; });
+                for (const block of collectInputs(data.layout)) {
+                  const full = (block.choices ?? []).filter(c => data.availability?.choices[block.name]?.[c.id]?.full);
+                  const unavailable = (value: string) => full.some(c => formChoiceIsSelected(block, c, [value]));
+                  if (Array.isArray(next[block.name])) next[block.name] = (next[block.name] as string[]).filter(v => !unavailable(v));
+                  else if (unavailable(String(next[block.name] ?? ''))) next[block.name] = '';
+                }
+                return next;
+              });
             }
           } catch {
             // 前回の回答は無くても入力はできる
@@ -292,6 +310,8 @@ export default function Form() {
   };
 
   const goBack = () => {
+    request.invalidate();
+    setSending(false);
     setError(null);
     setTrail((prev) => {
       const next = [...prev];
@@ -335,7 +355,7 @@ export default function Form() {
    * 枠の再確認と重なり防止は予約の受け口が担い、埋まっていれば断る。
    * 試し回答では予約を入れない。失敗の文言を返し、空なら全件確保できた。
    */
-  const ensureBookings = async (key: string): Promise<string | null> => {
+  const ensureBookings = async (key: string, generation: number): Promise<string | null> => {
     if (testToken || !layout) return null;
     const targets = collectInputs(layout)
       .map((block) => ({ block, picked: normalizeBookingValue(answers[block.name]) }))
@@ -343,12 +363,16 @@ export default function Form() {
     const made: Array<{ startsAt: string; status: string }> = [];
     setBooked([]);
     for (const { block, picked } of targets) {
-      const slot = picked as { menuId: string; staffId: string; startsAt: string };
+      if (!request.isCurrent(generation)) return null;
+      const slot = picked!;
       try {
-        const res = await api.createRequest(
+        const res = slot.kind === 'seats'
+          ? (await restaurantBookingApi.formBooking({formId:id!,blockId:block.id,submissionKey:key})).data
+          : await api.createRequest(
           { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
           `${key}:booking:${block.id}`,
         );
+        if (!request.isCurrent(generation)) return null;
         made.push({ startsAt: slot.startsAt, status: res?.status ?? 'requested' });
         setBooked([...made]);
       } catch (err) {
@@ -364,28 +388,32 @@ export default function Form() {
   };
 
   const retryBookings = async () => {
+    const generation = request.begin();
     setBookingRetrying(true);
     try {
-      const message = await ensureBookings(idemKey);
-      setBookingError(message);
+      const message = await ensureBookings(idemKey, generation);
+      if (request.isCurrent(generation)) setBookingError(message);
     } finally {
-      setBookingRetrying(false);
+      if (request.isCurrent(generation)) setBookingRetrying(false);
     }
   };
 
-  const sendFlow = async (key: string): Promise<void> => {
+  const sendFlow = async (key: string, generation: number): Promise<void> => {
     // 送り直しの判定は lib/form-submit-flow.ts の判定表に従う。内容違い・
     // 期限切れの自動付け替えはここには書かない(書くと二重回答になる)。
     let current = key;
     for (let i = 0; i < 6; i += 1) {
+      if (!request.isCurrent(generation)) return;
       const attempt = await api.submitForm(id!, {
         data: Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, Array.isArray(value) ? value.map(v => v && typeof v === 'object' && 'fileId' in v ? { fileId: v.fileId } : v) : value])),
         trackedLinkId: search.get('ref') ?? undefined,
       }, current, testToken ?? undefined);
+      if (!request.isCurrent(generation)) return;
       const decision = decideFormSubmitStep(attempt);
       if (decision.action === 'done') {
         // 回答の保存後に予約を確保する。予約だけ失敗しても回答は残す。
-        const bookingMessage = await ensureBookings(current);
+        const bookingMessage = await ensureBookings(current, generation);
+        if (!request.isCurrent(generation)) return;
         setBookingError(bookingMessage);
         const url = !bookingMessage ? layout!.options?.thanksUrl : undefined;
         if (url) {
@@ -429,18 +457,21 @@ export default function Form() {
       return;
     }
 
+    if (sending) return;
+    const generation = request.begin();
     setConfirming(false);
     setSending(true);
     setError(null);
     setConflict(null);
     setBookingError(null);
     try {
-      await sendFlow(keyOverride ?? idemKey);
+      await sendFlow(keyOverride ?? idemKey, generation);
     } catch (err) {
+      if (!request.isCurrent(generation)) return;
       logFailure('form-submit', err);
       setError(submitErrorText(err));
     } finally {
-      setSending(false);
+      if (request.isCurrent(generation)) setSending(false);
     }
   };
 
@@ -471,12 +502,13 @@ export default function Form() {
   const hasCustomTheme = options.theme !== undefined && options.theme !== null;
 
   // P（試し回答）：試し合言葉があるときは、受付停止の下書きでも試せる。
-  if (!form.isActive && !testToken) {
+  if ((!form.isActive && !testToken) || form.availability?.accepting === false) {
     return (
       <div className="min-h-screen bg-canvas">
         <LiffHeader title={options.pageTitle || form.name} />
         <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
-          <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
+          <StatusView icon="calendar" title={form.availability?.reason || 'このフォームは、いま回答を受け付けていません。'} />
+          <Button variant="secondary" onClick={() => setReloadKey(n => n + 1)}>もう一度読み込む</Button>
         </div>
       </div>
     );
@@ -580,6 +612,7 @@ export default function Form() {
       uploading={!!uploading[block.kind === 'input' ? block.name : '']}
       error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
       errorColor={theme.error}
+      choiceAvailability={block.kind === 'input' ? form.availability?.choices[block.name] : undefined}
     />
   );
 
@@ -629,6 +662,7 @@ export default function Form() {
             </p>
           )}
 
+          {firstPage && <FormReception availability={form.availability} />}
           {bodyBlocks.map((block) => blockView(block))}
 
           {error && (
@@ -645,20 +679,6 @@ export default function Form() {
             </div>
           )}
 
-          {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
-          {isLast && <PrivacyNote />}
-        </div>
-      </div>
-
-      <BottomBar>
-        <Button variant="primary"
-          type="button"
-          onClick={() => (isLast ? submit() : goNext())}
-          disabled={sending || Object.values(uploading).some(Boolean)}
-          style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
-        >
-          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
-        </Button>
         {trail.length > 0 && (
           <Button variant="text"
             type="button"
@@ -667,6 +687,21 @@ export default function Form() {
             ← {options.prevLabel || '前のページへ'}
           </Button>
         )}
+          {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
+          {isLast && <PrivacyNote />}
+        </div>
+      </div>
+
+      <BottomBar appearance="form">
+        <Button variant="primary"
+          type="button"
+          onClick={() => (isLast ? submit() : goNext())}
+          disabled={sending || Object.values(uploading).some(Boolean)}
+          style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+        >
+          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+        </Button>
+
       </BottomBar>
 
       {confirming && (
@@ -837,7 +872,11 @@ function AddressFields({
  * 日にち→時刻の順に空き枠から選ぶ。選んだ枠は回答に入れ、送信後に
  * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
  */
-export function BookingSlotPicker({
+export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void}) {
+  return props.block.booking?.kind==='seats' ? <SeatBookingBlock {...props} /> : <PeopleBookingSlotPicker {...props} />;
+}
+
+function PeopleBookingSlotPicker({
   block,
   value,
   onChange,
@@ -1020,6 +1059,7 @@ function BlockView({
   uploading,
   error,
   errorColor,
+  choiceAvailability,
 }: {
   block: FormBlock;
   /** ページの先頭の画像 (題の上の表紙)。★V8 B8rCt は高さ 96・角丸 12 の帯。 */
@@ -1031,6 +1071,7 @@ function BlockView({
   uploading: boolean;
   error: string | null;
   errorColor: string;
+  choiceAvailability?: Record<string, { remaining: number; full: boolean }>;
 }) {
   if (block.kind === 'heading') {
     const size = block.level === 1 ? 'text-xl' : block.level === 3 ? 'text-sm' : 'text-lg';
@@ -1099,7 +1140,7 @@ function BlockView({
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <FieldLabel id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
+      <FieldLabel size="form" id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
         {block.label}
       </FieldLabel>
       {block.description && (
@@ -1155,8 +1196,8 @@ function BlockView({
             >
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
-                <option key={choice.id} value={choice.label}>
-                  {choice.label}
+                <option key={choice.id} value={choice.label} disabled={choiceAvailability?.[choice.id]?.full}>
+                  {choice.label}{choiceReceptionLabel(choiceAvailability?.[choice.id])}
                 </option>
               ))}
             </FormSelectControl>
@@ -1184,9 +1225,10 @@ function BlockView({
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
+                      disabled={choiceAvailability?.[choice.id]?.full}
                       onChange={() => onChange(block.name, choice.label)}
                     />
-                    {choice.label}
+                    {choice.label}{choiceReceptionLabel(choiceAvailability?.[choice.id])}
                   </FormChoiceRow>
                   {choice.isOther && checkedRadio && (
                     <OtherTextInput
@@ -1213,6 +1255,7 @@ function BlockView({
                     <ChoiceInput
                       type="checkbox"
                       checked={isChecked}
+                      disabled={choiceAvailability?.[choice.id]?.full}
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -1229,7 +1272,7 @@ function BlockView({
                         );
                       }}
                     />
-                    {choice.label}
+                    {choice.label}{choiceReceptionLabel(choiceAvailability?.[choice.id])}
                   </FormChoiceRow>
                   {choice.isOther && isChecked && (
                     <OtherTextInput

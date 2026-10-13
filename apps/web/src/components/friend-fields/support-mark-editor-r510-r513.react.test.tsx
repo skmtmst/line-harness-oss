@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import React from 'react'
+import { navigationMock } from '@/test-utils/navigation-mock'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const identity = vi.hoisted(() => ({ role: 'owner' }))
 const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
   marksList: vi.fn(),
@@ -12,14 +14,17 @@ const fixture = vi.hoisted(() => ({
 }))
 
 vi.mock('next/navigation', () => ({
+  ...navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1' }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
+    staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     supportMarks: {
       list: fixture.marksList,
       create: fixture.marksCreate,
@@ -37,7 +42,7 @@ vi.mock('./support-mark-rules-panel', () => ({
   default: () => null,
 }))
 
-import SupportMarkEditor from './support-mark-editor'
+import SupportMarkEditor from '@/v8/tags/mark-editor'
 
 const oldMark = {
   id: 'm-1',
@@ -55,6 +60,7 @@ function createButton(): HTMLButtonElement {
 }
 
 beforeEach(() => {
+  identity.role = 'owner'
   const store = new Map<string, string>()
   Object.defineProperty(window, 'localStorage', {
     value: {
@@ -95,7 +101,7 @@ describe('R510 一覧の読込失敗中は作成を止め、その場で再試�
 
     fireEvent.click(createButton())
     await waitFor(() => expect(fixture.marksCreate).toHaveBeenCalledTimes(1))
-    expect(fixture.routerPush).toHaveBeenCalledWith('/tags?tab=marks')
+    await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith(expect.stringMatching(/^\/tags\?tab=marks(?:&.*)?$/)))
   })
 })
 
@@ -108,6 +114,7 @@ describe('R511 権限のない担当者に作成を案内しない', () => {
   })
 
   it('役割がstaffと分かっているときも作成を案内しない', async () => {
+    identity.role = 'staff'
     window.localStorage.setItem('lh_staff_role', 'staff')
     render(<SupportMarkEditor />)
     await screen.findByText('この操作の権限がありません。オーナーか管理者に頼んでください。')
@@ -120,7 +127,7 @@ describe('R511 権限のない担当者に作成を案内しない', () => {
     await screen.findByPlaceholderText('例：要確認')
     fixture.marksCreate.mockRejectedValueOnce({ status: 403 })
     fireEvent.click(createButton())
-    await screen.findByText('このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。')
+    await screen.findByText('この操作の権限がありません。オーナーか管理者に頼んでください。')
     expect(createButton().disabled).toBe(true)
     expect(fixture.marksCreate).toHaveBeenCalledTimes(1)
   })
@@ -139,7 +146,7 @@ describe('R512 応答消失後の再試行は同じ要求キーで送る', () =>
 
     fixture.marksCreate.mockResolvedValueOnce({ success: true, data: { id: 'm-9' } })
     fireEvent.click(createButton())
-    await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/tags?tab=marks'))
+    await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith(expect.stringMatching(/^\/tags\?tab=marks(?:&.*)?$/)))
     const secondKey = fixture.marksCreate.mock.calls[1][2] as string
     // 入力を変えていない再試行は同じ要求キーで送る（二重に作らない）。
     expect(secondKey).toBe(firstKey)
@@ -185,7 +192,7 @@ describe('R513 古い版の保存は止めて最新と比べられる', () => {
       'm-1', 'account-1', expect.objectContaining({ expectedVersion: 1 }),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '最新の内容を取り込む' }))
+    fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
     expect((screen.getByPlaceholderText('例：要確認') as HTMLInputElement).value).toBe('Bの名前')
 
     fixture.marksUpdate.mockResolvedValueOnce({ success: true, data: { id: 'm-1' } })

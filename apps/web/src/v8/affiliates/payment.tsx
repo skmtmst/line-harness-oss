@@ -1,16 +1,5 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
- *
- * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 決まりは今と同じ：
- * - 締めは日本時間の暦月で固定する
- * - 締め済みの台帳があれば settlementCurrent で再開する
- * - アカウント切替の遅い応答は世代番号で捨てる
- * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
- * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarClock, CalendarDays, FileText, Landmark, Lock, ReceiptText, TriangleAlert, Users, Wallet } from 'lucide-react'
@@ -30,16 +19,30 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
 import { currentSettlementPeriod, formatDate, formatMonthDay, formatYen, pageCountOf, pageOf, periodText } from './display'
 import { AffiliatePaymentConfirmDialog } from './dialogs'
-import { AffiliateFrame, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
 import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
+ *
+ * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
+ * 決まりは今と同じ：
+ * - 締めは日本時間の暦月で固定する
+ * - 締め済みの台帳があれば settlementCurrent で再開する
+ * - アカウント切替の遅い応答は世代番号で捨てる
+ * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
+ * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
+ */
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -63,6 +66,7 @@ const SAVED_VIEWS = [
 ]
 
 export default function PaymentTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow, accountId } = useAffiliateShell()
   const period = useMemo(() => currentSettlementPeriod(), [])
   const [items, setItems] = useState<AffiliatePaymentSummary[]>([])
@@ -103,12 +107,13 @@ export default function PaymentTab() {
     try {
       const [settlement, summaries, current] = await Promise.all([
         api.affiliates.settlementPreview(accountId, period),
-        api.affiliates.paymentSummaries(accountId).catch(() => null),
-        api.affiliates.settlementCurrent(accountId, period).catch(() => null),
+        api.affiliates.paymentSummaries(accountId),
+        api.affiliates.settlementCurrent(accountId, period),
       ])
       if (seq !== loadSeq.current) return
+      if(!summaries.success || !Array.isArray(summaries.data) || !current.success)throw new Error('payment data unavailable')
       if (!settlement.success || !Array.isArray(settlement.data.affiliates)) throw new Error('payment data malformed')
-      setItems(summaries?.success && Array.isArray(summaries.data) ? summaries.data : [])
+      setItems(summaries.data)
       setPreview(settlement.data)
       const found = current?.success && current.data && typeof current.data === 'object' && 'settlementId' in current.data ? current.data : null
       setResumed(found)
@@ -123,13 +128,15 @@ export default function PaymentTab() {
         })
       }
       setLoadState('ready')
-    } catch {
+    } catch (saveFailure) {
       if (seq !== loadSeq.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setItems([])
       setPreview(null)
-      setLoadState('error')
+      { if (!fieldFailure)
+      setLoadState('error') }
     }
-  }, [accountId, period])
+  }, [accountId, period, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -180,7 +187,10 @@ export default function PaymentTab() {
       }
       if (resumed && succeeded > 0) void load()
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -197,7 +207,10 @@ export default function PaymentTab() {
       if (!response.success) throw new Error(response.error)
       setBatch(response.data)
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -360,13 +373,13 @@ export default function PaymentTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tablePayment}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>払う相手</Th>
-            <Th className={`${styles.colPayAmount} ${styles.num}`}>今回 払う額</Th>
-            <Th className={`${styles.colPayCount} ${styles.num}`}>中身</Th>
-            <Th className={styles.colPayBank}>振込先</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>払う相手</Th>
+            <Th align="right" className={styles.colPayAmount}>今回 払う額</Th>
+            <Th collapseAt="narrow" align="right" className={styles.colPayCount}>中身</Th>
+            <Th collapseAt="narrow" className={styles.colPayBank}>振込先</Th>
             <Th className={styles.colPayState}>状態</Th>
             <Th className={styles.colPayOps}>操作</Th>
           </TableHeadRow>
@@ -376,27 +389,27 @@ export default function PaymentTab() {
             const summary = summaries.get(item.affiliateId)
             const gross = item.grossAmount ?? item.amount + (item.deduction ?? 0)
             return (
-              <Tr key={item.affiliateId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}>
+              <Tr key={item.affiliateId} data-table-layout="columns">
+                <Td grow><FolderDotName>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={item.affiliateName}  onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</button>
-                    <span className={styles.rowPlan}>{`コード ${item.code}`}</span>
+                    <RowNameButton title={item.affiliateName} onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</RowNameButton>
+
                   </span>
-                </Td>
-                <Td className={`${styles.colPayAmount} ${styles.num}`}>
+                </FolderDotName></Td>
+                <Td align="right" className={styles.colPayAmount}>
                   <span className={styles.stackEnd}>
                     <span className={styles.cellNum}>{formatYen(item.amount)}</span>
-                    <span className={styles.rowWrapEnd}>{`元の報酬 ${formatYen(gross)} − 取消 ${formatYen(item.deduction ?? 0)}`}</span>
+                    <span className={styles.rowWrapEnd}><TruncatedText value={`元の報酬 ${formatYen(gross)} − 取消 ${formatYen(item.deduction ?? 0)}`} /></span>
                   </span>
                 </Td>
-                <Td className={`${styles.colPayCount} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(item.conversionCount)} 件`}</span></Td>
-                <Td className={styles.colPayBank}>
+                <Td collapseAt="narrow" align="right" className={styles.colPayCount}><span className={styles.cellNum}>{`${formatNumber(item.conversionCount)} 件`}</span></Td>
+                <Td collapseAt="narrow" className={styles.colPayBank}>
                   {item.bankProfileRegistered ? (
                     <span className={styles.stack}>
                       <span className={styles.cellNum}>登録済み</span>
                       <span className={styles.rowPlan}>口座番号は本人だけに表示</span>
                     </span>
-                  ) : <StatusPill tone="danger">未登録</StatusPill>}
+                  ) : <span className={styles.cellNum}>未登録</span>}
                 </Td>
                 <Td className={styles.colPayState}>
                   <span className={styles.stack}>
@@ -460,7 +473,7 @@ export default function PaymentTab() {
   )
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
       actions={actions}
       stats={stats}
@@ -490,6 +503,6 @@ export default function PaymentTab() {
       </> : null}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

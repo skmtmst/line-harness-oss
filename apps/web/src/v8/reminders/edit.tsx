@@ -1,8 +1,10 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowDown,
   ArrowRight,
@@ -57,6 +59,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import Dialog from '@/components/shared/dialog'
 import DetailPanel from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -64,7 +67,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
-import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { firstReminderStepMessage, reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
@@ -80,11 +83,13 @@ import {
 import { describeReminderDiff } from './conflict-diff'
 import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV8, WizardFooterV8, type ReminderV8StepKey } from './ui'
 import styles from './edit.module.css'
+import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
 const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
@@ -98,12 +103,24 @@ const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
  *     p5YuP・r1l0bT（通知の中身 1440・1152）/ T0nis（配信予定）/
  *     ltAaq（確認）/ hjNpJ（有効にした）。
  * 画面の枠は型（CreatePage）が持つ。動き（API・保存・競合・テスト送信・有効化）は
- * 今の画面（app/reminders/edit/edit-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
+ * 既存のAPIと版管理を保持する。BEHAVIOR.md に一覧がある。
  */
 
 type V8Stage = 'basics' | 'target' | 'messages' | 'schedule' | 'confirm' | 'done'
 
-/** URL の ?stage= → 手順（今の画面と同じ名前）。 */
+/** 保存済みの対象人数。未取得を0にしない。現役の対象の段が使う。 */
+export function reminderAudienceCounts(validation: ReminderValidationResult | null) {
+  const matched = validation?.audience.matched ?? null
+  const excluded = validation?.audience.excluded ?? null
+  return {
+    matched,
+    excluded,
+    total: matched == null || excluded == null ? null : matched + excluded,
+  }
+}
+
+
+/** URLの?stage=を現役の手順へ対応させる。 */
 export function stageFor(raw: string | null): V8Stage {
   switch (raw) {
     case 'basics':
@@ -144,12 +161,9 @@ function formatJpDay(value: Date): string {
   return polishFormatDate(value, { style: 'detail' })
 }
 
-/** 届く日時の例に使う見本の基準日。3日後の14:00（端末の時計）。 */
+/** 届く日時の例に使う見本の基準日。日本時間で3日後の14:00。 */
 function sampleBaseDate(): Date {
-  const base = new Date()
-  base.setDate(base.getDate() + 3)
-  base.setHours(14, 0, 0, 0)
-  return base
+  return new Date(`${jstDateOffset(3)}T14:00:00+09:00`)
 }
 
 function exampleSendAt(step: ReminderDraftStep, mode: ReminderDraftSettings['deliveryMode'], base: Date): Date {
@@ -199,6 +213,8 @@ type StageFrame = {
 }
 
 export default function ReminderEditV8({ reminderId, stage }: { reminderId: string; stage: string | null }) {
+  const saveErrors = useSaveFormErrors()
+
   const v8stage = stageFor(stage)
   const narrowBoard = useNarrowBoard()
   usePageTitle(
@@ -228,6 +244,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const [loadMissing, setLoadMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [conflict, setConflict] = useState(false)
   const [compareTarget, setCompareTarget] = useState<ReminderDraftSettings | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
@@ -248,6 +265,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     const seq = ++requestSeq.current
     setLoading(true)
     setError('')
+    setLoadError(null)
     setLoadMissing(false)
     try {
       const response = await api.reminders.getDraft(reminderId)
@@ -260,12 +278,16 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setConflict(false)
     } catch (caught) {
       if (seq !== requestSeq.current) return
+      setLoadError(caught)
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) setLoadMissing(true)
-      else setError('下書きを読み込めませんでした。')
+      else { if (!fieldFailure)
+ setError('下書きを読み込めませんでした。') }
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [reminderId])
+  }, [reminderId, saveErrors])
 
   useEffect(() => {
     setDraft(null)
@@ -300,8 +322,11 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         return
       }
       setCompareTarget(response.data.settings)
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       setCompareBusy(false)
     }
@@ -415,10 +440,14 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       }
       return true
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
       } else if (!silent) {
-        setError('保存できませんでした。')
+        { if (!fieldFailure)
+
+        setError('保存できませんでした。') }
       }
       return false
     } finally {
@@ -435,7 +464,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const autosave = useDraftAutosave({
     fingerprint: JSON.stringify(v8stage === 'basics' ? basics : settings),
     dirty,
-    active: role === null || canManageRole(role),
+    active: canManageRole(role),
     enabled: !loading && !conflict && draft !== null && settings !== null
       && (v8stage !== 'basics' || Boolean(basics?.name.trim())),
     paused: leaveTarget !== null || busy,
@@ -473,8 +502,12 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       if (!response.success) throw new Error(response.error)
       setPublished(response.data)
       go('done')
-    } catch {
-      setError('リマインダを有効化できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('リマインダを有効化できませんでした。') }
     } finally {
       setBusy(false)
     }
@@ -483,14 +516,15 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const subjectDraft = draft && draft.reminderId === reminderId ? draft : null
   const subjectSettings = subjectDraft ? settings : null
 
-  if (loading) return <ListState kind="loading" title="下書きを読み込んでいます" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="下書きを読み込んでいます" /></SaveErrorScope>
   if (loadMissing) {
     return (
-      <ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
+      <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} /></SaveErrorScope>
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} />
+    const failure = isForbiddenOrRateLimited(loadError) ? loadFailureCopy(loadError, 'リマインダ') : null
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={failure?.title ?? '下書きを表示できませんでした'} description={failure?.description ?? (error || '下書きを読み込めませんでした。')} error={loadError ?? undefined} onRetry={() => void loadDraft()} /></SaveErrorScope>
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
@@ -541,7 +575,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     : null
 
   return (
-    <fieldset disabled={busy} className="contents">
+    <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents">
       {v8stage === 'basics' ? (
         <BasicsStageV8
           frame={frame}
@@ -683,7 +717,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           )
         })()}
       </ConfirmDialog>
-    </fieldset>
+    </fieldset></SaveErrorScope>
   )
 }
 
@@ -821,7 +855,7 @@ function BasicsStageV8({
 
 /* ---------------- 手順2：対象者と止める条件（YChR6） ---------------- */
 
-function TargetStageV8({
+export function TargetStageV8({
   frame,
   notice,
   reminderId,
@@ -891,12 +925,10 @@ function TargetStageV8({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderId, JSON.stringify(condition), recountRetryToken])
 
-  const matched = recount ? recount.matched : validation?.audience.matched ?? null
-  const total = recount
-    ? recount.matched + recount.excluded
-    : validation?.audience.matched != null && validation.audience.excluded != null
-      ? validation.audience.matched + validation.audience.excluded
-      : null
+  const savedAudience = reminderAudienceCounts(validation)
+  const matched = recount ? recount.matched : savedAudience.matched
+  const total = recount ? recount.matched + recount.excluded : savedAudience.total
+  const excluded = recount ? recount.excluded : savedAudience.excluded
 
   function openFaces() {
     if (recount) {
@@ -965,7 +997,7 @@ function TargetStageV8({
           <p className={styles.cardNote}>{audienceNote}</p>
         </div>
         <div className={styles.choiceRow} role="radiogroup" aria-label="対象者">
-          <ChoiceCardV8
+          <SaveErrorField names={["reminder-v8-audience","mode"]}><ChoiceCardV8
             name="reminder-v8-audience"
             value="all"
             checked={mode === 'all'}
@@ -973,8 +1005,8 @@ function TargetStageV8({
             icon={<Users size={18} />}
             title={allLabel}
             note={allNote}
-          />
-          <ChoiceCardV8
+          /></SaveErrorField>
+          <SaveErrorField names={["reminder-v8-audience","mode"]}><ChoiceCardV8
             name="reminder-v8-audience"
             value="condition"
             checked={mode === 'condition'}
@@ -982,12 +1014,12 @@ function TargetStageV8({
             icon={<Filter size={18} />}
             title="条件に合う人だけ"
             note="タグ・友だち情報などで絞る"
-          />
+          /></SaveErrorField>
         </div>
         {mode === 'condition' ? (
           <ConditionBuilder value={condition} showCount={false} onChange={(next) => onChange({ ...settings, targetCondition: next })} />
         ) : null}
-        <div className={styles.countBand}>
+        <div className={styles.countBand} aria-label={`対象人数：当てはまる ${countLabel(total, '人')}・送る予定 ${countLabel(matched, '人')}・除く ${countLabel(excluded, '人')}`}>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>当てはまる人</span>
             <strong className={styles.countValue}>{`${counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)} 人`}</strong>
@@ -1021,7 +1053,7 @@ function TargetStageV8({
           <p className={styles.cardNote}>当てはまったら、その人への残りの通知を止めます</p>
         </div>
         <div className={styles.stopList}>
-          {stopRows.map((row) => (
+          {stopRows.map((row, saveFieldIndex) => (
             <div key={row.key} className={styles.stopRow}>
               <span className={styles.stopText}>
                 <span className={styles.stopTitle}>{row.title}</span>
@@ -1029,7 +1061,7 @@ function TargetStageV8({
               </span>
               {row.locked
                 ? <SettingCheckbox label={row.label} checked locked />
-                : <SettingCheckbox label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
+                : <SaveErrorField names={[`stopRows.${saveFieldIndex}.checked`,"checked","row.checked"]}><SettingCheckbox label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} /></SaveErrorField>}
             </div>
           ))}
         </div>
@@ -1274,8 +1306,8 @@ function MessagesStageV8({
                       base={sampleBase.current}
                       onChange={(patch) => updateStep(step.stableStepId, patch)}
                     />
-                    <div className={styles.bodyBox}>
-                      <InsertTextField
+                    <MessageBody>
+                      <SaveErrorField names={[`shown.${index}.messageContent`,`shown.${index}.message_content`,"messageContent","step.messageContent","message_content","step.message_content"]}><InsertTextField
                         ref={bodyRef}
                         className={styles.bodyArea}
                         value={step.messageContent}
@@ -1284,35 +1316,15 @@ function MessagesStageV8({
                         placeholder="友だちに届く本文を書きます"
                         onValueChange={(next) => updateStep(step.stableStepId, { messageContent: next })}
                         extraTokens={REMINDER_TOKENS}
-/>
-                      <span className={styles.bodyGap} aria-hidden="true" />
-                      <div className={styles.insertRow}>
-                        <span className={styles.insertLabel}>差し込む</span>
-                        <Button type="button" variant="text" onClick={() => insertToken('{{name}}')}>
-                          <User size={15} aria-hidden="true" />名前
-                        </Button>
-                        <Button type="button" variant="text" onClick={() => insertToken('{{date}}')}>
-                          <CalendarDays size={15} aria-hidden="true" />予約日時
-                        </Button>
-                        <Button type="button" variant="text" onClick={() => insertToken('{{meet_url}}')}>
-                          <Video size={15} aria-hidden="true" />Google Meet の URL
-                        </Button>
-                        {narrow ? null : (
-                          <>
-                            <FieldInsert fields={fields} onInsert={insertToken} />
-                            <span className={styles.spacer} aria-hidden="true" />
-                            <span className={styles.charCount}>{formatNumber(step.messageContent.length)} / {formatNumber(BODY_LIMIT)}</span>
-                          </>
-                        )}
-                      </div>
-                      {narrow ? (
-                        <div className={styles.insertRow}>
-                          <FieldInsert fields={fields} onInsert={insertToken} />
-                          <span className={styles.spacer} aria-hidden="true" />
-                          <span className={styles.charCount}>{formatNumber(step.messageContent.length)} / {formatNumber(BODY_LIMIT)}</span>
-                        </div>
-                      ) : null}
-                    </div>
+/></SaveErrorField>
+                      <MessageInsertRow count={`${formatNumber(step.messageContent.length)} / ${formatNumber(BODY_LIMIT)}`} more={<>
+                        <MessageInsertButton kind="date" label="予約日時" onClick={() => insertToken('{{date}}')} />
+                        <MessageInsertButton kind="other" label="Google Meet の URL" onClick={() => insertToken('{{meet_url}}')} />
+                        </>}>
+                        <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} />
+                        <FieldInsert fields={fields} onInsert={insertToken} />
+                      </MessageInsertRow>
+                    </MessageBody>
                   </>
                 ) : (
                   <button type="button" className={styles.stepPreview} onClick={() => setSelectedStepId(step.stableStepId)}>
@@ -1343,9 +1355,7 @@ function FieldInsert({ fields, onInsert }: { fields: FriendField[]; onInsert: (t
     : [{ id: 'none', label: '友だち情報欄がありません', disabled: true, disabledReason: '友だち情報欄を作ると差し込めます', onSelect: () => {} }]
   return (
     <span ref={anchorRef} className={styles.fieldInsert}>
-      <Button type="button" variant="text" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <IdCard size={15} aria-hidden="true" />友だち情報
-      </Button>
+      <MessageInsertButton kind="field" label="友だち情報" expanded={open} onClick={() => setOpen(value => !value)} />
       <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel="差し込む友だち情報" items={items} anchorRef={anchorRef} />
     </span>
   )
@@ -1391,7 +1401,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span className={styles.timingWord}>基準日の</span>
-      <NumberInput
+      <SaveErrorField names={["amount"]}><NumberInput
         type="number"
         min={0}
         max={unit === 'day' ? 365 : undefined}
@@ -1402,14 +1412,14 @@ function TimingEditor({
           const next = Number(event.target.value)
           if (Number.isInteger(next) && next >= 0) onChange(build(next, unit, after))
         }}
-      />
-      <Select
+      /></SaveErrorField>
+      <SaveErrorField names={["unit"]}><Select
         value={unit}
         onChange={(next) => onChange(build(amount, next as TimingUnit, after))}
         aria-label="単位"
         width={72}
         options={[{ value: 'day', label: '日' }, { value: 'hour', label: '時間' }, { value: 'min', label: '分' }]}
-      />
+      /></SaveErrorField>
       <Select
         value={after ? 'after' : 'before'}
         onChange={(next) => onChange(build(amount, unit, next === 'after'))}
@@ -1420,12 +1430,12 @@ function TimingEditor({
       {dayWritten ? (
         <>
           <span className={styles.timingWord}>の</span>
-          <TimeField
+          <SaveErrorField names={["sendAtTime","step.sendAtTime","send_at_time","step.send_at_time"]}><TimeField
             aria-label="送る時刻"
             className={styles.timingTime}
             value={step.sendAtTime ?? ''}
             onChange={(next) => onChange({ sendAtTime: next || null })}
-          />
+          /></SaveErrorField>
         </>
       ) : null}
       <span className={styles.spacer} aria-hidden="true" />
@@ -1436,7 +1446,7 @@ function TimingEditor({
 
 /* ---------------- 手順4：配信予定（T0nis） ---------------- */
 
-function ScheduleStageV8({
+export function ScheduleStageV8({
   frame,
   notice,
   reminderId,
@@ -1489,7 +1499,9 @@ function ScheduleStageV8({
           />
           <PhoneV8
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
-            chip={nextItem ? formatMd(nextItem.scheduledAt) : '送信予定はまだありません'}
+            chip={nextItem ? formatMd(nextItem.scheduledAt)
+              : previewFailed ? '配信予定を読み込めませんでした'
+                : preview ? '送信予定はまだありません' : '配信予定を確認しています'}
             empty={!nextItem}
             message={nextItem ? renderReminderBodySample(firstReminderStepMessage(settings, nextItem.stableStepId) || '本文はまだありません') : undefined}
           />
@@ -1515,7 +1527,7 @@ function ScheduleStageV8({
           <p className={styles.cardNote}>有効にしたら、この予定で送ります。予約が変わると予定も変わります。</p>
         </div>
         <div className={styles.rangeRow}>
-          <SegmentedControl
+          <SaveErrorField names={["range"]}><SegmentedControl
             aria-label="予定の範囲"
             options={[
               { value: '7d', label: '今後7日' },
@@ -1524,7 +1536,7 @@ function ScheduleStageV8({
             ]}
             value={range}
             onChange={setRange}
-          />
+          /></SaveErrorField>
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.rangeCount}>
             {range === 'conflict' ? `重なり ${countLabel(rangeCount, '件')}` : `${range === '7d' ? '今後7日' : '今後30日'} ${countLabel(rangeCount, '通')}`}
@@ -1577,7 +1589,7 @@ function editHref(reminderId: string, stage: 'basics' | 'target' | 'preview' | n
   return `/reminders/edit?id=${encodeURIComponent(reminderId)}${stage ? `&stage=${stage}` : ''}`
 }
 
-function ConfirmStageV8({
+export function ConfirmStageV8({
   frame,
   notice,
   reminderId,
@@ -1640,6 +1652,9 @@ function ConfirmStageV8({
   }, [settings.folderId])
 
   const destination = testRecipientDestinationLabel(recipientView, sentName, sentKind)
+  const placeholderSummary = reminderPlaceholders(settings, sentName ?? (recipientView.kind === 'ready' ? recipientView.recipient.displayName : null))
+    .map((placeholder) => `${placeholder.token}：テストで使う値＝${placeholder.testValue}／本番での取得元＝${placeholder.source}`)
+    .join('\n')
   const firstStep = settings.steps[0] ?? null
   const testedLabel = draft.lastTestStatus === 'succeeded' && draft.lastTestedAt
     ? `前回：${formatMd(draft.lastTestedAt)} に送れました（1通目）`
@@ -1715,7 +1730,9 @@ function ConfirmStageV8({
           {confirmRows.map((row) => (
             <div key={row.key} className={styles.confirmRow}>
               <span className={styles.confirmKey}>{row.key}</span>
-              <span className={styles.confirmVal} title={row.value}>{row.value}</span>
+              <span className={styles.confirmVal} title={row.key === '通知' && validation?.audience.matched != null
+                ? `${row.value}（対象者×通知数：${countLabel(validation.audience.matched * settings.steps.length, '通')}）`
+                : row.value}>{row.value}</span>
               <Button variant="text" href={editHref(reminderId, row.stage)}>変える</Button>
             </div>
           ))}
@@ -1728,7 +1745,7 @@ function ConfirmStageV8({
           <p className={styles.cardNote}>{testRecipientNote(recipientView, sentKind)}</p>
         </div>
         <div className={styles.testRow}>
-          <span className={styles.testDestination} aria-label="送り先">送り先：{destination}</span>
+          <span className={styles.testDestination} aria-label="送り先" title={placeholderSummary || undefined}>送り先：{destination}</span>
           <Button variant="secondary" onClick={onSend} disabled={sendBusy || recipientView.kind !== 'ready'} busy={sendBusy} busyLabel="送信中…">
             <Send size={15} aria-hidden="true" />テストを送る
           </Button>
@@ -1795,7 +1812,7 @@ function CheckRow({ ok, title, note, action }: { ok: boolean; title: string; not
 
 /* ---------------- 完了（hjNpJ） ---------------- */
 
-function DoneStageV8({
+export function DoneStageV8({
   frame,
   reminderId,
   settings,

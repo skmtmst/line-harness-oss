@@ -9,20 +9,22 @@ const PANEL = readFileSync(join(__dirname, 'support-mark-rules-panel.tsx'), 'utf
   `/tags/marks/edit?id=` の `SupportMarkEditor` に分かれていて、
   設計 `GMvBd` の印もそちらに付いている。
 */
-const EDITOR = readFileSync(join(__dirname, 'support-mark-editor.tsx'), 'utf8')
+const EDITOR = readFileSync(join(__dirname, '../../v8/tags/mark-editor.tsx'), 'utf8')
 
 /**
  * 画面側の配線。**考え方が正しくても、繋いでいなければ効かない。**
  * 純粋関数の試験（`support-mark-rules-view.test.ts`）と対で見る。
  */
 describe('V6 対応マークの自動変更ルール（GMvBd）の配線', () => {
-  it('名前・色・並び順・初期値と同じ面に置く', () => {
+  it('編集画面から現役の窓で開き、作成前は保存先を持つパネルを出さない', () => {
     expect(EDITOR).toContain('<SupportMarkRulesPanel')
     expect(EDITOR).toContain('markId={markId ?? null}')
     // 設計の印は編集画面が持つ。パネルはその中の一区画。
-    expect(EDITOR).toContain('data-design-node="GMvBd"')
+    expect(EDITOR).toContain('boardId="ulq9Y"')
     expect(PANEL).toContain('data-qa-open="GMvBd"')
     // **作る前は出さない。** 保存先が無いので、押しても何も起きない。
+    expect(EDITOR).toContain('{rulesOpen ? <SupportMarkRulesPanel')
+    expect(EDITOR).toContain('自動で変えるきまり')
     expect(EDITOR).toContain('{editing ? (')
   })
 

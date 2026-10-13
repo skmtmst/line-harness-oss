@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const LIST_PAGE = fs.readFileSync(new URL('../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
-const EDITOR = fs.readFileSync(path.join(__dirname, 'friend-add-rule-editor.tsx'), 'utf8')
+const EDITOR = fs.readFileSync(path.join(__dirname, '../../v8/friend-add/editor.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 
 const ENTRY = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
@@ -24,22 +24,22 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
     expect(EDITOR).toContain('api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)')
     expect(EDITOR).toContain('api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)')
     // R262: テストは試す流入リンク・想定日時・友だちを実行側の判定へ渡す。
-    expect(EDITOR).toContain('api.friendAddRules.test(selectedAccountId, activeId, {')
+    expect(EDITOR).toContain('api.friendAddRules.test(selectedAccountId, activeId, testInput)')
     expect(API).toContain("'/api/friend-add-rules/drafts'")
     expect(API).toContain("'/api/friend-add-rules/test'")
     expect(API).toContain('friendId: input?.friendId')
   })
 
   it('読込中・空・失敗と再読込を用意する', () => {
-    expect(LIST_PAGE).toContain("onClick={() => void load()}")
+    expect(LIST_PAGE).toContain("onClick={() => load()}")
   })
 
   it('未接続の見せかけアクションを選択肢に出さない', () => {
-    expect(EDITOR).toContain("value: 'add_tag'")
-    expect(EDITOR).toContain("value: 'remove_tag'")
-    expect(EDITOR).toContain("value: 'start_scenario'")
-    expect(EDITOR).not.toContain("value: 'send_message'")
-    expect(EDITOR).not.toContain("value: 'send_webhook'")
+    expect(EDITOR).toContain("type: 'add_tag'")
+    expect(EDITOR).toContain("type: 'remove_tag'")
+    expect(EDITOR).toContain("type: 'start_scenario'")
+    expect(EDITOR).not.toContain("type: 'send_message'")
+    expect(EDITOR).not.toContain("type: 'send_webhook'")
   })
 
   it('テスト実行後だけ本番データを変更しないことを運用者へ伝える', () => {
@@ -98,7 +98,8 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   it('実際に配信するシナリオを編集画面で選べる(FRIENDADD-01)', () => {
     expect(EDITOR).toContain('value={definition.scenarioId ??')
     expect(EDITOR).toContain('scenarioId: value || null')
-    expect(EDITOR).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
+    expect(EDITOR).toContain('<EntityKindField kind="scenario"')
+    expect(EDITOR).toContain('options={scenarios}')
   })
 
   it('フォルダは表にあるものから選び、自由入力で増やさない', () => {
@@ -121,7 +122,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   it('設定を変えたあとは前のテスト結果を今の設定の判定として出さない(FRIENDADD-03)', () => {
     // 結果は実行時のアカウント・ルール・保存済みスナップショットと結び付ける。
     expect(EDITOR).toContain('testedMeta')
-    expect(EDITOR).toContain('testResult.snapshot === currentSnapshot')
+    expect(EDITOR).toContain('testResult.snapshot === editorSnapshot(rule, definition)')
     expect(EDITOR).toContain('testResult.accountId === selectedAccountId')
   })
 

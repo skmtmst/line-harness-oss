@@ -11,7 +11,7 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import TemplateConsole from './template-console'
+import TemplateConsole from '@/test-utils/hq-template-console'
 
 const calls = vi.hoisted(() => ({
   context: vi.fn(),
@@ -72,6 +72,6 @@ it('下書きの保存後に新しく作ると、保存済みを残して空の�
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 
 vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

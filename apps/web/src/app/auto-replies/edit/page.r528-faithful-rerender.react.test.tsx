@@ -1,3 +1,13 @@
+
+import React, { act, Profiler, type ReactNode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { AccountProvider, useAccount } from '@/contexts/account-context'
+import { PageChromeProvider } from '@/components/shell/page-chrome'
+import { clearLineAccountsCache } from '@/lib/line-accounts-cache'
+import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
+import AutoReplyEditPage from './page'
 // @vitest-environment happy-dom
 /*
  * J7 faithful oracle (R528: 188-001/002)。
@@ -6,10 +16,6 @@
  * 実useStaffRole/useAccountを使い、mockは輸送 (api)・router transport・URLSearchParams adapterのみ。
  * router spyはnative遷移の再現ではない。原条件未達なら結果として返し、期待を弱めない。
  */
-import React, { act, Profiler, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
@@ -27,6 +33,7 @@ const transport = vi.hoisted(() => ({
   commonVars: vi.fn(),
   reminders: vi.fn(),
   events: vi.fn(),
+  notificationRules: vi.fn(),
   staffMe: vi.fn(),
   lineAccounts: vi.fn(),
 }))
@@ -68,17 +75,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
       scenarios: { list: transport.scenarios },
       commonVars: { list: transport.commonVars },
       reminders: { list: transport.reminders },
+      notifications: { ...actual.api.notifications, operatorRules: { list: transport.notificationRules } },
       staff: { me: transport.staffMe },
       lineAccounts: { list: transport.lineAccounts },
     },
   }
 })
-
-import { AccountProvider, useAccount } from '@/contexts/account-context'
-import { PageChromeProvider } from '@/components/shell/page-chrome'
-import { clearLineAccountsCache } from '@/lib/line-accounts-cache'
-import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
-import AutoReplyEditPage from './page'
 
 const ACCOUNT = {
   id: 'synthetic-account',
@@ -237,7 +239,8 @@ beforeEach(() => {
   transport.scenarios.mockResolvedValue({ success: true, data: [] })
   transport.commonVars.mockResolvedValue({ success: true, data: [] })
   transport.reminders.mockResolvedValue({ success: true, data: [] })
-  transport.events.mockResolvedValue({ items: [], total: 0 })
+  transport.events.mockResolvedValue({ items: [], total: 0, limit: 200, sort: [] })
+  transport.notificationRules.mockResolvedValue({ success: true, data: { items: [] } })
 })
 
 afterEach(async () => {
@@ -264,7 +267,7 @@ describe('J7 R528 literal same-view rerender (原条件照合・別結果)', () 
 
     // 失敗確認: actual失敗領域と再試行control、編集入力はまだない。
     gate.reject(new TypeError('Failed to fetch'))
-    await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('読み込めませんでした')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     expect(screen.queryByPlaceholderText('例：予約の日程変更')).toBeNull()
     expect(transport.getDraft).toHaveBeenCalledTimes(1)
@@ -284,7 +287,7 @@ describe('J7 R528 literal same-view rerender (原条件照合・別結果)', () 
     expect(profile.mounts).toBe(mountsBefore)
     expect(searchCalls.count).toBeGreaterThan(searchBefore)
     expect(transport.getDraft).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('表示できませんでした')).toBeTruthy()
+    expect(screen.getByText('読み込めませんでした')).toBeTruthy()
     expect(screen.queryByPlaceholderText('例：予約の日程変更')).toBeNull()
     expect(netCalls.count).toBe(0)
   })
@@ -308,7 +311,7 @@ describe('J7 R528 explicit Retry (正の受入・別結果)', () => {
     await selectAccount()
 
     gate.reject(new TypeError('Failed to fetch'))
-    await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('読み込めませんでした')).toBeTruthy())
 
     transport.getDraft.mockResolvedValue({ success: true, data: DRAFT })
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
@@ -318,7 +321,7 @@ describe('J7 R528 explicit Retry (正の受入・別結果)', () => {
     const nameInput = await screen.findByPlaceholderText('例：予約の日程変更') as HTMLInputElement
     expect(nameInput.value).toBe('J7 synthetic reply')
     expect(screen.getByRole('navigation', { name: '自動応答を作る進み方' })).toBeTruthy()
-    expect(screen.queryByText('表示できませんでした')).toBeNull()
+    expect(screen.queryByText('読み込めませんでした')).toBeNull()
 
     // 入力保持: 回復後に変えた値が無関係rerenderで残る。
     fireEvent.change(nameInput, { target: { value: 'J7 synthetic reply 編集後' } })

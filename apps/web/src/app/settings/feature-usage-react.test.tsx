@@ -119,6 +119,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     if (path.includes('/api/settings/features')) return response(featureResponse())
     if (path.includes('/api/analytics/usage')) {
       network.usageRequests.push(path)

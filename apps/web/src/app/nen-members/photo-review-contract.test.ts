@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 const page = readFileSync(join(import.meta.dirname, 'photo-review-v8.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
-const detail = readFileSync(join(import.meta.dirname, 'photo-review-detail.tsx'), 'utf8')
-const helper = readFileSync(join(import.meta.dirname, 'photo-text.ts'), 'utf8')
+const detail = readFileSync(join(import.meta.dirname, '../../v8/nen-posts/detail.tsx'), 'utf8')
+const helper = readFileSync(join(import.meta.dirname, '../../v8/nen-posts/text.ts'), 'utf8')
 
 describe('投稿V8のAPIと失敗時の契約', () => {
   it('選んだアカウントと検索・ページを使い、古い取得結果を捨てる', () => {

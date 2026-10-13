@@ -39,7 +39,7 @@ export default function TagPickerField({ label = 'タグを付ける', value, on
     await Promise.allSettled([
       Promise.resolve().then(() => api.tags.list({ accountId: id })).then(res => {
         if (current !== request.current) return
-        if (res.success) { setItems(res.data); setStatus('ready') } else setStatus('error')
+        if (res.success) { setItems(res.data.filter(tag => (tag.status ?? 'active') === 'active')); setStatus('ready') } else setStatus('error')
       }, () => { if (current === request.current) setStatus('error') }),
       Promise.resolve().then(() => api.tagGroups.list(id ?? undefined)).then(res => {
         if (current !== request.current) return

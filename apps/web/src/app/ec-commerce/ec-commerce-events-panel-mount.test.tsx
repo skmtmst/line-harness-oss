@@ -48,6 +48,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 import { ApiError, api, fetchApi } from '@/lib/api'
 import EcCommercePage from './page'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 const mockFetchApi = fetchApi as unknown as ReturnType<typeof vi.fn>
 const mockOverview = api.ecCommerce.overview as unknown as ReturnType<typeof vi.fn>
@@ -153,6 +154,7 @@ let overviewCalls: string[] = []
 let overviewDeferreds: Map<string, Deferred<unknown>[]> = new Map()
 
 beforeEach(() => {
+  flushListUrlState(); window.history.replaceState({}, '', '/ec-commerce'); window.dispatchEvent(new Event('popstate')); document.documentElement.dataset.theme='v8'
   vi.useFakeTimers()
   fixture.accountId = 'account-a'
   eventsCalls = []
@@ -182,7 +184,7 @@ afterEach(async () => {
   if (container) container.remove()
   root = null
   container = null
-  vi.useRealTimers()
+  flushListUrlState(); vi.useRealTimers(); delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
@@ -198,7 +200,7 @@ async function drainMicrotasks(): Promise<void> {
   for (let index = 0; index < 8; index += 1) await Promise.resolve()
 }
 
-function overviewFor(accountId: string, index = 0): Deferred<unknown> {
+function overviewFor(accountId: string, index = 1): Deferred<unknown> {
   const bucket = overviewDeferreds.get(accountId)
   const item = bucket?.[index]
   if (!item) throw new Error(`${accountId} 向けの overview 呼び出しが見つかりません`)
@@ -410,7 +412,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
 
 /*
  * #635: 存在しない言葉で検索して0件になったとき、件数が減るだけでなく
- * 「条件に合う取り込みの記録はありません」と次にやること（解除）を出す。
+ * 「条件に合うものはありません」と次にやること（解除）を出す。
  * 監査5b_23: 不存在語を入れても明示の空メッセージが特定できなかった。
  */
 describe('EC取込一覧の絞り込み0件 (#635)', () => {
@@ -442,9 +444,9 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
     })
 
     // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
-    expect(el.textContent).toContain('条件に合う取り込みの記録はありません')
-    expect(el.textContent).toContain('検索語や表示条件を変えてください。')
-    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '検索と絞り込みを解除')
+    expect(el.textContent).toContain('条件に合うものはありません')
+    expect(el.textContent).toContain('札や検索を外すと、すべて出ます')
+    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '条件を外す')
     expect(clear).toBeTruthy()
 
     // 解除すると検索語を外して取り直す。
@@ -465,9 +467,9 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
  */
 describe('R599 一覧未取得の状態別件数', () => {
   function statusTabText(el: HTMLDivElement, label: string): string | null {
-    const tab = Array.from(el.querySelectorAll('[role="tab"]'))
+    const tab = Array.from(el.querySelectorAll('button[aria-pressed]'))
       .find((node) => (node.textContent ?? '').startsWith(label))
-    return tab ? tab.textContent : null
+    return tab ? tab.textContent?.replaceAll(' ', '') ?? null : null
   }
 
   function retryListButton(el: HTMLDivElement): HTMLButtonElement {
@@ -618,7 +620,11 @@ describe('取り込みの記録の器（監査A2）', () => {
       }))
       await drainMicrotasks()
     })
-    expect(el.textContent).toContain('NEN-12492')
+    expect(el.querySelector('[title="注文 NEN-12492"]')).toBeTruthy()
     expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner'}))

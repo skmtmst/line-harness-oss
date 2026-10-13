@@ -24,7 +24,7 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   // 一覧タブを最初から開いた状態にする（?view=list と同じ）。
   useSearchParams: () => new URLSearchParams('view=list'),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
@@ -37,11 +37,12 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   api: {
     staff: { me: fixture.staffMe },
   },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     listRequests: fixture.listRequests,
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,

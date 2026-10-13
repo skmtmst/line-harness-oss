@@ -1,5 +1,4 @@
 'use client'
-
 import { useState } from 'react'
 import { ApiError, api } from '@/lib/api'
 import type { EntryRoute } from '@line-crm/shared'
@@ -9,6 +8,7 @@ import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export type BulkRouteAction = 'pause' | 'resume' | 'move'
 
@@ -40,6 +40,7 @@ export default function BulkRoutesDialog({
   /** 一括バーで押した操作。渡すとその操作を選んだ状態で開く。 */
   initialAction?: BulkRouteAction | null
 }) {
+  const saveErrors = useSaveFormErrors()
   // 失敗した分だけ残して試し直せるよう、対象は窓の中で持ち直す。
   const [remaining, setRemaining] = useState<EntryRoute[]>(targets)
   const [action, setAction] = useState<BulkRouteAction | null>(initialAction)
@@ -71,6 +72,7 @@ export default function BulkRoutesDialog({
         if (res.success) succeeded.push(route)
         else failed.push({ route, error: res.error || '更新できませんでした' })
       } catch (cause) {
+        saveErrors.capture(cause)
         failed.push({
           route,
           error: cause instanceof ApiError && cause.status === 403
@@ -92,7 +94,7 @@ export default function BulkRoutesDialog({
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title="流入経路をまとめて操作"
       description="選んだ経路に同じ操作をまとめて行います。実行前に、実際に変わる件数を確認できます。"
@@ -157,7 +159,7 @@ export default function BulkRoutesDialog({
               {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))} 件` : ''}
             </p>
           </div>
-          <RadioCardGroup legend="どの操作をしますか？">
+          <SaveErrorField names={["inflow-bulk-action","value","option.value","action"]}><RadioCardGroup legend="どの操作をしますか？">
             {([
               {
                 value: 'pause' as const,
@@ -193,9 +195,9 @@ export default function BulkRoutesDialog({
                 />
               )
             })}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {action === 'move' ? (
-            <Select
+            <SaveErrorField names={["genre"]}><Select
               aria-label="移動先のフォルダ"
               value={genre}
               size="full"
@@ -205,10 +207,10 @@ export default function BulkRoutesDialog({
                 ...genreOptions.map((name) => ({ value: name, label: name })),
               ]}
               className="mt-2"
-            />
+            /></SaveErrorField>
           ) : null}
         </div>
       )}
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

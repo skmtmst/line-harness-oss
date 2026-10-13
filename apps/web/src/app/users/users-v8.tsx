@@ -1,16 +1,6 @@
 'use client'
 
-/*
- * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
- *
- * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
- * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
- * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
- *
- * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
- * 出さない（DEVIN-QUESTIONS に未接続として記録）。
- */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -23,12 +13,26 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import MergedPersonDetailViewV8 from '@/components/merged-person/merged-person-detail-v8'
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
 import { FriendsManageNavV8 } from '@/app/friends/friends-nav-v8'
-import { api } from '@/lib/api'
+import { useUsersSummary } from '@/components/users/use-users-summary'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
+ *
+ * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
+ * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
+ * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
+ *
+ * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
+ * 出さない（DEVIN-QUESTIONS に未接続として記録）。
+ */
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -40,7 +44,7 @@ export default function UsersV8() {
   usePageTitle('統合ユーザー')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(null)
   /*
    * 人の詳細は同じ URL のまま開くので、上の帯のパンくずの「統合ユーザー」で一覧へ戻す
@@ -51,15 +55,8 @@ export default function UsersV8() {
     : [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }])
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // 数の帯の「統合ユーザー」は重複検出の集計（uniquePeople）を使う（v7 と同じ API）。
-  const [uniquePeople, setUniquePeople] = useState<number | null>(null)
-  useEffect(() => {
-    let alive = true
-    api.duplicates.stats().then((res) => {
-      if (alive && res.success) setUniquePeople(res.data.uniquePeople)
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [])
+  const summary = useUsersSummary()
+  const uniquePeople = summary.stats?.uniquePeople ?? null
 
   const pageCount = Math.max(1, Math.ceil(u.total / USERS_PAGE_SIZE))
   const linkedUidCount = u.rows.filter((row) => row.identityKeyKind === 'uid').length
@@ -115,7 +112,9 @@ export default function UsersV8() {
             {uniquePeople !== null ? formatNumber(uniquePeople) : emptyValue('unknown')}
             <span className={styles.kpiUnit}>人</span>
           </p>
-          <p className={styles.kpiDetail}>重複を1人にまとめた数</p>
+          <p className={styles.kpiDetail} title={summary.stats ? `紐付く友だち：${formatNumber(summary.stats.totalFollowing)}件（各アカウントの友だち登録）` : undefined}>
+            {summary.status === 'loading' ? '読み込んでいます' : summary.status === 'error' ? <>読み込めませんでした <button type="button" className={styles.linkAction} onClick={() => void summary.load()}>再読み込み</button></> : '重複を1人にまとめた数'}
+          </p>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>
@@ -154,7 +153,7 @@ export default function UsersV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             label="UID連携"
             size="full"
@@ -165,10 +164,10 @@ export default function UsersV8() {
               { value: 'linked', label: 'UID：連携済み' },
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             size="full"
@@ -176,17 +175,17 @@ export default function UsersV8() {
             onChange={u.setAccount}
             options={[
               { value: '', label: '所属：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: a.name })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
-        <Checkbox
+        <SaveErrorField names={["onlyDups","u.onlyDups","only_dups","u.only_dups"]}><Checkbox
           checked={u.onlyDups}
           onCheckedChange={u.setOnlyDups}
           className="whitespace-nowrap"
         >
           複数アカウントのみ
-        </Checkbox>
+        </Checkbox></SaveErrorField>
         <span className={styles.toolbarSpacer} />
         <span className={styles.toolbarCount}>
           {/* WEB322：読めなかったときは 0人と言わない。 */}
@@ -207,7 +206,7 @@ export default function UsersV8() {
       </div>
 
       {u.exportError ? (
-        <p className={styles.errorBand} role="alert">{u.exportError}</p>
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{u.exportError}</Notice>
       ) : null}
 
       {/* 一覧。状態は SXCb3：骨格・0件・失敗をこの場所で出す。 */}
@@ -231,7 +230,7 @@ export default function UsersV8() {
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
                     <p className={styles.stateTitle}>統合ユーザーを読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void u.load()}>
+                    <Button type="button" variant="primary" onClick={() => u.load()} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>

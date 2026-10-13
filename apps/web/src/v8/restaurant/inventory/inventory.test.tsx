@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), inventoryDay: vi.fn(), openingHours: vi.fn(), saveOpeningHours: vi.fn(), saveInventoryAllocation: vi.fn(),
   updateInventory: vi.fn(), generateInventory: vi.fn(), listIntakeAddresses: vi.fn(), issueIntakeAddress: vi.fn(),
@@ -41,6 +47,8 @@ const channels = [
 ]
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
   fixture.inventoryDay.mockResolvedValue({ data: days })
@@ -53,7 +61,7 @@ beforeEach(() => {
     ? { success: true, data: channels }
     : { success: true, data: [{ id: 'mail-1', storeId: 'store-1', receivedAt: at(0, 18, 20), status: 'quarantined', reason: '人数の欄が読めませんでした', mediaCode: 'tabelog', mediaName: '食べログ' }], total: 1 }))
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
+afterEach(() => { delete document.documentElement.dataset.theme; cleanup(); vi.useRealTimers(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('Y8SjT2 予約枠・在庫', () => {
   it('配分・在庫の表・いちばん混む時間の卓と「行を押したとき」の箱・開ける時間が出る', async () => {
@@ -134,4 +142,29 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(joinTableCodes(pick(['T1', 'T3', 'T4', '個室A']))).toBe('個室A・T1・T3・T4')
     expect(joinTableCodes(pick(['T1', 'T2', 'T3', 'T4', '個室A']))).toBe('個室A・T1〜T4')
   })
+})
+
+it('OP-R04 未保存の配分があるタブの移動は確認し、取り消すと入力を残す',async()=>{
+ document.documentElement.dataset.theme='v8'
+ render(<InventoryPage/>)
+ const input=await screen.findByRole('spinbutton',{name:'OTA（予約媒体）'})
+ fireEvent.change(input,{target:{value:'7'}})
+ fireEvent.click(screen.getByRole('tab',{name:'予約経路の連携'}))
+ const dialog=await screen.findByRole('dialog',{name:'保存していない変更があります'})
+ expect((input as HTMLInputElement).value).toBe('7')
+ fireEvent.click(within(dialog).getByRole('button',{name:'編集を続ける'}))
+ expect((input as HTMLInputElement).value).toBe('7')
+ fireEvent.click(screen.getByRole('tab',{name:'予約経路の連携'}))
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'保存せずに移る'}))
+ await screen.findByText('Hot Pepper グルメ')
+ expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
+ delete document.documentElement.dataset.theme
+})
+
+it('B-241 inventory channel read failure does not become no channels',async()=>{
+ fetchApi.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<InventoryPage />)
+ const error=await screen.findByText('予約媒体を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('予約媒体を読み込めませんでした')).toBeNull())
 })

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * Devin 監査：重い入力画面（3つの節＋担当メニュー割当）なのに、キャンセルで
  * 確認なしに入力が消えていた。入力後にキャンセルを押すと共通窓で止め、
@@ -19,14 +21,14 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -35,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: { staff: { list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
+      listStaff: async () => ({ staff: [] }),
       listMenus: fixture.listMenus,
       createStaff: fixture.createStaff,
       putStaffMenus: fixture.putStaffMenus,
@@ -61,6 +64,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push.mockClear()
   memStorage.clear()
   memStorage.setItem('lh_staff_role', 'owner')

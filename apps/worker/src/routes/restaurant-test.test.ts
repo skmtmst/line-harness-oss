@@ -1,3 +1,5 @@
+import { publishScenarioVersion } from '@line-crm/db';
+import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +19,7 @@ type MockStaff = {
 };
 
 const authMocks = vi.hoisted(() => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
   getStaffByAdminSession: vi.fn(async (): Promise<MockStaff | null> => null),
   lineAccounts: [] as Array<Record<string, unknown>>,
@@ -121,6 +124,11 @@ function requestAs(path: string, token: string, body?: unknown) {
 }
 
 function requestWithMethod(path: string, method: string, body?: unknown, token = 'owner-key') {
+  if((method==='PUT'&&path.includes('/tables/layout')||method==='PATCH'&&path.includes('/tables/'))&&body&&typeof body==='object'&&!('expectedVersion' in body)){const table=path.match(/\/tables\/([^/?]+)/)?.[1];const floor=table?testDb.raw.prepare('SELECT f.version FROM rt_floors f JOIN rt_tables t ON t.floor_id=f.id WHERE t.id=?').get(table):testDb.raw.prepare("SELECT version FROM rt_floors WHERE store_id=?").get((body as {storeId:string}).storeId);body={...body,expectedVersion:(floor as {version:number}|undefined)?.version??1}}
+
+  const id=path.match(/^\/api\/restaurant-test\/reservations\/([^/?]+)(?:\?|$)/)?.[1];
+  if(method==='PATCH'&&id&&body&&typeof body==='object'&&!('expectedVersion' in body))body={...body,expectedVersion:((testDb.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(id)) as {customer_version:number}|undefined)?.customer_version??1};
+
   return app().request(path, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -153,7 +161,7 @@ beforeEach(() => {
     { id: 'account-3', name: '店舗B', is_active: 1, channel_access_token: 'token-3' },
     { id: 'account-4', name: '予備', is_active: 1, channel_access_token: 'token-4' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/175_restaurant_terms_agreement.sql'), 'utf8'));
   // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので
@@ -191,6 +199,13 @@ describe('電話予約のLINE確認通知', () => {
     testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
       .run('friend-fixture', body.lineUid, accountId, following);
   }
+  async function approveFollowup(){
+    testDb.raw.prepare("UPDATE scenario_steps SET message_content=? WHERE scenario_id='restaurant-followup:store-ginza' AND step_order=0").run('予約が確定しました。\n店舗: {{var.store_name}}\n日時: {{var.reservation_datetime}}〜{{var.reservation_end}}\n人数: {{var.guest_count}}名\nコース: {{var.course_name}}');
+    await publishScenarioVersion(testDb.db,'restaurant-followup:store-ginza',{staffId:'owner',idempotencyKey:crypto.randomUUID()});
+    const t=testDb.raw.prepare("SELECT template_version FROM rt_store_followup_templates WHERE store_id='store-ginza'").get() as {template_version:number};
+    const a=await requestRestaurantFollowupApproval(testDb.db,'store-ginza',t.template_version,'owner');expect(a).not.toBeNull();
+    testDb.raw.prepare("UPDATE rt_approval_requests SET status='approved',reviewed_by='owner' WHERE id=?").run(a!.id);
+  }
   async function notice(input: unknown = body) {
     const res = await request(path, input);
     expect(res.status).toBe(201);
@@ -199,10 +214,12 @@ describe('電話予約のLINE確認通知', () => {
     expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
     return result.data;
   }
+  it('未承認は送信0で予約を保存する',async()=>{seedFriend();expect((await notice()).lineNotice).toEqual({sent:false,reason:'approval_required'});expect(fetch).not.toHaveBeenCalled();});
   it('確認LINEに店舗・日時・人数・コースを載せ、自動通知として履歴を残す', async () => {
     seedFriend();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
+    await approveFollowup();
     const result = await notice({ ...body, courseId: 'menu-ginza' });
     expect(result.lineNotice).toEqual({ sent: true, reason: null });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -210,7 +227,8 @@ describe('電話予約のLINE確認通知', () => {
     expect(url).toBe('https://api.line.me/v2/bot/message/push');
     const headers = new Headers(init.headers);
     expect(headers.has('X-Line-Harness-Source')).toBe(false);
-    expect(headers.get('X-Line-Retry-Key')).toBe(result.id);
+    const job=testDb.raw.prepare("SELECT idempotency_key FROM scenario_source_jobs WHERE source_id=? AND status='sent'").get(result.id) as {idempotency_key:string};
+    expect(headers.get('X-Line-Retry-Key')).toBe(job.idempotency_key);
     expect(JSON.parse(init.body as string)).toMatchObject({ to: body.lineUid,
       messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
     expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
@@ -225,6 +243,7 @@ describe('電話予約のLINE確認通知', () => {
     testDb.raw.prepare("UPDATE rt_stores SET timezone = 'Asia/Bangkok' WHERE id = 'store-ginza'").run();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
+    await approveFollowup();
     expect((await notice({ ...body, guestCount: 3, startsAt: '2026-11-10T16:00:00.000Z', endsAt: '2026-11-10T18:00:00.000Z' })).lineNotice.sent).toBe(true);
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const text = JSON.parse(init.body as string).messages[0].text;
@@ -258,6 +277,7 @@ describe('電話予約のLINE確認通知', () => {
   it('送信失敗でも予約と在庫を保存し、例外の本文は返さない', async () => {
     seedFriend();
     vi.stubGlobal('fetch', vi.fn(async () => new Response('試験用の非公開本文', { status: 500 })));
+    await approveFollowup();
     const result = await notice();
     expect(result.lineNotice).toEqual({ sent: false, reason: 'send_failed' });
     expect(JSON.stringify(result)).not.toContain('非公開本文');
@@ -1531,14 +1551,34 @@ describe('V8 店の名簿とログイン権限',()=>{
 });
 
 describe('V8 フロア配置と結合グループ',()=>{
+ it('座標を省略した卓追加は空き位置に置き、重なり・店の外への変更を保存しない',async()=>{
+  seedRestaurantFixture();
+  const url='/api/restaurant-test/tables?account_id=account-1';
+  const input={storeId:'store-ginza',code:'T2',label:'新しい卓',seatType:'table',minCapacity:1,maxCapacity:2};
+  const added=await request(url,input);expect(added.status).toBe(201);
+  const id=(await added.json() as any).data.id;
+  const placed=testDb.raw.prepare('SELECT floor_x,floor_y FROM rt_tables WHERE id=?').get(id);
+  const original=testDb.raw.prepare("SELECT width FROM rt_tables WHERE id='table-ginza'").get() as {width:number};
+  expect((placed as {floor_x:number}).floor_x).toBeGreaterThanOrEqual(original.width);
+  expect(placed).toMatchObject({floor_y:0});
+  const version=testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get();
+  expect(version).toEqual({version:2});
+  expect((await request(url,{...input,code:'T3',floorX:0,floorY:0})).status).toBe(400);
+  for(const floorX of [0,10000])expect((await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX,floorY:0})).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[{id,floorX:0,floorY:0,joinGroup:null}]})).status).toBe(400);
+  expect(testDb.raw.prepare('SELECT floor_x,floor_y FROM rt_tables WHERE id=?').get(id)).toEqual(placed);
+  expect(testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get()).toEqual(version);
+  expect(testDb.raw.prepare("SELECT count(*) n FROM rt_tables WHERE store_id='store-ginza'").get()).toEqual({n:2});
+ });
+
  it('追加と変更で座標・結合を保存し、再取得しても同じ配置を返す',async()=>{
   seedRestaurantFixture();
-  const added=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',code:'T2',label:'試験卓',seatType:'table',minCapacity:1,maxCapacity:2,floorX:2,floorY:1,joinGroup:' A '});
+  const added=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',code:'T2',label:'試験卓',seatType:'table',minCapacity:1,maxCapacity:2,floorX:200,floorY:100,joinGroup:' A '});
   expect(added.status).toBe(201);const id=(await added.json() as any).data.id;
-  const updated=await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX:0,floorY:2,joinGroup:'B'});
+  const updated=await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX:0,floorY:120,joinGroup:'B'});
   expect(updated.status).toBe(200);
   const snapshot=await request('/api/restaurant-test/snapshot?account_id=account-1');
-  expect((await snapshot.json() as any).data.tables.find((t:any)=>t.id===id)).toMatchObject({floor_x:0,floor_y:2,join_group:'B'});
+  expect((await snapshot.json() as any).data.tables.find((t:any)=>t.id===id)).toMatchObject({floor_x:0,floor_y:120,join_group:'B'});
   await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{joinGroup:null});
   expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id=?').get(id)).toEqual({join_group:null});
  });
@@ -1609,12 +1649,13 @@ describe('提案E 来店記録', () => {
   it('来店の印と取消が履歴に反映され、過去の案内済みも数える', async () => {
     seedRestaurantFixture();
     testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000000000' WHERE id='reservation-ginza'");
+    const version=(testDb.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='reservation-ginza'").get() as {customer_version:number}).customer_version;
     const path='/api/restaurant-test/reservations/reservation-ginza/visit?account_id=account-1';
-    expect((await request(path,{kind:'visited'})).status).toBe(200);
-    expect((await request(path,{kind:'visited'})).status).toBe(409);
+    expect((await request(path,{kind:'visited',expectedVersion:version,requestId:'visit'})).status).toBe(200);
+    expect((await request(path,{kind:'visited',expectedVersion:version,requestId:'new-visit'})).status).toBe(409);
     const history=()=>request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
     expect((await (await history()).json() as any).data.visitCount).toBe(1);
-    expect((await requestWithMethod(path,'DELETE')).status).toBe(200);
+    expect((await requestWithMethod(path+`&expectedVersion=${version+1}&requestId=undo`,'DELETE')).status).toBe(200);
     expect((await (await history()).json() as any).data.visitCount).toBe(0);
     expect(testDb.raw.prepare('SELECT undone_at FROM rt_seat_visit_marks').get()).toMatchObject({undone_at:expect.any(String)});
     testDb.raw.exec("UPDATE rt_reservations SET status='seated' WHERE id='reservation-ginza'");
@@ -1655,7 +1696,7 @@ describe('提案E 媒体リンク',()=>{
     seedRestaurantFixture();env.LIFF_URL='https://liff.line.me/wrong-global';testDb.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,liff_id) VALUES('account-1','統括','hq','','','hq-liff'),('account-2','店','shop','','','shop-liff')");const path='/api/restaurant-test/reservation-link?account_id=account-1';
     const a=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
     const b=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
-    expect(a).toEqual(b);expect(a.available).toBe(true);expect(a.url).toMatch(/^https:\/\/liff\.line\.me\/shop-liff\/restaurant\/reserve\/[a-z0-9-]+$/);expect(a.html).toContain('noopener');
+    expect(a).toEqual(b);expect(a.available).toBe(true);expect(a.url).toMatch(/^https:\/\/liff\.line\.me\/shop-liff\?page=restaurant&token=[a-z0-9-]+$/);expect(a.html).toContain('noopener');
   });
 });
 
@@ -1682,4 +1723,109 @@ it('店の遅刻案内を版付きで保存・維持・解除し、他店・閲�
   authMocks.getStaffByApiKey.mockResolvedValueOnce({id:'viewer',name:'閲覧',role:'admin',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
   expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:3,lateArrivalPolicy:policy},'viewer-key')).status).toBe(403);
   expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2','PUT',{storeId:'store-yokohama',hours,expectedVersion:0,lateArrivalPolicy:policy})).status).toBe(400);
+});
+
+describe('飲食1 共通盤と予約の版',()=>{
+ it('読んだ版で一度だけ変更でき、古い画面と版なしは予約を上書きしない',async()=>{
+  seedRestaurantFixture();const url='/api/restaurant-test/reservations/reservation-ginza?account_id=account-1';
+  const initial=testDb.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='reservation-ginza'").get() as {customer_version:number};
+  expect((await requestWithMethod(url,'PATCH',{expectedVersion:initial.customer_version,note:'先に保存'})).status).toBe(200);
+  expect((await requestWithMethod(url,'PATCH',{expectedVersion:initial.customer_version,note:'古い画面'})).status).toBe(409);
+  const noVersion=await app().request(url,{method:'PATCH',headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify({note:'版なし'})},env);
+  expect(noVersion.status).toBe(400);expect(testDb.raw.prepare("SELECT note FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({note:'先に保存'});
+ });
+ it('共通表示は日時・店舗を絞り、版と旧予約の注意を返す',async()=>{
+  seedRestaurantFixture();const row=testDb.raw.prepare("SELECT starts_at,ends_at FROM rt_reservations WHERE id='reservation-ginza'").get() as {starts_at:string;ends_at:string};
+  const query=new URLSearchParams({account_id:'account-1',storeId:'store-ginza',from:row.starts_at,to:row.ends_at});
+  const result=await request('/api/restaurant-test/board?'+query);expect(result.status).toBe(200);const body=await result.json() as any;
+  expect(body.data.entries).toHaveLength(1);expect(body.data.entries[0]).toMatchObject({kind:'seats',id:'reservation-ginza',version:1,scopeId:'store-ginza',resourceIds:['table-ginza'],dining:{courseId:'menu-ginza'}});
+  query.set('from','2090-01-01T00:00:00Z');query.set('to','2090-01-02T00:00:00Z');expect((await (await request('/api/restaurant-test/board?'+query)).json() as any).data.total).toBe(0);
+  query.set('storeId','wrong');expect((await request('/api/restaurant-test/board?'+query)).status).toBe(404);
+ });
+ it('図面の保存は閲覧者・別の店舗を拒み、版ずれでは座標を保つ',async()=>{
+  seedRestaurantFixture();const floors=await request('/api/restaurant-test/floors?account_id=account-1&storeId=store-ginza');const f=(await floors.json() as any).data[0];
+  const body={...f,expectedVersion:f.version,tables:f.tables.map((t:any)=>({...t,x:100,y:100}))};
+  const url='/api/restaurant-test/floors/'+f.id+'?account_id=account-1';
+  expect((await requestWithMethod(url,'PUT',body)).status).toBe(200);expect((await requestWithMethod(url,'PUT',{...body,tables:body.tables.map((t:any)=>({...t,x:200}))})).status).toBe(409);
+  expect(testDb.raw.prepare("SELECT floor_x FROM rt_tables WHERE id='table-ginza'").get()).toEqual({floor_x:100});
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',role:'admin',name:'閲覧',access_level:'read_only',permission_keys:'[]'} as never);
+  expect((await requestWithMethod(url,'PUT',body,'reader-key')).status).toBe(403);
+  authMocks.getStaffByApiKey.mockResolvedValue(null);
+  expect((await requestWithMethod(url,'PUT',{...body,storeId:'wrong'})).status).toBe(404);
+ });
+});
+
+describe('飲食3・共通フォローのHTTP境界',()=>{
+ const path='/api/restaurant-test/followups/store-ginza';
+ const scope='?account_id=account-1';
+ const version=()=> (testDb.raw.prepare("SELECT template_version FROM rt_store_followup_templates WHERE store_id='store-ginza'").get() as {template_version:number}).template_version;
+ it('公開前の開始と古い版を拒否し、共通の行の追加・解除は停止にする',async()=>{
+  seedRestaurantFixture();
+  expect((await request(path+'/request-start'+scope,{expectedVersion:version()})).status).toBe(409);
+  const step='custom-review';
+  testDb.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES(?,'restaurant-followup:store-ginza',6,'text','同じ口コミの案内')").run(step);
+  const before=version();
+  const binding={expectedVersion:before,trigger:'review_request',offsetMinutes:181,enabled:true};
+  expect((await requestWithMethod(path+'/bindings/'+step+scope,'POST',binding)).status).toBe(200);
+  expect((await requestWithMethod(path+'/bindings/'+step+scope,'PATCH',binding)).status).toBe(409);
+  expect((await requestWithMethod(path+'/bindings/'+step+scope,'DELETE',{expectedVersion:version(),trigger:'review_request'})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT sending_status FROM rt_store_followup_templates WHERE store_id='store-ginza'").get()).toEqual({sending_status:'stopped'});
+ });
+ it('別店の行を結ばず、所属店の外は読めず、閲覧のみは開始・停止・編集できない',async()=>{
+  seedRestaurantFixture();
+  const body={expectedVersion:version(),trigger:'post_visit',offsetMinutes:180,enabled:true};
+  expect((await requestWithMethod(path+'/bindings/restaurant-followup:store-yokohama:post_visit'+scope,'POST',body)).status).toBe(409);
+  testDb.raw.exec("INSERT INTO staff_members(id,name,role,api_key,account_scope) VALUES('viewer','閲覧','staff','viewer-test-key','accounts');INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('viewer','account-2',datetime('now'))");
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',name:'閲覧',role:'staff',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:'account-2',can_access_descendant_accounts:0});
+  expect((await requestAs(path+'?account_id=account-2','viewer-key')).status).toBe(200);
+  expect((await requestAs('/api/restaurant-test/followups/store-yokohama?account_id=account-2','viewer-key')).status).toBe(404);
+  for(const suffix of ['/request-start','/stop'])expect((await requestAs(path+suffix+'?account_id=account-2','viewer-key',{expectedVersion:version()})).status).toBe(403);
+  expect((await requestWithMethod(path+'/bindings/restaurant-followup:store-ginza:post_visit?account_id=account-2','PATCH',body,'viewer-key')).status).toBe(403);
+ });
+ it('共通編集で行を削除でき、登録されたアレルゲンと口コミ依頼の区別を返す',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.prepare("DELETE FROM scenario_steps WHERE id='restaurant-followup:store-ginza:post_visit'").run();
+  expect(testDb.raw.prepare("SELECT COUNT(*) n FROM rt_store_followup_step_bindings WHERE store_id='store-ginza' AND trigger='post_visit'").get()).toEqual({n:0});
+  testDb.raw.prepare("UPDATE rt_reservations SET dining_snapshot_json=? WHERE id='reservation-ginza'").run(JSON.stringify({courseAllergens:['乳','小麦'],capturedAt:'2026-08-25T08:00:00Z'}));
+  const detail=await request('/api/restaurant-test/reservations/reservation-ginza'+scope);expect(detail.status).toBe(200);
+  expect((await detail.json() as {data:unknown}).data).toMatchObject({courseAllergens:['乳','小麦'],allergensSource:'registered_at_booking'});
+  const history=await request(path+'/review-history'+scope);expect(history.status).toBe(200);
+  expect((await history.json() as {data:unknown}).data).toMatchObject({reviewSelection:'all_customers',origin:'line_invitation',verifiedGoogleReviewAttributions:[]});
+ });
+});
+
+describe('飲食4 系列の管理と権限',()=>{
+ it('案内の組と確認済み座標を管理者だけが変更できる。別店・閲覧のみを拒否',async()=>{
+  seedRestaurantFixture();
+  const query='?account_id=account-1';
+  for(const members of [[null,{}],[{storeId:123},{}]]) {
+   expect((await request('/api/restaurant-test/store-groups'+query,{name:'壊れた入力',members})).status).toBe(400);
+  }
+  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_groups').get()).toEqual({n:0});
+  const made=await request('/api/restaurant-test/store-groups'+query,{name:'近くの店',members:[{storeId:'store-ginza',referralEnabled:true,maxDistance:5},{storeId:'store-yokohama',referralEnabled:false,maxDistance:5}]});
+  expect(made.status).toBe(201);
+  const id=(await made.json() as {data:{id:string}}).data.id;
+  expect((await requestWithMethod('/api/restaurant-test/stores/store-ginza/referral-location'+query,'PUT',{latitude:35.6,longitude:139.7,confirmed:false})).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/stores/store-ginza/referral-location'+query,'PUT',{latitude:35.6,longitude:139.7,confirmed:true})).status).toBe(200);
+  expect((await requestWithMethod(`/api/restaurant-test/store-groups/${id}/members/store-yokohama${query}`,'PATCH',{referralEnabled:true,maxDistance:10})).status).toBe(200);
+  expect((await request('/api/restaurant-test/store-groups'+query)).status).toBe(200);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',role:'admin',name:'閲覧',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+  expect((await requestWithMethod(`/api/restaurant-test/store-groups/${id}/members/store-ginza${query}`,'PATCH',{referralEnabled:false,maxDistance:5},'viewer-key')).status).toBe(403);
+  authMocks.getStaffByApiKey.mockResolvedValue(null);
+  expect((await request('/api/restaurant-test/store-groups'+query,{name:'越境',members:[{storeId:'store-ginza',referralEnabled:true,maxDistance:5},{storeId:'not-owned',referralEnabled:true,maxDistance:5}]})).status).toBe(404);
+ });
+});
+
+it.each(['reservationFrom','reservationTo'])('API-02 %s rejects impossible dates',async key=>{
+ seedRestaurantFixture();
+ expect((await request(`/api/restaurant-test/snapshot?account_id=account-1&${key}=2026-02-30`)).status).toBe(400);
+});
+
+it('API-01 飲食台帳の暦日も日本の00:30を含めて翌日00:30を除く',async()=>{
+ seedRestaurantFixture();
+ testDb.raw.exec("UPDATE rt_reservations SET starts_at='2026-08-24T15:30:00.000Z',ends_at='2026-08-24T16:30:00.000Z' WHERE id='reservation-ginza'; INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,guest_count,starts_at,ends_at,table_id,status) VALUES('next-day','store-ginza','restaurant_board','NEXT-DAY','人工客',2,'2026-08-25T15:30:00.000Z','2026-08-25T16:30:00.000Z','table-ginza','confirmed')");
+ const res=await request('/api/restaurant-test/snapshot?account_id=account-1&reservationFrom=2026-08-25&reservationTo=2026-08-25');
+ expect(res.status).toBe(200);
+ const body=await res.json() as {data:{reservations:Array<{id:string}>}};
+ expect(body.data.reservations.map(row=>row.id)).toEqual(['reservation-ginza']);
 });

@@ -17,6 +17,8 @@ import EmergencyControlV8 from './control-v8'
  * 隠れること、止める確認の窓は「停止」の言葉が合うまで
  * 進めないことを実DOMで固定する。
  */
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => (
     <a href={String(href)}>{children}</a>

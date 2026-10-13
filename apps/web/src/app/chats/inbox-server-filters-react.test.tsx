@@ -1,5 +1,6 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import ChatsPage from './page'
@@ -93,16 +94,7 @@ async function selectAssignee(value: string) {
   if (!document.querySelector('[aria-label="担当者で絞り込む（パネル）"]')) await click('絞り込み')
   // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
   const label = value === 'unassigned' ? '未割り当て' : '担当T'
-  await act(async () => {
-    const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, label)
-    field.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  await act(async () => {
-    const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes(label))
-    expect(option, label).toBeTruthy()
-    ;(option as HTMLElement).click()
-  })
+  await pickEntity('担当者で絞り込む（パネル）', label)
 }
 const listCalls = (channel: Channel) => calls.filter(url => listChannel(url) === channel)
 

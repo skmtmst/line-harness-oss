@@ -20,6 +20,7 @@ import { LINK_STATUS_LABEL, checkedLabel, urlLabel } from './manual-link-view'
 import { useManualLinks } from './use-manual-links'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'マニュアルの正本表'
 const DESCRIPTION = '画面の上の「マニュアル」が開く行き先を、画面ごとに決めます'
@@ -53,7 +54,7 @@ export default function ManualLinksScreen() {
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION}>
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。">
       {children}
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </SbSettingsScreen>
@@ -84,7 +85,7 @@ export default function ManualLinksScreen() {
 
   return frame(
     <>
-      <Notice tone="warn" icon={<ShieldCheck size={16} aria-hidden="true" />}>この表を直せるのは運営だけです。お客さまの組織からは見えません。</Notice>
+
 
       <div className={styles.toolbar}>
         <SearchField
@@ -104,7 +105,7 @@ export default function ManualLinksScreen() {
         </Button>
       </div>
 
-      {actionError && <p role="alert" className={styles.danger}>{actionError}</p>}
+      {actionError && <Notice tone="danger" className={styles.dangerNoticePlacement} >{actionError}</Notice>}
 
       {shown.length === 0 ? (
         <ListState
@@ -138,11 +139,11 @@ export default function ManualLinksScreen() {
                   <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={row.name}>{row.name}</GridCell>
                   <GridCell role="cell" className={styles.cell} title={urlLabel(row.url)}>
                     {editing ? (
-                      <TextField
+                      <SaveErrorField names={["editingUrl","editing_url"]}><TextField
                         aria-label={`${row.name}のマニュアルのURL`}
                         value={editingUrl}
                         onChange={(event) => setEditingUrl(event.target.value)}
-                      />
+                      /></SaveErrorField>
                     ) : (
                       <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>{urlLabel(row.url)}</span>
                     )}

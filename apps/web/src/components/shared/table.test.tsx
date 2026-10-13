@@ -11,6 +11,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   DataTable,
+  DateCell,
   SortTh,
   TableHeadRow,
   TableStateRow,
@@ -36,6 +37,15 @@ function renderTable(ui: React.ReactNode) {
 }
 
 describe('既存の使い方を壊さない', () => {
+  it('日時セルは日付の内容・読み上げ・共通セルの配置を保つ', () => {
+    renderTable(<Tr><DateCell align="right" title="2026年10月11日"><time dateTime="2026-10-11T12:34:00+09:00">10/11 12:34</time></DateCell></Tr>)
+    const time = screen.getByText('10/11 12:34')
+    expect(time.getAttribute('datetime')).toBe('2026-10-11T12:34:00+09:00')
+    expect(time.closest('td')?.getAttribute('data-align')).toBe('right')
+    expect(time.closest('td')?.getAttribute('title')).toBe('2026年10月11日')
+    expect(tableCss).toMatch(/\.dateCell\s*\{[^}]*color:\s*var\(--color-ink-secondary\);[^}]*font-variant-numeric:\s*tabular-nums;[^}]*white-space:\s*nowrap;/s)
+  })
+
   it('Th は今までどおり th・scope=col・左寄せ', () => {
     renderTable(
       <tr>
@@ -62,8 +72,8 @@ describe('既存の使い方を壊さない', () => {
     expect(screen.getByText('友だち').closest('tr')).not.toBeNull()
   })
 
-  it('一覧行の高さ58pxの既定は変えない', () => {
-    expect(dataTableCss).toContain('height: 58px;')
+  it('一覧行は現在のV8の共通の行高を使う', () => {
+    expect(dataTableCss).toMatch(/:root \.frame \.row\s*\{[^}]*height: var\(--polish-table-row\)/s)
   })
 
   it('Tr に何も渡さなければ aria-selected を付けない', () => {
@@ -76,10 +86,10 @@ describe('既存の使い方を壊さない', () => {
   })
 })
 
-describe('★V7の足し分', () => {
-  it('ゆったりした行は64px・見出し行は40px（CSSの指定）', () => {
-    expect(dataTableCss).toMatch(/\.rowComfortable\s*\{[^}]*height:\s*64px/s)
-    expect(tableCss).toMatch(/\.headComfortable\s*\{[^}]*height:\s*40px/s)
+describe('一覧の行と選択', () => {
+  it('行と見出しは現在のV8の共通の高さへそろえる', () => {
+    expect(dataTableCss).toMatch(/:root \.frame \.row\s*\{[^}]*min-height:\s*var\(--polish-table-row\)/s)
+    expect(tableCss).toMatch(/:root \.headRow \.cell\s*\{[^}]*height:\s*var\(--tpl-thead-h\)/s)
   })
 
   it('選んだ行は aria-selected と薄い緑の地（色だけにしない）', () => {
@@ -158,14 +168,14 @@ describe('★V7の足し分', () => {
 
   it('読み込み中の行は待つ旨だけ', () => {
     renderTable(<TableStateRow colSpan={2} kind="loading" />)
-    expect(screen.getByText('読み込んでいます')).not.toBeNull()
+    expect(screen.getByLabelText('読み込んでいます').getAttribute('aria-busy')).toBe('true')
     expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('失敗の行は必ず読み直すボタンを出す', () => {
     let calls = 0
     const { rerender } = renderTable(<TableStateRow colSpan={2} kind="error" />)
-    expect(screen.getByText('表示できませんでした')).not.toBeNull()
+    expect(screen.getByText('読み込めませんでした')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
 
     rerender(

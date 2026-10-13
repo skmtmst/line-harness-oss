@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 // オートウェビナー (疑似ライブ) HTTP routes.
 //
@@ -107,7 +108,7 @@ import {
 } from '../services/webinar-mileage.js';
 import type { Env } from '../index.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 
@@ -945,7 +946,7 @@ async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const column = 'account_id';
   const where = scope.allowedAccountIds.length
-    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    ? `(${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
     : scope.canSeeUnassigned
       ? `${column} IS NULL`
       : '1 = 0';
@@ -1382,7 +1383,7 @@ webinarRoutes.get('/api/webinars', async (c) => {
   }
 });
 
-webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), async (c) => {
+webinarRoutes.post('/api/webinars', requireDeliveryAccess('webinars'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<WebinarBody>();
     if (!body.accountId) {
@@ -1448,7 +1449,7 @@ webinarRoutes.get('/api/webinars/:id/editor', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), inputJsonBoundary({"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"],"notificationMessages":["object"],"notificationTest":["null","object"],"actionTemplateBody":["string"],"missingResultPolicy":["string"],"publicPageTest":["null","object"]}), async (c) => {
+webinarRoutes.put('/api/webinars/:id/editor', requireDeliveryAccess('webinars'), inputJsonBoundary({"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"],"notificationMessages":["object"],"notificationTest":["null","object"],"actionTemplateBody":["string"],"missingResultPolicy":["string"],"publicPageTest":["null","object"]}), async (c) => {
   try {
     const row = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1506,7 +1507,7 @@ webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), inp
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/public-page/test', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.post('/api/webinars/:id/public-page/test', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const row = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1646,7 +1647,7 @@ webinarRoutes.get('/api/webinars/:id/publish-validation', async (c) => {
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.post('/api/webinars/:id/publish', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1723,7 +1724,7 @@ const WEBINAR_VIDEO_NEXT_STAGE: Record<string, string[]> = {
   failed: [],
 };
 
-webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1785,7 +1786,7 @@ webinarRoutes.get('/api/webinars/:id/sessions/:startAt', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1816,7 +1817,7 @@ webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'a
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.post('/api/webinars/:id/pause', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1835,7 +1836,7 @@ webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), inp
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.post('/api/webinars/:id/duplicate', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1894,7 +1895,7 @@ webinarRoutes.get('/api/webinars/:id/notifications', async (c) => {
 
 webinarRoutes.put(
   '/api/webinars/:id/notifications',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('webinars'),
   inputJsonBoundary({"registrationEnabled":["boolean"],"dayBeforeEnabled":["boolean"],"dayBeforeTime":["string"],"hourBeforeEnabled":["boolean"],"hourBeforeMinutes":["number"],"startEnabled":["boolean"],"missedEnabled":["boolean"],"missedTime":["string"],"completedEnabled":["boolean"],"missedWindowDays":["number"]}), async (c) => {
     try {
       const body = await c.req.json<Partial<WebinarNotificationSettingsInput>>();
@@ -1948,7 +1949,7 @@ webinarRoutes.put(
 
 webinarRoutes.post(
   '/api/webinars/:id/notifications/test',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('webinars'),
   inputJsonBoundary(), async (c) => {
     try {
       const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
@@ -2007,7 +2008,7 @@ webinarRoutes.post(
   },
 );
 
-webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), async (c) => {
+webinarRoutes.put('/api/webinars/:id', requireDeliveryAccess('webinars'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -2061,7 +2062,7 @@ webinarRoutes.get('/api/webinars/:id/actions', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/actions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.put('/api/webinars/:id/actions', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ actions?: unknown }>();
     const actions = parseWebinarActions(body.actions);
@@ -2098,9 +2099,9 @@ async function archiveVisibleWebinar(c: Context<Env>) {
   }
 }
 
-webinarRoutes.post('/api/webinars/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), archiveVisibleWebinar);
+webinarRoutes.post('/api/webinars/:id/archive', requireDeliveryAccess('webinars'), inputJsonBoundary(), archiveVisibleWebinar);
 // 旧クライアント互換。物理削除はせず、同じアーカイブ処理を行う。
-webinarRoutes.delete('/api/webinars/:id', requireRole('owner', 'admin'), archiveVisibleWebinar);
+webinarRoutes.delete('/api/webinars/:id', requireDeliveryAccess('webinars'), archiveVisibleWebinar);
 
 webinarRoutes.get('/api/webinars/:id/comments', async (c) => {
   try {
@@ -2120,7 +2121,7 @@ webinarRoutes.get('/api/webinars/:id/comments', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/comments', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.put('/api/webinars/:id/comments', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -2186,7 +2187,7 @@ webinarRoutes.get('/api/webinars/:id/ctas', async (c) => {
 
 // CTA カード一括置換。kind='form' は forms 実在チェック、kind='url' は https? 必須。
 // 全要素検証 → 不正が1件でもあれば何も書かない (comments と同じ all-or-nothing)。
-webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+webinarRoutes.put('/api/webinars/:id/ctas', requireDeliveryAccess('webinars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -2399,7 +2400,7 @@ async function webinarParticipantMeasurement(
 
 webinarRoutes.get(
   '/api/webinars/:id/participants',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('webinars'),
   async (c) => {
   try {
     const id = c.req.param('id');
@@ -2482,7 +2483,7 @@ const WEBINAR_CLASSIFICATION_LABELS: Record<WebinarParticipantClassification, st
 
 webinarRoutes.get(
   '/api/webinars/:id/participants.csv',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('webinars', 'export'),
   async (c) => {
     try {
       const id = c.req.param('id');
@@ -2504,6 +2505,7 @@ webinarRoutes.get(
         measured: measurement.measured,
         classification,
       });
+      c.set('outputAudit', { count: participants.length, accountId: webinar.account_id ?? undefined, targetId: id });
       const rows = participants.map((participant) => [
         participant.friend_name ?? '',
         participant.first_joined_at,

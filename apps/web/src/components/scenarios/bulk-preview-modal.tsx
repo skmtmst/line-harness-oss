@@ -6,6 +6,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import StatusChip from '@/components/shared/status-chip'
 import { isCurrentPreviewRequest } from './bulk-preview-request'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 interface Props {
   open: boolean
@@ -110,11 +111,11 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
         <label className="text-ink-secondary mb-1 block text-xs font-medium">
           起点 (購読開始日時)
         </label>
-        <DateTimeField
+        <SaveErrorField names={["startAt","start_at"]}><DateTimeField
           value={startAt}
           onChange={setStartAt}
           aria-label="起点（購読開始日時）"
-        />
+        /></SaveErrorField>
       </div>
 
       {error && <p className="text-danger mb-3 text-sm" role="alert">{error}</p>}

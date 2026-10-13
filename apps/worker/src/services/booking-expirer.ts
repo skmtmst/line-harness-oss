@@ -1,5 +1,8 @@
 // Cron handler: expire 24h-old request bookings + purge idempotency rows.
 
+import { recoverExpiredBookingPayments, recoverPaidBookingPayments, recoverOrphanedOnlineBookings } from './booking-payment-recovery.js';
+import { recoverConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
+import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
@@ -25,12 +28,17 @@ interface StaleRow {
 export interface RunExpirerParams {
   now: Date;
   sender: BookingNotificationSender;
+  credentials?: GoogleServiceAccountCredentials;
 }
 
 export async function runExpirer(
   db: D1Database,
   params: RunExpirerParams,
 ): Promise<{ expired: number; idempotencyPurged: number }> {
+  await recoverPaidBookingPayments(db, params.now, params.credentials);
+  await recoverConfirmedBookingSideEffects(db, { now: params.now, credentials: params.credentials });
+  await recoverExpiredBookingPayments(db, params.now);
+  await recoverOrphanedOnlineBookings(db, params.now);
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
   // 機能オフはSQLで先に除き、緊急停止中の行も消費枠に数えず、IDで次のページへ進む。
   const stale: StaleRow[] = [];
@@ -54,6 +62,8 @@ export async function runExpirer(
           LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE b.status = 'requested'
           AND b.requested_at < ? AND b.id > ?
+          AND NOT EXISTS (SELECT 1 FROM booking_payments p
+            WHERE p.booking_id = b.id AND p.line_account_id = b.line_account_id AND p.status = 'paid')
           AND NOT ${accountFeatureOffExclusionSql('b.line_account_id', 'booking')}
         ORDER BY b.id
         LIMIT 200`,
@@ -92,7 +102,9 @@ export async function runExpirer(
     // requested 行に対してのみ expired 化する。changes=0 なら後続処理（通知/reminders cancel）
     // をスキップして、誤通知を防ぐ。
     const upd = await db
-      .prepare(`UPDATE bookings SET status='expired', decided_at = ? WHERE id = ? AND status = 'requested'`)
+      .prepare(`UPDATE bookings SET status='expired', decided_at = ? WHERE id = ? AND status = 'requested'
+        AND NOT EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = bookings.id
+          AND p.line_account_id = bookings.line_account_id AND p.status = 'paid')`)
       .bind(params.now.toISOString(), row.id)
       .run();
     if ((upd.meta?.changes ?? 0) === 0) continue;

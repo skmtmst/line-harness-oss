@@ -1,6 +1,8 @@
 'use client'
 
-import Link from 'next/link'
+import HqMessageBody from '@/components/shared/hq-message-inserts'
+import EntitySelect from '@/components/shared/entity-select'
+import Link from '@/components/shared/list-navigation'
 import { useRef, type ReactNode } from 'react'
 import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
 import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
@@ -194,10 +196,10 @@ export function TemplateInsertControls({
       <div className="flex flex-wrap gap-2">
         <Button size="field" disabled={disabled} onClick={() => onInsert('{{name}}')}>名前</Button>
         {fieldsEnabled && (
-          <Select aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
+          <EntitySelect aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
         )}
         {varsEnabled && (
-          <Select aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+          <EntitySelect aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
         )}
         <Select aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
         <Select aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
@@ -255,6 +257,7 @@ export function MessageTemplateEditor({
   afterType,
   editorContent,
   footer,
+  hqInserts=false,
 }: {
   value: MessageTemplateEditorValue
   onChange: (next: MessageTemplateEditorValue) => void
@@ -276,6 +279,7 @@ export function MessageTemplateEditor({
   beforeType?: ReactNode
   afterType?: ReactNode
   editorContent?: ReactNode
+  hqInserts?: boolean
   footer?: ReactNode
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -342,14 +346,14 @@ export function MessageTemplateEditor({
               ) : null}
             </>
           ) : (
-            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
+            hqInserts ? <HqMessageBody value={messageContent} label={bodyAriaLabel} readOnly={disabled} onChange={messageContent=>onChange({...value,messageContent})}/> : (<TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />)
           )}
           <p className="text-ink-faint mt-1 text-xs tabular-nums">{messageContent.length} 文字{messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
         </Field>
-        <div>
+        {!hqInserts && <div>
           <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
           <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
-        </div>
+        </div>}
         </>}
         <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
           <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-ink-faint text-xs font-semibold">短縮して、クリックを数える</span></div>

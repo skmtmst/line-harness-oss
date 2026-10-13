@@ -40,7 +40,7 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
   const lineRow = region(PAGE, 'const waitingLabel = needsAttention', '{/* Right Panel: Chat Detail */}')
 
   it('一覧の日時は共通の書式から時刻を出す', () => {
-    expect(PAGE).toContain("import { formatDateTime, formatNumber, formatRelative, formatTime }")
+    expect(PAGE).toContain("import { formatDateTime, formatNumber, formatTime }")
     expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
   })
 
@@ -139,20 +139,20 @@ describe('Xi4x9 右パネルの表示項目', () => {
  */
 describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
   const talkPane = region(PAGE, 'data-inbox-v4="talk-pane"', '{selectedThreadId ?')
-  const panel = region(PAGE, 'data-inbox-v4="customer-panel"', '</aside>')
+  const panel = region(PAGE, '<InboxSummaryPane', '</InboxSummaryPane>')
 
   it('白い板の実幅が1100px以上のときだけ3列を常設する', () => {
     expect(INBOX_LAYOUT).toContain('INBOX_INFO_PANEL_MIN_WIDTH = INBOX_LIST_WIDTH + INBOX_INFO_PANEL_WIDTH + INBOX_TALK_MIN_WIDTH')
     // メディアクエリとCSSの `2xl:` は同じ境界を指す。片方だけ変わると
     // 「ドロワーのつもりが列になる」ずれが起きる。
     expect(PAGE).toContain('entry.contentRect.width >= INBOX_INFO_PANEL_MIN_WIDTH')
-    expect(panel).toContain('relative z-auto w-[260px]')
+    expect(panel).toContain('<InboxSummaryPane wide={wideInfoPanel}')
   })
 
   it('トーク列は最低幅で固定せず、残り幅いっぱいに伸縮する', () => {
     // `xl:min-w-xl`（576px固定）が min-w-0 を上書きして 1280〜1536px で
     // 右列を画面外へ押し出していた。固定の最小幅は持たせない。
-    expect(talkPane).toContain('min-w-0 flex-1')
+    expect(PAGE).toContain('<InboxConversationPane')
     expect(talkPane).not.toMatch(/min-w-(xs|sm|md|lg|xl|2xl|\[)/)
   })
 
@@ -160,10 +160,12 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
     // `hidden xl:block` は1280px未満で常に非表示＝開く手段がなかった。
     expect(panel).not.toContain('hidden xl:block')
     // 狭い幅では fixed のドロワー（背景の暗幕付き）として出す。
-    expect(panel).toContain('fixed inset-y-0 right-0')
-    expect(PAGE).toContain("wideInfoPanel ? 'hidden' : ''")
+    expect(panel).toContain('wide={wideInfoPanel}')
+    expect(PAGE).toContain('<InboxInfoBackdrop wide={wideInfoPanel}')
+    const backdrop = readFileSync(join(HERE, '../shared/inbox-content.tsx'), 'utf8')
+    expect(backdrop).toContain('return wide ? null : <div')
     // 広い幅では従来どおり列として並ぶ。
-    expect(panel).toContain('w-[260px]')
+    expect(panel).toContain('wide={wideInfoPanel}')
   })
 
   it('ドロワーは Escape・背景・閉じるボタンで閉じられる', () => {

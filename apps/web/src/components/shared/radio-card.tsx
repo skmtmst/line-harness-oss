@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import type { FormEventHandler, KeyboardEventHandler, Ref, ReactNode } from 'react'
 import styles from './radio-card.module.css'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
  * ラジオカード。「この中から1つだけ選ぶ」選択肢をカードで出す共通部品。
@@ -28,12 +29,20 @@ import styles from './radio-card.module.css'
  * `className` はカードを並べる内側のコンテナへ付く（既定は縦1列）。
  */
 export function RadioCardGroup({
+  id,
   legend,
+  invalid,
+  'aria-describedby': describedBy,
+  onInput,
   legendVisible = false,
   className,
   children,
 }: {
   /** 群の名前。例「基準日の選択」「配信方法」。 */
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
+  onInput?: FormEventHandler<HTMLFieldSetElement>
   legend: string
   /** true にすると群名を見出しとして表示する。既定は読み上げ専用。 */
   legendVisible?: boolean
@@ -41,7 +50,7 @@ export function RadioCardGroup({
   children: ReactNode
 }) {
   return (
-    <fieldset className={styles.group}>
+    <fieldset id={id} className={styles.group} aria-invalid={invalid || undefined} aria-describedby={describedBy} onInput={onInput}>
       <legend className={legendVisible ? styles.legend : 'sr-only'}>{legend}</legend>
       <div className={[styles.items, className].filter(Boolean).join(' ')}>{children}</div>
     </fieldset>
@@ -49,6 +58,11 @@ export function RadioCardGroup({
 }
 
 export interface RadioCardProps {
+  id?: string
+  inputRef?: Ref<HTMLInputElement>
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>
+  tabIndex?: number
+  ariaLabel?: string
   /** 同じ群で同じ name。矢印キーで行き来できるのは同じ name のラジオ同士だけ。 */
   name: string
   value: string
@@ -82,7 +96,7 @@ export interface RadioCardProps {
    * `'compact'` は小さい箱（★BG-B の出力サイズ o2XyUk/aCyxg：
    * 角 8・余白 8/10・題 11/600・補足 10）。狭い脇のパネルに並べる選択肢に使う。
    * `'form'` は作る画面や操作窓の小さい箱。印を題の左に並べる（RaMf3・hadfk）。
-   * 画面の絵で行で並んでいる選択肢には `'row'` を使う。箱の合格は変えない。
+   * 画面の絵で行で並んでいる選択肢には `'row'` を使う。カードのラジオは右上に置く。
    */
   variant?: 'card' | 'row' | 'compact' | 'form'
   /** 統括の生成パネルの小さい箱（題12/700、補足11）。 */
@@ -95,9 +109,13 @@ export interface RadioCardProps {
   height?: 'default' | 'short'
   /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
   size?: 'default' | 'small'
+  /** 図・本文を右上の丸の下へ置く箱。本文の右側を丸用に狭めない。 */
+  contentPlacement?: 'standard' | 'below-indicator'
 }
 
 export default function RadioCard({
+  id,
+  inputRef, onKeyDown, tabIndex, ariaLabel,
   name,
   value,
   checked,
@@ -115,7 +133,10 @@ export default function RadioCard({
   compactTypography = 'default',
   height = 'default',
   size = 'default',
+  contentPlacement = 'standard',
 }: RadioCardProps) {
+  const field = useFieldContext()
+  invalid = invalid || Boolean(field?.invalid)
   return (
     <label
       className={[
@@ -129,23 +150,31 @@ export default function RadioCard({
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
+      data-choice-card={variant !== 'row' || undefined}
       data-variant={variant}
+      data-content-placement={contentPlacement}
       data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
     >
       {icon && variant !== 'form' ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
       <input
         type="radio"
+        ref={inputRef}
+        onKeyDown={onKeyDown}
+        tabIndex={tabIndex}
+        aria-label={ariaLabel}
+        id={id}
         className={styles.radio}
         name={name}
         value={value}
         checked={checked}
         disabled={disabled}
         aria-invalid={invalid || undefined}
+        aria-describedby={joinDescribedBy(field?.describedBy)}
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
-        <strong className={styles.title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
+        <strong className={styles.title} title={title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>

@@ -41,7 +41,7 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
     // ページ上の帯（`p-4 bg-danger-bg` の箱）。行の削除ボタンの hover は別物。
     expect(PAGE).not.toContain('p-4 bg-danger-bg')
     expect(PAGE).toContain(") : forbidden ? (")
-    expect(PAGE).toContain("onClick={() => void loadList(")
+    expect(PAGE).toContain("onClick={() => loadList(")
   })
 
   it('空・失敗・権限不足を共通部品で描く', () => {

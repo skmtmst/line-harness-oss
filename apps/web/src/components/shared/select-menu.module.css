@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 /*
  * ★V8 プルダウンの開いた中身（StFE7「選ぶ欄/開いた」）。値は globals.css の
  * [data-theme="v8"] の --select-menu-*。画面側で上書きしない。
@@ -117,7 +117,7 @@
 }
 
 .item:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
 
@@ -200,3 +200,6 @@
   height: var(--select-menu-item-line);
 }
 }
+
+/* B-161：開いた選ぶ欄も浮く面の薄い縁を使う。 */
+:root .surface { border-color: var(--card-edge); }

@@ -76,12 +76,12 @@ describe('ガードの撮影準備', () => {
     expect(fontsAt).toBeGreaterThan(waitedAt)
   })
 
-  it('合言葉（V7 テーマ＋偽ログイン）を置く', async () => {
+  it('偽ログインと選択中アカウントだけを置き、旧テーマの値は書かない', async () => {
     const stub = stubBrowser()
     await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, theme: 'v7', stable: true })
     const store: Record<string, string> = {}
     stub.runInit(store)
-    expect(store['lh-admin-theme']).toBe('v7')
+    expect(store).not.toHaveProperty('lh-admin-theme')
     expect(store['lh_selected_account']).toBe('visual-qa-account')
     expect(store['lh_csrf']).toBe('visual-qa-csrf')
   })

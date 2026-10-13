@@ -17,8 +17,8 @@ describe('V8 の入力・選択・押し口規定', () => {
      * 以前はボタン36px・選択/検索42pxでずれていた。タッチ端末は44px。
      * （`@media (pointer: coarse)` の 44px は design-unification の試験が見る）
      */
-    expect(button).toMatch(/\.standard\s*{[^}]*height:\s*36px/s)
-    expect(button).toMatch(/\.field\s*{[^}]*height:\s*36px/s)
+    expect(button).toMatch(/:root \.standard,\s*:root \.field\s*{[^}]*height:\s*var\(--tpl-button-h\)/s)
+    expect(read('../../app/globals.css')).toMatch(/--tpl-button-h:\s*36px/)
     expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(textField).toMatch(/\.single\s*{[^}]*height:\s*36px/s)
     expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*36px/s)
@@ -61,32 +61,18 @@ describe('V8 の入力・選択・押し口規定', () => {
     expect(offenders).toEqual([])
   })
 
-  it('部品の CSS Module は先頭で層の順番を宣言する', () => {
-    /*
-     * Tailwind v4 の出力は層の順番を先頭で宣言しない。部品の CSS が
-     * globals.css より先に読まれると、最初に現れた `@layer components` が
-     * 1番目の層になり、後から来る base（preflight）が部品に勝つ。
-     * ボタンの地・枠・余白、入力欄の枠が全部消えた（検証環境 2026-10-02）。
-     * どの順で読まれても同じになるよう、各ファイルの1行目で順番を宣言する。
-     *
-     * ★V8 移行が済んで不要になったら、次の1行で全部消せる（この試験も消す）:
-     *   grep -rl 'layer-order: V8 移行後に消す' apps/web/src | xargs sed -i '' '/layer-order: V8 移行後に消す/d'
-     */
-    // 層の順番を守る。注釈の有無は描画に関係しない。
-    const order = /^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;\s*(?:\/\*[\s\S]*?\*\/\s*)?@layer components\s*\{/
-    const dir = new URL('.', import.meta.url)
-    const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
-    const offenders = modules.filter((name) => {
-      const css = read(`./${name}`)
-      return css.includes('@layer components') && !order.test(css)
-    })
-    expect(offenders).toEqual([])
+  it('components loaded before globals still establish the same cascade order', () => {
+    expect(read('../../app/globals.css')).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
+    const modules = readdirSync(new URL('.', import.meta.url)).filter(name => name.endsWith('.module.css'))
+    for (const name of modules) {
+      expect(read(`./${name}`), name).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
+    }
   })
 
   it('代表的な画面側上書きも規定値に戻す', () => {
     const folderSelect = read('../chats/template-folder-select.tsx')
-    const users = read('../users/users-filters.tsx')
-    const tags = read('../friend-fields/tags-page-v4.tsx')
+    const users = read('../../app/users/users-v8.tsx')
+    const tags = read('../../v8/tags/tags-tab.tsx')
     const broadcasts = read('../../v8/broadcasts/list.tsx')
 
     expect(folderSelect).toContain('size="field"')
@@ -101,7 +87,7 @@ describe('V8 の入力・選択・押し口規定', () => {
     expect(tags).not.toContain('type="search"')
     expect(tags).not.toContain('<select')
     expect(tags).toContain('aria-label="使用状態で絞り込む"')
-    expect(tags).toContain('aria-label="表示件数"')
+    expect(tags).toContain('<PageSizeSelect')
     expect(broadcasts).toContain('<SearchField')
     expect(broadcasts).not.toContain('type="search"')
   })

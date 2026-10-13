@@ -14,7 +14,7 @@ vi.mock('next/link', () => ({
     <a href={typeof href === 'string' ? href : '#'}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/templates/edit',
   useSearchParams: () => new URLSearchParams(),
@@ -22,12 +22,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [], selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({
-  isOwnerOrAdmin: () => true,
-}))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 
-import TemplateEditV8 from './edit-v8'
+import TemplateEditV8 from './edit/page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -47,6 +44,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown) => {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     let body: unknown = { success: true, data: {} }
     if (path.startsWith('/api/folders')) body = { success: true, data: [] }
     if (path.startsWith('/api/templates/references')) body = { success: true, data: { scenarios: [], autoReplies: [], reminders: [] } }

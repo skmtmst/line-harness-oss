@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
@@ -195,10 +196,10 @@ export async function getStaffNameMap(
   )];
   const names = new Map<string, string>();
   if (unique.length === 0) return names;
-  const placeholders = unique.map(() => '?').join(',');
+  const placeholders = sqlIdSet(unique).sql;
   const rows = await db
     .prepare(`SELECT id, name FROM staff_members WHERE id IN (${placeholders})`)
-    .bind(...unique)
+    .bind(...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ id: string; name: string }>();
   for (const row of rows.results ?? []) names.set(row.id, row.name);
   return names;
@@ -448,8 +449,8 @@ export async function getStaffAccountScopeMap(
   const ids = [...new Set(staffIds.filter((id) => typeof id === 'string' && id.length > 0))];
   if (ids.length === 0) return map;
   const result = await db
-    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${ids.map(() => '?').join(',')}) ORDER BY staff_id, line_account_id`)
-    .bind(...ids)
+    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${sqlIdSet(ids).sql}) ORDER BY staff_id, line_account_id`)
+    .bind(...sqlIdSet(ids).binds)
     .all<{ staff_id: string; line_account_id: string }>();
   for (const row of result.results) {
     const list = map.get(row.staff_id) ?? [];
@@ -645,6 +646,10 @@ export async function deleteAdminSessionForStaff(
     .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash = ?')
     .bind(staffId, tokenHash)
     .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    await db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash).run();
+    await db.prepare('UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL').bind(jstNow(), staffId).run();
+  }
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -654,6 +659,9 @@ export async function deleteOtherAdminSessions(
   staffId: string,
   keepTokenHash: string,
 ): Promise<number> {
+  await db.prepare(`DELETE FROM platform_settings WHERE key IN
+    (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=? AND token_hash<>?)`)
+    .bind(staffId, keepTokenHash).run();
   const result = await db
     .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
     .bind(staffId, keepTokenHash)
@@ -684,11 +692,17 @@ export async function getStaffByAdminSession(
 }
 
 export async function deleteAdminSession(db: D1Database, tokenHash: string): Promise<void> {
-  await db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash).run();
+  await db.batch([
+    db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE ended_at IS NULL
+      AND staff_id IN (SELECT staff_id FROM admin_sessions WHERE token_hash=?)`).bind(jstNow(), tokenHash),
+    db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash),
+    db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash),
+  ]);
 }
 
 export async function deleteExpiredAdminSessions(db: D1Database, now: string): Promise<void> {
-  await db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
+  await db.batch([db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE expires_at<=?)").bind(now),
+    db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now)]);
 }
 
 /**
@@ -700,6 +714,8 @@ export async function deleteExpiredAdminSessions(db: D1Database, now: string): P
  */
 export async function revokeStaffAuthentication(db: D1Database, staffId: string): Promise<void> {
   await db.batch([
+    db.prepare('UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL').bind(jstNow(), staffId),
+    db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=?)").bind(staffId),
     db.prepare('DELETE FROM admin_sessions WHERE staff_id = ?').bind(staffId),
     db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId),
   ]);

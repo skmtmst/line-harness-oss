@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「サクサク感」。
  * A: 候補の読み込み中は目に見える「読み込み中…」を置かず、骨組みの入れ物が読み込み中と伝える。
- * B: 保存ボタンは押した直後にボタンの中だけ「保存中…」へ変わり（busy）、画面を止めない。
+ * B: 保存ボタンは押した直後にボタンの中だけ「保存しています…」へ変わり（busy）、画面を止めない。
  */
 import React from 'react'
 import { act } from 'react'
@@ -16,11 +18,10 @@ const fixture = vi.hoisted(() => ({
   listMenus: null as null | (() => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push?.(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [] }),
 }))
@@ -75,6 +76,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: async () => ({ success: true, data: [] }) },
     },
     bookingApi: {
+
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
       getSettings: async () => ({ success: true, data: { bookingWindowDays: 30 } }),
@@ -102,6 +104,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push = vi.fn()
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.listMenus = async () => ({ menus: [] })
@@ -126,14 +129,12 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
 
     await act(async () => { gate.resolve({ success: true, data: TAGS }) })
     // ★V8 書き直し（src/v8/booking-menus/menu-form.tsx）：打って絞れる1つ選び。候補を開いて中身を見る。
-    await screen.findByRole('combobox', { name: '予約後に付けるタグ' })
-    fireEvent.click(screen.getByRole('button', { name: '候補を開く' }))
-    const listbox = await screen.findByRole('listbox', { name: '予約後に付けるタグの候補' })
+    const listbox = await screen.findByRole('combobox', { name: '予約後に付けるタグ' })
     const options = within(listbox).getAllByRole('option')
     expect(options.map((o) => o.textContent)).toEqual(['付けるタグ：予約中', '付けるタグ：常連さん'])
   })
 
-  test('保存を押すとボタンの内側だけ「保存中…」になり成功したら一覧へ戻る', async () => {
+  test('保存を押すとボタンの内側だけ「保存しています…」になり成功したら一覧へ戻る', async () => {
     const gate = deferred<unknown>()
     fixture.createMenu = vi.fn(() => gate.promise)
     render(<NewBookingMenuPage />)
@@ -144,7 +145,7 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
 
     // ボタンの内側だけ保存中に変わり、画面は止めない（入力欄は触れるまま）。
-    const savingButton = await screen.findByRole('button', { name: '保存中…' })
+    const savingButton = await screen.findByRole('button', { name: '保存しています…' })
     expect(savingButton.getAttribute('aria-busy')).toBe('true')
     expect(screen.getByPlaceholderText("例：トリミング（小型犬）")).toBeTruthy()
 
@@ -153,3 +154,6 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     await waitFor(() => { expect(fixture.push).toHaveBeenCalledWith('/booking/menus?highlight=menu-new') })
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { inputError, inputJsonBoundary } from './input-errors.js';
 
 describe('入力エラーの共通HTTP契約', () => {
@@ -59,5 +59,29 @@ describe('入力エラーの共通HTTP契約', () => {
       expect(response.status).toBe(status);
       expect(await response.json()).toEqual({ error: '元のエラー' });
     }
+  });
+});
+
+describe('上限付きJSON境界', () => {
+  it('UTF-8のバイト上限で測り、後続は同じ本文を読める', async () => {
+    const raw = '{"name":"あ"}';
+    const size = new TextEncoder().encode(raw).length;
+    const app = new Hono();
+    app.post('/', inputJsonBoundary({}, { maxBytes: size }), async c => c.json({ body: await c.req.json(), raw: await c.req.text() }));
+    const response = await app.request('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: raw });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ body: { name: 'あ' }, raw });
+    const small = new Hono();
+    small.post('/', inputJsonBoundary({}, { maxBytes: size - 1 }), c => c.json({ saved: true }));
+    expect((await small.request('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: raw })).status).toBe(413);
+  });
+  it('壊れたJSONは400で保存せず、fieldsとcodeを保つ', async () => {
+    const save = vi.fn(() => new Response('{}'));
+    const app = new Hono();
+    app.post('/', inputJsonBoundary({}, { maxBytes: 16 * 1024 }), save);
+    const response = await app.request('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'INVALID_JSON', fields: {} });
+    expect(save).not.toHaveBeenCalled();
   });
 });

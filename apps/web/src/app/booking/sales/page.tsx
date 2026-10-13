@@ -161,7 +161,7 @@ export default function BookingSalesPage() {
 
   return (
     <div>
-      <div className="v8-only"><PageHeading title="予約からの売上" /></div>
+      <div><PageHeading title="予約からの売上" /></div>
       <div className={styles.head}>
         <SegmentedControl
           aria-label="集計する期間"

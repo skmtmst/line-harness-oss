@@ -1,7 +1,3 @@
-/*
- * 利用規約の同意の決まり（今の画面 app/restaurant-test/stores/new/terms-state.ts から写した）。
- * src/v8 からは @/app を読めないので写す。中身を変えるときは両方を直す。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 

@@ -8,7 +8,7 @@ import ConversionsPage from './page'
  * R596 回帰：集計の再試行の応答が遅れたとき、切り替え後のアカウントの
  * 表示を上書きしない。成功・失敗どちらの遅延応答も捨てる。
  *
- * 再現：本店で集計503→「集計を再読み込み」を押す→応答より先に別
+ * 再現：本店で集計503→「集計を読み直す」を押す→応答より先に別
  * アカウントへ切り替える→別アカウントの正常な集計が出る→遅れた本店の
  * 応答が返る→切り替え後の表示が本店の数値で上書きされてしまう。
  * 世代番号とアカウントの照合で、遅れた応答は成功・失敗とも捨てる。
@@ -17,7 +17,7 @@ import ConversionsPage from './page'
 const accountStore = vi.hoisted(() => ({ id: 'account-a' }))
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
@@ -135,6 +135,11 @@ function installFetch() {
 let container: HTMLDivElement
 let root: Root
 
+/** Text that is shown directly or available by hovering the V8 metric detail. */
+function screenText(): string {
+  return (container.textContent ?? '') + [...container.querySelectorAll('[title]')].map(node => node.getAttribute('title')).join(' ')
+}
+
 async function flush(times = 12) {
   for (let i = 0; i < times; i += 1) {
     await act(async () => { await Promise.resolve() })
@@ -156,7 +161,7 @@ async function rerender() {
 
 function findRetryButton() {
   return [...container.querySelectorAll('button')]
-    .find((button) => button.textContent?.trim() === '集計を再読み込み') as HTMLButtonElement | undefined
+    .find((button) => button.textContent?.trim() === '集計を読み直す') as HTMLButtonElement | undefined
 }
 
 beforeEach(() => {
@@ -189,7 +194,7 @@ describe('R596回帰 遅れた再試行の応答は捨てる', () => {
       return jsonResponse(reportBody({ netCount: 77, previousNetCount: 10, netValue: 770 }), 200)
     }
     await mount()
-    expect(container.textContent ?? '').toContain('この30日の集計を読み込めませんでした')
+    expect(screenText()).toContain('集計を表示できませんでした')
 
     // 再試行を押して応答を遅延させたまま、アカウントを切り替える。
     const retry = findRetryButton()
@@ -198,17 +203,17 @@ describe('R596回帰 遅れた再試行の応答は捨てる', () => {
     await flush()
     accountStore.id = 'account-b'
     await rerender()
-    expect(container.textContent ?? '').toContain('前の30日 10件')
+    expect(screenText()).toContain('前の30日 10件')
 
     // 遅れた旧アカウントの成功応答が返っても、表示は変わらない。
     await act(async () => {
       resolveOld(jsonResponse(reportBody({ netCount: 111111, previousNetCount: 99, netValue: 111111 }), 200))
     })
     await flush()
-    const text = container.textContent ?? ''
+    const text = screenText()
     expect(text).toContain('前の30日 10件')
     expect(text).not.toContain('111')
-    expect(text).not.toContain('この30日の集計を読み込めませんでした')
+    expect(text).not.toContain('集計を表示できませんでした')
   })
 
   it('遅れた旧アカウントの失敗応答で新アカウントの成功を消さない', async () => {
@@ -225,7 +230,7 @@ describe('R596回帰 遅れた再試行の応答は捨てる', () => {
       return jsonResponse(reportBody({ netCount: 77, previousNetCount: 10, netValue: 770 }), 200)
     }
     await mount()
-    expect(container.textContent ?? '').toContain('この30日の集計を読み込めませんでした')
+    expect(screenText()).toContain('集計を表示できませんでした')
 
     const retry = findRetryButton()
     expect(retry, '集計の再試行が出ません').toBeTruthy()
@@ -233,16 +238,16 @@ describe('R596回帰 遅れた再試行の応答は捨てる', () => {
     await flush()
     accountStore.id = 'account-b'
     await rerender()
-    expect(container.textContent ?? '').toContain('前の30日 10件')
+    expect(screenText()).toContain('前の30日 10件')
 
     // 遅れた旧アカウントの失敗応答が返っても、成功表示は残る。
     await act(async () => {
       resolveOld(jsonResponse({ success: false, error: 'audit report 503' }, 503))
     })
     await flush()
-    const text = container.textContent ?? ''
+    const text = screenText()
     expect(text).toContain('前の30日 10件')
-    expect(text).not.toContain('この30日の集計を読み込めませんでした')
+    expect(text).not.toContain('集計を表示できませんでした')
   })
 
   it('切り替えが無ければ再試行はそのまま直る', async () => {
@@ -255,15 +260,15 @@ describe('R596回帰 遅れた再試行の応答は捨てる', () => {
       return jsonResponse(reportBody({ netCount: 77, previousNetCount: 10, netValue: 770 }), 200)
     }
     await mount()
-    expect(container.textContent ?? '').toContain('この30日の集計を読み込めませんでした')
+    expect(screenText()).toContain('集計を表示できませんでした')
 
     const retry = findRetryButton()
     expect(retry, '集計の再試行が出ません').toBeTruthy()
     await act(async () => { retry!.click() })
     await flush()
-    const text = container.textContent ?? ''
+    const text = screenText()
     expect(text).toContain('前の30日 10件')
-    expect(text).not.toContain('この30日の集計を読み込めませんでした')
+    expect(text).not.toContain('集計を表示できませんでした')
     expect(container.querySelector('table')).not.toBeNull()
   })
 })

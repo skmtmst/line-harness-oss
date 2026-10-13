@@ -22,6 +22,7 @@ import styles from './message-kind-fields.module.css'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ComposerStickers from '@/components/shared/composer-stickers'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type MessageKind = 'location' | 'video' | 'audio' | 'sticker'
 
@@ -340,46 +341,46 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
       <div className="space-y-3">
         <label className="block">
           <span className={labelClass}>見出し</span>
-          <input
+          <SaveErrorField names={["title","v.title"]}><input
             value={v.title}
             onChange={(e) => set({ title: e.target.value })}
             placeholder="例：本店"
             className={inputClass}
-          />
+          /></SaveErrorField>
         </label>
         <label className="block">
           <span className={labelClass}>住所</span>
-          <input
+          <SaveErrorField names={["address","v.address"]}><input
             value={v.address}
             onChange={(e) => set({ address: e.target.value })}
             placeholder="例：東京都渋谷区〇〇1-2-3"
             className={inputClass}
-          />
+          /></SaveErrorField>
         </label>
         <div className="flex flex-wrap gap-3">
           <label className="min-w-0 flex-1">
             <span className={labelClass}>
               緯度 <span className="text-danger">*</span>
             </span>
-            <input
+            <SaveErrorField names={["latitude","v.latitude"]}><input
               value={v.latitude}
               onChange={(e) => set({ latitude: e.target.value })}
               inputMode="decimal"
               placeholder="35.658034"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </label>
           <label className="min-w-0 flex-1">
             <span className={labelClass}>
               経度 <span className="text-danger">*</span>
             </span>
-            <input
+            <SaveErrorField names={["longitude","v.longitude"]}><input
               value={v.longitude}
               onChange={(e) => set({ longitude: e.target.value })}
               inputMode="decimal"
               placeholder="139.701636"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </label>
         </div>
         <p className={hintClass}>
@@ -397,7 +398,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
     return (
       <div className="space-y-3">
         <div className={styles.videoRow}>
-          <MediaSlot
+          <SaveErrorField names={["originalContentUrl","v.originalContentUrl","original_content_url","previewImageUrl","v.original_content_url"]}><MediaSlot
             kind="video"
             title="動画を追加"
             value={v.originalContentUrl || null}
@@ -407,8 +408,8 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             onChange={(url) => set({ originalContentUrl: url ?? '' })}
             onMediaPick={pickFrom ? () => setPicking({ kind: 'video', apply: (url) => set({ originalContentUrl: url }) }) : undefined}
             urlEntry={{ value: v.originalContentUrl, onChange: (url) => set({ originalContentUrl: url }), label: '動画のURL', placeholder: 'https://…/movie.mp4' }}
-          />
-          <MediaSlot
+          /></SaveErrorField>
+          <SaveErrorField names={["previewImageUrl","v.previewImageUrl","preview_image_url","v.preview_image_url"]}><MediaSlot
             size="compact"
             title="プレビュー画像を追加"
             previewAlt="動画のプレビュー画像"
@@ -419,7 +420,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             onChange={(url) => set({ previewImageUrl: url ?? '' })}
             onMediaPick={pickFrom ? () => setPicking({ kind: 'image', apply: (url) => set({ previewImageUrl: url }) }) : undefined}
             urlEntry={{ value: v.previewImageUrl, onChange: (url) => set({ previewImageUrl: url }), label: 'サムネイル画像のURL', placeholder: 'https://…/thumbnail.jpg' }}
-          />
+          /></SaveErrorField>
         </div>
         <p className={hintClass}>
           動画は mp4・200MBまで。プレビュー画像（JPEG / PNG・1MBまで）は LINE 側で必須なので、無いと送れません。
@@ -436,7 +437,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
     const uploadAudio = upload('audio')
     return (
       <div className="space-y-3">
-        <MediaSlot
+        <SaveErrorField names={["originalContentUrl","v.originalContentUrl","autoDuration","original_content_url","previewImageUrl","v.original_content_url","auto_duration"]}><MediaSlot
           kind="audio"
           title="音声を追加"
           value={v.originalContentUrl || null}
@@ -463,7 +464,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             set(ms && ms > 0 ? { originalContentUrl: url, duration: String(ms / 1000) } : { originalContentUrl: url })
           } }) : undefined}
           urlEntry={{ value: v.originalContentUrl, onChange: (url) => { setAutoDuration(false); set({ originalContentUrl: url }) }, label: '音声のURL', placeholder: 'https://…/voice.m4a' }}
-        />
+        /></SaveErrorField>
         <p className={hintClass}>m4a、200MBまで。URL で入れるときは https で公開されている必要があります。</p>
         {autoDuration && v.duration ? (
           <p className={hintClass}>
@@ -475,13 +476,13 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               長さ（秒） <span className="text-danger">*</span>
             </span>
-            <input
+            <SaveErrorField names={["duration","v.duration"]}><input
               value={v.duration}
               onChange={(e) => set({ duration: e.target.value })}
               inputMode="decimal"
               placeholder="30"
               className={`${inputClass} max-w-40`}
-            />
+            /></SaveErrorField>
             <span className={hintClass}>
               ファイルから長さを読めなかったときに入れます。実際の長さと合っていないと、再生の途中で切れたり、伸びたまま止まったりします。
             </span>
@@ -506,7 +507,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
         LINE側の決まりで送れません。
       </p>
 
-      <RadioCardGroup legend="スタンプの決め方" className="flex flex-wrap gap-4">
+      <SaveErrorField names={["stickerMode","value","o.value"]}><RadioCardGroup legend="スタンプの決め方" className="flex flex-wrap gap-4">
         {(
           [
             { value: 'pick' as const, label: '一覧から選ぶ' },
@@ -522,7 +523,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             title={o.label}
           />
         ))}
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
 
       {stickerMode === 'pick' ? (
         <div className="flex flex-wrap gap-2">
@@ -543,25 +544,25 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               パッケージID <span className="text-danger">*</span>
             </span>
-            <input
+            <SaveErrorField names={["packageId","v.packageId","package_id","v.package_id"]}><input
               value={v.packageId}
               onChange={(e) => set({ packageId: e.target.value })}
               inputMode="numeric"
               placeholder="446"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </label>
           <label className="min-w-0 flex-1">
             <span className={labelClass}>
               スタンプID <span className="text-danger">*</span>
             </span>
-            <input
+            <SaveErrorField names={["stickerId","v.stickerId","sticker_id","v.sticker_id"]}><input
               value={v.stickerId}
               onChange={(e) => set({ stickerId: e.target.value })}
               inputMode="numeric"
               placeholder="1988"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </label>
         </div>
       )}

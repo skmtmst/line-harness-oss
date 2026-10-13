@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import V8EarningRulesTab from './v8-earning-rules-tab'
+import V8EarningRulesTab from '@/v8/mileage/earning-rules'
 import type { MileageEarningRuleV6 } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({ earningRulesV6: vi.fn(), history: vi.fn(), friendsV6: vi.fn() }))
@@ -22,7 +22,7 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/mileage',
@@ -76,7 +76,7 @@ describe('V8 たまる決めごとの「止めているのみ」', () => {
         measuredAt: '2026-09-01T00:00:00+09:00',
       },
     })
-    render(<V8EarningRulesTab readonly={false} registerHeaderActions={() => {}} />)
+    render(<V8EarningRulesTab />)
     await waitFor(() => expect(screen.getByText('動いている決めごと')).toBeTruthy())
     expect(screen.getByText('止めている決めごと')).toBeTruthy()
     fireEvent.click(screen.getByLabelText('よく使う絞り込み'))

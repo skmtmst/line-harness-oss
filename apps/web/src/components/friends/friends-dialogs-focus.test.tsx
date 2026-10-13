@@ -141,8 +141,8 @@ async function openDialog(kind: 'notice' | 'saved'): Promise<HTMLElement> {
     button.focus()
     button.click()
   })
-  await eventually(() => expect(host.querySelector('[role="dialog"]')).toBeTruthy())
-  return host.querySelector<HTMLElement>('[role="dialog"]')!
+  await eventually(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy())
+  return document.querySelector<HTMLElement>('[role="dialog"]')!
 }
 
 describe.each(['notice', 'saved'] as const)('N-039 %s 窓のoverlay規約', (kind) => {
@@ -186,7 +186,7 @@ describe.each(['notice', 'saved'] as const)('N-039 %s 窓のoverlay規約', (kin
     await act(async () => {
       keydown('Escape')
     })
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(document.activeElement).toBe(button)
     expect(document.body.style.overflow).toBe('')
   })

@@ -13,7 +13,6 @@ import {
 import { GripVertical } from 'lucide-react'
 import type { ActionMenuItem } from './action-menu'
 import { useLiveReorder } from '@/lib/use-live-reorder'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import styles from './row-actions.module.css'
 
 /*
@@ -27,7 +26,7 @@ import styles from './row-actions.module.css'
  * - 保存は画面ごとの今の API のまま。失敗したら画面側で元の位置へ戻して理由を出す。
  *
  * 以前の `DragHandle`（shared/row-actions）と `ReorderGrip`（friend-fields）は
- * この部品の別名として残す。v7 の画面の見た目を変えないため。
+ * この部品の別名として残す。動きは同じ入口を使う。
  */
 
 export type ReorderDirection = -1 | 1
@@ -56,7 +55,7 @@ export type ReorderHandleProps = HandleButtonProps & {
   look?: 'icon' | 'inline' | 'bare'
   /**
    * 動かせない時の出し方。V8 の画面は `hide`（つまみを出さない）。
-   * `dim` は v7 の画面の見た目を変えないためだけに残す（薄いつまみ）。
+   * `dim` は呼び出し互換の値。動かせない時は指定にかかわらず隠す。
    */
   disabledLook?: 'hide' | 'dim'
   children?: ReactNode
@@ -74,7 +73,7 @@ const SIX_DOTS = (
 )
 
 const INLINE_SLOT_CLASS = 'inline-flex items-center justify-center p-0.5'
-const INLINE_CLASS = 'inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action'
+const INLINE_CLASS = 'inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
 
 export default function ReorderHandle({
   label,
@@ -100,20 +99,9 @@ export default function ReorderHandle({
     setParentDraggable(previous => previous === connected ? previous : connected)
   })
   const mouseConnected = parentDraggable || rest.onPointerDown || rest.onMouseDown || (rest.draggable && rest.onDragStart)
-  const v8 = useAdminTheme() === 'v8'
-  const noMouse = v8 && !mouseConnected
+
+  const noMouse = !mouseConnected
   if (disabledReason || locked || rest.disabled || noMouse) {
-    if (disabledLook === 'dim' && !v8) {
-      return (
-        <span
-          className="inline-flex cursor-not-allowed items-center justify-center text-ink-faint"
-          title={disabledReason ?? undefined}
-          aria-label={disabledReason ?? undefined}
-        >
-          {glyph}
-        </span>
-      )
-    }
     /* つまみは出さない。幅だけ同じに空け、理由は title と読み上げで言う。 */
     return (
       <span
@@ -150,7 +138,7 @@ export default function ReorderHandle({
       data-reorder-handle=""
       aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
       title={title ?? 'ドラッグまたは上下キーで並び替え'}
-      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && INLINE_CLASS, className].filter(Boolean).join(' ')}
+      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && `${INLINE_CLASS} ${styles.inlineGrip}`, className].filter(Boolean).join(' ')}
     >
       {glyph}
     </button>

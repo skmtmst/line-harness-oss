@@ -1,13 +1,10 @@
 'use client'
 
-/*
- * ★V8 予約枠・在庫「予約経路の連携」タブ（板 `hQQlt`）。
- *
- * 取り込みアドレス（メール転送）と今日の取り込み → 予約経路の表（媒体ごとの受け取り方・状態・
- * 今日の件数・最後に届いた時刻・読めなかった数）→ 読めなかったもの（手で直して取り込む）。
- * 口：/api/restaurant-test/intake-addresses・channels・inbound-emails（・/:id/manual-import）。
- * 検証環境は受信専用。媒体へは書き戻さない。
- */
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  draft_customerName: requiredText("お客さまのお名前を入れてください。"),
+}
+
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, Copy, FlaskConical } from 'lucide-react'
@@ -20,6 +17,7 @@ import { TextField } from '@/components/shared/text-field'
 import Card, { CardHeader } from '@/components/shared/card'
 import KpiCard from '@/components/shared/kpi-card'
 import DateTimeField from '@/components/shared/date-time-field'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantIntakeAddress } from '@/lib/restaurant-test-api'
 import { Status } from '../booking-kit/shell'
@@ -29,6 +27,17 @@ import styles from './inventory.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約枠・在庫「予約経路の連携」タブ（板 `hQQlt`）。
+ *
+ * 取り込みアドレス（メール転送）と今日の取り込み → 予約経路の表（媒体ごとの受け取り方・状態・
+ * 今日の件数・最後に届いた時刻・読めなかった数）→ 読めなかったもの（手で直して取り込む）。
+ * 口：/api/restaurant-test/intake-addresses・channels・inbound-emails（・/:id/manual-import）。
+ * 検証環境は受信専用。媒体へは書き戻さない。
+ */
 
 export type RestaurantChannel = {
   id: string
@@ -136,11 +145,12 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   const manualImport = () => {
     if (!importing || busy) return
     const errors: typeof fieldErrors = {}
-    if (!draft.customerName.trim()) errors.customerName = 'お客さまのお名前を入れてください。'
+    if ((b244Requirements.draft_customerName.check(draft.customerName) !== null)) errors.customerName = 'お客さまのお名前を入れてください。'
     const guests = Number(draft.guestCount)
     if (!Number.isInteger(guests) || guests < 1 || guests > 100) errors.guestCount = '人数は1〜100の整数で入れてください。'
-    const start = new Date(draft.startsAt)
-    if (!draft.startsAt || Number.isNaN(start.getTime())) errors.startsAt = '来店の日時を入れてください。'
+    let startsAt = ''
+    try { if (draft.startsAt) startsAt = datetimeLocalJstToUtcIso(draft.startsAt) } catch { /* 日時の入力欄へ理由を出す */ }
+    if (!startsAt) errors.startsAt = '来店の日時を入れてください。'
     setFieldErrors(errors); setImportError('')
     if (Object.keys(errors).length) {
       requestAnimationFrame(() => { const field = importRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
@@ -149,7 +159,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
     setBusy(true)
     void fetchApi(`/api/restaurant-test/inbound-emails/${encodeURIComponent(importing.id)}/manual-import?account_id=${encodeURIComponent(accountId)}`, {
       method: 'POST',
-      body: JSON.stringify({ customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: start.toISOString() }),
+      body: JSON.stringify({ customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt }),
     })
       .then(() => { setImporting(null); setMessage({ tone: 'success', text: '予約台帳へ取り込みました。卓は空いている卓から自動で選びました。' }); setReload((n) => n + 1) })
       .catch((error: unknown) => setImportError(error instanceof Error ? error.message : '取り込めませんでした。'))
@@ -306,15 +316,15 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
       >
         <div ref={importRef} className={styles.manualFields}>
         {importError ? <Notice tone="danger" message={importError} /> : null}
-        <Field label="お客さまのお名前" htmlFor="rs-import-name" error={fieldErrors.customerName}>
-          <TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+        <Field label="お客さまのお名前" htmlFor="rs-import-name" error={fieldErrors.customerName} requirement={b244Requirements.draft_customerName}>
+          <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
         </Field>
         <div className={styles.pair}>
           <Field label="人数" htmlFor="rs-import-guests" error={fieldErrors.guestCount}>
-            <NumberInput id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+            <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><NumberInput id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
           </Field>
           <Field label="来店の日時" htmlFor="rs-import-at" error={fieldErrors.startsAt}>
-            <DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+            <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
           </Field>
         </div>
         </div>

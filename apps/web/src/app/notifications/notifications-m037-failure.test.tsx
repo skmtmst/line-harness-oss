@@ -21,14 +21,14 @@ const fixture = vi.hoisted(() => ({
   replace: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push, replace: fixture.replace }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -109,7 +109,7 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     render(<NotificationsPage />)
 
     const list = await screen.findByRole('list')
-    fireEvent.click(within(list).getByRole('button', { name: /大事なお知らせ/ }))
+    fireEvent.click(within(list).getByRole('link', { name: /大事なお知らせ/ }))
     // 裏の保存が失敗したら知らせが出て、やり直せる口が付く。
     await waitFor(() => expect(screen.getByText('通知を既読にできませんでした。')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'もう一度' })).toBeTruthy()
@@ -141,24 +141,23 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     // 1. 初期: rowに（未読）、全既読ボタン活性、list1回。
     const list = await screen.findByRole('list')
     const rowName = /大事なお知らせ/
-    expect(within(list).getByRole('button', { name: rowName }).textContent).toContain('（未読）')
+    expect(within(list).getByRole('link', { name: rowName }).textContent).toContain('（未読）')
     const markAll = screen.getByRole('button', { name: 'すべて既読にする' })
     expect(markAll.disabled).toBe(false)
     expect(fixture.list).toHaveBeenCalledTimes(1)
 
     // 2. 実row click→同ID/accountへ単件API1回・push(/updates)。pending中は未読印消失・全既読disabled。
-    fireEvent.click(within(list).getByRole('button', { name: rowName }))
+    fireEvent.click(within(list).getByRole('link', { name: rowName }))
     await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(1))
     expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
-    expect(fixture.push).toHaveBeenCalledTimes(1)
-    expect(fixture.push).toHaveBeenCalledWith('/updates')
-    expect(within(list).getByRole('button', { name: rowName }).textContent).not.toContain('（未読）')
+    expect(within(list).getByRole('link', { name: rowName }).getAttribute('href')).toBe('/updates')
+    expect(within(list).getByRole('link', { name: rowName }).textContent).not.toContain('（未読）')
     expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(true)
 
     // 3. 真正503reject→同じrow未読復元・全既読enabled・日本語Toast/もう一度。list1・markAllRead0。
     gates[0].reject(new ApiError(503))
     await waitFor(() => expect(
-      within(list).getByRole('button', { name: rowName }).textContent,
+      within(list).getByRole('link', { name: rowName }).textContent,
     ).toContain('（未読）'))
     expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(false)
     await waitFor(() => expect(screen.getByText('通知を既読にできませんでした。')).toBeTruthy())
@@ -171,11 +170,11 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(2))
     expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
     // 第2retryのpending中も未読印消失・全既読disabledを実DOMで見る。
-    expect(within(list).getByRole('button', { name: rowName }).textContent).not.toContain('（未読）')
+    expect(within(list).getByRole('link', { name: rowName }).textContent).not.toContain('（未読）')
     expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(true)
     gates[1].resolve({ success: false, error: 'audit_unavailable' })
     await waitFor(() => expect(
-      within(list).getByRole('button', { name: rowName }).textContent,
+      within(list).getByRole('link', { name: rowName }).textContent,
     ).toContain('（未読）'))
     expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(false)
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'もう一度' }).length).toBeGreaterThan(0))
@@ -188,12 +187,12 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     // 実Promise microtaskをflushしてから成功完了をassert (pending同値のまま主張しない)。
     await act(async () => { await Promise.resolve() })
     await waitFor(() => expect(
-      within(list).getByRole('button', { name: rowName }).textContent,
+      within(list).getByRole('link', { name: rowName }).textContent,
     ).not.toContain('（未読）'))
     expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(true)
     expect(screen.queryByText('通知を既読にできませんでした。')).toBeNull()
     expect(fixture.list).toHaveBeenCalledTimes(1)
     expect(fixture.markAllRead).not.toHaveBeenCalled()
-    expect(fixture.push).toHaveBeenCalledTimes(1)
+    expect(within(list).getByRole('link', { name: rowName }).getAttribute('href')).toBe('/updates')
   })
 })

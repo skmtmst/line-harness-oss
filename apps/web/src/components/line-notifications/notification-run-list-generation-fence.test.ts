@@ -11,7 +11,7 @@ import {
   type ScopedLoadState,
   type ScopedNotice,
   type ScopedRetrying,
-} from './notification-run-list'
+} from './notification-run-state'
 
 type DeliveriesResult = Awaited<ReturnType<NotificationRunPorts['deliveries']>>
 type RetryResult = Awaited<ReturnType<NotificationRunPorts['retryDelivery']>>

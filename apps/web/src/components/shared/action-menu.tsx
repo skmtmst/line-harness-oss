@@ -1,13 +1,17 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowUpRight } from 'lucide-react'
+import Link, { useListNavigationHref } from './list-navigation'
+import { ArrowUpRight, Eye, Pencil, Pause, Trash2 } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
 import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
+export type ActionMenuGroup = 'view' | 'manage' | 'destructive'
+
 export type ActionMenuItem = {
+  /** B-244：見る／変える・整理する／止める・消す。権限と動きは項目側で保つ。 */
+  group?: ActionMenuGroup
   id: string
   label: string
   icon?: ReactNode
@@ -22,8 +26,7 @@ export type ActionMenuItem = {
   description?: string
   tone?: 'default' | 'danger'
   /**
-   * 別画面へ行く項目（★V7）。右端に ↗ を出す。
-   * 同じ画面の中の操作（モーダル・タブ切替）には付けない。
+   * 新しいタブで開くリンクだけに ↗ を出す（B-177）。href と組にする。
    */
   external?: boolean
   href?: string
@@ -44,7 +47,29 @@ export type ActionMenuItem = {
    * 印にする。1画面に1つだけ。
    */
   qaOpen?: string
-  onSelect: () => void
+  onSelect?: () => void
+}
+
+/** B-244：旧い呼び口も同じ順で表示する。渡された配列と操作は変更しない。 */
+export function actionMenuGroup(item: ActionMenuItem): ActionMenuGroup {
+  if (item.tone === 'danger' || (!/再開|復元/.test(item.label) && /停止|止める|削除|消す|取り消|取消|取り下げ|保管する/.test(item.label))) return 'destructive'
+  if (item.group) return item.group
+  return /見る|確認|開く|戻る|履歴|結果|プレビュー|ダウンロード|コピー/.test(item.label) && !/編集|変更|再|更新|複製/.test(item.label) ? 'view' : 'manage'
+}
+
+export function orderActionMenuItems(items: ActionMenuItem[]): ActionMenuItem[] {
+  const groups: ActionMenuGroup[] = ['view', 'manage', 'destructive']
+  const titles = { view: '見る', manage: '変える・整理する', destructive: '止める・消す' }
+  let previous: ActionMenuGroup | undefined
+  return groups.flatMap(group => items.filter(item => actionMenuGroup(item) === group).map(item => {
+    const first = previous !== group
+    const dividerBefore = first && previous !== undefined
+    previous = group
+    const Icon = group === 'view' ? Eye : group === 'manage' ? Pencil : /削除|消す/.test(item.label) ? Trash2 : Pause
+    return { ...item, group, tone: group === 'destructive' ? 'danger' as const : item.tone,
+      icon: item.icon ?? <Icon size={16} aria-hidden="true" />,
+      dividerBefore, sectionBefore: first && items.length >= 5 ? titles[group] : undefined }
+  }))
 }
 
 export type ActionMenuProps = {
@@ -65,6 +90,7 @@ export type ActionMenuProps = {
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
 export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+  const navigationHref = useListNavigationHref()
   const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
@@ -126,7 +152,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     let frame = 0
     let tries = 0
     const focusFirst = () => {
-      const first = menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')
+      const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])')
       const host = menuRef.current?.closest<HTMLElement>('[data-menu-portal]')
       const hidden = !first || (host && host.style.visibility === 'hidden')
       if (!hidden && first) {
@@ -155,7 +181,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       return
     }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])
+    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])') ?? [])
     if (buttons.length === 0) return
     event.preventDefault()
     const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
@@ -182,15 +208,19 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {items.map((item) => item.content ?? (
-        <div key={item.id}>
+      {orderActionMenuItems(items).map((item) => {
+        const Item = item.href && !item.disabled ? 'a' : 'button'
+        return (
+        <div key={item.id} data-menu-group={item.group}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
           {item.sectionBefore ? (
             <p className={styles.section} role="presentation">
               {item.sectionBefore}
             </p>
           ) : null}
-          <MenuCommand href={item.href} external={item.external}
+          {item.content ? <div className={styles.item}>{item.content}</div> : <Item href={Item === 'a' && item.href ? navigationHref(item.href) : undefined}
+            target={Item === 'a' &&item.external ? '_blank' : undefined}
+            rel={Item === 'a' && item.external ? 'noopener noreferrer' : undefined}
             type="button"
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
@@ -202,7 +232,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               // 先に開いたボタンへ戻しておく。項目が窓を開くと、窓はこのボタンを
               // 「開く前の場所」として覚え、閉じた後にここへ戻す（消えた項目へは戻れない）。
               if (!inline) getFocusTarget()?.focus({ preventScroll: true })
-              if (!item.href) item.onSelect()
+              if (!item.href) item.onSelect?.()
               onClose()
             }}
           >
@@ -216,12 +246,12 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
                 <span className={styles.reason}>{item.disabledReason}</span>
               ) : null}
             </span>
-            {item.external ? (
+            {Item === 'a' &&item.external ? (
               <ArrowUpRight size={14} aria-hidden="true" className={styles.externalIcon} />
             ) : null}
-          </MenuCommand>
+          </Item>}
         </div>
-      ))}
+      )})}
       {note ? <p className={styles.note}>{note}</p> : null}
     </div>
   )

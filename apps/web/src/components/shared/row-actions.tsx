@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from 'lucide-react'
 import { useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
-import ActionMenu, { type ActionMenuItem } from './action-menu'
+import ActionMenu, { orderActionMenuItems, type ActionMenuItem } from './action-menu'
 import Button from './button'
 import IconButton from './icon-button'
 import ReorderHandle, { type ReorderDirection } from './reorder-handle'
@@ -86,12 +86,7 @@ export function MoreAction({ label = 'そのほかの操作', buttonRef, ...rest
  * 「危険な操作は赤字で区切りの下」は部品の中で決める（画面ごとに並べない）。
  */
 export function orderRowMenuItems(items: ActionMenuItem[]): ActionMenuItem[] {
-  const safe = items.filter((item) => item.tone !== 'danger')
-  const danger = items.filter((item) => item.tone === 'danger')
-  return [
-    ...safe,
-    ...danger.map((item, index) => ({ ...item, dividerBefore: index === 0 ? safe.length > 0 : false })),
-  ]
+  return orderActionMenuItems(items)
 }
 
 type RowMenuTriggerProps = Omit<
@@ -117,8 +112,8 @@ export type RowMenuProps = {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /**
-   * 見た目。'box' は ★V8 の行の「…」（KspUx の印ボタン＋横の3点）。
-   * 'plain' は枠の無い V5 の「…」（RowActions・v7 の一覧）。
+   * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
+   * V8では両方とも共通の薄い枠を持つ（B-253・一覧の型i0Ao0R）。
    */
   appearance?: 'box' | 'plain'
   /**
@@ -150,7 +145,7 @@ export function RowMenu({
   note,
   open: openProp,
   onOpenChange,
-  appearance = 'box',
+  appearance = 'plain',
   size,
   className,
   title,
@@ -163,7 +158,6 @@ export function RowMenu({
     onOpenChange?.(next)
   }
   const triggerRef = useRef<HTMLButtonElement>(null)
-  if (items.length === 0) return null
   const toggle = (event: MouseEvent<HTMLButtonElement>) => {
     /* R13: 「…」自体の押下も行の詳細遷移へ伝えない。 */
     event.stopPropagation()
@@ -178,9 +172,9 @@ export function RowMenu({
   return (
     <>
       {appearance === 'plain' ? (
-        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} />
+        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
-        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} data-row-menu="">
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} variant="plain" data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
         </IconButton>
       )}
@@ -189,7 +183,7 @@ export function RowMenu({
         ariaLabel={menuLabel ?? label}
         onClose={() => setOpen(false)}
         items={orderRowMenuItems(items)}
-        note={note}
+        note={note ?? (items.length ? undefined : 'この行に使える操作はありません')}
         anchorRef={triggerRef}
       />
     </>
@@ -239,7 +233,7 @@ export function RowQuickAction({ label, ariaLabel, icon, onClick, title, ...rest
  * #985 LAY-18: 一覧の操作はアプリ全体で同じルールにする。
  *
  * - 「詳細」は右端操作欄の先頭。閲覧する画面がない機能には置かない。
- * - 「編集」は「詳細」の次。同じ枠付きの補助ボタン（共通 Button）。
+ * - 編集は行の「…」へ入れる（B-193）。
  * - 複製・停止・アーカイブなどは「⋯」へ同じ順序で集約する。
  * - 削除など元に戻せない操作は区切りの後・赤で必ず最後に置く。
  *   ただし実装・許可されている操作だけを出す。全機能に削除を足さない。
@@ -260,9 +254,13 @@ export type RowAction = {
 export type RowActionDestructiveItem = Omit<ActionMenuItem, 'tone' | 'dividerBefore'>
 
 export type RowActionsProps = {
+  /** 行うことなど、枠付きの小さなメニューを使う行。既定は一覧の枠なし。 */
+  menuAppearance?: RowMenuProps['appearance']
+  menuSize?: RowMenuProps['size']
+
   /** 先頭の操作。既定ラベルは「詳細」。 */
   detail?: RowAction
-  /** 2番目の操作。既定ラベルは「編集」。 */
+  /** 編集は「…」に入れる。許可されない場合は渡さない。 */
   edit?: RowAction
   /** 「⋯」に集約する複製・停止・アーカイブなど。 */
   menuItems?: ActionMenuItem[]
@@ -293,10 +291,12 @@ function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultL
 }
 
 /**
- * 一覧行の右端に置く操作の並び。「詳細」「編集」の枠付きボタンと、
+ * 一覧行の右端に置く操作の並び。「詳細」のボタンと、編集を含む
  * それ以外を集約する「⋯」メニューを同じ順・同じ見た目で出す。
  */
 export function RowActions({
+  menuAppearance = 'plain',
+  menuSize,
   detail,
   edit,
   menuItems = [],
@@ -306,30 +306,26 @@ export function RowActions({
   menuButtonProps,
   className,
 }: RowActionsProps) {
+  const editItem: ActionMenuItem[] = edit ? [{
+    id: 'edit', label: edit.label ?? '編集する', disabled: edit.disabled,
+    disabledReason: edit.disabled ? 'ほかの操作を反映しています' : undefined,
+    onSelect: () => {
+      if (edit.href !== undefined) window.location.assign(edit.href)
+      else edit.onClick?.()
+    },
+  }] : []
+  const normalItems = [...editItem, ...menuItems.filter((item) => !edit || item.id !== 'edit')]
   const items: ActionMenuItem[] = destructiveItem
-    ? [...menuItems, { ...destructiveItem, tone: 'danger' }]
-    : menuItems
+    ? [...normalItems, { ...destructiveItem, tone: 'danger' }]
+    : normalItems
   return (
-    <span className={[styles.rowActions, className].filter(Boolean).join(' ')}>
+    <span data-row-actions="" className={[styles.rowActions, className].filter(Boolean).join(' ')}>
       {detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
-      {edit ? <RowActionButton action={edit} defaultLabel="編集" /> : null}
-      {items.length > 0 ? (
-        <RowMenu
-          appearance="plain"
-          items={items}
-          label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
-          menuLabel={subjectName ? `${subjectName}の操作` : '操作'}
-          note={menuNote}
-          triggerProps={menuButtonProps}
-        />
-      ) : (
-        /*
-         * 「⋯」が無い行（送信済みなど）でも同じ幅の場所を取る。
-         * 無いと主ボタン（詳細）が右へずれて行ごとにそろわない。
-         * 見せない・読ませないが、幅は「⋯」と同じだけ取る。
-         */
-        <span className={styles.morePlaceholder} data-more-placeholder aria-hidden="true" />
-      )}
+      <RowMenu appearance={menuAppearance} size={menuSize} items={items}
+        label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
+        menuLabel={subjectName ? `${subjectName}の操作` : '操作'}
+        note={menuNote ?? (items.length ? undefined : 'この行に使える操作はありません')}
+        triggerProps={menuButtonProps} />
     </span>
   )
 }

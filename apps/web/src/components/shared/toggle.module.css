@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * スイッチ。Pencil V5 の機能設定（31-1）で43個並ぶ。
@@ -11,16 +11,13 @@
   position: relative;
   display: inline-block;
   width: 36px; /* width: 36 */
-  height: 20px; /* height: 20 */
-  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
+  height: 20px; /* height: 20 */ /* cornerRadius: $radius-full */
   /*
    * ★V7（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
    * 白い地と 1.1:1 しかなく、切替があること自体が見えなかった。ink-faint を 72% にして約 3.2:1。
    */
-  background: color-mix(in srgb, var(--color-ink-faint) 72%, var(--color-canvas));
   border: none;
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease-out);
   flex: none;
 }
 
@@ -31,14 +28,12 @@
   left: 2px;
   width: 16px; /* つまみ 16 */
   height: 16px;
-  border-radius: var(--radius-pill);
   background: var(--color-canvas); /* fill: $canvas */
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .on {
-  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */
-  background: var(--color-accent-deep); /* fill: $accent-deep */
+  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */ /* fill: $accent-deep */
 }
 
 .on::after {
@@ -46,8 +41,7 @@
 }
 
 /* 消せない項目。オンのまま押せない。 */
-.locked {
-  background: var(--color-hairline); /* fill: $hairline */
+.locked { /* fill: $hairline */
   cursor: not-allowed;
 }
 
@@ -56,7 +50,7 @@
 }
 
 .toggle:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -65,15 +59,15 @@
  * オフの地は操作する部品の枠色（choice-border）に合わせる。
  * 「消せない項目」はオフに見せてはいけないので髪線の灰のまま保つ。
  */
-[data-theme='v8'] .toggle {
+:root .toggle {
   background: var(--color-choice-border);
 }
 
-[data-theme='v8'] .on {
+:root .on {
   background: var(--color-accent-deep);
 }
 
-[data-theme='v8'] .locked {
+:root .locked {
   background: var(--color-toggle-locked);
 }
 
@@ -82,24 +76,24 @@
  * 乗せたときは地を少し濃く、押したときはほんの少し沈む（明るさで）。
  * どちらも 120ms。押せない項目（locked）は動かさない。
  */
-[data-theme='v8'] .toggle {
+:root .toggle {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     filter var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .toggle:hover:not(:disabled) {
+:root .toggle:hover:not(:disabled) {
   filter: brightness(0.94);
 }
 
-[data-theme='v8'] .toggle:active:not(:disabled) {
+:root .toggle:active:not(:disabled) {
   filter: brightness(0.88);
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .toggle { padding: 2px; background: var(--color-toggle-off); }
-[data-theme='v8'] .on { background: var(--color-accent-deep); }
-[data-theme='v8'] .locked { background: var(--color-toggle-locked); }
-[data-theme='v8'] .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
-[data-theme='v8'] .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
+:root .toggle { padding: 2px; background: var(--color-toggle-off); }
+:root .on { background: var(--color-accent-deep); }
+:root .locked { background: var(--color-toggle-locked); }
+:root .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
+:root .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
 }

@@ -2,8 +2,11 @@
 import { act, createElement, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import { withViewTransition } from './view-transition'
+
+beforeEach(() => setTestReducedMotion(false))
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

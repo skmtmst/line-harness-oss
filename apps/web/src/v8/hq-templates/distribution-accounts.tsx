@@ -6,6 +6,7 @@ import Checkbox from '@/components/shared/checkbox'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDot } from '@/components/shared/folder-dot'
 import Notice from '@/components/shared/notice'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export const ALL_ACCOUNTS = 'all'
 const UNFILED = 'none'
@@ -35,9 +36,9 @@ export function distributionFolderRows({ accounts, folders, membership, selected
     return {
       id, label, count: ids.length,
       icon: id === ALL_ACCOUNTS ? undefined : <FolderDot folder={folder} />,
-      leading: <Checkbox aria-label={`${label}をまとめて選ぶ`} checked={ids.length > 0 && count === ids.length}
+      leading: <SaveErrorField names={["length","ids.length","count"]}><Checkbox aria-label={`${label}をまとめて選ぶ`} checked={ids.length > 0 && count === ids.length}
         indeterminate={count > 0 && count < ids.length} disabled={disabled || ids.length === 0}
-        onCheckedChange={(checked) => onChange(checked ? [...new Set([...selected, ...ids])] : selected.filter((accountId) => !ids.includes(accountId)))} />,
+        onCheckedChange={(checked) => onChange(checked ? [...new Set([...selected, ...ids])] : selected.filter((accountId) => !ids.includes(accountId)))} /></SaveErrorField>,
     }
   }
   return [row(ALL_ACCOUNTS, 'すべて'), ...(membership ? [

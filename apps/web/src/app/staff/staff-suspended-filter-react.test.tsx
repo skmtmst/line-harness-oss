@@ -5,6 +5,7 @@
  * 実物の staff 一覧をマウントし、利用状態の絞り込みで無効の人が見つかり、
  * 変更窓から有効に戻せることを確かめる。
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
@@ -16,7 +17,8 @@ const fixture = vi.hoisted(() => ({
   updated: [] as Array<{ id: string; data: unknown }>,
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
@@ -26,7 +28,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -112,18 +114,12 @@ afterEach(() => {
 async function renderList() {
   await act(async () => { render(<StaffPage />) })
   await waitFor(() => {
-    expect(screen.getByText('有効担当')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '有効担当の中身を見る' })).toBeTruthy()
   })
 }
 
 async function chooseStatusFilter(label: string) {
-  await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: '利用状態' }))
-  })
-  const option = await screen.findByRole('option', { name: label })
-  await act(async () => {
-    fireEvent.click(option.querySelector('button') ?? option)
-  })
+  fireEvent.click(screen.getByRole('button', { name: /^止めた / }))
 }
 
 describe('R500 無効にした人の再有効化', () => {
@@ -136,27 +132,22 @@ describe('R500 無効にした人の再有効化', () => {
     await renderList()
     await chooseStatusFilter('無効のみ')
     await waitFor(() => {
-      expect(screen.getByText('停止担当')).toBeTruthy()
+      expect(screen.getByRole('button', { name: '停止担当の中身を見る' })).toBeTruthy()
     })
-    expect(screen.getByText('無効')).toBeTruthy()
-    expect(screen.queryByText('有効担当')).toBeNull()
+    expect(screen.getByText('止めた')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '有効担当の中身を見る' })).toBeNull()
   })
 
-  test('無効の人の変更窓から有効に戻せる', async () => {
+  test('無効の人の行の再開から有効に戻せる', async () => {
     await renderList()
     await chooseStatusFilter('無効のみ')
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '変更する' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /の操作$/ })).toBeTruthy()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+      fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
     })
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'このユーザーを有効にする' })).toBeTruthy()
-    })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'このユーザーを有効にする' }))
-    })
+    fireEvent.click(screen.getByRole('menuitem', { name: '再開する' }))
     await waitFor(() => {
       expect(fixture.updated).toHaveLength(1)
     })
@@ -164,3 +155,6 @@ describe('R500 無効にした人の再有効化', () => {
     expect(fixture.updated[0].data).toMatchObject({ isActive: true })
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

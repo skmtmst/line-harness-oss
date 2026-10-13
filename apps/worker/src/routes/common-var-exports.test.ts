@@ -106,6 +106,19 @@ describe('共通情報CSVの監査付き非同期出力', () => {
     expect(csv).toContain('株式会社NEN');
   });
 
+  it('閲覧専用の管理者はCSVの依頼・ダウンロード・作り直しを実行できない', async () => {
+    const created = await app(store.db).request('/api/common-vars/exports', json('POST', { accountId: 'account-a' }), { DB: store.db } as Env['Bindings']);
+    const job = (await created.json() as { data: JobJson }).data;
+    fixture.staff = { ...fixture.staff, readOnly: true };
+    for (const [path, init] of [
+      ['/api/common-vars/exports', json('POST', { accountId: 'account-a' })],
+      [`/api/common-vars/exports/${job.id}/download`, {}],
+      [`/api/common-vars/exports/${job.id}/regenerate`, json('POST', {})],
+    ] as const) {
+      expect((await app(store.db).request(path, init, { DB: store.db } as Env['Bindings'])).status).toBe(403);
+    }
+  });
+
   it('200件を超える対象もページングで全件書き出す', async () => {
     for (let i = 0; i < 205; i += 1) {
       seedVar(store, `v${String(i).padStart(3, '0')}`, { name: `項目${String(i).padStart(3, '0')}` });

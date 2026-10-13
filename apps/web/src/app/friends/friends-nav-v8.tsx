@@ -12,7 +12,7 @@
  * 項目の名前と行き先は `friends-tabs.ts` の FRIENDS_MERGED_TABS が正本
  * （キー・名前・href をここで書き換えない）。API・権限も変えない。
  */
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import React, { useRef, useState } from 'react'
 import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
@@ -51,7 +51,7 @@ export function FriendsDataMenuV8({
    * 出さない」）。役割が読めるまでは今までどおり出す（最後の守りは
    * /friends/migrations 側の 403）。
    */
-  const canManageCsv = staffRole === null || canManageRole(staffRole)
+  const canManageCsv = canManageRole(staffRole)
 
   const manageItems: ActionMenuItem[] = FRIENDS_MERGED_TABS.filter(
     (tab) => tab.key !== 'list',
@@ -136,7 +136,7 @@ export function FriendsListHeadV8({
   /* 板 `x6QsVz`：閲覧のみは「取り込む」を押せない形にする（隠さない）。
      役割が読めるまでは今までどおり出す（このファイルの CSV と同じ守り）。 */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
   return (
     <>
@@ -162,7 +162,7 @@ export function FriendsListHeadV8({
         )}
       </div>
     </div>
-    {staffRole !== null && !canManageRole(staffRole) && !canEditFeature('/friends') && !canEditFeature('/chats') ? (
+    {staffRole !== null && !canManageRole(staffRole) && !canEditFeature('/friends', staffRole) && !canEditFeature('/chats', staffRole) ? (
       <Notice tone="info" data-design-node="x6QsVz">閲覧のみの権限です。友だちの情報を確認できますが、変更や取り込みはできません。</Notice>
     ) : null}
     </>

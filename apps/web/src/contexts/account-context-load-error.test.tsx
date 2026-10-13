@@ -52,6 +52,7 @@ vi.mock('next/link', () => ({
 }))
 
 import { AccountProvider, useAccount, type AccountWithStats } from './account-context'
+import { clearLineAccountsCache, prefetchLineAccounts } from '@/lib/line-accounts-cache'
 import StoreSelectionGate from '@/components/store-selection-gate'
 import RootLandingGate from '@/components/root-landing-gate'
 
@@ -117,6 +118,7 @@ let storage: MemoryStorage
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearLineAccountsCache()
   storage = new MemoryStorage()
   vi.stubGlobal('localStorage', storage)
   fixture.pathname = '/friends'
@@ -132,6 +134,18 @@ afterEach(() => {
 })
 
 describe('アカウント一覧の取得失敗（Issue #978）', () => {
+  it('初回は先読みした一覧を使い、手動の取り直しは最新を取得する', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    prefetchLineAccounts()
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => { expect(probe('count').textContent).toBe('1') })
+    expect(api.listAccounts).toHaveBeenCalledTimes(1)
+    api.listAccounts.mockResolvedValue({ success: true, data: [] })
+    await act(async () => { probe('refresh').click() })
+    await eventually(() => { expect(probe('count').textContent).toBe('0') })
+    expect(api.listAccounts).toHaveBeenCalledTimes(2)
+  })
+
   it('初回取得の失敗は error を立て、ガードが「読み込めませんでした＋再読み込み」を出す', async () => {
     api.listAccounts.mockRejectedValue(new Error('network down'))
     await act(async () => {

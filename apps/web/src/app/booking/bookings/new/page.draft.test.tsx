@@ -390,3 +390,6 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
   })
 
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

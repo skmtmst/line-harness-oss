@@ -61,12 +61,7 @@
   gap: var(--tpl-acd-dlg-field-gap);
 }
 
-.error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-acd-value-size);
-  line-height: var(--tpl-acd-sub-lh);
-}
+
 
 .fill {
   width: 100%;

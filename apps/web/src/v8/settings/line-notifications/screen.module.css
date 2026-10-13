@@ -4,7 +4,6 @@
  */
 
 .minor {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--tpl-sb-row-sub);
 }
@@ -27,19 +26,7 @@
   gap: var(--tpl-sb-ctl-gap);
 }
 
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-band-gap);
-  margin: 0;
-  padding: var(--tpl-sb-band-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-band-text);
-  line-height: var(--tpl-sb-band-lh);
-}
-
-.viewerBand { background: var(--color-shell); }
+.viewerBand { margin: 0; }
 
 .bandIcon {
   flex-shrink: 0;
@@ -300,3 +287,5 @@
   .opSchedule { display: none; }
   .name, .opNameLink { display: block; white-space: nowrap; text-overflow: ellipsis; }
 }
+
+.minor, .minorNoticePlacement { margin: 0; }

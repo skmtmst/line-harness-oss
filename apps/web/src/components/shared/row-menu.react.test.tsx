@@ -26,12 +26,12 @@ const openMenu = async () => {
 }
 
 describe('RowMenu：行の右端の「…」', () => {
-  it('size="row" は 28角の印（印14）、省略時は 36角のまま（板ごとに絵の大きさ）', () => {
-    const { unmount } = render(<RowMenu label="春のセールの操作" items={items()} size="row" />)
+  it('枠付きの指定では size="row" は 28角の印（印14）、省略時は 36角（板ごとの大きさ）', () => {
+    const { unmount } = render(<RowMenu label="春のセールの操作" items={items()} appearance="box" size="row" />)
     expect(trigger().getAttribute('data-size')).toBe('row')
     expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('14')
     unmount()
-    render(<RowMenu label="春のセールの操作" items={items()} />)
+    render(<RowMenu label="春のセールの操作" items={items()} appearance="box" />)
     expect(trigger().getAttribute('data-size')).toBeNull()
     expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('16')
   })
@@ -41,7 +41,7 @@ describe('RowMenu：行の右端の「…」', () => {
     const { join } = await import('node:path')
     const css = readFileSync(join(process.cwd(), 'src/components/shared/icon-button.module.css'), 'utf8')
     const globals = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
-    expect(css).toMatch(/\[data-theme='v8'\] \.button\[data-size='row'\] \{[^}]*width: var\(--tpl-icon-btn-row\)/)
+    expect(css).toMatch(/:root \.button\[data-size='row'\] \{[^}]*width: var\(--tpl-icon-btn-row\)/)
     expect(css).toMatch(/\[data-size='row'\]::before \{[^}]*--tpl-icon-btn-row-hit/)
     expect(globals).toContain('--tpl-icon-btn-row: 28px;')
     expect(globals).toContain('--tpl-icon-btn-row-hit: 36px;')
@@ -71,8 +71,8 @@ describe('RowMenu：行の右端の「…」', () => {
   it('危ない操作は赤字で、区切りの下・最後に回す', async () => {
     render(<RowMenu label="春のセールの操作" items={items()} />)
     await openMenu()
-    expect(menuItems().map((item) => item.textContent)).toEqual(['複製する', '止める', '削除する'])
-    const last = menuItems()[2]
+    expect(menuItems().map((item) => item.textContent)).toEqual(['複製する', '削除する', '止める'])
+    const last = menuItems()[1]
     expect(last.className).toMatch(/danger/)
     expect(last.parentElement?.querySelector('hr')).toBeTruthy()
     expect(menuItems()[0].parentElement?.querySelector('hr')).toBeNull()
@@ -154,9 +154,10 @@ describe('RowMenu：行の右端の「…」', () => {
     expect(changes).toEqual([true, false])
   })
 
-  it('項目が無ければ「…」を出さない', () => {
+  it('B-199：項目なしでも入口をそろえ、開くと理由を示す', async () => {
     render(<RowMenu label="春のセールの操作" items={[]} />)
-    expect(screen.queryByRole('button')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '春のセールの操作' }))
+    expect(await screen.findByText('この行に使える操作はありません')).toBeTruthy()
   })
 
   it('RowActions の「…」も同じ部品（危ない操作は区切りの下・最後）', async () => {

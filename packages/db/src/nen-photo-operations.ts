@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import {
   findRewardedAdoptedDuplicate,
   getEffectivePhotoRewardPolicy,
@@ -124,7 +125,7 @@ export async function getPhotoReviewMetrics(
 type QueueKind = 'assessment' | 'asset';
 type QueueRow = {
   id: string;
-  photo_id: string;
+  photo_id: string | null;
   line_account_id: string;
   requested_version: number;
   status: 'queued' | 'processing' | 'completed' | 'failed';
@@ -144,6 +145,7 @@ function mapQueue(row: QueueRow) {
   return {
     id: row.id,
     photoId: row.photo_id,
+    ...(row.photo_id === null ? { customerName: '削除済みのお客さま' } : {}),
     lineAccountId: row.line_account_id,
     requestedVersion: Number(row.requested_version),
     status: row.status,
@@ -334,10 +336,10 @@ export async function applyBulkPhotoDecisions(
   // 写真行だけ見ると、他アカウントへ移った友だちの写真を確定してしまう。
   {
     const friendIds = [...new Set(subjects.map((subject) => subject!.friendId))];
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const rows = await db.prepare(
       `SELECT id FROM friends WHERE id IN (${placeholders}) AND line_account_id = ?`,
-    ).bind(...friendIds, input.lineAccountId).all<{ id: string }>();
+    ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : []), input.lineAccountId).all<{ id: string }>();
     const visible = new Set(rows.results.map((row) => row.id));
     const mismatchIndex = subjects.findIndex((subject) => !visible.has(subject!.friendId));
     if (mismatchIndex >= 0) return { kind: 'not_found', photoId: input.decisions[mismatchIndex].photoId };
@@ -563,6 +565,7 @@ export async function claimPhotoNotificationDelivery(
             notification_attempt_count = notification_attempt_count + 1,
             updated_at = ?
       WHERE id = ? AND line_account_id = ?
+        AND photo_id IS NOT NULL
         AND (notification_status IN ('pending', 'failed')
           OR (notification_status = 'sending'
             AND (notification_lease_expires_at IS NULL OR notification_lease_expires_at <= ?)))
@@ -716,7 +719,7 @@ export async function consumePhotoOriginalDownload(
   const grant = await db.prepare(
     `UPDATE nen_photo_original_download_grants SET consumed_at = ?
       WHERE token_hash = ? AND line_account_id = ? AND requested_by = ?
-        AND consumed_at IS NULL AND expires_at > ?
+        AND photo_id IS NOT NULL AND consumed_at IS NULL AND expires_at > ?
       RETURNING photo_id`,
   ).bind(now, input.tokenHash, input.lineAccountId, input.actorId, now).first<{ photo_id: string }>();
   if (!grant) return null;

@@ -10,7 +10,9 @@ export type ContextMenuItem = {
   label: string
   danger?: boolean
   disabled?: boolean
-  onSelect: (id: string) => void
+  onSelect?: (id: string) => void
+  href?: string
+  external?: boolean
 }
 
 export type ContextMenuProps = {
@@ -113,7 +115,9 @@ export default function ContextMenu({ items, children, label, shouldOpen, itemsF
                   label: item.label,
                   tone: item.danger ? ('danger' as const) : undefined,
                   disabled: item.disabled,
-                  onSelect: () => item.onSelect(item.id),
+                  href: item.href,
+                  external: item.external,
+                  onSelect: () => item.onSelect?.(item.id),
                 }))}
               />
             </div>,

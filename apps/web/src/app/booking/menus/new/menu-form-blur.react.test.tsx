@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「その場で確かめる入力」。
  * 名前・かかる時間・後の空き時間の欄を離れたとき（blur）に直し方を
@@ -16,11 +18,10 @@ const fixture = vi.hoisted(() => ({
   listMenus: null as null | (() => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push?.(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [] }),
 }))
@@ -79,6 +80,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: async () => ({ success: true, data: [] }) },
     },
     bookingApi: {
+
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: async () => ({ staff: [] }),
       getSettings: async () => ({ success: true, data: { bookingWindowDays: 30 } }),
@@ -94,6 +96,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 import NewBookingMenuPage from './page'
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push = vi.fn()
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.listMenus = async () => ({ menus: [] })

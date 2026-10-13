@@ -42,8 +42,8 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => 'customer',
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({ default: () => null }))
-vi.mock('./operator-notification-rules', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -72,6 +72,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { ApiError } from '@/lib/api'
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+
 import LineNotificationsPage from './page'
 
 beforeEach(() => {

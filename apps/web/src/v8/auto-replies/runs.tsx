@@ -1,6 +1,47 @@
 'use client'
 
+import { jstMonthStart, jstDateOffset } from '@/lib/jst-datetime'
+
+
 import SegmentedControl from '@/components/shared/segmented'
+import { RowNameLink } from '@/components/shared/table';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { TriangleAlert } from 'lucide-react';
+import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared';
+import { DetailPage } from '@/components/templates';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import DateField from '@/components/shared/date-field'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { api, ApiError } from '@/lib/api';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import styles from './runs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
+import Notice from '@/components/shared/notice'
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
 /*
  * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
@@ -10,45 +51,6 @@ import SegmentedControl from '@/components/shared/segmented'
  * 取得・操作の動き（読み直し・一時停止・再実行・CSV）は `app/auto-replies/runs/runs-v8.tsx`
  * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
  */
-
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  Download,
-  MessageCircle,
-  Pause,
-  Pencil,
-  RotateCcw,
-  TriangleAlert,
-} from 'lucide-react'
-import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
-import { DetailPage } from '@/components/templates'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import DateField from '@/components/shared/date-field'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
-import styles from './runs.module.css'
-import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
@@ -71,7 +73,12 @@ export function statusView(status: string): { label: string; tone: StatusBadgeTo
     ?? { label: '確認中', tone: 'neutral' }
 }
 
+export function isDeliveryUnconfirmed(run: AutoReplyRun): boolean {
+  return run.errorCode === 'delayed_delivery_unknown'
+}
+
 export function actionLabel(run: AutoReplyRun): string {
+  if (isDeliveryUnconfirmed(run)) return DELIVERY_UNCONFIRMED_REASON
   const summary = run.actionSummary
   const parts: string[] = []
   if (run.replyStatus === 'accepted') parts.push('返信')
@@ -93,7 +100,7 @@ function csvFor(items: AutoReplyRun[]): string {
       item.accountLabel ?? emptyValue('unknown'),
       item.inputPreview ?? emptyValue('unknown'),
       item.triggerLabel,
-      statusView(item.status).label,
+      isDeliveryUnconfirmed(item) ? '要確認' : statusView(item.status).label,
       actionLabel(item),
       item.durationMs === null ? emptyValue('unknown') : `${item.durationMs}ms`,
     ]),
@@ -126,22 +133,15 @@ const PERIOD_OPTIONS: Array<{ value: PeriodKey; label: string }> = [
   { value: 'custom', label: '日付で決める' },
 ]
 
-function ymd(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-/** 期間の選び方から、口へ渡す開始日（YYYY-MM-DD）を出す。決めた日・すべては null。 */
+/** 期間の境目は日本時間。端末のタイムゾーンに左右されない。 */
 export function periodFrom(period: PeriodKey, now: Date): string | null {
-  if (period === 'month') return ymd(new Date(now.getFullYear(), now.getMonth(), 1))
-  if (period === 'last7') return ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6))
-  if (period === 'last30') return ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29))
+  if (period === 'month') return jstMonthStart(now)
+  if (period === 'last7') return jstDateOffset(-6, now)
+  if (period === 'last30') return jstDateOffset(-29, now)
   return null
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 届いた言葉は「」で囲んで1行。 */
 function quoted(text: string | null): string {
@@ -158,7 +158,7 @@ export default function AutoReplyRunsV8() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
   const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
   const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
@@ -253,7 +253,7 @@ export default function AutoReplyRunsV8() {
   }
 
   const retryRun = async (item: AutoReplyRun) => {
-    if (!item.canRetry || retryingId !== null || retryingAll) return
+    if (isDeliveryUnconfirmed(item) || !item.canRetry || retryingId !== null || retryingAll) return
     setRetryingId(item.id)
     setActionMessage('')
     try {
@@ -279,12 +279,13 @@ export default function AutoReplyRunsV8() {
 
   /* 「失敗した処理をもう一度」：今のページでやり直せる失敗を順に実行する。 */
   const retryAllFailed = async () => {
-    const targets = items.filter((item) => item.canRetry && matchesFilter(item, 'failed'))
+    const targets = items.filter((item) => !isDeliveryUnconfirmed(item) && item.canRetry && matchesFilter(item, 'failed'))
     if (targets.length === 0 || retryingAll || retryingId !== null) return
     setRetryingAll(true)
     setActionMessage('')
     let retried = 0
     let denied = false
+    let failed = 0
     for (const item of targets) {
       try {
         const response = await api.autoReplies.retryRun(item.id)
@@ -292,6 +293,7 @@ export default function AutoReplyRunsV8() {
         retried += 1
       } catch (e) {
         if (e instanceof ApiError && e.status === 403) denied = true
+        if (!(e instanceof ApiError && e.status === 409)) failed += 1
         /* 409（もう動いている・済み）などは飛ばして次へ。 */
       }
     }
@@ -301,7 +303,9 @@ export default function AutoReplyRunsV8() {
       return
     }
     setActionMessage(
-      retried > 0
+      failed > 0
+        ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${failed} 件をもう一度実行できませんでした。時間を置いてお試しください。`
+        : retried > 0
         ? `失敗した処理を${retried} 件もう一度実行しました。`
         : 'もう一度実行できる処理はありませんでした。',
     )
@@ -357,7 +361,7 @@ export default function AutoReplyRunsV8() {
   }
 
   const failedCount = data?.summary.errors ?? 0
-  const retryableFailed = items.filter((item) => item.canRetry && matchesFilter(item, 'failed')).length
+  const retryableFailed = items.filter((item) => !isDeliveryUnconfirmed(item) && item.canRetry && matchesFilter(item, 'failed')).length
   const query = search.trim().toLowerCase()
   const visibleItems = items.filter((item) => {
     if (!matchesFilter(item, filter)) return false
@@ -388,11 +392,11 @@ export default function AutoReplyRunsV8() {
         id: 'chat',
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
-        external: true,
+        external: false,
         href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
-    if (canManage && item.canRetry) {
+    if (canManage && !isDeliveryUnconfirmed(item) && item.canRetry) {
       list.push({
         id: 'retry',
         label: 'もう一度実行',
@@ -409,7 +413,7 @@ export default function AutoReplyRunsV8() {
       boardId="nWmLg"
       title={`実行結果：${data?.rule.name ?? '自動応答'}`}
       help="いつ・誰に・何を返したか、失敗した処理を見ます。"
-      identity={<Link href="/auto-replies" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />自動応答へ</Link>}
+      identity={<></>}
       actions={<div className={styles.headActions}>
         {canManage ? (
           <Button onClick={() => setStopOpen(true)} disabled={!isActiveRule || stopping}>
@@ -430,7 +434,7 @@ export default function AutoReplyRunsV8() {
       </div>}
     >
       {!canManage ? (
-        <p className={styles.viewerBand} role="status">{NO_MANAGE_NOTE}</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div>
       ) : null}
 
       <div className={styles.kpis}>
@@ -440,22 +444,16 @@ export default function AutoReplyRunsV8() {
         <KpiCard presentation="band" icon={null} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
           detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
         <KpiCard presentation="band" icon={null} title="失敗した処理" value={data ? failedCount : null} unit="件"
-          detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を開始してからの合計です'} />
+          detail={failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です'} />
         <KpiCard presentation="band" icon={null} title="平均で返すまで"
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
           detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>
       </div>
 
+      {items.some(isDeliveryUnconfirmed) ? <DeliveryUnconfirmedNotice action={<Button href="/chats">トークの送信記録を確認</Button>} /> : null}
       {failedCount > 0 ? (
-        <div className={styles.failBand} role="alert">
-          <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
-            <p className={styles.failNote}>止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</p>
-          </div>
-          <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>
-          {canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage && retryableFailed > 0 ? (
             <Button
               variant="primary"
               onClick={() => void retryAllFailed()}
@@ -465,8 +463,7 @@ export default function AutoReplyRunsV8() {
             >
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null}
-        </div>
+          ) : null} </>} >止まった行の理由を確認してください。「要確認」の行は届いたか分からないため、送り直しません。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">
@@ -484,26 +481,26 @@ export default function AutoReplyRunsV8() {
           <span className={styles.toolsSpacer} aria-hidden="true" />
           {period === 'custom' ? (
             <>
-              <DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" />
-              <DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" />
+              <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" /></SaveErrorField>
+              <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" /></SaveErrorField>
             </>
           ) : null}
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period"]}><Select
               aria-label="期間"
               value={period}
               onChange={(value) => { setPeriod(value as PeriodKey); setPage(1) }}
               options={PERIOD_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["pageSize","limit","page_size"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(pageSize)}
               onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 
@@ -532,18 +529,18 @@ export default function AutoReplyRunsV8() {
               {visibleItems.map((item) => {
                 const view = statusView(item.status)
                 const failed = matchesFilter(item, 'failed')
-                const done = failed && item.detail ? item.detail : actionLabel(item)
+                const done = isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : failed && item.detail ? item.detail : actionLabel(item)
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(item.friendName)}</span>
                       {item.friendId ? (
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></Link>
+                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></RowNameLink>
                       ) : (
                         <span className={styles.friendName} ><TruncatedText value={String(name ?? '')} /></span>
                       )}
@@ -551,7 +548,7 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colInput}>
                       <span className={styles.input} title={`${quoted(item.inputPreview)}（きっかけ：${item.triggerLabel}）`}>{quoted(item.inputPreview)}</span>
                     </Td>
-                    <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
+                    <Td className={styles.colResult}>{isDeliveryUnconfirmed(item) ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>}</Td>
                     <Td className={styles.colDone}><span className={styles.done} title={done}>{done}</span></Td>
                     <Td className={styles.colTime}>
                       <span className={styles.time}>{item.durationMs === null ? emptyValue('unknown') : `${(item.durationMs / 1000).toFixed(1)}秒`}</span>
@@ -641,14 +638,14 @@ export default function AutoReplyRunsV8() {
         onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
-        <input
+        <SaveErrorField names={["stopReason","reason","stop_reason"]}><input
           type="text"
           className={styles.stopReason}
           placeholder="止める理由（任意・記録に残ります）"
           aria-label="止める理由（任意）"
           value={stopReason}
           onChange={(e) => setStopReason(e.target.value)}
-        />
+        /></SaveErrorField>
       </ConfirmDialog>
     </DetailPage>
   )

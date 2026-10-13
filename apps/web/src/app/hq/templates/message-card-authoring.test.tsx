@@ -1,3 +1,4 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { useState } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -28,8 +29,7 @@ test('V8 titles and four button types save together and restore after an uncerta
     fireEvent.change(screen.getByLabelText(`ボタン${n}の文字`),{target:{value:'開く'}})
     fireEvent.change(screen.getByLabelText(`ボタン${n}を押したとき`),{target:{value:action}})
     if(action === 'form' || action === 'scenario') {
-      await screen.findByRole('option',{name:action === 'form' ? '回答（本店）' : '案内（本店）'})
-      fireEvent.change(screen.getByLabelText(`ボタン${n}の参照先`),{target:{value:`${action}-source`}})
+      await pickEntity(`ボタン${n}の参照先`, action === 'form' ? '回答（本店）' : '案内（本店）')
     } else fireEvent.change(screen.getByLabelText(`ボタン${n}の内容`),{target:{value:action === 'url' ? 'https://example.com' : '問い合わせ'}})
     expect(definitionError('template',captured)).toBeNull()
     if(action === 'url') fireEvent.click(screen.getByRole('button',{name:'ボタン1を外す'}))

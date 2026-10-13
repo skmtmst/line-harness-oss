@@ -4,24 +4,24 @@
  * × は絵に無いが共通の決まり（閉じ方は右上の×）なので残し、題の行の高さを変えないよう重ねる。
  * 値は globals.css の --tpl-ms-qc-*。色・角丸は名前だけ。
  */
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) {
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:first-child) {
   position: relative;
   padding: var(--tpl-ms-qc-head-pad);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) > :global(button) {
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:first-child) > :global(button) {
   position: absolute;
   top: var(--tpl-ms-qc-close-inset);
   right: var(--tpl-ms-qc-close-inset);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) :global(h2) {
+:global(:root [data-design-part='dialog']):has(.body) :global(h2) {
   font-size: var(--tpl-ms-qc-title-size);
   font-weight: 700;
   line-height: var(--tpl-ms-qc-title-lh);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
   padding: var(--tpl-ms-key-content-pad);
 }
 
@@ -60,7 +60,7 @@
 }
 
 .chipBox:focus-within {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
   outline-offset: var(--tpl-ms-focus-offset);
 }
 
@@ -71,7 +71,7 @@
   gap: var(--tpl-ms-qc-chip-gap);
   padding: var(--tpl-ms-qc-chip-pad);
   border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-action);
+  outline: 1px solid var(--color-focus-ring);
   outline-offset: -1px;
   background: var(--color-success-bg);
   color: var(--color-action);
@@ -141,7 +141,7 @@
 }
 
 .textarea:focus-visible {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
   outline-offset: var(--tpl-ms-focus-offset);
 }
 

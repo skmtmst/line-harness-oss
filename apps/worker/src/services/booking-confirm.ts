@@ -1,6 +1,5 @@
-// Confirmation side-effects shared by the admin approve route (PATCH
-// /api/booking/admin/requests/:id) and the admin proxy-create route
-// (POST /api/booking/admin/bookings).
+// Confirmation reminder timing shared by automatic creation, approval,
+// proxy creation and payment recovery, as well as booking changes.
 //
 // Reminders already in the past are skipped so that confirming a
 // same-day booking does not immediately fire "明日のご予約" messages.
@@ -121,8 +120,10 @@ export async function insertConfirmationReminders(
   } & ReminderScheduleOptions,
 ): Promise<number> {
   const inserts = buildConfirmationReminderSchedule(args).map((item) => db
-    .prepare(`INSERT INTO booking_reminders (id, booking_id, kind, scheduled_at) VALUES (?,?,?,?)`)
-    .bind(crypto.randomUUID(), args.bookingId, item.kind, item.scheduledAt));
+    .prepare(`INSERT INTO booking_reminders (id, booking_id, kind, scheduled_at)
+      SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM booking_reminders
+        WHERE booking_id = ? AND kind = ? AND scheduled_at = ?)`)
+    .bind(crypto.randomUUID(), args.bookingId, item.kind, item.scheduledAt, args.bookingId, item.kind, item.scheduledAt));
   if (inserts.length > 0) {
     await db.batch(inserts);
   }

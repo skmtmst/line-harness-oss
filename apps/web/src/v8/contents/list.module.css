@@ -121,8 +121,7 @@
   align-items: center;
   gap: var(--tpl-toolbar-gap);
   min-width: 0;
-  padding-right: var(--tpl-fm-menu-size);
-  margin-bottom: var(--tpl-rule-row-gap);
+  margin-bottom: var(--tpl-row-sub-gap);
 }
 .nameDot {
   display: inline-flex;
@@ -167,11 +166,6 @@
 }
 .usageIdle { color: var(--color-ink-faint); }
 .usageUsed { color: var(--color-ink-secondary); }
-.cardFoot {
-  position: absolute;
-  top: var(--tpl-toolbar-gap);
-  right: var(--tpl-toolbar-gap);
-}
 .menuWrap {
   position: relative;
   display: inline-flex;
@@ -250,16 +244,4 @@
 }
 
 /* 見るだけの人の帯（見出しの下・数の帯の上）。 */
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  margin: 0 0 var(--tpl-fm-band-after);
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-}
-.roBand > svg { flex-shrink: 0; color: var(--color-action); }
+.roBand { margin: 0 0 var(--tpl-fm-band-after); }

@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -34,7 +35,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { currentMonthRange } from '../lib/jst-range.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1053,8 +1054,8 @@ async function resolveStoppedByNames(
   if (ids.length === 0) return;
   try {
     const rows = await db.prepare(
-      `SELECT id, name FROM staff_members WHERE id IN (${ids.map(() => '?').join(',')})`,
-    ).bind(...ids).all<{ id: string; name: string }>();
+      `SELECT id, name FROM staff_members WHERE id IN (${sqlIdSet(ids).sql})`,
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; name: string }>();
     const nameById = new Map((rows.results ?? []).map((row) => [row.id, row.name]));
     for (const item of items) {
       item.stoppedByStaffName = item.stoppedByStaffId
@@ -1151,10 +1152,10 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
         .prepare(
           `SELECT id, name FROM line_accounts
             WHERE is_active = 1
-              AND id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
+              AND id IN (${sqlIdSet(scope.allowedAccountIds).sql})
             ORDER BY name`,
         )
-        .bind(...scope.allowedAccountIds)
+        .bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []))
         .all<{ id: string; name: string }>()).results ?? []
       : [];
     const automationIdx = await buildAutomationKeywordIndex(c.env.DB);
@@ -1263,7 +1264,7 @@ autoReplies.get('/api/auto-replies/conflicts', async (c) => {
 });
 
 /** V6: 新規設定は下書きだけを作り、この時点では返信を始めない。 */
-autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/drafts', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const parsed = await readDraftSettings(c.env.DB, await c.req.json());
     if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400, []);
@@ -1343,7 +1344,7 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
   }
 });
 
-autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.put('/api/auto-replies/:id/draft', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
@@ -1415,7 +1416,7 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), in
 // validate と conflicts は公開判断に使う管理操作なので、下書きを書ける人だけ。
 // test は本番状態を変えない試運転で、実施結果と担当者だけを監査用に記録する。
 // staff にはこの test だけを許可し、作成・更新・公開の権限は広げない。
-autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/validate', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '公開する下書きがありません' }, 404);
@@ -1426,7 +1427,7 @@ autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin')
   }
 });
 
-autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin'), async (c) => {
+autoReplies.get('/api/auto-replies/:id/conflicts', requireDeliveryAccess('autoReplies'), async (c) => {
   try {
     // m26c R558: 公開後は下書きが無い。下書き取得と同じく公開版へ読み替え、
     // 404 で完了 URL を壊さない。読み替えたことは source で区別する。
@@ -1553,7 +1554,7 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/publish', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
@@ -1661,9 +1662,9 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 // 届いたメッセージへ応答していた。動かすのは isActive: true の明示指定か、
 // 保存後の再開・公開操作だけにする。
 // F7: isActive: true の指定があっても、作る前に既存の有効ルールと当てる。
-// 当たれば有効化せず停止中で作り、理由を社内メモへ残す（応答にも返す）。
+// 当たれば有効化せず下書きで作り、理由を社内メモへ残す（応答にも返す）。
 // 当たらなければ要求どおりすぐ有効にする。
-autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"respondToAll":["boolean"],"name":["null","string"],"keywordMatchMode":["string"],"normalizeKeywords":["boolean"],"folderId":["null","string"]}), async (c) => {
+autoReplies.post('/api/auto-replies', requireDeliveryAccess('autoReplies'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"respondToAll":["boolean"],"name":["null","string"],"keywordMatchMode":["string"],"normalizeKeywords":["boolean"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       keyword: string;
@@ -1775,9 +1776,10 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBo
     }
 
     // F7: 有効で作る要求があれば、作る前に既存の有効ルールと当てる。
-    // 当たれば有効化せず停止中で作り、理由を社内メモへ残す。
+    // 当たれば有効化せず下書きで作り、理由を社内メモへ残す。
     // 当たらなければ要求どおりすぐ有効にする。
     // 停止指定・省略は従来どおり停止のまま（AUTOREPLY-08）。
+    let blockedDraftSettings: AutoReplyDraftSettings | null = null;
     let activationBlocked = false;
     let activationBlockedReason: string | null = null;
     // m26c R570: 確認キーがあれば再送を同じ行へ復帰させる。
@@ -1831,24 +1833,24 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBo
         activationBlockedReason = preConflicts.map((item) => item.reason).join(' ');
         createInput.isActive = false;
         const names = [...new Set(preConflicts.map((item) => item.name))].join('／');
-        const reasonHead = `競合のため停止中で作成（${names}と重なります）。有効にする前に競合を確認してください。`;
+        const reasonHead = `競合のため下書きで作成（${names}と重なります）。有効にする前に競合を確認してください。`;
         const userMemo = createInput.internalMemo ?? null;
         const merged = userMemo ? `${reasonHead}\n${userMemo}` : reasonHead;
         // 社内メモは1000文字まで。理由を優先して残す。
         createInput.internalMemo = [...merged].length > 1000
           ? [...merged].slice(0, 1000).join('')
           : merged;
+        blockedDraftSettings = { ...createSettings, internalMemo: createInput.internalMemo };
       }
     }
     let item: DbAutoReply;
     try {
-      const created = await createAutoReply(
-        c.env.DB,
-        createInput,
-        ruleKey
-          ? { key: ruleKey, fingerprint: autoReplyRuleCreateFingerprint(createInput) }
-          : undefined,
-      );
+      const idempotency = ruleKey
+        ? { key: ruleKey, fingerprint: autoReplyRuleCreateFingerprint(createInput) }
+        : undefined;
+      const created = blockedDraftSettings
+        ? await createAutoReplyWithDraftVersion(c.env.DB, blockedDraftSettings, idempotency)
+        : await createAutoReply(c.env.DB, createInput, idempotency);
       item = created.rule;
     } catch (err) {
       const mapped = idempotencyErrorResponse(err);
@@ -1877,7 +1879,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBo
 });
 
 // PUT /api/auto-replies/:id — update
-autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"]}), async (c) => {
+autoReplies.put('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -2090,7 +2092,7 @@ const AUTO_REPLY_STOP_REASON_MAX = 500;
  * 停止は運用の判断なので、理由（任意）・担当者・日時を記録する。
  * 確認キー（Idempotency-Key）必須。同じキーの再送は新しい停止として残さない。
  */
-autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/stop', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validIdempotencyKey(requestKey)) {
@@ -2135,7 +2137,7 @@ autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), in
 // DELETE /api/auto-replies/:id
 // 物理削除ではなく履歴を残す方式（機能08 点検 N-085）。設定と担当者を残し、
 // 一覧・評価・集計からは外れる。過去の一致記録と実行台帳はそのまま残る。
-autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c) => {
+autoReplies.delete('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), async (c) => {
   try {
     const id = c.req.param('id');
     const item = await getAutoReplyById(c.env.DB, id);
@@ -2157,7 +2159,7 @@ autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async
  * （is_active = 0）で送り出さない。再開は画面の再開操作で行う。
  * 消していない行・無い行は 404。
  */
-autoReplies.post('/api/auto-replies/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/restore', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const restored = await restoreAutoReply(c.env.DB, c.req.param('id'));
     if (!restored) {

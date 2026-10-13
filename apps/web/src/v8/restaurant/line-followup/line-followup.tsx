@@ -1,14 +1,6 @@
 'use client'
 
-/*
- * ★V8 LINE来店フォロー（Pencil `xLpnS`）。
- *
- * 確認用の注意の帯 → 数6（フロー・4種の有無・本送信）→ 流れのカード2列
- * （頭：NEN RESTAURANT・流れの名前・プレビューのみ／左：タイトル・本文・配信・下書き保存／
- * 右：LINEでの見え方）→ LINE ミニアプリ連携。
- * データの口は今の画面と同じ（snapshot の lineFlows＋updateLineFlow）。保存しても送らない。
- * 閲覧のみ（変える権限が無い人）には「下書きを保存する」を置かない。動きは BEHAVIOR.md。
- */
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useRef, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Eye, Utensils } from 'lucide-react'
@@ -23,6 +15,17 @@ import { Panel, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINE来店フォロー（Pencil `xLpnS`）。
+ *
+ * 確認用の注意の帯 → 数6（フロー・4種の有無・本送信）→ 流れのカード2列
+ * （頭：NEN RESTAURANT・流れの名前・プレビューのみ／左：タイトル・本文・配信・下書き保存／
+ * 右：LINEでの見え方）→ LINE ミニアプリ連携。
+ * データの口は今の画面と同じ（snapshot の lineFlows＋updateLineFlow）。保存しても送らない。
+ * 閲覧のみ（変える権限が無い人）には「下書きを保存する」を置かない。動きは BEHAVIOR.md。
+ */
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
 const FLOW_KINDS: Record<string, { stat: string; note: string; title: string }> = {
@@ -60,9 +63,9 @@ function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; st
       </div>
       <div className={styles.flowBody}>
         <div className={styles.form}>
-          <Field label="タイトル"><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></Field>
+          <Field label="タイトル"><SaveErrorField names={["title"]}><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></SaveErrorField></Field>
           <Field label="本文"><span className={styles.bodyBox} onClick={() => bodyRef.current?.focus()}>
-              <textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} />
+              <SaveErrorField names={["body"]}><textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} /></SaveErrorField>
             </span></Field>
           <div className={styles.flowFoot}>
             <span className={styles.timing}>{timingLabel(flow)}</span>
@@ -105,7 +108,7 @@ function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; st
 function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
   const { data, store } = ctx
   const role = useStaffRole()
-  const readOnly = role !== null && !canManageRole(role)
+  const readOnly = !canManageRole(role)
   const flows = data.lineFlows.filter((flow) => !store || !flow.store_id || flow.store_id === store.id)
   const has = (type: string) => flows.some((flow) => flow.flow_type === type)
   return (
@@ -115,7 +118,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <span>いまは「確認用」です。保存しても、お客さまへはまだ送りません。本当に送るのは、本送信の準備ができてから（司令塔の確認のあと）切り替えます。</span>
       </div>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
         <KpiCard density="compact" title="フロー" valueText={`${flows.length}`} detail="カードテンプレート" icon={null} presentation="band" value={null} unit="" />

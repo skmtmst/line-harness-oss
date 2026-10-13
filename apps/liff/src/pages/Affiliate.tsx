@@ -5,6 +5,8 @@ import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/u
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HelpTip from '../components/HelpTip.js';
+import MileageRewards from '../components/MileageRewards.js';
+import AffiliatePayments from '../components/AffiliatePayments.js';
 import Button from '../components/ui/Button.js';
 import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
@@ -166,7 +168,7 @@ async function fetchOffers(): Promise<OfferData[]> {
   const token = await getAccessToken();
   const url = `${BASE}/api/liff/affiliate/offers?lineAccessToken=${encodeURIComponent(token)}`;
   const res = await fetch(url);
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error('案件を読み込めませんでした。');
   const data = (await res.json()) as { offers: OfferData[] };
   return data.offers;
 }
@@ -882,7 +884,7 @@ export default function Affiliate() {
       const [result, mileageResult] = await Promise.all([fetchMe(), fetchMileage()]);
       setWallet(mileageResult);
       if (result.registered) {
-        const offers = await fetchOffers().catch(() => []);
+        const offers = await fetchOffers();
         setState({ phase: 'registered', affiliate: result.affiliate, links: result.links, offers });
       } else {
         setState({ phase: 'not_registered' });
@@ -903,7 +905,7 @@ export default function Affiliate() {
     setRegisterBusy(true);
     try {
       const data = await postRegister();
-      const offers = await fetchOffers().catch(() => []);
+      const offers = await fetchOffers();
       setState({ phase: 'registered', affiliate: data.affiliate, links: data.links, offers });
     } catch (e) {
       logFailure('affiliate-register', e);
@@ -961,6 +963,7 @@ export default function Affiliate() {
               {registerBusy ? '登録中…' : '紹介者になる'}
             </Button>
           </Card>
+          {wallet && <MileageRewards onChanged={async () => setWallet(await fetchMileage())} />}
           {wallet && <MileageHistory wallet={wallet} />}
         </div>
       </div>
@@ -1024,9 +1027,12 @@ export default function Affiliate() {
           onEnrolled={handleOfferEnrolled}
         />
 
+        {wallet && <MileageRewards onChanged={async () => setWallet(await fetchMileage())} />}
         {wallet && <MileageHistory wallet={wallet} />}
 
         {wallet && <MileageOpportunities items={wallet.opportunities} />}
+
+        <AffiliatePayments editable={state.affiliate.isActive} />
 
         {enrolledOffers.length > 0 && (
           <section aria-label="参加中の案件" className="space-y-3">

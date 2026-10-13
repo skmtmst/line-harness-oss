@@ -6,6 +6,7 @@ import styles from './radio.module.css'
 /** V8 の行内ラジオ（y4YQSB / gzxYf）。カード形式は RadioCardGroup を使う。 */
 export default function Radio({
   children,
+  invalid = false,
   className,
   size = 'medium',
   fill = false,
@@ -16,6 +17,7 @@ export default function Radio({
    * 外さないと数字と名前が重なって型が合わなくなる。
    */
 }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'children' | 'size'> & {
+  invalid?: boolean
   children: ReactNode
   /**
    * 文字の大きさ。既定 'medium' は行内ラジオ（y4YQSB／gzxYf：文 13/20）。
@@ -28,7 +30,7 @@ export default function Radio({
 }) {
   return (
     <label className={[styles.root, className].filter(Boolean).join(' ')} data-size={size} data-fill={fill || undefined}>
-      <input type="radio" className={styles.input} {...props} />
+      <input type="radio" className={styles.input} {...props} style={invalid ? { ...props.style, outline: '1px solid var(--color-danger)' } : props.style} />
       <span className={styles.label}>{children}</span>
     </label>
   )

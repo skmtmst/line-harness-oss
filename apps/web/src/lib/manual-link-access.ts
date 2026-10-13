@@ -1,0 +1,1 @@
+export function canEditManualLinks(staff: {id?:string|null;role?:string|null;permissionKeys?:string[]|null}|null):boolean { return !!staff && (staff.id==='env-owner'||(staff.permissionKeys??[]).includes('manual.link.edit')||staff.role==='owner') }

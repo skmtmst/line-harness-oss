@@ -8,6 +8,8 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -154,7 +156,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
           {phase === 'config' && (
             <>
               <div className="mb-5">
-                <RadioCardGroup legend="適用する相手" className="grid gap-2">
+                <SaveErrorField names={["apply-mode","kind","mode.kind"]}><RadioCardGroup legend="適用する相手" className="grid gap-2">
                   <RadioCard
                     name="apply-mode"
                     value="all-followers"
@@ -186,10 +188,10 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                     title="全員のデフォルトに設定する"
                     note="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
                   />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 {mode.kind === 'tag' && (
                   <div className="mt-2">
-                    <Select
+                    <SaveErrorField names={["tagId","mode.tagId","tag_id","mode.tag_id"]}><EntitySelect kind="tag"
                       value={mode.tagId}
                       onChange={(value) =>
                         pickMode({ kind: 'tag', tagId: value })
@@ -198,10 +200,10 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                       options={
                         tags.length === 0
                           ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
-                          : tags.map((t) => ({ value: t.id, label: t.name }))
+                          : tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))
                       }
                       size="full"
-                    />
+                    /></SaveErrorField>
                     {tagsLoadError && (
                       <p className="text-ink-faint mt-2 text-xs">
                         タグを読み込めませんでした。タグの絞り込みは使えません。

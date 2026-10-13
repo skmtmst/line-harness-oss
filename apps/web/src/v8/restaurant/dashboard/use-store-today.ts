@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDayStartIso } from '@/lib/jst-datetime'
+
+
 /*
  * 「今日のお店」（E-1）が読む物をまとめて取る。
  *  - snapshot（店舗・卓・今日の予約の範囲）… 店舗と卓。
@@ -17,6 +20,7 @@ import { restaurantGoogleApi, type GoogleConnectionData, type GoogleReview } fro
 import {
   restaurantTestApi,
   type RestaurantReservation,
+  type RestaurantRotation,
   type RestaurantSnapshot,
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
@@ -37,6 +41,7 @@ export type StoreToday = {
   snapshot: RestaurantSnapshot | null
   store: RestaurantStore | null
   today: RestaurantReservation[] | null
+  rotation: RestaurantRotation | null
   media: StoreMedium[] | null
   closeTasks: RestaurantChannelCloseTask[] | null
   hours: RestaurantOpeningDay[] | null
@@ -77,12 +82,12 @@ export function mergeMediaLinks(media: StoreMedium[], links: MediaLinkRow[]): St
   return merged
 }
 
-/** 店の媒体（名前＋保存した URL）。URL の口が読めなくても名前の一覧は出す。 */
+/** 店の媒体（名前＋保存した URL）。両方を確認し、取得失敗は呼び出し側へ渡す。 */
 export async function loadStoreMedia(accountId: string, storeId: string): Promise<StoreMedium[]> {
   const [channels, links] = await Promise.all([
     fetchApi<{ success: true; data: ChannelRow[] }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`)
-      .then((res) => toMedia(res.data)).catch(() => [] as StoreMedium[]),
-    Promise.resolve().then(() => restaurantTestApi.mediaLinks(accountId, storeId)).then((res) => res.data as MediaLinkRow[]).catch(() => [] as MediaLinkRow[]),
+      .then((res) => toMedia(res.data)),
+    Promise.resolve().then(() => restaurantTestApi.mediaLinks(accountId, storeId)).then((res) => res.data as MediaLinkRow[]),
   ])
   return mergeMediaLinks(channels, links)
 }
@@ -91,6 +96,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
   const [storeId, setStoreId] = useState('')
   const [today, setToday] = useState<RestaurantReservation[] | null>(null)
+  const [rotation,setRotation]=useState<RestaurantRotation|null>(null)
   const [media, setMedia] = useState<StoreMedium[] | null>(null)
   const [closeTasks, setCloseTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
@@ -102,9 +108,8 @@ export function useStoreToday(accountId: string | null): StoreToday {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
 
   const range = useMemo(() => {
-    const from = new Date(); from.setHours(0, 0, 0, 0)
-    const to = new Date(from); to.setDate(to.getDate() + 1)
-    return { from: from.toISOString(), to: to.toISOString() }
+    const now = new Date()
+    return { from: jstDayStartIso(now), to: jstDayStartIso(now, 1) }
   }, [])
 
   /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭。 */
@@ -130,18 +135,18 @@ export function useStoreToday(accountId: string | null): StoreToday {
   const loadStore = useCallback(async () => {
     if (!accountId || !storeId) return
     const day = toYmd(new Date())
-    await Promise.all([
-      restaurantTestApi.reservationsDay(accountId, storeId, day)
-        .then((res) => setToday(Array.isArray(res.data?.reservations) ? res.data.reservations : []))
-        .catch(() => setToday((current) => current ?? [])),
-      loadStoreMedia(accountId, storeId)
-        .then((rows) => setMedia(rows))
-        .catch(() => setMedia([])),
-      restaurantTestApi.channelCloseTasks(accountId, storeId)
-        .then((res) => setCloseTasks(res.data))
-        .catch(() => setCloseTasks([])),
-    ])
-    setUpdatedAt(new Date())
+    try {
+      const [rotation, reservations, media, tasks] = await Promise.all([
+        Promise.resolve().then(()=>restaurantTestApi.rotation(accountId,storeId,day)).then(r=>r.data).catch(()=>null),
+        restaurantTestApi.reservationsDay(accountId, storeId, day),
+        loadStoreMedia(accountId, storeId),
+        restaurantTestApi.channelCloseTasks(accountId, storeId),
+      ])
+      if (!Array.isArray(reservations.data?.reservations) || !Array.isArray(tasks.data)) throw new Error('invalid_store_response')
+      setRotation(rotation); setToday(reservations.data.reservations); setMedia(media); setCloseTasks(tasks.data)
+      setError(null); setUpdatedAt(new Date())
+    } catch (caught) { setError(caught) }
+
   }, [accountId, storeId])
 
   useEffect(() => { void loadSnapshot() }, [loadSnapshot])
@@ -177,7 +182,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   const store = snapshot?.stores.find((s) => s.id === storeId) ?? null
 
-  const reload = useCallback(async () => { await loadStore() }, [loadStore])
+  const reload = useCallback(async () => { await loadSnapshot(); await loadStore() }, [loadSnapshot,loadStore])
 
-  return { accountId: accountId ?? '', snapshot, store, today, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
+  return { accountId: accountId ?? '', snapshot, store, today, rotation, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { recoverOrphanedOnlineBookings } from '../services/booking-payment-recovery.js';
 
 const availability = vi.hoisted(() => ({ getAvailability: vi.fn() }));
 vi.mock('../services/availability.js', async (original) => ({
@@ -88,6 +89,43 @@ function count(table: 'bookings' | 'booking_audit_logs') {
 }
 
 describe('W1 LIFF予約のキー確保と保存失敗回収（実SQL・FK有効）', () => {
+  it.each(['onsite', 'none'])('REV-I1: %sで手動承認の予約を作ったあとonlineへ変更しても枠を保つ', async mode => {
+    sql.raw.prepare(`INSERT INTO booking_payment_configs
+      (line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES ('w1-account',?,'stripe',10,'2026-10-01','2026-10-01')`).run(mode);
+    const response = await create();
+    expect(response.status).toBe(201);
+    const body = await response.json() as {booking_id:string;status:string;payment_required:boolean};
+    expect(body).toMatchObject({status:'requested',payment_required:false});
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM booking_payments').get()).toEqual({n:0});
+    sql.raw.exec("UPDATE booking_payment_configs SET mode='online'");
+    await recoverOrphanedOnlineBookings(db, new Date(Date.now()+10*60000));
+    expect(sql.raw.prepare('SELECT status FROM bookings WHERE id=?').get(body.booking_id)).toEqual({status:'requested'});
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM booking_slot_allocations').get()).toEqual({n:1});
+    expect(sql.raw.prepare("SELECT COUNT(*) n FROM booking_audit_logs WHERE action='expired'").get()).toEqual({n:0});
+  });
+  it('REV-H2: 旧版で支払い記録なしの成功が保存されていても再読込を成功にしない', async () => {
+    sql.raw.exec(`INSERT INTO booking_payment_configs (line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES ('w1-account','online','stripe',10,'2026-10-01','2026-10-01')`);
+    expect((await create()).status).toBe(201);
+    sql.raw.exec(`DELETE FROM booking_payments;
+      UPDATE booking_idempotency_keys SET response_body=json_remove(response_body,'$.payment','$.payment_required')`);
+    expect((await create()).status).toBe(500);
+    expect(count('bookings')).toBe(1);
+  });
+  it('REV-H2: 支払い記録の保存失敗を成功にせず予約と枠を残さない', async () => {
+    sql.raw.exec(`UPDATE booking_settings SET approval_mode='automatic';
+      INSERT INTO booking_payment_configs (line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES ('w1-account','online','stripe',10,'2026-10-01','2026-10-01');
+      CREATE TRIGGER fail_payment BEFORE INSERT ON booking_payments
+      BEGIN SELECT RAISE(ABORT,'payment insert failed'); END;`);
+    const response = await create();
+    expect(response.status).toBe(500);
+    expect(count('bookings')).toBe(0);
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM booking_slot_allocations').get()).toEqual({ n: 0 });
+    sql.raw.exec('DROP TRIGGER fail_payment');
+    expect((await create()).status).toBe(201);
+  });
   it('定員2の枠でも同じキーの並行要求は予約1件だけを残す', async () => {
     let started!: () => void; let resume!: () => void;
     const entered = new Promise<void>((resolve) => { started = resolve; });

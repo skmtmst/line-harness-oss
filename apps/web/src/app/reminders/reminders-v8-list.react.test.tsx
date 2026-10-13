@@ -131,9 +131,9 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('8')
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('42')
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('1')
-  // 行には名と副題、状態の札、予定・次回の実値
+  // B-194: 名前は1行。状態の札、予定・次回の実値は専用の列へ
   expect(host.textContent).toContain('契約終了の前に知らせる')
-  expect(host.textContent).toContain('基準日の 3日前 09:00')
+  expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('基準日の 3日前 09:00')
   expect(host.textContent).toContain('5通')
   expect(host.textContent).toContain('10/10')
 })
@@ -173,8 +173,8 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
     const labels = [...menu!.querySelectorAll('[role="menuitem"]')]
       .map((item) => item.textContent?.trim())
     expect(labels).toEqual([
-      '詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る',
-      '編集する', '複製する', '一時停止する', 'フォルダへ移す', '削除',
+      'リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理',
+      '編集する', '複製する', 'フォルダへ移す', '一時停止する', '削除',
     ])
     // 板 SkY9V：行の「…」を開いた印
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
@@ -231,7 +231,7 @@ test('v8 の閲覧のみ（a5C1p）は作る・選ぶ箱・押せない行の操
   await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     const labels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(labels).toEqual(['詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る'])
+    expect(labels).toEqual(['リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理'])
   })
 })
 

@@ -160,6 +160,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     },
     api: {
       ...actual.api,
+      staff: {
+        ...actual.api.staff,
+        me: async () => ({ success: true, data: { role: 'admin', permissionKeys: [] } }),
+      },
       friends: {
         ...actual.api.friends,
         upcoming: (...args: unknown[]) => {
@@ -493,3 +497,6 @@ describe('概要の次の予定', () => {
     await eventually(() => expect(document.body.textContent).toContain('確定した配信予定はありません'))
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

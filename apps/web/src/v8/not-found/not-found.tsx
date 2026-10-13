@@ -6,7 +6,7 @@
  * 画面名は上の帯（ホーム › ページが見つかりません）が持つので、ここの題は h2。
  */
 import { CircleHelp } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import styles from './not-found.module.css'
 

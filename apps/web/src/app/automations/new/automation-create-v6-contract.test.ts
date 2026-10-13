@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 
 /**
- * ルールを作る（★V6 `Rv8Jv`）の見張り。
+ * 現役のルールを作る（V8）の見張り。
  *
  * 主に見ているのは、保存・権限・読み込みの扱いと、
  * **選べるきっかけが、実際に発火するものだけであること**。
@@ -17,7 +17,7 @@ import { AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 
 const HERE = import.meta.dirname
 const REPO = join(HERE, '..', '..', '..', '..', '..', '..')
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(REPO, 'apps/web/src/v8/automations/create/create.tsx'), 'utf8')
 /**
  * 注釈を落とした本文。
  *
@@ -68,22 +68,29 @@ function firedEventTypes(): Set<string> {
     }
     if (source.includes("'ec.order.confirmed'") && source.includes('EVENT_TRIGGER_TYPES')) fired.add('ec.order.confirmed')
   }
+  // 飲食は同じトランザクションでoutboxへ書き、共通配送からfireEventへ渡す。
+  const restaurantDelivery=readFileSync(join(root,'services/restaurant-events.ts'),'utf8')
+  if(restaurantDelivery.includes('fireEvent(owned,e.event_type')) {
+    const migration=readFileSync(join(REPO,'packages/db/migrations/629_restaurant_reservation_events.sql'),'utf8')
+    for(const m of migration.matchAll(/'(restaurant\.[a-z_.]+)'/g))fired.add(m[1])
+  }
   return fired
 }
 
-describe('V6 ルールを作る（Rv8Jv）', () => {
+describe('V8 ルールを作る', () => {
   it('保存後に見込み人数を確認でき、0件と書かない', () => {
     expect(PAGE).toContain(
-      '保存後に見込み人数を確認できます。',
+      '下書きを保存すると、いまの条件で数えます',
     )
     // 見込み人数の枠に 0 を書かない。
     expect(PAGE).not.toContain('見込み人数: 0')
     expect(PAGE).not.toContain('0人が当てはまります')
   })
 
-  it('権限が無いときは保存を押せない形にし、理由を本文へ出す', () => {
+  it('権限が無いときは保存を隠し、内部でも止めて理由を本文へ出す', () => {
     expect(PAGE).toContain("return '操作する権限がありません'")
-    expect(PAGE).toContain('操作する権限がありません。オーナーか管理者に依頼してください。')
+    expect(PAGE).toContain('閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。')
+    expect(PAGE).toContain('{canEdit ? (')
     expect(PAGE).toContain('disabled={saving || Boolean(blockedReason)}')
     expect(PAGE).toContain('if (saving || blockedReason) return')
   })
@@ -92,7 +99,9 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('読み込んでいます')
     expect(PAGE).toContain('タグを読み込めませんでした。画面を再読み込みしてください。')
     // 読めていないのに空の選択肢だけを出さない。
-    expect(PAGE).toContain('disabled={tagsLoading || tagsFailed}')
+    expect(PAGE).toContain('loading={tagsLoading}')
+    expect(PAGE).toContain('failed={tagsFailed}')
+    expect(PAGE).toContain('disabled={loading || failed}')
   })
 
   it('選べるきっかけが AutomationEventType に収まっている', () => {
@@ -122,8 +131,8 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('すること（動き）を複数持てる', () => {
-    expect(PAGE).toContain('動きを追加する')
-    expect(PAGE).toContain('この動きを削除する')
+    expect(PAGE).toContain('<ActionList<ActionDraft>')
+    expect(PAGE).toContain('choices={EDITABLE_ACTIONS.map')
     // 送る形は `draftActions()` にまとめた（確認画面とのずれ検出でも同じ形を使う）。
     // 名前が変わっても「入力の並びをそのまま送る」ことは崩さない。
     expect(PAGE).toContain('const draftActions = (): AutomationDraftAction[] => actions.map(')
@@ -133,7 +142,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('共有の全種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
-    // #942 N-355: 下書きunionと同じ10種を全部出す（以前は6種だけ）。
+    // #942 N-355: 下書きunionと同じ全種類を全部出す（以前は6種だけ）。
     expect(screenEventValues()).toHaveLength(AUTOMATION_DRAFT_TRIGGER_OPTIONS.length)
     expect(PAGE).toContain('api.automations.createDraftFromTemplate')
     expect(PAGE).toContain('api.automations.updateDraft')

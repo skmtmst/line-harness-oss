@@ -138,9 +138,6 @@ vi.mock('@line-crm/db', () => ({
   saveAutoReplyDraftVersion: mocks.saveAutoReplyDraftVersion,
   jstNow: () => '2026-08-30T10:00:00.000',
 }));
-vi.mock('../middleware/role-guard.js', () => ({
-  requireRole: () => async (_c: unknown, next: () => Promise<void>) => next(),
-}));
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccessAllLineAccounts,
 }));

@@ -1,13 +1,15 @@
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
+import InlineActionList from './inline-action-list'
+import type { InlineAction } from './draft-fields'
 // @vitest-environment happy-dom
 /**
  * 監査 R255：必須内容が空の後続処理を未完成と示さず保存できる。
  *
  * 行ごとに不足内容の札が出て、埋めたら消える。下書き保存は止めない。
  */
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import InlineActionList from './inline-action-list'
-import type { InlineAction } from './draft-fields'
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1' }),
@@ -66,14 +68,15 @@ it('担当者通知の通知先と本文を編集し、必要な版も保存す�
  const changed=vi.fn();
  const {fireEvent}=await import('@testing-library/react');
  render(<InlineActionList actions={[{key:'notify',actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'確認してください'},onFailure:'stop'}]} onChange={changed} {...EMPTY_OPTIONS} notificationRules={[{id:'r',name:'担当者',version:2}]}/>);
- fireEvent.click(screen.getByRole('button',{name:'通知先'}));
- fireEvent.click(screen.getByRole('button',{name:'担当者'}));
+ fireEvent.click(screen.getByRole('button',{name:'担当者へ知らせる'}));
+ await pickEntity('通知先', '担当者');
  expect(changed).toHaveBeenCalledWith([expect.objectContaining({config:{notificationRuleId:'r',notificationRuleVersion:2,message:'確認してください'}})]);
  expect(screen.getByText(/通知先と本文が選ばれていません/)).toBeTruthy();
 });
 
 it.each([['send_template','テンプレート','案内'],['reminder','リマインダ','翌日'],['event_booking','イベント予約','相談会']] as const)('%sの候補を編集欄に渡す', (actionType,label,selected) => {
   render(<InlineActionList actions={[{key:'target',actionType,config:{templateId:'t',reminderId:'r',eventId:'e'},onFailure:'continue'}]} onChange={()=>{}} {...EMPTY_OPTIONS} templates={[{id:'t',name:'案内'}]} reminders={[{id:'r',name:'翌日'}]} events={[{id:'e',name:'相談会'}]} />)
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(selected) }))
   expect(screen.getByText(selected)).toBeTruthy()
   expect(screen.getByRole('button',{name:label+'：変える'})).toBeTruthy()
 })
@@ -82,6 +85,7 @@ it('B-179：イベントの取り消しを選んでもイベントと指定回�
   const changed = vi.fn()
   const { fireEvent } = await import('@testing-library/react')
   render(<InlineActionList actions={[{ key: 'event', actionType: 'event_booking', config: { eventId: 'e', slotId: 'slot', op: 'register' }, onFailure: 'continue' }]} onChange={changed} {...EMPTY_OPTIONS} events={[{ id: 'e', name: '相談会' }]} />)
+  fireEvent.click(screen.getByRole('button', { name: 'イベントに予約する「相談会」' }))
   fireEvent.click(screen.getByRole('button', { name: 'イベント予約の操作' }))
   fireEvent.click(screen.getByRole('button', { name: '申し込みを取り消す' }))
   expect(changed).toHaveBeenCalledWith([expect.objectContaining({ config: { eventId: 'e', slotId: 'slot', op: 'cancel' } })])

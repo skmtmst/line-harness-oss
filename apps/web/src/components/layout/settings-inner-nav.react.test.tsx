@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
@@ -46,6 +48,8 @@ import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 describe('★V8 設定の中のメニュー', () => {
   beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
+    forgetStaffIdentity()
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
     fixture.pathname = '/settings'
@@ -56,9 +60,10 @@ describe('★V8 設定の中のメニュー', () => {
     })
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => { cleanup(); vi.unstubAllEnvs() })
 
   it('WEB252: 切替先が読込中なら前の機能を出さず、設定保存後に再取得する', async () => {
     const view = render(<SettingsInnerNav />)
@@ -104,6 +109,24 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('会社とロゴ')).toBeNull()
   })
 
+  // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した
+  it('飲食のテスト機能を有効にした時だけ予約サイト・グルメ媒体とデリバリー連携へ進める', async () => {
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    const booking = view.getByRole('link', { name: '予約サイト・グルメ媒体' })
+    const delivery = view.getByRole('link', { name: 'デリバリー連携' })
+    expect(booking.getAttribute('href')).toBe('/settings/booking-media')
+    expect(delivery.getAttribute('href')).toBe('/settings/delivery')
+    expect(view.getAllByRole('link').slice(-2)).toEqual([booking, delivery])
+  })
+
+  it('飲食のテスト機能が無い環境ではデリバリー連携を出さない', async () => {
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+  })
+
   it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {
     fixture.pathname = '/settings/sns'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
@@ -134,6 +157,7 @@ describe('★V8 設定の中のメニュー', () => {
 
   it('見るだけの人には見られる画面だけ出す（スタッフにはログインユーザーを出さない）', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/emergency']))
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())

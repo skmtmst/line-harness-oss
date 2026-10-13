@@ -1,17 +1,12 @@
 'use client'
 
-/*
- * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
- *
- * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
- * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
- * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
- */
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListItemHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Banknote, CalendarDays, Download, ListOrdered, ReceiptText, ShoppingBag, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -21,7 +16,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   downloadCsv,
   formatYen,
@@ -35,13 +30,23 @@ import {
 } from './display'
 import AffiliateDrawer from './drawer'
 import { AffiliateArchiveDialog } from './dialogs'
-import { AffiliateFrame, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
+ *
+ * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
+ * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
+ * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
+ * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
+ */
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -86,7 +91,8 @@ export default function ReportTab() {
   const [saved, setSaved] = useState('')
   /* 見方の札を押したか（はじめはアフィリエイターごとで、どちらの札も押していない形）。 */
   const [viewPicked, setViewPicked] = useState(false)
-  const [drawerRow, setDrawerRow] = useState<AffiliateListRow | null>(null)
+  const [drawerId, setDrawerId] = useDetailPanelUrl('affiliate')
+  const itemHref = useListItemHref()
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
   const requestSeq = useRef(0)
 
@@ -198,12 +204,10 @@ export default function ReportTab() {
     return `${base}（${diff > 0 ? '+' : '−'}¥${formatNumber(Math.abs(diff))}）`
   }
 
-  const openDrawer = (id: string) => {
-    const affiliate = affiliates.find((a) => a.id === id)
-    if (!affiliate) return
-    const agg = affiliateRows.find((row) => row.id === id)
-    setDrawerRow({ ...affiliate, totalClicks: 0, totalConversions: agg?.conversions ?? 0, totalRevenue: agg?.revenue ?? 0, rewardAmount: agg?.reward ?? 0, linkCount: 0, friendAdds: 0 })
-  }
+  const affiliate = affiliates.find(a => a.id === drawerId)
+  const agg = affiliateRows.find(row => row.id === drawerId)
+  const drawerRow: AffiliateListRow | null = affiliate ? { ...affiliate, totalClicks: 0, totalConversions: agg?.conversions ?? 0, totalRevenue: agg?.revenue ?? 0, rewardAmount: agg?.reward ?? 0, linkCount: 0, friendAdds: 0 } : null
+  const openDrawer = (id: string) => setDrawerId(current => current === id ? null : id)
 
   const loadingWord = '読み込んでいます'
   const errorWord = '読み込めませんでした'
@@ -287,10 +291,10 @@ export default function ReportTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableReport}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>{view === 'affiliate' ? 'アフィリエイター（いちばん多い案件）' : '案件（紹介した人の数）'}</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>{view === 'affiliate' ? 'アフィリエイター（いちばん多い案件）' : '案件（紹介した人の数）'}</Th>
             <Th className={styles.colRepConv}>成果・売上</Th>
             <Th className={styles.colRepReward}>{false ? '報酬' : '報酬（前の期間より）'}</Th>
             <Th className={styles.colRepOps}><span className={styles.srOnly}>操作</span></Th>
@@ -298,17 +302,17 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
-              <Td className={styles.colName}>
+            <Tr data-row-id={row.id} key={row.id} data-table-layout="columns" detailKey="affiliate" onOpen={() => openDrawer(row.id)}>
+              <Td grow><FolderDotName>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
-                    <button type="button" className={styles.rowLink} title={row.name}  onClick={() => openDrawer(row.id)}>{row.name}</button>
+                    <RowNameLink onOpen={() => setDrawerId(row.id)} href={itemHref('affiliate', row.id)} title={row.name}>{row.name}</RowNameLink>
                   ) : (
-                    <span className={styles.rowLinkText} ><TruncatedText value={String(row.name ?? '')} /></span>
+                    <span><TruncatedText value={String(row.name ?? '')} /></span>
                   )}
-                  <span className={styles.rowPlan}>{row.sub ?? emptyValue('unknown')}</span>
+
                 </span>
-              </Td>
+              </FolderDotName></Td>
               <Td className={styles.colRepConv}>
                 <span className={styles.stack}>
                   <span className={styles.cellMain}>{`${formatNumber(row.conversions)}件`}</span>
@@ -322,7 +326,7 @@ export default function ReportTab() {
                     label={`${row.name}の操作`}
                     items={[
                       { id: 'view', label: '成果を見る', onSelect: () => openDrawer(row.id) },
-                      { id: 'approvals', label: 'この人の成果承認を開く', external: true, href: `/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
+                      { id: 'approvals', label: 'この人の成果承認を開く', external: false, href: `/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
                     ]}
                   />
                 ) : null}
@@ -364,7 +368,7 @@ export default function ReportTab() {
             readonly={readonly}
             startInEdit={false}
             linkBaseUrl={null}
-            onClose={() => setDrawerRow(null)}
+            onClose={() => setDrawerId(null)}
             onChanged={() => { void load() }}
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}
           />

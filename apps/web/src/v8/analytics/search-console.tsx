@@ -1,14 +1,5 @@
 'use client'
-
 import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
-
-/*
- * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
- * 板の頭（CSV）→ 数の帯（合計クリック数・合計表示回数・平均CTR・平均掲載順位）→ 道具の段
- * （対象プロパティ・連携中・期間・連携を設定）→ 検索クリックの推移 → キーワード・ページ上位・デバイス別 → 見かたの注意。
- * つないでいないとき・閲覧権限が無いときは設定の案内。
- * 呼ぶ口（`api.searchConsole.performance(days)`）・403 とそれ以外の失敗の言い分け・CSV は今の画面（app/search-console/page.tsx）と同じ。
- */
 import { useEffect, useState } from 'react'
 import { Download, Eye, ListOrdered, MousePointerClick, Percent, SlidersHorizontal } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -28,6 +19,15 @@ import styles from './analytics.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
+ * 板の頭（CSV）→ 数の帯（合計クリック数・合計表示回数・平均CTR・平均掲載順位）→ 道具の段
+ * （対象プロパティ・連携中・期間・連携を設定）→ 検索クリックの推移 → キーワード・ページ上位・デバイス別 → 見かたの注意。
+ * つないでいないとき・閲覧権限が無いときは設定の案内。
+ * 呼ぶ口（`api.searchConsole.performance(days)`）・403 とそれ以外の失敗の言い分け・CSV は今の画面（app/search-console/page.tsx）と同じ。
+ */
 
 const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
@@ -120,7 +120,7 @@ export default function SearchConsoleV8() {
   }
   const settingsSiteUrl = data?.siteUrl ?? setup?.siteUrl
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
-  const periodControl = <PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} />
+  const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
   const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
   const maxDaily = Math.max(1, ...(data?.daily ?? []).map((row) => row.clicks))
   const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
@@ -150,7 +150,7 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <Field label="対象プロパティ"><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></Field>
+            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></SaveErrorField></Field>
             <span className={styles.pillSlot}><StatePill tone="ok">連携中</StatePill></span>
             {periodControl}
             <span className={styles.spacer} />

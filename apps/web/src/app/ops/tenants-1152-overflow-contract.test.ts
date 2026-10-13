@@ -7,14 +7,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const PAGE = readFileSync(resolve(__dirname, "tenants/page.tsx"), "utf-8");
-const CSS = readFileSync(resolve(__dirname, "tenants/tenants-v8.css"), "utf-8");
+const PAGE = readFileSync(resolve(__dirname, "../../v8/ops/tenants.tsx"), "utf-8");
+const CSS = readFileSync(resolve(__dirname, "../../v8/ops/tenants.module.css"), "utf-8");
 
 describe("tenants 一覧の1152幅", () => {
-  it("表の列を減らし、行末のメニューに操作をまとめる", () => {
-    expect(PAGE).toContain('<Th className="w-16" align="right">操作</Th>')
-    expect(PAGE).toContain('<MoreAction')
-    expect(PAGE).toContain("label: '代理ログイン（閲覧のみ）'")
-    expect(CSS).toContain('table-layout: fixed')
+  it("名前の列は伸び縮みし、狭い幅では補助列を畳む", () => {
+    expect(PAGE).toContain('className={parts.grow} role="cell"')
+    expect(PAGE).toContain('<TruncatedText')
+    expect(PAGE).toContain('href={tenantDetailHref(row.id)}')
+    expect(CSS).toContain('@media (max-width: 1023.98px)')
+    expect(CSS).toContain('display: none')
   })
 })

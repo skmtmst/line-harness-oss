@@ -25,7 +25,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...rest}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: navigation.push }),
 }))
 
@@ -45,9 +45,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({ ...(await importOriginal()), useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
 const { AccountProvider } = await import('@/contexts/account-context')
-// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した）。
-const { default: CampaignEditor } = await import('./campaign-editor-v8')
+const { default: CampaignEditor } = await import('@/v8/nen-campaigns/edit')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -121,6 +123,7 @@ function fakeStorage(): Storage {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   vi.stubGlobal('localStorage', fakeStorage())
   lineAccountsListApi.mockResolvedValue({
@@ -145,6 +148,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (root) await act(async () => { root.unmount() })
+  container.remove()
+  delete document.documentElement.dataset.theme
   localStorage.clear()
   vi.unstubAllGlobals()
 })
@@ -168,7 +173,7 @@ describe('M507フォロー 保存500の案内', () => {
     await settle()
     await settle()
 
-    expect(container.textContent).toContain('ほかの人が先に保存しました')
+    expect(container.textContent).toContain('ほかの担当者が先に保存しました')
     expect(container.textContent).not.toContain('API error:')
   })
 })

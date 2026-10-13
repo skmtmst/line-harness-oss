@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type { FriendActiveMonthComparison as importFriendActiveMonthComparison } from '@line-crm/shared';
 /**
  * ダッシュボードが1回で読む数。
@@ -360,11 +361,12 @@ export type AccountStatsScope =
 
 function accountScopeSql(scope: AccountStatsScope, column: string): { sql: string; binds: string[] } {
   if ('allTenants' in scope) return { sql: '1 = 1', binds: [] };
-  const placeholders = scope.allowedAccountIds.map(() => '?').join(', ');
+  const idSet = sqlIdSet(scope.allowedAccountIds);
+  const placeholders = scope.allowedAccountIds.length ? idSet.sql : '';
   if (placeholders) {
     return {
       sql: `(${column} IN (${placeholders})${scope.includeUnassigned ? ` OR ${column} IS NULL` : ''})`,
-      binds: [...scope.allowedAccountIds],
+      binds: sqlIdSet(scope.allowedAccountIds).binds,
     };
   }
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', binds: [] };
@@ -651,8 +653,8 @@ function snapshotScopeSql(scope: AccountStatsScope): { sql: string; binds: strin
   ];
   if (accountIds.length === 0) return { sql: '1 = 0', binds: [] };
   return {
-    sql: `line_account_id IN (${accountIds.map(() => '?').join(', ')})`,
-    binds: accountIds,
+    sql: `line_account_id IN (${sqlIdSet(accountIds).sql})`,
+    binds: sqlIdSet(accountIds).binds,
   };
 }
 
@@ -1268,9 +1270,10 @@ function broadcastStatsFilter(
   const conditions: string[] = [];
   const binds: string[] = [];
   if (scope.allowedAccountIds.length > 0) {
-    const placeholders = scope.allowedAccountIds.map(() => '?').join(', ');
+    const idSet = sqlIdSet(scope.allowedAccountIds);
+  const placeholders = scope.allowedAccountIds.length ? idSet.sql : '';
     conditions.push(`(${column} IN (${placeholders}) OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value IN (${placeholders}))))`);
-    binds.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+    binds.push(...idSet.binds, ...idSet.binds);
   }
   if (scope.canSeeUnassigned) conditions.push(`(${column} IS NULL AND ${accountIds} IS NULL)`);
   return { sql: ` AND (${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'})`, binds };
@@ -1410,8 +1413,8 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
     ? { sql: '1 = 1', binds: [] as string[] }
     : scope.allowedAccountIds.length > 0
       ? {
-          sql: `(sms.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')}) OR sms.line_account_id IS NULL)`,
-          binds: [...scope.allowedAccountIds],
+          sql: `(sms.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql}) OR sms.line_account_id IS NULL)`,
+          binds: sqlIdSet(scope.allowedAccountIds).binds,
         }
       : { sql: 'sms.line_account_id IS NULL', binds: [] as string[] };
 
@@ -1608,13 +1611,13 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
               sql: `(EXISTS (
                       SELECT 1 FROM form_accounts fa
                       WHERE fa.form_id = f.id
-                        AND fa.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})
+                        AND fa.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})
                     )${scope.includeUnassigned
                       ? ` OR NOT EXISTS (
                           SELECT 1 FROM form_accounts unassigned_fa WHERE unassigned_fa.form_id = f.id
                         )`
                       : ''})`,
-              binds: [...scope.allowedAccountIds],
+              binds: sqlIdSet(scope.allowedAccountIds).binds,
             }
           : scope.includeUnassigned
             ? {

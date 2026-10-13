@@ -3,8 +3,7 @@
  */
 
 /* 確認用の注意の帯：上下10・左右14・間8・地 #fff4e0・角8・印16・文12。 */
-.caution,
-.readOnly {
+.caution {
   display: flex;
   align-items: center;
   gap: var(--tpl-rt-chip-row-gap);
@@ -16,10 +15,6 @@
   line-height: normal;
 }
 
-.readOnly {
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-}
 
 .cautionIcon {
   width: var(--tpl-rt-icon-16);

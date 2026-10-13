@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
-/* 変数の定義場所は app/globals.css の [data-theme="v8"]（module の pure 検査に当たらない層）。 */
+/* 変数の定義場所は app/globals.css の :root（module の pure 検査に当たらない層）。 */
 const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
 
 /*
@@ -17,7 +17,7 @@ const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8
  */
 describe('型の見出し（379板の絵）', () => {
   it('寸法は先頭の変数に1か所まとめ・値は絵どおり', () => {
-    const vars = globals.match(/\[data-theme="v8"\] \{[^}]*--tpl-head-pad-top[^}]*\}/s)
+    const vars = globals.match(/:root \{[^}]*--tpl-head-pad-top[^}]*\}/s)
     expect(vars, '変数の一覧がありません').toBeTruthy()
     for (const [name, value] of [
       ['--tpl-head-pad-top', 'var(--polish-space-section)'], ['--tpl-head-pad-side', 'var(--polish-space-section)'], ['--tpl-head-pad-bottom', 'var(--polish-space-field)'],
@@ -28,17 +28,17 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
       ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '26px'],
       ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '24px'], ['--tpl-band-cell-gap', '8px'],
-      ['--tpl-create-head-pad-top', '20px'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', '16px'],
+      ['--tpl-create-head-pad-top', '24px'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', '16px'],
       ['--tpl-create-head-gap', '8px'],
       ['--tpl-detail-head-pad-top', '20px'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', '16px'],
       ['--tpl-detail-head-gap', '12px'], ['--tpl-detail-actions-gap', '6px'], ['--tpl-detail-tabs-pad-bottom', '12px'],
-      ['--tpl-create-content-pad-block', 'var(--polish-space-section)'], ['--tpl-create-content-pad-side', 'var(--polish-space-section)'], ['--tpl-create-content-gap', 'var(--polish-space-field)'],
+      ['--tpl-create-content-pad-block', 'var(--polish-space-section)'], ['--tpl-create-content-pad-side', 'var(--polish-space-section)'], ['--tpl-create-content-gap', 'var(--polish-space-card)'],
       ['--tpl-section-pad', 'var(--polish-space-section)'], ['--tpl-section-gap', 'var(--polish-space-field)'],
       ['--tpl-preview-pad', '24px'], ['--tpl-preview-narrow-width', '280px'],
       ['--tpl-detail-content-gap', '20px'],
       ['--tpl-footer-pad-block', '12px'], ['--tpl-footer-pad-side', '24px'], ['--tpl-footer-gap', '8px'],
       ['--tpl-settings-nav-width', '208px'], ['--tpl-settings-nav-pad-block', '16px'], ['--tpl-settings-nav-pad-side', '12px'],
-      ['--tpl-settings-content-pad-block', '24px'], ['--tpl-settings-content-pad-side', '28px'], ['--tpl-settings-content-gap', '16px'],
+      ['--tpl-settings-content-pad-block', '24px'], ['--tpl-settings-content-pad-side', '24px'], ['--tpl-settings-content-gap', '16px'],
       ['--tpl-settings-gap', '16px'],
       ['--tpl-inbox-list-width', '372px'], ['--tpl-inbox-summary-width', '320px'],
       ['--tpl-inbox-summary-pad', '20px'], ['--tpl-inbox-summary-gap', '16px'],
@@ -82,13 +82,13 @@ describe('型の見出し（379板の絵）', () => {
     expect(stats![0]).not.toMatch(/margin|padding-top/)
   })
 
-  it('v8 の行の高さは1.5（caption・label・body。v7は変えない）', () => {
+  it('行の高さは現在のV8の1.5に固定し、旧値を残さない', () => {
     for (const name of ['--text-caption--line-height', '--text-label--line-height', '--text-body--line-height']) {
-      const block = globals.match(new RegExp(`\\[data-theme="v8"\\] \\{[^}]*${name}:\\s*1\\.5`, 's'))
+      const block = globals.match(new RegExp(`:root \\{[^}]*${name}:\\s*1\\.5`, 's'))
       expect(block, `${name} が v8 にありません`).toBeTruthy()
     }
-    expect(globals).toMatch(/--text-caption--line-height:\s*1\.6/)
-    expect(globals).toMatch(/--text-body--line-height:\s*1\.7/)
+    expect(globals).not.toMatch(/--text-caption--line-height:\s*1\.6/)
+    expect(globals).not.toMatch(/--text-body--line-height:\s*1\.7/)
   })
 
   it('作る型の頭は20/24/16・間8・手順は題と説明の下の行（置き場所は1つ・q1xNMz）', () => {

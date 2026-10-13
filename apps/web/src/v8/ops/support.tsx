@@ -3,24 +3,16 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
-import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
+import { Building2, Check, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  api,
-  type OpsKnowledgeReference,
-  type OpsSupportDetail,
-  type OpsSupportPriority,
-  type OpsSupportStage,
-  type OpsSupportSummary,
-  type OpsSupportTicket,
-  type OpsTenantRow,
-} from '@/lib/api'
+import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
-import { formatDateTime, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
+import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL, ROLE_LABEL } from '@/components/ops/ops-ui'
+import { compareLabel, durationLabel, elapsedLabel } from '@/app/ops/support/format'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
+import { ListToolbarRow } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -29,13 +21,15 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -97,6 +91,7 @@ export default function OpsSupportV8() {
   const readOnly = useOpsReadOnly()
   const [summary, setSummary] = useState<OpsSupportSummary | null>(null)
   const [tickets, setTickets] = useState<OpsSupportTicket[]>([])
+  const [total, setTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [stage, setStage] = useState<OpsSupportStage | 'all'>('all')
   const [priority, setPriority] = useState<'' | OpsSupportPriority>('')
@@ -153,6 +148,7 @@ export default function OpsSupportV8() {
     if (sequence !== listRequest.current) return
     if (!res.success) { setError(res.error || '続きを読み込めませんでした'); return }
     setTickets((current) => [...current, ...res.data.filter((item) => !current.some((known) => known.id === item.id))])
+    if (typeof res.total === 'number') setTotal(res.total)
     setMayHaveMore(res.data.length >= TICKET_PAGE)
   }
 
@@ -165,6 +161,7 @@ export default function OpsSupportV8() {
     setLoading(false)
     if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setTickets(res.data)
+    setTotal(typeof res.total === 'number' ? res.total : null)
     setMayHaveMore(res.data.length >= TICKET_PAGE)
     setSelectedId((current) => deepLink.current || (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
   }, [stage, priority, q, sort])
@@ -332,9 +329,9 @@ export default function OpsSupportV8() {
 
   /* 起票の窓で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
   const createFields = useFormErrors()
-  createFields.define('tenant', '契約先', () => (form.tenantId ? null : '契約先を選んでください'))
-  createFields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入れてください'))
-  createFields.define('body', '内容', () => (form.body.trim() ? null : '内容を入れてください'))
+  createFields.define('tenant', '契約先', () => (form.tenantId ? null : '契約先を選んでください'), { required: true })
+  createFields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入れてください'), { required: true })
+  createFields.define('body', '内容', () => (form.body.trim() ? null : '内容を入れてください'), { required: true })
 
   const create = async () => {
     if (busy) return
@@ -355,43 +352,29 @@ export default function OpsSupportV8() {
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
   const pick = (id: string) => { deepLink.current = null; if (aiAbort.current) aiAbort.current.cancelled = true; setSelectedId(id) }
-  const chip = (c: { key: OpsSupportStage | 'all'; label: string }) => (
-    <FilterChip
-      key={c.key}
-      icon={c.key === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}
-      selected={stage === c.key}
-      onChange={() => setStage(c.key)}
-    >
-      {summary ? `${c.label} ${summary.byStage[c.key]}` : c.label}
-    </FilterChip>
-  )
+
 
   return (
     <div data-design-node="P0jhqO">
       <OpsHead
         title="お問い合わせ"
-        description="統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます"
+        description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={readOnly ? null : (
           <Button onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
         )}
       />
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
-      {error && !listFailed && !detailFailed ? <p role="alert" className={`${parts.alert} ${styles.notice}`}>{error}</p> : null}
+      {error && !listFailed && !detailFailed ? <Notice tone="danger" >{error}</Notice> : null}
 
       <div className={styles.columns}>
         <section aria-label="チケットの一覧" className={styles.list}>
           <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケットを探す" aria-label="チケットを探す" />
-          <div className={styles.chipRow}>{STAGE_CHIPS.slice(0, 3).map(chip)}</div>
-          <div className={styles.chipColumn}>
-            {STAGE_CHIPS.slice(3).map(chip)}
-            <div className={styles.priority}>
-              <Select aria-label="優先度で絞る" options={PRIORITY_FILTER} value={priority} onChange={(value) => setPriority(value as '' | OpsSupportPriority)} />
-            </div>
-          </div>
-          <div className={styles.sort}>
-            <Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as typeof sort)} size="full" />
-          </div>
+          <ListToolbarRow>
+            <Select aria-label="状態で絞る" label="状態" options={STAGE_CHIPS.map(c => ({ value: c.key, label: c.label, description: summary ? `${summary.byStage[c.key]}件` : undefined }))} value={stage} onChange={value => setStage(value as typeof stage)} size="page-size" />
+            <SaveErrorField names={["priority"]}><Select aria-label="優先度で絞る" options={PRIORITY_FILTER} value={priority} onChange={value => setPriority(value as '' | OpsSupportPriority)} size="page-size" /></SaveErrorField>
+            <SaveErrorField names={["sort"]}><Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={value => setSort(value as typeof sort)} size="page-size" /></SaveErrorField>
+          </ListToolbarRow>
           {loading && tickets.length === 0 ? (
             <ListState permissionScope="hq" kind="loading" title="チケットを読み込んでいます" />
           ) : listFailed && tickets.length === 0 ? (
@@ -399,7 +382,7 @@ export default function OpsSupportV8() {
           ) : tickets.length === 0 ? (
             <ListState permissionScope="hq" kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
           ) : (
-            <ul className={styles.tickets}>
+            <ul className={styles.tickets} title={total === null ? undefined : `${total}件中 ${tickets.length === 0 ? 0 : 1}〜${tickets.length}件を表示`}>
               {tickets.map((t) => (
                 <li key={t.id}>
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
@@ -408,7 +391,7 @@ export default function OpsSupportV8() {
                       <StatusPill tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusPill>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
-                    <span className={styles.ticketMeta}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
+                    <span className={styles.ticketMeta} title={`${t.staffName || emptyValue('unknown')}・${t.channelLabel}・最終のやり取り ${formatDateTime(t.lastMessageAt)}（${elapsedLabel(t.lastMessageAt)}）`}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
                   </button>
                 </li>
               ))}
@@ -430,7 +413,7 @@ export default function OpsSupportV8() {
                 <h2 className={styles.detailTitle}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
                 {readOnly ? null : (
                   <span className={styles.prioritySelect}>
-                    <Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} />
+                    <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
                   </span>
                 )}
                 <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
@@ -438,16 +421,17 @@ export default function OpsSupportV8() {
               </div>
               <div className={styles.detailMeta}>
                 <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
-                <span>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
+                <span title={`起票者 ${ticket.staffName || emptyValue('unknown')}${ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}・受付 ${ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}・プラン ${planLabel(ticket.tenantPlanKey)}／${PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}${detail ? `・店舗 ${detail.tenant.accountCount}・LINE登録 ${detail.tenant.staffCount}人中${detail.tenant.staffWithLine}人・これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : ''}`}>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>
               {detail ? <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} /> : null}
               <ol className={styles.messages} aria-label="やり取り">
-                <Message mine={false} author={`${ticket.staffName || ticket.tenantName}（${shortDateTime(ticket.createdAt)}）`} body={ticket.body} attachments={ticket.attachments} />
+                <Message mine={false} at={ticket.createdAt} author={`${ticket.staffName || ticket.tenantName}（${shortDateTime(ticket.createdAt)}）`} body={ticket.body} attachments={ticket.attachments} />
                 {detail?.messages.map((m) => (
                   <Message
                     key={m.id}
                     mine={m.authorKind === 'ops'}
+                    at={m.createdAt}
                     author={`${m.authorKind === 'ops' ? `運営 ${m.authorName}` : m.authorName}（${shortDateTime(m.createdAt)}）`}
                     body={m.body}
                     attachments={m.attachments}
@@ -460,7 +444,7 @@ export default function OpsSupportV8() {
                   <div className={styles.draft}>
                     <div className={styles.draftHead}>
                       <Sparkles aria-hidden="true" />
-                      <span className={styles.draftTitle}>{aiBusy ? 'AI の下書きを作成中…' : replyFromAi ? 'AI の下書き' : '返信'}</span>
+                      <span className={styles.draftTitle} title={replyFromAi ? `${formatDateTime(replyFromAi.generatedAt)} に作成` : undefined}>{aiBusy ? 'AI の下書きを作成中…' : replyFromAi ? 'AI の下書き' : '返信'}</span>
                       <span className={styles.spacer} />
                       {aiBusy ? (
                         <Button onClick={skipAi}>待たずに手で書く</Button>
@@ -482,7 +466,7 @@ export default function OpsSupportV8() {
                         <KnowledgeReferences key={ticket.id} references={replyFromAi ? references : []} requestId={ticket.id} busy={busy} onExclude={(id) => {
                           const next = [...new Set([...excluded, id])]; setExcluded(next); void generateAi(next)
                         }} />
-                        <TextArea
+                        <SaveErrorField names={["reply","body"]}><TextArea
                           className={styles.replyBox}
                           rows={2}
                           value={reply}
@@ -491,7 +475,7 @@ export default function OpsSupportV8() {
                           aria-label="返信"
                           disabled={closed}
                           maxLength={4000}
-                        />
+                        /></SaveErrorField>
                         <p className={styles.draftNote}>
                           {replyFromAi
                             ? 'お客様の状況・やり取りとナレッジをもとに作った下書きです。内容を確認してから送ってください。'
@@ -507,7 +491,7 @@ export default function OpsSupportV8() {
                     {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
                     <span className={styles.spacer} />
                     <Button onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
-                    <Select aria-label="送信後の状態" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} />
+                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
                     <Button variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
                   </div>
                 </>
@@ -535,7 +519,7 @@ export default function OpsSupportV8() {
           <div className={styles.field}>
             <span className={styles.smallLabel}>契約先</span>
             <div className={styles.fullSelect} {...createFields.bind('tenant')}>
-              <Select size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
+              <SaveErrorField names={["tenantId","form.tenantId","tenant_id","form.tenant_id"]}><EntitySelect size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]} /></SaveErrorField>
             </div>
             <FieldError id="sup-tenant-error">{createFields.error('tenant')}</FieldError>
           </div>
@@ -543,19 +527,19 @@ export default function OpsSupportV8() {
             <div className={styles.field}>
               <span className={styles.smallLabel}>種類</span>
               <div className={styles.fullSelect}>
-                <Select size="full" aria-label="種類" value={form.kind} onChange={(value) => setForm((f) => ({ ...f, kind: value }))} options={KIND_OPTIONS} />
+                <SaveErrorField names={["kind","form.kind"]}><Select size="full" aria-label="種類" value={form.kind} onChange={(value) => setForm((f) => ({ ...f, kind: value }))} options={KIND_OPTIONS} /></SaveErrorField>
               </div>
             </div>
             <div className={styles.field}>
               <span className={styles.smallLabel}>優先度</span>
               <div className={styles.fullSelect}>
-                <Select size="full" aria-label="優先度" value={form.priority} onChange={(value) => setForm((f) => ({ ...f, priority: value as OpsSupportPriority }))} options={PRIORITY_OPTIONS} />
+                <SaveErrorField names={["priority","form.priority"]}><Select size="full" aria-label="優先度" value={form.priority} onChange={(value) => setForm((f) => ({ ...f, priority: value as OpsSupportPriority }))} options={PRIORITY_OPTIONS} /></SaveErrorField>
               </div>
             </div>
           </div>
-          <div className={styles.field}><Field label="件名" htmlFor="sup-subject"><TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
+          <div className={styles.field}><Field label="件名" htmlFor="sup-subject" requirement={createFields.requirement('subject')}><SaveErrorField names={["subject","form.subject"]}><TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" /></SaveErrorField>
 <FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError></Field></div>
-          <div className={styles.field}><Field label="内容" htmlFor="sup-body"><TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
+          <div className={styles.field}><Field label="内容" htmlFor="sup-body" requirement={createFields.requirement('body')}><SaveErrorField names={["body","form.body"]}><TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" /></SaveErrorField>
 <FieldError id="sup-body-error">{createFields.error('body')}</FieldError></Field></div>
           <p className={parts.dialogNote}>電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
         </div>
@@ -606,10 +590,10 @@ async function impersonate(tenantId: string, setBusy: (v: boolean) => void, setE
   window.location.assign('/hq')
 }
 
-function Message({ mine, author, body, attachments }: { mine: boolean; author: string; body: string; attachments: Array<{ key: string; url: string; name: string }> }) {
+function Message({ mine, author, body, attachments, at }: { mine: boolean; author: string; body: string; at: string; attachments: Array<{ key: string; url: string; name: string }> }) {
   return (
     <li className={`${styles.message} ${mine ? styles.messageMine : ''}`}>
-      <span className={styles.messageAuthor}>{author}</span>
+      <span className={styles.messageAuthor} title={formatDateTime(at)}>{author}</span>
       <p className={styles.messageBody}>{body}</p>
       {attachments.length > 0 ? (
         <span className={styles.attachments}>

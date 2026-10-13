@@ -1,8 +1,10 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   archiveFriendAddRule,
+  restoreFriendAddRule,
   createFriendAddRuleDraft,
   deleteFriendAddRuleFolder,
   ensureFriendAddFallbackRules,
@@ -26,7 +28,7 @@ import {
 import { LineClient } from '@line-crm/line-sdk';
 import { CommonVarResolutionFailedError, expandSendCommonVars } from '../services/interpolation-context.js';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   areFriendAddConditionsOverlapping,
@@ -388,7 +390,7 @@ export async function validateReferences(
     }
   }
   if (definition.routeIds.length > 0) {
-    const placeholders = definition.routeIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(definition.routeIds).sql;
     const rows = await db.prepare(
       `SELECT id FROM entry_routes
         WHERE is_active = 1 AND id IN (${placeholders}) AND (
@@ -397,7 +399,7 @@ export async function validateReferences(
             AND tenant_id = (SELECT tenant_id FROM line_accounts WHERE id = ?)
           )
         )`,
-    ).bind(...definition.routeIds, accountId, accountId).all<{ id: string }>();
+    ).bind(...(definition.routeIds.length ? sqlIdSet(definition.routeIds).binds : []), accountId, accountId).all<{ id: string }>();
     if ((rows.results ?? []).length !== new Set(definition.routeIds).size) {
       push(friendKind, 'このLINEアカウントで使えない流入リンクが含まれています。');
     }
@@ -415,10 +417,10 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (tagIds.length > 0) {
     const unique = [...new Set(tagIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT id FROM tags WHERE line_account_id = ? AND id IN (${placeholders})`,
-    ).bind(accountId, ...unique).all<{ id: string }>();
+    ).bind(accountId, ...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'このLINEアカウントで使えないタグが含まれています。');
   }
   const actionScenarioIds = definition.actions
@@ -427,11 +429,11 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionScenarioIds.length > 0) {
     const unique = [...new Set(actionScenarioIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT id FROM scenarios
         WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders})`,
-    ).bind(accountId, ...unique).all<{ id: string }>();
+    ).bind(accountId, ...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えないシナリオが含まれています。');
   }
   /*
@@ -447,13 +449,13 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionFieldIds.length > 0) {
     const unique = [...new Set(actionFieldIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT DISTINCT ff.id AS id FROM friend_fields ff
          LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
         WHERE ff.id IN (${placeholders})
           AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
-    ).bind(...unique, accountId).all<{ id: string }>();
+    ).bind(...(unique.length ? sqlIdSet(unique).binds : []), accountId).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない友だち情報の項目が含まれています。');
   }
   const actionMarkIds = definition.actions
@@ -462,10 +464,10 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionMarkIds.length > 0) {
     const unique = [...new Set(actionMarkIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT id FROM support_marks WHERE id IN (${placeholders})`,
-    ).bind(...unique).all<{ id: string }>();
+    ).bind(...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない対応マークが含まれています。');
   }
   const actionVarKeys = definition.actions
@@ -474,12 +476,12 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionVarKeys.length > 0) {
     const unique = [...new Set(actionVarKeys)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT var_key FROM common_vars
         WHERE var_key IN (${placeholders})
           AND line_account_id = ? AND archived_at IS NULL`,
-    ).bind(...unique, accountId).all<{ var_key: string }>();
+    ).bind(...(unique.length ? sqlIdSet(unique).binds : []), accountId).all<{ var_key: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない共通情報が含まれています。');
   }
   if (definition.activeFrom && definition.activeUntil && definition.activeFrom > definition.activeUntil) {
@@ -1005,7 +1007,7 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
   }
 });
 
-friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendAddRules.post('/api/friend-add-runs/:id/retry', requireDeliveryAccess('friendAdd'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
   if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   try {
@@ -1030,7 +1032,7 @@ friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admi
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"color":["null","string"]}), async (c) => {
+friendAddRules.post('/api/friend-add-rules/folders', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"accountId":["string"],"name":["string"],"color":["null","string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; name?: string; color?: string | null }>();
   const accountId = accountIdFrom(c, body);
   const name = body.name?.trim() ?? '';
@@ -1075,7 +1077,7 @@ friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin
 });
 
 // フォルダ名は設定側にも保存されるため、同じトランザクションで置き換える。
-friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"color":["null","string"]}), async (c) => {
+friendAddRules.patch('/api/friend-add-rules/folders/:id', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"accountId":["string"],"name":["string"],"color":["null","string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; name?: string; color?: string | null }>();
   const accountId = accountIdFrom(c, body);
   if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
@@ -1099,7 +1101,7 @@ friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', '
   }
 });
 
-friendAddRules.delete('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.delete('/api/friend-add-rules/folders/:id', requireDeliveryAccess('friendAdd'), async (c) => {
   const text = await c.req.text();
   let body: { accountId?: string } | null;
   try { body = text.trim() ? JSON.parse(text) : null; }
@@ -1147,6 +1149,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
         limit,
         search,
         folderName: folder,
+        highlightId: c.req.query('highlight'),
       }),
       loadOptions(c.env.DB, accountId),
       /*
@@ -1250,7 +1253,7 @@ async function getFriendAddOrderVersion(
  * 並びだけを受け付ける——絞り込み中の一部だけで上書きされると、
  * 見えていない設定の順が壊れるため、足りなければ 409 で読み直しを促す。
  */
-friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"]}), async (c) => {
+friendAddRules.patch('/api/friend-add-rules/reorder', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown }>();
     const accountId = accountIdFrom(c, body);
@@ -1287,7 +1290,7 @@ friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admi
  * どれか1つでも合わなければ書かず 409 で読み直しを促す。
  * PATCH /reorder は従来の画面が使うので残し、版は見ないままにする。
  */
-friendAddRules.put('/api/friend-add-rules/order', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"]}), async (c) => {
+friendAddRules.put('/api/friend-add-rules/order', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown; expectedVersion?: unknown;
@@ -1447,7 +1450,7 @@ friendAddRules.post('/api/friend-add-rules/test', requireRole('owner', 'admin', 
   });
 });
 
-friendAddRules.post('/api/friend-add-rules/drafts', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"],"name":["string"],"folderName":["null","string"],"priority":["number"],"definition":["object"],"version":["number"]}), async (c) => {
+friendAddRules.post('/api/friend-add-rules/drafts', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"],"name":["string"],"folderName":["null","string"],"priority":["number"],"definition":["object"],"version":["number"]}), async (c) => {
   const body = await c.req.json<RuleInput>();
   const accountId = accountIdFrom(c, body);
   const idempotencyKey = c.req.header('Idempotency-Key');
@@ -1523,7 +1526,7 @@ friendAddRules.get('/api/friend-add-rules/:id', requireRole('owner', 'admin', 's
   });
 });
 
-friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"],"name":["string"],"folderName":["null","string"],"priority":["number"],"definition":["object"],"version":["number"]}), async (c) => {
+friendAddRules.put('/api/friend-add-rules/:id/draft', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"],"name":["string"],"folderName":["null","string"],"priority":["number"],"definition":["object"],"version":["number"]}), async (c) => {
   const body = await c.req.json<RuleInput>();
   const accountId = accountIdFrom(c, body);
   const idempotencyKey = c.req.header('Idempotency-Key');
@@ -1565,7 +1568,7 @@ friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admi
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/validate', requireDeliveryAccess('friendAdd'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
   if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
@@ -1734,7 +1737,7 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/publish', requireDeliveryAccess('friendAdd'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
   const idempotencyKey = c.req.header('Idempotency-Key');
   if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
@@ -1773,7 +1776,7 @@ friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'a
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary({"version":["number"]}), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/stop', requireDeliveryAccess('friendAdd'), inputJsonBoundary({"version":["number"]}), async (c) => {
   const accountId = accountIdFrom(c);
   const idempotencyKey = c.req.header('Idempotency-Key');
   if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
@@ -1811,7 +1814,37 @@ friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admi
   }
 });
 
-friendAddRules.delete('/api/friend-add-rules/:id', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/unarchive', requireDeliveryAccess('friendAdd'), inputJsonBoundary(), async (c) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+  const body = await c.req.json<{ expectedVersion?: number }>().catch(() => ({} as { expectedVersion?: number }));
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 1) return inputError(c, { success: false, error: '版番号が必要です' }, 422, ['expectedVersion']);
+  const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id'), includeArchived: true });
+  if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+  const restored = await restoreFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: current.id, expectedVersion: body.expectedVersion! });
+  if (!restored) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '状態が変わっています。一覧を読み直してください' }, 409);
+  return c.json({ success: true, data: { id: restored.id, status: restored.status, version: restored.lock_version } });
+});
+
+friendAddRules.post('/api/friend-add-rules/:id/duplicate', requireDeliveryAccess('friendAdd'), inputJsonBoundary(), async (c) => {
+  const accountId = accountIdFrom(c);
+  const key = c.req.header('Idempotency-Key');
+  if (!accountId || !key || key.length < 16 || key.length > 200) return c.json({ success: false, error: 'アカウントと操作の鍵が必要です' }, 400);
+  if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+  const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id'), includeArchived: true });
+  if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+  const body = await c.req.json<{ expectedVersion?: number }>().catch(() => ({} as { expectedVersion?: number }));
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 1) return inputError(c, { success: false, error: '版番号が必要です' }, 422, ['expectedVersion']);
+  if (body.expectedVersion !== current.lock_version) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '一覧を読み直してください' }, 409);
+  const definition = parseSnapshot(current.definition_snapshot);
+  const created = await createFriendAddRuleDraft(c.env.DB, { lineAccountId: accountId,
+    friendKind: current.friend_kind, name: `${current.name}（複製）`, folderName: current.folder_name,
+    priority: current.priority, definition, idempotencyKey: key });
+  return c.json({ success: true, data: { id: created.id, status: 'draft' } }, 201);
+});
+
+friendAddRules.delete('/api/friend-add-rules/:id', requireDeliveryAccess('friendAdd'), async (c) => {
   const accountId = accountIdFrom(c);
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);

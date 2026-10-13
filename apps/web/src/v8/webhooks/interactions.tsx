@@ -1,13 +1,5 @@
 'use client'
-
-/*
- * ★V8 外部連携「やり取りの記録」タブ（Pencil `Uv9AA`、中身は `DA0Ag`）。
- *
- * 型（ListPage）に、タブ・やり取りの帯・案内の帯・道具の段（探す・札4つ・
- * まとめてやり直す）・表・ページ送りをはめる。データの口は v7 と同じ
- * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
- * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, CircleAlert, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
@@ -25,6 +17,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
@@ -36,6 +29,16 @@ import { ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, useWebhookO
 import { eventWord, shortDateTime } from './words'
 import styles from './interactions.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 外部連携「やり取りの記録」タブ（Pencil `Uv9AA`、中身は `DA0Ag`）。
+ *
+ * 型（ListPage）に、タブ・やり取りの帯・案内の帯・道具の段（探す・札4つ・
+ * まとめてやり直す）・表・ページ送りをはめる。データの口は v7 と同じ
+ * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
+ * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
+ */
 
 type Direction = 'all' | 'outgoing' | 'incoming'
 type Status = 'all' | 'failed'
@@ -103,6 +106,53 @@ function canRetryNow(item: WebhookInteraction, allowed: boolean): boolean {
   return allowed && item.canRetry && item.direction === 'outgoing' && item.status === 'failed'
 }
 
+function failureDetail(
+  items: WebhookInteraction[],
+  summary: WebhookInteractionList['summary'],
+): string {
+  if (summary.failed === 0) return '失敗はありません'
+  const parts: string[] = []
+  const incomingFailed = Math.max(0, summary.failed - summary.outgoingFailed)
+  if (summary.retryable > 0) {
+    const visibleFailures = items.filter((item) => item.status === 'failed' && item.direction === 'outgoing')
+    const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
+    const sameDestination = firstDestination
+      && visibleFailures.length > 0
+      && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
+    parts.push(sameDestination
+      ? `すべて${firstDestination}へ。うち${summary.retryable}件はここから送り直せます`
+      : `うち${summary.retryable}件はここから送り直せます`)
+  } else if (summary.outgoingFailed > 0) {
+    parts.push('ここからまとめて送り直せる失敗はありません。行ごとの理由を確かめてください')
+  }
+  const excluded = summary.outgoingFailed - summary.retryable
+  if (excluded > 0) {
+    parts.push(`${excluded}件は送り先の停止・削除・自動の送り直し中などで対象外です`)
+  }
+  if (summary.resultUnknown > 0) {
+    parts.push(`うち${summary.resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`)
+  }
+  if (incomingFailed > 0) {
+    parts.push(`受け取りの失敗${incomingFailed}件は相手側で送り直してもらってください`)
+  }
+  return parts.join('。') || '失敗はありません'
+}
+
+/**
+ * 遅れと成功率の対象期間をカードの補足へ書く(IDEA-26)。
+ * 「いつからいつまでの数字か」が分からないと、遅い・悪いの判断が付かない。
+ */
+function durationDetail(
+  items: WebhookInteraction[],
+  averageDurationMs: number | null,
+  periodDays: number,
+): string {
+  if (averageDurationMs == null) return `この${periodDays}日は未取得`
+  const durations = items.flatMap((item) => item.durationMs == null ? [] : [item.durationMs])
+  if (durations.length === 0) return `この${periodDays}日の送受信の処理時間`
+  return `この${periodDays}日でいちばん遅くて ${Math.round(Math.max(...durations) / 100) / 10}秒`
+}
+
 export default function WebhooksInteractionsV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -112,8 +162,8 @@ export default function WebhooksInteractionsV8() {
   const generationRef = useRef(0)
   const staffRole = useStaffRole()
   /* 送り直しは統括と管理者（v7 と同じ）。確認が終わるまでは出す。 */
-  const canRetry = staffRole === null || staffRole === 'owner' || staffRole === 'admin'
-  const isOwner = staffRole === null || staffRole === 'owner'
+  const canRetry = staffRole === 'owner' || staffRole === 'admin'
+  const isOwner = staffRole === 'owner'
   const overview = useWebhookOverview()
 
   const [data, setData] = useState<WebhookInteractionList>(EMPTY)
@@ -250,12 +300,12 @@ export default function WebhooksInteractionsV8() {
     {
       key: 'failed', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />,
       value: known ? known.failed : null, unit: '件',
-      detail: known ? `やり直せるもの ${formatNumber(known.retryable)}` : '集計を読み込めませんでした',
+      detail: known ? <span title={failureDetail(data.items, summary)}>{`やり直せるもの ${formatNumber(known.retryable)}`}</span> : '集計を読み込めませんでした',
     },
     {
       key: 'all', title: 'すべて', icon: <LayoutList size={13} aria-hidden="true" />,
       value: known ? known.total : null, unit: '回',
-      detail: known ? `この${periodDays}日` : '集計を読み込めませんでした',
+      detail: known ? <span title={`この${periodDays}日で ${formatNumber(known.total > 0 ? Math.round(known.succeeded / known.total * 1000) / 10 : 0)}%成功。平均 ${seconds(known.averageDurationMs)}。${durationDetail(data.items, known.averageDurationMs, periodDays)}`}>{`この${periodDays}日`}</span> : '集計を読み込めませんでした',
     },
   ]
 
@@ -276,12 +326,12 @@ export default function WebhooksInteractionsV8() {
   const trailing = (
     <>
       <div className={styles.smallSelect}>
-        <Select
+        <SaveErrorField names={["periodDays","period_days"]}><Select
           aria-label="期間"
           value={String(periodDays)}
           onChange={(value) => { setPeriodDays(Number(value)); setPage(1) }}
           options={[{ value: '7', label: 'この7日' }, { value: '30', label: 'この30日' }, { value: '90', label: 'この90日' }]}
-        />
+        /></SaveErrorField>
       </div>
       {/* 閲覧のみには押せない「まとめてやり直す」を置かない。 */}
       {canRetry ? (
@@ -301,7 +351,7 @@ export default function WebhooksInteractionsV8() {
 
   let listBody
   if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (loading && data.items.length === 0) {
     listBody = (
       <div aria-busy="true" aria-label="やり取りの記録を読み込んでいます">
@@ -357,9 +407,9 @@ export default function WebhooksInteractionsV8() {
                     <span className={styles.main}>{shortDateTime(item.startedAt)}</span>
                     <span className={styles.sub}>{item.direction === 'outgoing' ? '送る' : '受け取る'}</span>
                   </Td>
-                  <Td grow className={styles.colName}>
+                  <Td grow className={styles.colName}><FolderDotName>
                     <span className={styles.main} title={`${item.webhookName}（${triggerWord(item)}）`}>{item.webhookName}</span>
-                  </Td>
+                  </FolderDotName></Td>
                   <Td className={styles.colBody}>
                     <span className={styles.main} title={item.triggerSummary}>{lines.main}</span>
                     {lines.sub ? <span className={styles.sub} title={lines.sub}>{lines.sub}</span> : null}
@@ -369,7 +419,7 @@ export default function WebhooksInteractionsV8() {
                   </Td>
                   <Td align="right" className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
                   <Td className={styles.colOps}>
-                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`}>中身を見る</Button>
+                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`} busyLabel="読み込み中…">中身を見る</Button>
                   </Td>
                 </Tr>
               )
@@ -386,12 +436,12 @@ export default function WebhooksInteractionsV8() {
       <span className={styles.pagerLead}>
         <span className={styles.pagerCount}>{`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`}</span>
         <span className={styles.smallSelect}>
-          <Select
+          <SaveErrorField names={["limit"]}><Select
             aria-label="1ページに出す件数"
             value={String(limit)}
             onChange={(value) => { setLimit(Number(value)); setPage(1) }}
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
-          />
+          /></SaveErrorField>
         </span>
       </span>
       <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} ariaLabel="やり取りの記録のページ送り" />
@@ -401,6 +451,7 @@ export default function WebhooksInteractionsV8() {
   return (
     <ListPage
       help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
+      explanation="失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。"
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"
@@ -411,9 +462,7 @@ export default function WebhooksInteractionsV8() {
         <WebhookBand cells={bandCells} />
       </>}
       toolbar={<>
-        <div className={styles.noticeRow}>
-          <Notice tone="info">失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。</Notice>
-        </div>
+
         {notice ? <div className={styles.noticeRow}><Notice tone="danger" message={notice} onClose={() => setNotice('')} /></div> : null}
         <ListToolbar
           search={{ placeholder: '送り先・友だちで探す', label: '送り先・友だちで探す', width: 240, value: search, onChange: (value) => { setSearch(value); setPage(1) } }}

@@ -1,3 +1,4 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * R526: 定期レポート作成の要求キーは、選んでいるアカウントに結びつける。
@@ -130,12 +131,7 @@ function saveButton(): HTMLButtonElement {
 
 /** 宛先の行リストから、名前の行のチェックを付ける。 */
 async function checkRecipient(name: string) {
-  const label = [...container.querySelectorAll('li')].find(
-    (li) => (li.textContent ?? '').includes(name),
-  )
-  const input = label?.querySelector('input[type="checkbox"]')
-  if (!input) throw new Error(`宛先「${name}」が見つかりません`)
-  await act(async () => { fireEvent.click(input) })
+  await pickEntities('レポートを受け取る人', [name])
 }
 
 async function click(element: HTMLElement) {
@@ -165,7 +161,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
   it('Aで応答を失ったキーをBで使い回さない。Bは新しいキーで作る', async () => {
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -183,7 +179,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     await rerender()
     await settle()
     await checkRecipient('山田')
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
     await click(buttonByText('つくって動かす'))
     await settle()
 
@@ -197,7 +193,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
   it('Aで応答を失いBで作ってAへ戻っても、Aの押し直しはAのキーで送る（R526）', async () => {
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -232,7 +228,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     postMode.current = 'manual'
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -256,7 +252,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     })
     await settle()
     expect(pushed).toHaveLength(0)
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
     expect(buttonByText('つくって動かす').disabled).toBe(false)
 
     // Bの作成はAと別のキーで送る。
@@ -272,7 +268,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
   it('同じアカウントの押し直しは同じキーで送る（二重予約にしない）', async () => {
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -290,7 +286,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     postMode.current = 'manual'
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -341,7 +337,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     postMode.current = 'manual'
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -387,7 +383,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     postMode.current = 'manual'
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -434,7 +430,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     postMode.current = 'manual'
     await mount()
     await settle()
-    expect(hasText('山田')).toBe(true)
+    expect(container.querySelector('button[aria-label="レポートを受け取る人"]')?.hasAttribute('disabled')).toBe(false)
 
     await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
@@ -479,7 +475,7 @@ it('WEB309：新規のアカウントを切り替えたら名前・宛先・通�
   await rerender()
   await settle()
   expect((container.querySelector('#report-name') as HTMLInputElement).value).toBe('週次まとめ')
-  const selected = [...container.querySelectorAll('li')].filter(li => li.textContent?.includes('山田')).flatMap(li => [...li.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]).filter(input => input.checked)
+  const selected = container.querySelectorAll('[aria-label="山田を外す"]')
   expect(selected).toHaveLength(0)
 })
 

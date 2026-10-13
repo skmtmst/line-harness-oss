@@ -11,6 +11,8 @@
  */
 import { PencilLine, Unlink } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { RowNameLink, TableStateRow } from '@/components/shared/table'
+import { deliveryPriorityDetails, linkedFriendDetails, personDetails, profileValueDetails } from './merged-person-metadata'
 import Dialog from '@/components/shared/dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -20,6 +22,8 @@ import MergedDeliveryDialog from './merged-delivery-dialog'
 import MergedProfileDialog from './merged-profile-dialog'
 import { useMergedPerson } from './use-merged-person'
 import styles from '@/app/friends/friends-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 function shortDate(iso: string): string {
   const d = new Date(iso)
@@ -36,7 +40,7 @@ export default function MergedPersonDetailViewV8({
 }) {
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
 
   if (m.phase === 'loading') return <ListState kind="loading" />
   if (m.phase === 'forbidden') {
@@ -82,7 +86,7 @@ export default function MergedPersonDetailViewV8({
     <div className={styles.board} data-design-node="Hn9eE">
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h2 className={styles.headTitle}>{person.primaryDisplayName}</h2>
+          <h2 className={styles.headTitle} title={personDetails(person)}>{person.primaryDisplayName}</h2>
           <p className={styles.headDescription}>
             統合ユーザー・結び付いた友だち {person.linkedFriends.length}
             {earliestLink ? `・${shortDate(earliestLink)} に結び付けた` : ''}
@@ -92,19 +96,17 @@ export default function MergedPersonDetailViewV8({
 
       {/* 版競合や保存失敗は面の上に残す（窓を閉じても消えない）。 */}
       {m.saveError ? (
-        <p className={styles.errorBand} role="alert">
-          {m.saveError}{' '}
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{m.saveError}{' '}
           <button type="button" className={styles.infoBandRetry} onClick={m.reload}>
             読み直す
-          </button>
-        </p>
+          </button></Notice>
       ) : null}
 
       <div className={styles.detailGrid}>
         <div className={styles.detailMain}>
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>同じ人に重なって届かないようにする</h3>
-            <p className={styles.sectionDesc}>
+            <p className={styles.sectionDesc} title={deliveryPriorityDetails(person.deliveryPriorities)}>
               どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります。
             </p>
             <div className={styles.tableWrap} style={{ border: 0 }}>
@@ -121,7 +123,7 @@ export default function MergedPersonDetailViewV8({
                   {deliveryRows.map(({ friend, active }) => (
                     <tr key={friend.friendId}>
                       <td style={{ color: 'var(--color-ink)', fontWeight: 600 }}>{friend.lineAccountName}</td>
-                      <td>{friend.displayName}</td>
+                      <td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></td>
                       <td>
                         <span className={`${styles.pill} ${friend.isFollowing ? styles.pillStrong : styles.pillWeak}`}>
                           {friend.isFollowing ? '友だち' : 'ブロック・削除'}
@@ -176,11 +178,12 @@ export default function MergedPersonDetailViewV8({
                   </tr>
                 </thead>
                 <tbody>
+                  {person.linkedFriends.length === 0 ? <TableStateRow colSpan={4} kind="empty" title="結び付いている友だちはまだありません。" /> : null}
                   {person.linkedFriends.map((friend) => (
                     <tr key={friend.friendId}>
                       <td style={{ color: 'var(--color-ink)', fontWeight: 600 }}>{friend.lineAccountName}</td>
-                      <td>{friend.displayName}</td>
-                      <td>{shortDate(friend.linkedAt)}</td>
+                      <td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></td>
+                      <td title={linkedFriendDetails(friend)}>{shortDate(friend.linkedAt)}</td>
                       <td>
                         <button
                           type="button"
@@ -237,7 +240,7 @@ export default function MergedPersonDetailViewV8({
             ) : (
               <ul className={styles.valueList}>
                 {person.profileValues.map((value) => (
-                  <li key={value.fieldKey} className={styles.valueRow}>
+                  <li key={value.fieldKey} className={styles.valueRow} title={profileValueDetails(value)}>
                     <span className={styles.valueLabel}>{value.fieldLabel}</span>
                     <span className={styles.valueText}>{value.valuePreview ?? '—'}</span>
                   </li>
@@ -291,12 +294,12 @@ export default function MergedPersonDetailViewV8({
         </p>
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-ink)' }}>
           <span>解除する理由<RequiredBadge /></span>
-          <textarea
+          <SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><textarea
             value={m.unlinkReason}
             onChange={(event) => m.setUnlinkReason(event.target.value)}
             placeholder="確認した根拠を書いてください"
             className={styles.reasonArea}
-          />
+          /></SaveErrorField>
         </label>
       </Dialog>
     </div>

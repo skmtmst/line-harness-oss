@@ -47,15 +47,8 @@
 }
 
 .card {
-  display: flex;
   width: 100%;
   max-width: var(--tpl-op-auth-card-w);
-  flex-direction: column;
-  gap: var(--tpl-op-auth-card-gap);
-  border-radius: var(--radius-panel);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-board);
-  padding: var(--tpl-op-auth-card-pad);
 }
 
 .title {
@@ -76,27 +69,23 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-op-auth-card-gap);
+  gap: var(--polish-space-field);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-op-auth-field-gap);
+  gap: var(--polish-space-row);
 }
 
 .label {
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-caption);
   font-weight: 500;
   line-height: var(--tpl-op-auth-label-lh);
 }
 
-.error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 .wide {
   width: 100%;
@@ -212,4 +201,10 @@
 
 .digit:focus {
   outline: var(--tpl-op-auth-digit-focus) solid var(--color-accent-deep);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
 }

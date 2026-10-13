@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 監査 WEB311：配信 A の承認の操作が終わる前に配信 B へ移ったら、
  * A の応答で B の承認の帯（文・押せる状態）を書き換えない。
@@ -61,6 +63,7 @@ const { default: BroadcastDetailPage } = await import('./page')
 
 let view: Mounted
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   net.id = 'bc-1'
   net.remind = null
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)

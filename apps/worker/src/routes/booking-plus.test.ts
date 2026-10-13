@@ -190,6 +190,25 @@ describe('7 予約からの売上', () => {
 });
 
 describe('8 無断キャンセルの印と前払いのみ', () => {
+  it.each([false, true])('REV-H仲間: 前払い代理予約の支払い保存失敗=%sを成功にせず、未確定では確定リマインダを作らない', async (failPayment) => {
+    seedBase();
+    sqlite.exec(`INSERT INTO booking_settings(id,line_account_id,max_active_bookings_per_friend) VALUES('prepay-settings','account-a',10);
+      INSERT INTO booking_payment_configs (line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES ('account-a','online','stripe',10,'2026-10-01','2026-10-01');`);
+    await staffApp(bookingPlus).request('/api/booking/admin/friends/friend-a/prepay?account_id=account-a', { method: 'POST' }, env());
+    const starts = new Date(Date.now() + 7 * 86400000); starts.setUTCHours(2,0,0,0);
+    const workDate = new Date(starts.getTime() + 9*3600000).toISOString().slice(0,10);
+    sqlite.exec(`INSERT INTO staff_shifts (id,staff_id,work_date,start_time,end_time) VALUES ('test-shift','staff-1','${workDate}','00:00','23:59')`);
+    if (failPayment) sqlite.exec(`CREATE TRIGGER fail_admin_payment BEFORE INSERT ON booking_payments BEGIN SELECT RAISE(ABORT,'payment insert failed'); END;`);
+    const { default: booking } = await import('./booking.js');
+    const response = await staffApp(booking).request('/api/booking/admin/bookings?account_id=account-a', {
+      method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':'rev-h-proxy'},
+      body:JSON.stringify({friend_id:'friend-a',menu_id:'menu-a',staff_id:'staff-1',starts_at:starts.toISOString()}),
+    }, env(), execCtx);
+    expect(response.status).toBe(failPayment ? 500 : 201);
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({ n: failPayment ? 4 : 5 });
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM booking_reminders').get()).toEqual({ n: 0 });
+  });
   it('基準（既定3）を超えたら前払いのみ、基準を変えられる', async () => {
     seedBase();
     sqlite.exec(`
@@ -414,4 +433,15 @@ describe('8 無断キャンセルの印と前払いのみ', () => {
     expect(json).toMatchObject({ status: 'requested' });
     expect(json.prepayNotice).toBeTruthy();
   });
+});
+
+describe('API-01/02 日本時間の暦日境界',()=>{
+ it('月初00:30を含め、翌月初00:30を含めない',async()=>{
+  seedBase();sqlite.exec("DELETE FROM bookings WHERE id NOT IN ('b-confirmed-1','b-confirmed-2'); UPDATE bookings SET starts_at='2026-10-31T15:30:00.000Z',price_at_booking=1000 WHERE id='b-confirmed-1'; UPDATE bookings SET starts_at='2026-11-30T15:30:00.000Z',price_at_booking=9000 WHERE id='b-confirmed-2'");
+  const res=await staffApp(bookingPlus).request('/api/booking/admin/sales-summary?account_id=account-a&from=2026-11-01&to=2026-12-01',{},env());
+  expect(res.status).toBe(200);const body:any=await res.json();expect(body.data.total.revenue).toBe(1000);expect(body.data.total.bookings).toBe(1);
+ });
+ it.each(['2026-02-30','2026-02-29','2026-04-31','2026-13-01','2026-00-01'])('存在しない日付 %s は400',async from=>{
+  const res=await staffApp(bookingPlus).request(`/api/booking/admin/sales-summary?account_id=account-a&from=${from}&to=2027-01-01`,{},env());expect(res.status).toBe(400);
+ });
 });

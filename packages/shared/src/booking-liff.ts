@@ -4,6 +4,9 @@ export interface BookingHistoryItem {
   starts_at: string;
   status: string;
   lock_version: number;
+  /** メニューの指定が無いときは店の既定を適用した期限（UTC）。 */
+  cancel_deadline_at?: string;
+  cancel_deadline_minutes_before?: number;
   menu_id: string;
   staff_id: string;
   customer_note?: string | null;

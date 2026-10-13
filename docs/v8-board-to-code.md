@@ -1,6 +1,6 @@
 # V8 の絵（Pencil の板）と画面のコードの対応表
 
-- 作り直し：`node scripts/visual-qa/build-v8-board-to-code.mjs`（手で直さない）。URL は前の撮影の対応表から写したもの（場所を決め直した板は `scripts/visual-qa/v8-board-urls.mjs`）。入口・画面のファイルは、その URL の入口（`page.tsx`、`?` の後ろは外して探す）が読む `@/v8/…` または `*-v8` のファイル。共通の見出し（`readonly-header-v8`）は画面のファイルに数えない。
+- 作り直し：`node scripts/visual-qa/build-v8-board-to-code.mjs`（手で直さない）。URL は `scripts/visual-qa/v8-design-map.json` と同じもの（実URL・タブ指定）。入口・画面のファイルは、その URL の入口（`page.tsx`、`?` の後ろは外して探す）が読む `@/v8/…` または `*-v8` のファイル。共通の見出し（`readonly-header-v8`）は画面のファイルに数えない。
 - 「V8 の画面ファイル」が `v8/…` なら `apps/web/src/v8/` の新しい画面、`app/…-v8.tsx` なら今の V8 ファイル（60% 以上合うものはここを直す。`apps/web/src/v8/README.md`）。1つの入口が複数の画面を読むとき（タブごと）は全部並べる。
 - 画面の中の見た目は型・部品で決まるので、まず `docs/v8-where-to-change.md` を読む。
 - 数：src/v8 を読む板 412・app の V8 ファイルだけを読む板 31・入口が V8 の別ファイルを読まない板（page.tsx の中で分けている・または V8 なし） 2・URL なし 60。
@@ -37,17 +37,17 @@
 | V8-B | tnTn9 | 成果とアフィリエイト アフィリエイターの詳細（引き出し）V8 | /affiliates?affiliate=af-1 | `app/affiliates/page.tsx` | `v8/affiliates/affiliates.tsx` |
 | V8-B | Gqve5 | 成果とアフィリエイト アフィリエイターを作る（競合）V8 | /affiliates/new | `app/affiliates/new/page.tsx` | `v8/affiliates/create.tsx` |
 | V8-B | RaMf3 | 成果とアフィリエイト アフィリエイターを作る V8 | /affiliates/new | `app/affiliates/new/page.tsx` | `v8/affiliates/create.tsx` |
-| V8-B | bglah | 分析 保存した分析 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | DkRDE | 分析 ファネル V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | eEhYU | 分析 友だちの増減 1152 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | iK4cQ | 分析 URLクリック V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | L4Uov | 分析 友だちの増減（閲覧のみ）V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | N8ZrUl | 分析 使われ方 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | PFe9c | 分析 経路と成果 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | u5CuB8 | 分析 クロス分析 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | ws9wt | 分析 友だちの増減 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | yvOtn | 分析 配信の反応 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
-| V8-B | AzrZq | 分析 成果地点ごとのレポート V8 | /analytics?view=conversion-report | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx`<br>`app/analytics/navigation-v8.tsx`<br>`app/analytics/conversion-report-v8.tsx` |
+| V8-B | bglah | 分析 保存した分析 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | DkRDE | 分析 ファネル V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | eEhYU | 分析 友だちの増減 1152 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | iK4cQ | 分析 URLクリック V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | L4Uov | 分析 友だちの増減（閲覧のみ）V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | N8ZrUl | 分析 使われ方 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | PFe9c | 分析 経路と成果 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | u5CuB8 | 分析 クロス分析 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | ws9wt | 分析 友だちの増減 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | yvOtn | 分析 配信の反応 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
+| V8-B | AzrZq | 分析 成果地点ごとのレポート V8 | /analytics?view=conversion-report | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
 | V8-B | G83vi | 分析 レポートを作る（競合）V8 | /analytics/reports/new | `app/analytics/reports/new/page.tsx` | `app/analytics/reports/new/report-head-v8.tsx` |
 | V8-B | H5UoIu | 分析 レポートを作る V8 | /analytics/reports/new | `app/analytics/reports/new/page.tsx` | `app/analytics/reports/new/report-head-v8.tsx` |
 | V8 | G4GejG | 自動応答 かんたんに作る（小窓 560）V8（機能追加 F-7・API待ち） | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |
@@ -80,14 +80,14 @@
 | V8-B | AjZhH | 予約台帳 予約の詳細 V8 | /booking/bookings | `app/booking/bookings/page.tsx` | `app/booking/bookings/booking-detail-v8.tsx` |
 | V8 | If9Mh | ★P2-2 予約：電話の予約・予約の詳細 2026-10-01 | /booking/bookings/new | `app/booking/bookings/new/page.tsx` | （別ファイルなし：page.tsx の中で分けている・または V8 なし） |
 | V8 | C9fv7A | 予約設定 メニュー（閲覧のみ）V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
-| V8 | KRgTQ | 予約設定 休業日 V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
 | V8 | owaS3 | 予約設定 メニュー V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
 | V8 | P6EdLW | 予約設定 メニュー（1152）V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
-| V8 | VFxWU | 予約設定 受付枠（1152）V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
-| V8 | x1OZS6 | 予約設定 予約のルール V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
 | V8 | xCoDe | ★V8 予約設定 状態 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
-| V8 | yRPxl | 予約設定 受付枠 V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
-| V8-B | ZyDd6 | 予約設定 予約経路の連携（人）V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
+| V8-B | ZyDd6 | 予約設定 予約経路の連携（人）V8 | /booking/menus?tab=channels | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
+| V8 | KRgTQ | 予約設定 休業日 V8 | /booking/menus?tab=holidays | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
+| V8 | VFxWU | 予約設定 受付枠（1152）V8 | /booking/menus?tab=hours | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
+| V8 | yRPxl | 予約設定 受付枠 V8 | /booking/menus?tab=hours | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
+| V8 | x1OZS6 | 予約設定 予約のルール V8 | /booking/menus?tab=rules | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
 | V8 | VLEaj | 予約設定 担当スタッフ V8 | /booking/menus?tab=staff | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
 | V8 | QqER7 | 予約設定 メニューを作る V8 | /booking/menus/new | `app/booking/menus/new/page.tsx` | `v8/booking-menus/menu-form.tsx` |
 | V8 | v5L19Z | 予約設定 メニュー編集（競合）V8 | /booking/menus/new | `app/booking/menus/new/page.tsx` | `v8/booking-menus/menu-form.tsx` |
@@ -131,22 +131,22 @@
 | V8 | C67dE | 共通情報 編集（1152）V8 | /contents/vars/edit | `app/contents/vars/edit/page.tsx` | `v8/common-vars-edit/edit.tsx` |
 | V8 | piWhz | 共通情報 編集（競合）V8 | /contents/vars/edit | `app/contents/vars/edit/page.tsx` | `v8/common-vars-edit/edit.tsx` |
 | V8 | p82v9 | 共通情報 作る V8 | /contents/vars/new | `app/contents/vars/new/page.tsx` | `v8/common-vars-edit/new.tsx` |
-| V8-B | BygrU | コンバージョン 一覧 1152 V8 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx`<br>`app/conversions/conversion-points-v8.tsx` |
-| V8-B | E2l8cw | ★V8-B コンバージョン 一覧の状態 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx`<br>`app/conversions/conversion-points-v8.tsx` |
-| V8-B | r6dJFy | コンバージョン 一覧 V8 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx`<br>`app/conversions/conversion-points-v8.tsx` |
-| V8-B | WSGvo | コンバージョン 一覧（閲覧のみ）V8 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx`<br>`app/conversions/conversion-points-v8.tsx` |
+| V8-B | BygrU | コンバージョン 一覧 1152 V8 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx` |
+| V8-B | E2l8cw | ★V8-B コンバージョン 一覧の状態 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx` |
+| V8-B | r6dJFy | コンバージョン 一覧 V8 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx` |
+| V8-B | WSGvo | コンバージョン 一覧（閲覧のみ）V8 | /conversions | `app/conversions/page.tsx` | `v8/conversions/list.tsx` |
 | V8-B | cXqlS | コンバージョン 作る（競合）V8 | /conversions/new | `app/conversions/new/page.tsx` | `v8/conversions/create.tsx` |
 | V8-B | j8p3yj | コンバージョン 作る V8 | /conversions/new | `app/conversions/new/page.tsx` | `v8/conversions/create.tsx` |
-| V8-B | GmVR5 | 設定 EC連携 V8 | /ec-commerce | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx`<br>`app/ec-commerce/ec-connector-v8.tsx` |
-| V8-B | nAesv | EC連携 注文の状況（引き出し）V8 | /ec-commerce | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx`<br>`app/ec-commerce/ec-connector-v8.tsx` |
-| V8-B | iLJmw | EC連携 つなぎ先 V8 | /ec-commerce?tab=connector | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx`<br>`app/ec-commerce/ec-connector-v8.tsx` |
-| V8-B | wqC8x | EC連携 定期便 V8 | /ec-commerce?tab=subscriptions | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx`<br>`app/ec-commerce/ec-connector-v8.tsx` |
+| V8-B | GmVR5 | 設定 EC連携 V8 | /ec-commerce | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx` |
+| V8-B | nAesv | EC連携 注文の状況（引き出し）V8 | /ec-commerce | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx` |
+| V8-B | iLJmw | EC連携 つなぎ先 V8 | /ec-commerce?tab=connector | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx` |
+| V8-B | wqC8x | EC連携 定期便 V8 | /ec-commerce?tab=subscriptions | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx` |
 | V8-B | w1W8h | EC連携 会員のつき合わせ V8 | /ec-commerce/identity-candidates | `app/ec-commerce/identity-candidates/page.tsx` | `v8/settings/ec-commerce/identity.tsx` |
 | V8-B | OHwbU | 運用状態 緊急コントロール V8 | /emergency?tab=control | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`app/emergency/control-v8.tsx` |
 | V8-B | Y4LkX1 | 設定 運用状態 V8 | /emergency?tab=health | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`app/emergency/control-v8.tsx` |
 | V8-B | I2V65v | 運用状態 更新履歴 V8 | /emergency?tab=history | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`app/emergency/control-v8.tsx` |
 | V8-B | e2ekFu | イベント予約 一覧 V8 | /events | `app/events/page.tsx` | `v8/events/list.tsx` |
-| V8-B | Mu8qW | イベント予約 申込者 V8 | /events | `app/events/page.tsx` | `v8/events/list.tsx` |
+| V8-B | Mu8qW | イベント予約 申込者 V8 | /events/bookings?id=ev-1 | `app/events/bookings/page.tsx` | `v8/events/bookings.tsx` |
 | V8-B | hmr2P | イベント予約 変更の確認 V8 | /events/change-review?id=ev-1 | `app/events/change-review/page.tsx` | `v8/events/change-review.tsx` |
 | V8-B | qUdNh | イベント予約 変更内容を確認 V8 | /events/change-review?id=ev-1 | `app/events/change-review/page.tsx` | `v8/events/change-review.tsx` |
 | V8-B | d4adD4 | イベント予約 イベントを作る V8 | /events/new | `app/events/new/page.tsx` | `v8/events/create.tsx` |
@@ -178,16 +178,16 @@
 | V8 | sFwWf | 友だち追加時の配信 テストで自分に送る（機能追加 F-12・API待ち） | /friend-add-settings | `app/friend-add-settings/page.tsx` | `v8/friend-add/list.tsx`<br>`v8/friend-add/editor.tsx` |
 | V8 | wDzkc | 友だち追加時の配信 作る① 基本設定 V8 | /friend-add-settings | `app/friend-add-settings/page.tsx` | `v8/friend-add/list.tsx`<br>`v8/friend-add/editor.tsx` |
 | V8 | xHpkS | 友だち追加時 作る②（1152）V8 | /friend-add-settings | `app/friend-add-settings/page.tsx` | `v8/friend-add/list.tsx`<br>`v8/friend-add/editor.tsx` |
-| V8 | e0FD1J | 友だち追加時の配信 作る 完了（有効にした） V8 | /friend-add-settings/publish | `app/friend-add-settings/publish/page.tsx` | `v8/friend-add-publish/publish.tsx`<br>`app/friend-add-settings/publish/done-v8.tsx` |
-| V8 | U8Xm3X | 友だち追加時の配信 作る⑤ 確認 V8 | /friend-add-settings/publish | `app/friend-add-settings/publish/page.tsx` | `v8/friend-add-publish/publish.tsx`<br>`app/friend-add-settings/publish/done-v8.tsx` |
+| V8 | e0FD1J | 友だち追加時の配信 作る 完了（有効にした） V8 | /friend-add-settings/publish | `app/friend-add-settings/publish/page.tsx` | `v8/friend-add-publish/publish.tsx` |
+| V8 | U8Xm3X | 友だち追加時の配信 作る⑤ 確認 V8 | /friend-add-settings/publish | `app/friend-add-settings/publish/page.tsx` | `v8/friend-add-publish/publish.tsx` |
 | V8 | REIxB | 友だち追加時の配信 実行結果 V8 | /friend-add-settings/runs | `app/friend-add-settings/runs/page.tsx` | `v8/friend-add-runs/runs.tsx` |
 | V8 | N43uVX | 友だち追加時の配信 実行の詳細（失敗あり） V8 | /friend-add-settings/runs/detail | `app/friend-add-settings/runs/detail/page.tsx` | `v8/friend-add-runs/detail.tsx` |
-| V8 | ADjK8 | 友だち 統合ユーザー V8 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx`<br>`app/friends/friends-nav-v8.tsx` |
-| V8 | CYJ0L | ★P1-2 友だち一覧から開くもの 2026-10-01（機能追加 F-1・API待ち） | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx`<br>`app/friends/friends-nav-v8.tsx` |
-| V8 | MyJP7 | 友だち「…」から予約して送る（小窓）V8 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx`<br>`app/friends/friends-nav-v8.tsx` |
-| V8 | SXCb3 | ★V8 友だちの残り 状態 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx`<br>`app/friends/friends-nav-v8.tsx` |
-| V8 | x6QsVz | 友だち一覧 V8（閲覧のみ） | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx`<br>`app/friends/friends-nav-v8.tsx` |
-| V8 | ywJ5H | ★P1 友だち一覧 /friends（個別設計・承認待ち）2026-10-01 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx`<br>`app/friends/friends-nav-v8.tsx` |
+| V8 | ADjK8 | 友だち 統合ユーザー V8 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx` |
+| V8 | CYJ0L | ★P1-2 友だち一覧から開くもの 2026-10-01（機能追加 F-1・API待ち） | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx` |
+| V8 | MyJP7 | 友だち「…」から予約して送る（小窓）V8 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx` |
+| V8 | SXCb3 | ★V8 友だちの残り 状態 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx` |
+| V8 | x6QsVz | 友だち一覧 V8（閲覧のみ） | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx` |
+| V8 | ywJ5H | ★P1 友だち一覧 /friends（個別設計・承認待ち）2026-10-01 | /friends | `app/friends/page.tsx` | `v8/friends/host.tsx` |
 | V8 | Hn9eE | 友だち 統合ユーザーの詳細 V8 | /friends/detail | `app/friends/detail/page.tsx` | `v8/friend-detail/detail.tsx` |
 | V8 | JCDRm | 友だち詳細 概要 V8（Q5F2QE の中の1枚） | /friends/detail | `app/friends/detail/page.tsx` | `v8/friend-detail/detail.tsx` |
 | V8 | Q5F2QE | ★P1-4 友だち詳細 /friends/detail 2026-10-01 | /friends/detail | `app/friends/detail/page.tsx` | `v8/friend-detail/detail.tsx` |
@@ -200,9 +200,9 @@
 | V8 | Z0jHp | 友だち UID移行（要確認の判断） V8（機能追加 F-3・API待ち） | /friends/migrations | `app/friends/migrations/page.tsx` | `v8/friends/migrations/page.tsx` |
 | V8 | BOj1a | ★P6 ログイン・はじめの設定 2026-10-01 | /getting-started | `app/getting-started/page.tsx` | `v8/settings/getting-started/getting-started.tsx` |
 | V8-B | xuJ7D | 設定 はじめの設定 V8 | /getting-started | `app/getting-started/page.tsx` | `v8/settings/getting-started/getting-started.tsx` |
-| V8-B | HMpVx | 統括 アカウント（アカウントの設定）V8 | /hq | `app/hq/page.tsx` | `v8/hq/home.tsx`<br>`app/hq/account-browser-v8.tsx` |
-| V8-B | JKjsE | 統括 アカウント（ホーム）V8 | /hq | `app/hq/page.tsx` | `v8/hq/home.tsx`<br>`app/hq/account-browser-v8.tsx` |
-| V8-B | VtJQ6 | 運営 代理ログイン中（閲覧のみ）V8 | /hq | `app/hq/page.tsx` | `v8/hq/home.tsx`<br>`app/hq/account-browser-v8.tsx` |
+| V8-B | HMpVx | 統括 アカウント（アカウントの設定）V8 | /hq | `app/hq/page.tsx` | `v8/hq/home.tsx` |
+| V8-B | JKjsE | 統括 アカウント（ホーム）V8 | /hq | `app/hq/page.tsx` | `v8/hq/home.tsx` |
+| V8-B | VtJQ6 | 運営 代理ログイン中（閲覧のみ）V8 | /hq | `app/hq/page.tsx` | `v8/hq/home.tsx` |
 | V8-B | B9ZAr | 統括 バナー生成（プロジェクト一覧）V8 | /hq/banners | `app/hq/banners/page.tsx` | `v8/hq-banners/list.tsx` |
 | V8-B | W7Z57 | 統括 バナー生成（プロジェクトを作る）V8 | /hq/banners | `app/hq/banners/page.tsx` | `v8/hq-banners/list.tsx` |
 | V8-B | AnwtH | 統括 バナー生成（画像を取り込む）V8 | /hq/banners?tab=library | `app/hq/banners/page.tsx` | `v8/hq-banners/list.tsx` |
@@ -214,18 +214,18 @@
 | V8-B | rI5uh | 統括 バナー生成（画像の詳細）V8 | /hq/banners/project?id=banner-project-qa-1 | `app/hq/banners/project/page.tsx` | `v8/hq-banners/project.tsx` |
 | V8-B | UcBQ5 | 統括 バナー生成（参照画像を選ぶ）V8 | /hq/banners/project?id=banner-project-qa-1 | `app/hq/banners/project/page.tsx` | `v8/hq-banners/project.tsx` |
 | V8-B | zOpMG | 統括 バナー生成（上限に達した）V8 | /hq/banners/project?id=banner-project-qa-1 | `app/hq/banners/project/page.tsx` | `v8/hq-banners/project.tsx` |
-| V8-B | JB8V1 | 統括 請求 V8 | /hq/billing | `app/hq/billing/page.tsx` | `v8/hq/billing.tsx`<br>`app/hq/hq-settings-nav-v8.tsx` |
-| V8-B | BHEl9 | 統括 メンバー（権限を変更する）V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx`<br>`app/hq/hq-settings-nav-v8.tsx` |
-| V8-B | M4jS9 | 統括 メンバー 権限を変える（確認）V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx`<br>`app/hq/hq-settings-nav-v8.tsx` |
-| V8-B | r4ARpV | 統括 メンバー V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx`<br>`app/hq/hq-settings-nav-v8.tsx` |
-| V8-B | yLKwV | 統括 メンバー（権限者を招待）V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx`<br>`app/hq/hq-settings-nav-v8.tsx` |
-| V8-B | K7HYu | 統括 統括の情報 V8 | /hq/settings | `app/hq/settings/page.tsx` | `v8/hq/settings.tsx`<br>`app/hq/hq-settings-nav-v8.tsx` |
+| V8-B | JB8V1 | 統括 請求 V8 | /hq/billing | `app/hq/billing/page.tsx` | `v8/hq/billing.tsx` |
+| V8-B | BHEl9 | 統括 メンバー（権限を変更する）V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx` |
+| V8-B | M4jS9 | 統括 メンバー 権限を変える（確認）V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx` |
+| V8-B | r4ARpV | 統括 メンバー V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx` |
+| V8-B | yLKwV | 統括 メンバー（権限者を招待）V8 | /hq/members | `app/hq/members/page.tsx` | `v8/hq/members.tsx` |
+| V8-B | K7HYu | 統括 統括の情報 V8 | /hq/settings | `app/hq/settings/page.tsx` | `v8/hq/settings.tsx` |
 | V8-B | b8xBtZ | 統括 お問い合わせ V8 | /hq/support | `app/hq/support/page.tsx` | `v8/hq/support.tsx` |
 | V8-B | D6fh3 | 統括 お問い合わせ（運営のLINEを登録）V8 | /hq/support | `app/hq/support/page.tsx` | `v8/hq/support.tsx` |
 | V8-B | OhguS | 統括 お問い合わせ（やり取り）V8 | /hq/support/detail | `app/hq/support/detail/page.tsx` | `v8/hq/support-detail.tsx` |
-| V8-B | LRc93 | 統括 テンプレート（ひな形の一覧）V8 | /hq/templates | `app/hq/templates/page.tsx` | `v8/hq-templates/console.tsx` |
-| V8-B | meBRB | 統括 テンプレート（アカウントへ配る）V8 | /hq/templates | `app/hq/templates/page.tsx` | `v8/hq-templates/console.tsx` |
-| V8-B | X4JcOf | 統括 テンプレート（ひな形を作る）V8 | /hq/templates | `app/hq/templates/page.tsx` | `v8/hq-templates/console.tsx` |
+| V8-B | LRc93 | 統括 テンプレート（ひな形の一覧）V8 | /hq/templates | `app/hq/templates/page.tsx` | `v8/hq-templates/console.tsx`<br>`v8/hq-deliveries/console.tsx` |
+| V8-B | meBRB | 統括 テンプレート（アカウントへ配る）V8 | /hq/templates | `app/hq/templates/page.tsx` | `v8/hq-templates/console.tsx`<br>`v8/hq-deliveries/console.tsx` |
+| V8-B | X4JcOf | 統括 テンプレート（ひな形を作る）V8 | /hq/templates | `app/hq/templates/page.tsx` | `v8/hq-templates/console.tsx`<br>`v8/hq-deliveries/console.tsx` |
 | V8-B | EMUl9 | 流入と計測 一覧（閲覧のみ）V8 | /inflow-links | `app/inflow-links/page.tsx` | `v8/inflow-links/ad-connections.tsx`<br>`v8/inflow-links/ad-history.tsx`<br>`v8/inflow-links/site-script.tsx`<br>`v8/inflow-links/ads.tsx`<br>`v8/inflow-links/list.tsx` |
 | V8-B | FDBsG | 流入と計測 広告とのつなぎ V8（機能追加 F-21・API待ち） | /inflow-links | `app/inflow-links/page.tsx` | `v8/inflow-links/ad-connections.tsx`<br>`v8/inflow-links/ad-history.tsx`<br>`v8/inflow-links/site-script.tsx`<br>`v8/inflow-links/ads.tsx`<br>`v8/inflow-links/list.tsx` |
 | V8-B | GtI4Y | 流入と計測 QR コードの小窓 V8 | /inflow-links | `app/inflow-links/page.tsx` | `v8/inflow-links/ad-connections.tsx`<br>`v8/inflow-links/ad-history.tsx`<br>`v8/inflow-links/site-script.tsx`<br>`v8/inflow-links/ads.tsx`<br>`v8/inflow-links/list.tsx` |
@@ -265,8 +265,8 @@
 | V8-B | MuhWR | NEN配信 一覧（自動配信）V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
 | V8-B | oqSJP | NEN配信 誕生日クーポンの決めごと（引き出し）V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
 | V8-B | Tj7n4 | NEN配信 送った履歴 V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
-| V8-B | yRDwW | NEN配信 コラムを書く V8 | /nen-campaigns/columns/new | `app/nen-campaigns/columns/new/page.tsx` | `v8/nen-campaigns/column-new.tsx`<br>`app/nen-campaigns/columns/new/column-new-v8.tsx` |
-| V8-B | w5pwG | NEN配信 配信を直す（口コミのお願い）V8 | /nen-campaigns/edit | `app/nen-campaigns/edit/page.tsx` | `v8/nen-campaigns/edit.tsx`<br>`app/nen-campaigns/edit/campaign-editor-v8.tsx` |
+| V8-B | yRDwW | NEN配信 コラムを書く V8 | /nen-campaigns/columns/new | `app/nen-campaigns/columns/new/page.tsx` | `v8/nen-campaigns/column-new.tsx` |
+| V8-B | w5pwG | NEN配信 配信を直す（口コミのお願い）V8 | /nen-campaigns/edit | `app/nen-campaigns/edit/page.tsx` | `v8/nen-campaigns/edit.tsx` |
 | V8-B | cniyw | 投稿 採用 V8 | /nen-members | `app/nen-members/page.tsx` | `v8/nen-posts/review.tsx` |
 | V8-B | Jn95h | 投稿 写真の審査（閲覧のみ）V8 | /nen-members | `app/nen-members/page.tsx` | `v8/nen-posts/review.tsx` |
 | V8-B | N1br7 | 投稿 報酬の決まり 版の履歴 V8 | /nen-members | `app/nen-members/page.tsx` | `v8/nen-posts/review.tsx` |
@@ -304,7 +304,7 @@
 | V8-B | Oub6x | 運営 契約先の詳細 V8 | /ops/tenants/detail | `app/ops/tenants/detail/page.tsx` | `v8/ops/tenant-detail.tsx` |
 | V8-B | okXoi | 運営 契約先を停止 V8 | /ops/tenants/detail?id=visual-tenant-1 | `app/ops/tenants/detail/page.tsx` | `v8/ops/tenant-detail.tsx` |
 | V8-B | qod6X | 運営 2要素認証を設定 V8 | /ops/two-factor | `app/ops/two-factor/page.tsx` | `v8/ops/two-factor.tsx` |
-| V8-B | u3iab3 | 設定 プール管理 V8 | /pools | `app/pools/page.tsx` | `v8/settings/pools/pools.tsx`<br>`app/settings/settings-nav-v8.tsx` |
+| V8-B | u3iab3 | 設定 プール管理 V8 | /pools | `app/pools/page.tsx` | `v8/settings/pools/pools.tsx`<br>`components/layout/settings-inner-nav.tsx` |
 | V8-B | D0AOyx | プール管理 プールを作る V8 | /pools/new | `app/pools/new/page.tsx` | `v8/settings/pools/create.tsx` |
 | V8 | a5C1p | リマインダ 一覧（閲覧のみ）V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
 | V8 | apLqS | リマインダ 一覧 V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
@@ -387,10 +387,10 @@
 | V8 | ztgRD | 設定 並びを変える V8 | /settings | `app/settings/page.tsx` | `v8/settings/features/screen.tsx` |
 | V8 | PfA4o | 設定 ファイルの検査 V8 | /settings/file-scan | `app/settings/file-scan/page.tsx` | `v8/settings/file-scan/screen.tsx` |
 | V8 | cIdA2 | 設定 マニュアルの正本表 V8 | /settings/manual-links | `app/settings/manual-links/page.tsx` | `v8/settings/manual-links/screen.tsx` |
-| V8 | A35Gh | 設定 ログインユーザー（閲覧のみ）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx`<br>`app/staff/staff-head-v8.tsx` |
-| V8 | nku0f | 設定 ログインユーザー（管理者・権限） V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx`<br>`app/staff/staff-head-v8.tsx` |
-| V8 | wbDHy | ログインユーザー（1152）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx`<br>`app/staff/staff-head-v8.tsx` |
-| V8-B | bMpC5 | 組織・権限 ユーザーの停止 V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx`<br>`app/staff/staff-head-v8.tsx` |
+| V8 | A35Gh | 設定 ログインユーザー（閲覧のみ）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
+| V8 | nku0f | 設定 ログインユーザー（管理者・権限） V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
+| V8 | wbDHy | ログインユーザー（1152）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
+| V8-B | bMpC5 | 組織・権限 ユーザーの停止 V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
 | V8 | aPeD8 | 友だち属性 一覧（1152）V8 | /tags | `app/tags/page.tsx` | `v8/tags/list.tsx` |
 | V8 | fkGUR | 友だち属性 タグ（閲覧のみ）V8 | /tags | `app/tags/page.tsx` | `v8/tags/list.tsx` |
 | V8 | I1E7Bt | 友だち属性 タグ V8 | /tags | `app/tags/page.tsx` | `v8/tags/list.tsx` |
@@ -437,21 +437,21 @@
 | V8-B | YZ57z | 外部連携 Google Sheets の接続を解除 V8 | /webhooks?tab=sheets | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
 | V8-B | hsD8e | 外部連携 送り先を作る V8 | /webhooks/new | `app/webhooks/new/page.tsx` | `v8/webhooks/create.tsx` |
 | V8-B | NGh7b | 外部連携 送り先を作る（競合）V8 | /webhooks/new | `app/webhooks/new/page.tsx` | `v8/webhooks/create.tsx` |
-| V8-B | E7iAYs | ウェビナー ④通知 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | eAQ3t | ウェビナー 状態 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | jiNg0 | ウェビナー 一覧（閲覧のみ）V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | Omqd4 | ウェビナー コメント演出 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | pvimJ | ウェビナー ③CTA・フォーム（競合）V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | Q0Jrk | ウェビナー ③CTA・フォーム V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | uBMuB | ウェビナー 一覧 1152 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | uNsEy | ウェビナー 参加者 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | UyUMw | ウェビナー 一覧 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | VWNaA | ウェビナー ②動画 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | VXZ6T | ウェビナー アーカイブの確認 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | z2dgw | ウェビナー 分析 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx`<br>`app/webinars/list-v8.tsx` |
-| V8-B | j7PP04 | ウェビナー ①基本設定（作る）V8 | /webinars/new | `app/webinars/new/page.tsx` | `v8/webinar-edit/new.tsx`<br>`app/webinars/new/new-v8.tsx` |
-| V8-B | LPOe7 | ウェビナー ②動画（日時指定・開催回）V8 | /webinars/new | `app/webinars/new/page.tsx` | `v8/webinar-edit/new.tsx`<br>`app/webinars/new/new-v8.tsx` |
-| V8-B | XCUNf | ウェビナー ⑤確認 V8 | /webinars/new | `app/webinars/new/page.tsx` | `v8/webinar-edit/new.tsx`<br>`app/webinars/new/new-v8.tsx` |
+| V8-B | E7iAYs | ウェビナー ④通知 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | eAQ3t | ウェビナー 状態 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | jiNg0 | ウェビナー 一覧（閲覧のみ）V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | Omqd4 | ウェビナー コメント演出 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | pvimJ | ウェビナー ③CTA・フォーム（競合）V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | Q0Jrk | ウェビナー ③CTA・フォーム V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | uBMuB | ウェビナー 一覧 1152 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | uNsEy | ウェビナー 参加者 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | UyUMw | ウェビナー 一覧 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | VWNaA | ウェビナー ②動画 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | VXZ6T | ウェビナー アーカイブの確認 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | z2dgw | ウェビナー 分析 V8 | /webinars | `app/webinars/page.tsx` | `v8/webinars/list.tsx` |
+| V8-B | j7PP04 | ウェビナー ①基本設定（作る）V8 | /webinars/new | `app/webinars/new/page.tsx` | `v8/webinar-edit/new.tsx` |
+| V8-B | LPOe7 | ウェビナー ②動画（日時指定・開催回）V8 | /webinars/new | `app/webinars/new/page.tsx` | `v8/webinar-edit/new.tsx` |
+| V8-B | XCUNf | ウェビナー ⑤確認 V8 | /webinars/new | `app/webinars/new/page.tsx` | `v8/webinar-edit/new.tsx` |
 | V8 | AcTHQ | LIFF 状態：読み込み中 | — | — | （撮らない板・URL なし） |
 | V8 | ADutg | LIFF 状態：空きがない | — | — | （撮らない板・URL なし） |
 | V8 | aNZKe | LIFF 回答フォーム 送った | — | — | （撮らない板・URL なし） |

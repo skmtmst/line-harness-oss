@@ -7,8 +7,12 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import type { NenCampaignSetting } from '../../lib/api'
-import { NenOverview, type NenTab } from './nen-overview'
+import NenOverview from '@/v8/nen-campaigns/list'
+import { type NenTab } from '@/v8/nen-campaigns/display'
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -100,10 +104,15 @@ afterEach(() => {
 })
 
 describe('NENコラム配信の停止・再開(#934 N-295)', () => {
+  function toggleAction(label: string) {
+    const menu = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'よく使う絞り込み')!
+    act(() => { menu.click() })
+    return Array.from(document.querySelectorAll('button[role="menuitem"]')).find((button) => button.textContent === label) as HTMLButtonElement | undefined
+  }
   it('配信中は「止める」が見え、押すと決めごとの切替を呼ぶ', () => {
     const onToggle = vi.fn()
     renderColumns(columnSetting(true), onToggle)
-    const stop = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '止める')
+    const stop = toggleAction('コラム配信を止める')
     expect(stop).toBeDefined()
     act(() => { stop!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     expect(onToggle).toHaveBeenCalledWith(expect.objectContaining({ campaignKey: 'column', isEnabled: true }))
@@ -112,7 +121,7 @@ describe('NENコラム配信の停止・再開(#934 N-295)', () => {
   it('停止中は「動かす」と停止の案内が見える', () => {
     const onToggle = vi.fn()
     renderColumns(columnSetting(false), onToggle)
-    const start = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '動かす')
+    const start = toggleAction('コラム配信を動かす')
     expect(start).toBeDefined()
     expect(container.textContent).toContain('停止中')
     expect(container.textContent).toContain('いまは送れません')

@@ -12,6 +12,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const access = vi.hoisted(() => ({ role: 'owner' as string | null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => access.role }))
 const push = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -22,6 +24,8 @@ vi.mock('next/navigation', () => ({
 import BroadcastDetail, { type BroadcastDetailProps } from './detail'
 import Reserved, { type ReservedProps } from './reserved'
 import type { ApiBroadcast, BroadcastApprovalState } from '@/lib/api'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -123,10 +127,20 @@ function reservedProps(overrides: Partial<ReservedProps> = {}): ReservedProps {
   }
 }
 
+const stored = new Map<string, string>()
+Object.defineProperty(window, 'localStorage', { configurable: true, value: {
+  getItem: (key: string) => stored.get(key) ?? null,
+  setItem: (key: string, value: string) => { stored.set(key, value) },
+  removeItem: (key: string) => { stored.delete(key) },
+  clear: () => { stored.clear() },
+} })
 let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  access.role = 'owner'
+  window.localStorage.clear()
+  forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -151,6 +165,24 @@ const buttonText = (text: string) => buttons().find((button) => button.textConte
 const linkText = (text: string) => [...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === text) as HTMLAnchorElement | undefined
 
 describe('V8 一斉配信の詳細', () => {
+  it('編集できてもテスト送信の鍵が無ければ押し口を隠す', async () => {
+    access.role = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
+    await render(<BroadcastDetail {...detailProps()} />)
+    expect(buttonText('テストを送る')).toBeUndefined()
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit', 'broadcast.test.send'] } as StaffMember)
+    await render(<BroadcastDetail {...detailProps()} />)
+    expect(buttonText('テストを送る')).toBeTruthy()
+  })
+
+  it('保存値がオーナーでもサーバーの役割が未確認ならテスト送信とCSVを隠す', async () => {
+    access.role = null
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    await render(<BroadcastDetail {...detailProps()} />)
+    expect(buttonText('テストを送る')).toBeUndefined()
+    expect(buttonText('CSVで書き出す')).toBeUndefined()
+  })
+
   it('下書きは止まった手順（3 メッセージ）から続けるボタンと、テスト送信・CSV・「…」を置く', async () => {
     await render(<BroadcastDetail {...detailProps()} />)
     const resume = linkText('3 メッセージから続ける')
@@ -166,6 +198,8 @@ describe('V8 一斉配信の詳細', () => {
   })
 
   it('閲覧のみには変える操作を置かない（押せないボタンも残さない）。CSV は出す', async () => {
+    access.role = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionViewKeys: ['/broadcasts', 'broadcast.result.export'] } as StaffMember)
     await render(<BroadcastDetail {...detailProps({ canEdit: false })} />)
     expect(linkText('3 メッセージから続ける')).toBeUndefined()
     expect(buttonText('テストを送る')).toBeUndefined()

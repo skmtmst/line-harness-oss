@@ -521,3 +521,6 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersCreate.mock.calls[1][0].operationId).not.toBe(operationA)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

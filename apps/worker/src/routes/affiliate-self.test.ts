@@ -660,6 +660,15 @@ describe('LIFF affiliate bank and statements', () => {
     expect(response.status).toBe(200);
   }
 
+  it('誤った振込先は欄ごとの理由を400で返し、秘密値を返さない', async () => {
+    const res = await call('/api/liff/affiliate/bank', { method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ lineAccessToken: 'tok-alice', bankCode: '1', bankName: '', branchCode: 'abc', branchName: '', accountType: 'invalid', accountNumber: 'secret', accountHolderName: '', expectedVersion: 0 }) });
+    expect(res.status).toBe(400);
+    const body = await res.json() as { fields: Record<string, string> };
+    expect(Object.keys(body.fields).sort()).toEqual(['bankCode', 'bankName', 'branchCode', 'branchName', 'accountType', 'accountNumber', 'accountHolderName'].sort());
+    expect(JSON.stringify(body)).not.toContain('secret');
+    expect(dbMocks.saveAffiliateBankProfile).not.toHaveBeenCalled();
+  });
+
   it('LINEで再照合した本人だけが振込先を保存し、口座番号を返さない', async () => {
     await registerAlice();
     const response = await call('/api/liff/affiliate/bank', {

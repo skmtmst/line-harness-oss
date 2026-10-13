@@ -138,11 +138,11 @@ describe('★V8 の Select は開いた中身を select-menu で描く', () => {
   })
 })
 
-describe('v7 は今までの中身', () => {
-  it('data-theme が v8 でなければ選択肢の文字は変えない', async () => {
-    delete document.documentElement.dataset.theme
+describe('テーマ指定がなくても現在の中身', () => {
+  it('旧テーマ指定でも現在の見出しと候補を出す', async () => {
+    document.documentElement.dataset.theme = 'v7'
     await open()
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['並び：友だち順', '並び：名前順', '並び：登録順'])
-    expect(document.querySelector('[data-select-menu]')).toBeNull()
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['友だち順', '名前順', '登録順'])
+    expect(document.querySelector('[data-select-menu]')).not.toBeNull()
   })
 })

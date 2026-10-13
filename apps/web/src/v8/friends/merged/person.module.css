@@ -32,8 +32,8 @@
 .colState { width: var(--tpl-fr-dup-col-status); }
 .colDate { width: var(--tpl-fr-mp-col-date); }
 
-:global([data-theme='v8']) .table thead tr { background: transparent; border-top: 0; }
-:global([data-theme='v8']) .table thead th.th {
+:global(:root) .table thead tr { background: transparent; border-top: 0; }
+:global(:root) .table thead th.th {
   height: var(--tpl-fr-dup-thead-h);
   padding: var(--tpl-fr-dup-thead-pad);
   background: transparent;
@@ -43,8 +43,8 @@
   line-height: var(--tpl-fr-desc-lh);
   vertical-align: top;
 }
-:global([data-theme='v8']) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
-:global([data-theme='v8']) .table td.td {
+:global(:root) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table td.td {
   height: var(--tpl-fr-mig-row-h);
   padding: 0 var(--tpl-fr-stack-gap) 0 0;
   color: var(--color-ink);
@@ -52,8 +52,8 @@
   line-height: var(--tpl-fr-desc-lh);
   vertical-align: middle;
 }
-:global([data-theme='v8']) .table tr.rowTall td.td { height: var(--tpl-fr-mu-row-h); }
-:global([data-theme='v8']) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table tr.rowTall td.td { height: var(--tpl-fr-mu-row-h); }
+:global(:root) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
 
 .pill { display: inline-flex; padding: var(--tpl-fr-status-pad); border-radius: var(--radius-pill); font-size: var(--text-micro); font-weight: 700; line-height: var(--tpl-fr-sub-lh); white-space: nowrap; }
 .pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
@@ -78,7 +78,7 @@
 .cardTitleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fr-stack-gap); }
 .linkRight { min-height: 0; padding: 0; line-height: var(--tpl-fr-desc-lh); flex-shrink: 0; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; }
 .linkRight:hover, .link:hover { text-decoration: underline; }
-.error { margin: 0; padding: var(--tpl-fm-band-pad); border-radius: var(--radius-control); background: var(--color-danger-bg); color: var(--color-danger); font-size: var(--text-caption); }
+
 
 .lines { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .line {

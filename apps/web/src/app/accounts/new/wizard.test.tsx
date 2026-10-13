@@ -1,17 +1,18 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import NewLineAccountPage from './page'
 
 const calls = vi.hoisted(() => ({
-  connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(),
+  connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(), list: vi.fn(), followerInsight: vi.fn(),
 }))
 // 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
 const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices } }))
+vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices, staff: { list: async () => ({ success: true, data: [] }) } } }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
 
 const passedSteps = [
   'チャネルIDとシークレットでアクセストークンを発行',
@@ -34,9 +35,10 @@ const checked = {
   },
 }
 
-afterEach(() => { cleanup(); window.localStorage?.clear() })
+afterEach(() => { cleanup(); window.localStorage?.clear(); delete document.documentElement.dataset.theme })
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.clearAllMocks(); document.documentElement.dataset.theme='v8'
+  calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
   notices.lineRegistration.mockResolvedValue({ success: true, data: { available: false } })
@@ -48,10 +50,10 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 async function enterConnectionStep() {
   render(<NewLineAccountPage />)
   next()
-  fill('channel-id', '123456789')
-  fill('channel-secret', 'synthetic-secret')
-  fill('login-channel-id', '2007123456')
-  fill('login-channel-secret', 'synthetic-login-secret')
+  fill('v8-channel-id', '123456789')
+  fill('v8-channel-secret', 'synthetic-secret')
+  fill('v8-login-channel-id', '2007123456')
+  fill('v8-login-channel-secret', 'synthetic-login-secret')
   next()
   next()
   expect(screen.getByRole('button', { name: '接続して設定する' })).toBeTruthy()
@@ -59,29 +61,31 @@ async function enterConnectionStep() {
 
 async function checkConnection() {
   fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-  await screen.findByText('5段すべて通りました。保存できます。')
+  await screen.findByRole('dialog', { name: '接続を確かめた結果' })
+  fireEvent.click(screen.getByRole('checkbox', { name: /応答メッセージ.*オフ/ }))
 }
 
 describe('LINEアカウント作成ウィザード', () => {
-  it('手順1はLINE側の準備で、手順3が表示名だけ（未入力のまま次へ進める）', () => {
+  it('LINEの準備から基本情報へ進み、任意の表示名は未入力でも接続できる', () => {
     render(<NewLineAccountPage />)
-    expect(screen.getByText('1. LINE側の準備')).toBeTruthy()
+    expect(screen.getByText('アカウントの用意方法')).toBeTruthy()
     next()
     expect(screen.getByText('接続に必要な4項目')).toBeTruthy()
-    fill('channel-id', '123456789')
-    fill('channel-secret', 'synthetic-secret')
-    fill('login-channel-id', '2007123456')
-    fill('login-channel-secret', 'synthetic-login-secret')
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-login-channel-id', '2007123456')
+    fill('v8-login-channel-secret', 'synthetic-login-secret')
     next()
-    expect(document.getElementById('account-name')).toBeTruthy()
-    expect(document.querySelectorAll('input')).toHaveLength(1)
+    expect(document.getElementById('v8-display-name')).toBeTruthy()
+    expect((document.getElementById('v8-display-name') as HTMLInputElement).required).toBe(false)
+    expect(document.getElementById('v8-line-id')).toBeTruthy()
     next()
     expect(screen.getByRole('button', { name: '接続して設定する' })).toBeTruthy()
   })
 
-  it('新規を選んだときだけ公式アカウント作成リンクを出す', () => {
+  it('用意方法を切り替えても公式アカウント作成リンクを別タブで開ける', () => {
     render(<NewLineAccountPage />)
-    expect(screen.queryByRole('link', { name: /LINE公式アカウントを作る/ })).toBeNull()
+    expect(screen.getByRole('link', { name: /LINE公式アカウントを作る/ }).getAttribute('href')).toBe('https://manager.line.biz/')
     fireEvent.click(screen.getByLabelText('新しく公式アカウントを作成'))
     const link = screen.getByRole('link', { name: /LINE公式アカウントを作る/ })
     expect(link.getAttribute('href')).toBe('https://manager.line.biz/')
@@ -91,12 +95,12 @@ describe('LINEアカウント作成ウィザード', () => {
   it('手順2は4項目だけを必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
     next()
-    const ids = ['channel-id', 'channel-secret', 'login-channel-id', 'login-channel-secret']
+    const ids = ['v8-channel-id', 'v8-channel-secret', 'v8-login-channel-id', 'v8-login-channel-secret']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
     expect(screen.getAllByRole('link', { name: '取得方法を見る' }).map((node) => node.getAttribute('href')))
-      .toEqual(['/manuals/line-connect/index.html#m1', '/manuals/line-connect/index.html#m2'])
+      .toEqual(['/manuals/line-connect/index.html#m1'])
   })
 
   it('5段で止まった箇所を示し、失敗時は保存できない', async () => {
@@ -111,25 +115,25 @@ describe('LINEアカウント作成ウィザード', () => {
     })
     await enterConnectionStep()
     fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    expect(await screen.findAllByText('Webhookの利用をオンにしてください')).toHaveLength(2)
-    expect((screen.getByRole('button', { name: '接続して保存する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(await screen.findAllByText(/Webhookの利用をオンにしてください/)).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: '確認コードを入れて登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
   })
 
   it('未認証アカウントは保存直後から完了ボタンを使える', async () => {
     await enterConnectionStep()
     await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
     await screen.findByText('登録が完了しました', { selector: 'h2' })
-    expect(calls.connect).toHaveBeenCalledWith({
+    expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({
       name: undefined,
       channelId: '123456789',
       channelSecret: 'synthetic-secret',
       loginChannelId: '2007123456',
       loginChannelSecret: 'synthetic-login-secret',
-    }, undefined)
+    }), undefined)
     expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toBe('/accounts/detail?id=new-account')
-    expect(screen.getByRole('link', { name: '統括コンソールへ' }).getAttribute('href')).toBe('/hq')
+    expect(screen.getByRole('link', { name: '統括コンソールへ戻る' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')
     await waitFor(() => expect(notices.lineRegistration).toHaveBeenCalled())
     expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）')
@@ -142,7 +146,7 @@ describe('LINEアカウント作成ウィザード', () => {
     } })
     await enterConnectionStep()
     await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
     await screen.findByText('登録が完了しました', { selector: 'h2' })
     await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
     expect(document.body.textContent).toContain('123456')
@@ -164,8 +168,8 @@ describe('LINEアカウント作成ウィザード', () => {
     calls.followerImportState.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
     await enterConnectionStep()
     await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
-    expect(await screen.findAllByText(/既存の友だちを取り込んでいます/)).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
+    expect(await screen.findAllByText(/既存の友だちを取り込んでいます/)).toHaveLength(1)
     expect((screen.getByRole('button', { name: '登録したアカウントを見る' }) as HTMLButtonElement).disabled).toBe(true)
     await waitFor(() => expect(calls.followerImportState).toHaveBeenCalled())
     finishStep({ success: true, data: {
@@ -180,11 +184,11 @@ it('V8の登録前タグを接続確認と登録へ渡す', async () => {
  try {
   render(<NewLineAccountPage />);
   next();fill('v8-channel-id','123456789');fill('v8-channel-secret','synthetic-secret');fill('v8-login-channel-id','2007123456');fill('v8-login-channel-secret','synthetic-login-secret');next();
-  fireEvent.click(await screen.findByRole('button',{name:'店舗'}));next();
+  await pickEntities('タグ', ['店舗']);next();
   fireEvent.click(screen.getByRole('button',{name:'接続して設定する'}));
   await waitFor(()=>expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']})));
   fireEvent.click(await screen.findByRole('checkbox',{name:/応答メッセージ.*オフ/}));
   fireEvent.click(screen.getByRole('button',{name:'確認コードを入れて登録する'}));
   await waitFor(()=>expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']}),undefined));
- } finally {document.documentElement.dataset.theme='v7';}
+ } finally {delete document.documentElement.dataset.theme;}
 });

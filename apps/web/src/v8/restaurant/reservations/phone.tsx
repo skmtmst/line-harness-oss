@@ -1,13 +1,7 @@
 'use client'
 
-/*
- * ★V8 電話の予約を入れる（板 `rm92Y`）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
- *
- * 何を入れますか（お客さまの予約／枠だけ押さえる）→ だれの予約ですか（LINE の友だちを探す／
- * LINE 未連携の電話番号）→ いつ・何人・どの卓（空いている時間・卓・コース）→ 要望・アレルギー →
- * お客さまに何を送りますか。右：その時間の卓・LINE で届く見本・この方について。下の帯：キャンセル／台帳に入れる。
- * 送る形・口は今の画面（app/restaurant-test/v8/reservation-phone.tsx）と同じ。
- */
+import { jstCalendar } from '@/lib/jst-datetime'
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Lock, UserPlus } from 'lucide-react'
 import type { RestaurantCustomerHistory, RestaurantOpeningDay } from '@line-crm/shared'
@@ -36,10 +30,21 @@ import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 電話の予約を入れる（板 `rm92Y`）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
+ *
+ * 何を入れますか（お客さまの予約／枠だけ押さえる）→ だれの予約ですか（LINE の友だちを探す／
+ * LINE 未連携の電話番号）→ いつ・何人・どの卓（空いている時間・卓・コース）→ 要望・アレルギー →
+ * お客さまに何を送りますか。右：その時間の卓・LINE で届く見本・この方について。下の帯：キャンセル／台帳に入れる。
+ * 送る形・口は今の画面（app/restaurant-test/v8/reservation-phone.tsx）と同じ。
+ */
 
 const STAY_MINUTES = 120
 const FALLBACK_START = 17 * 60
@@ -54,11 +59,11 @@ function toMinutes(time: string): number {
 
 /** 希望の時間（2時間）とその卓の予約が重なるか。期限切れの押さえは数えない。 */
 function overlaps(day: string, time: string, tableId: string, rows: RestaurantReservation[]): boolean {
-  const start = new Date(`${day}T${time.padStart(5, '0')}:00`).getTime()
+  const start = new Date(`${day}T${time.padStart(5, '0')}:00+09:00`).getTime()
   if (!Number.isFinite(start)) return false
   const end = start + STAY_MINUTES * 60_000
   return rows.some((r) => {
-    if (r.table_id !== tableId || INACTIVE_STATUSES.includes(r.status)) return false
+    if (r.departed_at || r.table_id !== tableId || INACTIVE_STATUSES.includes(r.status)) return false
     if (r.status === 'pending' && r.hold_expires_at && Date.parse(r.hold_expires_at) <= Date.now()) return false
     const s = new Date(r.starts_at).getTime()
     const e = new Date(r.ends_at).getTime()
@@ -111,12 +116,12 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const formRef = useRef<HTMLFormElement>(null)
   const guests = Number(count)
   const fields = useFormErrors()
-  fields.define('person', 'お客さま', () => kind !== 'customer' || whoTab !== 'line' || person ? null : '名前・電話番号で探して、お客さまを選んでください。')
-  fields.define('name', 'お名前', () => kind !== 'customer' || whoTab !== 'phone' || manualName.trim() ? null : 'お名前を入れてください。')
-  fields.define('date', '日付', () => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(`${date}T00:00:00`)) ? null : '日付を選んでください。')
-  fields.define('count', '人数', () => Number.isInteger(guests) && guests >= 1 && guests <= 100 ? null : '人数は1〜100で入れてください。')
-  fields.define('time', '時間', () => time && times.includes(time) ? null : '空いている時間を選んでください。')
-  fields.define('hold', '仮押さえの期限（分）', () => kind !== 'hold' || (Number.isInteger(Number(holdMinutes)) && Number(holdMinutes) >= 1 && Number(holdMinutes) <= 120) ? null : '期限は1〜120分で入れてください。')
+  fields.define('person', 'お客さま', () => kind !== 'customer' || whoTab !== 'line' || person ? null : '名前・電話番号で探して、お客さまを選んでください。', { required: true })
+  fields.define('name', 'お名前', () => kind !== 'customer' || whoTab !== 'phone' || manualName.trim() ? null : 'お名前を入れてください。', { required: true })
+  fields.define('date', '日付', () => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(`${date}T00:00:00`)) ? null : '日付を選んでください。', { required: true })
+  fields.define('count', '人数', () => Number.isInteger(guests) && guests >= 1 && guests <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
+  fields.define('time', '時間', () => time && times.includes(time) ? null : '空いている時間を選んでください。', { required: true })
+  fields.define('hold', '仮押さえの期限（分）', () => kind !== 'hold' || (Number.isInteger(Number(holdMinutes)) && Number(holdMinutes) >= 1 && Number(holdMinutes) <= 120) ? null : '期限は1〜120分で入れてください。', { required: true })
 
 
   const dirty = kind !== (preset.hold ? 'hold' : 'customer') || search !== '' || person !== null || manualPhone !== '' || manualName !== ''
@@ -200,7 +205,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const lastVisit = history?.visits[0] ?? null
   const lastAllergy = history?.visits.find((v) => v.allergy_note)?.allergy_note ?? null
   const [yy, mm, dd] = date.split('-').map(Number)
-  const dayDate = yy && mm && dd ? new Date(yy, mm - 1, dd) : new Date()
+  const dayDate = yy && mm && dd ? new Date(`${date}T00:00:00+09:00`) : new Date()
 
   const save = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
@@ -214,7 +219,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
       })
       return
     }
-    const startsAt = new Date(`${date}T${time.padStart(5, '0')}:00`).toISOString()
+    const startsAt = new Date(`${date}T${time.padStart(5, '0')}:00+09:00`).toISOString()
     const endsAtIso = new Date(new Date(startsAt).getTime() + STAY_MINUTES * 60_000).toISOString()
     void onSave({
       kind, holdMinutes: Number(holdMinutes), source: 'phone', storeId, customerName: name, customerPhone: phone || null, lineUid: lineUid || null,
@@ -264,7 +269,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         {history ? (
           <>
             <p className={styles.breakRow}><span>これまでの来店</span><strong>{`${history.visitCount} 回`}</strong></p>
-            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${new Date(lastVisit.starts_at).getMonth() + 1}/${new Date(lastVisit.starts_at).getDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
+            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${jstCalendar(new Date(lastVisit.starts_at)).getUTCMonth() + 1}/${jstCalendar(new Date(lastVisit.starts_at)).getUTCDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
             <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || emptyValue('unknown')}</strong></p>
           </>
         ) : (
@@ -294,13 +299,13 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         <form ref={formRef} className={styles.phoneForm} onSubmit={save} noValidate>
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-kind">
             <h2 id="rs-phone-kind" className={styles.phoneCardTitle}>何を入れますか</h2>
-            <RadioCardGroup legend="何を入れますか" className={styles.kindCards}>
+            <SaveErrorField names={["rs-phone-kind","kind"]}><RadioCardGroup legend="何を入れますか" className={styles.kindCards}>
               <RadioCard name="rs-phone-kind" value="customer" checked={kind === 'customer'} onChange={setKind} icon={<UserPlus size={16} aria-hidden="true" />} title="お客さまの予約を入れる" note="電話・店頭で受けた予約" />
               <RadioCard name="rs-phone-kind" value="hold" checked={kind === 'hold'} onChange={setKind} icon={<Lock size={16} aria-hidden="true" />} title="枠だけ押さえる" note="電話・常連・団体のために空けておく" />
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
             {kind === 'hold' ? (
-              <Field label="仮押さえの期限（分）" htmlFor="rs-phone-hold" error={fields.error('hold')}>
-                <NumberInput unit="分" id="rs-phone-hold" aria-label="仮押さえの期限（分）" type="number" min={1} max={120} value={holdMinutes} onChange={(event) => setHoldMinutes(event.target.value)} />
+              <Field label="仮押さえの期限（分）" htmlFor="rs-phone-hold" error={fields.error('hold')} requirement={fields.requirement('hold')}>
+                <SaveErrorField names={["holdMinutes","hold_minutes"]}><NumberInput unit="分" id="rs-phone-hold" aria-label="仮押さえの期限（分）" type="number" min={1} max={120} value={holdMinutes} onChange={(event) => setHoldMinutes(event.target.value)} /></SaveErrorField>
               </Field>
             ) : null}
           </Card>
@@ -310,13 +315,13 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                 <h2 id="rs-phone-who-title" className={styles.phoneCardTitle}>だれの予約ですか</h2>
                 <p className={styles.phoneCardText}>LINE の友だちなら名前で探して結びつけます。LINE 未連携の電話番号でも入れられます</p>
               </div>
-              <div className={styles.inlineControls}><SegmentedControl aria-label="お客さまの探し方" appearance="choices" value={whoTab} onChange={(next) => { setWhoTab(next); setPerson(null) }} options={[
+              <div className={styles.inlineControls}><SaveErrorField names={["whoTab"]}><SegmentedControl aria-label="お客さまの探し方" appearance="choices" value={whoTab} onChange={(next) => { setWhoTab(next); setPerson(null) }} options={[
                 { value: 'line', label: 'LINE の友だち' }, { value: 'phone', label: 'LINE 未連携の電話番号' },
-              ]} /></div>
+              ]} /></SaveErrorField></div>
               {whoTab === 'line' ? (
                 <>
                   {/* 選んだあとも探す欄は残す（絵 rm92Y：欄の下に選んだ人の行）。 */}
-                  <Field label="名前・電話番号で探す" labelHidden error={fields.error('person')}>
+                  <Field label="名前・電話番号で探す" labelHidden error={fields.error('person')} requirement={fields.requirement('person')}>
                   <SearchField id="rs-phone-search" aria-invalid={fields.invalid('person')}
                     aria-label="名前・電話番号で探す"
                     placeholder="名前・電話番号で探す"
@@ -328,7 +333,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                   </Field>
                   {!person && search.trim().length >= 2 ? (
                     <div className={styles.foundList}>
-                      {searchError ? <p role="alert" className={styles.formError}>{searchError}</p> : null}
+                      {searchError ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{searchError}</Notice> : null}
                       {found.length === 0 && !searchError ? <p className={styles.sideText}>台帳に見つかりません。電話番号のタブから入れられます。</p> : null}
                       {found.map((c) => (
                         <Button key={`${c.lineUid || c.phone || c.name}`} type="button" onClick={() => { setPerson(c); setSearch('') }}>
@@ -349,10 +354,10 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               ) : (
                 <div className={styles.pair}>
                   <Field label="電話番号" htmlFor="rs-phone-tel">
-                    <TextField id="rs-phone-tel" inputMode="tel" value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} />
+                    <SaveErrorField names={["manualPhone","manual_phone"]}><TextField id="rs-phone-tel" inputMode="tel" value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} /></SaveErrorField>
                   </Field>
-                  <Field label="お名前" htmlFor="rs-phone-name" error={fields.error('name')}>
-                    <TextField id="rs-phone-name" value={manualName} onChange={(event) => setManualName(event.target.value)} />
+                  <Field label="お名前" htmlFor="rs-phone-name" error={fields.error('name')} requirement={fields.requirement('name')}>
+                    <SaveErrorField names={["manualName","manual_name"]}><TextField id="rs-phone-name" value={manualName} onChange={(event) => setManualName(event.target.value)} /></SaveErrorField>
                   </Field>
                 </div>
               )}
@@ -361,15 +366,15 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-when">
             <h2 id="rs-phone-when" className={styles.phoneCardTitle}>いつ・何人・どの卓</h2>
             <div className={styles.pair}>
-              <Field label="日付" htmlFor="rs-phone-date" error={fields.error('date')}>
-                <DateField size="compact" id="rs-phone-date" invalid={fields.invalid('date')} value={date} onChange={(next) => { setDate(next); setTime('') }} />
+              <Field label="日付" htmlFor="rs-phone-date" error={fields.error('date')} requirement={fields.requirement('date')}>
+                <SaveErrorField names={["date"]}><DateField size="compact" id="rs-phone-date" invalid={fields.invalid('date')} value={date} onChange={(next) => { setDate(next); setTime('') }} /></SaveErrorField>
               </Field>
-              <Field label="人数" htmlFor="rs-phone-count" error={fields.error('count')}>
-                <NumberInput id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} />
+              <Field label="人数" htmlFor="rs-phone-count" error={fields.error('count')} requirement={fields.requirement('count')}>
+                <SaveErrorField names={["count"]}><NumberInput id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} /></SaveErrorField>
               </Field>
             </div>
             <div className={styles.timeBlock}>
-              {fields.invalid('time') ? <Field label="時間" error={fields.error('time')}><TimeField aria-label="時間" invalid value={time} onChange={setTime} /></Field> : null}
+              {fields.invalid('time') ? <Field label="時間" error={fields.error('time')} requirement={fields.requirement('time')}><SaveErrorField names={["time"]}><TimeField aria-label="時間" invalid value={time} onChange={setTime} /></SaveErrorField></Field> : null}
               <p className={styles.timeLabel}>{`空いている時間（${guests}名が入る卓がある時間）`}</p>
               {times.length === 0 ? (
                 <p className={styles.sideText}>この日は予約を受ける時間がありません（予約枠・在庫の開ける時間）。</p>
@@ -386,16 +391,16 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             </div>
             <div className={styles.pair}>
               <Field labelSize="compact" label="卓">
-                <Select aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
+                <SaveErrorField names={["tableMode","table_mode"]}><EntitySelect aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
                   { value: 'auto', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.label} ${recommended.max_capacity}名）` : '自動で選ぶ' },
-                  ...activeTables.map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
-                ]} />
+                  ...activeTables.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
+                ]} /></SaveErrorField>
               </Field>
               <Field labelSize="compact" label="コース">
-                <Select aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
+                <SaveErrorField names={["courseId","course_id"]}><EntitySelect aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
                   { value: '', label: '席のみ' },
-                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${polishFormatYen(c.price)}` })),
-                ]} />
+                  ...courses.map((c) => ({ ...entityOptionMetadata(c), value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
+                ]} /></SaveErrorField>
               </Field>
             </div>
             <p className={styles.phoneNote}>自動で選ぶと、人数が入る卓のうち余る席が一番少ない卓にします（座席・卓管理の自動配席ルール）</p>
@@ -403,7 +408,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-allergy">
             <h2 id="rs-phone-allergy" className={styles.phoneCardTitle}>要望・アレルギー</h2>
             <Field label="アレルギー・特記事項" htmlFor="rs-phone-allergy-input">
-              <TextField id="rs-phone-allergy-input" value={allergy} onChange={(event) => setAllergy(event.target.value)} />
+              <SaveErrorField names={["allergy","allergyNote"]}><TextField id="rs-phone-allergy-input" value={allergy} onChange={(event) => setAllergy(event.target.value)} /></SaveErrorField>
             </Field>
           </Card>
           {kind === 'customer' ? (
@@ -412,10 +417,10 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                 <h2 id="rs-phone-send" className={styles.phoneCardTitle}>お客さまに何を送りますか</h2>
                 <p className={styles.phoneCardText}>LINE とつながっている方には予約の案内を送れます。送らない選択もできます</p>
               </div>
-              <Checkbox checked={notify} onCheckedChange={setNotify}>
+              <SaveErrorField names={["notify"]}><Checkbox checked={notify} onCheckedChange={setNotify}>
                 <span className={styles.checkTitle}>予約を受け付けたことを、いますぐ LINE に送る</span>
                 <span className={styles.checkSub}>日時・人数・コースを書いた案内が届きます</span>
-              </Checkbox>
+              </Checkbox></SaveErrorField>
               <p className={styles.phoneNote}>前日・当日のご案内は「LINE来店フォロー」で決めた送り方で届きます。</p>
             </Card>
           ) : null}

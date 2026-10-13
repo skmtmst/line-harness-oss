@@ -35,7 +35,9 @@ describe('リッチメニュー作る④の公開前確認（F4gELj）', () => {
 
   it('「見直す」は文字だけのボタン（button役割を保つ）', () => {
     expect(block('.checkRetry {')).toContain('background: transparent')
-    expect(TSX).toContain('className={styles.checkRetry}')
+    expect(TSX).toContain('busy={checksLoading} busyLabel=')
+    expect(TSX).toContain('busy={validating} busyLabel=')
+    expect(TSX).toContain('variant="text" size="inline"')
   })
 
   it('注意の帯は公開前確認の段の中にある', () => {

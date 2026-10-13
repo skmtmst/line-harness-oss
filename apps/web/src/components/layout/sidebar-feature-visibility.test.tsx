@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
@@ -52,6 +54,7 @@ import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 describe('Sidebarのstaff向け機能表示read-model', () => {
   beforeEach(() => {
+    forgetStaffIdentity()
     // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
     clearFeatureVisibilityCache()
     fixture.accountId = 'account-1'
@@ -77,6 +80,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
 
   it('一般staffは最小read-modelだけを使い、offの項目を隠す', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/scenarios', '/broadcasts']))
     expect(window.localStorage.getItem('lh_staff_role')).toBe('staff')
     const view = render(<Sidebar />)
@@ -93,6 +97,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
 
   it('multi_store_hierarchy: offと応答欠落では「プール管理」を出さず、onで出す(#860)', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts', '/pools']))
     fixture.visibility.mockResolvedValue({
       success: true,
@@ -131,6 +136,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
 
   it('ownerも表示可否は最小read-modelから読み、管理GETは並び用に追加する', async () => {
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
     expect(window.localStorage.getItem('lh_staff_role')).toBe('owner')
     render(<Sidebar />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
@@ -143,6 +149,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
 
   it('保存roleがadminでも管理GETが403なら、staff向け表示可否を捨てない', async () => {
     window.localStorage.setItem('lh_staff_role', 'admin')
+    rememberStaffIdentity({ role: 'admin' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/scenarios', '/broadcasts']))
     fixture.get.mockRejectedValue(new Error('403 Forbidden'))
     const view = render(<Sidebar />)
@@ -173,6 +180,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
 
   it('loading/error/retryとaccount切替の遅延応答で、未確認・古い任意機能を表示しない', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts']))
     fixture.visibility
       .mockRejectedValueOnce(new Error('temporary network error'))

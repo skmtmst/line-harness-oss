@@ -1,11 +1,11 @@
 # ログインユーザーの動き（BEHAVIOR.md）
 
-対象：`app/staff/page.tsx`（今の画面）を写して `staff.tsx` に書き直した。板 `nku0f`（管理者）・`A35Gh`（閲覧のみ）・`wbDHy`（1152）・`bMpC5`（止める）。
-窓（役割を変える `EOTS4`・見せる範囲・2段階の確認・ログイン中の端末）は今の画面の写し。直すときは両方。
-`staff-actions.ts`・`staff-scope-draft.ts`・`permission-labels.ts` も写し（src/v8 は @/app を読めない）。
+対象：`app/staff/page.tsx` は `staff.tsx` を常に出す。板 `nku0f`（管理者）・`A35Gh`（閲覧のみ）・`wbDHy`（1152）・`bMpC5`（止める）。
+役割の編集は `/staff/edit?id=` の `StaffEditV8`。見せる範囲・2段階の確認・ログイン中の端末も現役だけを使う。
+`staff-actions.ts`・`staff-scope-draft.ts`・`permission-labels.ts` はここにあるものが正本。招待の画面と純粋な試験もこちらを使う。旧の写しは削除済み。
 
 ## 入口
-- `app/staff/page.tsx`：`data-theme="v8"` のときだけこの画面を出す（`useSettingsTheme`）。v7 側は触らない。
+- `app/staff/page.tsx`：V8固定。テーマの分岐は無い。
 
 ## 受け付ける URL と指定
 - `?tab=members|invited|audit|roles`（`useMergedTab`。今と同じ名前・同じ意味）。

@@ -15,7 +15,8 @@
  * へ渡す。課金の対象外・支払いの管理画面が無いときは、運営へのお問い合わせへ渡す。
  */
 import { Check, CreditCard, Download } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -239,7 +240,7 @@ function BillingInner() {
         ) : null}
       </div>
 
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" >{error}</Notice> : null}
 
       <div className={styles.plans} data-design="Plans">
         {summary.plans.map((plan) => {

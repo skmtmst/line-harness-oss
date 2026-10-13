@@ -2,6 +2,7 @@
 
 import type { DeliveryMode } from '@line-crm/shared'
 import { TimeField } from '@/components/shared/date-time-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export interface ScheduleValue {
   delayMinutes: number
@@ -46,13 +47,13 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
     return (
       <div>
         <label className="block text-xs font-medium text-ink-secondary mb-1">遅延 (分)</label>
-        <input
+        <SaveErrorField names={["delayMinutes","value.delayMinutes","delay_minutes","value.delay_minutes"]}><input
           type="number"
           min={0}
           className={inputCls + ' w-full'}
           value={value.delayMinutes}
           onChange={(e) => onChange({ ...value, delayMinutes: Math.max(0, Number(e.target.value) || 0) })}
-        />
+        /></SaveErrorField>
         <p className="text-xs text-ink-faint mt-0.5">前のステップから</p>
       </div>
     )
@@ -62,15 +63,15 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
       <div className="space-y-2">
         <label className="block text-xs font-medium text-ink-secondary">購読開始から</label>
         <div className="flex items-center gap-2 flex-wrap">
-          <input
+          <SaveErrorField names={["offsetDays","value.offsetDays","offset_days","value.offset_days"]}><input
             type="number"
             min={0}
             className={inputCls}
             value={value.offsetDays}
             onChange={(e) => onChange({ ...value, offsetDays: Math.max(0, Number(e.target.value) || 0) })}
-          />
+          /></SaveErrorField>
           <span className="text-sm text-ink-secondary">日</span>
-          <input
+          <SaveErrorField names={["offsetHours","value.offsetHours","offset_hours","value.offset_hours"]}><input
             type="number"
             min={0}
             max={23}
@@ -79,9 +80,9 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
             onChange={(e) =>
               onChange({ ...value, offsetHours: Math.max(0, Math.min(23, Number(e.target.value) || 0)) })
             }
-          />
+          /></SaveErrorField>
           <span className="text-sm text-ink-secondary">時間</span>
-          <input
+          <SaveErrorField names={["offsetMinutesRemainder","value.offsetMinutesRemainder","offset_minutes_remainder","value.offset_minutes_remainder"]}><input
             type="number"
             min={0}
             max={59}
@@ -93,7 +94,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
                 offsetMinutesRemainder: Math.max(0, Math.min(59, Number(e.target.value) || 0)),
               })
             }
-          />
+          /></SaveErrorField>
           <span className="text-sm text-ink-secondary">分後に配信</span>
         </div>
       </div>
@@ -104,20 +105,20 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
     <div className="space-y-2">
       <label className="block text-xs font-medium text-ink-secondary">購読開始から</label>
       <div className="flex items-center gap-2 flex-wrap">
-        <input
+        <SaveErrorField names={["offsetDays","value.offsetDays","offset_days","value.offset_days"]}><input
           type="number"
           min={0}
           className={inputCls}
           value={value.offsetDays}
           onChange={(e) => onChange({ ...value, offsetDays: Math.max(0, Number(e.target.value) || 0) })}
-        />
+        /></SaveErrorField>
         <span className="text-sm text-ink-secondary">日後の</span>
-        <TimeField
+        <SaveErrorField names={["deliveryTime","value.deliveryTime","delivery_time","value.delivery_time"]}><TimeField
           value={value.deliveryTime}
           aria-label="配信する時刻"
           onChange={(v) => onChange({ ...value, deliveryTime: v })}
           className="w-32"
-        />
+        /></SaveErrorField>
         <span className="text-sm text-ink-secondary">に配信</span>
       </div>
       <p className="text-xs text-ink-faint">

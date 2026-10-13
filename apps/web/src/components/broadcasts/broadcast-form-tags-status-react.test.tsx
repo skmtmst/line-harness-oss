@@ -1,3 +1,4 @@
+
 // @vitest-environment happy-dom
 /*
  * 配信対象のタグ候補の取得失敗と真の0件の分け方（監査 R581）。
@@ -149,10 +150,7 @@ async function selectTagMode() {
   await flush()
 }
 
-function tagComboboxInput(): HTMLInputElement | null {
-  const field = container.querySelector('[aria-label="どのタグ"]')
-  return (field instanceof HTMLInputElement ? field : field?.querySelector('input') ?? null) as HTMLInputElement | null
-}
+function tagComboboxInput(): HTMLButtonElement | null { return container.querySelector('button[aria-label="どのタグ"]') }
 
 function setNativeValue(element: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -192,21 +190,22 @@ describe('タグ候補の失敗と0件の分け方（R581）', () => {
       expect(container.textContent).not.toContain('タグを読み込めませんでした')
       const input = tagComboboxInput()
       expect(input?.disabled).toBe(false)
-      // 候補欄は焦点で開く。候補はポータルに描かれるため文書全体で見る。
+      // 窓で選んで確定する。
       await act(async () => {
-        input!.focus()
+        input!.click()
       })
       await flush()
       expect(document.body.textContent).toContain('VIP')
-      const option = [...document.querySelectorAll('[role="option"]')].find(
-        (item) => (item.textContent ?? '').includes('VIP'),
+      const option = [...document.querySelectorAll('input[type="radio"]')].find(
+        (item) => item.getAttribute('aria-label') === 'VIP',
       )
       expect(option, 'VIPを選べません').toBeTruthy()
       await act(async () => {
         (option as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
-      expect(input!.value).toBe('VIP')
+      await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!.click() })
+      expect(input!.parentElement?.textContent).toContain('VIP')
     } finally {
       unmount()
     }

@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner' }))
 const fx = vi.hoisted(() => ({ refreshAccounts: vi.fn(async () => {}) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: () => {}, refreshAccounts: fx.refreshAccounts }) }))
 
@@ -108,5 +108,5 @@ test('フォルダの「色を変える」から既存色を変えて保存し�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
   expect(api.lineAccountFolders.update).toHaveBeenCalledWith('f1', { name: '関西', color: '#ef4444' })
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(document.querySelector('[data-folder-dot="filed"]')?.getAttribute('style')).toContain('#ef4444')
+  expect(document.querySelector('nav svg.lucide-folder')?.getAttribute('style')).toContain('#ef4444')
 })

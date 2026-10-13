@@ -1,14 +1,7 @@
 'use client'
 
-/*
- * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`）。/friends/migrations。
- *
- * 手順・API は今と同じ（書き出しを作る → 取り込みは「まず確認だけ」→ 内訳を見て反映）。
- * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。
- * 確認の結果は、確認する前も場所と5つの区分を出しておく（数は「—」）。
- */
 import { jstDate } from '@/lib/jst-datetime'
-import { Download, FileSearch, Info } from 'lucide-react'
+import { Download, FileSearch, Info, Inbox } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -17,6 +10,7 @@ import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
@@ -28,6 +22,16 @@ import styles from './migrations.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`）。/friends/migrations。
+ *
+ * 手順・API は今と同じ（書き出しを作る → 取り込みは「まず確認だけ」→ 内訳を見て反映）。
+ * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。
+ * 確認の結果は、確認する前も場所と5つの区分を出しておく（数は「—」）。
+ */
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
@@ -79,13 +83,13 @@ export default function CsvMigrationsV8() {
           <h3 id="csv-export-title" className={styles.cardTitle}>CSVで書き出す</h3>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>アカウント</span>
-            <Select
+            <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><EntitySelect
               aria-label="書き出すLINEアカウント"
               size="full"
               value={m.accountId}
               onChange={m.setAccountId}
-              options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]}
-            />
+              options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]}
+            /></SaveErrorField>
           </div>
           <fieldset className={styles.fieldset}>
             <legend className={styles.fieldLabel}>
@@ -93,9 +97,9 @@ export default function CsvMigrationsV8() {
               <HelpTip label="書き出す項目の説明">基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。タグ・友だち情報、対応情報はまだ書き出せません。</HelpTip>
             </legend>
             {COLUMN_CHOICES.filter(([value]) => value !== 'support').map(([value, label, unavailable]) => (
-              <Checkbox key={value} checked={m.columns.includes(value)} onCheckedChange={() => m.toggleColumn(value)} disabled={unavailable}>
+              <SaveErrorField names={["value"]} key={value}><Checkbox key={value} checked={m.columns.includes(value)} onCheckedChange={() => m.toggleColumn(value)} disabled={unavailable}>
                 {label}
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             ))}
           </fieldset>
           <p className={styles.small} title="Shift_JISの書き出しはまだ使えません">文字コード：UTF-8</p>
@@ -148,7 +152,7 @@ export default function CsvMigrationsV8() {
           <h3 id="csv-result-title" className={styles.cardTitle}>{m.summary && m.file ? `確認の結果：${m.file.name}` : '確認の結果'}</h3>
           <p className={styles.cardSub}>{m.summary ? 'まだ友だち情報は変えていません' : 'CSVを選んで「まず確認だけする」を押すと、ここに内訳が出ます'}</p>
         </div>
-        <div className={styles.results}>
+        <KpiBand gridClassName="grid grid-cols-5">
           {([
             ['add', '追加', '人', ''],
             ['update', '更新', '人', ''],
@@ -160,17 +164,16 @@ export default function CsvMigrationsV8() {
             return (
               <KpiCard
                 key={key}
-                presentation="card"
-                icon={null}
+                presentation="band"
+                icon={<Inbox size={14} />}
                 title={title}
                 value={value}
                 unit={value == null ? '' : unit}
                 detail={detail || null}
-                className={styles.result}
               />
             )
           })}
-        </div>
+        </KpiBand>
         <div className={styles.resultActions}>
           {m.summary && m.importId ? (
             <>
@@ -227,7 +230,7 @@ export default function CsvMigrationsV8() {
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
                         </span>
                         {downloadable ? (
-                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVで書き出す</a>
+                          <a className={styles.link}>CSVで書き出す</a>
                         ) : null}
                       </span>
                     </Td>

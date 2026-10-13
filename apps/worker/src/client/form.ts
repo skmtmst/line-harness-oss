@@ -1,3 +1,6 @@
+import '../../../liff/src/card-surface.css';
+import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
+import {applyCustomerFormTheme} from './customer-look.js';
 /**
  * LIFF Form Page — Dynamic form renderer for LINE surveys / questionnaires
  *
@@ -19,6 +22,9 @@ import {
   newFormIdempotencyKey,
   toFormIdempotencyKey,
   type FormIdempotencyKey,
+  type FormAvailability,
+  type FormLayout,
+  collectInputs,
 } from '@line-crm/shared';
 import { customerMessage } from './customer-message.js';
 
@@ -52,6 +58,8 @@ interface FormDef {
   fields: FormField[];
   isActive: boolean;
   hideProfile?: boolean;
+  availability?: FormAvailability;
+  layout?: FormLayout;
   hasSubmitWebhook: boolean;
   webhookOrigin: string | null;
   webhookGateId: string | null;
@@ -67,6 +75,7 @@ interface XFollowerSuggestion {
 
 interface FormState {
   formDef: FormDef | null;
+  receptionHtml: string;
   xHarnessBaseUrl: string | null;
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
@@ -89,6 +98,7 @@ interface FormState {
 
 const state: FormState = {
   formDef: null,
+  receptionHtml: '',
   xHarnessBaseUrl: null,
   profile: null,
   friendId: null,
@@ -129,6 +139,19 @@ function getApp(): HTMLElement {
 }
 
 // ========== Field Rendering ==========
+
+function choiceCapacity(field: FormField, label: string) {
+  const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(b => b.name === field.name);
+  const choice = block?.choices?.find(c => c.label === label);
+  const choices = state.formDef?.availability?.choices[field.name];
+  return choices?.[choice?.id ?? label];
+}
+function disabledChoice(field: FormField, label: string): string {
+  return choiceCapacity(field, label)?.full ? ' disabled' : '';
+}
+function receptionOption(field: FormField, label: string): string {
+  return escapeHtml(label + choiceReceptionLabel(choiceCapacity(field, label)));
+}
 
 function renderField(field: FormField): string {
   const required = field.required ? ' required' : '';
@@ -174,7 +197,7 @@ function renderField(field: FormField): string {
 
     case 'select': {
       const opts = (field.options ?? [])
-        .map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)
+        .map((o) => `<option value="${escapeHtml(o)}"${disabledChoice(field, o)}>${receptionOption(field, o)}</option>`)
         .join('');
       inputHtml = `<select
         name="${escapeHtml(field.name)}"
@@ -191,8 +214,8 @@ function renderField(field: FormField): string {
         .map(
           (o) =>
             `<label class="radio-label">
-              <input type="radio" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${required} />
-              ${escapeHtml(o)}
+              <input type="radio" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${required}${disabledChoice(field, o)} />
+              ${receptionOption(field, o)}
             </label>`,
         )
         .join('');
@@ -201,12 +224,13 @@ function renderField(field: FormField): string {
     }
 
     case 'checkbox': {
+      const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(block => block.name === field.name);
       const boxes = (field.options ?? [])
         .map(
           (o) =>
             `<label class="checkbox-label">
-              <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}" />
-              ${escapeHtml(o)}
+              <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${disabledChoice(field, o)} />
+              ${receptionOption(field, o)}${block?.fixedField === 'allergy' && block.choices?.some(choice => choice.label === o && choice.isOther) ? `<input type="text" data-allergy-other="${escapeHtml(field.name)}" aria-label="そのほかのアレルギー" maxlength="100" placeholder="自由に書く" />` : ''}
             </label>`,
         )
         .join('');
@@ -248,7 +272,7 @@ function injectStyles(): void {
     .form-profile { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; }
     .form-profile img { width: 36px; height: 36px; border-radius: 50%; }
     .form-profile span { font-size: 14px; font-weight: 600; }
-    .form-body { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .form-body { background: #fff; border-radius: 12px; padding: 20px; box-shadow: var(--liff-card-shadow); }
     .form-field { margin-bottom: 20px; }
     .form-label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 6px; }
     .required-mark { color: #e53e3e; margin-left: 2px; }
@@ -274,8 +298,8 @@ function injectStyles(): void {
       border-color: #06C755; background: #e8faf0;
     }
     .radio-label input, .checkbox-label input { accent-color: #06C755; width: 18px; height: 18px; }
-    .radio-label input[type="radio"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 50%; background: #fff; cursor: pointer; }
-    .radio-label input[type="radio"]:checked { background: #fff; border-color: #06C755; border-width: 5px; }
+    .radio-label input[type="radio"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border: 1.5px solid var(--color-choice-border, #c9ced6); border-radius: 50%; background: #fff; cursor: pointer; }
+    .radio-label input[type="radio"]:checked { border-color: var(--color-selection-border, #087a3e); background: radial-gradient(circle, var(--color-selection-border, #087a3e) calc(var(--liff-radio-dot) / 2), #fff calc(var(--liff-radio-dot) / 2)); }
     .submit-btn {
       width: 100%; padding: 14px; border: none; border-radius: 8px;
       background: #06C755; color: #fff; font-size: 16px; font-weight: 700;
@@ -402,6 +426,8 @@ function render(): void {
 
   injectStyles();
   const app = getApp();
+  const receptionHtml = state.receptionHtml;
+  const closed = formDef.availability?.accepting === false;
   const profileHtml = (formDef.hideProfile || !profile?.pictureUrl)
     ? ''
     : `<div class="form-profile">
@@ -425,12 +451,13 @@ function render(): void {
           <h1>${escapeHtml(formDef.name).replace(/\\n|\n/g, '<br>')}</h1>
           ${formDef.description && !formDef.hasSubmitWebhook ? `<p class="form-description">${escapeHtml(formDef.description).replace(/\\n|\n/g, '<br>')}</p>` : ''}
           ${profileHtml}
+          ${receptionHtml}
         </div>
         <!-- Page 1: Survey -->
         <div id="form-page-1">
           <form id="survey-form" class="form-body" novalidate>
             ${surveyFieldsHtml}
-            <button type="submit" class="submit-btn" id="nextBtn">次へ →</button>
+            <button type="submit" class="submit-btn" id="nextBtn"${closed ? ' disabled' : ''}>次へ →</button>
           </form>
         </div>
         <!-- Page 2: X-Link -->
@@ -440,7 +467,7 @@ function render(): void {
           </div>
           <form id="liff-form" class="form-body" novalidate>
             ${xFieldHtml}
-            <button type="submit" class="submit-btn" id="submitBtn">受け取る</button>
+            <button type="submit" class="submit-btn" id="submitBtn"${closed ? ' disabled' : ''}>受け取る</button>
           </form>
         </div>
       </div>
@@ -450,6 +477,7 @@ function render(): void {
     document.getElementById('survey-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      if (closed) return;
       // Validate survey fields
       for (const field of surveyFields) {
         if (!field.required) continue;
@@ -482,7 +510,7 @@ function render(): void {
       const surveyData: Record<string, unknown> = {};
       for (const field of surveyFields) {
         if (field.type === 'checkbox') {
-          surveyData[field.name] = Array.from(document.querySelectorAll<HTMLInputElement>(`input[name="${field.name}"]:checked`)).map((el) => el.value);
+          surveyData[field.name] = collectFormData()[field.name];
         } else if (field.type === 'radio') {
           surveyData[field.name] = document.querySelector<HTMLInputElement>(`input[name="${field.name}"]:checked`)?.value ?? '';
         } else {
@@ -527,10 +555,11 @@ function render(): void {
           <h1>${escapeHtml(formDef.name).replace(/\\n|\n/g, '<br>')}</h1>
           ${formDef.description && !formDef.hasSubmitWebhook ? `<p class="form-description">${escapeHtml(formDef.description).replace(/\\n|\n/g, '<br>')}</p>` : ''}
           ${profileHtml}
+          ${receptionHtml}
         </div>
         <form id="liff-form" class="form-body" novalidate>
           ${fieldsHtml}
-          <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
+          <button type="submit" class="submit-btn" id="submitBtn"${closed ? ' disabled' : ''}>送信する</button>
         </form>
       </div>
     `;
@@ -692,6 +721,12 @@ function collectFormData(): Record<string, unknown> {
           `input[name="${field.name}"]:checked`,
         ),
       ).map((el) => el.value);
+      const block = formDef.layout && collectInputs(formDef.layout).find(block => block.name === field.name && block.fixedField === 'allergy');
+      const other = block?.choices?.find(choice => choice.isOther);
+      if (other && checked.includes(other.label)) {
+        const value = document.querySelector<HTMLInputElement>(`[data-allergy-other="${CSS.escape(field.name)}"]`)?.value.trim() ?? '';
+        checked.splice(checked.indexOf(other.label), 1, value);
+      }
       result[field.name] = checked;
     } else if (field.type === 'radio') {
       const checked = document.querySelector<HTMLInputElement>(
@@ -712,6 +747,10 @@ function collectFormData(): Record<string, unknown> {
 function validateForm(): string | null {
   const { formDef } = state;
   if (!formDef) return null;
+  const values = collectFormData();
+  for (const block of formDef.layout ? collectInputs(formDef.layout) : []) {
+    if (block.fixedField === 'allergy' && Array.isArray(values[block.name]) && (values[block.name] as string[]).includes('')) return 'そのほかのアレルギーを書いてください';
+  }
 
   for (const field of formDef.fields) {
     if (!field.required) continue;
@@ -814,7 +853,13 @@ function throwOnFormSubmitError(payload: FormSubmitPayload, fallback: string): v
 }
 
 async function submitForm(): Promise<void> {
-  if (state.submitting || !state.formDef) return;
+  if (state.submitting || !state.formDef || state.formDef.availability?.accepting === false) return;
+  // DOMを書き換えて満杯の選択肢を選んでも送信しない。最終判断はAPIで行う。
+  for (const field of state.formDef.fields) {
+    if (!field.options) continue;
+    const selected = Array.from(document.querySelectorAll<HTMLInputElement | HTMLOptionElement>(`[name="${CSS.escape(field.name)}"]:checked, [name="${CSS.escape(field.name)}"] option:checked`));
+    if (selected.some(el => choiceCapacity(field, el.value)?.full)) { showFieldError('受付終了の選択肢があります。選び直してください。'); return; }
+  }
 
   const validationError = validateForm();
   if (validationError) {
@@ -1311,7 +1356,16 @@ export async function initForm(formId: string | null): Promise<void> {
       return;
     }
 
+    // 予約ブロックは共通の画面へ。通常のフォームの既存受付・再送は保つ。
+    if (json.data.layout && collectInputs(json.data.layout).some(block => block.type === 'booking')) {
+      const { initRestaurantForm } = await import('./main.js');
+      await initRestaurantForm();
+      return;
+    }
+
     state.formDef = json.data;
+    applyCustomerFormTheme(json.data.layout?.options.theme);
+    state.receptionHtml = json.data.availability ? (await import('./form-reception.js')).renderFormReception(json.data.availability) : '';
     // ブラウザ・LINE の上の帯に出る題。フォームの名前（1行目）にする。
     document.title = json.data.name.split(/\\n|\n/)[0] || document.title;
 

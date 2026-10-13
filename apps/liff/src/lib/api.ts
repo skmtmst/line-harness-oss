@@ -22,9 +22,11 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
+  payment_mode?: 'none' | 'onsite' | 'online';
   sort_order: number;
-  /** キャンセル期限 (開始の何時間前まで)。null は期限なし。 */
+  /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
+  intake_question?: string | null;
 }
 
 export interface StaffItem {
@@ -73,15 +75,23 @@ export interface LiffBookingSettings extends LiffLookApiSettings {
   booking_window_days: number;
   /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
   approval_mode?: 'automatic' | 'manual';
+  cancel_deadline_minutes_before?: number;
 }
 
 /** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
 export interface CreateBookingResponse {
   booking_id: string;
   status: string;
+  payment_required?: boolean;
   payment?: { id: string; status: string; holdUntil: string | null } | null;
   /** 無断キャンセルが続いている人への前払いのみの案内。対象のときだけ付く。 */
   prepayNotice?: string;
+}
+
+/** 支払い必須の不完全な成功応答は、通常予約・待ちからの予約とも完了にしない。 */
+export function assertBookingPaymentResponse(created: CreateBookingResponse): CreateBookingResponse {
+  if (created.payment_required && !created.payment?.id) throw new Error('booking_payment_unavailable');
+  return created;
 }
 
 /** 前回と同じで予約：本人の前回の予約。無い・使えないときは available=false。 */
@@ -346,6 +356,7 @@ export interface PublicForm {
   isActive: boolean;
   /** P（試し回答）：true は下書きの試し。集計に入らず、後処理も動かない。 */
   isTest?: boolean;
+  availability?: import('@line-crm/shared').FormAvailability;
 }
 
 /** F-11：郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */
@@ -377,6 +388,7 @@ export interface FormSubmitResponse {
 }
 
 export const api = {
+  customerLook: () => get<{success: boolean;data:{settings:LiffLookApiSettings;look:import('@line-crm/shared').CustomerLook;version:number}}>('/api/liff/customer-look'),
   researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
   entryRouteCoupon: {
     receive: async (ref: string) => unwrapSuccessData<EntryRouteCouponReceived>(await post<unknown>('/api/liff/entry-route-coupon', { ref }), '/api/liff/entry-route-coupon'),
@@ -406,7 +418,7 @@ export const api = {
       '/api/liff/booking/requests',
       body,
       { 'Idempotency-Key': idempotencyKey },
-    ),
+    ).then(assertBookingPaymentResponse),
   /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
   startBookingPayment: (bookingId: string) =>
     post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(
@@ -433,7 +445,7 @@ export const api = {
   seatAvailability:(query:{storeId:string;startsAt:string;endsAt:string;guestCount:number})=>get<{success:true;data:import('@line-crm/shared').RestaurantSeatAvailability}>(`/api/liff/booking/seat-availability?${new URLSearchParams({store_id:query.storeId,starts_at:query.startsAt,ends_at:query.endsAt,guest_count:String(query.guestCount)})}`),
   seatWaitlists:(id?:string)=>get<{waitlist:CustomerSeatWaitlist[]}>(`/api/liff/booking/seat-waitlist${id?'?id='+encodeURIComponent(id):''}`),
   registerSeatWaitlist:(body:RegisterSeatWaitlistInput)=>post<{id:string}>('/api/liff/booking/seat-waitlist',body),
-  acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}),
+  acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}).then(assertBookingPaymentResponse),
   acceptSeatWaitlist:(id:string,key:string)=>post<{reservation_id:string;status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}/accept`,{}, {'Idempotency-Key':key}),
   cancelSeatWaitlist:(id:string)=>remove<{status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}`),
   /** 枠を指定して自分の待ち登録を返す。 */
@@ -601,6 +613,7 @@ export const api = {
 
 /** 来店スタンプ。PINを使う口には本人のIDトークンを常に送る。 */
 export const visitStampsApi = {
+  redeemQr:(accountId:string,token:string,requestId:string,visitId?:string)=>post<{success:true;data:import('@line-crm/shared').VisitStampQrResult}>(`/api/liff/visit-stamps/qr/redeem?${new URLSearchParams({accountId})}`,{token,requestId,visitId}),
   cards: (accountId:string) => get<{success:true;data:Array<{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet}>}>(`/api/liff/visit-stamps/cards?${new URLSearchParams({accountId})}`),
   card: (accountId:string,id:string) => get<{success:true;data:{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet;entries:import('@line-crm/shared').VisitStampEntry[]}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`),
   showReward: (accountId:string,id:string,rewardId:string,requestId:string) => post<{success:true;data:import('@line-crm/shared').VisitStampRedemption}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/rewards?${new URLSearchParams({accountId})}`,{rewardId,requestId}),
@@ -620,11 +633,15 @@ export const visitStampsApi = {
 
 /** 飲食店の席予約。既存get/postと同じくliffIdと本人のIDトークンを送る。 */
 export const restaurantBookingApi = {
+  courses: (storeId:string)=>get<{success:true;timezone?:string;data:import('@line-crm/shared').RestaurantCustomerCourse[]}>(`/api/liff/restaurant/courses?${new URLSearchParams({storeId})}`),
+  referrals: (storeId:string,date:string,guestCount:number,startsAt?:string,courseId?:string|null)=>get<{success:true;data:import('@line-crm/shared').RestaurantReferralCandidate[]}>(`/api/liff/restaurant/referrals?${new URLSearchParams({storeId,date,guestCount:String(guestCount),...(startsAt ? {startsAt}: {}),...(courseId ? {courseId}: {})})}`),
+  referral: (body:{storeId:string;targetStoreId:string;date:string;startsAt:string;guestCount:number;courseId?:string|null})=>post<{success:true;data:{bookingUrl:string}}>('/api/liff/restaurant/referrals',body),
+  formBooking: (body:{formId:string;blockId:string;submissionKey:string})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/form-booking',body),
   link: (token:string)=>get<{success:true;data:{id:string;name:string;timezone:string}}>(`/api/liff/restaurant/link/${encodeURIComponent(token)}`),
-  availability: (storeId:string,date:string,guestCount:number)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount)})}`),
+  availability: (storeId:string,date:string,guestCount:number,courseId?:string|null)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount),...(courseId ? {courseId}: {})})}`),
   hold: (body:import('@line-crm/shared').RestaurantCustomerHoldInput)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/holds',body),
   mine: (storeId:string)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking[]}>(`/api/liff/restaurant/reservations?${new URLSearchParams({storeId})}`),
-  confirm: (id:string,expectedVersion:number,details:import('@line-crm/shared').RestaurantCustomerDetails={})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{...details,expectedVersion}),
+  confirm: (id:string,expectedVersion:number,details:import('@line-crm/shared').RestaurantCustomerDetails & {referralId?:string}={})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{...details,expectedVersion}),
   cancel: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/cancel`,{expectedVersion}),
-  reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
+  reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number;courseId?:string|null})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
 };

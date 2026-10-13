@@ -57,6 +57,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
   vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     const accountId = new URL(path, 'http://localhost').searchParams.get('account_id') ?? 'account-a'
     if (path.includes('/api/analytics/usage')) return Promise.resolve(response({ success: true, data: { categories: [] } }))
     if (path.includes('/api/settings/features/impact')) {

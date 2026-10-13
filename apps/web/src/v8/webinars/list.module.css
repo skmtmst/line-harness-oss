@@ -17,12 +17,12 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   gap: var(--tpl-wb-col-gap);
   height: var(--tpl-wb-head-h);
   padding: var(--tpl-wb-head-pad);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-wb-col-gap);
   height: var(--tpl-wb-row-h);
   padding: var(--tpl-wb-row-pad);
@@ -30,23 +30,23 @@
   box-shadow: var(--shadow-row-line);
   cursor: pointer;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   height: auto;
   padding: 0;
   border: 0;
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colView,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colView {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colView,
+:global(:root) .table .row[data-table-layout='columns'] > td.colCount,
+:global(:root) .table .row[data-table-layout='columns'] > td.colView {
   padding-right: var(--tpl-wb-num-pad-end);
   text-align: right;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
+:global(:root) .table .row[data-table-layout='columns'] > td.colName {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -173,15 +173,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-block);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 /* 道具の段の右：並び・よく使う絞り込み（左に印）。 */
 .sortBox { width: var(--tpl-wb-sort-w); }
@@ -234,22 +226,7 @@
 }
 
 /* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-wb-ro-gap) var(--tpl-head-pad-side);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-wb-ro-gap) var(--tpl-head-pad-side); }
 .statsNotice {
   padding: 0 var(--tpl-head-pad-side) var(--tpl-wb-ro-gap);
 }
@@ -378,4 +355,3 @@
 .skeletonNum { display: block; width: 60%; height: var(--tpl-rule-row-gap); margin-left: auto; }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

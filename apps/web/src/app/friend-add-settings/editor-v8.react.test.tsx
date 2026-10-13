@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
@@ -171,7 +171,7 @@ test('シナリオが未選択なら選べる赤い欄へ移り、選ぶと誤�
   const field = () => host.querySelector<HTMLElement>('#fa-scenario')!
   const open = () => host.querySelector<HTMLButtonElement>('button[aria-label="実際に配信するシナリオ：選ぶ"]')!
   await eventually(() => expect(document.activeElement).toBe(open()))
-  expect(field().getAttribute('data-invalid')).toBe('true')
+  expect(field().getAttribute('aria-invalid')).toBe('true')
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
   await act(async () => open().click())
   await act(async () => document.querySelector<HTMLInputElement>('input[type="radio"][aria-label="新規登録7日間フォロー"]')!.click())

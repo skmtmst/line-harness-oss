@@ -139,6 +139,15 @@ describe('直す', () => {
     expect(db.upsertManualLink).not.toHaveBeenCalled();
   });
 
+  it('UI2-C01 空にしたURLは以前のURLへ戻さない', async () => {
+    const res = await makeApp().fetch(new Request('https://example.com/api/manual-links/2-1', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: null, expectedVersion: 1 }),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(db.upsertManualLink).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ url: null }));
+  });
+
   it('正しい URL は保存する', async () => {
     const res = await makeApp().fetch(
       new Request('https://example.com/api/manual-links/2-1', {

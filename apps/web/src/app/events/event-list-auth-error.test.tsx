@@ -23,9 +23,15 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    fetchApi: (path: string) => {
+      const params = new URL(path, 'http://worker.test').searchParams
+      return params.get('filter') === 'pending' && params.get('limit') === '1'
+        ? Promise.resolve({ items: [], total: 0 }) : listEvents(path)
+    },
     api: {
       ...actual.api,
       staff: { ...actual.api.staff, me: staffMe },
+      folders: { ...actual.api.folders, list: vi.fn().mockResolvedValue({ success: true, data: [] }) },
     },
     eventsApi: { ...actual.eventsApi, listEvents },
   }
@@ -37,11 +43,13 @@ vi.mock('next/link', () => ({
   ),
 }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -127,6 +135,8 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  history.replaceState({}, '', '/events')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -196,7 +206,9 @@ describe('R601 イベント一覧の権限不足と通信失敗の言い分け',
   it('空は「まだありません」と作る口が出る', async () => {
     listEvents.mockResolvedValue({ items: [], total: 0, limit: 20, sort: [] })
     await renderPage()
-    expect(bodyText()).toContain('イベントがまだありません')
+    expect(bodyText()).toContain('まだイベントがありません')
+    expect(document.querySelector('a[href="/events/new"]')?.textContent).toContain('イベントを作る')
+    expect([...document.querySelectorAll('[data-kpi-presentation]')].every((kpi) => kpi.textContent?.includes('0'))).toBe(true)
   })
 
   it('503 のあと再読み込みで直れば一覧に戻る', async () => {
@@ -216,5 +228,26 @@ describe('R601 イベント一覧の権限不足と通信失敗の言い分け',
     await renderPage()
     expect(bodyText()).toContain('—')
     expect(bodyText()).not.toContain('0件')
+  })
+
+  it('一覧上部の件数は表示のみで、タブや操作ボタンとして扱わない', async () => {
+    listEvents.mockResolvedValue(listPayload())
+    await renderPage()
+    const kpis = document.querySelector('[data-design="KPIs"]')!
+    expect(kpis.textContent).toContain('これからの回')
+    expect(kpis.querySelector('[role="tab"]')).toBeNull()
+    const buttons = [...kpis.querySelectorAll('button, a')]
+    expect(buttons.every((button) => button.getAttribute('aria-label')?.endsWith('の説明'))).toBe(true)
+  })
+
+  it('申し込みが少ない回の日付と残り日数は既存の説明で確認できる', async () => {
+    const payload = listPayload()
+    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+    listEvents.mockResolvedValue({ ...payload, summary: { ...payload.summary, low_applications: 1, nearest_low_starts_at: start } })
+    await renderPage()
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="イベント予約の説明"]')!.click() })
+    const note = document.querySelector<HTMLElement>('[role="note"][id]')!
+    expect(note.textContent).toContain('申し込みが少ないのは')
+    expect(note.textContent).toContain('あと2日です')
   })
 })

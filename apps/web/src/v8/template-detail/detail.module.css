@@ -15,7 +15,7 @@
 .side { display: flex; flex-direction: column; gap: var(--tpl-eds-aside-gap); min-width: 0; }
 
 /* 閲覧のみの帯。 */
-.roBand { margin: 0; padding: var(--tpl-ro-band-pad); border-radius: var(--tpl-ro-band-radius); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-ro-band-lh); }
+.roBand { margin: 0; }
 
 /* 未公開の変更の帯（琥珀）：印18・文・比べる・公開する。 */
 .draftBand { display: flex; align-items: center; gap: var(--tpl-eds-band-gap); padding: var(--tpl-eds-band-pad); border-radius: var(--radius-card); background: var(--color-status-warn-soft); }
@@ -31,7 +31,6 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 .bodyBox { padding: var(--tpl-eds-body-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-eds-body-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
-.empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); text-align: center; }
 .errorText { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 .inlineLink { color: var(--color-action); text-decoration: underline; }
 

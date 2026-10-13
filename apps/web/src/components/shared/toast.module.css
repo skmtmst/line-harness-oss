@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 保存の知らせ（Toast）。★V7 共通部品その2 §2。
@@ -20,7 +20,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: min(360px, calc(100vw - 32px));
 }
 
 .host[hidden] {
@@ -40,21 +39,11 @@
   --toast-duration: 4000ms;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
   background: var(--color-canvas);
   color: var(--color-ink);
-  box-shadow: var(--shadow-toast);
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: 1.6;
 }
 
 .icon {
-  width: 15px;
-  height: 15px;
   flex: none;
 }
 
@@ -77,11 +66,9 @@
 .undo {
   flex: none;
   border: 0;
-  padding: 4px 8px;
   background: transparent;
   color: var(--color-accent-deep);
   font: inherit;
-  text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
 }
@@ -118,7 +105,7 @@
  * （200ms ease-out）。出る側は今の仕組みが即時に外すため入りだけ。
  * 「動きを減らす」設定では globals の規定で一瞬になる。
  */
-[data-theme='v8'] .toast {
+:root .toast {
   animation: toast-v8-enter var(--motion-base) var(--motion-ease-out);
 }
 
@@ -127,7 +114,7 @@
  * 透明度を 1→0 へ一方向に下げる（--motion-exit）。入りの動きは止め、
  * 押せないようにする。動きを減らす設定では印が立たず即時に外れる。
  */
-[data-theme='v8'] .toast[data-closing] {
+:root .toast[data-closing] {
   animation: toast-v8-leave var(--motion-exit) var(--motion-ease-out) forwards;
   pointer-events: none;
 }
@@ -143,7 +130,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='v8'] .toast[data-closing] {
+  :root .toast[data-closing] {
     animation: none;
     opacity: 0;
   }
@@ -162,22 +149,28 @@
 }
 
 /* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
-[data-theme="v8"] .toast {
+:root .toast {
   border-color: var(--color-border-soft);
 }
 }
 
 /* 正本 Q6cQB / tnWX9。閉じる操作と消える期限は残す。 */
-[data-theme='v8'] .host { max-width: min(380px, calc(100vw - 32px)); }
-[data-theme='v8'] .toast {
+:root .host { max-width: min(380px, calc(100vw - 32px)); }
+:root .toast {
   width: 380px; max-width: 100%; gap: 10px; padding: 12px 14px;
   border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
   border-radius: var(--polish-radius-card); box-shadow: var(--v8-parts-toast-shadow);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
   font-size: 13px; line-height: 20px; font-weight: 400;
 }
-[data-theme='v8'] .icon { width: 16px; height: 16px; }
-[data-theme='v8'] .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }
+:root .icon { width: 16px; height: 16px; }
+:root .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
-[data-theme='v8'] .toast { -webkit-font-smoothing: auto; }
+:root .toast { -webkit-font-smoothing: auto; }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html:root .host { bottom: var(--toast-bottom, var(--space-16)); }
+html:root .toast { background: var(--color-canvas); color: var(--color-ink); outline: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); }
+html:root .message { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html:root .iconInfo { color: var(--color-status-info); }

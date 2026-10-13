@@ -4,30 +4,6 @@
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
 
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-info-bg);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-ro-band-lh);
-}
-
-/* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-section-gap);
-  padding: var(--tpl-section-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-cv-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
@@ -83,7 +59,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-label);
 }
-.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-action); }
+.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-focus-ring); }
 .keyMark { flex-shrink: 0; color: var(--color-ink-faint); }
 .keyInput {
   min-width: 0;
@@ -97,36 +73,8 @@
   field-sizing: content;
 }
 
-/* 種別：4つずつ2段・間8。選んだカードは緑の地・1.5の枠。 */
+/* 種別：4つずつ2段。選択カードの形は共通 RadioCard が持つ。 */
 .typeGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-body-gap); }
-.typeCard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-sub-gap);
-  min-width: 0;
-  padding: var(--tpl-rule-row-gap);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  text-align: left;
-  cursor: pointer;
-}
-.typeCard[aria-checked='true'] { outline: var(--tpl-fm-option-outline) solid var(--color-accent); background: var(--color-success-bg); }
-.typeTop { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); color: var(--color-ink); }
-.typeCard[aria-checked='true'] .typeTop { color: var(--color-success); }
-.typeLabel { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
-.typeDesc {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-ar-cv-type-desc-size);
-  line-height: var(--tpl-ar-cv-type-desc-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* 使える期間：見出しの段と欄の段（始まり・終わり・期間の外では 220）。 */
 .periodGrid {
@@ -183,7 +131,7 @@
 }
 .talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
 
-.formError { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
+.formError { color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
 .secretConfirm {
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
@@ -194,3 +142,8 @@
 .secretConfirmTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-card-title-size); font-weight: 700; }
 .secretConfirmText { margin: var(--tpl-body-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-body-lh); }
 .secretConfirmActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); margin-top: var(--tpl-rule-row-gap); }
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+
+.formError, .formErrorNoticePlacement { margin: 0; }
+.roBand { }

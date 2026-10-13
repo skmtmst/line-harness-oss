@@ -1,5 +1,9 @@
+import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
+import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
+import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
+import { pagesParityPaths } from './pages-parity-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
 import {auditstepsPaths} from './auditsteps-openapi.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
@@ -11,6 +15,7 @@ import { api9Paths, api9Schemas } from './api9-openapi.js';
 import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
 import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
+import { trafficPoolSavePaths } from './traffic-pools-save-openapi.js';
 import { tenantCompanyContactPaths } from './tenant-company-contact-openapi.js';
 import type { Env } from '../index.js';
 
@@ -404,11 +409,24 @@ const spec = {
     },
   },
   paths: {
+    '/api/account-settings/customer-look': {
+      get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
+      put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
+    },
+    '/api/account-settings/allergy-options': {
+      get: { tags:['Account Settings'],summary:'店のアレルギー選択肢',parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}],responses:{'200':{description:'選択肢と版'},'403':{description:'担当外'}} },
+      put: { tags:['Account Settings'],summary:'店のアレルギー選択肢を保存',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','options'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},options:{type:'array',maxItems:32,items:{type:'string',maxLength:100}}}}}}},responses:{'200':{description:'選択肢を保存'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'選択肢が不正'}} },
+    },
+    '/api/liff/customer-look': {get:{tags:['LIFF'],summary:'保存済みのお客さまのデザイン（予約機能に依存しない）',security:[],parameters:[{name:'liffId',in:'query',required:true,schema:{type:'string'}}],responses:{'200':{description:'保存した版・型・公開用の色と書体'},'400':{description:'LIFF IDなし'},'404':{description:'不明なLIFF ID'}}}},
+    ...pagesParityPaths,
+    ...reservationBoardPaths,
+    ...restaurantFollowupPaths,
     ...folderUpgradePaths,
     ...archiveRestorePaths,
     ...formDocumentPaths,
     ...tabCountPaths,
     ...tenantCompanyContactPaths,
+    ...trafficPoolSavePaths,
     ...chatAttachmentPaths,
     '/api/mileage/reward-folders': {
       get: { tags: ['Mileage'], summary: '使い道のフォルダと件数を読む', parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Folders: id, name, displayOrder, count' }, '404': { description: 'Account not found' } } },
@@ -433,6 +451,7 @@ const spec = {
     ...api18Paths,
     ...api17Paths,
     ...api9Paths,
+    ...restaurantRest4Paths,
     ...restaurantClosurePaths,
     ...stampPaths,
     ...hqBroadcastPaths,
@@ -1457,12 +1476,30 @@ const spec = {
       post: {
         tags: ['Auth'], summary: 'パスワードを再設定', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
-        responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
+        responses: { '200': { description: 'パスワード更新・既存セッション失効。TOTPは保持し、セッションは発行しない' }, '400': { description: 'Invalid or expired token' } },
       },
+    },
+    '/api/auth/two-factor/policy': {
+      get: { summary: '統括のログインで二段階認証を必須にする設定', tags: ['Auth'],
+        responses: { '200': { description: 'required・canEdit・登録済み人数・configured・notice（鍵ありは初期値On、鍵不足はOff）' }, '401': { description: '未ログイン' } } },
+      put: { summary: 'オーナー・運営が二段階認証のOn/Offを変更', tags: ['Auth'],
+        parameters: [{ name: 'X-Step-Up-Token', in: 'header', schema: { type: 'string' }, description: 'Offにする時の本人確認。セッションに結び付く1回限りの票' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['required'], properties: { required: { type: 'boolean' } } } } } },
+        responses: { '200': { description: '監査へ保存。Onへの変更時は既存セッションを失効' }, '401': { description: '再確認が必要' }, '400': { description: '鍵が未設定のため必須にできない' }, '403': { description: '変更権限なし' }, '409': { description: '他の操作と競合' } } },
+    },
+    '/api/auth/two-factor/self': {
+      get: { summary: '本人の認証アプリ登録日と回復コードの残数', tags: ['Auth'],
+        responses: { '200': { description: '本人だけの登録日・残数・鍵の準備状態。コードとハッシュは返さない' }, '401': { description: '未ログイン' }, '403': { description: '代理ログイン中または本人設定なし' } } },
+    },
+    '/api/auth/two-factor/recovery': {
+      post: { summary: '本人確認後に回復コード8個を作り直す', tags: ['Auth'],
+        parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.mfa.recovery 用の1回限りの本人確認票' }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: '8文字4-4の回復コード8個をこの時だけ返す。前のコードは全部無効。応答保存禁止' }, '400': { description: '未登録または鍵未設定' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
     },
     '/api/auth/two-factor/setup': {
       post: {
-        tags: ['Auth'], summary: 'TOTP未登録の管理者向けに二段階認証の初回設定を開始', security: [],
+        tags: ['Auth'], summary: 'TOTP未登録の人が二段階認証の初回登録を開始', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken'], properties: { challengeToken: { type: 'string' } } } } } },
         responses: { '200': { description: 'provisioningUri and manualKey issued' }, '400': { description: 'Missing challenge token' }, '401': { description: 'Invalid or expired setup challenge' }, '409': { description: 'TOTP already configured' } },
       },
@@ -1471,7 +1508,7 @@ const spec = {
       post: {
         tags: ['Auth'], summary: '二段階認証の初回設定を確認してセッションを発行', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken', 'code'], properties: { challengeToken: { type: 'string' }, code: { type: 'string' } } } } } },
-        responses: { '200': { description: 'TOTP enabled; session issued' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
+        responses: { '200': { description: 'TOTP登録・確認済みセッション発行。回復コード8個をこの時だけ返す' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
     '/api/auth/ops-invite/check': {
@@ -1485,7 +1522,7 @@ const spec = {
       post: {
         tags: ['Auth'], summary: '運営メンバーの招待を受ける（名前・パスワード設定 → 2要素認証待ち）', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' }, name: { type: 'string' }, password: { type: 'string' } } } } } },
-        responses: { '200': { description: 'Session issued; next = two-factor-setup' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
+        responses: { '200': { description: '確認または登録用のchallengeTokenのみ。セッションは二段階の確認後に発行' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
       },
     },
     '/api/auth/sessions': {
@@ -1510,7 +1547,7 @@ const spec = {
     '/api/auth/step-up': {
       post: {
         tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行（V: パスワード経路あり）',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret'] } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret', 'auth.mfa.policy', 'auth.mfa.recovery', 'auth.mfa.reenroll'] } } } } } },
         responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong credential' }, '401': { description: 'Not authenticated (STEP_UP_UNAUTHORIZED)' }, '403': { description: 'Neither TOTP nor password configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
@@ -1604,6 +1641,21 @@ const spec = {
         tags: ['HQ Banners'], summary: '残りのバナー生成を中止',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Cancelled' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/images/{key}': {
+      get: {
+        tags: ['Media'],
+        summary: 'Read an uploaded image within the authenticated staff account scope',
+        parameters: [
+          { name: 'key', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Owned image bytes', content: { 'image/*': { schema: { type: 'string', format: 'binary' } } } },
+          '401': { description: 'Authentication required' },
+          '404': { description: 'Image not found within the account scope' },
+        },
       },
     },
     '/api/hq/banners/images': {
@@ -2545,6 +2597,24 @@ const spec = {
         summary: '友だち詳細取得',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Friend with tags' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/friends/{id}/data': {
+      delete: {
+        tags: ['Friends'], summary: 'お客さまの依頼で友だちの顧客データと書類を削除（B-215）',
+        description: '書込可能なオーナー・管理者だけ。友だちのアカウントの所属を照合し、R2・DB・完了監査を再試行可能に削除する。成功済みの再実行はreplayed=true。同時実行は409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'X-Confirm-Irreversible', in: 'header', required: true, schema: { type: 'string', enum: ['delete-friend-data'] } },
+        ],
+        responses: {
+          '200': { description: '削除完了または成功済みの再実行。data.deleted=true、data.replayedはboolean' },
+          '403': { description: 'スタッフ・閲覧のみ・未認証は実行不可' },
+          '404': { description: '対象が無いか、アカウントが範囲外' },
+          '409': { description: 'deletion_in_progress または deletion_schema_approval_required（保存対象の保護にmigration承認が必要）' },
+          '428': { description: '確認ヘッダーが無いか不一致' },
+          '503': { description: 'deletion_retry_required。同じ対象で再試行する' },
+        },
       },
     },
     '/api/friends/{id}/form-submissions': {
@@ -8487,6 +8557,24 @@ const spec = {
       },
     },
     '/api/forms/{id}/submissions/{submissionId}': {
+      delete: {
+        tags: ['Forms'], summary: '個別の回答と添付を削除（B-215）',
+        description: '書込可能なオーナー・管理者だけ。回答とアカウントの所属を照合し、R2・DB・完了監査を再試行可能に削除する。成功済みの再実行はreplayed=true。同時実行は409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'submissionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'X-Confirm-Irreversible', in: 'header', required: true, schema: { type: 'string', enum: ['delete-form-response'] } },
+        ],
+        responses: {
+          '200': { description: '削除完了または成功済みの再実行。data.deleted=true、data.replayedはboolean' },
+          '403': { description: 'スタッフ・閲覧のみ・未認証は実行不可' },
+          '404': { description: '対象が無いか、所属・フォーム・アカウントが範囲外' },
+          '409': { description: 'deletion_in_progress または deletion_schema_approval_required（保存対象の保護にmigration承認が必要）' },
+          '428': { description: '確認ヘッダーが無いか不一致' },
+          '503': { description: 'deletion_retry_required。同じ対象で再試行する' },
+        },
+      },
       get: {
         tags: ['Forms'], summary: 'フォーム回答1件と後処理の済んだ工程を読み直す',
         description: '所有者・管理者・スタッフの閲覧範囲とフォームとの一致を確認する。試し回答は404。過去の工程で日時が不明ならcompletedAtはnull。',

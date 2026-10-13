@@ -28,7 +28,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-1', name: '本店' }], selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
   canManageRole: (r: string | null | undefined) => r === 'owner' || r === 'admin',
@@ -117,7 +116,7 @@ describe('V8 テンプレートの一覧', () => {
 
   it('画像は中身の JSON を出さず「画像 1枚」、一度も公開していないものの送信数は「—」', async () => {
     await renderList()
-    expect(screen.getByText('画像 1枚')).toBeTruthy()
+    expect(document.querySelector('[data-list-name]')?.textContent).not.toContain('画像 1枚')
     expect(screen.queryByText(/originalContentUrl/)).toBeNull()
     expect(screen.getByText('—')).toBeTruthy()
     expect(screen.queryByText('0通')).toBeNull()
@@ -225,4 +224,17 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     expect(screen.queryByRole('heading', { name: '見本から作る' })).toBeNull()
     expect(screen.getByRole('button', { name: /カルーセル/ })).toBeTruthy()
   })
+})
+
+it('B-241：見本の取得失敗を見本なしとして消さず、同じ窓で読み直す',async()=>{
+ role.value='owner'
+ listTemplates.mockResolvedValue({success:true,data:[used]})
+ fetchApi.mockReset().mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[]})
+ await renderList()
+ fireEvent.click(screen.getAllByRole('button',{name:/テンプレートを作る/})[0])
+ const error=await screen.findByText('見本を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await act(async()=>{})
+ expect(fetchApi).toHaveBeenCalledTimes(2)
+ expect(screen.queryByText('見本を読み込めませんでした')).toBeNull()
 })

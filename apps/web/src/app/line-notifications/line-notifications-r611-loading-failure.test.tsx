@@ -12,7 +12,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { customerNotificationKpis } from './customer-kpis'
+import { customerNotificationKpis } from '@/v8/settings/line-notifications/customer-kpis'
 
 const fixture = vi.hoisted(() => ({
   operatorList: vi.fn(),
@@ -43,8 +43,8 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => 'customer',
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({ default: () => null }))
-vi.mock('./operator-notification-rules', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -77,6 +77,8 @@ vi.mock('@/lib/api', () => {
     },
   }
 })
+
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 
 import LineNotificationsPage from './page'
 
@@ -127,7 +129,7 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
     render(<LineNotificationsPage />)
 
     // 一覧は失敗と再読み込み。
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     // 上部の件数・送信枠は「取得中」のままではなく、取れなかったことを示す。
     await waitFor(() => expect(screen.getByText(/お知らせの件数は取得失敗です/)).toBeTruthy())
     // 板 g3iDs の4枚のうち3枚（今日送った・この30日・今月の送信枠）が取得失敗を示す。
@@ -142,11 +144,11 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(fixture.settings).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getByText('ご注文ありがとうございます')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'ご注文ありがとうございますの内容を編集' })).toBeTruthy())
     // 板 g3iDs の4枚が戻る（数カードと表の見出し）。
     expect(screen.getAllByText('この30日')).toHaveLength(2)
     expect(screen.queryByText(/から読み直してください/)).toBeNull()
@@ -164,14 +166,14 @@ describe('R611 customer-kpis の失敗注記（器の試験）', () => {
     const kpis = customerNotificationKpis({ ...base, loadFailed: true })
     expect(kpis.every((kpi) => kpi.value === null)).toBe(true)
     // 板 g3iDs の4枚。
-    expect(kpis.find((kpi) => kpi.label === '今日送った')?.note).toBe('取得失敗')
+    expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('取得失敗')
     expect(kpis.find((kpi) => kpi.label === 'この30日')?.note).toBe('取得失敗')
     expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('取得失敗')
   })
 
   it('loadFailed がなければ今までどおり「取得中」', () => {
     const kpis = customerNotificationKpis({ ...base })
-    expect(kpis.find((kpi) => kpi.label === '今日送った')?.note).toBe('種類別の件数は未取得')
+    expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('種類別の件数は未取得')
     expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('送信枠を取得中')
   })
 })

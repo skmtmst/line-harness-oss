@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .inlineBar { display: flex; align-items: center; gap: var(--tpl-acd-actions-gap); }
 .inlineBar[data-presentation='account-registration'] {
@@ -19,15 +19,12 @@
 
 .bar {
   position: sticky;
-  bottom: 0;
   z-index: 20;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center; /* alignItems: center */
-  gap: 16px;
-  min-height: 72px; /* height: 72 */
-  padding: 12px 20px; /* padding: [0, 20]。折り返したときのために上下を持つ */
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  gap: 16px; /* height: 72 */
+  padding: 12px 20px; /* padding: [0, 20]。折り返したときのために上下を持つ */ /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
   background: var(--color-canvas); /* fill: $canvas */
 }
@@ -37,7 +34,7 @@
  * ふんわり影にする。角丸と並び（削除は左端・操作は中央）はそのまま。
  * v7 は今までどおり。
  */
-[data-theme='v8'] .bar {
+:root .bar {
   bottom: 12px;
   min-height: 60px; /* 絵 K7HWG ほか：padding 12・ボタン36 で高さ60 */
   border: 0;
@@ -61,7 +58,7 @@
  * 下から 12px 浮かせるかは `X2oLn` に指定が無い（板は帯を画面の端から
  * 24px 内側に描いている）。推測で 0 へ戻さず、★A のまま 12px を使う。
  */
-[data-theme='v8'] .bar.outlined {
+:root .bar.outlined {
   min-height: 72px; /* height: 72 */
   border: 1px solid var(--color-hairline); /* stroke: #DADDE2 / strokeWidth: 1 */
   box-shadow: none;
@@ -76,6 +73,10 @@
 }
 
 .status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */
@@ -140,7 +141,7 @@
   }
 }
 /* 左の一覧と右の作る欄が独立した操作を持つ板用。既定の帯は変えない。 */
-[data-theme='v8'] .bar.splitBar.outlined { border: 0; background: transparent; }
+:root .bar.splitBar.outlined { border: 0; background: transparent; }
 .bar.splitBar { grid-template-columns: minmax(0, 1fr) var(--sticky-trailing-width); gap: 0; padding: 0; }
 .splitLead:empty { padding: 0; }
 .splitLead:not(:empty) { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-right: 0; border-radius: var(--radius-card) 0 0 var(--radius-card); }
@@ -154,3 +155,5 @@
   .splitTrailing { border-radius: var(--radius-card); justify-content: flex-end; flex-wrap: wrap; }
 }
 }
+
+.inlineBar[data-presentation='distribution'] { justify-content: center; gap: var(--tpl-wh-check-gap); padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top); }

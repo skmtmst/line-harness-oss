@@ -6,6 +6,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
 
 const apiMocks = vi.hoisted(() => ({
   publishValidation: vi.fn(),
@@ -27,8 +28,11 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import ReviewV8 from './review-v8'
+import ReviewPane from '@/v8/webinar-edit/review'
+import { webinarEditContext, webinarWizardChrome } from '@/test-utils/webinar-edit'
 import type { Webinar, WebinarEditor } from '@/lib/api'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 const WEBINAR = {
   id: 'webinar-1',
@@ -49,20 +53,16 @@ const EDITOR = {
 
 let mounted: Root[] = []
 
-function render(): HTMLElement {
+function render(editor = EDITOR): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
   mounted.push(root)
   act(() => {
     root.render(
-      <ReviewV8
-        webinar={WEBINAR}
-        editor={EDITOR}
-        registrations={124}
-        ctaCount={2}
-        onPublished={() => undefined}
-        onTestNotifications={() => undefined}
+      <ReviewPane
+        ctx={webinarEditContext(WEBINAR, editor, { ctaCount: 2 })}
+        chromeFor={(primary) => ({ ...webinarWizardChrome, footerActions: primary })}
       />,
     )
   })
@@ -73,6 +73,7 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
   beforeEach(() => {
     apiMocks.publishValidation.mockResolvedValue({
       data: {
+        version: 4, blockers: [], warnings: [],
         checks: [
           { key: 'video', label: '動画の準備ができている', status: 'passed', detail: '' },
           { key: 'page', label: '公開ページを確かめた', status: 'failed', detail: 'ページをテストしてください' },
@@ -120,7 +121,7 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
   })
 
   it('ページのテスト後は更新された保存版で公開し、二重クリックを一回にする', async () => {
-    apiMocks.publishValidation.mockResolvedValue({ data: { checks: [{ key: 'page', label: '公開ページ', status: 'passed' }] } })
+    apiMocks.publishValidation.mockResolvedValue({ data: { version: 4, blockers: [], warnings: [], checks: [{ key: 'page', label: '公開ページ', status: 'passed' }] } })
     apiMocks.testPublicPage.mockResolvedValue({ data: { ...EDITOR, version: 5, publicPage: { test: { status: 'passed' } } } })
     let reject!: (error: Error) => void
     apiMocks.publish.mockReturnValue(new Promise((_resolve, rejectPromise) => { reject = rejectPromise }))
@@ -135,6 +136,15 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
     await act(async () => { reject(new Error('通信切れ')) })
     expect(host.textContent).toContain('公開できませんでした')
     expect((button('この版を公開') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('現在の補足から未確認のテストと監視の失敗件数を確認できる', async () => {
+    const host = render({ ...EDITOR, monitoring: { ...EDITOR.monitoring, notificationFailures: 2, viewSegmentFailures: 1 } })
+    await act(async () => undefined)
+    fireEvent.click(host.querySelector('button[aria-label="ウェビナーの編集の説明"]')!)
+    const note = host.querySelector('[role="note"]')
+    expect(note?.textContent).toContain('通知のテスト送信・公開ページの確認が終わっていません。')
+    expect(note?.textContent).toContain('3件の要確認')
   })
 
 })

@@ -13,7 +13,8 @@ import {
   selectOffers,
 } from './offer-list-view'
 
-const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
+const TABS = readFileSync(new URL('../../v8/affiliates/offers.tsx', import.meta.url), 'utf8')
+const DISPLAY = readFileSync(new URL('../../v8/affiliates/display.ts', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./new-affiliate-v8.tsx', import.meta.url), 'utf8')
 
 function offer(over: Partial<AffiliateOffer> & { id: string }): AffiliateOffer {
@@ -154,8 +155,9 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
   it('読込中・取得失敗・空を言い分ける', () => {
     expect(TABS).toContain('title="案件を読み込んでいます"')
     expect(TABS).toContain('title="案件を読み込めませんでした"')
-    expect(TABS).toContain('title="案件はまだ登録されていません"')
-    expect(TABS).toContain('title="絞り込みに合う案件がありません"')
+    expect(TABS).toContain('title="まだ案件がありません"')
+    expect(TABS).toContain('filtered={offers.length > 0}')
+    expect(TABS).toContain('onClearFilters={resetConditions}')
   })
 
   it('参照名を引けなくても内部IDを画面へ出さない', () => {
@@ -194,8 +196,8 @@ describe('V6 アフィリエイターを作る（xqT1Z）', () => {
     // `limit: 200` で止めると数が小さく出て支払い判断を誤る。
     // offset で送って短い頁まで取り、安全弁のときだけ注記を出す。
     expect(TABS).toContain('listAllConversionApprovals')
-    expect(TABS).toContain('offset: startOffset + page * APPROVAL_PAGE_SIZE')
-    expect(TABS).toContain('直近5000件まで')
+    expect(DISPLAY).toContain('offset: startOffset + page * APPROVAL_PAGE_SIZE')
+    expect(TABS).toContain("approvalsTruncated ? '件数が多く、全部は数えられませんでした'")
     // KPI 用の読み出し（紹介者タブの pending/approved、案件タブの3状態）に
     // 加え、成果承認の作業列も同じ読み方へ替えた(N-207)。「各状態
     // 最大200件」の注記は残さない。

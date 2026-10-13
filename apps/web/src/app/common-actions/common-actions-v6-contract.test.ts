@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,11 +6,11 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const LIST = read('page.tsx')
-const CREATE = read('new', 'page.tsx')
-const EDIT = read('edit', 'page.tsx')
-const BRANCH_EDITOR = read('branch-editor.tsx')
-const VERSIONS = read('versions', 'page.tsx')
+const LIST = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const CREATE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
+const EDIT = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const BRANCH_EDITOR = read('..', '..', 'v8', 'automations', 'branch-editor.tsx')
+const VERSIONS = readUiSource(join(HERE, 'versions', 'page.tsx'), 'utf8')
 const EDITOR = read('..', '..', 'components', 'automations', 'common-action-editor.tsx')
 // #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
 const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
@@ -21,7 +22,7 @@ const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrati
 describe('V6共通アクションの画面契約', () => {
   it('一覧・空・読込・失敗と、名前で分かる遷移を持つ', () => {
     expect(LIST).toContain('共通アクションを読み込んでいます')
-    expect(LIST).toContain('共通アクションはまだありません')
+    expect(LIST).toContain('まだ、共通アクションはありません')
     expect(LIST).toContain('共通アクションを読み込めませんでした')
     expect(LIST).toContain('中身を見る')
     expect(LIST).toContain('使われている場所')
@@ -31,14 +32,14 @@ describe('V6共通アクションの画面契約', () => {
   })
 
   it('作成はJSON入力ではなく、選択肢と順番で編集する', () => {
-    expect(CREATE + EDIT).toContain('<CommonActionEditor')
+    expect(CREATE + EDIT).toMatch(/<(CommonActionEditor|ActionList)/)
     expect(EDITOR).toContain('失敗したとき')
-    expect(EDITOR).toContain('処理を追加する')
+    expect(EDITOR).toContain('commonActionChoices(resources)')
     expect(EDITOR).not.toContain('actionsJson')
     expect(CREATE).not.toContain('<main className=')
     expect(EDITOR).toContain('テンプレート「{selected.name}」')
     expect(EDITOR).toContain('版: —（未取得。テンプレートの版を返す口が接続されると表示します）')
-    expect(CREATE).toContain('すでに呼び出している場所はいまの版のまま動きます')
+    expect(CREATE).toContain('使う所はいまの版のまま')
   })
 
   it('条件分岐はタグ条件と両方の公開版を保存・実行契約へ接続する', () => {
@@ -64,23 +65,23 @@ describe('V6共通アクションの画面契約', () => {
   })
 
   it('利用版の変更前に差分と進行中への影響を確認する', () => {
-    expect(VERSIONS).toContain('変更内容を確認')
+    expect(VERSIONS).toContain('変わった点')
     expect(VERSIONS).toContain('現在の版')
     expect(VERSIONS).toContain('更新後')
     expect(VERSIONS).toContain('実行中・待機中の処理は変えず')
     expect(VERSIONS).toContain('<Dialog')
-    expect(VERSIONS).toContain('versionChangeSummary')
+    expect(VERSIONS).toContain('describeVersionChanges')
     expect(VERSIONS).toContain('summary?.executionCountThisMonth')
-    expect(VERSIONS).toContain('summary?.failureCountThisMonth')
-    expect(VERSIONS).toContain('このアクションを実行中')
-    expect(VERSIONS).toContain('待ち時間の途中')
+    expect(VERSIONS).toContain('summary.failureCountThisMonth')
+    expect(VERSIONS).toContain('runningCount')
+    expect(VERSIONS).toContain('waitingCount')
     expect(VERSIONS).not.toContain('内容を取得できません')
     expect(VERSIONS).not.toContain('確認できません')
   })
 
   it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
-    expect(LIST).toContain('summary?.executions')
-    expect(LIST).toContain('summary?.failures')
+    expect(LIST).toContain('summary.executions')
+    expect(LIST).toContain('summary.failures')
     // 監査 R464: CSVは一覧の検索・絞り込みを引き継ぎ、範囲と件数を事前に出す。
     expect(LIST).toContain('api.commonActions.csvUrl({')
     expect(LIST).toContain('status: filter')
@@ -89,10 +90,10 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('条件に合う共通アクションがないため書き出せません')
     // 監査 R466: 書き出し権限のない担当者にリンク自体を出さない。
     expect(LIST).toContain('canExportCsv')
-    expect(LIST).toContain('useAutomationRunPermissions')
+    expect(LIST).toContain('useAutomationRunManage')
     expect(LIST).toContain('古い版あり')
-    expect(LIST).toContain('limit: PAGE_SIZE')
-    expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
+    expect(LIST).toContain('limit: pageSize')
+    expect(LIST).toContain('offset: (page - 1) * pageSize')
     // ページ送りは共通の Pagination が担う（`aria-label="ページ送り"` は部品側にある）。
     expect(LIST).toContain('<Pagination')
   })
@@ -116,7 +117,7 @@ describe('V6共通アクションの画面契約', () => {
     expect(WORKER).toContain('consumer_path')
     expect(API).toContain('olderRunningCount')
     expect(VERSIONS).toContain('olderRunningCount')
-    expect(VERSIONS).toContain('旧版のまま進行中')
+    expect(VERSIONS).toContain('binding.olderRunningCount')
   })
 
   it('下書き保存・公開は改訂番号を照合する（監査 R473・R477）', () => {
@@ -142,7 +143,7 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('保管を戻す')
     expect(LIST).toContain('api.commonActions.archive')
     expect(LIST).toContain('api.commonActions.unarchive')
-    expect(LIST).toContain("value: 'archived'")
+    expect(LIST).toContain("chip('archived', '保管'")
     expect(WORKER).toContain('binding_exists')
     expect(API).toContain('archive:')
   })
@@ -170,8 +171,9 @@ describe('V6共通アクションの画面契約', () => {
   it('「マニュアル」は正本表の画面IDを引き、/supportへ固定で飛ばさない (監査R128)', () => {
     // /support はメール問い合わせの受信箱。説明書ではないので、画面内の
     // マニュアル導線は正本表（/settings/manual-links）が返すURLを使う。
-    expect(LIST).toContain('useManualHref')
-    expect(VERSIONS).toContain('useManualHref')
+    const topBar = read('..', '..', 'components', 'shell', 'app-top-bar.tsx')
+    expect(topBar).toContain('useManualHref(pathname)')
+    expect(topBar).toContain('manualHref={manualHref}')
     expect(LIST).not.toContain('href="/support"')
     expect(VERSIONS).not.toContain('href="/support"')
   })
@@ -200,10 +202,13 @@ describe('V6共通アクションの機能契約', () => {
   })
 
   it('札・KPIは集計口で受け、件数表示の全件取得はしない（#554 点検#519中2）', () => {
-    expect(LIST.match(/api\.commonActions\.list\(/g)).toHaveLength(1)
+    const main = read('..', '..', 'v8', 'automations', 'common-actions.tsx')
+    expect(main.match(/api\.commonActions\.list\(/g)).toHaveLength(1)
+    expect(main).toContain('useAutomationTabCounts(undefined, summary?.total ?? null)')
+    expect(LIST).toContain('needCommonActions ? api.commonActions.list')
     expect(LIST).toContain('response.summary')
-    expect(LIST).toContain('summary?.total')
-    expect(LIST).toContain('summary?.outdatedItems')
+    expect(LIST).toContain('summary.total')
+    expect(LIST).toContain('summary?.oldVersion')
     expect(LIST).not.toContain('summaryResponse')
     expect(LIST).not.toContain('summaryItems')
     // 暫定の注記ではなく、口の集計を使う

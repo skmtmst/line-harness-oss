@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
@@ -45,18 +45,23 @@ describe('#639 主要操作の最小高さ 32px', () => {
     // 行内アイコン操作 32px（Pencil K65Uhe・Ls12y・H0V8EK の寸法）。
     expect(readShared('row-actions.module.css')).toMatch(/\.action\s*\{[^}]*height:\s*32px/s)
     // 一覧の絞り込み札 32px。
-    expect(readShared('filter-chip.css')).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)
+    expect(readShared('filter-chip.css')).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
     // ページネーションは推奨 36px 以上（38px）。
     expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*32px/s)
     // タブは 44px。
-    expect(readShared('tabs.module.css')).toMatch(/\.tab\s*\{[^}]*height:\s*44px/s)
+    expect(readShared('tabs.module.css')).toMatch(/:root \.list \.tab\.tab\s*\{[^}]*height:\s*var\(--tpl-tabs-h\)/s)
     // 共通ボタンの標準は 40px。
-    expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*36px/s)
+    expect(readShared('button.module.css')).toMatch(/:root \.standard,\s*:root \.field\s*\{[^}]*height:\s*var\(--tpl-button-h\)/s)
   })
 
-  it('画像タイルのお気に入り星は 32px の当たりを持つ', () => {
-    const tile = readFileSync(join(SRC, 'components', 'hq', 'banners', 'image-tile.tsx'), 'utf8')
-    expect(tile).toMatch(/aria-label=\{image\.isFavorite \? 'お気に入りから外す' : 'お気に入りにする'\}[\s\S]*?h-8 w-8/)
+  it('画像タイルのお気に入り星は現役の板の24pxを使う', () => {
+    const list = readFileSync(join(SRC, 'v8', 'hq-banners', 'list.tsx'), 'utf8')
+    const css = readFileSync(join(SRC, 'v8', 'hq-banners', 'list.module.css'), 'utf8')
+    expect(list).toContain("aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}")
+    expect(css).toMatch(/\.star\s*\{[^}]*width:\s*var\(--tpl-hb-star\)/s)
+    expect(css).toMatch(/\.star\s*\{[^}]*height:\s*var\(--tpl-hb-star\)/s)
+    expect(GLOBALS_CODE).toMatch(/--tpl-hb-star:\s*24px/)
+
   })
 })
 
@@ -105,15 +110,18 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     expect(readApp('booking/menus/staff/page.tsx')).toContain('variant="primary"')
     // V8 移行 ①: 緊急停止の操作は共通 Button へ。塗りとホバー（brightness）の
     // 持ち主は共通部品で、画面側は寸法の指定だけを持つ。
-    expect(readApp('emergency/page.tsx')).toContain('variant="primary"')
-    expect(readApp('emergency/page.tsx')).toContain('min-h-9')
+    expect(readApp('../v8/settings/emergency/health.tsx')).toContain('variant="secondary"')
+    const buttonCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'button.module.css'), 'utf8')
+    expect(buttonCss).toContain('.secondary:hover:not(:disabled)')
+    expect(buttonCss).toContain('min-height:')
     // 流入経路モーダル・プールは brightness で沈む（生の色を増やさない）。
     // 2026-09-25: 白字 3.77:1 の bg-emerald-600 を bg-success（5.61:1）へ。
     // 見張りはホバー変化の有無（意図は変えない）。
-    expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90')
+    expect(readApp('../v8/inflow-links/genre-dialog.tsx')).toContain('onConfirm={() => save()}')
+    expect(readShared('dialog.tsx')).toContain("'danger' : 'primary'")
     // ★V7 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
-    expect(readApp('inflow-links/_components/edit-route-modal.tsx')).toContain('variant="primary"')
-    expect(readApp('pools/page.tsx')).toContain('bg-action text-on-accent hover:brightness-90')
+    expect(readApp('../v8/inflow-links/edit-route-dialog.tsx')).toContain('variant="primary"')
+    expect(readApp('../v8/settings/pools/pools.tsx')).toContain('variant="primary"')
     // 白地の枠付き口は沈み色へ、淡色ピルは brightness で応答する。
     // V8 移行 ①: 白地の枠付き口は共通 Button secondary へ。沈み色は部品が持つ。
     expect(readFileSync(join(HERE, '../../v8/tags/folder-page.tsx'), 'utf8')).toContain('<FolderEditorDialog')
@@ -142,7 +150,7 @@ describe('#639 高さ規則は本物の操作部品に載る（実React描画）
     expect(html).toContain('aria-current="page"')
   })
 
-  it('行内操作は「詳細」「編集」の実ボタンを出す', () => {
+  it('行内操作の編集は「…」へ入る', () => {
     const html = renderToStaticMarkup(
       <RowActions
         subjectName="来店お礼"
@@ -151,7 +159,8 @@ describe('#639 高さ規則は本物の操作部品に載る（実React描画）
       />,
     )
     expect(html).toContain('詳細')
-    expect(html).toContain('編集')
+    expect(html).not.toContain('編集')
+    expect(html).toContain('来店お礼のその他操作')
     expect(html).toMatch(/<(button|a)\b/)
   })
 

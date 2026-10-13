@@ -114,7 +114,7 @@ describe('FRIEND-18/19/20/29/30 保存した検索の窓', () => {
   it('FRIEND-18: 失敗・空・成功を排他的にし、失敗には再読込を置く', () => {
     expect(SAVED).toContain('保存した検索を読み込めませんでした')
     expect(SAVED).toContain('再読み込み')
-    expect(SAVED).toContain('!loading && !error && saved.length === 0')
+    expect(SAVED).toMatch(/loading \?[^]*?: error \?[^]*?: saved.length === 0 \?/)
   })
 
   it('FRIEND-19: 切替・再読込のたびに前の候補を破棄する', () => {
@@ -137,9 +137,10 @@ describe('FRIEND-18/19/20/29/30 保存した検索の窓', () => {
   })
 
   it('FRIEND-30: パネル全体を画面内に収め、内容だけ伸縮する', () => {
-    expect(SAVED).toContain('max-h-full')
-    expect(SAVED).toContain('flex-col')
-    expect(SAVED).toContain('overflow-y-auto')
+    expect(SAVED).toContain('<EntityPickerDialog')
+    const css = readFileSync(join(HERE, '..', '..', 'components', 'shared', 'entity-picker.module.css'), 'utf8')
+    expect(css).toContain('max-height:')
+    expect(css).toContain('overflow-y: auto')
   })
 })
 

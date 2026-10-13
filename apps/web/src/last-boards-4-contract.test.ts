@@ -15,9 +15,9 @@ const BOOKINGS = read('app/booking/bookings/page.tsx')
 const BOOKING_NEW = read('app/booking/bookings/new/page.tsx')
 const BOOKING_DETAIL = read('app/booking/bookings/detail/page.tsx')
 const CHATS = read('app/chats/page.tsx')
-const DASHBOARD_EDITOR = read('components/dashboard/dashboard-editor.tsx')
+const DASHBOARD_EDITOR = read('v8/dashboard/dashboard-editor.tsx')
 const DASHBOARD = read('app/page.tsx')
-const TEMPLATE_EDIT = read('app/templates/edit-v8.tsx')
+const TEMPLATE_EDIT = read('v8/template-edit/message.tsx')
 const REMINDER_EDIT = read('app/reminders/edit/edit-v8.tsx')
 // 友だち追加の作る・直すの入口は src/v8/friend-add/editor.tsx（古い editor-v8.tsx はもう描かれない）。
 const FRIEND_ADD_EDITOR = read('v8/friend-add/editor.tsx')
@@ -32,22 +32,22 @@ describe('最後の細かい板の印', () => {
   })
 
   it('一覧から開く窓にCYJ0Lを付ける', () => {
-    expect(ADV_SEARCH).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
-    expect(SAVED_SEARCH).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
-    expect(SINGLE_ACTIONS).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
-    expect(FRIEND_TABLE).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
+    expect(ADV_SEARCH).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
+    expect(SAVED_SEARCH).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
+    expect(SINGLE_ACTIONS).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
+    expect(FRIEND_TABLE).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
   })
 
   it('予約にacRIl・If9Mhを付ける', () => {
-    expect(BOOKINGS).toMatch(/(?:data-design-node|boardId)="acRIl"/)
+    expect(BOOKINGS).toMatch(/(?:data-design-node|boardId|designNode)="acRIl"/)
     expect(BOOKING_NEW).toContain('If9Mh')
-    expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId)="If9Mh"/)
+    expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId|designNode)="If9Mh"/)
   })
 
-  it('受信箱にM0393・ダッシュボードにd8X09・mcOqKを付ける', () => {
-    expect(CHATS).toMatch(/(?:data-design-node|boardId)="M0393"/)
-    expect(DASHBOARD).toMatch(/(?:data-design-node|boardId)="WQmep"/)
-    expect(DASHBOARD_EDITOR).toMatch(/(?:data-design-node|boardId)="mcOqK"/)
+  it('受信箱にeovoG・ダッシュボードにd8X09・mcOqKを付ける', () => {
+    expect(CHATS).toMatch(/(?:data-design-node|boardId|designNode)="eovoG"/)
+    expect(DASHBOARD).toMatch(/(?:data-design-node|boardId|designNode)="WQmep"/)
+    expect(DASHBOARD_EDITOR).toMatch(/(?:data-design-node|boardId|designNode)="mcOqK"/)
   })
 
   it('1152の幅違いを動的に選ぶ（a1k3d・r1l0bT・xHpkS）', () => {

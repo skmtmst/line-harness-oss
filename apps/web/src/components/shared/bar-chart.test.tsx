@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 // @vitest-environment happy-dom
 /*
  * ★V7 グラフ（ノード `h99Gb`）。
@@ -10,12 +11,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BarChart, BarChartEmpty, barChartTicks, toBarChartItems } from './bar-chart'
+import { BarChart, BarChartEmpty, BarChartLegend, barChartTicks, toBarChartItems, type BarChartLegendItem } from './bar-chart'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const tsx = readFileSync(join(DIR, 'bar-chart.tsx'), 'utf8')
 const css = readFileSync(join(DIR, 'bar-chart.module.css'), 'utf8')
-const analyticsPage = readFileSync(join(DIR, '..', '..', 'app', 'analytics', 'page.tsx'), 'utf8')
+const analyticsPage = readUiSource(join(DIR, '..', '..', 'app', 'analytics', 'page.tsx'), 'utf8')
 
 afterEach(() => cleanup())
 
@@ -65,6 +66,10 @@ describe('数の写し（画面と一致させる）', () => {
     expect(barChartTicks(6)).toEqual([0, 2, 4, 6])
     expect(barChartTicks(0)).toEqual([0, 1])
     expect(barChartTicks(30)).toEqual([0, 10, 20, 30])
+    expect(barChartTicks(99400)).toEqual([0, 50000, 100000])
+    expect(barChartTicks(100001)).toEqual([0, 50000, 100000, 150000])
+    expect(barChartTicks(Number.POSITIVE_INFINITY)).toEqual([0, 1])
+    expect(barChartTicks(Number.MAX_VALUE)).toEqual([0, Number.MAX_VALUE])
   })
 })
 
@@ -100,6 +105,21 @@ describe('色は2つまで（増えた=濃い緑・減った=灰色）', () => {
     expect(legend.textContent).toContain('登録')
     expect(legend.textContent).toContain('ブロック')
     expect(legend.textContent).not.toContain('増えた')
+  })
+
+  it('凡例を外へ置いても、日を選ぶ操作と読み上げる数を保つ', () => {
+    const legend: BarChartLegendItem[] = [{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]
+    const selected: string[] = []
+    render(<>
+      <BarChartLegend items={legend} layout="dashboard" />
+      <BarChart items={SAMPLE} layout="dashboard" showLegend={false} legend={legend} onSelect={key => selected.push(key)} />
+    </>)
+    expect(screen.getAllByRole('list', { name: '凡例' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '9月20日 登録6人・ブロック0人・朝の配信' }))
+    expect(selected).toEqual(['2026-09-20'])
+    const table = screen.getByRole('table', { name: '日ごとの増減' })
+    expect(table.textContent).toContain('6人')
+    expect(table.textContent).toContain('2人')
   })
 })
 
@@ -147,10 +167,10 @@ describe('まだ数えられないとき', () => {
 })
 
 describe('分析画面の配線（見た目と数字の一致）', () => {
-  it('日ごとの増減の枠が BarChart を使う', () => {
-    expect(analyticsPage).toContain("from '@/components/shared/bar-chart'")
-    expect(analyticsPage).toContain('<BarChart')
-    expect(analyticsPage).toContain('toBarChartItems(overview.days')
+  it('日ごとの増減の枠がV8のグラフへ実際の増減を渡す', () => {
+    expect(analyticsPage).toContain("from '@/components/shared/charts'")
+    expect(analyticsPage).toContain('<DailyBars')
+    expect(analyticsPage).toContain('days={overview.days}')
   })
 
   it('減った棒に赤を使わない', () => {
@@ -160,7 +180,7 @@ describe('分析画面の配線（見た目と数字の一致）', () => {
   it('日ごとの数は overview.days の増減をそのまま渡す', () => {
     expect(analyticsPage).toContain('overview.campaigns')
     // 選択日の1行は BarChart の外で今までどおり出す。
-    expect(analyticsPage).toContain('増加 {selectedDay.added}人・減少 {selectedDay.removed}人')
+    expect(analyticsPage).toContain('増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人')
   })
 })
 

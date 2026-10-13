@@ -27,7 +27,7 @@
   padding: var(--tpl-hb-band-pad);
   border-radius: var(--tpl-hb-tile-radius);
   background: var(--color-status-info-soft);
-  color: var(--color-status-info);
+  color: var(--color-action);
 }
 
 .runningText { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-hb-small-lh); }

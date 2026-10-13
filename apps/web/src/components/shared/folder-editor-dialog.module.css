@@ -5,8 +5,13 @@
 .name { flex: 1; min-width: 0; }
 .color { flex: none; }
 .name, .color { display: flex; flex-direction: column; gap: var(--tpl-field-gap-basic); }
-.label { color: var(--color-ink); font-size: var(--select-menu-item-size); font-weight: 600; line-height: var(--tpl-chip-label-lh); }
+.label { color: var(--color-ink); line-height: var(--tpl-chip-label-lh); }
 .nameError { margin: 0; color: var(--color-danger); font-size: var(--select-menu-item-size); line-height: var(--tpl-chip-label-lh); }
 .error { margin: 0; border-radius: var(--radius-control); background: var(--color-status-danger-soft); padding: var(--tpl-tg2-info-band-pad); color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-tg2-info-band-lh); overflow-wrap: anywhere; }
 .footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--select-menu-panel-gap); padding: var(--tpl-tg2-dialog-footer-pad); }
+}
+
+:root .label {
+  font-size: var(--tpl-field-label-size);
+  font-weight: var(--tpl-field-label-weight);
 }

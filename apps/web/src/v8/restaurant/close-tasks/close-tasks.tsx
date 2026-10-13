@@ -1,17 +1,9 @@
 'use client'
 
 import { useUrlTab } from '@/lib/use-url-tab'
-
-/*
- * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
- *
- * 未対応／閉じた で切り替え。1行＝1つの枠（時刻）。閉じる媒体は札で並べ、閉じた媒体には ✓。
- * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
- * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import { ListPage } from '@/components/templates/list-page'
@@ -33,6 +25,15 @@ import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, 
 import { type StoreMedium, loadStoreMedia } from '../dashboard/use-store-today'
 import styles from './close-tasks.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
+ *
+ * 未対応／閉じた で切り替え。1行＝1つの枠（時刻）。閉じる媒体は札で並べ、閉じた媒体には ✓。
+ * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
+ * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
+ */
 
 type Tab = 'open' | 'done'
 
@@ -47,13 +48,13 @@ const STATE_BADGE: Record<CloseGroup['state'], { label: string; tone: 'danger' |
 }
 
 export default function CloseTasksPage() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   usePageTitle('枠を閉じる知らせ')
   usePageCrumbs([{ label: '店舗ダッシュボード', href: '/restaurant-test/dashboard' }])
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const canWrite = canWriteRole(role)
-  const [storeId, setStoreId] = useState('')
   const [tasks, setTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
@@ -62,35 +63,32 @@ export default function CloseTasksPage() {
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
 
-  /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭（ダッシュボードと同じ）。 */
-  useEffect(() => {
-    let current = true
-    if (!selectedAccountId) return
-    void Promise.all([
-      restaurantTestApi.listStores(selectedAccountId),
-      restaurantTestApi.storeContext(selectedAccountId).catch(() => null),
-    ]).then(([stores, context]) => {
-      if (!current) return
-      const selected = context?.data.selectedStore?.id
-      setStoreId(stores.data.stores.some((s) => s.id === selected) ? selected! : stores.data.stores[0]?.id ?? '')
-      if (stores.data.stores.length === 0) setTasks([])
-    }).catch((caught) => { if (current) setError(caught) })
-    return () => { current = false }
-  }, [selectedAccountId])
-
+  const latest = useRef(0)
   const load = useCallback(async () => {
-    if (!selectedAccountId || !storeId) return
+    const ticket = ++latest.current
+    if (!selectedAccountId) return
+    setError(null)
     try {
+      const [stores, context] = await Promise.all([
+        restaurantTestApi.listStores(selectedAccountId),
+        restaurantTestApi.storeContext(selectedAccountId),
+      ])
+      const selected = context?.data.selectedStore?.id
+      const storeId = stores.data.stores.some(s => s.id === selected) ? selected! : stores.data.stores[0]?.id
+      if (!storeId) { if (ticket === latest.current) { setTasks([]); setMedia([]) }; return }
       const [list, channels] = await Promise.all([
         restaurantTestApi.channelCloseTasks(selectedAccountId, storeId),
-        loadStoreMedia(selectedAccountId, storeId).catch(() => [] as StoreMedium[]),
+        loadStoreMedia(selectedAccountId, storeId),
       ])
-      setTasks(list.data); setMedia(channels); setError(null)
+      if (ticket !== latest.current) return
+      if (!Array.isArray(list.data)) throw new Error('読み込めませんでした')
+      setTasks(list.data); setMedia(channels)
     } catch (caught) {
-      setError(caught)
+      if (ticket === latest.current) setError(caught)
     }
-  }, [selectedAccountId, storeId])
-  useEffect(() => { void load() }, [load])
+  }, [selectedAccountId])
+  useEffect(() => { setTasks(null); setMedia([]); void load(); return () => { latest.current++ } }, [load])
+
 
   const groups = useMemo(() => groupCloseTasks(tasks ?? [], media), [tasks, media])
   const openCount = groups.filter((g) => g.state !== 'done').length
@@ -109,7 +107,11 @@ export default function CloseTasksPage() {
       await restaurantTestApi.completeChannelCloseTask(selectedAccountId, taskId)
       notifyToast(`${name}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
     } finally {
       await load()
       setBusyId('')
@@ -117,7 +119,7 @@ export default function CloseTasksPage() {
   }
 
   let content
-  if (error && tasks === null) content = <ListState kind="error" error={error} onRetry={() => void load()} />
+  if (error) content = <ListState kind="error" error={error} onRetry={() => void load()} />
   else if (tasks === null) content = <ListState kind="loading" />
   else if (shown.length === 0) {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />
@@ -175,7 +177,7 @@ export default function CloseTasksPage() {
                       label={`${slotTitle(group.startsAt)}の操作`}
                       items={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
-                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, href: `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: false, href: `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
                       ]}
                     />
                   </span>
@@ -190,7 +192,7 @@ export default function CloseTasksPage() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="YMVFD"
       headingSize="compact"
       title="他のサイトの枠を閉じる知らせ"
@@ -209,16 +211,16 @@ export default function CloseTasksPage() {
           <span className={styles.search}>
             <SearchField aria-label="日時・媒体で探す" placeholder="日時・媒体で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </span>
-          <Select
+          <SaveErrorField names={["medium"]}><Select
             aria-label="媒体で絞る"
             value={medium}
             onChange={setMedium}
             options={[{ value: 'all', label: '媒体：すべて' }, ...mediaOptions.map(([code, name]) => ({ value: code, label: `媒体：${name}` }))]}
-          />
+          /></SaveErrorField>
         </>
       )}
     >
       {content}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

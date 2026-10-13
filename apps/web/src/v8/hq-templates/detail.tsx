@@ -24,9 +24,12 @@ import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
+import { ListEmptyMessage } from '@/components/shared/list-state'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -130,8 +133,8 @@ export default function HqTemplateDetail({
     )
   }
   const compareBox = compare ? (
-    compare.error ? <p className={styles.errorText} role="alert">{compare.error}</p>
-      : !compare.result ? <p className={styles.empty} role="status">比べています…</p>
+    compare.error ? <Notice tone="danger" >{compare.error}</Notice>
+      : !compare.result ? <ListEmptyMessage role="status">比べています…</ListEmptyMessage>
       : (
         <ChangeBox
           title={`比べる（版${compare.from} → 版${compare.to}）`}
@@ -179,7 +182,7 @@ export default function HqTemplateDetail({
     </div>
   )
 
-  const backLink = <button type="button" className={styles.backLink} onClick={onBack}><ArrowLeft size={14} aria-hidden="true" />テンプレートへ</button>
+  const backLink = <></>
   /* 配った先の名前（API-14 はアカウントの今の表示名）からアカウントを引く。同じ名前が無ければ、末尾が一致する1件だけ。 */
   const accountIdOf = (name: string) => {
     const exact = accounts.find((account) => account.name === name)
@@ -217,7 +220,7 @@ export default function HqTemplateDetail({
         description={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
         preview={side}
       >
-        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</p>}
+        {canEdit ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</ReadOnlyNotice></div>}
         {notices}
         {canEdit ? (
           <div className={styles.draftBand} role="status">
@@ -291,9 +294,9 @@ export default function HqTemplateDetail({
                   {enterButton(accountIdOf(name))}
                 </div>
               ))}
-              {more > 0 ? <div className={styles.moreRow}><span className={styles.empty}>{`ほか ${more} アカウント`}</span></div> : null}
+              {more > 0 ? <div className={styles.moreRow}><ListEmptyMessage as="span">{`ほか ${more} アカウント`}</ListEmptyMessage></div> : null}
             </>
-          ) : <p className={styles.empty}>まだ配っていません</p>}
+          ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
           {canEdit ? (
             <div className={styles.moreRow}>
               <button type="button" className={styles.ghostButton} onClick={onDistribute} disabled={busy}>配る先を変える</button>

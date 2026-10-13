@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BOARD_URLS } from './v8-board-urls.mjs'
+import { buildFrozenMap } from './frozen-v8-design-map.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -29,6 +30,13 @@ const outIndex = args.indexOf('--out')
 const OUT = outIndex >= 0 && args[outIndex + 1]
   ? resolve(ROOT, args[outIndex + 1])
   : join(HERE, 'v8-design-map.json')
+
+const seedPath = join(HERE, 'v8-design-map.json')
+// 固定後は古い台帳を再び重ねない。現在のURL・撮影用データを保って書き出しへ合わせる。
+if (args.includes('--frozen-exports') || (existsSync(seedPath) && JSON.parse(readFileSync(seedPath, 'utf8')).frozenAt)) {
+  buildFrozenMap(seedPath, DESIGN_DIR, OUT)
+  process.exit(0)
+}
 
 /** 表の1行を `|` で割る。見出しと区切り行は捨てる。 */
 function tableRows(text) {

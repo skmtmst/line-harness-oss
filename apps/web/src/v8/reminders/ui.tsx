@@ -2,8 +2,8 @@
 
 import { Steps } from '@/components/templates/steps'
 import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ChevronLeft } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import RadioCard from '@/components/shared/radio-card'
@@ -64,12 +64,7 @@ export function ReminderV8Stepper({ current, reminderId }: { current: ReminderV8
 
 /** 頭の「← リマインダへ」。 */
 export function BackToReminders() {
-  return (
-    <Link href="/reminders" className={styles.backLink}>
-      <ChevronLeft size={14} aria-hidden="true" />
-      リマインダへ
-    </Link>
-  )
+  return null
 }
 
 /** 右の列の「設定内容」。共通部品 CreateSummaryCard に載せる。 */

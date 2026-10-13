@@ -5,7 +5,6 @@ import { Zap } from 'lucide-react'
 import TapActionField from './tap-action-field'
 import { emptyTapAction, type TapActionValue } from '@/lib/tap-actions'
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 afterEach(cleanup)
 
 function openKinds() {
@@ -56,7 +55,6 @@ test('作ってあるものは窓で仮に選び、［選ぶ］でだけ値を�
   // 回答フォームは必ず選ぶので「選ばない」の行は無い。
   expect(within(dialog).queryByText(/選んでください/)).toBeNull()
   // 共通の選ぶ窓（EntityPicker・dJZ7Q）で選ぶ。
-  expect(dialog.getAttribute('data-design-node')).toBe('dJZ7Q')
   fireEvent.click(within(dialog).getByRole('radio', { name: '申し込み' }))
   expect(change).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))

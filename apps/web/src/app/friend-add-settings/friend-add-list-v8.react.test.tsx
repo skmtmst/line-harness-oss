@@ -173,7 +173,7 @@ test('v8 の下では Pencil MRhef の新しい一覧に切り替わる', async 
   expect(host.textContent).toContain('流入リンク')
   // 行の中身
   expect(host.textContent).toContain('店頭QRの初回案内')
-  expect(host.textContent).toContain('店頭QRコード')
+  expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('店頭QRコード')
   expect(host.textContent).toContain('常に有効')
 })
 

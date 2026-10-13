@@ -27,6 +27,7 @@ describe('返したあとに行うこと（V8 の行）', () => {
   it('失敗したらの動きを変えると、その行だけが変わる', () => {
     const onChange = vi.fn()
     render(<InlineActionRowsV8 actions={[a({}), a({ key: 'k2' })]} onChange={onChange} {...opts} />)
+    fireEvent.click(screen.getAllByRole('button', { name: '対応マークを付ける「予約変更」' })[0])
     // 選ぶ欄は共通の Select（ボタン＋一覧）。開いて「ここで止める」を押す。
     fireEvent.click(screen.getByRole('button', { name: '1つ目の失敗したときの動き' }))
     fireEvent.click(screen.getByRole('button', { name: 'ここで止める' }))
@@ -38,8 +39,8 @@ describe('返したあとに行うこと（V8 の行）', () => {
 
   it('何も無いときは足し方を出す', () => {
     render(<InlineActionRowsV8 actions={[]} onChange={() => {}} {...opts} />)
-    expect(screen.getByText('まだ何もありません。「処理を足す」から選んでください。')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /処理を足す/ })).toBeTruthy()
+    expect(screen.getByText('行うことはまだありません。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /行うことを足す/ })).toBeTruthy()
   })
 })
 
@@ -47,7 +48,7 @@ it('WEB-019：つまみはマウスと上下キーで同じ順へ動かせる', 
   const onChange = vi.fn()
   const actions = [a({}), a({ key: 'k2' })]
   const { container } = render(<InlineActionRowsV8 actions={actions} onChange={onChange} {...opts} />)
-  const handle = screen.getAllByRole('button', { name: '対応マークを付ける「予約変更」を並べ替える' })[0]
+  const handle = screen.getByRole('button', { name: '1つ目の行うことを並べ替える' })
   fireEvent.keyDown(handle, { key: 'ArrowDown' })
   expect(onChange).toHaveBeenLastCalledWith([actions[1], actions[0]])
   onChange.mockClear()
@@ -61,8 +62,7 @@ it('WEB-019：つまみはマウスと上下キーで同じ順へ動かせる', 
 
 it('編集を開くと送信・リマインダ・イベントの候補が入る', () => {
   render(<InlineActionRowsV8 actions={[a({})]} onChange={()=>{}} {...opts} templates={[{id:'t',name:'案内'}]} reminders={[{id:'r',name:'翌日'}]} events={[{id:'e',name:'相談会'}]} />)
-  fireEvent.click(screen.getByRole('button',{name:'1つ目の処理の操作'}))
-  fireEvent.click(screen.getByRole('menuitem',{name:'設定を変える'}))
+  fireEvent.click(screen.getByRole('button',{name:'対応マークを付ける「予約変更」'}))
   expect(screen.getByText(/中身の編集/).textContent).toContain('案内')
   expect(screen.getByText(/中身の編集/).textContent).toContain('翌日')
   expect(screen.getByText(/中身の編集/).textContent).toContain('相談会')

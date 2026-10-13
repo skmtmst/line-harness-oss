@@ -1,5 +1,7 @@
 'use client'
 
+import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle } from '@/components/shared/save-conflict'
+
 /*
  * ★V8 プール管理（Pencil `u3iab3`）。
  *
@@ -9,19 +11,24 @@
  * プール一覧・LINEアカウント一覧・プールごとの所属アカウント・追加・外す・削除。
  * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
  */
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, Info, Plus } from 'lucide-react'
+import { Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import { notifyToast } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
@@ -29,7 +36,8 @@ import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
+
+import Notice from '@/components/shared/notice'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
@@ -48,8 +56,8 @@ export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
 export default function PoolsV8() {
   usePageTitle(TITLE)
   const role = useStaffRole()
-  // 役割が読めるまでは今までどおり出し、見るだけと分かったら操作を隠す（最後の守りはサーバの 403）。
-  const canManage = role === null || canManageRole(role)
+  // APIと同じくオーナーだけ。役割の確認中も変更操作を隠す。
+  const canManage = role === 'owner'
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
@@ -147,9 +155,17 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   canManage: boolean
   onChange: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const isMain = pool.slug === 'main'
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const publicUrl = `${apiBase}/pool/${pool.slug}`
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(pool.name)
+  const [editVersion, setEditVersion] = useState(pool.updatedAt)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -157,6 +173,38 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  const fetchLatest = async () => {
+    const response = await api.pools.get(pool.id)
+    if (!response.success) throw new Error('latest_failed')
+    return response.data
+  }
+  const conflict = useSaveConflict<TrafficPool>({ contextKey: pool.id, fetchLatest, reload: async () => {
+    try {
+      const latest = await fetchLatest()
+      setEditName(latest.name); setEditVersion(latest.updatedAt); setEditError(''); conflict.clear()
+    } catch { setEditError('最新のプールを読み込めませんでした。入力は残っています。もう一度お試しください。') }
+  } })
+
+  const closeEdit = () => {
+    if (editBusy) return
+    if (editName !== pool.name) setDiscardOpen(true)
+    else setEditing(false)
+  }
+  const saveEdit = async () => {
+    if (!canManage || editBusy || conflict.conflict) return
+    if (!editName.trim()) { setNameError('名前を入力してください'); return }
+    setEditBusy(true); setEditError('')
+    try {
+      const response = await api.pools.update(pool.id, { name: editName.trim(), expectedUpdatedAt: editVersion })
+      if (!response.success) throw new Error(response.error)
+      setEditing(false); notifyToast('プールを保存しました'); onChange()
+    } catch (cause) {
+      if ((cause as { status?: number })?.status === 409) {
+        conflict.mark((cause as ApiError).data && typeof (cause as ApiError).data === 'object' ? ((cause as ApiError).data as { updatedAt?: string }).updatedAt : undefined)
+      } else if (!saveErrors.capture(cause)) setEditError('保存できませんでした。入力は残っています。もう一度お試しください。')
+    }
+    finally { setEditBusy(false) }
+  }
 
 
   const onDelete = async () => {
@@ -183,14 +231,14 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
           <h2 className={styles.cardTitle} title={pool.name}>{pool.name}</h2>
           <p className={styles.slug} title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
         </div>
-        {canManage && !isMain ? (
+        {canManage ? (
           <div className={styles.menuBox}>
             <RowMenu
               label={`${pool.name}の操作`}
               menuLabel="操作"
               open={menuOpen}
               onOpenChange={setMenuOpen}
-              items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } }]}
+              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
             />
           </div>
         ) : null}
@@ -199,9 +247,17 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
         <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
       </div>
-      {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
+      {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
+      <SaveErrorScope errors={saveErrors}><Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={conflict.conflict ? undefined : () => void saveEdit()} confirmLabel="保存する">
+        {conflict.conflict && <SaveConflictBand title={saveConflictTitle(conflict.conflict.updatedAt, 'プール', pool.name)} description="ほかの人が先に保存しました。入力は残っています。" compareBusy={conflict.compareBusy} onCompare={() => void conflict.compare()} onReload={() => void conflict.reloadLatest()} />}
+        <Field label="プール名" htmlFor={`pool-name-${pool.id}`} required error={nameError}>
+          <SaveErrorField names={["name"]}><TextField id={`pool-name-${pool.id}`} value={editName} maxLength={100} onChange={(event) => { setEditName(event.target.value); setNameError('') }} /></SaveErrorField>
+        </Field>
+      </Dialog></SaveErrorScope>
+      <SaveConflictCompareDialog open={conflict.compareOpen} busy={conflict.compareBusy} error={conflict.compareError} lines={conflict.latest ? (conflict.latest.name === editName ? [] : [{ text: `プール名：あなたの下書き「${editName}」／最新「${conflict.latest.name}」`, kind: 'change' }]) : null} onReload={() => void conflict.reloadLatest()} onCancel={conflict.closeCompare} />
+      <ConfirmDialog open={discardOpen} title="入力を破棄しますか？" description="変更したプール名は保存されません。" confirmLabel="破棄する" onConfirm={() => { setDiscardOpen(false); setEditing(false) }} onCancel={() => setDiscardOpen(false)} />
       <ConfirmDialog
         open={confirmOpen}
         title={`プール「${pool.name}」を削除しますか？`}
@@ -307,10 +363,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         {members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
       </ul>
       {listError ? (
-        <p role="alert" className={styles.inlineError}>
-          {listError}{' '}
-          <button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button>
-        </p>
+        <Notice tone="danger" >{listError}{' '}<button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {canManage && candidates.length > 0 ? (
         <div className={styles.menuBox}>

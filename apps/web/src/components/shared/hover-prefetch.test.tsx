@@ -73,7 +73,7 @@ describe('HoverPrefetch（リンクの先読み・F①）', () => {
     expect(prefetch).not.toHaveBeenCalled()
   })
 
-  it('v7 では読まない', () => {
+  it('古いDOMの値で現役の先読みを止めない', () => {
     document.documentElement.dataset.theme = 'v7'
     render(
       <>
@@ -82,7 +82,7 @@ describe('HoverPrefetch（リンクの先読み・F①）', () => {
       </>,
     )
     hover(document.querySelector('a')!)
-    expect(prefetch).not.toHaveBeenCalled()
+    expect(prefetch).toHaveBeenCalledWith('/broadcasts')
   })
 
   it('data-prefetch の API も温める', async () => {

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 
 import React from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -34,14 +36,11 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock('@/lib/staff-capability', () => ({
-  isOwnerOrAdmin: () => true,
-}))
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => undefined,
@@ -63,6 +62,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   document.documentElement.dataset.theme = 'v8'
 })
 
@@ -72,12 +72,12 @@ afterEach(() => {
 })
 
 async function renderList() {
-  const { default: CommonVarsListV8 } = await import('./list-v8')
+  const { default: CommonVarsListV8 } = await import('@/v8/common-vars/list')
   return render(<CommonVarsListV8 />)
 }
 
 describe('共通情報V8一覧の戻した表示', () => {
-  test('期限切れの札で絞り込める（v7と同じ7枚）', async () => {
+  test('期限切れの札で絞り込める', async () => {
     fixture.items = [
       varItem('v1', 'ふつう'),
       varItem('v2', '切れた', { state: 'expired' }),
@@ -91,18 +91,19 @@ describe('共通情報V8一覧の戻した表示', () => {
     expect(rendered.getByText('切れた')).toBeTruthy()
   })
 
-  test('更新・次回の列に更新日と予定を出す（1行・全文はtitle）', async () => {
+  test('更新日と次回予定は現役の行のtitleで全文を確認できる', async () => {
     fixture.items = [varItem('v1', 'ふつう')]
     const rendered = await renderList()
     await rendered.findByText('ふつう')
     const cell = rendered.getByTitle(/最終更新/)
-    expect(cell.textContent).toContain('予定なし')
+    expect(cell.getAttribute('title')).toContain('予定なし')
+    expect(cell.getAttribute('title')).toContain('9月20日（日）')
   })
 
-  test('件数は範囲で出す（v7と同じListRange）', async () => {
+  test('件数は範囲で出す', async () => {
     fixture.items = [varItem('v1', 'ひとつ'), varItem('v2', 'ふたつ')]
     const rendered = await renderList()
     await rendered.findByText('ひとつ')
-    expect(rendered.getByText(/2件中 1〜2件を表示/)).toBeTruthy()
+    expect(rendered.getByText(/^2 件$/)).toBeTruthy()
   })
 })

@@ -85,7 +85,7 @@ import {
   type RichMenuAreaIntent,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
@@ -751,7 +751,7 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
 // 取り込み後は通常の編集画面で操作できる。
 //
 // query: { accountId, richMenuId }
-richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/import', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const accountId = c.req.query('accountId');
   const richMenuId = c.req.query('richMenuId');
   if (!accountId || !richMenuId) {
@@ -1086,7 +1086,7 @@ richMenuGroups.get('/api/rich-menu-groups/external', async (c) => {
 // LINE 上の rich menu を直接削除する (admin 管理外の orphan を片付ける用)。
 // admin 管理されている richMenuId を渡された場合は 409 で拒否
 // (Unpublish 経由で消すべき)。
-richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireDeliveryAccess('richMenus'), async (c) => {
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
@@ -1343,7 +1343,7 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
 
 richMenuGroups.get(
   '/api/rich-menu-groups/:groupId/delete-impact',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   async (c) => {
     try {
       const impact = await getRichMenuDeleteImpact(c.env.DB, c.req.param('groupId'));
@@ -1382,7 +1382,7 @@ function countPreviewRules(condition: SegmentCondition, depth: number): number {
  * 上位条件のどれかにも一致する人を重複として1回だけ数える。
  * 保存(PATCH)と同じく owner/admin のみ。人数の列挙を権限の弱い職員に開かない。
  */
-richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
@@ -1521,7 +1521,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/usages', async (c) => {
 /** 公開予約。予約時点のメニュー定義を固定して保存する。 */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/schedule',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -1634,7 +1634,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/schedules', async (c) => {
 /** 実行前の取消。publishing/restoring の最中は最新状態付きの409で止める。 */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/schedules/:scheduleId/cancel',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -1659,7 +1659,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   return c.json({ success: true, data: serializeGroupWithPages(group) });
 });
 
-richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -1734,7 +1734,7 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), inpu
   return c.json({ success: true, data: serializeGroupWithPages(created) });
 });
 
-richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   const existing = await getRichMenuGroupById(c.env.DB, groupId);
   if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
@@ -1841,7 +1841,7 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/reorder-priorities',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     let body: unknown;
     try {
@@ -1887,7 +1887,7 @@ richMenuGroups.post(
   },
 );
 
-richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireDeliveryAccess('richMenus'), async (c) => {
   const groupId = c.req.param('groupId');
   let impact: Awaited<ReturnType<typeof getRichMenuDeleteImpact>>;
   try {
@@ -1925,7 +1925,7 @@ richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'ad
 
 // ----- Image upload -----
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const { groupId, pageId } = c.req.param();
   const group = await getRichMenuGroupById(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -2233,7 +2233,7 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
   };
 }
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!idempotencyKey) {
     return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
@@ -2598,7 +2598,7 @@ async function handleManualPublish(
  */
 richMenuGroups.get(
   '/api/rich-menu-groups/:groupId/prepublish-check',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -2652,7 +2652,7 @@ richMenuGroups.get(
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/validate',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -2690,7 +2690,7 @@ richMenuGroups.post(
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/device-confirm',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -2719,7 +2719,7 @@ richMenuGroups.post(
  */
 richMenuGroups.get(
   '/api/rich-menu-groups/:groupId/publish-progress',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -2789,7 +2789,7 @@ richMenuGroups.get(
  */
 richMenuGroups.get(
   '/api/rich-menu-groups/:groupId/publish-runs',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   async (c) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -2879,7 +2879,7 @@ richMenuGroups.get(
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/publish-runs/:requestId/retry',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const requestId = c.req.param('requestId');
@@ -2924,7 +2924,7 @@ richMenuGroups.post(
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/reconcile',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -3020,7 +3020,7 @@ richMenuGroups.post(
 // LINE 上の alias / richmenu / default を全削除して draft に戻す。
 // 削除フローや、別 group を default にしたい時に使う。idempotent (既に消えてる
 // alias / richmenu は 404 を許容)。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -3116,7 +3116,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
 //     同 account 内の他 group の is_default_for_all は 0 にリセット。
 //
 // 前提: group が published かつ default_page に line_richmenu_id がセット済み。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   let body: unknown;
   try {
@@ -3245,7 +3245,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/duplicate',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupById(c.env.DB, groupId);
@@ -3495,7 +3495,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/test-apply', async (c) => {
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/test-apply',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -3702,7 +3702,7 @@ richMenuGroups.post(
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/test-apply/revert',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('richMenus'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     // pages まで読む。公開済みメニューの「適用に使ったID」を確定し、

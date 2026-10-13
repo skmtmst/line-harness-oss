@@ -1,6 +1,6 @@
 /*
  * ★V8 タグ タグの一覧（Pencil I1E7Bt・1152 aPeD8・閲覧のみ fkGUR）。
- * 寸法は app/globals.css の [data-theme="v8"] の --tpl-tag-* と型の --tpl-*。
+ * 寸法は app/globals.css の :root の --tpl-tag-* と型の --tpl-*。
  */
 
 /* 閲覧のみの帯（fkGUR「帯の段 閲覧のみ」：左右24・下8、中は 10/14・印16・間10・字13/20）。 */
@@ -9,18 +9,7 @@
   flex-shrink: 0;
 }
 
-.readonlyBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-tag-ro-gap);
-  margin: 0;
-  padding: var(--tpl-tag-ro-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-tag-ro-lh);
-}
+.readonlyBand { margin: 0; }
 
 .readonlyIcon {
   width: var(--tpl-tag-ro-icon);
@@ -29,9 +18,7 @@
   color: var(--color-action);
 }
 
-/* タブの段（I1E7Bt「タブの段」：左右24・字の下12・高さ約31・下に線）。
-   共通のタブは字の下12＋線で 35 になるので、この段だけ 31 に詰める。
-   入口の折り返しの決まり（data-tabs-row）より強くするため .tabs を重ねる。 */
+/* タブの段。高さ・文字・下線は共通の Tabs（B-180：36）に任せる。 */
 .tabs {
   padding: 0 var(--tpl-head-pad-side);
   border-bottom: 1px solid var(--color-hairline);
@@ -40,12 +27,10 @@
 
 /* 線は段（板の端から端）に引く。タブの線は消して、選んだタブの下線だけ段の線に重ねる。 */
 .tabs.tabs > :global(nav) {
-  height: var(--tpl-tag-tabs-h);
   border-bottom: 0;
 }
 
 .tabs.tabs > :global(nav) button {
-  padding-bottom: var(--tpl-tag-tabs-pad-bottom);
   margin-bottom: -1px;
 }
 
@@ -101,7 +86,7 @@
 }
 
 .quickButton[data-active] {
-  outline: 1px solid var(--color-action);
+  outline: 1px solid var(--color-focus-ring);
   color: var(--color-action);
 }
 
@@ -116,7 +101,6 @@
 
 /* フォルダの列の下の注（字11/17・2行）。 */
 .folderNote {
-  margin: 0;
   padding: 0;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-tag-note-size);
@@ -202,8 +186,6 @@
   text-decoration: underline;
 }
 
-
-
 .sub {
   margin: var(--tpl-tag-sub-gap) 0 0;
   overflow: hidden;
@@ -261,7 +243,6 @@
 
 /* 行の「…」（共通の RowMenu）。絵は 28 なので、共通の印ボタン（36）より強く当てる。 */
 
-
 .menuIcon {
   width: var(--tpl-tag-ro-icon);
   height: var(--tpl-tag-ro-icon);
@@ -285,17 +266,7 @@
 }
 
 /* 操作の失敗の帯。 */
-.errorBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-tag-name-gap);
-  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-gap);
-  padding: var(--tpl-tag-ro-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 .errorBand button {
   margin-left: auto;
@@ -391,7 +362,7 @@
 }
 
 .formInput:focus-visible {
-  outline: var(--tpl-tag-ring) solid var(--color-action);
+  outline: var(--tpl-tag-ring) solid var(--color-focus-ring);
 }
 
 .colorRow {
@@ -454,7 +425,6 @@
 }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 /* 閲覧のみで隠したフォルダを追加の場所（フォルダを消しても…の注が動かない）。 */
 .viewerFolderAddSpace { display: block; height: var(--tpl-viewer-folder-add-space); }
 
@@ -579,3 +549,5 @@
 
 /* 統括だけ、共通の配る操作の場所を表の列として確保する。 */
 .colDistribute { width: var(--tpl-hq-attribute-distribute-col); text-align: left; }
+
+.folderNote, .folderNoteNoticePlacement { margin: 0; }

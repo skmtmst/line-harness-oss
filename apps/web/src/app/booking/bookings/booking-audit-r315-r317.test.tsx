@@ -33,7 +33,7 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(nav.search),
   useRouter: () => ({ replace: nav.replace, push: nav.push }),
 }))
@@ -45,11 +45,12 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   api: {
     staff: { me: fixture.staffMe },
   },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     listRequests: fixture.listRequests,
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
@@ -130,11 +131,11 @@ afterEach(cleanup)
 describe('監査 R315: 選択状態を意味で伝える', () => {
   it('表示切替（今日・今週・今月・一覧）は押下状態を持つ', async () => {
     render(<BookingsPage />)
-    const listTab = await screen.findByRole('button', { name: '一覧' })
+    const listTab = (await screen.findAllByRole('button', { name: '一覧' }))[0]
     // 初期表示は「日」なので一覧は押されていない。
     expect(listTab.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(listTab)
-    expect(listTab.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '一覧' }).getAttribute('aria-pressed')).toBe('true')
     // 既存操作は維持する。一覧へ切り替わり、検索欄が出る。
     expect(await screen.findByPlaceholderText('お客さま名で検索')).toBeTruthy()
   })
@@ -222,7 +223,8 @@ describe('監査 R316: 集計の見出しは選んだ期間を名指しする', 
         availability={{ status: 'ready', slots: [] }}
       />,
     )
-    expect(screen.getByText(/今日（.*）の予約/)).toBeTruthy()
+    expect(screen.getByText('今日の予約')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '今日の予約の説明' })).toBeTruthy()
   })
 
   it('翌週の週表示では週の範囲を名指しする', () => {

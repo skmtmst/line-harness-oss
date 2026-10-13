@@ -9,9 +9,10 @@
  * 前の条件が残り続けることはない。
  */
 import type { AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 const KEY_PREFIX = 'lh_friends_list_state_v1:'
-export const LIST_PAGE_SIZES = [10, 20, 30, 40, 50] as const
+export const LIST_PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export interface FriendsListSnapshot {
   searchInput: string

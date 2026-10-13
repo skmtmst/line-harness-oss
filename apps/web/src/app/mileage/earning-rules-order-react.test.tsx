@@ -21,7 +21,7 @@ vi.hoisted(() => {
 })
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=earning-rules'),
   usePathname: () => '/mileage',
@@ -168,7 +168,7 @@ beforeEach(async () => {
   installWebStorage()
   globalThis.localStorage.setItem('lh_selected_account', ACC_A)
   const { createTestD1 } = await import(/* @vite-ignore */ join(WORKER_SRC, 'test-utils/d1-sqlite.ts'))
-  const testD1 = createTestD1()
+  const testD1 = createTestD1({ loginPolicy: 'off' })
   sqlite = testD1.raw as unknown as typeof sqlite
   db = testD1.db
   sqlite.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run()
@@ -248,12 +248,12 @@ describe('たまる決めごとの並び順保存(本物のReact + 本物のrout
 
     // 1頁目100件 + 2頁目1件。全件読めていること。
     const listCalls = calls.filter((call) => call.url.includes('/api/mileage/earning-rules?'))
-    await waitForText('決めごと 101件のうち')
+    await waitForText('たまる決めごと101件')
     expect(listCalls.length).toBeGreaterThanOrEqual(2)
 
     // 先頭の決めごとを1つ下へ動かして保存する。
     const firstDown = [...container.querySelectorAll('tbody tr button')]
-      .find((b) => b.textContent === '下へ' && !(b as HTMLButtonElement).disabled)
+      .find((b) => b.getAttribute('aria-label')?.endsWith('を下へ') && !(b as HTMLButtonElement).disabled)
     expect(firstDown).toBeTruthy()
     await act(async () => { (firstDown as HTMLButtonElement).click() })
     await settle()
@@ -312,12 +312,12 @@ describe('たまる決めごとの並び順保存(本物のReact + 本物のrout
     await settle(10)
 
     // 一覧は acc-b のまま(101件の acc-a に化けない)。
-    expect(container.textContent ?? '').toContain('決めごと 3件のうち')
-    expect(container.textContent ?? '').not.toContain('決めごと 101件のうち')
+    expect(container.textContent ?? '').toContain('たまる決めごと3件')
+    expect(container.textContent ?? '').not.toContain('たまる決めごと101件')
 
     // 送信するIDも acc-b の3件だけ。旧アカウントのIDは混ざらない。
     const firstDown = [...container.querySelectorAll('tbody tr button')]
-      .find((b) => b.textContent === '下へ' && !(b as HTMLButtonElement).disabled)
+      .find((b) => b.getAttribute('aria-label')?.endsWith('を下へ') && !(b as HTMLButtonElement).disabled)
     await act(async () => { (firstDown as HTMLButtonElement).click() })
     await settle()
     await act(async () => { saveOrderButton().click() })
@@ -363,10 +363,10 @@ describe('たまる決めごとの並び順保存(本物のReact + 本物のrout
     await settle(10)
 
     // acc-b の一覧はそのまま。旧アカウント由来のエラーも出ない。
-    expect(container.textContent ?? '').toContain('決めごと 3件のうち')
+    expect(container.textContent ?? '').toContain('たまる決めごと3件')
     expect(container.textContent ?? '').toContain('店Bの決めごと0')
     expect(container.textContent ?? '').not.toContain('マイルデータを読み込めませんでした')
     expect(container.textContent ?? '').not.toContain('並び順を保存できませんでした')
-    expect(container.textContent ?? '').not.toContain('決めごと 101件のうち')
+    expect(container.textContent ?? '').not.toContain('たまる決めごと101件')
   })
 })

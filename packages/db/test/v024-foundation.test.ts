@@ -247,7 +247,7 @@ describe('友だち情報欄', () => {
     // 空欄も出せてはじめて入力欄として使える。
     expect(rows.filter(row => !row.fixed_key)).toHaveLength(1);
     expect(rows.every(row => row.value === null)).toBe(true);
-    expect(rows.filter(row => row.fixed_key)).toHaveLength(7);
+    expect(rows.filter(row => row.fixed_key)).toHaveLength(10);
   });
 
   test('書いて読める', async () => {

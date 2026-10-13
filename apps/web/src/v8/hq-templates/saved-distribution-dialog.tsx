@@ -24,7 +24,7 @@ export default function SavedDistributionDialog({ accounts, folders, selected, o
   busy: boolean; error?: string
   onLater: () => void; onDistribute: () => void
 }) {
-  return <Dialog open title={title ?? "保存しました。アカウントに配りますか？"} designNode="d8CL4g" designWidth={860}
+  return <Dialog open title={title ?? "保存しました。アカウントに配りますか？"} designNode="d8CL4g" designWidth={720}
     designHeaderPadding="20px 24px 8px" designContentPadding="0" busy={busy} error={error} onCancel={onLater}
     titleHelp={<HelpTip label="アカウントに配るの説明">{help ?? <>配ると、選んだアカウントのテンプレートに新しい版として届きます。あとで一覧の「…」からも配れます。</>}</HelpTip>}
     footer={<div className={styles.footer}>

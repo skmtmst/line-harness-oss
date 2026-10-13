@@ -33,12 +33,12 @@ function pages(dir: string, out: string[] = []): string[] {
  * 画面が読み込んでいるものも一緒に見る（親フォルダの相対importも含む）。
  *
  * **帯は部品の中にあることがある。** `tags/edit` は
- * `components/friend-fields/edit-tag-page-v4.tsx` に、
- * `tags/marks/new` は `support-mark-editor.tsx` に本体がある。
+ * `v8/tag-edit/edit-form.tsx` に、
+ * `tags/marks/new` は `v8/tags/mark-editor.tsx` に本体がある。
  * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
  */
 function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {
-  if (depth > 2 || seen.has(file)) return ''
+  if (depth > 8 || seen.has(file)) return ''
   seen.add(file)
   let source: string
   try {
@@ -123,7 +123,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
     const wizard = readWithParts(path.join(SRC, 'app/accounts/new/page.tsx'))
     expect(wizard).toContain('V8_STEPS')
     expect(wizard).toContain('type="submit"')
-    expect(wizard).toContain('!connectionPassed')
+    expect(wizard).toContain('!rowsPassed || !manualAck || busy')
     expect(wizard).toContain('api.lineAccounts.connect(')
   })
 
@@ -204,12 +204,12 @@ describe('下部追従バーの並びを部品で固定する', () => {
 
   it('画面の下に追従する', () => {
     expect(CSS).toMatch(/position:\s*sticky/)
-    // v7 の土台は画面の下端に付けるまま。
-    expect(CSS).toMatch(/\.bar \{\s*position:\s*sticky;\s*bottom:\s*0;/s)
+    // 現在のV8は下から12px浮かせる。
+    expect(CSS).toMatch(/:root \.bar \{\s*bottom:\s*12px;/s)
   })
 
   it('★A の浮かせ（V8 は下から 12px・枠なし・ふんわり影・角丸そのまま）', () => {
-    const v8 = CSS.match(/\[data-theme='v8'\] \.bar \{([^}]*)\}/s)?.[1] ?? ''
+    const v8 = CSS.match(/:root \.bar \{([^}]*)\}/s)?.[1] ?? ''
     expect(v8, 'V8 の .bar の規定が無い').not.toBe('')
     expect(v8).toMatch(/bottom:\s*12px/)
     expect(v8).toMatch(/border:\s*0/)
@@ -235,7 +235,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
    * ★A の規定を消す・弱めると上の試験が落ちる。ひと組で見張る。
    */
   it('板が枠線の帯を描く画面は、その板どおりに戻せる（★BG-B X2oLn）', () => {
-    const outlined = CSS.match(/\[data-theme='v8'\] \.bar\.outlined \{([^}]*)\}/s)?.[1] ?? ''
+    const outlined = CSS.match(/:root \.bar\.outlined \{([^}]*)\}/s)?.[1] ?? ''
     expect(outlined, 'V8 の .bar.outlined の規定が無い').not.toBe('')
     expect(outlined).toMatch(/min-height:\s*72px/) // height: 72
     expect(outlined).toMatch(/border:\s*1px solid var\(--color-hairline\)/) // stroke: #DADDE2 / 1
@@ -246,7 +246,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(BAR).toMatch(/outlined\?:\s*boolean/)
     expect(BAR).toMatch(/outlined \? styles\.outlined : null/)
     // 渡した画面だけに効く。渡さない画面は ★A の浮かせのまま。
-    expect(CSS).toMatch(/\[data-theme='v8'\] \.bar \{/)
+    expect(CSS).toMatch(/:root \.bar \{/)
   })
 
   it('バナーのプロジェクト（V8）が札を渡している', () => {

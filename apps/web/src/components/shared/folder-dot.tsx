@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+
+import { Children, isValidElement, type ReactNode } from 'react'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import TruncatedText from './truncated-text'
+import Checkbox from './checkbox'
 import styles from './folder-dot.module.css'
 
 /**
@@ -41,16 +43,31 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
   )
 }
 
+function nameText(node: ReactNode): string {
+  return Children.toArray(node).map((child): string => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child)
+    if (isValidElement<{ children?: ReactNode; title?: string; value?: string }>(child)) {
+      if (child.type === TruncatedText) return child.props.value ?? ''
+      return child.props.title ?? nameText(child.props.children)
+    }
+    return ''
+  }).join('').trim()
+}
+
 /**
  * 丸＋名前の1行。名前は1行のまま省略する（全文は呼ぶ側の title で見せる）。
- * `dot={false}` は丸を置かず名前だけを返す（丸の無い絵の板。例：1152 の板でまだ丸を描いていない一覧）。
+ * B-194: どの幅でも丸を出す。旧い dot 指定は受け取るだけ。
  */
-export function FolderDotName({ folder, dot = true, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
-  if (!dot) return <>{typeof children === 'string' ? <TruncatedText value={children} /> : children}</>
+export function FolderDotName({ folder, children, annotation }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode; annotation?: ReactNode }) {
+  const parts = Children.toArray(children)
+  const selection = parts.filter(child => isValidElement(child) && child.type === Checkbox)
+  const name = parts.filter(child => !isValidElement(child) || child.type !== Checkbox)
   return (
-    <span className={styles.line}>
+    <span className={styles.line} data-list-name="" data-has-annotation={annotation ? true : undefined} title={nameText(name)}>
+      {selection}
       <FolderDot folder={folder} />
-      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{children}</span>}
+      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{name}</span>}
+      {annotation}
     </span>
   )
 }

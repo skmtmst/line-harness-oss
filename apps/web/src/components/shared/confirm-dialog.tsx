@@ -4,6 +4,7 @@ import React, { useRef, useState, type ReactNode } from 'react'
 import { CircleCheck, Trash2, TriangleAlert } from 'lucide-react'
 import Dialog from './dialog'
 import { deleteConfirmationTitle, isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
+import { CONFIRM_WIDTH } from './destination-policy'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -12,6 +13,8 @@ interface ConfirmDialogProps {
   deleteName?: string
   description: string
   confirmLabel?: string
+  /** 実行中の文字。Buttonのbusyへ渡す。 */
+  busyLabel?: string
   cancelLabel?: string
   destructive?: boolean
   /**
@@ -50,6 +53,7 @@ interface ConfirmDialogProps {
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number
   confirmFirst?: boolean
+  size?: 'small' | 'medium' | 'large' | 'wide'
   designWidth?: number
   /** ★V8：絵の窓の上からの位置 px（Dialog の designTop と同じ）。 */
   designTop?: number
@@ -78,6 +82,7 @@ export default function ConfirmDialog({
   deleteName,
   description,
   confirmLabel = '実行する',
+  busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   destructive = false,
   warning = false,
@@ -91,6 +96,7 @@ export default function ConfirmDialog({
   designHeaderPadding,
   designHeaderHeight,
   designWidth,
+  size,
   designLayout,
   footerAlign,
   designFooterGap,
@@ -142,6 +148,7 @@ export default function ConfirmDialog({
       tone={destructive ? 'destructive' : 'default'}
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
       confirmLabel={deleteName !== undefined || isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
+      busyLabel={busyLabel}
       cancelLabel={cancelLabel}
       busy={busy || executing}
       confirmDisabled={confirmDisabled}
@@ -152,7 +159,8 @@ export default function ConfirmDialog({
       designNode={designNode}
       designHeaderPadding={designHeaderPadding}
       designHeaderHeight={designHeaderHeight}
-      designWidth={designWidth}
+      size={size}
+      designWidth={designWidth ?? (size ? undefined : CONFIRM_WIDTH)}
       designLayout={designLayout}
       footerAlign={footerAlign}
       designFooterGap={designFooterGap}

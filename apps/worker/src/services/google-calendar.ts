@@ -113,6 +113,8 @@ export class GoogleCalendarClient {
       body: JSON.stringify(body),
     });
 
+    // 呼び出し側が固定IDを指定した再試行は、受理済みの重複を成功として回収する。
+    if (res.status === 409 && event.id) return { eventId: event.id };
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`Google Calendar createEvent error ${res.status}: ${text}`);

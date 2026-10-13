@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
@@ -10,10 +11,8 @@ import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { usePageChrome } from './page-chrome'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath } from '@/lib/menu'
 import { brandInitial } from '@/components/layout/brand-initial'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
-import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import { setDocumentTitle } from '@/lib/document-title'
 import { canReturnToHqFrom } from '@/lib/hq-return'
 
@@ -106,7 +105,7 @@ export default function AppTopBar() {
   const router = useRouter()
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
-  const [staffRole, setStaffRole] = useState('')
+  const staffRole = useStaffRole()
   /*
    * ★V8 外側：ベルの未読の数。取るのは v8 のときだけ（v7 では描かない
    * ので余計な要求を出さない）。取れなくても帯は壊さない。
@@ -119,7 +118,6 @@ export default function AppTopBar() {
     const load = async () => {
       // 店を選んでいない（統括で店を選ぶ前など）ときは数を出さない。前の店の数を残さない。
       if (!selectedAccountId) { setNotificationUnread(0); return }
-      if (document.documentElement.dataset.theme !== 'v8') return
       try {
         const { api } = await import('@/lib/api')
         const response = await api.notifications.center.list(selectedAccountId, { limit: 1 })
@@ -130,11 +128,8 @@ export default function AppTopBar() {
       }
     }
     void load()
-    const onThemeChanged = () => { void load() }
-    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, onThemeChanged)
     return () => {
       cancelled = true
-      window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, onThemeChanged)
     }
   }, [selectedAccountId])
 
@@ -142,7 +137,6 @@ export default function AppTopBar() {
   useEffect(() => {
     try {
       setStaffName(localStorage.getItem('lh_staff_name') ?? '')
-      setStaffRole(localStorage.getItem('lh_staff_role') ?? '')
     } catch {
       // localStorage が使えない環境では名前を出さない
     }
@@ -163,7 +157,7 @@ export default function AppTopBar() {
    * ★V8 統括の外側（絵 `V8-B/JKjsE`・オーナー 2026-10-07）：統括の画面（LINEアカウントの登録も含む）では、
    * 切替の札に「統括」と統括名、名前の下に「統括」を出す。v7 は今までどおり。
    */
-  const isV8 = useAdminTheme() === 'v8'
+
   /*
    * 画面がパンくずを渡さない（または「ホーム」だけの）子の画面では、左メニューの親へ戻れるようにする。
    * - 画面名が親と違う（「テンプレートを作る」）→ 手前に親を置く（ホーム › テンプレート › テンプレートを作る）
@@ -173,7 +167,7 @@ export default function AppTopBar() {
   const parentCrumb = onlyHome ? parentCrumbForPath(pathname) : null
   const crumbs = parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs
   const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
-  const hqShell = isV8 && isHqShellPath(pathname)
+  const hqShell = isHqShellPath(pathname)
   const [hqName, setHqName] = useState<string | null>(null)
   useEffect(() => {
     if (!hqShell) return
@@ -186,7 +180,7 @@ export default function AppTopBar() {
     return () => { cancelled = true }
   }, [hqShell])
   const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
-  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (ROLE_LABELS[staffRole] ?? '')
+  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
   /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
   const changeAccount = (accountId: string) => {
     requestUnsavedAction(() => {
@@ -271,9 +265,9 @@ export default function AppTopBar() {
       userName={staffName}
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
-      renderNotifications={isV8 ? (popover) => (
+      renderNotifications={(popover) => (
         <BellNotifications popover={popover} accountId={selectedAccountId || null} onUnreadChange={setNotificationUnread} />
-      ) : undefined}
+      )}
       v8Chrome
       chromeVariant="shell"
       crumbs={crumbs}
@@ -285,7 +279,7 @@ export default function AppTopBar() {
         ★V8：自分の名前・役割・ログアウトは左下の自分のメニューへ移した
         （オーナー 2026-10-07・絵 zUg8S の zyFtB・l0VY4 を隠した）。v7 は今までどおり。
       */
-      showIdentity={!isV8}
+      showIdentity={false}
     />
     </div>
     {accountsLoadFailed ? (

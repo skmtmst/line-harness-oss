@@ -14,7 +14,7 @@ import type { BookingHistoryItem } from '../lib/api.js';
  */
 
 vi.mock('../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     me: vi.fn(),
     cancelMyBooking: vi.fn(),
     rescheduleMyBooking: vi.fn(),
@@ -119,4 +119,25 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
       expect(rescheduleMyBooking).toHaveBeenCalledWith('bk-1', { starts_at: '2099-10-06T05:00:00.000Z', lock_version: 4 }),
     );
   });
+});
+
+it('店の期限を過ぎた予約は期限を表示してキャンセルと日時変更を隠す', async () => {
+  setup([item({ cancel_deadline_at: '2020-01-01T00:00:00Z' })]);
+  await screen.findByText('トリミング（小型犬）');
+  expect(screen.getByText(/キャンセル期限：/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '日時を変える' })).toBeNull();
+});
+
+it('確認窓を開いた後に期限を過ぎたら送信を止め、理由を窓の中に出す', async () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2099-10-01T00:00:00Z'));
+  try {
+    setup([item({ cancel_deadline_at: '2099-10-01T00:00:01Z' })]);
+    fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
+    clock.mockReturnValue(Date.parse('2099-10-01T00:00:02Z'));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
+    expect(cancelMyBooking).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('キャンセルの期限を過ぎています');
+  } finally { clock.mockRestore(); }
 });

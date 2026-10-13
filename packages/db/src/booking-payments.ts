@@ -24,7 +24,7 @@ export interface BookingPaymentConfig {
   holdMinutes: number;
 }
 
-const DEFAULT_CONFIG: BookingPaymentConfig = { mode: 'none', provider: 'none', holdMinutes: 30 };
+const DEFAULT_CONFIG: BookingPaymentConfig = { mode: 'none', provider: 'none', holdMinutes: 10 };
 
 function normalizeMode(value: unknown): BookingPaymentMode | null {
   return value === 'none' || value === 'onsite' || value === 'online' ? value : null;
@@ -49,7 +49,7 @@ export async function getBookingPaymentConfig(
     provider: normalizeProvider(row.provider, 'none'),
     holdMinutes: Number.isFinite(Number(row.hold_minutes))
       ? Math.min(1440, Math.max(5, Math.trunc(Number(row.hold_minutes))))
-      : 30,
+      : DEFAULT_CONFIG.holdMinutes,
   };
 }
 
@@ -111,7 +111,7 @@ export async function saveBookingPaymentMenuSetting(
 export interface BookingPaymentRecord {
   id: string;
   line_account_id: string;
-  booking_id: string;
+  booking_id: string | null;
   amount: number;
   currency: string;
   status: BookingPaymentStatus;
@@ -120,6 +120,20 @@ export interface BookingPaymentRecord {
   idempotency_key: string;
   hold_until: string | null;
   paid_at: string | null;
+}
+
+/** 予約保存のbatch用。枠の競合で予約が作られなければ支払い行も作らない。 */
+export function bookingPaymentInsertStatement(db: D1Database, input: {
+  id: string; lineAccountId: string; bookingId: string; amount: number;
+  provider: string; holdUntil: string; now: string;
+}): D1PreparedStatement {
+  return db.prepare(`INSERT INTO booking_payments
+    (id,line_account_id,booking_id,amount,currency,status,provider,idempotency_key,hold_until,created_at,updated_at)
+    SELECT ?,?,?,?,'JPY','unpaid',?,?,?,?,? WHERE EXISTS (
+      SELECT 1 FROM bookings WHERE id = ? AND line_account_id = ?)`)
+    .bind(input.id, input.lineAccountId, input.bookingId, Math.max(0, Math.trunc(input.amount)),
+      input.provider, `booking:${input.bookingId}`, input.holdUntil, input.now, input.now,
+      input.bookingId, input.lineAccountId);
 }
 
 export async function createBookingPayment(

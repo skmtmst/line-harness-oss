@@ -1,5 +1,6 @@
 'use client'
 
+import { ListNavigationAccount, ListReturnAccountGuard } from '@/components/shared/list-navigation'
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -119,11 +120,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const refreshAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (reload: boolean) => {
     setRefreshing(true)
     try {
-      // 取り直しの口なので、使い回しの答えは捨てて必ず取り直す。
-      const res = await loadLineAccounts({ reload: true })
+      // 初回は AuthGuard の先読みを使う。変更後の取り直しだけ古い答えを捨てる。
+      const res = await loadLineAccounts({ reload })
       if (!res.success) {
         // 失敗時は手元の一覧を消さない。古い一覧でも「アカウントなし」の
         // 空画面より役に立つし、初回失敗ではもともと空なので差し支えない。
@@ -161,18 +162,21 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshAccounts = useCallback(() => loadAccounts(true), [loadAccounts])
+
   useEffect(() => {
-    refreshAccounts()
-  }, [refreshAccounts])
+    void loadAccounts(false)
+  }, [loadAccounts])
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 
   return (
-    <AccountContext.Provider
+    <ListNavigationAccount.Provider value={selectedAccountId}><AccountContext.Provider
       value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, clearSelectedAccountId, refreshAccounts, loading, error, refreshing }}
     >
+      <ListReturnAccountGuard accountId={selectedAccountId} />
       {children}
-    </AccountContext.Provider>
+    </AccountContext.Provider></ListNavigationAccount.Provider>
   )
 }
 

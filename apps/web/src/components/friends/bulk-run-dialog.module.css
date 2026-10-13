@@ -9,7 +9,7 @@
 .op, .opOn { display: flex; min-width: 0; flex-direction: column; gap: 6px; text-align: left; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 12px; }
 .op:disabled { cursor: not-allowed; opacity: .68; }
 .opOn { border-color: var(--color-accent-deep); background: var(--color-accent-soft); }
-.op:focus-visible, .opOn:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.op:focus-visible, .opOn:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .opLabel { display: flex; align-items: center; gap: 6px; color: var(--color-ink); font-size: var(--text-micro); font-weight: 600; white-space: nowrap; }
 .opLabel svg { flex-shrink: 0; color: var(--color-ink-secondary); }
 .hint { color: var(--color-ink-faint); font-size: var(--text-nano); line-height: 1.5; }

@@ -1,12 +1,10 @@
 'use client'
 
-/*
- * ★V8 ウェビナーの参加者（Pencil uNsEy）。
- * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
- * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { RowNameLink } from '@/components/shared/table'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import Link from 'next/link'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
 import { ListPageBody, ListPagePagination } from '@/components/templates'
@@ -19,7 +17,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
@@ -48,6 +46,13 @@ import styles from './participants.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 ウェビナーの参加者（Pencil uNsEy）。
+ * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
+ * 口・権限・失敗の扱いは BEHAVIOR.md に記録。
+ */
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -70,6 +75,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const [filter, setFilter] = useListUrlValue<'' | WebinarParticipantClassification>('filter', '')
   const [rule, setRule] = useState<WebinarParticipantPage['rule'] | null>(null)
   const [measurement, setMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
+  const canExport = useFeatureAccess('webinars', 'export')
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvError, setCsvError] = useState('')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -80,7 +86,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const moreLock = useRef(false)
 
   const downloadCsv = useCallback(() => {
-    if (csvLock.current) return
+    if (!canExport || csvLock.current) return
     csvLock.current = true
     const request = generation.current
     setCsvBusy(true)
@@ -88,7 +94,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id, filter || undefined), csvFileName("動画セミナー参加者"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
-  }, [webinar.id, filter])
+  }, [webinar.id, filter, canExport])
 
   useEffect(() => {
     let cancelled = false
@@ -199,12 +205,12 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, webinar.durationSeconds)) * 100))
             const badge = actionBadge(participant)
             return (
-              <Tr key={participant.friendId} className={styles.row} data-table-layout="columns" data-row-id={participant.friendId}>
-                <Td className={styles.colName}>
-                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className={styles.name}><TruncatedText value={String(name ?? '')} /></Link>
-                  <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
-                </Td>
-                <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
+              <Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}>
+                <Td className={styles.colName}><FolderDotName>
+                  <RowNameLink href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</RowNameLink>
+
+                </FolderDotName></Td>
+                <Td className={styles.colWhen}><span className={styles.main} title={[joinNote(participant), joinKindLabel(participant)].filter(Boolean).join("・")}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
                   <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
                   <span className={styles.sub}>{participantStateLabel(participant, webinar.durationSeconds)}</span>
@@ -226,7 +232,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     )
   }
 
-  const csvButton = state === 'ready'
+  const csvButton = canExport && state === 'ready'
     ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
@@ -250,7 +256,6 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         </>}
         toolbar={<>
           <div className={styles.noticeRow}>
-            <Notice tone="info">「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</Notice>
           </div>
           {csvError ? <div className={styles.noticeRow}><Notice tone="danger">{csvError}</Notice></div> : null}
           <ListToolbar
@@ -267,7 +272,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             trailing={<>
               <div className={styles.savedBox}>
                 <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-                <Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />
+                <SaveErrorField names={["filter"]}><Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} /></SaveErrorField>
               </div>
               <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} options={[10, 20, 50]} label={null} />
             </>}
@@ -285,7 +290,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         {body}
         {state === 'ready' && (nextCursor || moreError) ? (
           <div className={styles.more}>
-            {moreError ? <p className={styles.moreError} role="alert">{moreError}</p> : null}
+            {moreError ? <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{moreError}</Notice> : null}
             {nextCursor ? <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込み中…">続きを読み込む</Button> : null}
           </div>
         ) : null}

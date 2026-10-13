@@ -103,7 +103,7 @@ async function flush() {
 }
 
 describe('自動応答一覧の行操作', () => {
-  it('「編集」が枠つきボタン、停止・削除は「・・・」メニューの中', async () => {
+  it('B-193：編集・停止・削除は「・・・」メニューの中', async () => {
     await act(async () => { root.render(<AutoRepliesPage />) })
     await flush()
 
@@ -137,7 +137,7 @@ describe('自動応答一覧の行操作', () => {
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('削除')
-    expect(menu!.textContent).not.toContain('止める')
+    expect([...menu!.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).not.toContain('止める')
     expect(menu!.textContent).not.toContain('再開する')
   })
 })

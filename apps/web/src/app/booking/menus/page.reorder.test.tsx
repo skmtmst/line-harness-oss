@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * Issue #709残件: 28予約メニューの「⠿」は掴めない飾りだったので置かず、
  * 並び順の変更は操作列の「…」の中の上へ・下へで行うことを、
@@ -33,12 +35,13 @@ Object.defineProperty(window, 'localStorage', {
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
   activeTab: 'menus',
+  reorderMenus: vi.fn(),
   updateMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
   listMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
   getSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -71,6 +74,11 @@ vi.mock('@/lib/api', () => ({
     tags: { list: async () => ({ success: true, data: [] }) },
   },
   bookingApi: {
+    reorderMenus: (...args: unknown[]) => fixture.reorderMenus(...args),
+    listStaff: async () => ({ staff: [] }),
+    getAvailabilityRules: async () => ({ rules: [] }),
+    getGoogleCalendar: async () => ({ connected: false }),
+    listRequests: async () => ({ items: [], total: 0 }),
     updateMenu: (...args: unknown[]) => fixture.updateMenu!(...args),
     listMenus: (...args: unknown[]) => fixture.listMenus!(...args),
     patchMenu: async () => ({ ok: true }),
@@ -120,10 +128,14 @@ function menuBase(id: string, name: string, sortOrder: number) {
 const MENUS = [menuBase('menu-1', 'カット', 0), menuBase('menu-2', 'カラー', 1)]
 
 beforeEach(() => {
-  window.localStorage.setItem('lh_staff_role', 'owner')
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
+  window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   clearToastsForTest()
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'
+  fixture.reorderMenus.mockReset().mockResolvedValue({ ok: true })
+  window.history.replaceState(null, '', '/booking/menus')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.updateMenu = vi.fn(async () => ({ ok: true }))
   fixture.listMenus = vi.fn(async () => ({ menus: MENUS.map((m) => ({ ...m })) }))
   fixture.getSettings = vi.fn(async () => ({ success: true, data: SETTINGS }))
@@ -138,58 +150,59 @@ afterEach(() => {
 describe('Issue #709残件: 28予約メニューの「…」並び替え', () => {
   test('⠿の飾りが出ず、各行の「…」に上へ/下へがある', async () => {
     const { container } = render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('button', { name: 'カラーのその他操作' })
+    await screen.findByRole('button', { name: '「カラー」のそのほかの操作' })
 
     expect(container.textContent).not.toContain('⠿')
-    fireEvent.click(screen.getByRole('button', { name: 'カラーのその他操作' }))
-    const menu = screen.getByRole('menu', { name: 'カラーの操作' })
+    fireEvent.click(screen.getByRole('button', { name: '「カラー」のそのほかの操作' }))
+    const menu = screen.getByRole('menu', { name: '「カラー」の操作' })
     expect(within(menu).getByRole('menuitem', { name: '上へ' })).toBeTruthy()
     // 末尾の下へは押せない（理由付きで名前が「下へいちばん下です」になる）。
     expect(within(menu).getByRole('menuitem', { name: /下へ/ })).toBeTruthy()
     // 注意書きに「…」の導線を書く。
-    expect(screen.getByText(/操作列の「…」から変えられます/)).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /を並び替える/ })).toHaveLength(2)
   })
 
   test('先頭の上へ・末尾の下へは押せない', async () => {
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('button', { name: 'カラーのその他操作' })
+    await screen.findByRole('button', { name: '「カラー」のそのほかの操作' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'カットのその他操作' }))
-    const topMenu = screen.getByRole('menu', { name: 'カットの操作' })
+    fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
+    const topMenu = screen.getByRole('menu', { name: '「カット」の操作' })
     expect((within(topMenu).getByRole('menuitem', { name: /上へ/ }) as HTMLButtonElement).disabled).toBe(true)
     expect((within(topMenu).getByRole('menuitem', { name: /下へ/ }) as HTMLButtonElement).disabled).toBe(false)
 
-    fireEvent.click(screen.getByRole('button', { name: 'カラーのその他操作' }))
-    const lastMenu = screen.getByRole('menu', { name: 'カラーの操作' })
+    fireEvent.click(screen.getByRole('button', { name: '「カラー」のそのほかの操作' }))
+    const lastMenu = screen.getByRole('menu', { name: '「カラー」の操作' })
     expect((within(lastMenu).getByRole('menuitem', { name: /下へ/ }) as HTMLButtonElement).disabled).toBe(true)
     expect((within(lastMenu).getByRole('menuitem', { name: /上へ/ }) as HTMLButtonElement).disabled).toBe(false)
   })
 
-  test('下へを押すと2件のsort_orderを交換したPUTが送られる', async () => {
+  test('下へを押すと2件の版と並びをまとめて保存する', async () => {
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('button', { name: 'カットのその他操作' })
+    await screen.findByRole('button', { name: '「カット」のそのほかの操作' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'カットのその他操作' }))
-    const menu = screen.getByRole('menu', { name: 'カットの操作' })
+    fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
+    const menu = screen.getByRole('menu', { name: '「カット」の操作' })
     fireEvent.click(within(menu).getByRole('menuitem', { name: '下へ' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledTimes(2))
-    expect(fixture.updateMenu).toHaveBeenNthCalledWith(
-      1, 'account-a', 'menu-1', 1, expect.objectContaining({ sort_order: 1 }),
-    )
-    expect(fixture.updateMenu).toHaveBeenNthCalledWith(
-      2, 'account-a', 'menu-2', 1, expect.objectContaining({ sort_order: 0 }),
-    )
+    await waitFor(() => expect(fixture.reorderMenus).toHaveBeenCalledTimes(1))
+    expect(fixture.reorderMenus).toHaveBeenCalledWith('account-a', { changes: expect.arrayContaining([
+      { id: 'menu-1', expectedVersion: 1, sortOrder: 1 },
+      { id: 'menu-2', expectedVersion: 1, sortOrder: 0 },
+    ]) })
+
   })
 
-  test('失敗したらalertで理由が出る', async () => {
-    fixture.updateMenu = vi.fn(async () => { throw new Error('down') })
+  test('失敗したら理由を知らせ、並びを戻して再試行できる', async () => {
+    fixture.reorderMenus.mockRejectedValue(new Error('down'))
     render(<><MenusPage /><ToastHost /></>)
-    await screen.findByRole('button', { name: 'カラーのその他操作' })
+    await screen.findByRole('button', { name: '「カラー」のそのほかの操作' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'カラーのその他操作' }))
-    const menu = screen.getByRole('menu', { name: 'カラーの操作' })
+    fireEvent.click(screen.getByRole('button', { name: '「カラー」のそのほかの操作' }))
+    const menu = screen.getByRole('menu', { name: '「カラー」の操作' })
     fireEvent.click(within(menu).getByRole('menuitem', { name: '上へ' }))
-    await screen.findByRole('alert')
-    expect(screen.getByRole('alert').textContent).toContain('保存できませんでした')
+    await screen.findByText('予約メニューを保存できませんでした。通信状態を確認して、もう一度お試しください。')
+    expect(document.querySelector('[data-reorder-id]')?.textContent).toContain('カット')
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度' }))
+    await waitFor(() => expect(fixture.reorderMenus).toHaveBeenCalledTimes(2))
   })
 })

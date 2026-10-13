@@ -1,11 +1,17 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { purgeUnsafeFormDocuments } from '../services/form-documents.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { recordAuditEvent } from '@line-crm/db';
+import { auditEventStatement, recordAuditEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   FILE_SCAN_REASON_LABELS,
+  FORM_FILE_SCAN_MAX_ATTEMPTS,
+  isPrivateFormDocumentScan,
+  markFileScanRejected,
   claimDueFileScans,
   createFileScan,
   getFileScanBySubject,
@@ -85,7 +91,7 @@ async function findR2Key(
     if (photo) return { key: photo.r2_key, width: photo.image_width, height: photo.image_height };
   }
   if (
-    scan.subject_kind === 'form_file'
+    isPrivateFormDocumentScan(scan)
     || scan.subject_kind === 'broadcast_asset'
     || scan.subject_kind === 'generic_image'
   ) {
@@ -95,7 +101,7 @@ async function findR2Key(
   return null;
 }
 
-/** 期限切れの pending を拾って内蔵＋外部の検査を回す。失敗は pending のまま。 */
+/** pending を再検査する。回答の書類は5回で却下する。 */
 export async function processDueFileScans(
   env: Env['Bindings'],
   limit = 20,
@@ -105,10 +111,13 @@ export async function processDueFileScans(
   let stillPending = 0;
   for (const scan of due) {
     try {
+      if (isPrivateFormDocumentScan(scan) && scan.attempts >= FORM_FILE_SCAN_MAX_ATTEMPTS) {
+        await markFileScanRejected(env.DB, scan.id, 'scan_attempts_exhausted', '検査を5回試しても終わりませんでした');
+        continue;
+      }
       const target = await findR2Key(env.DB, scan);
       if (!target) {
-        await markFileScanPendingRetry(env.DB, scan.id, scan.attempts);
-        stillPending += 1;
+        if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
         continue;
       }
       const config = await getFileScanConfig(env.DB, scan.line_account_id);
@@ -118,6 +127,7 @@ export async function processDueFileScans(
       if (external) {
         // 外の検査は設定があれば使う。鍵は設定の secret_ref が指す環境値から。
         const head = await env.IMAGES.get(target.key, target.key.startsWith('private/form-documents/') ? undefined : { range: { offset: 0, length: 256 * 1024 } });
+        if (isPrivateFormDocumentScan(scan) && !head) throw new ScanRetryableError('document_missing');
         const bytes = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
         try {
           const verdict = await external.scan(bytes, {
@@ -127,12 +137,12 @@ export async function processDueFileScans(
             await markFileScanClean(env.DB, scan.id);
           } else {
             await markFileScanQuarantined(env.DB, scan.id, 'external_flagged', '外部の検査で問題が見つかりました');
+            if (isPrivateFormDocumentScan(scan)) await purgeUnsafeFormDocuments(env.DB, env.IMAGES, scan.id);
           }
           continue;
         } catch (err) {
           if (err instanceof ScanRetryableError) {
-            await markFileScanPendingRetry(env.DB, scan.id, scan.attempts);
-            stillPending += 1;
+            if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
             continue;
           }
           throw err;
@@ -147,8 +157,7 @@ export async function processDueFileScans(
       if (next.status === 'pending') stillPending += 1;
     } catch (err) {
       console.error('processDueFileScans error:', scan.id, err);
-      await markFileScanPendingRetry(env.DB, scan.id, scan.attempts);
-      stillPending += 1;
+      if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
     }
   }
   return { processed: due.length, stillPending };
@@ -196,21 +205,21 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
   const photoIds = [...new Set(items.filter((row) => row.subject_kind === 'photo').map((row) => row.subject_id))];
   const uploaders = new Map<string, string>();
   if (mediaIds.length > 0) {
-    const placeholders = mediaIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(mediaIds).sql;
     const mediaRows = await c.env.DB.prepare(
       `SELECT id, uploaded_by FROM media WHERE id IN (${placeholders})`,
-    ).bind(...mediaIds).all<{ id: string; uploaded_by: string | null }>();
+    ).bind(...(mediaIds.length ? sqlIdSet(mediaIds).binds : [])).all<{ id: string; uploaded_by: string | null }>();
     for (const mediaRow of mediaRows.results ?? []) {
       if (mediaRow.uploaded_by) uploaders.set(`media:${mediaRow.id}`, mediaRow.uploaded_by);
     }
   }
   if (photoIds.length > 0) {
-    const placeholders = photoIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(photoIds).sql;
     const photoRows = await c.env.DB.prepare(
       `SELECT ps.id, f.display_name AS friend_name
          FROM nen_photo_submissions ps LEFT JOIN friends f ON f.id = ps.friend_id
         WHERE ps.id IN (${placeholders})`,
-    ).bind(...photoIds).all<{ id: string; friend_name: string | null }>();
+    ).bind(...(photoIds.length ? sqlIdSet(photoIds).binds : [])).all<{ id: string; friend_name: string | null }>();
     for (const photoRow of photoRows.results ?? []) {
       uploaders.set(`photo:${photoRow.id}`, photoRow.friend_name ?? 'お客さん');
     }
@@ -297,6 +306,9 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJ
   if (!scan || scan.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
+  if (isPrivateFormDocumentScan(scan) && (scan.status !== 'pending' || scan.attempts >= FORM_FILE_SCAN_MAX_ATTEMPTS)) {
+    return c.json({ success: false, error: 'この書類は検査をやり直せません。別のファイルを選んでください' }, 409);
+  }
   // 二重実行は行の状態で抑える。pending の再試行は時刻だけ前倒しする。
   const now = new Date().toISOString();
   await c.env.DB.prepare(
@@ -331,6 +343,7 @@ fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), inpu
   if (!scan || scan.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
+  if (isPrivateFormDocumentScan(scan)) return c.json({ success: false, error: '回答の書類は戻せません。別のファイルを選んでください' }, 409);
   if (scan.status !== 'quarantined') {
     return c.json({ success: false, code: 'file_scan_not_quarantined', error: 'しまったファイルだけ戻せます' }, 409);
   }
@@ -370,14 +383,16 @@ fileScan.delete('/api/file-scans/:id', requireRole('owner', 'admin'), async (c) 
     return c.json({ success: false, code: 'file_scan_not_disposable', error: 'しまった・使えないファイルだけ消せます' }, 409);
   }
   const target = await findR2Key(c.env.DB, scan);
-  if (target) await c.env.IMAGES.delete(target.key).catch(() => {});
+  if (isPrivateFormDocumentScan(scan)) {
+    if (!await purgeUnsafeFormDocuments(c.env.DB, c.env.IMAGES, scan.id)) return c.json({ success: false, error: '書類を消せませんでした。もう一度お試しください' }, 503);
+  } else if (target) await c.env.IMAGES.delete(target.key).catch(() => {});
   if (scan.media_id) {
     await c.env.DB.prepare(
       `UPDATE media SET archived_at = ?, archived_by = ?, archive_reason = ?
         WHERE id = ? AND line_account_id = ?`,
     ).bind(new Date().toISOString(), c.get('staff')?.id ?? null, '検査でしまったため', scan.media_id, accountId).run();
   }
-  await c.env.DB.prepare(`DELETE FROM media_file_scans WHERE id = ?`).bind(scan.id).run();
+  if (!isPrivateFormDocumentScan(scan)) await c.env.DB.prepare(`DELETE FROM media_file_scans WHERE id = ?`).bind(scan.id).run();
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
     category: 'business',
@@ -406,6 +421,8 @@ fileScan.get('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
         externalEndpointUrl: config.external_endpoint_url,
         // 鍵そのものは返さない。名前だけ。
         externalSecretRef: config.external_secret_ref,
+        // 許可境界だけを判定する。鍵の値や実在、通信の健康状態は返さない。
+        externalEnabled: resolveExternalScanner(c.env as unknown as Record<string, string | undefined>, config) !== null,
         externalTimeoutMs: config.external_timeout_ms,
         maxBytesOverride: config.max_bytes_override,
         maxPixelsOverride: config.max_pixels_override,
@@ -435,10 +452,20 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     return typeof v === 'string' ? v.trim().slice(0, max) || null : null;
   };
   const provider = text(body?.externalProvider, 80);
-  const endpoint = text(body?.externalEndpointUrl, 500);
-  const secretRef = text(body?.externalSecretRef, 120);
-  if (endpoint && !/^https:\/\//.test(endpoint)) {
-    return inputError(c, { success: false, error: '外の検査の宛先は https にしてください' }, 400, ["externalEndpointUrl"]);
+  for (const key of ['externalEndpointUrl', 'externalSecretRef'] as const) {
+    if (body?.[key] != null && typeof body[key] !== 'string') {
+      return inputError(c, { success: false, error: '文字で入力してください' }, 400, [key]);
+    }
+  }
+  // 宛先・名前は切り詰めず、不正な入力全体を拒否する。
+  const endpoint = typeof body?.externalEndpointUrl === 'string' ? body.externalEndpointUrl.trim() || null : null;
+  const secretRef = typeof body?.externalSecretRef === 'string' ? body.externalSecretRef.trim() || null : null;
+  const url = endpoint ? allowedFileScanEndpoint(endpoint, c.env.FILE_SCAN_ALLOWED_PAIRS, secretRef) : null;
+  if (endpoint && !url) {
+    return inputError(c, { success: false, error: '送り先と鍵の名前は、運営が許可した同じ組で指定してください。送り先は公開ホストの https、資格情報なし、既定ポートだけ使えます' }, 400, ['externalEndpointUrl', 'externalSecretRef']);
+  }
+  if ((provider || endpoint || secretRef) && !isFileScanSecretRef(secretRef)) {
+    return inputError(c, { success: false, error: '鍵の名前は FILE_SCAN_SECRET_ で始まる大文字・数字・下線の120文字以内で指定してください' }, 400, ['externalSecretRef']);
   }
   if ((provider || endpoint || secretRef) && !(provider && endpoint)) {
     return inputError(c, { success: false, error: '外の検査を使う時は提供元と宛先の両方が必要です' }, 400, ["externalProvider","externalEndpointUrl","externalSecretRef"]);
@@ -450,7 +477,15 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     return Number.isSafeInteger(n) && n > 0 ? n : null;
   };
   const now = new Date().toISOString();
-  await c.env.DB.prepare(
+  const endpointHost = url?.hostname ?? null;
+  // 共通監査は長い文字列を秘密値として伏せる。ホストだけを短い断片で
+  // 保存すれば、その保護を緩めず長い正式ホストも正確に復元できる。
+  // 3文字の断片は電話番号の伏せ字にも該当しない。1配列50項目の上限を
+  // 守って二段に分け、最大253文字をすべて保存する。flat().join('')で復元。
+  const auditHost = endpointHost && (endpointHost.length > 200 || /[A-Za-z0-9_-]{32,}|[0-9-]{6,}/.test(endpointHost))
+    ? { endpointHostParts: [endpointHost.slice(0, 150).match(/.{1,3}/g)!, ...(endpointHost.length > 150 ? [endpointHost.slice(150).match(/.{1,3}/g)!] : [])] }
+    : { endpointHost };
+  const statement = c.env.DB.prepare(
     `INSERT INTO file_scan_configs
       (line_account_id, external_provider, external_endpoint_url, external_secret_ref,
        external_timeout_ms, max_bytes_override, max_pixels_override, updated_by, updated_at)
@@ -469,7 +504,21 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     Number.isSafeInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
     numOrNull(body?.maxBytesOverride), numOrNull(body?.maxPixelsOverride),
     c.get('staff')?.id ?? null, now,
-  ).run();
+  );
+  // 設定と監査を同じbatchで確定。宛先のパス・クエリ・鍵の値は記録しない。
+  await c.env.DB.batch([statement, auditEventStatement(c.env.DB, {
+    tenantId: c.get('staff')?.tenantId,
+    lineAccountId: accountId,
+    category: 'business',
+    actorPrincipalId: c.get('staff')?.id ?? 'unknown',
+    actorRole: c.get('staff')?.role ?? 'unknown',
+    action: 'file_scan.config.update',
+    targetKind: 'file_scan_config',
+    targetId: accountId,
+    result: 'success',
+    after: auditHost,
+    createdAt: now,
+  })]);
   return c.json({ success: true, data: { lineAccountId: accountId } });
 });
 

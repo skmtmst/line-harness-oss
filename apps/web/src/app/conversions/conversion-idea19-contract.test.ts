@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
 /* 詳細の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = readFileSync(join(import.meta.dirname, '_components', 'conversion-dialogs.tsx'), 'utf8')
+const DIALOGS = readFileSync(join(import.meta.dirname, '../../v8/conversions', 'dialogs.tsx'), 'utf8')
 const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /**

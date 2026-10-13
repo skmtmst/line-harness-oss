@@ -1,9 +1,10 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * ★V8 CTA・フォーム（`Q0Jrk`）の描画。
  * 差し替えるのは通信だけ。カードの一覧・選んだカードの欄・申込フォームが実在する。
  */
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -30,26 +31,29 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import CtaV8 from './cta-v8'
-import { ApiError, type WebinarEditor } from '@/lib/api'
+import CtaPane from '@/v8/webinar-edit/cta'
+import { webinarEditContext, webinarWizardChrome } from '@/test-utils/webinar-edit'
+import type { EditContext, PaneSaveProps } from '@/v8/webinar-edit/types'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+import { ApiError, type Webinar, type WebinarEditor } from '@/lib/api'
 
-const EDITOR = { version: 5, registrationFormId: null } as WebinarEditor
+const EDITOR = { version: 5, registrationFormId: null, publicPage: { form: null } } as WebinarEditor
 
 const roots: Root[] = []
-function render(props: Partial<Pick<React.ComponentProps<typeof CtaV8>, 'onDirtyChange' | 'registerSave' | 'onEditorChange'>> = {}): HTMLElement {
+function render(props: Partial<PaneSaveProps & Pick<EditContext, 'onEditorChange'>> = {}): HTMLElement {
+  let saveHandler: (() => Promise<boolean>) | null = null
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
   roots.push(root)
   act(() => {
     root.render(
-      <CtaV8
-        webinarId="webinar-1"
-        accountId="account-1"
-        durationSeconds={3600}
-        editor={EDITOR}
-        onEditorChange={() => undefined}
-        {...props}
+      <CtaPane
+        ctx={webinarEditContext({ id: 'webinar-1', accountId: 'account-1', durationSeconds: 3600 } as Webinar, EDITOR, { onEditorChange: props.onEditorChange ?? (() => {}) })}
+        chrome={{ ...webinarWizardChrome, footerActions: <button onClick={() => void saveHandler?.()}>下書きを保存</button> }}
+        onDirtyChange={props.onDirtyChange ?? (() => {})}
+        registerSave={(handler) => { saveHandler = handler; props.registerSave?.(handler) }}
       />,
     )
   })
@@ -58,6 +62,9 @@ function render(props: Partial<Pick<React.ComponentProps<typeof CtaV8>, 'onDirty
 
 describe('CTA・フォームのV8（Q0Jrk）', () => {
   beforeEach(() => {
+    vi.resetAllMocks()
+    apiMocks.saveCtas.mockResolvedValue({ data: [] })
+    apiMocks.saveEditor.mockResolvedValue({ data: { ...EDITOR, version: 6 } })
     apiMocks.ctas.mockResolvedValue({
       data: [
         {
@@ -72,7 +79,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
         },
       ],
     })
-    apiMocks.fetchApi.mockResolvedValue({ success: true, data: [] })
+    apiMocks.fetchApi.mockResolvedValue({ success: true, data: [{ id: 'form-1', name: 'フォーム1', isActive: true }] })
   })
 
   afterEach(() => {
@@ -85,7 +92,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     const host = render()
     await act(async () => undefined)
     expect(host.querySelector('[data-design-node="Q0Jrk"]')).not.toBeNull()
-    expect(host.textContent).toContain('CTAカード 1枚')
+    expect(host.textContent).toContain('CTA カード 1 枚')
     expect(host.textContent).toContain('個別導入診断、受付中です')
     expect(host.textContent).toContain('申込に使う回答フォーム')
     expect(host.textContent).toContain('カードの見え方')
@@ -94,17 +101,19 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
   it('空のまま保存すると注意が出て送らない', async () => {
     const host = render()
     await act(async () => undefined)
-    const add = [...host.querySelectorAll('button')].find((el) => el.textContent === '＋ CTAカードを足す')
+    await pickEntity('申込に使う回答フォーム', 'フォーム1')
+    const add = [...host.querySelectorAll('button')].find((el) => el.textContent === 'CTA カードを足す')
     await act(async () => {
       add!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(host.textContent).toContain('CTAカード 2枚')
-    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === 'CTAカードを保存する')
+    expect(host.textContent).toContain('CTA カード 2 枚')
+    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')
     await act(async () => {
       save!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(apiMocks.saveCtas).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('2枚目')
+    expect(apiMocks.saveEditor).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('カード2')
   })
 
   it('下の保存操作へ登録し、失敗では入力と未保存の印を残して再試行できる', async () => {
@@ -112,7 +121,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     const dirty = vi.fn()
     const host = render({ registerSave: (callback) => { save = callback }, onDirtyChange: dirty })
     await act(async () => undefined)
-    const title = host.querySelector('input') as HTMLInputElement
+    const title = host.querySelector('#cta-title') as HTMLInputElement
     await act(async () => fireEvent.change(title, { target: { value: '新しいCTA' } }))
     expect(dirty).toHaveBeenLastCalledWith(true)
     apiMocks.saveCtas.mockRejectedValueOnce(new Error('temporary')).mockResolvedValueOnce({ data: [] })
@@ -155,14 +164,39 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     })
     const host = render()
     await act(async () => undefined)
-    expect(host.textContent).toContain('CTAカード 2枚')
-    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === 'CTAカードを保存する')
+    expect(host.textContent).toContain('CTA カード 2 枚')
+    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')
     await act(async () => {
       save!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(apiMocks.saveCtas).toHaveBeenCalledTimes(1)
     const cards = apiMocks.saveCtas.mock.calls[0][1] as Array<{ atSeconds: number }>
     expect(cards).toHaveLength(2)
+  })
+
+  it('秒数だけで出す時刻を入れても保存する値は秒で送る', async () => {
+    let save: (() => Promise<boolean>) | null = null
+    const host = render({ registerSave: (handler) => { save = handler } })
+    await act(async () => undefined)
+    fireEvent.change(host.querySelector('#cta-time')!, { target: { value: '600' } })
+    await act(async () => { expect(await save!()).toBe(true) })
+    expect(apiMocks.saveCtas).toHaveBeenCalledWith('webinar-1', [expect.objectContaining({ atSeconds: 600 })])
+  })
+
+  it('申込フォームだけ保存できた後は、カード失敗の再試行でフォームを二度保存しない', async () => {
+    apiMocks.saveCtas.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({ data: [] })
+    let save: (() => Promise<boolean>) | null = null
+    const host = render({ registerSave: (handler) => { save = handler } })
+    await act(async () => undefined)
+    await pickEntity('申込に使う回答フォーム', 'フォーム1')
+    fireEvent.change(host.querySelector('#cta-title')!, { target: { value: '保存したいCTA' } })
+    await act(async () => { expect(await save!()).toBe(false) })
+    expect(apiMocks.saveEditor.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.saveCtas.mock.invocationCallOrder[0])
+    expect(apiMocks.saveEditor).toHaveBeenCalledTimes(1)
+    expect((host.querySelector('#cta-title') as HTMLInputElement).value).toBe('保存したいCTA')
+    await act(async () => { expect(await save!()).toBe(true) })
+    expect(apiMocks.saveEditor).toHaveBeenCalledTimes(1)
+    expect(apiMocks.saveCtas).toHaveBeenCalledTimes(2)
   })
 
   it('版の競合で入力を残し、最新版との比較と置き換えの確認を挟む', async () => {
@@ -174,26 +208,27 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     let save: (() => Promise<boolean>) | null = null
     const host = render({ onEditorChange: changed, registerSave: (callback) => { save = callback } })
     await act(async () => undefined)
-    const selected = host.querySelector<HTMLButtonElement>('button[aria-label="申込に使う回答フォーム"]')!
-    await act(async () => selected.click())
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((element) => element.textContent?.includes('この画面のフォーム'))!.click())
-    const title = host.querySelector('input') as HTMLInputElement
+    await pickEntity('申込に使う回答フォーム', 'この画面のフォーム')
+    const title = host.querySelector('#cta-title') as HTMLInputElement
     await act(async () => fireEvent.change(title, { target: { value: '入力を残すCTA' } }))
     const click = async (label: string) => act(async () => { [...host.querySelectorAll('button')].find((element) => element.textContent === label)!.click() })
-    await click('申込フォームを保存する')
+    await click('下書きを保存')
     expect(host.querySelector('[data-design-node="pvimJ"]')).not.toBeNull()
-    expect(selected.textContent).toContain('この画面のフォーム')
-    await act(async () => { expect(await save!()).toBe(false) })
+    expect(host.querySelector('button[aria-label^="申込に使う回答フォーム"]')?.parentElement?.textContent).toContain('この画面のフォーム')
+    expect(save).toBeNull()
     expect(apiMocks.saveCtas).not.toHaveBeenCalled()
     await click('違いを比べる')
-    expect(host.textContent).toContain('保存されている申込フォーム：保存済みのフォーム')
-    expect(host.textContent).toContain('この画面の入力：この画面のフォーム')
+    const comparison = screen.getByRole('dialog', { name: '違いを比べる' })
+    expect(within(comparison).getByRole('cell', { name: '保存済みのフォーム' })).toBeTruthy()
+    expect(within(comparison).getByRole('cell', { name: 'この画面のフォーム' })).toBeTruthy()
     expect(changed).not.toHaveBeenCalled()
     await click('最新を読み込んで続ける')
     expect(changed).not.toHaveBeenCalled()
-    await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((element) => element.textContent === '最新を読み込んで続ける')!.click() })
+    const confirm = screen.getByRole('dialog', { name: '最新を読み込んで続けますか？' })
+    expect(within(confirm).getByText(/CTA カードの入力は残します/)).toBeTruthy()
+    await act(async () => { within(confirm).getByRole('button', { name: '最新を読み込んで続ける' }).click() })
     expect(changed).toHaveBeenCalledWith(latest)
-    expect(selected.textContent).toContain('保存済みのフォーム')
+    expect(host.querySelector('button[aria-label^="申込に使う回答フォーム"]')?.parentElement?.textContent).toContain('保存済みのフォーム')
     expect(title.value).toBe('入力を残すCTA')
   })
 

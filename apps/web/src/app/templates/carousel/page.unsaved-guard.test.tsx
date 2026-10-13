@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * カルーセル編集の未保存ガード（D009）を、実際に mount して確かめる。
  *
@@ -22,7 +24,7 @@ const routing = vi.hoisted(() => ({
   pushed: [] as string[],
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: (href: string) => routing.pushed.push(href),
     replace: (href: string) => routing.pushed.push(href),
@@ -119,8 +121,8 @@ function dialogByText(tag: string, text: string): HTMLElement | null {
   return allIn(document, tag).find((element) => element.textContent?.trim() === text) ?? null
 }
 
-const nameInput = () => document.getElementById('cr-name') as HTMLInputElement | null
-const cancelLink = () => byText('a', 'キャンセル')
+const nameInput = () => document.getElementById('cr-name-input') as HTMLInputElement | null
+const cancelLink = () => byText('button', 'キャンセル')
 
 /** 入力の欄へ、画面と同じく入力の出来事で入れる。 */
 function typeInto(input: HTMLInputElement, value: string) {
@@ -134,6 +136,7 @@ function click(element: HTMLElement) {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.foldersList.mockReset()
   calls.foldersList.mockResolvedValue({ success: true, data: [] })
@@ -199,10 +202,9 @@ describe('D009: 未保存のままキャンセルすると確認が出る', () =
     await act(async () => { click(cancelLink()!) })
     await settle()
 
-    // 番兵は止めない。進む役は Link 本体なので、行き先が残っていることだけ見る。
+    // 現役のキャンセルはボタン。未変更なら確認を出さず一覧へ進む。
     expect(dialogByText('h2', '保存していない変更があります')).toBeNull()
     expect(dialogByText('button', '保存せずに移る')).toBeNull()
-    expect(cancelLink()!.getAttribute('href')).toBe('/templates')
-    expect(routing.pushed).toEqual([])
+    expect(routing.pushed).toEqual(['/templates'])
   })
 })

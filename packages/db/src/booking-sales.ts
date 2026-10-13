@@ -314,7 +314,7 @@ async function fetchSalesRows(
             b.starts_at
        FROM bookings b
        LEFT JOIN menus m ON m.id = b.menu_id
-      WHERE b.line_account_id = ? AND b.starts_at >= ? AND b.starts_at < ?`,
+      WHERE b.line_account_id = ? AND julianday(b.starts_at) >= julianday(?) AND julianday(b.starts_at) < julianday(?)`,
   ).bind(lineAccountId, from, to).all<SalesRow>();
   return rows.results ?? [];
 }
@@ -335,18 +335,18 @@ async function fetchPaidRevenue(
 ): Promise<PaidRevenue[]> {
   const rows = await db.prepare(
     `SELECT b.menu_id, m.name AS menu_name, p.amount,
-            b.starts_at
+            COALESCE(b.starts_at, p.paid_at) AS starts_at
        FROM booking_payments p
-       JOIN bookings b ON b.id = p.booking_id
+       LEFT JOIN bookings b ON b.id = p.booking_id
        LEFT JOIN menus m ON m.id = b.menu_id
       WHERE p.line_account_id = ? AND p.status = 'paid'
-        AND p.paid_at IS NOT NULL AND p.paid_at >= ? AND p.paid_at < ?`,
+        AND p.paid_at IS NOT NULL AND julianday(p.paid_at) >= julianday(?) AND julianday(p.paid_at) < julianday(?)`,
   ).bind(lineAccountId, from, to).all<{
     menu_id: string; amount: number; menu_name: string | null; starts_at: string;
   }>();
   return (rows.results ?? []).map((row) => ({
     menuId: row.menu_id ?? '',
-    menuName: row.menu_name ?? '',
+    menuName: row.menu_name ?? '削除済みのお客さま',
     startsAt: row.starts_at,
     amount: Number(row.amount ?? 0),
   }));

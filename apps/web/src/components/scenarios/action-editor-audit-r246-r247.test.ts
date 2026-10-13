@@ -4,7 +4,9 @@
  * R246: 選択肢とアクションを並びの位置ではなく選択肢の鍵で結ぶ。
  * R247: 数値条件の上下限の逆転は落とさず、欄の下で知らせて止める。
  */
-import fs from 'node:fs'
+import nodeFs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+const fs = { ...nodeFs, readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'

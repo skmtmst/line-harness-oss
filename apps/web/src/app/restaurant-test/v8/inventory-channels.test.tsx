@@ -7,7 +7,7 @@ import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import InventoryChannels from './inventory-channels'
+import InventoryChannels from '@/v8/restaurant/inventory/channels'
 
 const jsonResponse = (body: unknown) => ({ ok: true, status: 200, json: async () => body })
 
@@ -20,6 +20,7 @@ beforeEach(() => {
         total: 1,
       })
     }
+    if(String(url).includes('/channels')) return jsonResponse({success:true,data:[{id:'c1',code:'restaurant_board',name:'restaurant_board',receiveMethod:'email_forward',status:'receiving',todayCount:1,lastReceivedAt:null,unreadableCount:0,daysWithoutReceipt:0}]})
     return jsonResponse({ success: true, data: [{ id: 'a1', storeId: 'store-1', localPart: 'r-abc', address: 'r-abc@in.musubo.jp', status: 'active', createdAt: '2026-10-01T00:00:00+09:00', revokedAt: null }] })
   }))
 })
@@ -31,11 +32,11 @@ const connectors = [
 
 describe('hQQlt 予約経路の連携', () => {
   it('アドレス・媒体・読めなかったものを出す', async () => {
-    render(<InventoryChannels accountId="account-1" storeId="store-1" connectors={connectors} />)
+    render(<InventoryChannels accountId="account-1" storeId="store-1" date="2026-10-02" canEdit />)
     expect(await screen.findByText('r-abc@in.musubo.jp')).toBeTruthy()
     expect(document.querySelector('[data-design-node="hQQlt"]')).toBeTruthy()
     expect(screen.getByText('restaurant_board')).toBeTruthy()
-    expect(screen.getByText('読めなかったものが 1 件あります。')).toBeTruthy()
-    expect(screen.getByText('食べログ')).toBeTruthy()
+    expect(screen.getByText('読めなかったもの 1 件')).toBeTruthy()
+    expect(screen.getByText('食べログの予約メール')).toBeTruthy()
   })
 })

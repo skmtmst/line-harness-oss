@@ -6,7 +6,7 @@ import styles from './page-templates.module.css'
 
 /** 詳細の本文と補助欄。狭い板では補助欄を畳み、操作は開いて使う。 */
 export function DetailColumns({ children, aside, asideLabel, expanded, onExpandedChange, presentation, variant }: {
-  variant?: 'restaurant-inventory' | 'restaurant-tables'
+  variant?: 'restaurant-inventory' | 'restaurant-tables' | 'restaurant-ledger'
   children: ReactNode
   aside: ReactNode
   asideLabel: string

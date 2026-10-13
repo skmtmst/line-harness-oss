@@ -58,7 +58,7 @@
   table-layout: fixed;
 }
 
-:global([data-theme='v8']) .table .headRow.headRow > th {
+:global(:root) .table .headRow.headRow > th {
   height: auto;
   padding: var(--tpl-e49-head-pad);
   color: var(--color-ink-secondary);
@@ -67,18 +67,18 @@
   line-height: var(--tpl-e49-lh-18);
 }
 
-:global([data-theme='v8']) .table .row.row > td {
+:global(:root) .table .row.row > td {
   height: var(--tpl-e49-row-h);
   padding: var(--tpl-e49-row-pad);
 }
 
-:global([data-theme='v8']) .table .headRow.headRow > th:first-child,
-:global([data-theme='v8']) .table .row.row > td:first-child {
+:global(:root) .table .headRow.headRow > th:first-child,
+:global(:root) .table .row.row > td:first-child {
   padding-left: var(--tpl-e49-edge);
 }
 
-:global([data-theme='v8']) .table .headRow.headRow > th:last-child,
-:global([data-theme='v8']) .table .row.row > td:last-child {
+:global(:root) .table .headRow.headRow > th:last-child,
+:global(:root) .table .row.row > td:last-child {
   padding-right: var(--tpl-e49-edge);
 }
 
@@ -220,7 +220,7 @@
 }
 
 .pickerRow:focus-visible {
-  outline: var(--tpl-e49-focus-ring) solid var(--color-action);
+  outline: var(--tpl-e49-focus-ring) solid var(--color-focus-ring);
   outline-offset: calc(var(--tpl-e49-focus-ring) * -1);
 }
 

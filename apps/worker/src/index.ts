@@ -1,3 +1,4 @@
+import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
 import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
@@ -10,6 +11,7 @@ import { scenarioDrafts, purgeExpiredScenarioDrafts } from './routes/scenario-dr
 import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
+import { processRestaurantEvents } from './services/restaurant-events.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
 import { processVisitStampReminders } from './services/visit-stamp-reminders.js';
 import { Hono, type Context } from 'hono';
@@ -65,7 +67,7 @@ import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
-import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
@@ -177,15 +179,18 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { dbFor } from './services/db-router.js';
 import { restaurantTest } from './routes/restaurant-test.js';
+import { restaurantExternalLinks } from './routes/restaurant-external-links.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
 import { tiktokPnl } from './routes/tiktok-pnl.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
 import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
+import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
 import { hqBilling } from './routes/hq-billing.js';
@@ -251,6 +256,8 @@ export type Env = {
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
     BUILD_RELEASED_AT?: string;
+    /** 外部ファイル検査の許可組（host=FILE_SCAN_SECRET_X、カンマ区切り）。未設定なら内蔵検査のみ。 */
+    FILE_SCAN_ALLOWED_PAIRS?: string;
     IMAGES: R2Bucket;
     /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
     RAW_MAIL?: R2Bucket;
@@ -269,6 +276,31 @@ export type Env = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
+    /**
+     * デリバリー受注（Uber Eats・出前館・ロケットナウ）の接続設定。
+     * 送信は 'true' のときだけ行う。未設定の環境では台帳へ記録して送らない。
+     * 受信の合言葉は32文字以上でないと受け取らない（短い鍵は使わない）。
+     */
+    RT_DELIVERY_SEND_ENABLED?: string;
+    RT_DELIVERY_UBEREATS_API_BASE_URL?: string;
+    RT_DELIVERY_UBEREATS_API_TOKEN?: string;
+    RT_DELIVERY_UBEREATS_WEBHOOK_SECRET?: string;
+    RT_DELIVERY_DEMAECAN_API_BASE_URL?: string;
+    RT_DELIVERY_DEMAECAN_API_TOKEN?: string;
+    RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET?: string;
+    RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
+    RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
+    RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
+    /**
+     * Uber Eats のログイン連携（設定 › デリバリー連携からお店の人が自分でつなぐ経路）。
+     * Uber の開発者画面で発行された値を、環境ごとの秘密設定として入れる。
+     * 入れるのは2つだけで、戻り先URLは WORKER_PUBLIC_URL から組み立てる。
+     * 2つそろわない環境では連携の口を開けない。
+     */
+    RT_DELIVERY_UBEREATS_CLIENT_ID?: string;
+    RT_DELIVERY_UBEREATS_CLIENT_SECRET?: string;
+    /** 既定では使わない。Uber 側の登録が別の文字列のときだけ上書きとして入れる。 */
+    RT_DELIVERY_UBEREATS_REDIRECT_URI?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
@@ -329,6 +361,8 @@ export type Env = {
     GOOGLE_BUSINESS_WRITE_ENABLED?: string;
     /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
     GOOGLE_BUSINESS_AI_MODEL?: string;
+    /** 口コミ返信の下書きに使う OpenAI のモデル。未設定なら既定値。OPENAI_API_KEY が無い環境では Workers AI を使う。 */
+    GOOGLE_BUSINESS_TEXT_MODEL?: string;
     /** Google Sheets連携(#838)：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
     GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
@@ -347,6 +381,10 @@ export type Env = {
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
     META_APP_ID?: string;
     META_APP_SECRET?: string;
+    // Instagram API with Instagram Login (no Facebook Page). Separate credentials
+    // from META_APP_*: App Dashboard > Instagram > API setup with Instagram login.
+    INSTAGRAM_APP_ID?: string;
+    INSTAGRAM_APP_SECRET?: string;
     META_REDIRECT_URI?: string;
     META_GRAPH_API_VERSION?: string;
     META_TOKEN_ENCRYPTION_KEY?: string;
@@ -429,6 +467,9 @@ export type Env = {
     staff: AuthenticatedStaff;
     /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
     auditRecorded?: boolean;
+    mfaAuditRecorded?: boolean;
+    outputAuditRecorded?: boolean;
+    outputAudit?: { count: number | null; accountId?: string; accountIds?: string[]; accountCounts?: Record<string, number>; targetId?: string; phase?: 'requested' | 'download' };
     /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
     /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
@@ -492,6 +533,8 @@ app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
+app.use('*', authenticatedRateLimitMiddleware);
+app.use('/api/*', outputAuditMiddleware);
 app.use('*', timingMark('auth'));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
@@ -638,12 +681,14 @@ app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', visitStamps);
+app.route('/', restaurantExternalLinks);
 app.route('/', restaurantTest);
 app.route('/', restaurantCustomerBooking);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
 app.route('/', restaurantGooglePerformance);
+app.route('/', restaurantDelivery);
 app.route('/', googleSheets);
 app.route('/', tiktokPnl);
 app.route('/', tenants);
@@ -1450,6 +1495,7 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'line webhook recovery',run:async()=>{const {processDueLineWebhookRetries}=await import('./services/line-webhook-recovery.js');await processDueLineWebhookRetries(env);}},
     {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
     {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
     {
@@ -1724,6 +1770,7 @@ async function runFrequentHeavyJobs(
       },
     },
     { name: 'visit stamps', run: () => processVisitStampQueue(env) },
+    { name: 'restaurant followup jobs', run: async () => { await processScenarioSourceJobs(env); } },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',
@@ -1908,7 +1955,8 @@ async function runSixHourlyHeavyJobs(
     {
       name: 'booking expirer',
       run: async () => {
-        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification });
+        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification,
+          credentials: { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } });
         console.log(
           `[booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
         );
@@ -2067,6 +2115,10 @@ async function scheduled(
   // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
+  if (lane === 'restaurantMinute') {
+    await runIsolatedScheduledJobs([{ name: 'restaurant events', run: () => processRestaurantEvents(env) }]);
+    return;
+  }
   if (lane === 'frequentHeavy') {
     await runFrequentHeavyJobs(event, env);
     return;

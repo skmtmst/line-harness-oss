@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * カルーセル保存の失敗まわりを、実際に mount して確かめる（N-149）。
  *
@@ -18,6 +20,7 @@
  * next/link）だけ。画面の判断は差し替えない。
  */
 import React, { act } from 'react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,7 +36,7 @@ const routing = vi.hoisted(() => ({
   pushed: [] as string[],
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: (href: string) => routing.pushed.push(href),
     replace: (href: string) => routing.pushed.push(href),
@@ -153,9 +156,9 @@ function byText(tag: string, text: string): HTMLElement | null {
   return all(tag).find((element) => element.textContent?.trim() === text) ?? null
 }
 
-const saveButton = () => byText('button', '保存する')
-const retryButton = () => byText('button', 'もう一度保存する')
-const nameInput = () => document.getElementById('cr-name') as HTMLInputElement | null
+const saveButton = () => byText('button', '下書きを保存')
+const retryButton = () => screenText().includes('入力した内容はそのまま残っています') ? saveButton() : null
+const nameInput = () => document.getElementById('cr-name-input') as HTMLInputElement | null
 const screenText = () => container.textContent ?? ''
 
 /** 入力の欄へ、画面と同じく入力の出来事で入れる。 */
@@ -168,6 +171,10 @@ function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) 
 
 function typeName(value: string) {
   typeInto(nameInput()!, value)
+  typeInto(document.getElementById('cr-text') as HTMLInputElement, '案内の本文')
+  typeInto(choiceLabelInput()!, '詳しく見る')
+  const uri = container.querySelector<HTMLInputElement>('input[placeholder="https://example.com"]')
+  if (uri) typeInto(uri, 'https://example.com')
 }
 
 /** 選択肢の「ボタンの文字」の欄。 */
@@ -188,6 +195,7 @@ const okCreate = () => Promise.resolve({ success: true as const, data: { id: 'tp
 const okUpdate = () => Promise.resolve({ success: true as const, data: { id: 'tpl-new' } })
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.templatesGet.mockReset()
   calls.templatesCreate.mockReset()
@@ -260,8 +268,10 @@ describe('N-149: 保存に失敗しても下書きを保持して再試行でき
       // ボタンの文字を入れて「押されたときに何かする」へ替えると postback
       // になり、保存は2段階になる。
       typeInto(choiceLabelInput()!, '詳しく見る')
-      click(byText('button', '押されたときに何かする')!)
+      fireEvent.click(screen.getByLabelText('カード1のボタン1の動き'))
     })
+    await settle()
+    await act(async () => { fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '動きを実行する' }).querySelector('button')!) })
     await settle()
 
     await act(async () => { click(saveButton()!) })
@@ -290,7 +300,7 @@ describe('N-149: 保存に失敗しても下書きを保持して再試行でき
     expect(retryPayload).toMatchObject({ name: '新しいカルーセル', messageType: 'carousel' })
     expect(String(retryPayload.messageContent)).toContain('ctpl=tpl-new')
     // 成功してはじめて一覧へ進む。
-    expect(routing.pushed).toEqual(['/templates'])
+    expect(routing.pushed[0]).toMatch(/^\/templates(?:\?|$)/)
   })
 
   it('409 が返っても下書きは残り、再試行で保存できる', async () => {
@@ -313,7 +323,7 @@ describe('N-149: 保存に失敗しても下書きを保持して再試行でき
 
     expect(calls.templatesUpdate).toHaveBeenCalledTimes(2)
     expect(calls.templatesUpdate.mock.calls[1][0]).toBe('tmpl-1')
-    expect(routing.pushed).toEqual(['/templates'])
+    expect(routing.pushed).toEqual([])
   })
 
   it('保存中にもう一度押しても、通信は1回しか出ない', async () => {
@@ -338,7 +348,7 @@ describe('N-149: 保存に失敗しても下書きを保持して再試行でき
     pending.release()
     await settle()
     expect(calls.templatesCreate).toHaveBeenCalledTimes(1)
-    expect(routing.pushed).toEqual(['/templates'])
+    expect(routing.pushed).toEqual(['/templates?highlight=tpl-new'])
   })
 
   it('入力の不備で止まったときは、再試行の口を出さない', async () => {

@@ -1,19 +1,13 @@
 'use client'
 
 import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
-
-/*
- * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-history-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * フォルダの列は無い（絵どおり）。表は「いつ・だれに・増減・なぜ・残高・だれが・操作」。
- * 行末は操作ボタン1つ（確定待ちは「確定する」、付けた分は「取り消す」、
- * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
- * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
- */
+import { validateHistoryPeriod } from './history-period'
+import DateField from '@/components/shared/date-field'
+import Select from '@/components/shared/select'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -32,8 +26,9 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   formatMileageChange,
   formatMileageShortDateTime,
@@ -43,12 +38,23 @@ import {
   mileageSourceNoteText,
   mileageStatusLabel,
 } from './display'
-import { MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-history-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * フォルダの列は無い（絵どおり）。表は「いつ・だれに・増減・なぜ・残高・だれが・操作」。
+ * 行末は操作ボタン1つ（確定待ちは「確定する」、付けた分は「取り消す」、
+ * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
+ * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
+ */
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -66,6 +72,7 @@ const PRESETS: Array<{ value: string; label: string }> = [
   { value: 'manual', label: '手で動かした分のみ' },
   { value: 'month', label: '今月のみ' },
   { value: 'week', label: '過去7日のみ' },
+  { value: 'custom', label: '日付・種類・状態を指定' },
 ]
 
 function monthStart(): string {
@@ -94,6 +101,15 @@ export default function HistoryTab() {
   const [grantedOnly, setGrantedOnly] = useListUrlValue('grantedOnly', false)
   const [spentOnly, setSpentOnly] = useListUrlValue('spentOnly', false)
   const [preset, setPreset] = useState('all')
+  const [customFrom, setCustomFrom] = useListUrlValue('from', '')
+  const [to, setTo] = useListUrlValue('to', '')
+  const [customEntryType, setCustomEntryType] = useListUrlValue<MileageHistoryItem['entryType'] | ''>('entryType', '')
+  const [customStatus, setCustomStatus] = useListUrlValue<MileageHistoryItem['status'] | ''>('status', '')
+  const [customMode, setCustomMode] = useListUrlValue<'automatic' | 'manual' | ''>('mode', '')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterDraft, setFilterDraft] = useState({ from: '', to: '', entryType: '', status: '', mode: '' })
+  const [filterError, setFilterError] = useState<string | null>(null)
+  const [inputRejected, setInputRejected] = useState<string | null>(null)
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -101,31 +117,51 @@ export default function HistoryTab() {
   const [error, setError] = useState(false)
 
   const applyPreset = (value: string) => {
+    if (value === 'custom') {
+      setFilterDraft({ from: customFrom, to, entryType: customEntryType, status: customStatus, mode: customMode })
+      setFilterError(null)
+      setFilterOpen(true)
+      return
+    }
+    setCustomFrom(''); setTo(''); setCustomEntryType(''); setCustomStatus(''); setCustomMode('')
     setPreset(value)
     setPage(1)
     setGrantedOnly(value === 'granted')
     setSpentOnly(value === 'spent')
   }
-  const presetValue = preset === 'all' && !grantedOnly && !spentOnly ? 'all'
+  const presetValue = customFrom || to || customEntryType || customStatus || customMode ? 'custom'
+    : preset === 'all' && !grantedOnly && !spentOnly ? 'all'
     : preset !== 'all' ? preset
       : grantedOnly ? 'granted' : 'spent'
 
-  const from = preset === 'month' ? monthStart() : preset === 'week' ? daysAgo(6) : undefined
-  const modeFilter: 'automatic' | 'manual' | undefined = preset === 'manual' ? 'manual' : undefined
-  const entryTypeFilter: MileageHistoryItem['entryType'] | undefined = grantedOnly ? 'grant' : undefined
+  const from = preset === 'month' ? monthStart() : preset === 'week' ? daysAgo(6) : customFrom
+  const periodError = validateHistoryPeriod(from, to)
+  const modeFilter: 'automatic' | 'manual' | undefined = preset === 'manual' ? 'manual' : customMode || undefined
+  const entryTypeFilter: MileageHistoryItem['entryType'] | undefined = grantedOnly ? 'grant' : customEntryType || undefined
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
     setLoading(true)
     setError(false)
     setExportError('')
+    setInputRejected(null)
+    if (!selectedAccountId) {
+      setResult(null); setPeriodResult(null); setLoadedAccountId(null); setLoading(false)
+      return
+    }
+    if (validateHistoryPeriod(from, to)) {
+      setResult(null); setPeriodResult(null); setLoading(false)
+      return
+    }
     try {
       const [response, period] = await Promise.all([api.mileage.history({
         accountId: selectedAccountId ?? '',
         search: search || undefined,
         entryType: entryTypeFilter,
         mode: modeFilter,
-        from,
+        from: from || undefined,
+        to: to || undefined,
+        status: customStatus || undefined,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }), api.mileage.history({ accountId: selectedAccountId ?? '', from: daysAgo(29), to: daysAgo(0), limit: 1, offset: 0 }).catch(() => null)])
@@ -141,11 +177,12 @@ export default function HistoryTab() {
     } catch (caught) {
       if (request !== requestRef.current) return
       setResult(null); setPeriodResult(null)
-      if (!(caught instanceof ApiError && caught.status === 400)) setError(true)
+      if (caught instanceof ApiError && caught.status === 400) setInputRejected('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')
+      else setError(true)
     } finally {
       if (request === requestRef.current) setLoading(false)
     }
-  }, [entryTypeFilter, from, modeFilter, page, pageSize, search, selectedAccountId, spentOnly])
+  }, [entryTypeFilter, from, modeFilter, page, pageSize, search, selectedAccountId, spentOnly, to, customStatus])
 
   useEffect(() => {
     if (accountLoading) return
@@ -229,8 +266,9 @@ export default function HistoryTab() {
     setPendingError('')
   }
 
-  const filtered = search.trim() || grantedOnly || spentOnly || preset !== 'all'
+  const filtered = search.trim() || grantedOnly || spentOnly || preset !== 'all' || customFrom || to || customEntryType || customStatus || customMode
   const resetAll = () => {
+    setCustomFrom(''); setTo(''); setCustomEntryType(''); setCustomStatus(''); setCustomMode('')
     setSearchInput('')
     setSearch('')
     setGrantedOnly(false)
@@ -249,7 +287,7 @@ export default function HistoryTab() {
         icon={<History size={14} aria-hidden="true" />}
         value={ready ? mileagePaginationTotal(periodResult) : null}
         unit="件"
-        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}
+        detail={<span title={`この条件で手で動かした分 ${result?.summary.manualCount == null ? '未取得' : `${formatNumber(result.summary.manualCount)} 件`}・反映を待っている ${result?.summary.pendingCount == null ? '未取得' : `${formatNumber(result.summary.pendingCount)} 件`}`}>{ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}</span>}
       />
       <KpiCard
         presentation="band"
@@ -329,14 +367,14 @@ export default function HistoryTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>いつ・だれに</Th>
-            <Th className={`${styles.colDelta} ${styles.num}`}>増減</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>いつ・だれに</Th>
+            <Th align="right" className={styles.colDelta}>増減</Th>
             <Th className={styles.colWhy}>なぜ</Th>
-            <Th className={`${styles.colAfter} ${styles.num}`}>残高</Th>
-            <Th className={styles.colWho}>だれが</Th>
+            <Th align="right" className={styles.colAfter}>残高</Th>
+            <Th collapseAt="narrow" className={styles.colWho}>だれが</Th>
             <Th className={styles.colOpsHistory}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -348,7 +386,7 @@ export default function HistoryTab() {
             return (
               <Tr
                 key={item.id}
-                className={styles.row}
+
                 data-table-layout="columns"
                 interactive
                 onClick={(event) => {
@@ -356,13 +394,11 @@ export default function HistoryTab() {
                   router.push(friendHref)
                 }} data-row-id={item.id}
               >
-                <Td className={styles.colName}>
-                  <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>
-                  <span className={styles.rowSub}>
-                    {`${formatMileageShortDateTime(item.occurredAt)}${item.lineAccountName ? `・${item.lineAccountName}` : ''}`}
-                  </span>
-                </Td>
-                <Td className={`${styles.colDelta} ${styles.num}`}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
+                <Td grow><FolderDotName>
+                  <span  title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
+
+                </FolderDotName></Td>
+                <Td align="right" className={styles.colDelta}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
                 <Td className={styles.colWhy}>
                   <span
                     className={styles.cellMain}
@@ -372,15 +408,15 @@ export default function HistoryTab() {
                   </span>
                   <span className={styles.cellSub}>{`${mileageEntryTypeLabel(item.entryType)}・${mileageStatusLabel(item.status)}`}</span>
                 </Td>
-                <Td className={`${styles.colAfter} ${styles.num}`}>
+                <Td align="right" className={styles.colAfter}>
                   <span className={styles.cellMain}>{item.balanceAfter === null ? emptyValue('unknown') : formatNumber(item.balanceAfter)}</span>
                 </Td>
-                <Td className={styles.colWho}>
+                <Td collapseAt="narrow" className={styles.colWho}>
                   <span className={styles.cellMain}>
                     {item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}
                   </span>
                 </Td>
-                <Td className={styles.colOpsHistory}>
+                <ActionCell className={styles.colOpsHistory}>
                   <span className={styles.rowActions}>
                     {pending ? (
                       <Button onClick={() => openPending('confirm', item)}>確定する</Button>
@@ -396,12 +432,12 @@ export default function HistoryTab() {
                         onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
                           ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
-                          { id: 'friend', label: '友だちを見る', external: true, href: friendHref, onSelect: () => router.push(friendHref) },
+                          { id: 'friend', label: '友だちを見る', external: false, href: friendHref, onSelect: () => router.push(friendHref) },
                         ]}
                       />
                     </div>
                   </span>
-                </Td>
+                </ActionCell>
               </Tr>
             )
           })}
@@ -410,8 +446,12 @@ export default function HistoryTab() {
     </div>
   )
 
-  const body = loading ? (
+  const body = !accountLoading && !selectedAccountId ? (
+    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、マイルの履歴を確認できます。" />
+  ) : loading ? (
     <ListState kind="loading" title="マイルの履歴を読み込んでいます" />
+  ) : (periodError ?? inputRejected) ? (
+    <StateCard title="日付の条件を確認してください" description={periodError ?? inputRejected ?? undefined} />
   ) : error ? (
     <StateCard tone="error" title="マイルの履歴を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
   ) : items.length === 0 ? (
@@ -461,6 +501,26 @@ export default function HistoryTab() {
       toolbar={toolbar}
       pagination={footer}
       overlays={
+        <>
+        <Dialog open={filterOpen} title="履歴の条件を指定" confirmLabel="この条件で絞る" onCancel={() => setFilterOpen(false)} onConfirm={() => {
+          const invalid = validateHistoryPeriod(filterDraft.from, filterDraft.to)
+          if (invalid) { setFilterError(invalid); return }
+          setPreset('all'); setGrantedOnly(false); setSpentOnly(false); setPage(1)
+          setCustomFrom(filterDraft.from); setTo(filterDraft.to)
+          setCustomEntryType(filterDraft.entryType as MileageHistoryItem['entryType'] | '')
+          setCustomStatus(filterDraft.status as MileageHistoryItem['status'] | '')
+          setCustomMode(filterDraft.mode as 'automatic' | 'manual' | '')
+          setFilterOpen(false)
+        }}>
+          <div className={styles.dlgBody}>
+            <Field label="開始日"><DateField aria-label="開始日" value={filterDraft.from} invalid={Boolean(filterError ?? periodError ?? inputRejected)} onChange={(value) => setFilterDraft((draft) => ({ ...draft, from: value }))} /></Field>
+            <Field label="終了日"><DateField aria-label="終了日" value={filterDraft.to} invalid={Boolean(filterError ?? periodError ?? inputRejected)} onChange={(value) => setFilterDraft((draft) => ({ ...draft, to: value }))} /></Field>
+            {(filterError ?? periodError ?? inputRejected) ? <Notice tone="danger">{filterError ?? periodError ?? inputRejected}</Notice> : null}
+            <Select label="種類" aria-label="種類" value={filterDraft.entryType} options={[{ value: '', label: 'すべての種類' }, { value: 'grant', label: '付与' }, { value: 'reversal', label: '取消' }, { value: 'spend', label: '使用' }, { value: 'expiration', label: '失効' }, { value: 'adjustment', label: '手動調整' }]} onChange={(value) => setFilterDraft((draft) => ({ ...draft, entryType: value }))} />
+            <Select label="状態" aria-label="状態" value={filterDraft.status} options={[{ value: '', label: 'すべての状態' }, { value: 'available', label: '利用可能' }, { value: 'pending', label: '確定待ち' }, { value: 'void', label: '取消済み' }]} onChange={(value) => setFilterDraft((draft) => ({ ...draft, status: value }))} />
+            <Select label="動かした方法" aria-label="動かした方法" value={filterDraft.mode} options={[{ value: '', label: 'すべての方法' }, { value: 'automatic', label: '自動' }, { value: 'manual', label: '手動' }]} onChange={(value) => setFilterDraft((draft) => ({ ...draft, mode: value }))} />
+          </div>
+        </Dialog>
         <Dialog
           open={pendingAction !== null}
           title={pendingAction?.kind === 'confirm' ? 'このマイルを確定しますか？' : 'このマイルを取り消しますか？'}
@@ -474,14 +534,15 @@ export default function HistoryTab() {
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
           onConfirm={() => runPendingAction()}
         >
-          <Field label="理由" required><textarea
+          <Field label="理由" required><SaveErrorField names={["pendingReason","pending_reason"]}><textarea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}
               placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
               rows={3}
-            /></Field>
+            /></SaveErrorField></Field>
         </Dialog>
+        </>
       }
     >
       {body}

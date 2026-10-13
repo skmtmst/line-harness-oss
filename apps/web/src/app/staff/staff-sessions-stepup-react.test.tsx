@@ -8,6 +8,7 @@
  *   - 権限の保存が 428 STEP_UP_REQUIRED で止まったとき、本人確認の窓が立ち、
  *     6桁コード → grant 取得 → 同じ保存に grant を付けてやり直す
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
@@ -23,17 +24,18 @@ const fixture = vi.hoisted(() => ({
   staffStepUp: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: (await import('@/test-utils/staff-navigation-mock')).staffTestRouter,
   usePathname: () => '/staff',
-  useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -113,7 +115,7 @@ vi.mock('@/lib/api', () => ({
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: StaffPage } = await import('./page')
+const { default: StaffPage } = await import('@/test-utils/staff-test-routes')
 const { default: ToastHost, clearToastsForTest } = await import('@/components/shared/toast')
 
 const locationAssign = vi.fn()
@@ -121,8 +123,9 @@ const locationAssign = vi.fn()
 async function mount() {
   // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
   await act(async () => { render(<><StaffPage /><ToastHost /></>) })
-  await waitFor(() => expect(screen.getByText('対象の人')).toBeTruthy())
-  await waitFor(() => expect(screen.getByText('ログイン中の端末')).toBeTruthy())
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象の人の中身を見る' })).toBeTruthy())
+  await waitFor(() => expect(screen.getByText('ログイン中の端末を確認')).toBeTruthy())
+  fireEvent.click(screen.getByText('ログイン中の端末を確認'))
 }
 
 beforeEach(() => {
@@ -135,13 +138,10 @@ beforeEach(() => {
   state.members = [member({})]
   state.users = [accessUser({})]
   locationAssign.mockReset()
-  Object.defineProperty(window, 'location', {
-    configurable: true,
-    value: { ...window.location, assign: locationAssign },
-  })
+  vi.spyOn(window.location, 'assign').mockImplementation(locationAssign)
   clearToastsForTest()
 })
-afterEach(() => { cleanup() })
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('ログイン中の端末 (N-427)', () => {
   it('自分のセッションが並び、今の端末に印が付く', async () => {
@@ -186,11 +186,12 @@ describe('ログイン中の端末 (N-427)', () => {
 describe('権限変更の直前再認証 (N-427)', () => {
   async function openEditModal() {
     await mount()
-    // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
+    // B-193: 変更するは行の「…」から開く。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+      fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
     })
-    await screen.findByText('見せる範囲を決める')
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })
+    await screen.findByText('ログインユーザーを編集する')
   }
 
   it('保存が 428 で止まったら本人確認の窓が立ち、grant を付けて保存し直す', async () => {
@@ -230,3 +231,6 @@ describe('権限変更の直前再認証 (N-427)', () => {
     expect(screen.queryByText('認証アプリで本人確認')).toBeNull()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

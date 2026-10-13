@@ -1,57 +1,49 @@
-import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-/*
- * 共通情報の一覧と板 `FM94M` の数値突き合わせ（2026-10-03）。
- * 見本の数字が変わったらここも直す。共通部品の中身は M10 の持ち物なので見ない。
- */
-const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(join(HERE, 'list-v8.module.css'), 'utf8')
-const tsx = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+const css = readFileSync(join(SRC, 'v8/common-vars/list.module.css'), 'utf8')
+const tsx = readFileSync(join(SRC, 'v8/common-vars/list.tsx'), 'utf8')
+const tokens = readFileSync(join(SRC, 'app/globals.css'), 'utf8')
+const kpi = readFileSync(join(SRC, 'components/shared/kpi-card.module.css'), 'utf8')
 
-describe('共通情報の一覧は板 FM94M の数字どおり', () => {
-  it('数の帯のマスは余白 16/20・間 8', () => {
-    expect(css).toMatch(/\.kpi \{[^}]*padding: 16px 20px/s)
-    expect(css).toMatch(/\.kpi \{[^}]*gap: 8px/s)
+describe('V8共通情報の現役の型と数値', () => {
+  it('数の帯は共通の16/24・間8を使う', () => {
+    expect(tsx).toContain('presentation="band"')
+    expect(kpi).toContain('var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side)')
+    expect(tokens).toContain('--tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 8px')
   })
-
-  it('数の帯の題は 12・500・ink、数は 22・600', () => {
-    expect(css).toMatch(/\.kpiLabel \{[^}]*font-size: 12px/s)
-    expect(css).toMatch(/\.kpiLabel \{[^}]*color: var\(--color-ink\)/s)
-    expect(css).toMatch(/\.kpiValue \{[^}]*font-size: 22px/s)
-    expect(css).toMatch(/\.kpiValue \{[^}]*font-weight: 600/s)
+  it('数字は共通の22と行高26を使う', () => {
+    expect(kpi).toContain('font-size: var(--tpl-band-number-size)')
+    expect(tokens).toContain('--tpl-band-number-size: 22px; --tpl-band-number-lh: 26px')
   })
-
-  it('表の見出しは余白 12/24・12/600/secondary・地 table-head、行の余白は 12/24', () => {
-    expect(css).toMatch(/\.table th \{[^}]*padding: 12px 24px/s)
-    expect(css).toMatch(/\.table th \{[^}]*font-size: 12px/s)
-    expect(css).toMatch(/\.table th \{[^}]*color: var\(--color-ink-secondary\)/s)
-    expect(css).toMatch(/\.table th \{[^}]*background: var\(--color-table-head\)/s)
-    expect(css).toMatch(/\.table td \{[^}]*padding: 12px 24px/s)
+  it('見出しと行は共通の高さ・行余白に従う', () => {
+    expect(css).toContain('height: var(--tpl-cv-head-h)')
+    expect(css).toContain('height: var(--tpl-cv-row-h)')
+    expect(css).toContain('padding-block: var(--tpl-cv-row-pad-block)')
+    expect(tokens).toContain('--tpl-cv-row-pad-block: 12px')
   })
-
-  it('列幅は中身 170・状態 80・使っている所 90で見出しに付く', () => {
-    expect(css).toMatch(/\.cellValue \{\s*width: 170px/)
-    expect(css).toMatch(/\.cellStatus \{\s*width: 80px/)
-    expect(css).toMatch(/\.cellUsage \{\s*width: 90px/)
-    expect(tsx).toContain('<col className={styles.colValue} />')
+  it('列幅は現役の186/96/106を使う', () => {
+    expect(css).toContain('.colValue { width: var(--tpl-cv-col-value); }')
+    expect(css).toContain('.colState { width: var(--tpl-cv-col-state); }')
+    expect(css).toContain('.colUsage { width: var(--tpl-cv-col-usage); }')
+    expect(tokens).toContain('--tpl-cv-col-value: 186px; --tpl-cv-col-state: 96px; --tpl-cv-col-usage: 106px')
     expect(tsx).toContain('<Th className={styles.headCell}>中身</Th>')
     expect(tsx).toContain('<Th className={styles.headCell}>状態</Th>')
     expect(tsx).toContain('<Th className={styles.headCell}>使っている所</Th>')
   })
-
-  it('ページ送りの段は余白 10/20・間 6、件数は 13/secondary', () => {
-    expect(css).toMatch(/\.foot \{[^}]*gap: 6px/s)
-    expect(css).toMatch(/\.foot \{[^}]*padding: 10px 20px/s)
-    expect(css).toMatch(/\.footCount \{[^}]*font-size: 13px/s)
-    expect(css).toMatch(/\.footCount \{[^}]*color: var\(--color-ink-secondary\)/s)
+  it('ページ送りの余白は10/20・件数は字の型に従う', () => {
+    expect(css).toContain('padding: var(--tpl-cv-pager-pad)')
+    expect(tokens).toContain('--tpl-cv-pager-pad: 10px 20px')
+    expect(css).toMatch(/\.pagerCount \{[^}]*font-size: var\(--text-label\)/s)
   })
-
-  it('警告の帯は余白 10/14・間 10、探す欄の幅は 200', () => {
-    expect(css).toMatch(/\.alertBand \{[^}]*padding: 10px 14px/s)
-    expect(css).toMatch(/\.alertBand \{[^}]*gap: 10px/s)
-    expect(css).toMatch(/\.searchWrap \{[^}]*width: 200px/s)
+  it('警告の余白10/14・間10、探す欄の幅200を使う', () => {
+    expect(css).toContain('padding: var(--tpl-cv-alert-pad)')
+    expect(css).toContain('gap: var(--tpl-cv-alert-gap)')
+    expect(tokens).toContain('--tpl-cv-alert-gap: 10px; --tpl-cv-alert-pad: 10px 14px')
+    expect(css).toContain('--list-search-width: var(--tpl-cv-search-w)')
+    expect(tokens).toContain('--tpl-cv-search-w: 200px')
   })
 })

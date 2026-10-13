@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
 import { NOT_AVAILABLE, NotConnected } from '@/components/shared/not-connected'
 import { conditionFromSegmentPreset } from './segment-preset'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * 保存した対象条件の数（設計 `sqFXf` のKPI3枚）。
@@ -47,6 +48,8 @@ export default function SegmentPresetControls({
   value,
   onApply,
 }: SegmentPresetControlsProps) {
+  const saveErrors = useSaveFormErrors()
+
   const [chooserOpen, setChooserOpen] = useState(false)
   const [saveOpen, setSaveOpen] = useState(false)
   const [presets, setPresets] = useState<SavedSegmentPreset[]>([])
@@ -100,17 +103,18 @@ export default function SegmentPresetControls({
         setPresetsAccountId(null)
         setLoadError('保存した条件を表示できませんでした。')
       }
-    } catch {
+    } catch (saveFailure) {
       if (currentAccountIdRef.current !== requestAccountId || loadGenerationRef.current !== generation) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setPresets([])
       setPresetsAccountId(null)
-      setLoadError('保存した条件を表示できませんでした。')
+      { if (!fieldFailure) setLoadError('保存した条件を表示できませんでした。') }
     } finally {
       if (currentAccountIdRef.current === requestAccountId && loadGenerationRef.current === generation) {
         setLoading(false)
       }
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   const openChooser = () => {
     setChooserOpen(true)
@@ -158,9 +162,10 @@ export default function SegmentPresetControls({
       setPresets((items) => [result.data, ...items.filter((item) => item.id !== result.data.id)])
       setSaveOpen(false)
       notifyToast(`「${result.data.name}」として保存しました。`)
-    } catch {
+    } catch (saveFailure) {
       if (currentAccountIdRef.current !== requestAccountId || saveGenerationRef.current !== generation) return
-      setSaveError('条件を保存できませんでした。入力内容を確認して、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setSaveError('条件を保存できませんでした。入力内容を確認して、もう一度お試しください。') }
     } finally {
       if (currentAccountIdRef.current === requestAccountId && saveGenerationRef.current === generation) {
         setSaving(false)
@@ -181,7 +186,7 @@ export default function SegmentPresetControls({
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <div className="flex flex-wrap items-center gap-2" data-design-node="cPk8A">
         <Button
           type="button"
@@ -232,20 +237,20 @@ export default function SegmentPresetControls({
         <div className="space-y-4" data-design-node="sqFXf">
           <label className="block">
             <span className="text-ink block text-sm font-bold">条件の名前</span>
-            <input
+            <SaveErrorField names={["name"]}><input
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={80}
               placeholder="例：この30日で反応した友だち"
               className="border-hairline rounded-control mt-2 w-full border bg-canvas px-3 py-2 text-sm text-ink"
               autoFocus
-            />
+            /></SaveErrorField>
           </label>
-          <Checkbox
+          <SaveErrorField names={["isShared","is_shared"]}><Checkbox
             checked={isShared}
             onCheckedChange={setIsShared}
             description="外すと、自分だけが呼び出せます。"
-          >同じLINEアカウントを扱う運用者と共有する</Checkbox>
+          >同じLINEアカウントを扱う運用者と共有する</Checkbox></SaveErrorField>
         </div>
       </Dialog>
 
@@ -305,6 +310,6 @@ export default function SegmentPresetControls({
           ) : null}
         </div>
       </Dialog>
-    </>
+    </></SaveErrorScope>
   )
 }

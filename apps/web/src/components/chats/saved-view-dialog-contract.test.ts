@@ -1,10 +1,11 @@
 import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 const DIALOG = fs.readFileSync(path.join(__dirname, 'saved-view-dialog.tsx'), 'utf8')
-const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
 
 describe('受信箱 保存した検索の完了判定', () => {
   it('保存先の成功を確認してからだけ完了表示へ進む', () => {
@@ -94,7 +95,7 @@ describe('受信箱 保存した検索の完了判定', () => {
   it('顧客情報を開いても会話一覧の幅を保つ', () => {
     // LAY-01(#982): 開いている間は 288px 固定。2xl で 420px へ急拡大すると
     // 3列が 1536px に収まらなくなる（一覧+トーク+顧客情報）。
-    expect(PAGE).toContain('w-full lg:w-[340px]')
+    expect(PAGE).toContain('<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>')
     expect(PAGE).not.toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
   })
 
@@ -104,7 +105,7 @@ describe('受信箱 保存した検索の完了判定', () => {
   })
 
   it('削除は名前の隣へ常設せず、その他操作へ畳む', () => {
-    expect(PAGE).toContain("import { MoreAction } from '@/components/shared/row-actions'")
+    expect(PAGE).toContain("import { RowMenu } from '@/components/shared/row-actions'")
     expect(PAGE).toContain('label={`${view.name}の操作`}')
     expect(PAGE).toContain('保存した検索を削除')
   })

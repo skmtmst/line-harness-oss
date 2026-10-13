@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * テンプレート詳細の形の違う応答（D008）を、実際に mount して確かめる。
  *
@@ -25,7 +27,7 @@ const routing = vi.hoisted(() => ({
   pushed: [] as string[],
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: (href: string) => routing.pushed.push(href),
     replace: (href: string) => routing.pushed.push(href),
@@ -57,10 +59,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       templates: {
         ...actual.api.templates,
         get: calls.templatesGet,
+        versions: async () => ({ success: true, data: [] }),
       },
     },
   }
 })
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, accounts: [], loading: false }) }))
 
 import TemplateDetailPage from './page'
 
@@ -127,6 +132,7 @@ const validDetail = {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.templatesGet.mockReset()
   const store = new Map<string, string>([['lh_staff_role', 'owner']])
@@ -151,8 +157,8 @@ describe('D008: 形の違う詳細応答', () => {
 
     expect(screenText()).toContain('このテンプレートは見つかりません')
     // 存在しない相手への操作口は出さない。
-    expect(byText('a', 'テンプレートを編集')).toBeNull()
-    expect(byText('button', 'テンプレートを削除する')).toBeNull()
+    expect(byText('a', '編集する')).toBeNull()
+    expect(byText('button', '削除する')).toBeNull()
     expect(byText('button', '使用中のため削除できません')).toBeNull()
   })
 
@@ -161,8 +167,9 @@ describe('D008: 形の違う詳細応答', () => {
 
     await mountAt('?id=tmpl-1')
 
-    expect(screenText()).toContain('{{name}}さん、いつもありがとうございます。')
-    expect(byText('a', 'テンプレートを編集')).not.toBeNull()
-    expect(byText('button', 'テンプレートを削除する')).not.toBeNull()
+    expect(screenText()).toContain('さん、いつもありがとうございます。')
+    expect(container.querySelector('[data-token="{{name}}"]')).not.toBeNull()
+    expect(byText('a', '編集する')).not.toBeNull()
+    expect(container.querySelector('button[aria-label="そのほかの操作"]')).not.toBeNull()
   })
 })

@@ -63,7 +63,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(state.search),
 }))
@@ -72,7 +72,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: null }),
 }))
 
-import TagsPageV4 from './tags-page-v4'
+import TagsList from '@/v8/tags/list'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -82,7 +82,7 @@ let root: Root
 
 async function render() {
   await act(async () => {
-    root.render(React.createElement(TagsPageV4, { accountId: 'account-1' }))
+    root.render(React.createElement(TagsList, { accountId: 'account-1' }))
   })
   // visibility 応答まで待つ
   await act(async () => {})

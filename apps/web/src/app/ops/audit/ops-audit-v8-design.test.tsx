@@ -63,7 +63,15 @@ describe('e7ljE 監査ログの絵合わせ', () => {
     await act(async () => { root.render(<OpsAuditPage />) })
     await settle()
     const body = text()
-    expect(body).toContain('運営が行った操作の記録です')
+    // 見出し下の説明は共通の「？」から読む。説明の欠落と開閉の動きを検査する。
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="監査ログの説明"]')!
+    expect(help).toBeTruthy()
+    expect(help.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
+    expect(host.querySelector('[role="note"]')?.textContent).toContain('運営が行った操作の記録です')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).toContain("CSVで書き出す")
     for (const chip of ['すべて', '代理ログイン', '個人情報の表示', '契約先の停止', '運営メンバー']) {
       expect(body).toContain(chip)

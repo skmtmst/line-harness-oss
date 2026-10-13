@@ -61,14 +61,18 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('apps/worker/wrangler.toml');
   });
 
-  it('acquires an exact deploy lock for apply and releases only after success', () => {
+  it('acquires an exact deploy lock for apply and releases it however the run ends', () => {
     expect(workflow).toContain('id: staging_lock');
     expect(workflow).toContain("if: env.DELIVERY_MODE == 'apply'");
     expect(workflow).toContain('pnpm deploy:lock acquire staging');
     expect(workflow).toContain(
       'pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin',
     );
-    expect(workflow).toContain("if: success() && steps.staging_lock.outcome == 'success'");
+    // 途中の段が落ちても解放する。success() に戻すと、取得後の失敗でロックが残る。
+    expect(workflow).toContain("if: always() && steps.staging_lock.outcome == 'success'");
+    expect(workflow).not.toContain("if: success() && steps.staging_lock.outcome == 'success'");
+    // 取得していない run は他担当のロックを解放しない。
+    expect(workflow).not.toMatch(/if: always\(\)\n\s+run: pnpm deploy:lock release staging/);
     expect(workflow).toContain('pnpm deploy:lock release staging --remote origin');
     expect(workflow.indexOf('pnpm deploy:lock acquire staging')).toBeLessThan(
       workflow.indexOf('npx wrangler deploy --config apps/worker/wrangler.staging.toml'),
@@ -169,4 +173,12 @@ describe('Deploy Cloudflare Staging workflow', () => {
       'test "$actual" = "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED"',
     );
   });
+  it('stamps the source HEAD before build and checks public metadata after deploy', () => {
+    expect(workflow).toContain('stamp-staging-version.ts "$worker_root"');
+    expect(workflow.indexOf('stamp-staging-version.ts')).toBeLessThan(workflow.indexOf('pnpm --filter worker build'));
+    expect(workflow).toContain('$STAGING_API_URL/admin/version');
+    expect(workflow).toContain('.git_commit == $commit and .version == $version');
+    expect(workflow).toContain('test "$matched" = true');
+  });
+
 });

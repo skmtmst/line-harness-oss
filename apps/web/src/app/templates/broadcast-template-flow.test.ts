@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const templatesSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const templatesSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../v8/templates/list.tsx'), 'utf8')
 const broadcastsSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../broadcasts/page.tsx'), 'utf8')
 const formSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../../components/broadcasts/broadcast-form.tsx'),
@@ -43,7 +43,8 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
 
   it('drops previous-account templates and bubbles on account switch', () => {
     // 独立審査指摘4: 旧候補・選択・吹き出しを残さない。持ち主不明は保つ。
-    expect(formSource).toContain('setSelectedTemplate(null)')
+    // 仮選択はアカウントごとに窓を作り直して捨てる。
+    expect(formSource).toContain("<EntityPickerDialog key={selectedAccountId ?? ''}")
     expect(formSource).toContain('templateAccountId')
     expect(formSource).toContain('owner == null || owner === selectedAccountId')
   })

@@ -1,79 +1,91 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+// @vitest-environment happy-dom
 import React from 'react'
+import { readFileSync } from 'node:fs'
+const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf8')
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
-import ListToolbar from './list-toolbar'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
+import PageSizeSelect from './page-size-select'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
+afterEach(cleanup)
 
-/**
- * ★V7 `Xn1Mz`「一覧の上の道具の並び」。
- *
- * - 1行目：検索（幅320・虫眼鏡つき）→ 保存した検索 → この条件を保存。
- *   検索を横いっぱいに伸ばさない。検索を枠付きの箱で包まない。
- * - 2行目：左に絞り込み、右端に並び順と表示件数。表示件数だけの行を作らない。
- * - 狭い幅では2行目の右が下へ折り返す。検索は縮めても240まで。
- */
-describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
-  it('1行目に検索・保存した検索・この条件を保存を同じ行で出す', () => {
-    const html = renderToStaticMarkup(
-      <ListToolbar
-        search={{ placeholder: 'タイトル・内容で検索', value: '', onChange: vi.fn() }}
-        actions={
-          <>
-            <select aria-label="保存した検索" />
-            <button type="button">この条件を保存する</button>
-          </>
-        }
-      />,
-    )
-    const searchAt = html.indexOf('タイトル・内容で検索')
-    const savedAt = html.indexOf('保存した検索')
-    const saveAt = html.indexOf('この条件を保存する')
-    expect(searchAt).toBeGreaterThan(-1)
-    expect(savedAt).toBeGreaterThan(searchAt)
-    expect(saveAt).toBeGreaterThan(savedAt)
+describe('B-178 共通の道具の段の操作', () => {
+  it('検索の変更と消す操作を元の受け口へ返す', async () => {
+    const onChange = vi.fn()
+    render(<ListToolbar search={{ placeholder: '名前を探す', label: '一覧を検索', value: '来店', onChange }} />)
+    fireEvent.change(screen.getByRole('searchbox', { name: '一覧を検索' }), { target: { value: '予約' } })
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('予約'))
+    fireEvent.click(screen.getByRole('button', { name: /消/ }))
+    expect(onChange).toHaveBeenCalledWith('')
   })
 
-  it('2行目は左に絞り込み・右端に並び順と表示件数を出す', () => {
-    const html = renderToStaticMarkup(
-      <ListToolbar
-        search={{ placeholder: '探す', value: '', onChange: vi.fn() }}
-        filters={<button type="button">予約中のみ</button>}
-        trailing={
-          <>
-            <select aria-label="並び順" />
-            <select aria-label="表示件数" />
-          </>
-        }
-      />,
-    )
-    const filterAt = html.indexOf('予約中のみ')
-    const sortAt = html.indexOf('aria-label="並び順"')
-    const perPageAt = html.indexOf('aria-label="表示件数"')
-    expect(filterAt).toBeGreaterThan(-1)
-    expect(sortAt).toBeGreaterThan(filterAt)
-    expect(perPageAt).toBeGreaterThan(sortAt)
+  it('保存した条件の操作を2段目の口へ渡し、元のイベントを保つ', () => {
+    const useCondition = vi.fn()
+    render(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} actions={<button onClick={useCondition}>保存した条件</button>} />)
+    const action = screen.getByRole('button', { name: '保存した条件' })
+    expect(action.closest('[data-toolbar-actions]')).toBeTruthy()
+    fireEvent.click(action)
+    expect(useCondition).toHaveBeenCalledOnce()
   })
 
-  it('絞り込みも並び順も無いときは2行目を作らない（表示件数だけの行を作らない）', () => {
-    const html = renderToStaticMarkup(
-      <ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} />,
-    )
-    expect(html).not.toContain('row2')
+  it('読み上げ名が省略されたときは探す欄の説明を使う', () => {
+    render(<ListToolbar search={{ placeholder: '名前・本文を探す', value: '', onChange: vi.fn() }} />)
+    expect(screen.getByRole('searchbox', { name: '名前・本文を探す' })).toBeTruthy()
   })
 
-  it('検索の幅は320・下限240で部品が持つ（画面ごとに手で書かせない）', () => {
-    const css = read('list-toolbar.module.css')
-    const searchRule = css.match(/\.row1\s*>\s*\.search\s*{[^}]*}/s)
-    expect(searchRule, '検索の幅指定がありません').toBeTruthy()
-    expect(searchRule![0]).toContain('320px')
-    expect(searchRule![0]).toContain('240px')
-    // 横いっぱいに伸ばさない（flex-1 方式に戻さない）。
-    expect(searchRule![0]).not.toMatch(/flex:\s*1(?![\d.])/)
+  it('検索がない一覧でも絞り込みと件数を操作できる', () => {
+    const filter = vi.fn(), size = vi.fn()
+    render(<ListToolbar filters={<button onClick={filter}>予約のみ</button>} trailing={<select aria-label="表示件数" onChange={size}><option>20件</option><option>50件</option></select>} />)
+    expect(screen.queryByRole('textbox')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '予約のみ' }))
+    fireEvent.change(screen.getByRole('combobox', { name: '表示件数' }), { target: { value: '50件' } })
+    expect(filter).toHaveBeenCalledOnce()
+    expect(size).toHaveBeenCalledOnce()
+  })
+
+  it('字ラベルを省略した表示件数も共通の件数の役目として右端へ渡す', () => {
+    render(<ListToolbarRow><button>よく使う絞り込み</button><PageSizeSelect label={null} value={20} onChange={vi.fn()} /></ListToolbarRow>)
+    const count = screen.getByRole('button', { name: '表示件数' })
+    expect(count.closest('[data-toolbar-role="count"]')).toBeTruthy()
+    expect(count.closest('[data-toolbar-role="filter"]')).toBeNull()
+  })
+
+  it('断片の道具も型の口でまとめ、作る・検索・件数の役目とフォーム送信を保つ', () => {
+    const submit = vi.fn((event: React.FormEvent) => event.preventDefault())
+    render(<ListToolbarLeading leading={<button>タグを作る</button>}><>
+      <ListToolbarSearchSlot><input aria-label="タグを探す" /></ListToolbarSearchSlot>
+      <ListToolbarRow as="form" onSubmit={submit}><PageSizeSelect label={null} value={20} onChange={vi.fn()} /><button type="submit">検索する</button></ListToolbarRow>
+    </></ListToolbarLeading>)
+    const search = screen.getByRole('textbox', { name: 'タグを探す' })
+    expect(search.closest('[data-toolbar-role="search"]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '表示件数' }).closest('[data-toolbar-role="count"]')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'タグを作る' })).toHaveLength(1)
+    fireEvent.submit(screen.getByRole('button', { name: '検索する' }).closest('form')!)
+    expect(submit).toHaveBeenCalledOnce()
+  })
+
+  it('入れ子の断片に既存の道具の型があれば二重に包まず、作る操作を保つ', () => {
+    const { container } = render(<ListToolbarLeading leading={<button>流入リンクを作る</button>}><><>
+      <ListToolbar search={{ placeholder: '流入元を探す', value: '', onChange: vi.fn() }} />
+    </></></ListToolbarLeading>)
+    expect(container.querySelectorAll('[data-toolbar-layout="band"]')).toHaveLength(1)
+    expect(container.querySelector('[data-toolbar-layout="slots"]')).toBeNull()
+    expect(screen.getAllByRole('button', { name: '流入リンクを作る' })).toHaveLength(1)
+  })
+
+  it('フォームを共通の段へ移しても検索の送信と条件操作を保つ', () => {
+    const submit = vi.fn((event: React.FormEvent) => event.preventDefault()), filter = vi.fn()
+    render(<ListToolbarFrame><ListToolbarRow as="form" onSubmit={submit}>
+      <ListToolbarSearchSlot><input aria-label="検索" defaultValue="来店" /></ListToolbarSearchSlot>
+      <button type="submit">検索する</button>
+      <ListToolbarEnd><button type="button" onClick={filter}>詳細条件</button></ListToolbarEnd>
+    </ListToolbarRow></ListToolbarFrame>)
+    fireEvent.submit(screen.getByRole('textbox', { name: '検索' }).closest('form')!)
+    fireEvent.click(screen.getByRole('button', { name: '詳細条件' }))
+    expect(submit).toHaveBeenCalledOnce()
+    expect(filter).toHaveBeenCalledOnce()
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: '検索' }).value).toBe('来店')
   })
 
   it('検索を枠付きの箱（カード）で包まない', () => {
@@ -103,14 +115,23 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
      * v7 の 320・下限240 は変えない。
      */
     const css = read('list-toolbar.module.css')
-    const v8Rule = css.match(/\[data-theme='v8'\]\s*\.row1\s*>\s*\.search\s*{[^}]*}/s)
+    const v8Rule = css.match(/:root\s*\.row1\s*>\s*\.search\s*{[^}]*}/s)
     expect(v8Rule, 'V8 の探す欄の幅指定がありません').toBeTruthy()
     expect(v8Rule![0]).toContain('280px')
     // 縮ませない（flex:none＝flex-shrink:0。min-width:0・flex:1 方式に戻さない）。
     expect(v8Rule![0]).toMatch(/flex:\s*none/)
     expect(v8Rule![0]).not.toContain('min-width: 0')
     expect(v8Rule![0]).not.toMatch(/flex:\s*1(?![\d.])/)
-    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
+    expect(css).toMatch(/:root\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
+  })
+
+  it('畳む道具がないV8一覧では実際の空き幅に合わせて折り返す', () => {
+    const css = read('list-toolbar.module.css')
+    expect(css).toMatch(/:root\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
+    // B-244：名前の無い「…」へ畳まず、狭い白い板で2段にする。
+    expect(css).not.toContain('.optional[data-collapsed] > summary')
+    expect(css).toContain('@container v8-page (max-width: 1099px)')
+    expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
   })
 
   it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {
@@ -151,6 +172,13 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(perPageRule, '表示件数の幅指定がありません').toBeTruthy()
     expect(perPageRule![0]).toContain('96px')
     expect(perPageRule![0]).toMatch(/flex:\s*none/)
+  })
+
+  it('2段目の状態切り替えも操作を保つ', () => {
+    const onClick = vi.fn()
+    render(<ListToolbar secondary={<button onClick={onClick}>注目のみ</button>} />)
+    fireEvent.click(screen.getByRole('button', { name: '注目のみ' }))
+    expect(onClick).toHaveBeenCalledOnce()
   })
 })
 

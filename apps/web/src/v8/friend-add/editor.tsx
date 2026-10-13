@@ -1,5 +1,72 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  rule_name: requiredText("設定名を入力してください。"),
+}
+
+
+import Toggle from '@/components/shared/toggle'
+import { notifySaved, notifyToast } from '@/components/shared/toast';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { SaveConflictBand } from '@/components/shared/save-conflict';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, Smartphone, User, UserPlus, UserRound, Workflow } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { RowMenu } from '@/components/shared/row-actions';
+import { CreatePage } from '@/components/templates';
+import { Steps } from '@/components/templates/steps';
+import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts';
+import type { StepperStep } from '@/components/shared/stepper';
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import CheckCard from '@/components/shared/check-card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Select from '@/components/shared/select'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select';
+import FriendPickerField from '@/components/shared/friend-picker-field';
+import SegmentedControl from '@/components/shared/segmented'
+import { TextArea, TextField } from '@/components/shared/text-field';
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import type { SegmentCondition } from '@/lib/segment-condition';
+import { pruneCondition } from '@/lib/segment-condition';
+import { ApiError, api, describeSaveFailure } from '@/lib/api';
+import type { FriendAddRule, FriendAddRuleAction, FriendAddRuleDefinition, FriendAddRuleKind, FriendAddRuleOptions, FriendAddRuleStatus } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { describeFriendAddFailure } from './failure';
+import { addTimeWindow, friendAddFlowSteps, friendAddReaddLines, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow';
+import { resendSuppressionText } from './text';
+import styles from './editor.module.css'
+import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls';
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ActionList from '@/components/shared/action-list'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8 友だち追加時の配信を作る・直す（Pencil：作る①基本設定 `wDzkc` → ②流入リンク `h8uNW`
  * （1152 `xHpkS`）→ ③初回案内 `al47K` → ④あわせて行うこと `i1nThZ` → ⑤確認 `U8Xm3X`、
@@ -12,81 +79,6 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
-import { notifySaved } from '@/components/shared/toast'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowRight,
-  Ban,
-  Braces,
-  CircleAlert,
-  CircleCheck,
-  FileText,
-  IdCard,
-  ListChecks,
-  Pencil,
-  Plus,
-  Power,
-  Route,
-  Search,
-  Smartphone,
-  User,
-  UserPlus,
-  UserRound,
-  Workflow,
-} from 'lucide-react'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import { Steps } from '@/components/templates/steps'
-import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import type { StepperStep } from '@/components/shared/stepper'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import CheckCard from '@/components/shared/check-card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ConditionBuilder from '@/components/shared/condition-builder'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
-import SegmentedControl from '@/components/shared/segmented'
-import { TextField } from '@/components/shared/text-field'
-import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { pruneCondition } from '@/lib/segment-condition'
-import { ApiError, api, describeSaveFailure } from '@/lib/api'
-import type {
-  FriendAddRule,
-  FriendAddRuleAction,
-  FriendAddRuleDefinition,
-  FriendAddRuleKind,
-  FriendAddRuleOptions,
-} from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { describeFriendAddFailure } from './failure'
-import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow'
-import { resendSuppressionText } from './text'
-import styles from './editor.module.css'
-import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -95,7 +87,7 @@ type EditorRule = {
   priority: number
   friendKind: FriendAddRuleKind
   isFallback: boolean
-  status: string
+  status: FriendAddRuleStatus
   matchedLast7Days: number | null
   lastTestStatus: string | null
   version: number
@@ -209,6 +201,7 @@ export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
 }
 
 function FriendAddEditor({ ruleId }: { ruleId?: string }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
@@ -232,12 +225,16 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const [saving, setSaving] = useState(false)
   const [enabling, setEnabling] = useState(false)
   const [error, setError] = useState('')
+  const [duplicating, setDuplicating] = useState(false)
+  const duplicateKey = useRef(crypto.randomUUID())
   const [notice, setNotice] = useState('')
   /* 先にほかの人が保存したとき（版の競合）。保存はせず、違いを比べるか最新を読むかを選ぶ。 */
   const [conflict, setConflict] = useState(false)
   const [compare, setCompare] = useState<Array<{ label: string; mine: string; theirs: string }> | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [testConditionsOpen, setTestConditionsOpen] = useState(false)
+  const [testInput, setTestInput] = useState<{ routeId: string | null; expectedAt: string | null; friendId: string | null }>({ routeId: null, expectedAt: null, friendId: null })
   const [testResult, setTestResult] = useState<{
     accountId: string
     ruleId: string
@@ -247,6 +244,15 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     stateChanged: false
   } | null>(null)
   const saveIdempotencyKey = useRef(crypto.randomUUID())
+  useEffect(() => {
+    setTestInput({ routeId: null, expectedAt: null, friendId: null })
+    setTestConditionsOpen(false)
+    setTestResult(null)
+  }, [selectedAccountId, ruleId])
+  const changeTestInput = (patch: Partial<typeof testInput>) => {
+    setTestInput((current) => ({ ...current, ...patch }))
+    setTestResult(null)
+  }
   const folderKey = useRef(crypto.randomUUID())
   const saveInFlight = useRef(false)
   const savedSnapshot = useRef<string | null>(null)
@@ -317,11 +323,16 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       setLoadedAccountId(request.accountId)
     } catch (caught) {
-      if (isCurrentRequest()) setError(describeFriendAddFailure(caught, '設定', 'load').message)
+      const fieldFailure = saveErrors.capture(caught);
+
+      if (isCurrentRequest()) { if (!fieldFailure)
+
+
+ setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
       if (isCurrentRequest()) setLoading(false)
     }
-  }, [ruleId, selectedAccountId])
+  }, [ruleId, selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -346,7 +357,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     && savedSnapshot.current !== editorSnapshot(rule, definition)
 
   /* 未保存の変更がある間、画面外への離脱を確認対話へ寄せる。 */
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving || enabling })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving || enabling || duplicating })
 
   const validateStep = (target: Step) => {
     const skipsScenario = rule.friendKind === 'returning' && definition.returningMode === 'none'
@@ -373,7 +384,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         ? '#fa-name'
         : fieldError.step === 'routes'
           ? '[data-friend-add-routes] input[type=checkbox]'
-          : '#fa-scenario button[aria-haspopup], #fa-returning-scenario button[aria-haspopup]')
+          : '#fa-scenario[aria-haspopup], #fa-returning-scenario[aria-haspopup]')
       field?.focus()
       field?.scrollIntoView({ block: 'center' })
     })
@@ -395,7 +406,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         : 'LINE公式アカウントを選んでください。')
       return null
     }
-    if (!rule.name.trim()) {
+    if ((b244Requirements.rule_name.check(rule.name) !== null)) {
       showFieldError({ step: 'basic', message: '設定名を入力してください。' })
       return null
     }
@@ -429,10 +440,14 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       return savedId
     } catch (caught) {
       if (!isCurrent()) return null
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
       } else {
-        setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
+        { if (!fieldFailure)
+
+        setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store')) }
       }
       return null
     } finally {
@@ -474,7 +489,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       setCompare(rows)
     } catch (caught) {
       if (loadRequestRef.current !== request) return
-      setError(describeFriendAddFailure(caught, '設定', 'load').message)
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure)
+
+      setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
       if (loadRequestRef.current === request) setCompareBusy(false)
     }
@@ -483,7 +501,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
     if (STEPS.findIndex((item) => item.key === nextStep) > currentIndex) {
-      if (!rule.name.trim()) {
+      if ((b244Requirements.rule_name.check(rule.name) !== null)) {
         showFieldError({ step: 'basic', message: '設定名を入力してください。' })
         return
       }
@@ -504,7 +522,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     setSaving(true)
     setError('')
     try {
-      const response = await api.friendAddRules.test(selectedAccountId, activeId, { routeId: null, expectedAt: null, friendId: null })
+      const response = await api.friendAddRules.test(selectedAccountId, activeId, testInput)
       if (loadRequestRef.current !== request) return
       const testedMeta = {
         accountId: selectedAccountId,
@@ -518,9 +536,12 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       setTestResult({ ...testedMeta, ...response.data })
       setNotice('テストが完了しました。本番の登録・送信・タグ・マイルは変更していません。')
-    } catch {
+    } catch (saveFailure) {
       if (loadRequestRef.current !== request) return
-      setError('テストを実行できませんでした。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+
+      setError('テストを実行できませんでした。') }
     } finally {
       if (loadRequestRef.current === request) setSaving(false)
     }
@@ -536,12 +557,14 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         const res = await api.friendAddRules.validate(selectedAccountId, ruleId)
         if (!alive || !res.success) return
         setValidateChecks(res.data.checks.map((check) => ({ key: check.key, status: check.status, detail: check.detail })))
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         /* 読めないときはテストの行だけを見る。 */
       }
-    })()
+    })();
+
     return () => { alive = false }
-  }, [step, ruleId, selectedAccountId, loadedAccountId])
+  }, [step, ruleId, selectedAccountId, loadedAccountId, saveErrors])
   useEffect(() => {
     if (step !== 'preview' || !selectedAccountId) return
     let alive = true
@@ -550,12 +573,14 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         const res = await api.friendAddRules.conflicts(selectedAccountId, rule.friendKind)
         if (!alive || !res.success) return
         setOverlapNotes(res.data.conflicts.map((item) => item.message))
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         /* 読めないときは重なりの行を出さない。 */
       }
-    })()
+    })();
+
     return () => { alive = false }
-  }, [step, selectedAccountId, rule.friendKind])
+  }, [step, selectedAccountId, rule.friendKind, saveErrors])
 
   /* 「有効にする」：検証が通り、テストで判定が通ったときだけ押せる。 */
   const testOk = testResult
@@ -580,9 +605,12 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         return
       }
       router.replace(`/friend-add-settings/publish?id=${encodeURIComponent(activeId)}&done=1`)
-    } catch {
+    } catch (saveFailure) {
       if (loadRequestRef.current !== request) return
-      setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+
+      setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       if (loadRequestRef.current === request) setEnabling(false)
     }
@@ -597,14 +625,14 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     .map((id) => options.routes.find((route) => route.id === id)?.name)
     .filter((name): name is string => Boolean(name)), [definition.routeIds, options.routes])
 
-  if (accountLoading || loading) return <ListState kind="loading" title="設定を読み込んでいます" />
-  if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで対象を選ぶと設定を表示します。' : '先にLINE公式アカウントを登録してください。'} />
+  if (accountLoading || loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="設定を読み込んでいます" /></SaveErrorScope>
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで対象を選ぶと設定を表示します。' : '先にLINE公式アカウントを登録してください。'} /></SaveErrorScope>
   if (loadedAccountId !== selectedAccountId) {
     return error
       ? <ListState kind="error" title="設定を表示できませんでした" description={error} onRetry={() => void load()} />
       : <ListState kind="loading" title="設定を読み込んでいます" />
   }
-  if (error && !rule.name && ruleId) return <ListState kind="error" title="設定を表示できませんでした" description={error} onRetry={() => void load()} />
+  if (error && !rule.name && ruleId) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="設定を表示できませんでした" description={error} onRetry={() => void load()} /></SaveErrorScope>
 
   /* ===== 右の列：設定内容と LINE での見え方 ===== */
   const noneMode = rule.friendKind === 'returning' && definition.returningMode === 'none'
@@ -674,6 +702,20 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     </>
   )
 
+  const duplicateSaved = async () => {
+    if (!ruleId || !selectedAccountId || !canEdit || duplicating) return
+    setDuplicating(true); setError('')
+    try {
+      const response = await api.friendAddRules.duplicate(selectedAccountId, ruleId, rule.version, duplicateKey.current)
+      if (!response.success) throw new Error(response.error)
+      notifyToast('複製した下書きを追加しました')
+      router.push(`/friend-add-settings?kind=${rule.friendKind}&highlight=${encodeURIComponent(response.data.id)}&status=draft`)
+    } catch (cause) { if (!saveErrors.capture(cause))
+
+ setError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
+    finally { setDuplicating(false) }
+  }
+
   const nextStep = STEPS[Math.min(currentIndex + 1, STEPS.length - 1)]
   const stepperSteps: StepperStep[] = STEPS.map((item, index) => ({
     key: item.key,
@@ -683,9 +725,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   }))
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
+      actions={canEdit && ruleId ? <RowMenu label="初回案内の操作" triggerProps={{ disabled: saving || enabling || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : undefined}
       steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       help={<>
         {step === 'basic'
@@ -730,11 +773,11 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         </>
       ) : (
         /* 閲覧のみ：変える操作（保存・次へ・有効にする）は置かない。 */
-        <Button href="/friend-add-settings">一覧へ戻る</Button>
+        <></>
       )} dirty={false}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
@@ -743,6 +786,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         <BasicStep
           rule={rule}
           setRule={setRule}
+          definition={definition}
+          setDefinition={setDefinition}
           options={options}
           canEdit={canEdit}
           isExisting={Boolean(ruleId)}
@@ -784,14 +829,25 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           definition={definition}
           routeNames={routeNames}
           runTest={runTest}
+          onTestConditions={() => setTestConditionsOpen(true)}
           testing={saving}
           testOk={Boolean(testOk)}
           overlapNotes={overlapNotes}
           slackConnected={slackConnected}
           canEdit={canEdit}
           hrefFor={hrefFor}
+          accountId={selectedAccountId}
+          ruleId={ruleId}
+          scenarios={options.scenarios}
         />
       ) : null}
+
+      <Dialog open={testConditionsOpen && canEdit} title="テストの条件" busy={saving} onCancel={() => setTestConditionsOpen(false)} footer={<Button type="button" variant="primary" busy={saving} busyLabel="判定中…" onClick={() => { setTestConditionsOpen(false); void runTest() }}>この条件でテストする</Button>}>
+        <Field label="試す流入リンク"><SaveErrorField names={["routeId"]}><EntitySelect noun="流入リンク" clearable aria-label="試す流入リンク" value={testInput.routeId ?? ''} onChange={(routeId) => changeTestInput({ routeId: routeId || null })} options={[{ value: '', label: 'どの経路でも' }, ...options.routes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]} /></SaveErrorField></Field>
+        <Field label="想定日時"><SaveErrorField names={["expectedAt"]}><DateTimeField aria-label="想定日時" value={testInput.expectedAt ?? ''} onChange={(expectedAt) => changeTestInput({ expectedAt: expectedAt || null })} /></SaveErrorField></Field>
+        <SaveErrorField names={["friendId"]}><FriendPickerField accountId={selectedAccountId} label="試す友だち" value={testInput.friendId ?? ''} onChange={(friendId) => changeTestInput({ friendId: friendId || null })} /></SaveErrorField>
+        <Notice tone="info" message="指定しない条件は、いま・どの経路でも・友だち不問で判定します。実際の友だちへは送信しません。" />
+      </Dialog>
 
       <ConfirmDialog
         open={previewOpen}
@@ -830,7 +886,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 
@@ -842,9 +898,11 @@ function sharedPrefix(names: string[]) {
 
 /* ===== 作る① 基本設定（板 `wDzkc`） ===== */
 
-function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onCreateFolder }: {
+function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit, isExisting, nameError, onCreateFolder }: {
   rule: EditorRule
   setRule: Dispatch<SetStateAction<EditorRule>>
+  definition: FriendAddRuleDefinition
+  setDefinition: Dispatch<SetStateAction<FriendAddRuleDefinition>>
   options: FriendAddRuleOptions
   canEdit: boolean
   isExisting: boolean
@@ -852,11 +910,12 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
   /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
   onCreateFolder?: FolderSelectCreate
 }) {
+  const [memoOpen, setMemoOpen] = useState(false)
   const locked = rule.isFallback || isExisting
   const folderOptions = options.folders.some((folder) => folder.name === (rule.folderName ?? ''))
     ? options.folders
     : rule.folderName ? [...options.folders, { id: rule.folderName, name: rule.folderName }] : options.folders
-  const lockReason = locked ? '保存したあとの設定では変えられません' : undefined
+  const lockReason = locked ? '保存したあとの設定では変えられません。変更するには一覧から新しく作ってください。' : undefined
   return (
     <>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前とフォルダ">
@@ -865,7 +924,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
           <p className={styles.cardDesc}>一覧に出る名前です。友だちには見えません。</p>
         </div>
         <div className={styles.fieldPair}>
-          <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name"><TextField
+          <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name" requirement={b244Requirements.rule_name}><SaveErrorField names={["name","rule.name","mine"]}><TextField
               id="fa-name"
               value={rule.name}
               maxLength={60}
@@ -874,10 +933,10 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
               aria-describedby={nameError ? 'fa-name-error' : undefined}
               placeholder="例：秋フェアの初回案内"
               onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))}
-            />
+            /></SaveErrorField>
 {nameError ? <span id="fa-name-error" className={styles.fieldError} role="alert">{nameError}</span> : null}</Field></div>
           <div className={styles.field}><Field label="フォルダ" htmlFor="fa-folder">{canEdit ? (
-              <FolderSelect
+              <SaveErrorField names={["folderName","rule.folderName","folder_name","mine","id","name","rule.folder_name"]}><FolderSelect
                 id="fa-folder"
                 aria-label="フォルダ"
                 size="full"
@@ -886,12 +945,18 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
                 folders={folderOptions.map(folderByName)}
                 onCreate={onCreateFolder}
 
-              />
+              /></SaveErrorField>
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
             )}</Field></div>
         </div>
+        {canEdit ? <Button type="button" variant="text" onClick={() => setMemoOpen(true)}>社内メモ</Button> : null}
       </Card>
+      <Dialog open={memoOpen && canEdit} title="社内メモ" onCancel={() => setMemoOpen(false)} footer={<Button type="button" onClick={() => setMemoOpen(false)}>閉じる</Button>}>
+        <Field label="社内メモ" htmlFor="fa-internal-memo" note="配信の条件には使いません">
+          <SaveErrorField names={["internalMemo", "definition.internalMemo"]}><TextArea id="fa-internal-memo" aria-label="社内メモ" value={definition.internalMemo ?? ''} onChange={(event) => setDefinition((current) => ({ ...current, internalMemo: event.target.value }))} /></SaveErrorField>
+        </Field>
+      </Dialog>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに送るか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>だれに送るか</h2>
@@ -900,7 +965,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
         {!canEdit ? (
           <ReadOnlyText label="だれに送るか" value={rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除した人' : 'はじめて友だち追加した人'} />
         ) : (
-        <RadioCardGroup legend="だれに送るか" className={styles.kindPair}>
+        <SaveErrorField names={["fa-kind","friendKind","rule.friendKind","rule"]}><RadioCardGroup legend="だれに送るか" className={styles.kindPair}>
           <RadioCard
             name="fa-kind"
             value="first_time"
@@ -925,7 +990,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
             note="戻ってきた人には別の案内"
             className={styles.kindCard}
           />
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
         )}
         <Notice tone="info" icon={<CircleAlert size={16} aria-hidden="true" />} message="この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。" />
       </Card>
@@ -965,21 +1030,21 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
   const conditions = (<>
       <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
       <div className={styles.datePair}>
-        <div className={styles.field}><Field label="有効期間 はじめ" htmlFor="fa-from"><DateTimeField
+        <div className={styles.field}><Field label="有効期間 はじめ" htmlFor="fa-from"><SaveErrorField names={["activeFrom","definition.activeFrom","active_from","definition.active_from"]}><DateTimeField
             id="fa-from"
             value={localInputValue(definition.activeFrom)}
             readOnly={!canEdit}
             onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
-          /></Field></div>
-        <div className={styles.field}><Field label="有効期間 おわり" htmlFor="fa-until"><DateTimeField
+          /></SaveErrorField></Field></div>
+        <div className={styles.field}><Field label="有効期間 おわり" htmlFor="fa-until"><SaveErrorField names={["activeUntil","definition.activeUntil","active_until","definition.active_until"]}><DateTimeField
             id="fa-until"
             value={localInputValue(definition.activeUntil)}
             readOnly={!canEdit}
             onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
-          /></Field></div>
+          /></SaveErrorField></Field></div>
       </div>
       {legacy ? (
-        <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
+        <Notice tone="warn" role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
         {canEdit ? (
@@ -1019,13 +1084,13 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           <h2 className={styles.cardTitle}>どの流入リンクから来た人に送るか</h2>
           <p className={styles.cardDesc}>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</p>
         </div>
-        <Field label={<><Search size={14} aria-hidden="true" /></>}><input
+        <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><input
             className={styles.routeSearchInput}
             value={query}
             placeholder="流入リンクの名前で探す"
             aria-label="流入リンクの名前で探す"
             onChange={(event) => setQuery(event.target.value)}
-          /></Field>
+          /></SaveErrorField></Field>
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)
@@ -1157,8 +1222,8 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           })}
         </div>
         )}
-        <div className={styles.bodyBox}>
-          <InsertTextField
+        <MessageBody>
+          <SaveErrorField names={["messageText","definition.messageText","message_text","mine","definition.message_text"]}><InsertTextField
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             className={styles.bodyText}
@@ -1166,25 +1231,11 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             value={definition.messageText}
             readOnly={!canEdit}
             onValueChange={(next) => setDefinition((current) => ({ ...current, messageText: next }))}
-          />
-          <div className={styles.insertRow}>
-            {/* 閲覧のみ：差し込むボタンは置かない（文字数だけ見せる）。 */}
-            {canEdit ? (<>
-              <span className={styles.insertLabel}>差し込む</span>
-              <Button type="button" variant="text" onClick={() => insertToken('{{name}}')}>
-                <User size={15} aria-hidden="true" />名前
-              </Button>
-              <Button type="button" variant="text" disabled title="友だち情報の欄を選ぶ口はこの版にありません">
-                <IdCard size={15} aria-hidden="true" />友だち情報
-              </Button>
-              <Button type="button" variant="text" disabled title="共通情報の値を選ぶ口はこの版にありません">
-                <Braces size={15} aria-hidden="true" />共通情報
-              </Button>
-            </>) : null}
-            <span className={styles.spacer} aria-hidden="true" />
-            <span className={styles.charCount}>{`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}</span>
-          </div>
-        </div>
+          /></SaveErrorField>
+          <MessageInsertRow count={`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}>
+            {canEdit ? <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} /> : null}
+          </MessageInsertRow>
+        </MessageBody>
         {scenarioError && canEdit ? (
           <div className={styles.field}>
             <span className={styles.label}>実際に配信するシナリオ</span>
@@ -1202,7 +1253,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           {!canEdit ? (
             <ReadOnlyText label="送るタイミング" value={scheduled ? '時間帯を決める' : '追加してすぐ'} />
           ) : (
-          <SegmentedControl
+          <SaveErrorField names={["definition"]}><SegmentedControl
             aria-label="送るタイミング"
             value={scheduled ? 'window' : 'now'}
             onChange={(next) => {
@@ -1214,7 +1265,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
               { value: 'now', label: '追加してすぐ' },
               { value: 'window', label: '時間帯を決める' },
             ]}
-          />
+          /></SaveErrorField>
           )}
         </div>
         <p className={styles.cardDesc}>「時間帯を決める」にすると、時間帯の外に追加した人には、次の時間帯の始めに届きます。</p>
@@ -1249,19 +1300,19 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             )}
             {(definition.timeWindows ?? []).map((slot, index) => (
               <div key={index} className={styles.timeRow}>
-                <TimeField
+                <SaveErrorField names={["start","slot.start","definition"]}><TimeField
                   aria-label={`時間帯${index + 1}の開始`}
                   value={slot.start}
                   readOnly={!canEdit}
                   onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: next }) }))}
-                />
+                /></SaveErrorField>
                 <span aria-hidden="true">〜</span>
-                <TimeField
+                <SaveErrorField names={["end","slot.end","definition"]}><TimeField
                   aria-label={`時間帯${index + 1}の終了`}
                   value={slot.end}
                   readOnly={!canEdit}
                   onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: next }) }))}
-                />
+                /></SaveErrorField>
                 {canEdit ? (
                   <Button type="button" variant="text" aria-label={`時間帯${index + 1}を削除`} onClick={() => setDefinition((current) => ({ ...current, timeWindows: removeTimeWindow(current.timeWindows, index) }))}>削除</Button>
                 ) : null}
@@ -1284,11 +1335,11 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           <span className={styles.spacer} aria-hidden="true" />
           {/* 閲覧のみ：つまみは置かない（左の文で今の設定が読める）。 */}
           {canEdit ? (
-            <SettingCheckbox
+            <SaveErrorField names={["suppressOn","definition","suppress_on"]}><SettingCheckbox
               checked={suppressOn}
               label="同じ人に何度も送らない"
               onChange={(next) => setDefinition((current) => ({ ...current, resendSuppressionHours: next ? 24 : 0 }))}
-            />
+            /></SaveErrorField>
           ) : null}
         </div>
       </Card>
@@ -1318,14 +1369,14 @@ function ScenarioPicker({ id, label, scenarios, value, error, onChange }: {
   onChange: (value: string) => void
 }) {
   return <>
-    <EntityKindField kind="scenario" id={id} label={label} options={scenarios} value={value} invalid={Boolean(error)}
-      placeholder="（選んでください）" onChange={onChange} />
+    <SaveErrorField names={["value"]}><EntityKindField kind="scenario" id={id} label={label} options={scenarios} value={value} invalid={Boolean(error)}
+      placeholder="（選んでください）" onChange={onChange} /></SaveErrorField>
     {error ? <span id={`${id}-error`} className={styles.fieldError} role="alert">{error}</span> : null}
   </>
 }
 
 function ReadOnlyText({ id, label, value }: { id?: string; label: string; value: string }) {
-  return <TextField id={id} aria-label={label} value={value} readOnly aria-readonly="true" title={value} />
+  return <SaveErrorField names={["value"]}><TextField id={id} aria-label={label} value={value} readOnly aria-readonly="true" title={value} /></SaveErrorField>
 }
 
 function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scenarioError }: {
@@ -1335,6 +1386,7 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scena
   canEdit: boolean
   scenarioError?: string
 }) {
+  const [messageOpen, setMessageOpen] = useState(false)
   const mode = definition.returningMode ?? 'same'
   const start = definition.startPosition ?? 'beginning'
   return (
@@ -1347,7 +1399,7 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scena
         {!canEdit ? (
           <ReadOnlyText label="追加のときに送るもの" value={RETURNING_MODES.find((option) => option.key === mode)?.title ?? ''} />
         ) : (
-        <RadioCardGroup legend="追加のときに送るもの" className={styles.kindTriple}>
+        <SaveErrorField names={["fa-returning","key","option.key","mode","definition"]}><RadioCardGroup legend="追加のときに送るもの" className={styles.kindTriple}>
           {RETURNING_MODES.map((option) => (
             <RadioCard
               key={option.key}
@@ -1359,8 +1411,9 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scena
               note={option.desc}
             />
           ))}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
         )}
+        {mode === 'none' ? <Notice tone="info" message="この設定はメッセージを届けません。案内後のアクションだけを行います。" /> : null}
         {mode === 'other' || scenarioError ? (
           <div className={styles.field}>
             <span className={styles.label}>始めるシナリオ</span>
@@ -1373,15 +1426,16 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scena
             )}
           </div>
         ) : null}
+        {mode === 'other' && canEdit ? <Button type="button" variant="text" onClick={() => setMessageOpen(true)}>初回メッセージを確認・変更</Button> : null}
       </Card>
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どこから始めるか">
+      {mode !== 'none' ? <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どこから始めるか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>どこから始めるか</h2>
         </div>
         {!canEdit ? (
           <ReadOnlyText label="どこから始めるか" value={START_POSITIONS.find((option) => option.key === start)?.title ?? ''} />
         ) : (
-        <RadioCardGroup legend="どこから始めるか" className={styles.kindPair}>
+        <SaveErrorField names={["fa-start","key","option.key","start","definition"]}><RadioCardGroup legend="どこから始めるか" className={styles.kindPair}>
           {START_POSITIONS.map((option) => (
             <RadioCard
               key={option.key}
@@ -1393,9 +1447,12 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scena
               note={option.desc}
             />
           ))}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
         )}
-      </Card>
+      </Card> : null}
+      <Dialog open={messageOpen && mode === 'other' && canEdit} title="初回メッセージ" onCancel={() => setMessageOpen(false)} footer={<Button type="button" onClick={() => setMessageOpen(false)}>閉じる</Button>}>
+        <Field label="最初に送るメッセージ"><SaveErrorField names={["messageText","definition.messageText","message_text"]}><InsertTextField aria-label="最初に送るメッセージ" maxLength={MESSAGE_LIMIT} value={definition.messageText} onValueChange={(messageText) => setDefinition((current) => ({ ...current, messageText }))} /></SaveErrorField></Field>
+      </Dialog>
     </>
   )
 }
@@ -1414,86 +1471,65 @@ function ActionsStep({ definition, setDefinition, options, canEdit }: {
   options: FriendAddRuleOptions
   canEdit: boolean
 }) {
-  const [kind, setKind] = useState<FriendAddRuleAction['type']>('add_tag')
-  const [target, setTarget] = useState('')
-  const source = ACTION_KINDS.find((item) => item.type === kind)?.source ?? 'tag'
-  const targets = source === 'scenario' ? options.scenarios : options.tags
-  const addAction = () => {
-    const found = targets.find((item) => item.id === target)
-    if (!found) return
-    const label = kind === 'start_scenario'
-      ? `シナリオ「${found.name}」を始める`
-      : kind === 'remove_tag'
-        ? `タグ「${found.name}」を外す`
-        : `タグ「${found.name}」を付ける`
-    setDefinition((current) => ({ ...current, actions: [...current.actions, { type: kind, label, targetId: found.id }] }))
-    setTarget('')
+  const setActions = (actions:FriendAddRuleAction[]) =>
+    setDefinition(current => ({ ...current, actions }))
+  const title =(kind: FriendAddRuleAction['type'], id: string) => {
+    const list = kind === 'start_scenario' ? options.scenarios : options.tags
+    const name = list.find(item => item.id === id)?.name ?? '未設定'
+    return kind === 'start_scenario' ? `シナリオ「${name}」を始める` : `タグ「${name}」を${kind === 'remove_tag' ? '外す' : '付ける'}`
   }
-  return (
-    <Card padding="roomy" layout="vertical" className={styles.card} aria-label="あわせて行うこと">
+  return <Card padding="roomy" layout="vertical" className={styles.card} aria-label="あわせて行うこと">
       <div className={styles.cardHead}>
         <h2 className={styles.cardTitle}>あわせて行うこと</h2>
         <p className={styles.cardDesc}>案内を送ったあと、上から順に行います</p>
       </div>
-      {definition.actions.length === 0 ? (
-        <p className={styles.cardDesc}>まだ何もありません。下から足せます。</p>
-      ) : (
-        <ol className={styles.actionList}>
-          {definition.actions.map((action, index) => (
-            <li key={`${action.type}-${index}`} className={styles.actionRow}>
-              <span className={styles.actionIndex}>{index + 1}</span>
-              <span className={styles.actionLabel} title={action.label}>{action.label}</span>
-              {canEdit ? (
-                <Button
-                  type="button"
-                  variant="text"
-                  aria-label={`${action.label}を外す`}
-                  onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}
-                >
-                  外す
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      )}
-      {canEdit ? (
-        <div className={styles.actionAdd}>
-          <div className={styles.actionSelect}>
-            <Select
-              aria-label="足す操作の種類"
-              size="full"
-              value={kind}
-              onChange={(value) => { setKind(value as FriendAddRuleAction['type']); setTarget('') }}
-              options={ACTION_KINDS.map((item) => ({ value: item.type, label: item.label }))}
-            />
-          </div>
-          <div className={styles.actionSelect}>
-            <EntityKindField kind={source} label="足す操作の対象" options={targets} value={target} onChange={setTarget} />
-          </div>
-          <Button type="button" disabled={!target} onClick={addAction}>
-            <Plus size={15} aria-hidden="true" />足す
-          </Button>
-        </div>
-      ) : null}
-    </Card>
-  )
+    <ActionList<FriendAddRuleAction> value=
+      {definition.actions} onChange={setActions} readOnly={!canEdit} idOf=
+          {(_, index) => String (index)} titleOf={action=>action.label}
+      choices={ACTION_KINDS.map(kind=> ({ id: kind.type, label: kind.label, make:() =>({ type: kind.type, label: '', targetId: '' }),
+        picker: { title: `${kind.source === 'tag' ? 'タグ' : 'シナリオ'}を選ぶ`, items: kind.source === 'tag' ? options.tags : options.scenarios,
+          apply:(action, ids) => ({ ...action, targetId: ids[0], label: title(action.type, ids[0]) }) } }))}
+      renderEditor={(action, update) =>
+            <SaveErrorField names={["target"]}><EntityKindField kind={action.type === 'start_scenario' ? 'scenario' : 'tag'} label="操作の対象" options={action.type === 'start_scenario' ? options.scenarios : options.tags} value={action.targetId} onChange={targetId => update({ ...action, targetId, label: title(action.type, targetId) })} /></SaveErrorField>} />
+          </Card>
 }
 
 /* ===== 作る⑤ 確認（板 `U8Xm3X`） ===== */
 
-function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, overlapNotes, slackConnected, canEdit, hrefFor }: {
+function PreviewStep({ rule, definition, routeNames, runTest, onTestConditions, testing, testOk, overlapNotes, slackConnected, canEdit, hrefFor, accountId, ruleId, scenarios }: {
   rule: EditorRule
   definition: FriendAddRuleDefinition
   routeNames: string[]
   runTest: () => void
+  onTestConditions: () => void
   testing: boolean
   testOk: boolean
   overlapNotes: string[]
   slackConnected: boolean | null
   canEdit: boolean
   hrefFor: (next: Step, extra?: string) => string
+  accountId: string
+  ruleId?: string
+  scenarios: FriendAddRuleOptions['scenarios']
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
+  const [metricsError, setMetricsError] = useState(false)
+  const [metricsAttempt, setMetricsAttempt] = useState(0)
+  useEffect(() => {
+    if (!detailsOpen || !ruleId) return
+    let cancelled = false
+    setMatchedLast28Days(null)
+    setMetricsError(false)
+    void api.friendAddRules.conflicts(accountId, rule.friendKind).then((response) => {
+      if (cancelled) return
+      if (!response.success) { setMetricsError(true); return }
+      setMatchedLast28Days(response.data.rules.find((item) => item.id === ruleId)?.matchedLast28Days ?? null)
+    }).catch(() => { if (!cancelled) setMetricsError(true) })
+    return () => { cancelled = true }
+  }, [detailsOpen, ruleId, accountId, rule.friendKind, metricsAttempt])
+  const flowSteps = friendAddFlowSteps({ isFallback: rule.isFallback, routeNames, missingRouteCount: definition.routeIds.length - routeNames.length, friendKind: rule.friendKind, definition, scenarioName: scenarios.find((scenario) => scenario.id === definition.scenarioId)?.name ?? null })
+  const readdLines = friendAddReaddLines({ friendKind: rule.friendKind, status: rule.status, definition })
   const noneMode = rule.friendKind === 'returning' && definition.returningMode === 'none'
   const firstSend = noneMode
     ? '配信なし'
@@ -1531,7 +1567,14 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
             </div>
           ))}
         </dl>
+        <Button type="button" variant="text" onClick={() => setDetailsOpen(true)}>動きの詳細を確認</Button>
       </Card>
+      <Dialog open={detailsOpen} title="追加された人に起きること" onCancel={() => setDetailsOpen(false)} footer={<Button type="button" onClick={() => setDetailsOpen(false)}>閉じる</Button>}>
+        <dl>{flowSteps.map((item) => <div key={item.key}><dt>{item.title}</dt><dd>{item.detail}</dd></div>)}</dl>
+        <Field label="再追加・ブロック解除のとき"><ul>{readdLines.map((line) => <li key={line}>{line}</li>)}</ul></Field>
+        <Field label="過去28日の該当"><span>{matchedLast28Days === null ? '未取得' : `${formatNumber(matchedLast28Days)}人`}</span></Field>
+        {metricsError ? <Notice tone="danger" message="該当数を読み込めませんでした。" action={<Button type="button" onClick={() => setMetricsAttempt((current) => current + 1)}>再試行</Button>} /> : null}
+      </Dialog>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="テストする（送らずに判定）">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>テストする（送らずに判定）</h2>
@@ -1540,6 +1583,9 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
         <div className={styles.switchRow}>
           <span className={styles.switchText}>送り先：自分（送らずに判定）</span>
           <span className={styles.spacer} aria-hidden="true" />
+          {canEdit ? (
+            <Button type="button" variant="text" disabled={testing} onClick={onTestConditions}>試す条件を指定</Button>
+          ) : null}
           {canEdit ? (
             <Button type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={runTest}>テストする（送らずに判定）</Button>
           ) : null}

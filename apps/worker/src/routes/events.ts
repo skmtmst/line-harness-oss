@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';
 // Event booking feature HTTP routes.
@@ -785,12 +786,12 @@ events.get('/api/events/admin/events', async (c) => {
          -- 呼び出し側で別に見ること。
          (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
        ${where}
-       ORDER BY ${sort === 'name'
+       ORDER BY ${c.req.query('highlight') ? 'CASE WHEN e.id = ? THEN 0 ELSE 1 END,' : ''} ${sort === 'name'
          ? `e.name COLLATE NOCASE ASC, e.id ASC`
          : `next_slot_starts_at IS NULL ASC, next_slot_starts_at ASC, e.id ASC`}
        LIMIT ? OFFSET ?`,
     )
-    .bind(...params, paging.limit, paging.offset)
+    .bind(...params, ...(c.req.query('highlight') ? [c.req.query('highlight')!] : []), paging.limit, paging.offset)
     .all();
   /*
    * R79/R80: 上部の数値カードは「今後の開催回」の全体像を出す。
@@ -858,6 +859,40 @@ events.get('/api/events/admin/events/:id', async (c) => {
     .first();
   if (!row) return bad(c, 'not_found', 404);
   return c.json(withFolder(row));
+});
+
+// 設定と開催回だけを下書きへ写す。申込者・公開版・送信予定は写さない。
+events.post('/api/events/admin/events/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  const accountId = getAccountId(c);
+  if (!accountId) return bad(c, 'account_id_required', 400);
+  const sourceId = c.req.param('id');
+  const source = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND
+    ((target_type = 'single' AND line_account_id = ?) OR
+     (target_type = 'multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?)))`)
+    .bind(sourceId, accountId, accountId).first<Record<string, unknown>>();
+  if (!source) return bad(c, 'not_found', 404);
+  const accounts = source.target_type === 'multi-account-dedup' ? JSON.parse(String(source.account_ids)) as string[] : [accountId];
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accounts)) return bad(c, 'not_found', 404);
+  const body = await c.req.json<{ expectedVersion?: number }>().catch(() => ({} as { expectedVersion?: number }));
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 1) return bad(c, 'expected_version_required', 422);
+  if (body.expectedVersion !== source.version) return bad(c, 'version_conflict', 409);
+  const id = crypto.randomUUID();
+  const columns = ['line_account_id','venue_name','venue_url','venue_address','image_url','description','description_centered',
+    'max_bookings_per_friend','requires_approval','approval_deadline_hours','cancel_deadline_hours_before',
+    'reminder_day_before_enabled','reminder_hours_before','sort_order','target_type','account_ids','dedup_priority',
+    'confirmation_message_extra','reminder_message_extra','og_title','og_description','og_image_url','visible_tag_id',
+    'waitlist_enabled','entry_cutoff_hours_before','questions_json'];
+  const result = await c.env.DB.batch([
+    c.env.DB.prepare(`INSERT INTO events (id,name,is_published,lifecycle_status,${columns.join(',')},folder_id)
+      SELECT ?,name || '（複製）',0,'draft',${columns.join(',')},folder_id FROM events
+      WHERE id = ? AND version = ? AND deleted_at IS NULL`).bind(id, sourceId, body.expectedVersion!),
+    c.env.DB.prepare(`INSERT INTO event_slots (id,event_id,starts_at,ends_at,capacity,is_active,sort_order)
+      SELECT lower(hex(randomblob(16))),?,starts_at,ends_at,capacity,is_active,sort_order FROM event_slots
+      WHERE event_id = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM events WHERE id = ?)`)
+      .bind(id, sourceId, id),
+  ]);
+  if (!result[0].meta.changes) return bad(c, 'version_conflict', 409);
+  return c.json({ id, lifecycle_status: 'draft' }, 201);
 });
 
 events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
@@ -1699,6 +1734,7 @@ events.get(
       if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
       if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
       if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+      c.set('outputAudit', { count: loaded.snapshot.data.applicants.length, accountId, targetId: occurrenceId });
       const rows = loaded.snapshot.data.applicants.map((applicant) => [
         applicant.displayName,
         applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
@@ -2568,43 +2604,33 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         return finalize(409, { error: 'slot_full' });
       }
     }
-    await c.env.DB
-      .prepare(
-        `INSERT INTO event_bookings
+    // 新行の確保と旧行の取消は D1 の原子的 batch にする。
+    // 席数と旧行の状態も INSERT 内で再確認し、並走する変更に負けたら何も作らない。
+    const moved = await c.env.DB.batch([
+      c.env.DB.prepare(`INSERT INTO event_bookings
            (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
             requested_at, identity_key, party_size, answer_snapshot_json,
             event_version_id, event_snapshot_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        newId, account_id, event.id, target.id, friend.id, current.status,
-        current.customer_note, nowIso, current.identity_key, current.party_size,
-        current.answer_snapshot_json,
-        event.current_published_version_id, bookingSnapshotJson,
-      )
-      .run();
-    if (target.capacity != null) {
-      const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, target.id);
-      if (usedSeats > target.capacity) {
-        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-        return finalize(409, { error: 'slot_full' });
-      }
-    }
-
-    // 旧予約の取消（条件付き）。並走する取消・変更に負けたら新行を巻き戻す。
-    // cancelled_by は CHECK 制約の範囲で 'friend'（本人の操作）。
-    // 変更であることは event_change_logs の booking_change に残す。
-    const cancelled = await c.env.DB
-      .prepare(
-        `UPDATE event_bookings
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (SELECT 1 FROM event_bookings WHERE id = ? AND status IN ('requested','confirmed'))
+            AND (? IS NULL OR
+              COALESCE((SELECT SUM(party_size) FROM event_bookings WHERE slot_id = ? AND status IN ('requested','confirmed')), 0)
+              + COALESCE((SELECT SUM(party_size) FROM event_waitlist WHERE slot_id = ? AND status IN ('offered','accepted')), 0)
+              + ? <= ?)`)
+        .bind(newId, account_id, event.id, target.id, friend.id, current.status,
+          current.customer_note, nowIso, current.identity_key, current.party_size,
+          current.answer_snapshot_json, event.current_published_version_id, bookingSnapshotJson,
+          current.id, target.capacity, target.id, target.id, current.party_size, target.capacity),
+      c.env.DB.prepare(`UPDATE event_bookings
             SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-          WHERE id = ? AND status IN ('requested', 'confirmed')`,
-      )
-      .bind(nowIso, nowIso, current.id)
-      .run();
-    if ((cancelled.meta?.changes ?? 0) === 0) {
-      await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-      return finalize(409, { error: 'invalid_state' });
+          WHERE id = ? AND status IN ('requested', 'confirmed')
+            AND EXISTS (SELECT 1 FROM event_bookings WHERE id = ?)`)
+        .bind(nowIso, nowIso, current.id, newId),
+    ]);
+    if ((moved[0].meta?.changes ?? 0) === 0) {
+      const latest = await c.env.DB.prepare('SELECT status FROM event_bookings WHERE id = ?')
+        .bind(current.id).first<{ status: string }>();
+      return finalize(409, { error: latest && ['requested','confirmed'].includes(latest.status) ? 'slot_full' : 'invalid_state' });
     }
 
     // 旧回の未送信予定を止める。送信権の貸出中は新旧とも巻き戻して 409。
@@ -2621,15 +2647,15 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
-        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-        await c.env.DB
-          .prepare(
+        await c.env.DB.batch([
+          c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId),
+          c.env.DB.prepare(
             `UPDATE event_bookings
                 SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
               WHERE id = ? AND status = 'cancelled'`,
           )
-          .bind(current.status, nowIso, current.id)
-          .run();
+          .bind(current.status, nowIso, current.id),
+        ]);
         return finalize(409, { error: 'send_in_flight_retry' });
       }
       throw error;
@@ -3563,10 +3589,10 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
       .prepare(
         `SELECT booking_id, kind, scheduled_at, sent_at, status
            FROM event_booking_reminders
-          WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
+          WHERE booking_id IN (${sqlIdSet(bookingIds).sql})
           ORDER BY scheduled_at ASC`,
       )
-      .bind(...bookingIds)
+      .bind(...(bookingIds.length ? sqlIdSet(bookingIds).binds : []))
       .all<{
         booking_id: string;
         kind: string;
