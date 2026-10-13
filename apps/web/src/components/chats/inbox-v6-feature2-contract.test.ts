@@ -13,6 +13,7 @@ import { formatRelative } from '@/lib/format'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const HEAD = readFileSync(join(HERE, '../shared/inbox-conversation-head.tsx'), 'utf8')
 const SIDEBAR = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 const INBOX_DROPDOWN = readFileSync(join(HERE, 'inbox-dropdown.tsx'), 'utf8')
 const INBOX_FILTER = readFileSync(join(HERE, 'inbox-filter-panel.tsx'), 'utf8')
@@ -67,7 +68,7 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
 })
 
 describe('H3lAOB / xGLVe トーク見出しの操作', () => {
-  const header = region(PAGE, '{/* Chat Header */}', '{/* Messages') + readFileSync(join(HERE, '..', '..', 'v8', 'inbox-chat', 'conversation-head.tsx'), 'utf8')
+  const header = region(PAGE, '{/* Chat Header */}', '{/* Messages') + HEAD
 
   it('顧客情報は開いていても閉じていても同じ1つのボタンで切り替える', () => {
     expect(header).toContain('onToggle: () => setShowFriendInfo((current) => !current)')
@@ -180,8 +181,8 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
     // 同じ1つのボタンが開閉し、パネルは showFriendInfo だけに従う。
     // 「開いていないのに閉じると表示する」状態を作らない(#982 LAY-02)。
     expect(PAGE).toContain('{showFriendInfo && (selectedChatId || selectedThreadId)')
-    expect(PAGE).toContain('aria-expanded={panel.open}')
-    expect(PAGE).toContain("panel.open ? '顧客情報を閉じる' : '顧客情報を表示'")
+    expect(HEAD).toContain('aria-expanded={panel.open}')
+    expect(HEAD).toContain("panel.open ? '顧客情報を閉じる' : '顧客情報を表示'")
   })
 })
 

@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import styles from './sticky-bar.module.css'
 
+export { default as StickyBarAction } from './sticky-bar-action'
+
 /**
  * 下部追従バー。作成・編集画面の最下段。Pencil V5 の `Ai3fq`。
  *

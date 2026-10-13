@@ -18,6 +18,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict } from '@/components/shared/save-conflict'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import {
   EMPTY_BASICS,
@@ -45,6 +46,7 @@ export default function NewReminderV8() {
 
   usePageTitle('リマインダを作成・基本設定')
   const router = useRouter()
+  const canEdit = useFeatureAccess('reminders')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [previewOpen, setPreviewOpen] = useState(false)
   const [value, setValue] = useState<BasicsValue>(EMPTY_BASICS)
@@ -184,6 +186,7 @@ export default function NewReminderV8() {
    * 競合（409）だけは自動でも帯を出す。
    */
   async function save({ silent = false }: { silent?: boolean } = {}): Promise<string | null> {
+    if (!canEdit) return null
     const message = validate()
     if (message) {
       if (!silent) {
@@ -317,6 +320,8 @@ export default function NewReminderV8() {
             LINEでの見え方は、届けるメッセージを決める手順から右に出ます。
           </p>
         </>
+
+  if (!canEdit) return <CreatePage boardId="VE1u5" title="リマインダを作る" readOnly footerActions={<Button href="/reminders">一覧へ戻る</Button>} dirty={false}>{null}</CreatePage>
 
   return (
     <SaveErrorScope errors={saveErrors}><>

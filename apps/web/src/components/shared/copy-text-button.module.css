@@ -1,5 +1,14 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
+.button {
+  width: max-content;
+  min-width: var(--copy-feedback-min-w);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-slot-gap);
+  white-space: nowrap;
+}
 :root .button { transition: transform var(--motion-instant) var(--motion-ease-out); }
 :root .button:active { transform: scale(var(--press-scale)); }
 .button:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

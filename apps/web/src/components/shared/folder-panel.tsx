@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { Children, Fragment, isValidElement, useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
 import HelpTip from './help-tip'
@@ -128,6 +128,25 @@ function folderMenuItems(
     ...items.map((item, index) => index === 0 && leading.length ? { ...item, dividerBefore: true } : item)]
 }
 
+const FOLDER_DELETE_HELP = 'フォルダを消しても、中の項目は未分類に残ります。'
+
+/** Legacy notes belong to the common explanation; operational notices stay in the footer. */
+function takeFolderNotes(nodes: ReactNode): { content: ReactNode[]; help: ReactNode[] } {
+  const content: ReactNode[] = [], help: ReactNode[] = []
+  for (const node of Children.toArray(nodes)) {
+    if (isValidElement<{ children?: ReactNode }>(node) && node.type === FolderPanelNote) {
+      const extra = typeof node.props.children === 'string'
+        ? node.props.children.replace(/(?:フォルダを)?(?:消しても|削除しても)[^。]*未分類に残ります[。]?/gu, '').trim()
+        : node.props.children
+      if (extra) help.push(extra)
+    } else if (isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment) {
+      const nested = takeFolderNotes(node.props.children)
+      content.push(...nested.content); help.push(...nested.help)
+    } else content.push(node)
+  }
+  return { content, help }
+}
+
 export default function FolderPanel({
   rows,
   activeId,
@@ -180,6 +199,8 @@ export default function FolderPanel({
   children?: ReactNode
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const notes = takeFolderNotes(children), addNotes = takeFolderNotes(addFolderNote)
+  const hasExplanation = (!readOnly && heading === 'フォルダ') || headingHelp || notes.help.length > 0 || addNotes.help.length > 0
 
   const runAction = (action: (() => void) | undefined) => {
     setOpenMenuId(null)
@@ -191,7 +212,11 @@ export default function FolderPanel({
     <aside aria-label="フォルダ" className={`${styles.panel} overflow-visible`}>
       {!readOnly && createAction ? <div className={styles.create}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder}`} aria-hidden="true" /> : null}
       {showHeading ? <div className={`${styles.heading} flex items-center justify-between`}>
-        {headingHelp ? <p className=" font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
+        {hasExplanation ? <p className=" font-semibold">{heading}<HelpTip label={`${heading}の説明`}>
+          {heading === 'フォルダ' ? <span>{FOLDER_DELETE_HELP}</span> : null}
+          {headingHelp ? <span>{headingHelp}</span> : null}
+          {[...notes.help, ...addNotes.help].map((help, index) => <span key={index}>{help}</span>)}
+        </HelpTip></p>
           : <p className=" font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint">{total}</span>}
       </div> : null}
@@ -275,7 +300,7 @@ export default function FolderPanel({
           )
         })}
       </nav>
-      {!readOnly && (onAddFolder || addFolderDisabled || addFolderNote || children) && (
+      {!readOnly && (onAddFolder || addFolderDisabled || addNotes.content.length > 0 || notes.content.length > 0) && (
         <div className={styles.footer}>
           {(onAddFolder || addFolderDisabled) && (
             <Button
@@ -289,8 +314,8 @@ export default function FolderPanel({
               {addFolderLabel}
             </Button>
           )}
-          {addFolderNote}
-          {children}
+          {addNotes.content}
+          {notes.content}
         </div>
       )}
     </aside>

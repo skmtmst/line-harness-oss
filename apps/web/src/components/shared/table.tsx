@@ -4,6 +4,7 @@ import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import React from 'react'
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
+import { useListColumnSizing } from './use-list-column-sizing'
 import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
@@ -128,6 +129,7 @@ export function DataTable({
   columnLayout,
   'aria-label': ariaLabel,
   grid,
+  columnSizing,
 }: {
   children: ReactNode
   className?: string
@@ -143,14 +145,17 @@ export function DataTable({
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string; headTextSize?: string; bodyTextSize?: string }
+  /** 補助列の内容幅を読み、名前へ残りの幅を割り当てる。 */
+  columnSizing?: 'content'
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   useListRowDensity(actionWidthRef)
+  useListColumnSizing(actionWidthRef, columnSizing === 'content')
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -169,6 +174,8 @@ export function DataTable({
         '--table-grid-gap':grid.gap,
         '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
+        '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
+        '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
       } as CSSProperties : undefined}>{children}</table>
     </div>
   )
@@ -272,6 +279,11 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
 /** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
 export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>) {
   return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
+}
+
+/** B-194: states belong to their column; stacked badges keep the 60px row. */
+export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'className'> & { primary?: ReactNode }) {
+  return <Td {...cellProps} className={shell.statusCell} data-list-status-cell><div className={shell.statusStack}>{primary ? <span className={shell.statusPrimary}>{primary}</span> : null}{children}</div></Td>
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */

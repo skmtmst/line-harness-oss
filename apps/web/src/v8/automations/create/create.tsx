@@ -2348,13 +2348,13 @@ export function NewAutomationV8({
 
   const sideColumn = (
     <div className={styles.side} aria-label="決めごとの確認">
-      <section className={styles.sideCard} aria-label="いまの決めごとを文章にすると">
+      <Card variant="aside" aria-label="いまの決めごとを文章にすると">
         <h2 className={styles.sideTitle}>いまの決めごとを文章にすると</h2>
         {/* この文章のとおりに動く。おかしいと感じたら、左の3つを見直す。 */}
         <p className={styles.sideBody}>{ruleSentence}</p>
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="当てはまりそうな人数">
+      <Card variant="aside" aria-label="当てはまりそうな人数">
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
           <p className={styles.sideNote}>
@@ -2387,9 +2387,9 @@ export function NewAutomationV8({
             </Button>
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="1人で試す">
+      <Card variant="aside" aria-label="1人で試す">
         <div className={styles.sideHead}>
           <div className={styles.sideTitleRow}>
             <h2 className={styles.sideTitle}>1人で試す</h2>
@@ -2461,9 +2461,9 @@ export function NewAutomationV8({
             </div>
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="気をつけること">
+      <Card variant="aside" aria-label="気をつけること">
         <h2 className={styles.sideTitle}>気をつけること</h2>
         {existingError?<ListState kind="error" title="既存のルールを読み込めませんでした" onRetry={()=>setExistingRetry(value=>value+1)}/>:null}
         <ul className={styles.cautionList}>
@@ -2472,9 +2472,9 @@ export function NewAutomationV8({
           <li>・止めると、そのあとのきっかけでは動きません</li>
           <li>・友だちになったとき は、ブロック解除では動きません</li>
         </ul>
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="つながる先">
+      <Card variant="aside" aria-label="つながる先">
         <h2 className={styles.sideTitle}>つながる先</h2>
         <dl className={styles.kvList}>
           <div className={styles.kvRow}>
@@ -2490,7 +2490,7 @@ export function NewAutomationV8({
             <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : emptyValue('none')}</dd>
           </div>
         </dl>
-      </section>
+      </Card>
     </div>
   )
 
@@ -2585,7 +2585,7 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
-        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
+        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" requirement={b244Requirements.name} error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
           <SaveErrorField names={["name"]}><TextField
             id="v8-rule-name"
             value={name}

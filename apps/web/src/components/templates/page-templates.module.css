@@ -69,8 +69,8 @@
 /* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（Iffil・L7zA7C）の幅。 */
 :global(:root) .collapsedCreate { display: flex; flex-shrink: 0; }
 :global(:root) .collapsedCreate > * { width: fit-content; height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad); }
-:global(:root) .collapsedSelect { display: block; flex-shrink: 0; width: var(--tpl-narrow-folder-w); }
-:global(:root) .collapsedSelect > :global(*) { width: 100%; min-width: 0; }
+:global(:root) .collapsedSelect { display: block; flex-shrink: 0; width: max-content; min-width: max-content; }
+:global(:root) .collapsedSelect > :global(*) { width: max-content; min-width: max-content; }
 /* 道具を渡さない画面で、広い板に空の段を出さない。 */
 :global(:root) .toolbar[data-collapsed-only] { display: none; }
 :global(:root) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -120,7 +120,7 @@
 :global(:root) .frame[data-page-template='inbox'] { position: relative; height: var(--tpl-inbox-panes-h); min-height: 0; overflow: hidden; }
 :global(:root) .inboxList { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 :global(:root) .conversation { position: relative; min-height: 0; overflow: hidden; }
-:global(:root) .inboxMessages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
+:global(:root) .inboxMessages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--tpl-inbox-thread-pad); background: var(--color-shell); }
 /* 枠の強調で会話の高さを変えず、検索の移動位置を保つ。 */
 .inboxMessages :global([data-search-hit='current']) { box-shadow: var(--tpl-inbox-search-hit-current); }
 .inboxMessages :global([data-search-hit='other']) { box-shadow: var(--tpl-inbox-search-hit-other); }
@@ -132,7 +132,7 @@
   :global(:root) .inboxList { width: 100%; }
 }
 :global(:root) .inboxList { width: var(--tpl-inbox-list-width); flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
-:global(:root) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
+:global(:root) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-shell); }
 :global(:root) .conversationHeader { padding: var(--tpl-conv-head-pad-block) var(--tpl-conv-head-pad-side); display: flex; align-items: center; gap: var(--tpl-conv-head-gap); flex-shrink: 0; }
 :global(:root) .messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--tpl-conv-messages-pad-block) var(--tpl-conv-messages-pad-side); gap: var(--tpl-conv-messages-gap); }
 :global(:root) .composer { flex-shrink: 0; display: flex; flex-direction: column; padding: var(--tpl-composer-pad-top) var(--tpl-composer-pad-side) var(--tpl-composer-pad-bottom); gap: var(--tpl-composer-gap); }
@@ -410,7 +410,7 @@
 :global(:root) [data-list-skeleton] .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-16); }
 
 /* ページ送りを別の子で組む一覧でも、型の余白を二重に足さない。 */
-:global(:root) [data-list-skeleton] .pagination .pagination { padding: 0; }
+:global(:root) .listBody .pagination .pagination { padding: 0; }
 
 /* 道具の段の左右・上下の余白は型が一度だけ持つ。 */
 :global(:root) [data-list-skeleton] .toolbar :global([data-list-toolbar]) { padding: 0; }
@@ -442,8 +442,8 @@
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
-:global(:root) [data-list-skeleton] .paginationRow,
-:global(:root) [data-list-skeleton] .pagination { justify-content: space-between; }
+:global(:root) .listBody .paginationRow,
+:global(:root) .listBody .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-16); }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }
 
 /* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */
@@ -465,8 +465,25 @@
 /* 申込者の数の帯も、本文と同じ左右24・上16。 */
 :global(:root) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }
 
+/* Collapsed list folders keep the complete selected label. */
+:global(:root) .collapsedSelect { width: max-content; flex: none; }
+
 /* 閉じた説明の器は、道具の前に空の段を残さない。 */
 :global(:root) .explanation:has(> [hidden]) { display: none; }
 
 /* 受信箱も白い板の下に24を残し、本文だけを送る。 */
 :global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }
+/* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
+:global(:root) fieldset.createContent { border: 0; margin: 0; }
+
+/* No-choice lists retain their create action even without other tools. */
+:global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+
+:global(:root) .pageContent { display: flex; flex-direction: column; gap: var(--polish-space-card); padding: var(--polish-space-card) var(--polish-space-section) 0; min-width: 0; }
+:global(:root) .pageContent[data-content-layout='columns'] { flex-direction: row; align-items: flex-start; }
+:global(:root) .createColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-preview-width); min-height: 0; align-items: stretch; }
+:global(:root) .createColumns > aside { contain: size; min-height: 0; overflow-y: auto; }
+@container (width < 1100px) {
+  :global(:root) .pageContent[data-content-layout='columns'] { flex-direction: column; align-items: stretch; }
+  :global(:root) .createColumns { grid-template-columns: minmax(0, 1fr); }
+}

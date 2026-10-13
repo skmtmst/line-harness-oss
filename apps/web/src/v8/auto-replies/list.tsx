@@ -2,7 +2,7 @@
 import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -43,7 +43,7 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -56,7 +56,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
@@ -1116,12 +1116,12 @@ export default function AutoRepliesListV8() {
           <thead>
             <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {canEdit ? <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのルールをすべて選択"
-                  /></SaveErrorField>}
+                  /></SaveErrorField> : <UnavailableSelection label="このページのルールをすべて選択" />}
                 </Th>
               {tableHeadCells}
             </TableHeadRow>
@@ -1149,11 +1149,11 @@ export default function AutoRepliesListV8() {
                    data-row-id={r.id}
                 >
                     <Td className={styles.selectCell}>
-                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
+                      {canEdit ? <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
                         aria-label={`${name}を選択`}
-                      /></SaveErrorField>}
+                      /></SaveErrorField> : <UnavailableSelection label={`${name}を選択`} />}
                     </Td>
                   <Td
                     className={styles.gripCell}
@@ -1373,7 +1373,7 @@ export default function AutoRepliesListV8() {
   const listPager = ready ? (
     <ListPagePagination>
       <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage}
-        summary={paginationSummary(sortedItems.length, (safePage - 1) * pageSize + 1, Math.min(safePage * pageSize, sortedItems.length))} />
+        range={{ total: sortedItems.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, sortedItems.length) }} />
     </ListPagePagination>
   ) : null
 

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const mockState = vi.hoisted(() => ({
+  role: 'owner' as string | null,
   revision: 5,
   previewRevisions: [] as Array<number | undefined>,
 }))
@@ -35,6 +36,8 @@ const baseDetail = () => ({
     calculatedAt: '2026-09-27T00:00:00.000Z',
   },
 })
+
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => mockState.role }))
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
@@ -92,6 +95,7 @@ vi.mock('@/lib/use-feature-visibility', () => ({
 }))
 
 beforeEach(() => {
+  mockState.role = 'owner'
   mockState.revision = 5
   mockState.previewRevisions = []
 })
@@ -121,4 +125,14 @@ describe('R179 保存直後の人数プレビュー', () => {
     expect(mockState.previewRevisions).not.toContain(5)
     expect(screen.queryByText('人数を計算できませんでした。条件を確かめて再計算してください。')).toBeNull()
   })
+})
+
+for (const role of [null, 'staff', 'viewer']) test(`権限${role}では条件の入力と保存・複製・削除を置かない`, async () => {
+  mockState.role = role
+  const { default: SavedSearchEditPage } = await import('./page')
+  await act(async () => { render(<SavedSearchEditPage />) })
+  expect(await screen.findByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+  expect(screen.queryByLabelText('条件名')).toBeNull()
+  for (const name of ['保存する', '複製して保存する', '削除する']) expect(screen.queryByRole('button', { name, exact: true })).toBeNull()
+  expect(mockState.previewRevisions).toHaveLength(0)
 })

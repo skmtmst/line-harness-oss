@@ -10,6 +10,8 @@ import type { EventApplicationPreview } from '@line-crm/shared'
 import { eventsApi, type EventDetail } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { TextField } from '@/components/shared/text-field'
 import TextLink from '@/components/shared/text-link'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -56,7 +58,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
 
   return (
     <div className={styles.linkRow}>
-      <button type="button" className={styles.linkButton} onClick={() => void load()}>プレビューを開く →</button>
+      <Button variant="text" onClick={() => void load()}>プレビューを開く →</Button>
       <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} footer={<Button onClick={close}>閉じる</Button>}>
         {busy ? <ListState kind="loading" /> : error ? (
           <ListState kind="error" description={error} onRetry={() => void load()} />
@@ -71,10 +73,10 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
             <p>残り {data.capacity} 席</p>
             {data.questions.map((question) => (
-              <Field key={question.id} label={question.label} required={question.required}><input className={styles.input} disabled aria-label={question.label} /></Field>
+              <Field key={question.id} label={question.label} required={question.required}><TextField disabled aria-label={question.label} /></Field>
             ))}
             <Button disabled>{data.requiresApproval ? '申し込む（承認後に確定）' : '申し込む'}</Button>
-            <p className={styles.cardNote}>見本です。申し込みや公開は行いません。</p>
+            <Notice tone="info">見本です。申し込みや公開は行いません。</Notice>
           </div>
         ) : null}
       </Dialog>

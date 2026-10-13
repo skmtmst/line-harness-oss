@@ -78,8 +78,6 @@
   font-weight: 400;
 }
 .fieldNote { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-text-sm-lh); }
-.fieldGrid { display: grid; gap: var(--tpl-section-gap); grid-template-columns: var(--tpl-rm-field-grid); }
-.fieldGrid > .span2 { grid-column: 1 / -1; }
 .testRow { display: flex; align-items: center; gap: var(--tpl-rm-row-gap); }
 .choiceGrid { display: grid; gap: var(--tpl-rm-row-gap); grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .tplGrid { display: grid; gap: var(--tpl-rm-row-gap); grid-template-columns: repeat(4, minmax(0, 1fr)); }

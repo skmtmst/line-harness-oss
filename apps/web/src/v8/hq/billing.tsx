@@ -19,8 +19,8 @@ import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ListPage } from '@/components/templates'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import Button from '@/components/shared/button'
-import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -45,6 +45,7 @@ import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -338,32 +339,41 @@ function BillingInner() {
         ) : invoices === null || invoices.length === 0 ? (
           <p className={styles.empty}>まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>
         ) : (
-          <GridTable label="支払い履歴" design={{ columns: 'var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-rt-col-130) max(var(--tpl-hq-col-receipt), var(--row-action-width, 0px))', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
-            <GridHeadRow>
-              <GridCell role="columnheader">日付</GridCell>
-              <GridCell role="columnheader">内容</GridCell>
-              <GridCell role="columnheader" align="right">金額</GridCell>
-              <GridCell role="columnheader">状態</GridCell>
-              <GridCell role="columnheader">領収書</GridCell>
-            </GridHeadRow>
-            {invoices.map((inv) => (
-              <GridRow key={inv.id}>
-                <GridCell><span className={styles.shortText}>{invoiceDate(inv.createdAt)}</span></GridCell>
-                <GridCell><TruncatedText value={inv.description ?? inv.number ?? emptyValue('unknown')} /></GridCell>
-                <GridCell align="right">{yen(inv.amountYen)}</GridCell>
-                <GridCell><StatusBadge tone={inv.status === 'paid' ? 'success' : inv.status === 'open' || inv.status === 'draft' ? 'info' : 'neutral'}>{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</StatusBadge></GridCell>
-                <GridCell align="right" data-list-action-cell>
+          <DataTable label="支払い履歴" columnSizing="content" grid={{
+            columns: 'var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-rt-col-130) max(var(--tpl-hq-col-receipt), var(--row-action-width, 0px))',
+            padding: 'var(--tpl-hq-pay-row-pad)',
+            headPadding: 'var(--tpl-hq-head-pad)',
+            gap: 'var(--tpl-hq-col-gap)',
+            bodyTextSize: 'var(--text-caption)',
+            headTextSize: 'var(--text-micro)',
+          }}>
+            <thead><TableHeadRow>
+              <Th>日付</Th>
+              <Th grow>内容</Th>
+              <Th align="right">金額</Th>
+              <Th>状態</Th>
+              <Th>領収書</Th>
+            </TableHeadRow></thead>
+            <tbody>{invoices.map((inv) => (
+              <Tr key={inv.id}>
+                <Td>{invoiceDate(inv.createdAt)}</Td>
+                <Td grow><TruncatedText value={inv.description ?? inv.number ?? emptyValue('unknown')} /></Td>
+                <Td align="right">{yen(inv.amountYen)}</Td>
+                <Td>
+                  <StatusBadge tone={inv.status === 'paid' ? 'success' : inv.status === 'open' || inv.status === 'draft' ? 'info' : 'neutral'}>{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</StatusBadge>
+                </Td>
+                <Td align="right" data-list-action-cell>
                   {inv.hostedUrl ? (
-                    <Button external href={inv.hostedUrl}>
+                    <Button size="compact" external href={inv.hostedUrl}>
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書
                     </Button>
                   ) : (
                     <span className={styles.faint}>{emptyValue('unknown')}</span>
                   )}
-                </GridCell>
-              </GridRow>
-            ))}
-          </GridTable>
+                </Td>
+              </Tr>
+            ))}</tbody>
+          </DataTable>
         )}
       </section>
     </>,

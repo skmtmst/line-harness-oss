@@ -9,7 +9,7 @@ const API = readFileSync(join(HERE, '../../lib/api.ts'), 'utf8')
 const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
-describe('V6 外部連携の接続別集計と受信口詳細', () => {
+describe('V8 外部連携の接続別集計と受信口詳細', () => {
   it('送信一覧を接続別集計つきの型で受け取る', () => {
     expect(API).toContain('export type OutgoingWebhookOverview = OutgoingWebhook &')
     expect(API).toContain('deliverySummary: {')
@@ -36,7 +36,8 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
     expect(OVERVIEWS).toContain('accountRef.current !== accountId')
     expect(OVERVIEWS).toContain('試しに送る')
     expect(OVERVIEWS).toContain('item.deliverySummary.canRetry && canManage')
-    expect(OVERVIEWS).toContain('aria-expanded={menuId === item.id}')
+    expect(OVERVIEWS).toContain('<RowMenu')
+    expect(OVERVIEWS).toContain('open={menuId === item.id}')
   })
 
   it('選んだ受け取り口の詳細をアカウント付きで取得する', () => {

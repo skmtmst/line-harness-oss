@@ -10,10 +10,10 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { CircleAlert, RefreshCw } from 'lucide-react';
+import { CircleAlert, RefreshCw, Trash2 } from 'lucide-react';
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared';
 import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api';
-import StickyBar from '@/components/shared/sticky-bar'
+import StickyBar, { StickyBarAction } from '@/components/shared/sticky-bar'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
@@ -2775,15 +2775,14 @@ export default function ScenarioDetailV8({
         <StickyBar
           destructive={
             canEdit ? (
-              <Button
-                variant="danger"
+              <StickyBarAction
+                icon={Trash2}
+                label="このシナリオを削除する"
                 onClick={() => {
                   setDeleteScenarioError('')
                   setDeleteScenarioOpen(true)
                 }}
-              >
-                このシナリオを削除する
-              </Button>
+              />
             ) : undefined
           }
           actions={

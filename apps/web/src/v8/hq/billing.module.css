@@ -204,57 +204,6 @@
   font-size: var(--text-caption);
 }
 
-.table {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  box-shadow: var(--card-shadow);
-}
-
-.head,
-.row {
-  display: grid;
-  grid-template-columns: var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-hq-col-paystate) var(--tpl-hq-col-receipt);
-  align-items: center;
-  column-gap: var(--tpl-hq-col-gap);
-}
-
-.head {
-  padding: var(--tpl-hq-head-pad);
-  background: var(--color-table-head);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-hq-small-lh);
-  white-space: nowrap;
-}
-
-.row {
-  padding: var(--tpl-hq-pay-row-pad);
-  border-top: 1px solid var(--color-hairline);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-hq-cell-lh);
-}
-
-.cell {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shortText { white-space: nowrap; }
-.amount {
-  padding-right: var(--tpl-hq-action-pad);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .pill {
   display: inline-flex;
   align-items: center;

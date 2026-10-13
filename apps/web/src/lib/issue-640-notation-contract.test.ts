@@ -39,7 +39,7 @@ describe('#640 省略表示の全文確認（title）', () => {
 
   it('/contents/vars: 省略した中身・使用箇所・更新と操作に全文を残す', () => {
     expect(VARS).toContain('<TableHeadRow>')
-    expect(VARS).toContain('title={valueText || \'（空）\'}')
+    expect(VARS).toContain("title={displayValue(valueText, 'unconfigured')}")
     expect(VARS).toContain('title={`${formatNumber(item.usageCount)}か所で使われています`}')
     expect(VARS).toContain('const updateTitle = `最終更新 ')
     expect(VARS).toContain('title={updateTitle}')
@@ -90,7 +90,7 @@ describe('#640 日時表記の統一（JST・フォーマット）', () => {
   })
 
   it('/contents/vars: 更新日は JST、日付型の値は formatStamp の「/」区切り', () => {
-    expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?formatDay\(date\)/)
+    expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?formatListTimestamp\(value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, item\.value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, pending\.value\)/)
   })

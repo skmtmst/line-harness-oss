@@ -67,7 +67,7 @@ export default function Checkbox({
             checked={checked}
             aria-invalid={isInvalid || undefined}
             aria-describedby={hasNote ? noteId : rest['aria-describedby']}
-            onChange={(event) => onCheckedChange(event.target.checked)}
+            onChange={(event) => { if (!rest.disabled) onCheckedChange(event.target.checked) }}
             className={styles.input}
           />
           <span aria-hidden="true" className={styles.box}>
@@ -86,6 +86,12 @@ export default function Checkbox({
       ) : null}
     </span>
   )
+}
+
+/** Preserve the selection column's outline for a row that cannot be included. */
+export function UnavailableSelection({ label, reason = '閲覧のみのため選べません' }: { label: string; reason?: string }) {
+  return <Checkbox checked={false} disabled aria-label={label} aria-description={reason} title={reason}
+    onClick={(event) => event.stopPropagation()} onCheckedChange={() => {}} />
 }
 
 /** 保存や送信で反映する二択。即時反映のスイッチと同じデータ契約で移行できる。 */

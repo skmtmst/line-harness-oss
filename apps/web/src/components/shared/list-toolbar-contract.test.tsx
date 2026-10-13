@@ -5,10 +5,28 @@ const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from './list-toolbar'
 import PageSizeSelect from './page-size-select'
 
 afterEach(cleanup)
+
+it('nested Frame and Toolbar render the leading actions once and keep their handler', () => {
+  const create = vi.fn()
+  render(<ListToolbarLeading leading={<button onClick={create}>作る</button>}><ListToolbarFrame><ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} /></ListToolbarFrame></ListToolbarLeading>)
+  expect(screen.getAllByRole('button', { name: '作る' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '作る' }))
+  expect(create).toHaveBeenCalledOnce()
+})
+
+it('the shared end orders sort before page size while preserving selection', () => {
+  const change = vi.fn()
+  const { container } = render(<ListToolbarEnd><PageSizeSelect value={20} onChange={change} /><ListToolbarSort value="new" onChange={vi.fn()} options={[{ value: 'new', label: '新しい順' }]} /></ListToolbarEnd>)
+  const buttons = [...container.querySelectorAll('button[aria-haspopup="listbox"]')]
+  expect(buttons.map(el => el.getAttribute('aria-label'))).toEqual(['並び', '表示件数'])
+  fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+  fireEvent.click(screen.getByRole('option', { name: /50/ }).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith(50)
+})
 
 describe('B-178 共通の道具の段の操作', () => {
   it('検索の変更と消す操作を元の受け口へ返す', async () => {
@@ -129,7 +147,7 @@ describe('B-178 共通の道具の段の操作', () => {
     const css = read('list-toolbar.module.css')
     expect(css).toMatch(/:root\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
     // B-244：名前の無い「…」へ畳まず、狭い白い板で2段にする。
-    expect(css).not.toContain('.optional[data-collapsed] > summary')
+    expect(read('list-toolbar.tsx')).not.toMatch(/<summary[^>]*>…<\/summary>/)
     expect(css).toContain('@container v8-page (max-width: 1099px)')
     expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
   })
@@ -186,4 +204,20 @@ it('並びは道具の段の共通欄だけで選ぶ', () => {
   const html = renderToStaticMarkup(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} sort={{ value: 'recent', onChange: vi.fn(), options: [{ value: 'recent', label: '新しい順' }] }} />)
   expect(html).toContain('data-list-sort')
   expect(html).toContain('aria-label="並び"')
+})
+
+it('U4：並びの現在値を表示し、選んだ順序を元の受け口へ返す', () => {
+  const change = vi.fn()
+  render(<ListToolbarSort aria-label="並び順" value="newest" options={[{ value: 'newest', label: '新しい順' }, { value: 'name', label: '名前順' }]} onChange={change} />)
+  const trigger = screen.getByRole('button', { name: '並び' })
+  expect(trigger.textContent).toContain('並び：新しい順')
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('option', { name: '名前順' }).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith('name')
+})
+it('U4：並びの候補が無ければ空の欄を置かない', () => {
+  const change = vi.fn()
+  const { container } = render(<ListToolbarSort value="" options={[]} onChange={change} />)
+  expect(container.querySelector('button')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
 })
