@@ -174,6 +174,102 @@ Application ID はこの文書にも会話にも書きません。
 | 6手順のうち5つ | 緑（完了） |
 | Integration Verification Result | **未完了**（残り1つ） |
 
+## 7-2. 実機で出た認可エラー（2026-10-13）
+
+staging（`https://stg-admin.musubo.jp/settings/delivery`）で Uber Eats の「つなぐ」を押したところ、
+`auth.uber.com` へは遷移しましたが、認可画面ではなくエラー画面になりました。
+
+```
+https://auth.uber.com/oauth/errors?error=invalid_client
+  &error_description=we+were+unable+to+fetch+client+metadata...
+Authorization Error / Invalid client
+```
+
+### 切り分け（コードと設定の読み取りのみ。秘密値は見ていません）
+
+| 確認したこと | 結果 |
+| --- | --- |
+| musubo 側が「設定が無い」と判断していないか | **設定はある**。`oauth_not_configured`（503）が出ず認可URLまで作れている＝`client_id`／`client_secret` は `nen-line-stg` に存在し空でない |
+| 認可URLの組み立て | **公式仕様どおり**。`client_id`／`redirect_uri`／`response_type=code`／`scope=eats.pos_provisioning`（＋`state`）。`services/uber-eats.ts` の `buildAuthorizeUrl` |
+| 設定の読み取り | **前後の空白は除去済み**（`uberOAuthClient` が `.trim()`）。改行混入による不一致は起きない |
+| 戻り先URL | 不一致なら Uber は `redirect_uri` の文言で返すのが通例。今回の文言は「クライアントの情報を引けない」で別の種類 |
+
+公式のエラー表（https://developer.uber.com/docs/eats/guides/authentication）では
+`invalid_client` は「client ID または secret が不正。開発者画面で確認する」。
+つまり **musubo 側のコードと配備設定の不具合は否定**され（Jev 判定 C＝1%）、
+Uber の認可サーバが `client_id` を自分の登録簿から引けていない状態です。
+
+### 残る原因候補（どちらも Uber 開発者画面の確認が必要）
+
+| 候補 | Jev 判定 |
+| --- | --- |
+| **B：アプリがまだ `authorization_code`／`eats.pos_provisioning` で認可を受けられる状態になっていない**（Integration Verification・Scope Whitelisting 未了のため認可サーバ側にクライアントが未登録） | **64%** |
+| A：`RT_DELIVERY_UBEREATS_CLIENT_ID` に入っている文字列が OAuth 用の Client ID ではない（別欄の Application ID をコピー、切れ、別アプリ） | 35% |
+
+公式資料では本番の `eats.pos_provisioning` は「Uber Eats チームの承認とホワイトリスト登録が先」と
+明記されており（§3・§5）、§7 の **Integration Verification Result が未完了**であることと符合します。
+
+### 利用者の確認結果（2026-10-13）
+
+Cloudflare の `RT_DELIVERY_UBEREATS_CLIENT_ID` へ入れた値は、Uber 開発者画面の
+**`Client ID` という欄**からコピーしたものでした（値は確認していません）。
+したがって候補 A（別欄の取り違え）は後退し、**候補 B が残ります**。
+
+### 結論と次の1手
+
+**musubo 側に直す箇所はありません。** Uber の認可サーバがこのアプリの `client_id` を
+まだ受け付けていない状態で、§7 の **Integration Verification Result 未完了**
+＝ `eats.pos_provisioning` の Scope Whitelisting が済んでいないことが原因と判断します。
+
+次は利用者が Integration Tech Support Form（`http://t.uber.com/integration-support`）へ
+下の下書きを出し、(1) Integration Verification の実施、(2) `client_id` の Scope Whitelisting、
+(3) Sandbox のテスト店舗（§4）をまとめて依頼します。
+
+> 残り3.5%の確認（任意）：コピーの途中切れでも同じエラーになります。
+> 画面の `Client ID` の**文字数**と、Cloudflare に入れた値の**文字数**が同じかだけ見ておくと確実です。
+> 値そのものは見せないでください。
+
+### Integration Tech Support への依頼文（下書き・`<>` は利用者が埋める）
+
+```
+Subject: POS integration verification & eats.pos_provisioning whitelisting request
+
+Company / Integrator: musubo (<legal entity name>)
+Integration name: musubo POS Integration
+App name in Developer Dashboard: <app name> (TEST APP)
+Client ID: <paste from Developer Dashboard>
+Region / Market: Japan
+Contact: <email>
+
+What we have completed
+- API Suite: Eats Marketplace selected
+- App registered, authentication method: Client Secret
+- 5 of the 6 onboarding steps are green; "Integration Verification Result" is the only
+  remaining item
+- OAuth redirect URI registered:
+  https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback
+- Implemented and unit-tested on our side: authorization-code flow (authorize URL,
+  callback, token exchange, 30-day re-acquisition), GET /v1/eats/stores,
+  POST/GET/PATCH/DELETE /v1/eats/stores/{store_id}/pos_data,
+  webhook signature verification (X-Uber-Signature, HMAC-SHA256)
+
+Problem we are blocked on
+When a merchant starts the flow from our settings screen, the browser reaches
+https://auth.uber.com/oauth/v2/authorize with
+  client_id=<our client id>&response_type=code
+  &redirect_uri=https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback
+  &scope=eats.pos_provisioning&state=<random>
+and Uber returns:
+  https://auth.uber.com/oauth/errors?error=invalid_client
+  &error_description=we were unable to fetch client metadata
+We believe our client is not yet whitelisted for eats.pos_provisioning.
+
+Requests
+1. Please schedule / proceed with Integration Verification for this app.
+2. Please whitelist the above Client ID for the eats.pos_provisioning scope.
+3. Please provision a Sandbox test store so we can complete end-to-end testing.
+```
+
 ## 8. 残件と次の1手
 
 1. ~~利用者が設計案（v03）を承認する。~~ → 2026-10-12 承認済み。設定画面も実装済み。
