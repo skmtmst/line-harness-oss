@@ -23,6 +23,8 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs';
 import { formatDateTime, formatNumber } from '@/lib/format';
@@ -491,7 +493,7 @@ export default function ScenarioResultsV8() {
             {sortedSteps.length === 0 ? (
               <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
             ) : (
-              <ol className={styles.stepList}>
+              <GridTable label="通ごとの反応" framed={false} design={{ columns: "minmax(0, 1fr)", gap: "var(--polish-space-row)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
                 {sortedSteps.map((step) => {
                   const run = runsByOrder.get(step.stepOrder)
                   const reached = reachedOf(step)
@@ -501,7 +503,7 @@ export default function ScenarioResultsV8() {
                   const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)}人` : emptyValue('unknown')
                   const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)}人` : emptyValue('unknown')
                   return (
-                    <li key={step.id} className={styles.stepRow}>
+                    <GridRow key={step.id}><GridCell className={styles.stepRow}>
                       <div className={styles.stepTop}>
                         <span className={styles.stepNo}>{step.stepOrder} 通目</span>
                         <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
@@ -514,10 +516,10 @@ export default function ScenarioResultsV8() {
                         ) : null}
                       </div>
                       <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder} 通目の届いた率`} />
-                    </li>
+                    </GridCell></GridRow>
                   )
                 })}
-              </ol>
+              </GridTable>
             )}
           </section>
 
@@ -587,15 +589,15 @@ export default function ScenarioResultsV8() {
               />
             ) : (
               <>
-                <div className={styles.table} role="table" aria-label="参加中の友だち">
-                  <div className={styles.headRow} role="row">
-                    <span className={styles.colName} role="columnheader">友だち</span>
-                    <span className={styles.colState} role="columnheader">状態</span>
-                    <span className={styles.colNow} role="columnheader">いま</span>
-                    <span className={styles.colNext} role="columnheader">次に届く</span>
-                    <span className={styles.colPlan} role="columnheader"><span className="sr-only">予定</span></span>
-                    <span className={styles.colMenu} role="columnheader"><span className="sr-only">操作</span></span>
-                  </div>
+                <GridTable label="参加中の友だち" framed={false} design={{ columns: "minmax(0, 1fr) var(--tpl-sc2-col-state) var(--tpl-sc2-col-now) var(--tpl-sc2-col-next) var(--tpl-sc2-col-plan) var(--table-action-width, var(--tpl-sc2-col-menu))", gap: "var(--polish-space-card)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
+                  <GridHeadRow>
+                    <GridCell role="columnheader">友だち</GridCell>
+                    <GridCell role="columnheader">状態</GridCell>
+                    <GridCell role="columnheader">いま</GridCell>
+                    <GridCell role="columnheader">次に届く</GridCell>
+                    <GridCell role="columnheader"><span className="sr-only">予定</span></GridCell>
+                    <GridCell role="columnheader"><span className="sr-only">操作</span></GridCell>
+                  </GridHeadRow>
                   {runs.subscriptions.map((sub) => {
                     const state = subscriptionState(sub)
                     const pausedByFailure = sub.status === 'paused' && sub.pauseReason === 'delivery_failed'
@@ -632,14 +634,14 @@ export default function ScenarioResultsV8() {
                     })
                     const showMenu = canEdit && sub.pauseReason !== 'delivery_unconfirmed' && (sub.status === 'active' || sub.status === 'paused')
                     return (
-                      <div key={sub.id} className={styles.row} role="row">
-                        <span className={styles.colName} role="cell" title={sub.friendName}>{sub.friendName}</span>
-                        <span className={styles.colState} role="cell" title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
+                      <GridRow key={sub.id} data-subscription-status={sub.status}>
+                        <GridNameCell folder={false} name={<TruncatedText value={sub.friendName} />} />
+                        <GridCell title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
                           {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
-                        </span>
-                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder} 通目まで`}</span>
-                        <span className={styles.colNext} role="cell">{nextLabel(sub)}</span>
-                        <span className={styles.colPlan} role="cell">
+                        </GridCell>
+                        <GridCell>{`${sub.currentStepOrder} 通目まで`}</GridCell>
+                        <GridCell><TruncatedText value={nextLabel(sub)} /></GridCell>
+                        <GridCell>
                           <Button
                             onClick={() => {
                               setPlanFriend({ id: sub.friendId, name: sub.friendName })
@@ -648,8 +650,8 @@ export default function ScenarioResultsV8() {
                           >
                             <Eye size={15} aria-hidden="true" />予定を見る
                           </Button>
-                        </span>
-                        <span className={styles.colMenu} role="cell">
+                        </GridCell>
+                        <GridCell data-list-action-cell>
                           {showMenu ? (
                             <span className={styles.menuBox}>
                               <RowMenu
@@ -661,11 +663,11 @@ export default function ScenarioResultsV8() {
                               />
                             </span>
                           ) : null}
-                        </span>
-                      </div>
+                        </GridCell>
+                      </GridRow>
                     )
                   })}
-                </div>
+                </GridTable>
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
                   <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}
