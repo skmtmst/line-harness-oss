@@ -515,37 +515,13 @@ function InflowDetailContent() {
                 : '右上の「…」から：受付を止める・別リンクへ送る・削除する'}
             </p>
             {funnel ? (
-              <div className={styles.minis}>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>クリック</span>
-                  <span className={styles.miniValue}>{formatNumber(funnel.click_count)}</span>
-                  <span className={styles.miniSub}>{' '}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>友だち追加</span>
-                  <span className={styles.miniValue}>{formatNumber(funnel.friend_add_count)}</span>
-                  <span className={styles.miniSub}>{`追加率 ${addRate ?? emptyValue('unknown')}%`}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>フォーム</span>
-                  <span className={styles.miniValue}>{formatNumber(funnel.form_submission_count)}</span>
-                  <span className={styles.miniSub}>{' '}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>購入</span>
-                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.total) : emptyValue('unknown')}</span>
-                  <span className={styles.miniSub}>{ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>返金・取消</span>
-                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.refunded + ordersSummary.cancelled) : emptyValue('unknown')}</span>
-                  <span className={styles.miniSub}>
-                    {ordersSummary
-                      ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`)
-                      : '集計を取得できていません'}
-                  </span>
-                </div>
-              </div>
+              <KpiBand aria-label="流入後の成果">
+                <KpiCard presentation="band" icon={null} title="クリック" value={funnel.click_count} unit="回" detail={null} />
+                <KpiCard presentation="band" icon={null} title="友だち追加" value={funnel.friend_add_count} unit="人" detail={addRate == null ? '追加率は集計できません' : `追加率 ${addRate}%`} />
+                <KpiCard presentation="band" icon={null} title="フォーム" value={funnel.form_submission_count} unit="件" detail={null} />
+                <KpiCard presentation="band" icon={null} title="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
+                <KpiCard presentation="band" icon={null} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
+              </KpiBand>
             ) : funnelError ? (
               <div className={styles.funnelError}>
                 <p className={styles.note}>段階を読み込めませんでした。集計データは消えていません。</p>

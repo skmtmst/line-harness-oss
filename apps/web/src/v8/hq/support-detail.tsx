@@ -1,7 +1,7 @@
 'use client'
 
 import { PageContent } from '@/components/templates/page-frame'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import { Paperclip, Send, X } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useId, useState } from 'react'
@@ -204,7 +204,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           ) : (
             <>
               <div className={styles.statusRow}>
-                <StatusPill tone={detail.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[detail.status]}</StatusPill>
+                <StatusBadge tone={detail.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[detail.status]}</StatusBadge>
                 <span className={styles.statusNote}>{statusNote(detail.status, hasSenderEmail)}</span>
               </div>
 
@@ -275,7 +275,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           <CreateSummaryCard title="これまでの問い合わせ" variant="record" rows={Array.isArray(history) ? history.slice(0, 10).map(item => ({
             key: item.id,
             label: <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} aria-current={item.id === id ? 'page' : undefined} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</Link>,
-            value: <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>,
+            value: <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>,
           })) : []}>
             {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
           </CreateSummaryCard>

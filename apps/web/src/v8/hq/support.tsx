@@ -2,7 +2,7 @@
 
 import { PageContent } from '@/components/templates/page-frame'
 import { Field as SharedField } from '@/components/shared/form-controls'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import { CheckCircle2, Plus, X } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
@@ -351,7 +351,7 @@ export default function HqSupportV8() {
                   </GridCell>
                   <GridCell>{supportKindWord(item.kind, item.kindLabel)}</GridCell>
                   <GridCell>
-                    <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>
+                    <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>
                   </GridCell>
                   <GridCell><span className={styles.shortText}>{supportTime(item.createdAt)}</span></GridCell>
                 </GridRow>

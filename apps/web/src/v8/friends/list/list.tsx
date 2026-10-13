@@ -7,7 +7,8 @@ import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
-import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import StatusBadge from '@/components/shared/status-badge'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react';
@@ -837,7 +838,7 @@ export default function FriendsListV8() {
                   <Td key={column.key} className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
-                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
+                        <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusBadge>
                         {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
                       </span>
                       <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>

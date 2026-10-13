@@ -2,7 +2,6 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
@@ -389,7 +388,7 @@ export default function OpsSupportV8() {
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
                     <span className={styles.ticketTop}>
                       <span className={styles.ticketNo}>{t.ticketLabel}</span>
-                      <StatusPill tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusPill>
+                      <StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
                     <span className={styles.ticketMeta} title={`${t.staffName || emptyValue('unknown')}・${t.channelLabel}・最終のやり取り ${formatDateTime(t.lastMessageAt)}（${elapsedLabel(t.lastMessageAt)}）`}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
@@ -421,7 +420,7 @@ export default function OpsSupportV8() {
                 {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
-                <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
+                <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
                 <span title={`起票者 ${ticket.staffName || emptyValue('unknown')}${ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}・受付 ${ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}・プラン ${planLabel(ticket.tenantPlanKey)}／${PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}${detail ? `・店舗 ${detail.tenant.accountCount}・LINE登録 ${detail.tenant.staffCount}人中${detail.tenant.staffWithLine}人・これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : ''}`}>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>
