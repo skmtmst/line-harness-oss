@@ -429,9 +429,9 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
         <LiffHeader title="紙のカードを移す" />
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-40">
           <div className="flex flex-col items-center gap-2.5 px-4 pt-12 pb-6 text-center">
-            <span className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink" aria-hidden="true"><Icon name="hourglass" className="h-9 w-9" /></span>
+            <span className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-ink" aria-hidden="true"><Icon name="hourglass" className="h-9 w-9" /></span>
             <h1 className="text-2xl leading-9 font-bold text-ink">お店の確認待ち</h1>
-            <Badge tone="pending">確認待ち</Badge>
+            <Badge tone="pending" withDot>確認待ち</Badge>
             <p className="w-full text-sm leading-[21px] text-liff-sub">確認できたらカードに足して、LINE でお知らせします。</p>
           </div>
           <InfoRows rows={[['押印数', `${shownStamps} 個`], ['申請日', shownAt ? jpDateTime(shownAt) : '—'], ['写真', '1枚']]} />

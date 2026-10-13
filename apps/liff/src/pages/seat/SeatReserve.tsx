@@ -12,6 +12,7 @@ import LiffLookScope from '../../components/LiffLookScope.js';
 import Stepper from '../../components/ui/Stepper.js';
 import BottomBar from '../../components/ui/BottomBar.js';
 import Button from '../../components/ui/Button.js';
+import Icon from '../../components/ui/Icon.js';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.js';
 import LoadingView from '../../components/LoadingView.js';
 import LoadErrorView from '../../components/LoadErrorView.js';
@@ -467,7 +468,7 @@ export default function SeatReserve() {
                     if(busyRef.current)return;busyRef.current=true;setBusy(true);setReferralError(false);
                     try {const next=await restaurantBookingApi.referral({storeId:store.id,targetStoreId:r.storeId,date,startsAt:r.startsAt,guestCount,courseId});window.location.assign(next.data.bookingUrl);}
                     catch{setReferralError(true);}finally{busyRef.current=false;setBusy(false);}
-                  }}>この店で予約する</Button></div>
+                  }}><Icon name="arrow-right" className="h-4 w-4 shrink-0" />この店で予約する</Button></div>
                 </div>
               </Card>)}
             </section>}

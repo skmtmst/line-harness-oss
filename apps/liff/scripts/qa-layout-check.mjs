@@ -73,6 +73,8 @@ try {
     await page.goto(`${base}/restaurant/reserve/qa-seat`);
     await page.getByRole('radio', { name: '19:00 残りわずか', exact: true }).click({ timeout: 5000 }).catch(async e => { await page.screenshot({ path: `${output}/seat-opening-failed-${width}.png` }); console.log(await page.locator('body').innerText()); throw e; });
     await page.getByRole('button', { name: /空いたら知らせる/ }).first().waitFor();
+    const info = page.locator('[data-liff-icon-tone="info"]').first();
+    assert.equal(await info.evaluate(el => getComputedStyle(el).color), 'rgb(37, 99, 235)', '満席の案内印は青');
     m = await page.evaluate(measure, page.viewportSize());
     assert.ok(m.controls.length >= 2 && m.controls.every(c => c.fits), '通知の短文が枠内の1行に収まる');
     assert.equal(m.overflow, 0); results.push({ page: 'seat', width, measured: m });
@@ -95,19 +97,22 @@ try {
     await chosen.waitFor();
     await page.evaluate(() => document.fonts.ready);
     const choiceLook = () => chosen.evaluate(el => {
-      const css = getComputedStyle(el), probe = document.createElement('span');
+      const css = getComputedStyle(el), core = getComputedStyle(el, '::after'), probe = document.createElement('span');
       el.parentElement.append(probe);
       probe.style.color = 'var(--color-canvas)'; const canvas = getComputedStyle(probe).color;
       probe.style.color = 'var(--color-liff-primary)'; const primary = getComputedStyle(probe).color; probe.remove();
-      return { background: css.backgroundImage, canvas, primary, rowHeight: el.closest('label').getBoundingClientRect().height };
+      return { background: css.backgroundColor, image: css.backgroundImage, canvas, primary, core: { background: core.backgroundColor, width: parseFloat(core.width), height: parseFloat(core.height), radius: core.borderRadius }, rowHeight: el.closest('label').getBoundingClientRect().height };
     });
     const formLook = await choiceLook();
-    const correctChoice = c => c.background.indexOf(c.canvas) >= 0 && c.background.indexOf(c.canvas) < c.background.indexOf(c.primary);
+    const correctChoice = c => c.background === c.primary && c.image === 'none' && c.core.background === c.canvas && c.core.width > 0 && c.core.width === c.core.height && (c.core.radius === '50%' || parseFloat(c.core.radius) >= c.core.width / 2);
     assert.ok(correctChoice(formLook), '選択の丸は白い芯と緑の輪');
     await page.screenshot({ path: `${output}/form-${width}.png` });
     await chosen.evaluate(el => { const css = getComputedStyle(el); el.style.background = `radial-gradient(circle, ${css.getPropertyValue('--color-liff-primary')} 4px, ${css.getPropertyValue('--color-canvas')} 4px)`; });
     assert.equal(correctChoice(await choiceLook()), false, '古い緑の点へ戻す故障を検出');
     await chosen.evaluate(el => el.style.removeProperty('background'));
+    const squareCore = await page.addStyleTag({ content: 'input[type="radio"]:checked::after { border-radius: 0 !important; }' });
+    assert.equal(correctChoice(await choiceLook()), false, '白い芯が四角になる故障を検出');
+    await squareCore.evaluate(el => el.remove());
     await page.getByRole('radio', { name: 'シャンプーのみ', exact: true }).click();
     await page.waitForFunction(() => [...document.querySelectorAll('input[type=radio]')].some(el => el.checked && el.closest('label').textContent.includes('シャンプーのみ')));
     const unselected = await choiceLook();
@@ -123,6 +128,18 @@ try {
     const fitsCta = c => c.x >= 15 && c.right <= c.viewport - 15 && c.overflow === 0;
     const webinar = await ctaLook();
     assert.ok(fitsCta(webinar), '相談ボタンの左右16pxを指定幅で確かめる');
+    const liveLook = () => page.locator('[data-liff-player-status]').evaluate(el => {
+      const b = el.getBoundingClientRect(), p = el.closest('[data-liff-player-controls]').getBoundingClientRect(), css = getComputedStyle(el);
+      return { centered: Math.abs((b.left + b.right) / 2 - (p.left + p.right) / 2) < 1, radius: css.borderRadius, color: css.backgroundColor };
+    });
+    const liveOK = x => x.centered && parseFloat(x.radius) >= 20 && x.color === 'rgb(229, 72, 77)';
+    assert.ok(liveOK(await liveLook()), '配信中の札は中央の赤い丸札');
+    await page.locator('[data-liff-player-status]').evaluate(el => { el.style.borderRadius = '0'; });
+    assert.equal(liveOK(await liveLook()), false, '四角い札へ戻す故障を検出');
+    await page.locator('[data-liff-player-status]').evaluate(el => el.style.removeProperty('border-radius'));
+    for (const author of await page.locator('[data-liff-comment-author]').all()) assert.equal(await author.evaluate(el => getComputedStyle(el).color), 'rgb(230, 232, 235)', '投稿者は本文と同じ色');
+    await page.getByRole('button', { name: '音声をオンにする', exact: true }).click();
+    await page.getByRole('button', { name: '音声をオフにする', exact: true }).waitFor();
     results.push({ page: 'webinar', width, measured: webinar });
     await page.screenshot({ path: `${output}/webinar-${width}.png` });
     await cta.evaluate(el => el.style.width = '100%');
@@ -131,5 +148,5 @@ try {
     await context.close();
   }
   writeFileSync(`${output}/results.json`, JSON.stringify(results, null, 2));
-  console.log(`LIFF layout: ${results.length}場面・故障対照15件・イベント変更の入口3幅 成功`);
+  console.log(`LIFF layout: ${results.length}場面・故障対照21件・イベント変更の入口3幅 成功`);
 } finally { await browser.close(); await fetch(`${api}/__qa/reset`, { method: 'POST' }); }

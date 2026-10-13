@@ -98,6 +98,12 @@
   --color-liff-document-empty: #f7f8fa;
   --color-liff-document-preview: #e8edf3;
   --color-liff-document-remove: #1d1d1fb3;
+  --liff-pending-bg: #f973161a;
+  --liff-pending-ink: #c2410c;
+  --liff-pending-dot: #f97316;
+  --liff-live-bg: #e5484d;
+  --liff-live-sound-bg: #00000099;
+  --liff-booking-info-ink: #2f6fde;
 }
 
 /* 主の色の上の字。店の色で上書きする (見やすさの計算で白か濃字か)。 */
