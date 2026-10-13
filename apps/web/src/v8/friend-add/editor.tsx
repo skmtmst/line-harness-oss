@@ -12,7 +12,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, User, UserPlus, UserRound, Workflow } from 'lucide-react';
+import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, User, UserPlus, UserRound, Workflow } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -42,6 +42,7 @@ import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } fr
 import FriendPickerField from '@/components/shared/friend-picker-field';
 import SegmentedControl from '@/components/shared/segmented'
 import { TextArea, TextField } from '@/components/shared/text-field';
+import SearchField from '@/components/shared/search-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
 import { SettingCheckbox } from '@/components/shared/checkbox';
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
@@ -1054,12 +1055,12 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
     <>
       <Card variant="form" gap="normal" className={styles.card} aria-label="どの流入リンクから来た人に送るか" data-friend-add-routes>
         <CardHeader size="stacked" title={<>どの流入リンクから来た人に送るか</>} meta={<>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</>} />
-        <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><TextField
+        <SaveErrorField names={["query"]}><SearchField
             value={query}
             placeholder="流入リンクの名前で探す"
             aria-label="流入リンクの名前で探す"
-            onChange={(event) => setQuery(event.target.value)}
-          /></SaveErrorField></Field>
+            onChange={setQuery}
+          /></SaveErrorField>
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)
