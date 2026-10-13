@@ -4,6 +4,25 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('F1 catches a selected label ellipsized by half a pixel and accepts its exact rendered width', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><span data-select-value style="display:inline-block;font:13px Arial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォルダ：すべて</span><span data-list-name style="display:inline-block;width:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">省略してよい名前</span></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+    const fullWidth = await page.locator('[data-select-value]').evaluate(el => el.getBoundingClientRect().width)
+    await page.locator('[data-select-value]').evaluate((el, width) => el.style.width = `${width - .5}px`, fullWidth)
+    const deficit = await page.locator('[data-select-value]').evaluate(el => {
+      const range = document.createRange(); range.selectNodeContents(el)
+      return range.getBoundingClientRect().width - el.getBoundingClientRect().width
+    })
+    assert.ok(deficit > 0 && deficit < 1, 'the regression is smaller than the former one-pixel tolerance')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 1)
+    await page.locator('[data-select-value]').evaluate((el, width) => el.style.width = `${width}px`, fullWidth)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+  } finally { await browser.close() }
+})
+
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
   try {

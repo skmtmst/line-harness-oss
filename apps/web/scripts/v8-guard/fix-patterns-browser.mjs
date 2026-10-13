@@ -55,7 +55,9 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const rects = textRects(el)
       if (!rects.length) continue
       const paintedWidth = Math.max(...rects.map(r=>r.right)) - Math.min(...rects.map(r=>r.left))
-      if (paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
+      const selectedValueContentWidth = el.getBoundingClientRect().width - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
+      const selectedValueIsEllipsized = el.matches('[data-select-value]') && css.textOverflow === 'ellipsis' && paintedWidth > selectedValueContentWidth
+      if (selectedValueIsEllipsized || paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
         || el.scrollHeight > el.clientHeight + 1) add('F1', el, 'short text does not fit')
     }
     for (const el of all('input[type="search"]')) {
