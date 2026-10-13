@@ -32,11 +32,18 @@ function faqItems() {
 // (not executed, so it stays within script-src 'self').
 const tourJson = () => JSON.stringify(tourData).replace(/</g, "\\u003c");
 
+// Promise given for Google Business Profile / Instagram (also checked by the Worker's
+// google-business-application-consistency test). The build stops if the copy loses it.
+export const NO_AUTO_SEND = "自動で送ることはありません";
+
 export function home(config, production) {
   const app = production ? config.productionAppOrigin : config.stagingAppOrigin;
-  return template
+  const html = template
     .replaceAll("{{APP}}", e(app))
     .replace("{{FEATURES}}", featureCards())
     .replace("{{FAQ}}", faqItems())
     .replace("{{TOUR}}", tourJson());
+  if (!html.includes(NO_AUTO_SEND))
+    throw new Error("トップページから「自動で送ることはありません」の説明が消えています");
+  return html;
 }
