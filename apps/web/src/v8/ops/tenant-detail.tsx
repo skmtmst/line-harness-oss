@@ -172,7 +172,7 @@ function DetailContent() {
 
         {tab === 'overview' ? (
           <DashboardColumns layout="cards">{[
-            <Card  aria-label="契約先の情報" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="information" aria-label="契約先の情報" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="契約先の情報" />
               <dl className={styles.kvs}>
                 <Kv k="統括名" v={tenant.name} />
@@ -181,7 +181,7 @@ function DetailContent() {
                 <Kv k="最終ログイン" v={formatDateTime(tenant.last_login_at)} />
               </dl>
             </Card>,
-            <Card  aria-label="契約の状況" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <Card key="subscription" aria-label="契約の状況" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="契約の状況" />
               <dl className={styles.kvs}>
                 <Kv k="プラン" v={planLabel(tenant.plan_key)} />
