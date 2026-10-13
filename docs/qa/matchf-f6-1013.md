@@ -1,5 +1,30 @@
 # F組6回目・列車31取り込みとY1〜Y4
 
+つかんだ型：私有クラスでなく役目へ／速くなったか：F4比では未達／一番うまくいっていない事：事前の棚卸しと検査の手戻り。
+
+証拠と左右の絵： [F6の全報告](/Users/kentakenta/lh-work/design/v8/review/MATCH-ANALYSIS-1011/measure2/match2/F6/final/FINAL.md)、[Penへ返す一覧](/Users/kentakenta/lh-work/design/v8/review/MATCH-ANALYSIS-1011/measure2/match2/F6/final/PEN-AND-FEATURES.md)。以下の証拠パスは外部F6/finalを基準に読む。
+
+再確認候補27板・54幅。正式合格は17:43の27板を維持、新規0。コード/静的出力/81場面/保護78場面/左右は4d6a13fa3a、土台b7e54d350c、写し18:17。27板はY1〜Y4・F1〜F9・崩れ・右端・例外0。一般一覧F10は対象外81、1152の独立入力親32組・横配置0。生POST9/guard終了1は保持。保護26板78場面は退行/通信0・終了0。
+
+|結果|証拠|
+|---|---|
+|全Web13040成功、既存skip/todo各1、型成功|../checks/web-all-final.log・type-final.log（f306の同じtree、../MERGE-1725-PROOF.json）|
+|見張り118成功、SVG/背景/実寸の故障対照成功|../checks/guard-fixtures-final.log、../y4/narrow-preview.log（現物54場面、後の取り込みで同じWeb tree）|
+|監査新しい候補0・一時許可0・未許可0|../checks/audit-final-correct.log|
+|最新本線サイト26成功、静的ビルド成功|../checks/merge1725-related.log・../final-current/BUILD.json|
+|全27板の数・1〜4・P〜S|F-PATTERN-COUNTS.tsv・AUDIT-1-4.tsv・PQRS-CHECKS.tsv|
+|左右全54、代表/抜き取り10板を両幅で目視|EVIDENCE-INDEX.json・VISUAL-REVIEW.md・sbs-1440/・sbs-1152/|
+
+帳面に足した直し6種類＝Y1行・Y2面・Y3題・Y4印＋端末の描画を測る検査＋狭い行の実描画試験。新規型カード5・既存補足1。修正の予想6回：Y1当たり、Y2初回部分、Y2bビルド外れ、Y2c当たり、Y3当たり、Y4当たり＝4/6 (66.7%)。補助の試験移行1/1は別。Y4の母数2漏れは数え方の診断として残す。
+
+候補をそろえるまで169.21分、6.27分/板（待ち・全試験・取り込み・記録込み）。F4の5.84より遅い。F5の切断込み15.13からは短縮、最後の再開だけ1.30とは対象が違い直接比べない。3枚ごとの撮影時間/率はTIMING-BY-3、全工程とは分ける。次は共通部品の役目・影響するA/D試験・依存一覧を最初にまとめ、別型漏れと全Webのやり直しを先に防ぐ。
+
+Penへ返す物と機能待ちはPEN-AND-FEATURES.md。フォルダ?・来店スタンプ・説明・件数/必須札/FolderSelectの済んだ直しは再計上しない。新しいデータや見本は作り込まない。原本の失敗と版はCOUNT-METHOD.md参照。
+
+次のタスクはこれ：QqER7/CcA4k/d5fmnM（NEXT-FAMILY.md）、そのあと主な141板の残り。F2x115は担当外、受信箱は最後。Pen/migration/DB/配備/push/PR/統合なし。自分のサーバーは終了時に停止し、ソース元の既存NodeTerm2変更/未追跡workspace1は触らない。
+
+## 開始・途中の原記録
+
 開始7ab08ac3b3、本線b56967dbb2。未コミット0、doctor合格、空き33GB。
 
 ## 競合の選択理由
