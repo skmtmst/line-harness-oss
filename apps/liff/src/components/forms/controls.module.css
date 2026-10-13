@@ -35,7 +35,7 @@ input.nightInput:not([type='radio']):not([type='checkbox']) { height: 44px; bord
 .stars { display: flex; gap: 4px; }
 .star { display: flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; border: 0; background: transparent; font-size: 30px; line-height: 1; color: var(--color-liff-idle, var(--v8-liff-idle, var(--color-ink-faint))); }
 .star[data-on] { color: var(--color-liff-star, var(--color-star-on-edge)); }
-.fileButton { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 500; background: var(--color-canvas); color: var(--color-ink); }
+.fileButton { box-sizing: border-box; display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); border-radius: 10px; padding: 10px 12px; font-size: 15px; line-height: 23px; font-weight: 700; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
 .postal { display: flex; gap: 8px; }
 .lookup { min-height: 44px; flex-shrink: 0; border: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); border-radius: 10px; padding: 0 12px; font-size: 14px; font-weight: 700; color: var(--color-ink); background: var(--color-canvas); }
 .days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
@@ -65,16 +65,25 @@ input.nightInput:not([type='radio']):not([type='checkbox']) { height: 44px; bord
 
 .concealedInput { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; border: 0; }
 .pinInput { position: absolute; inset-inline: 0; bottom: 0; height: 48px; width: 100%; cursor: text; opacity: 0; }
-.filePreview { max-width: 100%; max-height: 160px; object-fit: contain; border-radius: 12px; }
-
-.fileSlots { display: grid; gap: 8px; min-width: 0; }
+.fileControl { display: flex; flex-direction: column; gap: var(--liff-document-gap, 14px); min-width: 0; }
+.fileActions { display: flex; flex-direction: column; gap: var(--liff-document-action-gap, 10px); }
+.filePreview { display: block; box-sizing: border-box; width: 100%; height: 100%; padding: 26px 12px 10px; object-fit: contain; }
+.fileSlots { display: grid; gap: var(--liff-document-slot-gap, 10px); min-width: 0; }
 .fileSlots[data-both-sides] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.fileSlot { min-height: 88px; border: 1px dashed var(--color-liff-line-strong, var(--color-border)); border-radius: 10px; color: var(--color-ink-faint); background: var(--color-canvas); padding: 8px; font-size: 12px; }
-.fileSlot[aria-pressed='true'] { border-color: var(--color-liff-primary, var(--color-accent)); }
-.fileItem { position: relative; min-width: 0; }
-.fileRemove { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border: 1px solid var(--color-border); border-radius: 50%; color: var(--color-ink); background: var(--color-canvas); font-size: 18px; }
-.fileName { display: block; padding-right: 32px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
-.fileSlot:focus-visible, .fileRemove:focus-visible { outline: 2px solid var(--color-liff-primary, var(--color-accent)); outline-offset: 2px; }
+.fileSide { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fileSlot { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: var(--liff-document-empty-height, 110px); border: 1.5px solid var(--color-liff-line-strong, var(--color-border)); border-radius: var(--liff-document-radius, 12px); color: var(--color-liff-sub); background: var(--color-liff-document-empty, #f7f8fa); padding: 8px; font-size: 14px; line-height: 20px; font-weight: 700; }
+.fileSlotIcon { width: 20px; height: 20px; }
+.fileItem { position: relative; min-width: 0; height: var(--liff-document-preview-height, 118px); border-radius: var(--liff-document-radius, 12px); background: var(--color-liff-document-preview, #e8edf3); }
+.fileSelect { display: block; box-sizing: border-box; width: 100%; height: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; color: var(--color-ink); overflow: hidden; }
+.fileSideLabel { position: absolute; top: 8px; left: 12px; font-size: 12px; line-height: 18px; font-weight: 700; }
+.fileRemove { display: flex; align-items: center; justify-content: center; position: absolute; top: 8px; right: 12px; width: var(--liff-document-remove-size, 24px); height: var(--liff-document-remove-size, 24px); padding: 0; border: 0; border-radius: 50%; color: var(--color-white); background: var(--color-liff-document-remove, #1d1d1fb3); cursor: pointer; }
+.fileRemove::after { content: ''; position: absolute; width: 44px; height: 44px; }
+.fileRemoveIcon { width: 14px; height: 14px; }
+.fileName { display: block; box-sizing: border-box; max-width: 100%; padding: 34px 12px 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.fileNames { display: flex; gap: 8px; font-size: 12px; line-height: 18px; color: var(--color-liff-sub); }
+.fileNames span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fileReselect[data-open] .fileActions { margin-top: var(--liff-document-action-gap, 10px); }
+.fileSlot:focus-visible, .fileSelect:focus-visible, .fileRemove:focus-visible { outline: 2px solid var(--color-liff-primary, var(--color-accent)); outline-offset: 2px; }
 .input[aria-invalid="true"] { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
 
 /* B-203：本番LIFFと管理画面の入力見本に同じ輪・点・チェック。 */
@@ -85,8 +94,6 @@ input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { b
 input.choiceInput[type='checkbox'], .choice input[type='checkbox'] { border-radius: 3px; }
 input.choiceInput[type='checkbox']:checked, .choice input[type='checkbox']:checked { border-color: var(--color-selection-border); background: var(--color-selection-border) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m3 8 3 3 7-7'/%3E%3C/svg%3E") center/contain no-repeat; }
 .choiceInput:focus-visible, .choice input:focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }
-
-.fileSlot { min-height: var(--upload-slot-height, var(--tpl-slot-h-compact)); padding: var(--upload-slot-padding, var(--tpl-slot-pad-compact)); }
 
 input.choiceInput[type='radio'], .choice input[type='radio'] { width: var(--liff-radio-size, 18px); height: var(--liff-radio-size, 18px); }
 input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { background: radial-gradient(circle, var(--color-selection-border) calc(var(--liff-radio-dot, 9px) / 2), var(--color-canvas) calc(var(--liff-radio-dot, 9px) / 2)); }

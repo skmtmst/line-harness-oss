@@ -88,6 +88,16 @@
   --liff-radius-lg: 14px;
   --liff-radius-night-action: 12px;
   --liff-radius-stamp-control: 8px;
+  --liff-document-empty-height: 110px;
+  --liff-document-preview-height: 118px;
+  --liff-document-radius: 12px;
+  --liff-document-gap: 14px;
+  --liff-document-slot-gap: 10px;
+  --liff-document-action-gap: 10px;
+  --liff-document-remove-size: 24px;
+  --color-liff-document-empty: #f7f8fa;
+  --color-liff-document-preview: #e8edf3;
+  --color-liff-document-remove: #1d1d1fb3;
 }
 
 /* 主の色の上の字。店の色で上書きする (見やすさの計算で白か濃字か)。 */
