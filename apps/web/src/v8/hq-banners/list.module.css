@@ -43,13 +43,6 @@
 .cardMeta .metaText { flex: 1; }
 
 /* 画像のます（4列・横の間12・縦の間14） */
-.imageGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  column-gap: var(--tpl-hb-kpi-gap);
-  row-gap: var(--tpl-hb-body-gap);
-}
-
 .tile { display: flex; flex-direction: column; min-width: 0; }
 
 .tileImage {

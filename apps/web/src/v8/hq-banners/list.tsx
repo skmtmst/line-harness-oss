@@ -652,7 +652,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       : <ListState permissionScope="hq" kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
   ) : (
     <>
-      <div className={styles.imageGrid}>
+      <ListPageCards columns={4}>
         {images.map((image) => {
           const preset = image.generation ? presets.find((p) => p.key === image.generation?.presetKey) : null
           return (
@@ -674,8 +674,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
             </article>
           )
         })}
-      </div>
-      {pager}
+      </ListPageCards>
     </>
   )
 
@@ -691,13 +690,13 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       tabs={head.tabs}
       explanation={head.explanation}
       contentInset
+      pagination={images.length > 0 && status === 'ready' ? pager : undefined}
       toolbar={<>
-        <ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} />
         <ListToolbar search={{placeholder:'テキスト・指示で探す',label:'テキスト・指示で探す',value:query,onChange:(value)=>{setQuery(value);resetPage()}}}
-          filters={<div role="group" aria-label="用途で絞り込む" className={styles.chips}>
+          filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><div role="group" aria-label="用途で絞り込む" className={styles.chips}>
             <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={()=>{setShape(null);resetPage()}}>すべて</FilterChip>
             {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
-          </div>}
+          </div></>}
           trailing={<span>並び：作成が新しい順</span>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
       </>}
