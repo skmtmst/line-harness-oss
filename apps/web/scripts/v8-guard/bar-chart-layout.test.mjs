@@ -34,3 +34,10 @@ test('凡例を見つけられない測定を0へしない', () => {
   measured.legendPresent = false
   assert.equal(assessBarChartLayout(measured), 1)
 })
+
+test('色の変数が出力されず印が透明になったら落ちる', () => {
+  const measured = chart()
+  measured.colors.broadcast = 'rgba(0, 0, 0, 0)'
+  measured.events[0].color = 'rgba(0, 0, 0, 0)'
+  assert.equal(assessBarChartLayout(measured), 2)
+})

@@ -5,9 +5,11 @@ import { writeFileSync } from 'node:fs'
 
 export function assessBarChartLayout(chart) {
   const misplaced = chart.bars.filter(bar => chart.line === null || (bar.height > 0 && (bar.series === 'added' ? bar.bottom > chart.line + 1 : bar.top < chart.line - 1))).length
-  const mismatch = chart.events.filter(event => chart.colors[event.kind] && chart.colors[event.kind] !== event.color).length
+  const transparent = color => !color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)'
+  const mismatch = chart.events.filter(event => transparent(event.color) || !chart.colors[event.kind] || chart.colors[event.kind] !== event.color).length
+  const unpainted = Object.values(chart.colors).filter(transparent).length
   const duplicateColor = chart.colors.added && chart.colors.broadcast && chart.colors.added === chart.colors.broadcast ? 1 : 0
-  return misplaced + mismatch + duplicateColor + (chart.legendPresent === false ? 1 : 0)
+  return misplaced + mismatch + duplicateColor + unpainted + (chart.legendPresent === false ? 1 : 0)
 }
 
 export function inspectBarCharts() {
