@@ -246,6 +246,8 @@ async function main() {
   const apply = flags.includes("--apply");
   if (config.previewOrigin !== "https://stg.musubo.jp")
     throw new Error("配備先は承認済みのstg.musubo.jpだけです");
+  if (config.stagingAppOrigin !== "https://stg-admin.musubo.jp")
+    throw new Error("確認用サイトの登録・ログイン先は検証環境の stg-admin.musubo.jp だけです");
   const user = process.env.MUSUBO_XSERVER_USER;
   const server = process.env.MUSUBO_XSERVER_HOST;
   const { target } = deploymentPaths(user);
@@ -310,7 +312,7 @@ async function main() {
     if (
       !html.includes("noindex,nofollow") ||
       !html.includes("確認用サイト") ||
-      !html.includes("https://nen-line-stg-admin.pages.dev/register")
+      !html.includes(`${config.stagingAppOrigin}/register`)
     )
       throw new Error(`確認用の安全表示がありません: ${file}`);
   }
