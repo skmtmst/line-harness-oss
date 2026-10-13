@@ -56,6 +56,7 @@ export default function CustomerLookScreen() {
   finally{if(request===generation.current)setSaving(false)}
  }
  return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsNavV8/>}
+  help="予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。"
   preview={status==='ready'?<CustomerLookPreview look={draft} accountName={selectedAccount?.name??'公式アカウント'}/>:undefined}
   saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
   saveActions={canEdit&&status==='ready'?<><Button disabled={saving||!dirty} title={!dirty?'取り消す変更はありません':undefined} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button><Button variant="primary" disabled={!dirty||!!conflict} title={conflict?'ほかの人の変更を読み直してから保存してください':!dirty?'保存する変更はありません':undefined} busy={saving} onClick={()=>void save()}>保存する</Button></>:undefined}>

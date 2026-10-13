@@ -874,6 +874,7 @@ export default function HqBroadcastCreate() {
         previewToggle={<PreviewLauncher>{previewContent}</PreviewLauncher>}
         status={draftLabel}
          title={<>一括配信を作る</>} headingSize="compact"
+        help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
         steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
         >
         {error ? (
