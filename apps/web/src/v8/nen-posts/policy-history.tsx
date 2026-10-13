@@ -20,6 +20,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : emptyValue('none')}`
 
@@ -106,7 +107,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
       {loading ? <ListState kind="loading" title="版を読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => void load()} /> : <>
         <div className={styles.historyTable}><DataTable><thead><TableHeadRow><Th>版</Th><Th>保存日時</Th><Th>保存した人</Th><Th>内容</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead><tbody>
           {versions.filter((version) => version.status !== 'reserved').map((version) => <Tr key={version.versionNumber}>
-            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td>{policyContent(version)}</Td>
+            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td><TruncatedText value={policyContent(version)} /></Td>
             <Td>{version.status === 'in_use' ? <StatusBadge tone="success">いま使っている版</StatusBadge> : <Button variant="secondary" onClick={() => setSelected(version)}>比べる</Button>}</Td>
           </Tr>)}
         </tbody></DataTable></div>
