@@ -108,7 +108,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       else if (ts.isReturnStatement(node)) returns.push(evaluate(node.expression,scope,ctx,depth))
       else if (ts.isBlock(node)) returns.push(statements(node.statements,new Scope(scope),ctx,depth))
       else if (ts.isIfStatement(node)) {
-        if(!ctx.test&&!isTest(ctx.file))continue // Imported CLIs are not running as main.
+        const conditionText=node.expression.getText(ctx.sf)
+        if(!ctx.test&&!isTest(ctx.file)&&/import\.meta\.(?:url|main)/.test(conditionText)&&/process\.argv|import\.meta\.main/.test(conditionText))continue
         const condition = evaluate(node.expression,scope,ctx,depth)
         const throws = branch => branch && (ts.isThrowStatement(branch) || ts.isBlock(branch) && branch.statements.some(ts.isThrowStatement))
         if (condition.predicate && throws(node.thenStatement)) matcher('toBe',false,condition,value({bool:false}),ctx,node.expression)

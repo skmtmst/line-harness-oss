@@ -81,6 +81,12 @@ test('local imported helpers propagate source and scopes do not taint unrelated 
   assert.equal(findings.length,1)
   assert.equal(findings[0].test,'source')
 })
+test('conditional module-level reads in imported helpers keep their source origin', () => {
+  const helper = 'apps/web/src/helper.mjs'
+  const files = new Map([[entry, `import {getUi} from './helper.mjs';import {it,expect} from 'vitest';it('case',()=>expect(getUi()).toContain('styles.row'))`],
+    [helper, `import {readFileSync} from 'node:fs';let source='';if(enabled){source=readFileSync('view.tsx')}export function getUi(){return source}`]])
+  assert.ok(analyzeSourceTests(files).length)
+})
 
 test('helper changes introduce a different reading path even with unchanged test text',()=>{
   const helper='apps/web/src/helper.mjs',body=`import {getUi}from './helper.mjs';import {it,expect}from'vitest';it('case',()=>expect(getUi()).toContain('styles.row'))`
