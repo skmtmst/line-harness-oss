@@ -17,12 +17,13 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import StatusBadge from '@/components/shared/status-badge'
 import {
   AUTOMATIONS_DESCRIPTION,
   AutomationBand,
@@ -111,10 +112,10 @@ const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], 
   cancelled: '取りやめ',
 }
 
-function statusTone(status: RunStatus): 'active' | 'danger' | 'warn' | 'neutral' {
-  if (status === 'succeeded') return 'active'
+function statusTone(status: RunStatus): 'success' | 'danger' | 'warning' | 'neutral' {
+  if (status === 'succeeded') return 'success'
   if (status === 'permanent_failed' || status === 'partial') return 'danger'
-  if (status === 'retry_wait' || status === 'queued' || status === 'claimed' || status === 'waiting') return 'warn'
+  if (status === 'retry_wait' || status === 'queued' || status === 'claimed' || status === 'waiting') return 'warning'
   return 'neutral'
 }
 
@@ -147,8 +148,8 @@ function runsSearchUrl(pathname: string, currentParams: string, value: string): 
 function TableHead() {
   return (
     <thead>
-      <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colWhen}>いつ・だれに</Th>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow className={styles.colWhen}>いつ・だれに</Th>
         <Th className={styles.colRule}>オートメーション</Th>
         <Th className={styles.colResult}>結果</Th>
         <Th className={styles.colDone}>したこと</Th>
@@ -509,7 +510,7 @@ export default function AutomationRunsV8() {
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <TableHead />
             <tbody>
               {data.items.map((run) => {
@@ -519,11 +520,11 @@ export default function AutomationRunsV8() {
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
                 const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
                 return (
-                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
-                    <Td className={styles.colWhen}>
-                      <button type="button" className={styles.subject} onClick={() => setSelectedRun(run)}>
+                  <Tr key={run.id} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
+                    <Td grow className={styles.colWhen}>
+                      <RowNameButton title={run.subject ?? "友だち名なし"} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
-                      </button>
+                      </RowNameButton>
                       <span className={styles.sub}>{whenLine}</span>
                     </Td>
                     <Td className={styles.colRule}>
@@ -531,18 +532,15 @@ export default function AutomationRunsV8() {
                       <span className={styles.sub}>{versionLine}</span>
                     </Td>
                     <Td className={styles.colResult}>
-                      <span className={styles.pill} data-tone={statusTone(run.status)}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {STATUS_LABEL[run.status]}
-                      </span>
+                      <StatusBadge tone={statusTone(run.status)}>{STATUS_LABEL[run.status]}</StatusBadge>
                       {reason ? <span className={styles.sub} title={reason}>{reason}</span> : null}
                     </Td>
                     <Td className={styles.colDone}>
                       <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : emptyValue('unknown')}</span>
                       {done.length > 0 ? <span className={styles.sub}>{`${done.length} つ`}</span> : null}
                     </Td>
-                    <Td className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
-                    <Td className={styles.colOps}>
+                    <Td align="right" className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
                         <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
                         <RowMenu
@@ -552,7 +550,7 @@ export default function AutomationRunsV8() {
                           items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -567,12 +565,7 @@ export default function AutomationRunsV8() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const pager = status === 'ready' && data && data.items.length > 0 ? (
     <>
-      <div className={styles.pagerRow}>
-        <span className={styles.pagerCount}>
-          {`${formatNumber(total)} 件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length} 件`}
-        </span>
-        {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" /> : null}
-      </div>
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" range={{ total, first: data.pagination.offset + 1, last: data.pagination.offset + data.items.length }} />
     </>
   ) : null
 
