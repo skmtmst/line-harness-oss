@@ -358,7 +358,7 @@ export default function QuestionEditor({
       </div>
 
       </> : null}
-      <div className={choiceColumns ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
+      <div className={choiceColumns && choiceOnly === undefined ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
         {value.choices.map((choice, index) => {
           if (choiceOnly !== undefined && index !== choiceOnly) return null
           /*
@@ -602,6 +602,7 @@ export default function QuestionEditor({
                         onChange={(e) => setChoice(index, { userMessage: e.target.value })}
                         placeholder={choice.label || '空欄なら選択肢の文字が使われます'}
                         disabled={choice.hideUserMessage === true}
+                        title={choice.hideUserMessage ? 'ユーザーメッセージを使用しない設定です。使う場合はチェックを外してください。' : undefined}
                         className="mt-1.5"
                       /></SaveErrorField>
                       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
