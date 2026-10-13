@@ -3,7 +3,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
+import { CircleAlert, CircleCheck, Power, Send } from 'lucide-react'
 import type { FriendAddRoutingValidation } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
@@ -14,14 +14,12 @@ import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { resendSuppressionText } from '@/v8/friend-add/text'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
@@ -76,7 +74,6 @@ function FriendAddPublish() {
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出す。staff と分かったら変える操作を隠す（最後の守りはサーバ）。
   const canEdit = useFeatureAccess('friendAdd')
-  const narrow = useNarrowViewport()
   const [me, setMe] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
   const [detail, setDetail] = useState<RuleDetail | null>(null)
@@ -89,7 +86,6 @@ function FriendAddPublish() {
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testNote, setTestNote] = useState<string | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * どのアカウントの、何回目の読み込みかを持つ。切り替え・読み直しのあとに
@@ -348,14 +344,7 @@ function FriendAddPublish() {
       </LinePreviewMessage>
     </LinePreview>
   )
-  const preview = narrow ? (
-    <div className={styles.narrowSide}>
-      <Button type="button" onClick={() => setPreviewOpen(true)}>
-        <Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る
-      </Button>
-      {summary}
-    </div>
-  ) : (
+  const preview = (
     <>
       {summary}
       {phone}
@@ -469,16 +458,6 @@ function FriendAddPublish() {
         ) : null}
       </Card>
 
-      <ConfirmDialog
-        open={previewOpen}
-        title="LINEでの見え方"
-        description="友だち追加した人に届くメッセージの見え方です。"
-        confirmLabel="閉じる"
-        onConfirm={() => setPreviewOpen(false)}
-        onCancel={() => setPreviewOpen(false)}
-      >
-        {phone}
-      </ConfirmDialog>
     </CreatePage></SaveErrorScope>
   )
 }

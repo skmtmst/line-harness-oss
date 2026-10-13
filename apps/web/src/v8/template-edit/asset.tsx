@@ -19,7 +19,6 @@ import TapExtrasField from '@/components/shared/tap-extras-field'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
 import ActionMenu from '@/components/shared/action-menu'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Combobox from '@/components/shared/combobox'
@@ -144,7 +143,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
   const [tapExtras, setTapExtras] = useState<TapExtras | undefined>(init?.tapExtras)
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>(init ? init.couponOnce : 'once')
   const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(init ? init.couponVisibility : 'friends')
@@ -456,14 +454,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
-        side={(
+        side={(inDialog) => (
           <>
-            <div className={styles.previewToggle}>
-              <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
-            </div>
             {sideCard}
             <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">届き方</h2>
-            <div className={styles.phone}>{phone}</div>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
         footerActions={(
@@ -724,9 +719,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         items={orderMenu ? questionOrder.menuItems(orderMenu, () => setOrderMenu(null)).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })) : []}
       />
 
-      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
 
       <MediaPickerDialog
         open={pickerOpen}

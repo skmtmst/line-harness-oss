@@ -5,7 +5,6 @@ const b244Requirements = {
   rule_name: requiredText("設定名を入力してください。"),
 }
 
-
 import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
@@ -13,7 +12,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, Smartphone, User, UserPlus, UserRound, Workflow } from 'lucide-react';
+import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, User, UserPlus, UserRound, Workflow } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -233,7 +232,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const [conflict, setConflict] = useState(false)
   const [compare, setCompare] = useState<Array<{ label: string; mine: string; theirs: string }> | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [testConditionsOpen, setTestConditionsOpen] = useState(false)
   const [testInput, setTestInput] = useState<{ routeId: string | null; expectedAt: string | null; friendId: string | null }>({ routeId: null, expectedAt: null, friendId: null })
   const [testResult, setTestResult] = useState<{
@@ -327,7 +325,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const fieldFailure = saveErrors.capture(caught);
 
       if (isCurrentRequest()) { if (!fieldFailure)
-
 
  setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
@@ -685,17 +682,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       {summary}
       <CreatePreviewNote>LINEでの見え方は、届けるメッセージを決める手順から右に出ます。</CreatePreviewNote>
     </>
-  ) : narrow ? (
-    <>
-      <div className={styles.narrowSide}>
-        <div className={styles.previewOpen}>
-          <Button type="button" className={styles.previewButton} onClick={() => setPreviewOpen(true)}>
-            <Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る
-          </Button>
-        </div>
-        {summary}
-      </div>
-    </>
   ) : (
     <>
       {summary}
@@ -850,16 +836,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         <Notice tone="info" message="指定しない条件は、いま・どの経路でも・友だち不問で判定します。実際の友だちへは送信しません。" />
       </Dialog>
 
-      <ConfirmDialog
-        open={previewOpen}
-        title="LINEでの見え方"
-        description="友だち追加した人に届くメッセージの見え方です。"
-        confirmLabel="閉じる"
-        onConfirm={() => setPreviewOpen(false)}
-        onCancel={() => setPreviewOpen(false)}
-      >
-        {phone}
-      </ConfirmDialog>
       <ConfirmDialog
         open={compare !== null}
         title="最新の保存とあなたの直しの違い"

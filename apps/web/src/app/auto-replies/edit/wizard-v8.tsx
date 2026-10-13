@@ -39,7 +39,6 @@ import {
   Mic,
   File,
   MousePointerClick,
-  Smartphone,
   List,
   Activity,
   Plus,
@@ -64,7 +63,6 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import SearchField from '@/components/shared/search-field'
-import Dialog from '@/components/shared/dialog'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
@@ -385,7 +383,6 @@ const kindOrder = (label: string) => { const i = MAIN_KINDS.indexOf(label); retu
 /** 絵 A0pDt「反応するメッセージの種類」の札の印。 */
 const KIND_ICONS: Record<string, typeof Type> = { テキスト: Type, スタンプ: Sticker, 画像: ImageIcon, 位置情報: MapPin, 動画: Video, 音声: Mic, ファイル: File, ボタンのタップ: MousePointerClick }
 
-
 /** 「返すまで待つ時間」の選択肢。 */
 const REPLY_DELAY_OPTIONS = [
   { value: '0', label: 'すぐ返す' },
@@ -473,7 +470,6 @@ function AutoReplyWizardV8Inner() {
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
   // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
   const [saveConflict, setSaveConflict] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [compareTarget, setCompareTarget] = useState<WizardForm | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
@@ -678,7 +674,6 @@ function AutoReplyWizardV8Inner() {
   }
   }, [saveErrors]);
 
-
   const loadPriorityData = useCallback(
     async (ruleId: string, accountId: string | null) => {
       setPriorityState('loading')
@@ -695,7 +690,6 @@ function AutoReplyWizardV8Inner() {
     },
     [loadOrder, loadFriendsInitial, saveErrors],
   );
-
 
   const searchFriends = useCallback(
     async (query: string) => {
@@ -1116,7 +1110,6 @@ function AutoReplyWizardV8Inner() {
 
       { if (!fieldFailure)
 
-
       setError('試し送りできませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setSaving(false)
@@ -1159,7 +1152,6 @@ function AutoReplyWizardV8Inner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-
 
       setError(
         caught instanceof ApiError && caught.status === 409
@@ -1517,12 +1509,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
-            <div className={styles.narrowPhoneOpen}>
-              <Button onClick={() => setPreviewOpen(true)}><Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る</Button>
-            </div>
-            {renderPreview(false)}
-          </> : renderPreview(true)} previewToggle={narrow ? undefined : <Button onClick={() => setPreviewOpen(true)}>設定内容とLINEプレビューを見る</Button>} footerActions={
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={renderPreview(true)} footerActions={
           <>
             <Button
               type="button"
@@ -1583,7 +1570,6 @@ function AutoReplyWizardV8Inner() {
           />
         ) : undefined} status={dirty ? '下書きに未保存の変更があります' : undefined}>
 
-
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {saveNotice ? <Notice tone="success" message={saveNotice} onClose={() => setSaveNotice('')} /> : null}
       {staleTest ? (
@@ -1593,7 +1579,6 @@ function AutoReplyWizardV8Inner() {
           onClose={() => setStaleTest(false)}
         />
       ) : null}
-
 
           {step === 'basic' && (
             <>
@@ -2484,9 +2469,7 @@ function AutoReplyWizardV8Inner() {
             </>
           )}
 
-
       {/* ===== 下の帯 ===== */}
-
 
       <SaveConflictCompareDialog
         open={compareTarget !== null || compareError !== ''}
@@ -2499,11 +2482,6 @@ function AutoReplyWizardV8Inner() {
           setCompareError('')
         }}
       />
-
-      <Dialog open={previewOpen} title="設定内容とLINEプレビュー" onCancel={() => setPreviewOpen(false)}
-        footer={<Button onClick={() => setPreviewOpen(false)}>閉じる</Button>}>
-        {renderPreview(true)}
-      </Dialog>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

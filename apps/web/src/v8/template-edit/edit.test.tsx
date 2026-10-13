@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -166,13 +166,22 @@ describe('V8 メッセージを作る・編集', () => {
     expect(push).toHaveBeenCalledWith('/templates?highlight=template-new')
   })
 
-  it('1152 の幅では板 a1k3d の印を付け、見え方は「LINEでの見え方を見る」の窓で開く', async () => {
+  it('1152 の幅でも共通の入口から見え方を1回で開き、閉じても入力を保つ', async () => {
     narrow.value = true
     await mount()
     expect(document.querySelector('[data-design-node="a1k3d"]')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方を見る' }))
+    type(screen.getByLabelText('テンプレート名'), '確認中の名前')
+    type(screen.getByLabelText('本文'), '確認中の本文')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINEの見え方を確認' })) })
     await flush()
-    expect(screen.getByRole('dialog', { name: 'LINEでの見え方' })).toBeTruthy()
+    const dialog = screen.getByRole('dialog', { name: 'LINEの見え方' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(dialog).queryByRole('button', { name: /見え方.*(?:見る|確認)/ })).toBeNull()
+    expect(dialog.querySelector('[data-line-preview-part="phone"]')).toBeTruthy()
+    await act(async () => { fireEvent.click(within(dialog).getAllByRole('button', { name: '閉じる' })[0]) })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('確認中の名前')
+    expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('確認中の本文')
   })
 
   it('名前が空なら保存の口を呼ばず、理由を出す', async () => {
