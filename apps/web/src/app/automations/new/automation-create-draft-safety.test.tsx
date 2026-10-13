@@ -515,18 +515,26 @@ describe('M4torYの保存・送信の誤操作防止（DOMと実API境界）', (
     expect(api.updateCalls.at(-1)?.pathname).toBe('/api/automation-drafts/draft-account-a-2')
   })
   it('遅延保存中は店舗切替を止め、往復後も各店の下書きを保つ', async () => {
-    const { api, view } = await openPage({ slowCreate: true })
-    await fillTagRule('既存A'); fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ [ACCOUNT_A]: { id: 'existing-a', draftVersionId: 'existing-version-a' } }))
+    const { api, view } = await openPage({ slowCreate: true, knownDrafts: [{
+      id: 'existing-a', draftVersionId: 'existing-version-a', name: '既存Aの下書き',
+      description: null, eventType: 'message_received', triggerConfig: {}, conditions: {},
+      actions: [{ id: 'step-1', type: 'add_tag', params: { tagId: 'tag-vip' }, onFailure: 'stop' }],
+    }] })
+    expect(nameInput().value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: '保存した下書きを開く' }))
+    await waitFor(() => expect(nameInput().value).toBe('既存Aの下書き'))
+    await switchAccount(view, ACCOUNT_B)
+    await fillTagRule('新規B'); fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
     await waitFor(() => expect(api.createCalls).toHaveLength(1))
-    await switchAccount(view, ACCOUNT_B); expect(account.id).toBe(ACCOUNT_A)
+    await switchAccount(view, ACCOUNT_A); expect(account.id).toBe(ACCOUNT_B)
     await act(async () => api.releaseCreate()); await waitFor(() => expect(api.updateCalls).toHaveLength(1))
     await waitFor(() => expect((screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement).disabled).toBe(false))
-    await switchAccount(view, ACCOUNT_B); await fillTagRule('新規B'); await saveDraft()
     for (const id of [ACCOUNT_A, ACCOUNT_B]) {
       await switchAccount(view, id); await fillTagRule(`更新${id}`); await saveDraft()
-      expect(api.updateCalls.at(-1)?.pathname).toBe(`/api/automation-drafts/draft-${id}-${id === ACCOUNT_A ? 1 : 2}`)
+      expect(api.updateCalls.at(-1)?.pathname).toBe(`/api/automation-drafts/${id === ACCOUNT_A ? 'existing-a' : 'draft-account-b-1'}`)
     }
-    expect(api.createCalls).toHaveLength(2)
+    expect(api.createCalls).toHaveLength(1)
   })
   it('1人テストは保存済みの文面・送り先・副作用を確認して1回だけ送る', async () => {
     const { api } = await openPage({ slowTest: true })
