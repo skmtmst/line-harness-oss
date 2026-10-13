@@ -23,8 +23,9 @@ export type BarChartItem = {
   tooltipTitle: string
   added: number
   removed: number
-  /** 3つ目の意味（施策名など）は色を足さず文字で添える。 */
+  /** 配信やシナリオの名前は、日付を選ぶボタンでも読む。 */
   note?: string | null
+  events?: Array<{ kind: 'broadcast' | 'scenario'; label: string }>
 }
 
 function defaultTitle(date: string): string {
@@ -40,7 +41,7 @@ function defaultTitle(date: string): string {
 export function toBarChartItems(
   days: Array<{ date: string; added: number; removed: number }>,
   options?: {
-    campaigns?: Array<{ date: string; name: string }>
+    campaigns?: Array<{ date: string; name: string; kind?: 'broadcast' | 'scenario' }>
     formatTitle?: (date: string) => string
     formatAxisLabel?: (date: string) => string
   },
@@ -51,6 +52,8 @@ export function toBarChartItems(
       .filter((item) => item.date === day.date)
       .map((item) => item.name)
       .join('、')
+    const events = (options?.campaigns ?? []).filter(item => item.date === day.date && item.kind)
+      .map(item => ({ kind: item.kind!, label: item.name }))
     return {
       key: day.date,
       axisLabel: options?.formatAxisLabel?.(day.date) ?? `${Number(day.date.slice(5, 7))}/${Number(day.date.slice(8, 10))}`,
@@ -58,6 +61,7 @@ export function toBarChartItems(
       added: day.added,
       removed: day.removed,
       note: note || null,
+      ...(events.length ? { events } : {}),
     }
   })
 }
@@ -82,20 +86,29 @@ function labelStep(count: number): number {
   return Math.ceil(count / 8)
 }
 
-export type BarChartLegendItem = { label: string; tone: 'added' | 'removed' }
+export type BarChartLegendItem = { label: string; tone: 'added' | 'removed' | 'broadcast' | 'scenario' }
 const DEFAULT_LEGEND: BarChartLegendItem[] = [
   { label: '増えた', tone: 'added' },
   { label: '減った', tone: 'removed' },
 ]
 
 /** 凡例を切り替えの隣へ置く板でも、色と文字は同じ部品を使う。 */
-export function BarChartLegend({ items = DEFAULT_LEGEND, layout }: { items?: BarChartLegendItem[]; layout?: 'dashboard' }) {
+export function BarChartLegend({ items = DEFAULT_LEGEND, layout }: { items?: BarChartLegendItem[]; layout?: 'dashboard' | 'analytics' }) {
   return <ul className={styles.legend} data-layout={layout} aria-label="凡例">
     {items.map((entry) => <li key={entry.label} className={styles.legendItem}>
-      <span aria-hidden="true" className={[styles.swatch, entry.tone === 'added' ? styles.swatchAdded : styles.swatchRemoved].join(' ')} />
+      <span aria-hidden="true" data-chart-tone={entry.tone} className={[styles.swatch, toneClass(entry.tone)].join(' ')} />
       {entry.label}
     </li>)}
   </ul>
+}
+
+function toneClass(tone: BarChartLegendItem['tone']): string {
+  return { added: styles.swatchAdded, removed: styles.swatchRemoved, broadcast: styles.swatchBroadcast, scenario: styles.swatchScenario }[tone]
+}
+
+/** 出来事の注と日付の印は、凡例と同じ色を読む。 */
+export function BarChartEventMark({ tone }: { tone: 'broadcast' | 'scenario' }) {
+  return <span aria-hidden="true" data-chart-event={tone} className={[styles.eventMark, toneClass(tone)].join(' ')} />
 }
 
 /**
@@ -111,6 +124,7 @@ export function BarChart({
   legend = DEFAULT_LEGEND,
   layout,
   showLegend = true,
+  distribution,
 }: {
   items: BarChartItem[]
   selectedKey?: string
@@ -124,23 +138,32 @@ export function BarChart({
   /** 短い日別グラフ。凡例を別の段へ出しても数・吹き出し・読み上げ表を保つ。 */
   layout?: 'dashboard'
   showLegend?: boolean
+  /** 同じ人数の単位で、増加は基準線より上・減少は下へ描く。 */
+  distribution?: 'diverging'
 }) {
   const addedLabel = legend.find(item=>item.tone==='added')?.label ?? '増えた'
   const removedLabel = legend.find(item=>item.tone==='removed')?.label ?? '減った'
   const max = Math.max(1, ...items.flatMap((item) => [item.added, item.removed]))
   const ticks = barChartTicks(max)
   const top = ticks[ticks.length - 1] || 1
+  const addedTop = barChartTicks(Math.max(0, ...items.map(item => item.added))).at(-1) || 1
+  const removedTop = items.some(item => item.removed > 0) ? barChartTicks(Math.max(...items.map(item => item.removed))).at(-1) || 1 : 0
+  const scale = Math.max(addedTop, removedTop)
+  const span = addedTop / scale + removedTop / scale
+  const fraction = (value: number) => (value / scale) / span * 100
+  const chartTicks = distribution ? [...barChartTicks(addedTop), ...barChartTicks(removedTop).filter(value => value > 0 && value <= removedTop).map(value => -value)] : ticks
   const step = layout === 'dashboard' && items.length <= 8 ? 1 : labelStep(items.length)
   return (
-    <div className={styles.chart} data-layout={layout}>
+    <div className={styles.chart} data-layout={layout} data-chart-distribution={distribution} style={distribution ? ({ '--chart-zero': `${fraction(removedTop)}%` } as React.CSSProperties) : undefined}>
       {showLegend ? <BarChartLegend items={legend} layout={layout} /> : null}
       <div className={styles.plot} role="group" aria-label={label} data-blank-ok="棒の高さを共通の縦目盛りと比べるための描画領域">
-        {ticks.map((tick) => (
+        {chartTicks.map((tick) => (
           <div
             key={tick}
             aria-hidden="true"
             className={styles.gridline}
-            style={{ bottom: `${(tick / top) * 100}%` }}
+            data-chart-baseline={distribution && tick === 0 ? true : undefined}
+            style={{ bottom: `${distribution ? fraction(tick) + fraction(removedTop) : (tick / top) * 100}%` }}
           >
             <span className={styles.tick}>{tick}</span>
           </div>
@@ -164,13 +187,16 @@ export function BarChart({
                   <span aria-hidden="true" className={styles.bars}>
                     <span
                       className={[styles.bar, styles.addedBar].join(' ')}
-                      style={{ height: `${(item.added / top) * 100}%` }}
+                      data-chart-series="added"
+                      style={{ height: `${distribution ? fraction(item.added) : (item.added / top) * 100}%` }}
                     />
                     <span
                       className={[styles.bar, styles.removedBar, layout === 'dashboard' ? styles.dashboardRemovedBar : ''].filter(Boolean).join(' ')}
-                      style={{ height: `${(item.removed / top) * 100}%` }}
+                      data-chart-series="removed"
+                      style={{ height: `${distribution ? fraction(item.removed) : (item.removed / top) * 100}%` }}
                     />
                   </span>
+                  {distribution && item.events?.length ? <span className={styles.events}>{item.events.filter((event, eventIndex, events) => events.findIndex(other => other.kind === event.kind) === eventIndex).map((event, eventIndex) => <BarChartEventMark key={`${event.kind}:${eventIndex}`} tone={event.kind} />)}</span> : null}
                   <span aria-hidden="true" className={styles.tooltip}>
                     <span className={styles.tooltipTitle}>{item.tooltipTitle}</span>
                     <span>
@@ -194,8 +220,8 @@ export function BarChart({
         <thead>
           <tr>
             <Th scope="col">日付</Th>
-            <Th scope="col">増えた</Th>
-            <Th scope="col">減った</Th>
+            <Th scope="col">{addedLabel}</Th>
+            <Th scope="col">{removedLabel}</Th>
           </tr>
         </thead>
         <tbody>
