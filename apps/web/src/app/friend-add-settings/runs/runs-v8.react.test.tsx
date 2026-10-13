@@ -140,3 +140,22 @@ test('v8 の実行結果は板 REIxB・数の帯・失敗の帯・表・下の2�
   expect(host.textContent).toContain('経路ごとの内訳')
   expect(host.textContent).toContain('二重送信を防ぐ・知らせ')
 })
+
+test('実行結果は取得した総数・実際の表示範囲を共通件数へ渡し、次のカーソルへ進む', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const calls: URL[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+    if (url.pathname !== '/api/friend-add-runs') return base(url)
+    calls.push(url)
+    return response({ success: true, data: { ...runsData, total: 214, nextCursor: url.searchParams.get('cursor') ? null : 'page-2' } })
+  }))
+  await act(async () => root.render(<FriendAddRunsPage />))
+  await eventually(() => expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('214件中 1〜2件'))
+  expect(host.querySelectorAll('[data-list-person-cell]')).toHaveLength(2)
+  expect(host.querySelector('[data-list-person-cell] a')?.getAttribute('href')).toContain('run-ok')
+  await act(async () => (host.querySelector('button[aria-label="次のページ"]') as HTMLButtonElement).click())
+  await eventually(() => expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('214件中 21〜22件'))
+  expect(calls.some(url => url.searchParams.get('cursor') === 'page-2')).toBe(true)
+  expect(host.querySelector('button[aria-label="次のページ"]')?.hasAttribute('disabled')).toBe(true)
+})

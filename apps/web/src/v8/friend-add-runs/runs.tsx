@@ -35,7 +35,7 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
-import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, PersonCell, ActionCell } from '@/components/shared/table';
 import { useAccount } from '@/contexts/account-context';
 import { api, type FriendAddRunList } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
@@ -84,10 +84,7 @@ function displayNameOf(item: RunItem): string {
   return item.friend.displayName || '名前は未取得'
 }
 
-function initialOf(name: string): string {
-  const trimmed = name.trim()
-  return trimmed ? Array.from(trimmed)[0].toUpperCase() : '?'
-}
+
 
 /** 結果の札。以前からの友だちで案内を送らなかった記録は「再追加」（絵どおり）。 */
 export function resultView(item: RunItem): { label: string; tone: StatusBadgeTone } {
@@ -551,10 +548,9 @@ function FriendAddRunsInner() {
                     <Td className={styles.colWhen}>
                       <time dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)} className={styles.when}>{jstTime(item.receivedAt)}</time>
                     </Td>
-                    <Td className={styles.colFriend}>
-                      <span className={styles.face} aria-hidden="true">{initialOf(name)}</span>
-                      <RowNameLink className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</RowNameLink>
-                    </Td>
+                    <PersonCell className={styles.colFriend} avatarName={name} name={
+                      <RowNameLink href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</RowNameLink>
+                    } />
                     <Td className={styles.colRoute}><span className={styles.route} title={route}>{route}</span></Td>
                     <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
                     <Td grow className={styles.colDone}><TruncatedText value={done} /></Td>
@@ -582,7 +578,7 @@ function FriendAddRunsInner() {
               pageCount={pageCount}
               onPageChange={changePage}
               disabled={loading}
-              summary={`${formatNumber(data.total)} 件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length} 件`}
+              range={{ total: data.total, first: (cursorPage - 1) * perPage + 1, last: (cursorPage - 1) * perPage + items.length }}
             />
           </div>
         ) : null}

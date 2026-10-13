@@ -33,7 +33,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import DateField from '@/components/shared/date-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
-import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, PersonCell, ActionCell } from '@/components/shared/table';
 import { api, ApiError } from '@/lib/api';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
@@ -151,10 +151,7 @@ function quoted(text: string | null): string {
   return text ? `「${text}」` : emptyValue('unknown')
 }
 
-function initialOf(name: string | null): string {
-  const trimmed = (name ?? '').trim()
-  return trimmed ? Array.from(trimmed)[0].toUpperCase() : '?'
-}
+
 
 export default function AutoReplyRunsV8() {
   const router = useRouter()
@@ -534,14 +531,9 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colWhen}>
                       <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>
-                    <Td className={styles.colFriend}>
-                      <span className={styles.face} aria-hidden="true">{initialOf(item.friendName)}</span>
-                      {item.friendId ? (
-                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></RowNameLink>
-                      ) : (
-                        <span className={styles.friendName} ><TruncatedText value={String(name ?? '')} /></span>
-                      )}
-                    </Td>
+                    <PersonCell className={styles.colFriend} avatarName={item.friendName} name={item.friendId ? (
+                      <RowNameLink href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}><TruncatedText value={name} /></RowNameLink>
+                    ) : <TruncatedText value={name} />} />
                     <Td className={styles.colInput}>
                       <span className={styles.input} title={`${quoted(item.inputPreview)}（きっかけ：${item.triggerLabel}）`}>{quoted(item.inputPreview)}</span>
                     </Td>
@@ -575,7 +567,7 @@ export default function AutoReplyRunsV8() {
               pageCount={pageCount}
               onPageChange={setPage}
               disabled={loading}
-              summary={total > 0 ? `${formatNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)} 件` : undefined}
+              range={{ total, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, total) }}
             />
           </div>
         ) : null}

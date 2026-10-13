@@ -9,10 +9,10 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     counts[pattern]++
     findings.push({ pattern, reason, text: el.textContent?.trim().slice(0, 90) ?? '', label: el.getAttribute('aria-label') })
   }
-  const textRects = el => {
+  const textRects = (el, exclude) => {
     const rects = [], walker = document.createTreeWalker(el, 4)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (!node.textContent.trim() || !visible(node.parentElement) || node.parentElement.closest('svg')) continue
+      if (!node.textContent.trim() || !visible(node.parentElement) || node.parentElement.closest('svg') || exclude?.contains(node.parentElement)) continue
       const range = document.createRange(); range.selectNodeContents(node)
       for (const r of range.getClientRects()) if (r.width && r.height) rects.push(r)
     }
@@ -31,6 +31,30 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
   const roots = [...document.querySelectorAll('[data-page-template]')].filter(visible)
   for (const root of roots) {
     const all = selector => [...root.querySelectorAll(selector)].filter(visible)
+    // Z1: text can be one line while its avatar has moved above it.
+    for (const cell of all('tbody td,[role="row"] [role="cell"]')) {
+      const avatar = [...cell.querySelectorAll('[data-avatar],[aria-hidden="true"]')].find(el => {
+        const r = el.getBoundingClientRect(), radius = getComputedStyle(el).borderRadius
+        return visible(el) && !el.matches('svg') && (el.hasAttribute('data-avatar') || r.width <= 56 && r.height <= 56 && (radius === '50%' || parseFloat(radius) >= Math.min(r.width, r.height) / 2))
+      })
+      if (!avatar) continue
+      const face = avatar.getBoundingClientRect()
+      const names = textRects(cell, avatar)
+      if (names.length && !names.some(r => Math.min(r.bottom, face.bottom) > Math.max(r.top, face.top))) add('F2', cell, 'avatar and person name occupy separate vertical rows')
+    }
+    // Z3: canonical content owns an inset, whereas a full-bleed list table does not.
+    for (const content of all('[data-template-region="content"]')) {
+      if (content.parentElement?.closest('[data-template-region="content"]')) continue
+      const children = [...content.children].filter(visible)
+      const inset = parseFloat(getComputedStyle(content).paddingRight) || 0
+      const nestedContent = children.find(el => el.matches('[data-template-region="content"]'))
+      const body = nestedContent ?? (root.dataset.pageTemplate === 'settings' || inset > 0 ? content : null)
+      if (!body) continue
+      const blocks = [...body.children].filter(el => visible(el) && !el.matches('[role="dialog"],[role="menu"]'))
+      if (!blocks.length) continue
+      const gap = root.getBoundingClientRect().right - Math.max(...blocks.map(el => el.getBoundingClientRect().right))
+      if (gap < 8) add('F6', body, 'content right edge is less than 8px from the white page edge')
+    }
     const isList = root.dataset.pageTemplate === 'list'
     if (isList && !root.hasAttribute('data-list-skeleton') && !root.querySelector('[data-list-skeleton]')) add('F4', root, 'list template is missing its shared standard and audit scope')
     const heading = root.querySelector('[data-template-region="heading"],[data-template-region="header"]')

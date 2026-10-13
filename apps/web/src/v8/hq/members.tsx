@@ -1,7 +1,7 @@
 'use client'
 
 import { PageContent } from '@/components/templates/page-frame'
-import { Plus } from 'lucide-react'
+import { Plus, Users, UserPlus, Eye, Building2 } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
@@ -243,10 +243,10 @@ function MembersInner() {
         ) : (
           <>
             <KpiBand aria-label="権限者の数">
-              <KpiCard title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
-              <KpiCard title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
-              <KpiCard title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
-              <KpiCard title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
+              <KpiCard icon={<Users />} title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
+              <KpiCard icon={<UserPlus />} title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
+              <KpiCard icon={<Eye />} title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
+              <KpiCard icon={<Building2 />} title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
             </KpiBand>
 
             <GridTable label="権限者の一覧" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
