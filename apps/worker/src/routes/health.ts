@@ -8,7 +8,9 @@ import {
   getAccountMigrationById,
   createAccountMigration,
   updateAccountMigration,
+  isLineAccountTenantActive,
 } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -133,14 +135,20 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
      * 範囲外も 404 に倒す（詳細口と同じ fail-closed）。
      */
     const scope = await getVisibleLineAccountScope(db, c.get('staff'));
-    if (!scope.ids.includes(fromAccountId)) {
+    const source = scope.accounts.find((account) => account.id === fromAccountId);
+    const target = scope.accounts.find((account) => account.id === body.toAccountId);
+    if (!source || !target || source.is_active !== 1 || target.is_active !== 1
+      || source.archived_at || target.archived_at
+      || (source.tenant_id ?? DEFAULT_TENANT_ID) !== (target.tenant_id ?? DEFAULT_TENANT_ID)
+      || !await isLineAccountTenantActive(db, fromAccountId)
+      || !await isLineAccountTenantActive(db, body.toAccountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
 
-    // 移行対象: このアカウントに紐づく友だち数をカウント（line_accountsとの関連はuser_id経由）
-    // 簡易版: is_following=1 の全友だちを移行対象とする
+    // Never include another account's friends in this migration's count.
     const countResult = await db
-      .prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1`)
+      .prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`)
+      .bind(fromAccountId)
       .first<{ count: number }>();
     const totalCount = countResult?.count ?? 0;
 
