@@ -1278,7 +1278,7 @@ function PublicationsV8({
           <Button disabled={index === orderItems.length-1 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === orderItems.length-1 ? 'これより下には移動できません' : undefined} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
         </li>)}</ol>
       </Dialog>
-      {notice && !withdrawTarget ? <Notice tone="danger" message={notice} /> : null}
+      {notice && !withdrawTarget && !editing && !orderItems ? <Notice tone="danger" message={notice} /> : null}
       {state === 'loading' ? (
         <ListState kind="loading" title="公式サイト掲載中の写真を読み込んでいます" />
       ) : state === 'forbidden' ? (
