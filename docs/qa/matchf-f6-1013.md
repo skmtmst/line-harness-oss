@@ -48,3 +48,5 @@ Y2初回a2d4691a55：54→2（u5広幅）、スマホが下まで描かれる4�
 Y2bビルド終了1：CSS Modulesのpure指定不足（local classなし）。正の.frameへ条件を限定して修正。plainの古いprivateクラス文字assert1つはcreate-consistencyの実CSS/描画/灰色故障対照へ移し、ルールは保持。新node2件・関連spacing5件が成功。B-274のCURRENTと最新VERDICTSを読み、次の撮影からFRESH.txtとCOPIES-STAMPを保存する。古い写しの位置点は比較・合算しない。
 
 Y2c d40f676242の静的81場面：Y1/Y2=0、Y3=3/Y4=54（未修正）、既存崩れ0。FRESH成功、写し18:17。Y3はIDの有無ではなく下書き/公開の状態から題とパンくずを同じ変数で出す。関連8件・描画故障対照3件成功。B-275以降は司令塔heavy.shを使用。
+
+Y3 abfba66621の81場面はY1〜Y3/既存崩れ0、未修正Y4=54。Y4は通常/分割の帯だけの主保存操作をSaveへ。副操作・次へ・リンク・インラインの別用途を保持。実部品34件/描画故障4件/型成功。最初の関連34件はkey警告が出たためReact.Children.mapへ修正し、同じ34件を再実行して警告なし。保存中/完了/ref/submit/理由/disabled/clickを実DOMで確認。

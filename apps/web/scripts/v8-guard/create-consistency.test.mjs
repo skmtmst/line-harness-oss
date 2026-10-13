@@ -30,3 +30,14 @@ test('Y3 作る題と編集のパンくずの不一致を落とし、同じ状�
  await page.locator('main h2').evaluate(e=>e.textContent='ルールを編集');await page.locator('nav h1').evaluate(e=>e.textContent='ルールを編集・基本設定');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,0);
  }finally{await browser.close()}
 });
+
+test('Y4 主保存の実SVGを数え、チェック・印なし・二重印の故障を落とす',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();
+ const button=icons=>`<main><div data-sticky-actions><button class="button_primary_x">${icons}保存する</button></div></main>`;
+ const svg=kind=>`<svg class="lucide lucide-${kind}" width="16" height="16"><path d="M0 0L16 16" /></svg>`;
+ for(const icons of [svg('check'),'',svg('save')+svg('check')]){await page.setContent(button(icons));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,1);}
+ await page.setContent(button(svg('save')));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,0);
+ await page.locator('button').evaluate(e=>{e.textContent='保存中…';e.setAttribute('aria-busy','true')});assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
+ await page.setContent(button(svg('arrow-right')).replace('保存する','次へ'));assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
+ }finally{await browser.close()}
+});
