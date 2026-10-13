@@ -8,8 +8,7 @@ import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus } from 'lucide-react'
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { CreatePage } from '@/components/templates';
-import PreviewLauncher from '@/components/templates/preview-launcher'
+import { DetailPage } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
@@ -176,6 +175,7 @@ function Connections() {
 
   const menuItems: ActionMenuItem[] = [
     { id: 'open', label: canEdit ? 'メニューを開く' : '詳しく見る', external: false, href: editHref, onSelect: () => router.push(editHref) },
+    ...(canEdit ? [{ id: 'buttons', label: 'ボタンの動きを直す', href: buttonsHref, onSelect: () => router.push(buttonsHref) }] : []),
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -198,19 +198,17 @@ function Connections() {
   )
 
   return (
-    <CreatePage
+    <DetailPage
       boardId="wxIQ7"
+      layout="record-detail"
+      heightMode="content"
       title={`切替のつながり：${group.name}`}
       help="タブで行き来できるメニューの関係"
 
-      preview={aside}
-      previewToggle={<PreviewLauncher label="状態と操作を見る" title="いまの状態と操作">{aside}</PreviewLauncher>}
-      previewSurface="plain"
+      summary={aside}
+      summaryLabel="いまの状態と操作"
+      summaryPreview={{ label: '状態と操作を見る', title: 'いまの状態と操作' }}
       readOnly={!canEdit}
-      footerActions={<>
-        <Button href="/rich-menus">メニュー一覧へ</Button>
-        {canEdit ? <Button variant="primary" href={buttonsHref}>ボタンの動きを直す</Button> : null}
-      </>}
     >
       <Card layout="vertical" padding="roomy" gap="normal" aria-labelledby="rm-map">
         <CardHeader size="content" titleId="rm-map" title="つながりの図" meta={others.length > 0 ? '緑のタブが「別のメニューへ移る」ボタンです' : '切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます'} />
@@ -255,6 +253,6 @@ function Connections() {
         // 対象条件は束ごとに保存するため、切替先だけ別の条件にはならない。
         { label: '切替先だけ「誰に出すか」が違う', value: 'なし' },
       ]} />
-    </CreatePage>
+    </DetailPage>
   )
 }
