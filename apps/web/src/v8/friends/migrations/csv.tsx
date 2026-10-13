@@ -1,18 +1,20 @@
 'use client'
 
-import { jstDate } from '@/lib/jst-datetime'
-import { Download, FileSearch, Info, Inbox } from 'lucide-react'
+import { Download, FileSearch, Inbox } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { DashboardColumns } from '@/components/templates/dashboard-page'
 import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { FriendsSectionHead } from '../shared/head'
 import { slashDateTime } from '../duplicates/words'
@@ -74,14 +76,11 @@ export default function CsvMigrationsV8() {
     <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" onRetry={() => void m.load()} />
   ) : (
     <>
-      <p className={styles.band}>
-        <Info size={16} aria-hidden="true" />
-        <span>書き出しても友だちの情報は変わりません。取り込みは、まず確認だけをします（追加・更新・変更なし・競合・エラーの内訳）。</span>
-      </p>
+      <Notice tone="info" message="書き出しても友だちの情報は変わりません。取り込みは、まず確認だけをします（追加・更新・変更なし・競合・エラーの内訳）。" />
 
-      <div className={styles.pair}>
-        <section className={styles.card} aria-labelledby="csv-export-title">
-          <h3 id="csv-export-title" className={styles.cardTitle}>CSVで書き出す</h3>
+      <DashboardColumns layout="cards">{[
+        <Card key="export" layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-export-title">
+          <CardHeader title="CSVで書き出す" titleId="csv-export-title" headingLevel={3} size="content" />
           <div className={styles.field}>
             <span className={styles.fieldLabel}>アカウント</span>
             <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><EntitySelect
@@ -119,10 +118,10 @@ export default function CsvMigrationsV8() {
               </Button>
             )}
           </div>
-        </section>
+        </Card>,
 
-        <section className={styles.card} aria-labelledby="csv-import-title">
-          <h3 id="csv-import-title" className={styles.cardTitle}>CSVを取り込む</h3>
+        <Card key="import" layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-import-title">
+          <CardHeader title="CSVを取り込む" titleId="csv-import-title" headingLevel={3} size="content" />
           <FileDropzone
             className={styles.drop}
             title="ここにCSVを置く"
@@ -143,16 +142,15 @@ export default function CsvMigrationsV8() {
               </Button>
             )}
           </div>
-        </section>
-      </div>
+        </Card>
+      ]}</DashboardColumns>
 
       {m.message ? <p role="status" className={styles.message}>{m.message}</p> : null}
 
-      <section className={styles.card} aria-labelledby="csv-result-title">
-        <div className={styles.cardHead}>
-          <h3 id="csv-result-title" className={styles.cardTitle}>{m.summary && m.file ? `確認の結果：${m.file.name}` : '確認の結果'}</h3>
-          <p className={styles.cardSub}>{m.summary ? 'まだ友だち情報は変えていません' : 'CSVを選んで「まず確認だけする」を押すと、ここに内訳が出ます'}</p>
-        </div>
+      <Card layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-result-title">
+        <CardHeader size="content" headingLevel={3} titleId="csv-result-title"
+          title={m.summary && m.file ? `確認の結果：${m.file.name}` : '確認の結果'}
+          meta={m.summary ? 'まだ友だち情報は変えていません' : 'CSVを選んで「まず確認だけする」を押すと、ここに内訳が出ます'} />
         <KpiBand gridClassName="grid grid-cols-5">
           {([
             ['add', '追加', '人', ''],
@@ -187,13 +185,10 @@ export default function CsvMigrationsV8() {
             <p className={styles.small}>{m.summary ? '競合・エラーのある行を直して、もう一度「まず確認だけする」からやり直してください。' : '反映は、確認の結果を見てからです。'}</p>
           )}
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="csv-history-title">
-        <h3 id="csv-history-title" className={styles.cardTitle}>
-          書き出し・取り込みの履歴
-          <HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip>
-        </h3>
+      <Card layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-history-title">
+        <CardHeader size="content" headingLevel={3} titleId="csv-history-title" title={<>書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></>} />
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
@@ -219,7 +214,7 @@ export default function CsvMigrationsV8() {
               {m.jobs.map((job) => {
                 const account = m.accounts.find((item) => item.id === job.line_account_id)?.name
                 const count = job.row_count ?? job.total_count ?? null
-                const downloadable = job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString())
+                const downloadable = !m.manageLocked && job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString())
                 return (
                   <Tr key={`${job.kind}-${job.id}`} className={styles.row}>
                     <Td>{slashDateTime(job.created_at)}</Td>
@@ -228,11 +223,11 @@ export default function CsvMigrationsV8() {
                     <Td><TruncatedText value={job.created_by_name ?? emptyValue('unknown')} /></Td>
                     <Td>
                       <span className={styles.stateCell}>
-                        <span className={`${styles.pill} ${job.status === 'completed' ? styles.pillOk : job.status === 'previewed' ? styles.pillWarn : styles.pillMuted}`}>
+                        <StatusBadge tone={job.status === 'completed' ? 'success' : job.status === 'previewed' ? 'warning' : 'neutral'} size="compact">
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
-                        </span>
+                        </StatusBadge>
                         {downloadable ? (
-                          <a className={styles.link}>CSVで書き出す</a>
+                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${encodeURIComponent(job.id)}/download`}>CSVで書き出す</a>
                         ) : null}
                       </span>
                     </Td>
@@ -242,7 +237,7 @@ export default function CsvMigrationsV8() {
             </tbody>
           </DataTable>
         )}
-      </section>
+      </Card>
     </>
   )
 
@@ -258,7 +253,7 @@ export default function CsvMigrationsV8() {
           </Button>
         )}
       />
-      <div className={styles.body}>{body}</div>
+      <PageContent>{body}</PageContent>
     </PageFrame>
   )
 }

@@ -257,11 +257,10 @@ export default function AccountsV8() {
               const friends = archived || account.stats?.friendCount == null ? '—' : polishFormatNumber(account.stats.friendCount)
               return (
                 <Tr data-row-id={account.id} key={account.id} interactive>
-                  <Td className={styles.colName}><div className={styles.nameStack}>
-                    <span className={styles.name} title={account.name}>{account.name}</span>
+                  <Td className={styles.colName}><span className={styles.name} title={account.name}>{account.name}</span></Td>
+                  <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
                     <TruncatedText className={styles.sub} value={account.channelId ? `チャネル ${account.channelId}` : `チャネル ${emptyValue("unconfigured")}`} />
-                  </div></Td>
-                  <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
+                  </Td>
                   <Td className={styles.colHook}>
                     {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
                   </Td>
