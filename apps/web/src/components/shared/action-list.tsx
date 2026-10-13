@@ -90,9 +90,11 @@ export function ActionRow({ title, kind, icon: Icon = Zap, number, open, readOnl
       {readOnly ? null : handle}
       <span className={styles.icon}><Icon size={16} aria-hidden="true" /></span>
       {kind ? <span className={styles.kind} title={kind}>{kind}</span> : null}
-      {readOnly || !onToggle ? <span className={styles.title} title={title}>{title}</span>
-        : <button type="button" className={styles.titleButton} title={title} aria-expanded={Boolean(open)} onClick={onToggle}>{title}</button>}
-      {extra ? <div className={styles.extra}>{extra}</div> : null}
+      <div className={styles.details}>
+        {readOnly || !onToggle ? <span className={styles.title} data-action-name title={title}>{title}</span>
+          : <button type="button" className={styles.titleButton} data-action-name title={title} aria-expanded={Boolean(open)} onClick={onToggle}>{title}</button>}
+        {extra ? <div className={styles.extra} data-action-value title={typeof extra === 'string' ? extra : undefined}>{extra}</div> : null}
+      </div>
       {readOnly ? null : <RowActions menuAppearance="box" menuSize="row" subjectName={`${number}つ目の行うこと`} menuItems={[
         ...(onToggle ? [{ id: 'edit', label: open ? '設定を閉じる' : '設定を変える', onSelect: onToggle }] : []), ...menuItems,
       ]} destructiveItem={onRemove ? { id: 'remove', label: '削除する', onSelect: () => setRemoving(true) } : undefined} />}
