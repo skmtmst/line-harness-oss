@@ -1,4 +1,4 @@
-import type { FormEventHandler, KeyboardEventHandler, Ref, ReactNode } from 'react'
+import { useId, type FormEventHandler, type KeyboardEventHandler, type Ref, type ReactNode } from 'react'
 import styles from './radio-card.module.css'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
@@ -136,6 +136,7 @@ export default function RadioCard({
   contentPlacement = 'standard',
 }: RadioCardProps) {
   const field = useFieldContext()
+  const disabledReasonId = useId()
   invalid = invalid || Boolean(field?.invalid)
   return (
     <label
@@ -170,13 +171,13 @@ export default function RadioCard({
         checked={checked}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        aria-describedby={joinDescribedBy(field?.describedBy)}
+        aria-describedby={joinDescribedBy(field?.describedBy, disabled && disabledReason ? disabledReasonId : undefined)}
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
         <strong className={styles.title} title={title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
-        {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
+        {disabled && disabledReason ? <small id={disabledReasonId} className={styles.reason}>{disabledReason}</small> : null}
       </span>
       {children}
     </label>

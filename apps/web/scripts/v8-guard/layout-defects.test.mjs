@@ -289,6 +289,35 @@ test('空白検査はCIで一度だけ実行し、既存V8 guardと同じ必須�
 
 // P〜Sは実際のCSSの故障を検出する。許可や上限では通さない。
 import scanFormRules from './form-rules-browser.mjs'
+test('F8の見張りはフォーム内の押せない理由とその接続を検査し、既存CIでも故障を検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-page-template="create"><button disabled title="受け取る人を選んでください">送る</button><input disabled aria-describedby="reason"><p id="reason">種類を選んでください</p><button disabled aria-busy="true">処理中…</button></div></main>')
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 0)
+    await page.locator('button').first().evaluate(el => el.removeAttribute('title'))
+    await page.locator('#reason').evaluate(el => el.hidden = true)
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 2)
+    await page.locator('#reason').evaluate(el => el.remove())
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 2)
+    await page.locator('button').first().evaluate(el => el.setAttribute('title', '受け取る人を選んでください'))
+    await page.locator('input').evaluate(el => el.setAttribute('aria-description', '種類を選んでください'))
+    assert.equal((await measurePage(page)).filter(f => f.kind === 'form-action-reason').length, 0)
+  } finally { await browser.close() }
+})
+test('作成の題の説明と条件の日本語を、欠け・旧表記の故障で見張る', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const good = '<main><div data-page-template="create"><div data-template-region="heading"><h1>タグを作る</h1><button aria-label="タグを作るの説明" aria-expanded="false">？</button></div><button>いずれか1つ以上を満たす条件を足す</button></div></main>'
+    await page.setContent(good)
+    assert.deepEqual(await page.evaluate(scanFormRules), [])
+    await page.setContent(good.replace('<button aria-label="タグを作るの説明" aria-expanded="false">？</button>', '').replace('いずれか1つ以上を満たす条件', 'いずれか1つ以上を満たす条件（or 条件）'))
+    const findings = await page.evaluate(scanFormRules)
+    assert.ok(findings.some(f => f.kind === 'form-help'))
+    assert.ok(findings.some(f => f.kind === 'form-copy'))
+  } finally { await browser.close() }
+})
 test('F組の色・左操作・任意・欄の右端を、正しい形と故障注入で守る', async () => {
   const browser = await chromium.launch()
   try {
@@ -335,3 +364,13 @@ test('作る型の実CSS：1152は右欄を畳み名前とフォルダを1列、
     }
   } finally { await browser.close() }
 })
+
+test('LINE見本の描かれる箱を内容として数え、スクロールの箱や端末後の本当の空白は見逃さない',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage({viewport:{width:1440,height:900}});
+ const phone='<section data-line-preview-part="phone" style="width:300px;height:600px;background:#111"><div data-line-preview-part="talk" style="height:520px"><p style="margin:0;color:white">短い見本</p></div></section>';
+ const pane=height=>shell(`<aside data-template-region="preview" style="width:400px;height:${height}px;padding:24px;background:white;overflow:auto">${phone}</aside><footer style="margin-top:900px">続き</footer>`);
+ await page.setContent(pane(400));assert.deepEqual(await page.evaluate(scanPanelBlank),[]);
+ await page.setContent(pane(760));const bad=await page.evaluate(scanPanelBlank);assert.equal(bad.length,1);assert.equal(bad[0].measure.gap,136);
+ await page.setContent(pane(400));await page.locator('[data-line-preview-part="phone"]').evaluate(e=>{e.removeAttribute('data-line-preview-part');e.style.height='300px';e.style.background='transparent'});assert.ok((await page.evaluate(scanPanelBlank)).some(f=>f.measure.gap>=64));
+ }finally{await browser.close()}
+});

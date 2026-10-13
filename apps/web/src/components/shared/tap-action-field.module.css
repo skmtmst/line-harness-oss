@@ -184,3 +184,9 @@
   font-size: var(--text-caption);
 }
 }
+
+@container v8-page (width < 1100px) {
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind, .row .body { flex: none; }
+  .row .body { align-items: stretch; }
+}

@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 
 import Card from '@/components/shared/card'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
@@ -470,10 +472,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
           <>
             {inline ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
-              <div className={styles.row}>
+              <SettingsFormRow layout="name-folder">
                 <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="cr-name-input" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
 <FieldError id="cr-name-input-error">{fields.error('name')}</FieldError></Field></div>
-                <div className={`${styles.field} ${styles.folder}`}>
+                <div className={styles.field}>
                   <span className={styles.pickLabel}>フォルダ</span>
                   <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                     size="full"
@@ -489,7 +491,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         : undefined}
                   /></SaveErrorField>
                 </div>
-              </div>
+              </SettingsFormRow>
             </Card>}
 
             <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-cards">

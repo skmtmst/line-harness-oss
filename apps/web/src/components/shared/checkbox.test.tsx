@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Checkbox from './checkbox'
+import Checkbox, { SettingCheckbox } from './checkbox'
 
 afterEach(() => cleanup())
 
@@ -58,5 +58,30 @@ describe('チェックボックス（★V7 gvjpx）', () => {
     expect(css).toMatch(/\.input \{\s*position:\s*absolute;\s*inset:\s*0;/s)
     // 24px の当たりは札（.line）の padding＋戻し margin で持つ。
     expect(css).toMatch(/\.line \{[^}]*padding:\s*3px;[^}]*margin:\s*-3px;/s)
+  })
+})
+
+
+describe('固定の設定の理由と通常の切り替え', () => {
+  it('常にオンの項目は値と理由を保ち、押しても外れない', () => {
+    const changes: boolean[] = []
+    render(<SettingCheckbox checked={false} locked label="URLを短縮して数える" onChange={(value) => changes.push(value)} />)
+    const box = screen.getByRole('checkbox', { name: 'URLを短縮して数える' }) as HTMLInputElement
+    expect(box.checked).toBe(true)
+    expect(box.disabled).toBe(true)
+    expect(box.title).toBe('この設定は常にオンです')
+    expect(box.getAttribute('aria-description')).toBe('この設定は常にオンです')
+    fireEvent.click(box)
+    expect(changes).toEqual([])
+  })
+  it('通常の項目には固定の理由を付けず、選んだ値を通知する', () => {
+    const changes: boolean[] = []
+    render(<SettingCheckbox checked={false} label="抽選する" onChange={(value) => changes.push(value)} />)
+    const box = screen.getByRole('checkbox', { name: '抽選する' }) as HTMLInputElement
+    expect(box.disabled).toBe(false)
+    expect(box.hasAttribute('title')).toBe(false)
+    expect(box.hasAttribute('aria-description')).toBe(false)
+    fireEvent.click(box)
+    expect(changes).toEqual([true])
   })
 })

@@ -72,7 +72,6 @@ import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback
 import { notifyToast } from '@/components/shared/toast';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
-import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -1030,12 +1029,6 @@ export default function ScenariosListV8() {
 
   /* ===== 道具の段の部品（広い板と狭い板で同じものを並べ替える） ===== */
 
-  const noteBand = (
-    <PageExplanationBody>
-      作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
-    </PageExplanationBody>
-  )
-
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
       <FilterChip
@@ -1134,7 +1127,7 @@ export default function ScenariosListV8() {
   }
 
   return (
-    <PageExplanationProvider pageKey="scenarios"><SaveErrorScope errors={saveErrors}><ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       heightMode="content"
       toolbarSpacing={narrow ? undefined : 'section'}
       noticeSpacing="section"
@@ -1142,7 +1135,8 @@ export default function ScenariosListV8() {
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
-      titleAccessory={<PageExplanationToggle />}
+      explanationKey="scenarios"
+      explanation="作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。"
 
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
@@ -1309,6 +1303,6 @@ export default function ScenariosListV8() {
         <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
-    </ListPage></SaveErrorScope></PageExplanationProvider>
+    </ListPage></SaveErrorScope>
   )
 }

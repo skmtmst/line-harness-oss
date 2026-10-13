@@ -2,14 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus } from 'lucide-react';
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { CreatePage } from '@/components/templates';
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
@@ -18,6 +18,11 @@ import TargetMissing from '@/components/shared/target-missing'
 import { formatNumber } from '@/lib/format';
 import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis';
 import styles from './connections.module.css'
+import Card, { CardHeader } from '@/components/shared/card'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
 
@@ -89,6 +94,7 @@ export default function RichMenuConnectionsV8() {
 function Connections() {
   const router = useRouter()
   const groupId = useSearchParams().get('id') ?? ''
+  const canEdit = useFeatureAccess('richMenus')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const activeAccountIdRef = useRef(selectedAccountId)
   const requestGenerationRef = useRef(0)
@@ -169,26 +175,25 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    { id: 'open', label: 'メニューを開く', external: false, href: editHref, onSelect: () => router.push(editHref) },
+    { id: 'open', label: canEdit ? 'メニューを開く' : '詳しく見る', external: false, href: editHref, onSelect: () => router.push(editHref) },
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
   const aside = (
     <div className={styles.aside}>
       <div className={styles.asideActions}>
-        <Button href={editHref} className={styles.asideButton}><Pencil size={15} aria-hidden="true" />編集する</Button>
+        <Button href={editHref} className={styles.asideButton}><Pencil size={15} aria-hidden="true" />{canEdit ? '編集する' : '詳しく見る'}</Button>
         <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} aria-current="page" className={styles.asideButton}><GitFork size={15} aria-hidden="true" />切替のつながり</Button>
         <span className={styles.menuAnchor}>
-          <RowMenu className={styles.moreButton} label="そのほかの操作" items={menuItems} />
+          <RowMenu label="そのほかの操作" items={menuItems} />
         </span>
       </div>
-      <section className={styles.box} aria-labelledby="rm-state">
-        <h2 className={styles.boxTitle} id="rm-state">いまの状態</h2>
-        <div className={styles.row}><span>状態</span><strong>{group.status === 'published' ? '公開中' : '下書き'}</strong></div>
-        <div className={styles.row}><span>出す相手</span><strong>{audienceText}</strong></div>
-        <div className={styles.row}><span>出る人</span><strong>{reach === null ? emptyValue('unknown') : `${formatNumber(reach)}人`}</strong></div>
-        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? emptyValue('unknown') : `${formatNumber(taps)}回`}</strong></div>
-      </section>
+      <CreateSummaryCard title="いまの状態" rows={[
+        { label: '状態', value: <StatusBadge tone={group.status === 'published' ? 'success' : 'neutral'}>{group.status === 'published' ? '公開中' : '下書き'}</StatusBadge> },
+        { label: '出す相手', value: <TruncatedText value={audienceText} /> },
+        { label: '出る人', value: reach === null ? emptyValue('unknown') : `${formatNumber(reach)}人` },
+        { label: '今月押された', value: taps === null ? emptyValue('unknown') : `${formatNumber(taps)}回` },
+      ]} />
     </div>
   )
 
@@ -199,23 +204,22 @@ function Connections() {
       help="タブで行き来できるメニューの関係"
 
       preview={aside}
+      previewToggle={<PreviewLauncher label="状態と操作を見る" title="いまの状態と操作">{aside}</PreviewLauncher>}
+      previewSurface="plain"
+      readOnly={!canEdit}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>
-        <Button variant="primary" href={buttonsHref}>ボタンの動きを直す</Button>
+        {canEdit ? <Button variant="primary" href={buttonsHref}>ボタンの動きを直す</Button> : null}
       </>}
     >
-      <section className={styles.card} aria-labelledby="rm-map">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="rm-map">つながりの図</h2>
-          <p className={styles.cardNote}>{others.length > 0 ? '緑のタブが「別のメニューへ移る」ボタンです' : '切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます'}</p>
-        </div>
+      <Card layout="vertical" padding="roomy" gap="normal" aria-labelledby="rm-map">
+        <CardHeader size="content" titleId="rm-map" title="つながりの図" meta={others.length > 0 ? '緑のタブが「別のメニューへ移る」ボタンです' : '切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます'} />
         <div className={styles.map}>
           {entry ? (
-            <article className={styles.menu} data-entry="">
+            <Card layout="vertical" padding="compact" gap="tight" surface="muted" className={styles.menu} data-entry="">
               <span className={styles.menuImage} aria-hidden="true" />
-              <strong className={styles.menuName} ><TruncatedText value={String(entry.name ?? '')} /></strong>
-              <span className={styles.menuSub}>このメニュー・タブA</span>
-            </article>
+              <CardHeader size="content" title={<TruncatedText value={String(entry.name ?? '')} />} meta="このメニュー・タブA" />
+            </Card>
           ) : null}
           {others.map((page, index) => {
             const link = linkLabel(analysis, entryId, page.id)
@@ -223,45 +227,34 @@ function Connections() {
             return (
               <div key={page.id} className={styles.mapPair}>
                 <span className={styles.link}>
-                  <span>{link.label}</span>
+                  <TruncatedText value={link.label} />
                   {link.both ? <ArrowLeftRight className={styles.linkIcon} aria-hidden="true" /> : <ArrowRight className={styles.linkIcon} aria-hidden="true" />}
                 </span>
-                <article className={styles.menu} data-broken={returns ? undefined : ''}>
+                <Card layout="vertical" padding="compact" gap="tight" surface={returns ? 'standard' : 'danger'} className={styles.menu} data-broken={returns ? undefined : ''}>
                   <span className={styles.menuImage} aria-hidden="true" />
-                  <strong className={styles.menuName} ><TruncatedText value={String(page.name ?? '')} /></strong>
-                  <span className={styles.menuSub}>{`タブ${tabLetter(index + 1)}・${returns ? '戻るタブあり' : '戻るタブなし'}`}</span>
-                </article>
+                  <CardHeader size="content" title={<TruncatedText value={String(page.name ?? '')} />} meta={`タブ${tabLetter(index + 1)}・${returns ? '戻るタブあり' : '戻るタブなし'}`} />
+                </Card>
               </div>
             )
           })}
         </div>
         <div className={styles.addRow}>
-          {pages.length < MAX_PAGES ? (
+          {canEdit && pages.length < MAX_PAGES ? (
             <Button variant="text" href={buttonsHref}><Plus size={15} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
-          ) : <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span>}
+          ) : pages.length >= MAX_PAGES ? <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span> : null}
           <span className={styles.count}>{`${pages.length} 枚`}</span>
         </div>
-      </section>
-
-      <section className={styles.card} aria-labelledby="rm-watch">
-        <div className={styles.cardHead}><h2 className={styles.cardTitle} id="rm-watch">よくある事故の見張り</h2></div>
-        {noReturn.map((page) => (
-          <div key={page.id} className={styles.warn}>
-            <TriangleAlert className={styles.icon} aria-hidden="true" />
-            <span className={styles.warnText}>{`「${page.name}」に${entry ? `${entry.name}へ` : ''}戻るタブがありません。押した人が元のメニューに帰れません。`}</span>
-            <Button href={buttonsHref}>{`${page.name}を開いて直す`}</Button>
-          </div>
-        ))}
-        {analysis.missingTargetEdges.length > 0 ? (
-          <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={styles.bad}>{`${analysis.missingTargetEdges.length} 件`}</strong></div>
-        ) : null}
-        {analysis.unreachablePageIds.size > 0 ? (
-          <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size} 件`}</strong></div>
-        ) : null}
-        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : emptyValue('none')}</strong></div>
-        {/* 「誰に出すか」はメニューの束ごとに決めるので、切替先だけ違うことは起きない。 */}
-        <div className={styles.check}><span>切替先だけ「誰に出すか」が違う</span><strong>なし</strong></div>
-      </section>
+      </Card>
+      <CreateSummaryCard title="よくある事故の見張り" beforeRows={noReturn.map(page => (
+        <Notice key={page.id} tone="warn" message={`「${page.name}」に${entry ? `${entry.name}へ` : ''}戻るタブがありません。押した人が元のメニューに帰れません。`}
+          action={canEdit ? <Button href={buttonsHref}>{`${page.name}を開いて直す`}</Button> : undefined} />
+      ))} rows={[
+        ...(analysis.missingTargetEdges.length > 0 ? [{ label: '切替先が見つからないタブ', value: <StatusBadge tone="danger">{`${analysis.missingTargetEdges.length} 件`}</StatusBadge> }] : []),
+        ...(analysis.unreachablePageIds.size > 0 ? [{ label: 'どこからも来られないメニュー', value: <StatusBadge tone="danger">{`${analysis.unreachablePageIds.size} 件`}</StatusBadge> }] : []),
+        { label: '切替先が下書きのまま', value: draftTargets.length ? <StatusBadge tone="warning">{`${draftTargets.length}件`}</StatusBadge> : emptyValue('none') },
+        // 対象条件は束ごとに保存するため、切替先だけ別の条件にはならない。
+        { label: '切替先だけ「誰に出すか」が違う', value: 'なし' },
+      ]} />
     </CreatePage>
   )
 }
