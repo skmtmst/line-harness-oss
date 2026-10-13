@@ -584,12 +584,12 @@ export default function TemplateDetailV8() {
         )}
       >
         <div className={styles.dialogList}>
-          <DataTable label="使っている所" columns="var(--tpl-eds-kind-w) minmax(0, 1fr) auto" columnLayout={{
+          <DataTable label="使っている所" columnLayout={{
             headHeight: 'auto', rowHeight: 'auto', gap: 'var(--polish-space-field)',
             padding: 'var(--tpl-eds-dialog-row-pad)', bodyTextSize: 'var(--text-label)',
           }}><tbody>{usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
-            <Tr key={row.key}>
-              <Td><TruncatedText value={row.kind} /></Td>
+            <Tr key={row.key} data-table-layout="columns">
+              <Td style={{ flex: '0 0 var(--tpl-eds-kind-w)' }}><TruncatedText value={row.kind} /></Td>
               <Td grow><TruncatedText value={String(row.name ?? '')} /></Td>
               <Td>
               {row.href
