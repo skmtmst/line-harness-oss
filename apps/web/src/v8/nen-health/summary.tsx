@@ -19,6 +19,8 @@ import Drawer from '@/components/shared/drawer'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { formatDay } from '@/lib/format'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
@@ -104,28 +106,26 @@ export default function SummaryDrawerV8({
               <WeightChart30d logs={s.logs} generatedAt={summary.generatedAt} />
             </section>
             {s.logs.length > 0 ? (
-              <div className={styles.logTable} role="table" aria-label="記録の表">
-                <div className={styles.logHead} role="row">
-                  <span className={styles.logDate} role="columnheader">日付</span>
-                  <span className={styles.logWeight} role="columnheader">体重</span>
-                  <span className={styles.logStool} role="columnheader">便</span>
-                  <span className={styles.logStool} role="columnheader">食いつき</span>
-                  <span className={styles.logSkin} role="columnheader">皮膚</span>
-                  <span className={styles.logTear} role="columnheader">涙やけ</span>
-                  <span className={styles.logMemo} role="columnheader">メモ</span>
-                </div>
-                {s.logs.map((log) => (
-                  <div key={log.loggedOn} className={styles.logRow} role="row">
-                    <span className={styles.logDate} role="cell">{md(log.loggedOn)}</span>
-                    <span className={styles.logWeight} role="cell">{log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`}</span>
-                    <span className={styles.logStool} role="cell">{summary.labels.stool[log.stool] ?? log.stool}</span>
-                    <span className={styles.logStool} role="cell">{summary.labels.appetite[log.appetite] ?? log.appetite}</span>
-                    <span className={styles.logSkin} role="cell">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')}</span>
-                    <span className={styles.logTear} role="cell">{log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')}</span>
-                    <span className={styles.logMemo} role="cell">{notes.get(log.loggedOn) ?? emptyValue('unknown')}</span>
-                  </div>
-                ))}
-              </div>
+              <DataTable label="記録の表" grid={{
+                columns: 'var(--tpl-nph-lcol-date) var(--tpl-nph-lcol-weight) repeat(4, minmax(0, 1fr)) minmax(0, 2fr)',
+                padding: 'var(--tpl-nph-log-row-pad)', headPadding: 'var(--tpl-nph-log-head-pad)',
+                gap: 'var(--tpl-nph-pair-gap)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)',
+              }}>
+                <thead><TableHeadRow>
+                  {['日付', '体重', '便', '食いつき', '皮膚', '涙やけ', 'メモ'].map(label => <Th key={label} truncate>{label}</Th>)}
+                </TableHeadRow></thead>
+                <tbody>{s.logs.map(log => (
+                  <Tr key={log.loggedOn}>
+                    <Td><TruncatedText value={md(log.loggedOn)} /></Td>
+                    <Td><TruncatedText value={log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`} /></Td>
+                    <Td><TruncatedText value={summary.labels.stool[log.stool] ?? log.stool} /></Td>
+                    <Td><TruncatedText value={summary.labels.appetite[log.appetite] ?? log.appetite} /></Td>
+                    <Td><TruncatedText value={log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')} /></Td>
+                    <Td><TruncatedText value={log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')} /></Td>
+                    <Td><TruncatedText value={notes.get(log.loggedOn) ?? emptyValue('unknown')} /></Td>
+                  </Tr>
+                ))}</tbody>
+              </DataTable>
             ) : (
               <p className={styles.summaryEmpty}>この30日の記録はありません。</p>
             )}

@@ -362,46 +362,6 @@
 .chartBar[data-level='2'] { height: var(--tpl-nph-chart-l2); }
 .chartBar[data-level='3'] { height: var(--tpl-nph-chart-l3); }
 .chartBar[data-level='4'] { height: var(--tpl-nph-chart-h); }
-
-/* 記録の表（見出し 30・行は中身なり上下 8・左右 12・間 12）。 */
-.logTable {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
-.logHead,
-.logRow {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-nph-pair-gap);
-  box-shadow: var(--shadow-row-line);
-  line-height: normal;
-}
-.logHead {
-  padding: var(--tpl-nph-log-head-pad);
-  background: var(--color-table-head);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.logRow {
-  padding: var(--tpl-nph-log-row-pad);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-}
-.logRow:last-child {
-  box-shadow: none;
-}
-.logDate { flex: 0 0 var(--tpl-nph-lcol-date); }
-.logWeight { flex: 0 0 var(--tpl-nph-lcol-weight); }
-.logStool { flex: 0 0 var(--tpl-nph-lcol-stool); }
-.logSkin { flex: 0 0 var(--tpl-nph-lcol-skin); }
-.logTear { flex: 0 0 var(--tpl-nph-lcol-tear); }
-.logMemo { flex: 1 1 0; min-width: 0; }
 .summaryEmpty {
   margin: 0;
   color: var(--color-ink-faint);
