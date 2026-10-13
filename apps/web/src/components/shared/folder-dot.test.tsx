@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
 import TruncatedText from './truncated-text'
 import Checkbox from './checkbox'
+import { NameCell } from './table'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /*
@@ -71,6 +72,16 @@ describe('フォルダの色の丸', () => {
     expect(html.indexOf('aria-label="資料を選ぶ"')).toBeLessThan(html.indexOf('data-folder-dot'))
     expect(html).toContain('title="資料をダウンロードした"')
     expect(html).toContain('<button>資料をダウンロードした</button>')
+  })
+
+  it('名前を包む別の操作があっても、明示した選択は名前の外に残る', () => {
+    const html=renderToStaticMarkup(<table><tbody><tr><NameCell
+      selection={<Checkbox aria-label="教室を選ぶ" checked onCheckedChange={()=>{}} />}
+      name={<div><a href="/events/edit?id=event">教室</a></div>}
+    /></tr></tbody></table>)
+    expect(html).toContain('aria-label="教室を選ぶ"')
+    expect(html.indexOf('aria-label="教室を選ぶ"')).toBeLessThan(html.indexOf('data-folder-dot'))
+    expect(html).toContain('href="/events/edit?id=event"')
   })
 
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {

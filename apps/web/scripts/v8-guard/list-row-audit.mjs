@@ -32,6 +32,15 @@ try {
   const rules = ['B-190 タグのはみ出し', 'B-193 行の右の編集', 'B-194 名前の2行目', 'B-195 数の帯の言葉', 'B-198 表の青い文字']
   if (rules.some((rule) => !negative.failures.includes(rule))) throw new Error(`対照が見逃しました: ${JSON.stringify(negative)}`)
   console.log(`対照: ${rules.length}種類の違反を検出（合格）`)
+  for (const [folders, dot, expected] of [
+    ['true', false, 'B-194 名前の丸なし'], ['true', true, null],
+    ['false', false, null], ['false', true, 'X2 フォルダ機能なしの丸'],
+  ]) {
+    await control.setContent(`<main><div data-list-folders="${folders}"><nav data-template-region="folders" hidden>畳んだフォルダ</nav><table><tbody><tr><td><span data-list-name title="名前">${dot ? '<i data-folder-dot>○</i>' : ''}<span>名前</span></span></td></tr></tbody></table></div></main>`)
+    const result = await control.evaluate(scanListRows)
+    if (expected ? !result.failures.includes(expected) : result.failures.length) throw new Error(`X2対照が不一致: ${JSON.stringify({ folders, dot, result })}`)
+  }
+  console.log('X2対照: フォルダあり/なし・丸あり/なしの4組を検証（合格）')
   await control.close()
   if (rowCount === 0) throw new Error('一覧の行が一つも取れていません')
 } finally { await browser.close() }

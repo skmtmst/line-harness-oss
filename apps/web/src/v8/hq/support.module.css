@@ -2,14 +2,6 @@
  * ★V8 統括のお問い合わせ（Pencil `b8xBtZ`）。頭・左の列は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-body-gap);
-  padding: var(--tpl-hq-body-pad);
-  min-width: 0;
-}
-
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .smallIcon { width: var(--tpl-hq-check); height: var(--tpl-hq-check); }
 .doneIcon { width: var(--tpl-hq-attach-icon); height: var(--tpl-hq-attach-icon); color: var(--color-accent-deep); }
@@ -157,6 +149,7 @@
   font-size: var(--text-caption);
 }
 
+.shortText { white-space: nowrap; }
 .table {
   display: flex;
   flex-direction: column;

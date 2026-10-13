@@ -5,7 +5,6 @@ const b244Requirements = {
   rule_name: requiredText("設定名を入力してください。"),
 }
 
-
 import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
@@ -13,7 +12,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, Smartphone, User, UserPlus, UserRound, Workflow } from 'lucide-react';
+import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, User, UserPlus, UserRound, Workflow } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -233,7 +232,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const [conflict, setConflict] = useState(false)
   const [compare, setCompare] = useState<Array<{ label: string; mine: string; theirs: string }> | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [testConditionsOpen, setTestConditionsOpen] = useState(false)
   const [testInput, setTestInput] = useState<{ routeId: string | null; expectedAt: string | null; friendId: string | null }>({ routeId: null, expectedAt: null, friendId: null })
   const [testResult, setTestResult] = useState<{
@@ -327,7 +325,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const fieldFailure = saveErrors.capture(caught);
 
       if (isCurrentRequest()) { if (!fieldFailure)
-
 
  setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
@@ -685,17 +682,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       {summary}
       <CreatePreviewNote>LINEでの見え方は、届けるメッセージを決める手順から右に出ます。</CreatePreviewNote>
     </>
-  ) : narrow ? (
-    <>
-      <div className={styles.narrowSide}>
-        <div className={styles.previewOpen}>
-          <Button type="button" className={styles.previewButton} onClick={() => setPreviewOpen(true)}>
-            <Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る
-          </Button>
-        </div>
-        {summary}
-      </div>
-    </>
   ) : (
     <>
       {summary}
@@ -749,6 +735,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : null}
       noticeSpacing="band"
       preview={preview}
+      previewLabel={step === 'basic' ? '設定内容を見る' : undefined}
+      previewTitle={step === 'basic' ? '設定内容' : undefined}
       footerActions={canEdit ? (
         <>
           <Button href="/friend-add-settings">キャンセル</Button>
@@ -851,16 +839,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       </Dialog>
 
       <ConfirmDialog
-        open={previewOpen}
-        title="LINEでの見え方"
-        description="友だち追加した人に届くメッセージの見え方です。"
-        confirmLabel="閉じる"
-        onConfirm={() => setPreviewOpen(false)}
-        onCancel={() => setPreviewOpen(false)}
-      >
-        {phone}
-      </ConfirmDialog>
-      <ConfirmDialog
         open={compare !== null}
         title="最新の保存とあなたの直しの違い"
         description={compare && compare.length === 0 ? '項目の違いはありません。最新を読み込んで続けてください。' : '左があなたの直し、右が先に保存された内容です。'}
@@ -922,7 +900,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
       <Card variant="form" gap="normal" className={styles.card} aria-label="名前とフォルダ">
         <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
         <SettingsFormRow layout="name-folder">
-          <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name" requirement={b244Requirements.rule_name}><SaveErrorField names={["name","rule.name","mine"]}><TextField
+          <div className={styles.field}><Field requirement={b244Requirements.rule_name} label="設定名（60文字まで）" htmlFor="fa-name"><SaveErrorField names={["name","rule.name","mine"]}><TextField
               id="fa-name"
               value={rule.name}
               maxLength={60}
@@ -966,7 +944,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
             value="first_time"
             checked={rule.friendKind === 'first_time'}
             disabled={locked}
-            disabledReason={rule.friendKind === 'first_time' ? undefined : lockReason}
+            disabledReason={lockReason}
             onChange={() => setRule((current) => ({ ...current, friendKind: 'first_time' }))}
             icon={<UserPlus size={16} />}
             title="はじめて友だち追加した人"
@@ -978,7 +956,7 @@ function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit,
             value="returning"
             checked={rule.friendKind === 'returning'}
             disabled={locked}
-            disabledReason={rule.friendKind === 'returning' ? undefined : lockReason}
+            disabledReason={lockReason}
             onChange={() => setRule((current) => ({ ...current, friendKind: 'returning' }))}
             icon={<UserRound size={16} />}
             title="以前からの友だち・ブロック解除した人"

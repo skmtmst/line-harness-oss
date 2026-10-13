@@ -127,10 +127,11 @@ export function scanListSkeleton() {
       const controls = [...toolbar.querySelectorAll('[data-toolbar-row] input,[data-toolbar-row] button')].filter(el => visible(el)
         && !el.closest('[role="menu"],[role="listbox"],[role="dialog"]')
         && !el.closest('[data-toolbar-optional][data-collapsed] [data-toolbar-optional-content]'))
-      const lastY = Math.max(...controls.map(el => el.getBoundingClientRect().top))
+      const centerY = el => { const r = el.getBoundingClientRect(); return r.top + r.height / 2 }
+      const lastY = Math.max(...controls.map(centerY))
       const end = size.closest('[data-toolbar-end]') ?? size
       const right = toolbar.getBoundingClientRect().right - parseFloat(getComputedStyle(toolbar).paddingRight)
-      if (size.getBoundingClientRect().top < lastY - 1 || Math.abs(end.getBoundingClientRect().right - right) > 1) fail('V1 件数は最後の道具行の右', size)
+      if (centerY(size) < lastY - 1 || Math.abs(end.getBoundingClientRect().right - right) > 1) fail('V1 件数は最後の道具行の右', size)
     }
     for (const pager of root.querySelectorAll('[data-list-pager], [data-template-region="pagination"]')) {
       const nav = pager.querySelector('nav')

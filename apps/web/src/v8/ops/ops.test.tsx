@@ -104,7 +104,16 @@ describe('閲覧のみには押せないボタンを置かない', () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
     expect(buttons('招待メールを送る')).toHaveLength(1)
-    expect(buttons('停止')).toHaveLength(1)
+    const menu = document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!
+    expect(menu).not.toBeNull()
+    act(() => menu.click())
+    const stop = document.querySelector<HTMLElement>('[role="menuitem"]')!
+    expect(stop.textContent).toContain('停止する')
+    act(() => stop.click())
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('停止')
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+    act(() => buttons('キャンセル')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
 
     act(() => root.unmount())
     readOnly = true
@@ -113,7 +122,7 @@ describe('閲覧のみには押せないボタンを置かない', () => {
     await settle()
     expect(text()).toContain('見本 次郎')
     expect(buttons('招待メールを送る')).toHaveLength(0)
-    expect(buttons('停止')).toHaveLength(0)
+    expect(document.querySelector('button[aria-label="見本 次郎のその他操作"]')).toBeNull()
   })
 
   it('契約先アカウント：閲覧のみには「契約先を作る」を出さない', async () => {

@@ -125,7 +125,9 @@ describe('V8 統括のメンバーの窓', () => {
   })
 
   it('確認の間は変更の窓を閉じ、やめたら入れた中身のまま戻り、役割を変えないときは役割を送らない', async () => {
-    await act(async () => { buttonByText('中川 由美さんの権限を変更')!.click() })
+    await act(async () => { buttonByText('中川 由美のその他操作')!.click() })
+    await flush()
+    await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
     expect(dialogTitles()).toEqual(['メンバーの権限を変更する'])
     // 担当者のまま。状態だけ無効にする。
@@ -156,9 +158,11 @@ describe('V8 統括のメンバーの窓', () => {
     list.mockResolvedValue({ success: true, data: [ownerMember, staffMember] })
     await act(async () => { root!.render(<HqMembersV8 key="again" />) })
     await flush()
-    const edit = buttonByText('本部 太郎さんの権限を変更')
+    const edit = buttonByText('本部 太郎のその他操作')
     expect(edit).toBeTruthy()
     await act(async () => { edit!.click() })
+    await flush()
+    await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
     const accountsOnly = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'accounts')!
     await act(async () => { accountsOnly.click() })

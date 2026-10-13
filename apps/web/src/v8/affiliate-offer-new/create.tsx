@@ -262,6 +262,8 @@ export default function AffiliateOfferCreateV8() {
 
       title="案件を作る"
       help="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
+      previewLabel="アフィリエイターの見え方を見る"
+      previewTitle="アフィリエイターの見え方"
       preview={preview}
       status={canEdit ? (saving ? '保存しています' : createdId ? '下書きを保存済み・続きを作れます' : undefined) : undefined}
       footerActions={(
@@ -287,7 +289,7 @@ export default function AffiliateOfferCreateV8() {
 
       <Card variant="form" aria-labelledby="af-new-what">
         <CardHeader size="stacked" titleId="af-new-what" title="どんな案件か" meta="アフィリエイターの画面に出ます" />
-        <Field label="案件名" htmlFor="of-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} /></SaveErrorField>
+        <Field requirement={fields.requirement('name')} label="案件名" htmlFor="of-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-name-error">{fields.error('name')}</FieldError></Field>
         <Field label="説明" htmlFor="of-description"><SaveErrorField names={["description"]}><TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} /></SaveErrorField></Field>
       </Card>
@@ -302,9 +304,9 @@ export default function AffiliateOfferCreateV8() {
       <Card variant="form" aria-labelledby="af-new-reward">
         <CardHeader size="stacked" titleId="af-new-reward" title="いくら払うか" meta="アフィリエイター側の決まりが「定額」のときにこの額を使います" />
         <SettingsFormRow>
-          <Field label="報酬額（円）" htmlFor="of-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["rewardAmount","reward_amount"]}><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} /></SaveErrorField>
+          <Field requirement={fields.requirement('amount')} label="報酬額（円）" htmlFor="of-amount"><SaveErrorField names={["rewardAmount","reward_amount"]}><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-amount-error">{fields.error('amount')}</FieldError></Field>
-          <Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>} requirement={fields.requirement('miles')}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
+          <Field requirement={fields.requirement('miles')} label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field>
         </SettingsFormRow>
       </Card>

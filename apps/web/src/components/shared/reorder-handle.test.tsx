@@ -6,7 +6,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ReorderHandle, { moveIdTo, useReorder, type ReorderChange } from './reorder-handle'
+import ReorderHandle, { moveIdTo, reorderMoveReason, useReorder, type ReorderChange } from './reorder-handle'
 import { DragHandle } from './row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 
@@ -76,7 +76,7 @@ function List({ disabledReason, onReorder }: { disabledReason?: string | null; o
         <li key={id} {...reorder.rowProps(id)}>
           <ReorderHandle label={id} {...reorder.handle(id)} {...reorder.handleProps(id)} />
           {reorder.menuItems(id).map((item) => (
-            <button key={item.id} type="button" disabled={item.disabled} onClick={item.onSelect}>{`${id}:${item.label}`}</button>
+            <button key={item.id} type="button" title={reorder.moveReason(id, item.id === 'move-up' ? -1 : 1) ?? undefined} disabled={item.disabled} onClick={item.onSelect}>{`${id}:${item.label}`}</button>
           ))}
         </li>
       ))}
@@ -101,6 +101,9 @@ describe('useReorder', () => {
       ['drag', ['b', 'a', 'c']],
     ])
     expect(screen.getByRole('button', { name: 'a:上へ' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'a:上へ' }).title).toBe('いちばん上です')
+    expect(screen.getByRole('button', { name: 'c:下へ' }).title).toBe('いちばん下です')
+    expect(screen.getByRole('button', { name: 'b:上へ' }).title).toBe('')
   })
 
   it('動かせない時は、つまみ・上へ／下へを出さず、ドラッグも受けない', () => {
@@ -111,4 +114,10 @@ describe('useReorder', () => {
     expect(view.container.querySelector('[draggable="true"]')).toBeNull()
     expect(onReorder).not.toHaveBeenCalled()
   })
+})
+
+it('順番の端より保存・権限などの禁止理由を優先し、未取得の項目を動かさない', () => {
+  expect(reorderMoveReason(0, 3, -1, '保存しています')).toBe('保存しています')
+  expect(reorderMoveReason(-1, 3, 1)).toBe('この項目が見つかりません')
+  expect(reorderMoveReason(1, 3, 1)).toBeNull()
 })

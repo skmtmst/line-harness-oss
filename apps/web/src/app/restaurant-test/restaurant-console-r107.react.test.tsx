@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), updateMembership: vi.fn(), updateTable: vi.fn(), updateMenu: vi.fn(), loginMembers: vi.fn(), listIntakeAddresses: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), storeGroups: vi.fn(), updateMembership: vi.fn(), updateTable: vi.fn(), updateMenu: vi.fn(), loginMembers: vi.fn(), listIntakeAddresses: vi.fn() }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/components/layout/header', () => ({ default: () => null }))
@@ -30,7 +30,7 @@ const data = {
 }
 
 beforeEach(() => {
-  fixture.snapshot.mockResolvedValue({ data })
+  fixture.storeGroups.mockResolvedValue({data:[]});fixture.snapshot.mockResolvedValue({ data })
   fixture.loginMembers.mockResolvedValue({data:[]})
   fixture.listIntakeAddresses.mockResolvedValue({data:[]})
   for (const key of ['updateMembership', 'updateTable', 'updateMenu'] as const) fixture[key].mockResolvedValue({ success: true })

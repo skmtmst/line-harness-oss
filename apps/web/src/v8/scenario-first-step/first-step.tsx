@@ -9,7 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from 'lucide-react';
+import { Filter, PencilLine, Tag as TagIcon, Users } from 'lucide-react';
 import { countTemplateTextCharacters, type DeliveryMode, type Scenario, type ScenarioStep, type Tag, type Template } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
@@ -35,7 +35,6 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Notice from '@/components/shared/notice'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
@@ -143,7 +142,6 @@ export default function ScenarioFirstStepV8() {
   const [offsetMinutesRemainder, setOffsetMinutesRemainder] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [previewOpen, setPreviewOpen] = useState(false)
 
   /** 別のシナリオへ切り替わったとき、前のシナリオの入力を持ち越さない。 */
   const resetForm = () => {
@@ -232,7 +230,6 @@ export default function ScenarioFirstStepV8() {
 
         if (caught instanceof ApiError && caught.status === 404) {
           { if (!fieldFailure)
-
 
           setError('') }
           setLoadMissing(true)
@@ -444,7 +441,6 @@ export default function ScenarioFirstStepV8() {
       const detail = submitError instanceof ApiError ? submitError.message : ''
       { if (!fieldFailure)
 
-
       setError(
         detail
           ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
@@ -549,13 +545,7 @@ export default function ScenarioFirstStepV8() {
       ) : null}
     </LinePreview>
   )
-  const preview = narrow ? (
-    <div className={styles.previewOpen}>
-      <Button type="button" onClick={() => setPreviewOpen(true)}>
-        <Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る
-      </Button>
-    </div>
-  ) : phone
+  const preview = phone
 
   const tagName = tags.find((t) => t.id === targetTagId)?.name
   const conditionCount = targetCondition ? pruneCondition(targetCondition)?.rules.length ?? 0 : 0
@@ -811,16 +801,7 @@ export default function ScenarioFirstStepV8() {
           onClose={() => setConditionOpen(false)}
         />
       ) : null}
-      <ConfirmDialog
-        open={previewOpen}
-        title="LINEでの見え方"
-        description="この1通目が届く形です。"
-        confirmLabel="閉じる"
-        onConfirm={() => setPreviewOpen(false)}
-        onCancel={() => setPreviewOpen(false)}
-      >
-        {phone}
-      </ConfirmDialog>
+
     </CreatePage></SaveErrorScope>
   )
 }
