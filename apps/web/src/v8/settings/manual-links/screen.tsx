@@ -58,7 +58,13 @@ export default function ManualLinksScreen() {
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。">
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。"
+      saveStatus={editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
+      saveActions={editingKey ? <>
+        <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
+        <Button variant="primary" actionWording disabled={saving} onClick={() => void saveEdit()} busy={saving} busyLabel="保存しています…">決める</Button>
+      </> : undefined}>
+
       {children}
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </SbSettingsScreen>
@@ -152,14 +158,7 @@ export default function ManualLinksScreen() {
                     <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : LINK_STATUS_LABEL[row.status]}</StatusBadge>
                   </GridCell>
                   <GridCell role="cell" className={styles.actions}>
-                    {editing ? (
-                      <>
-                        <Button variant="text" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
-                        <Button variant="primary" actionWording disabled={saving} onClick={() => void saveEdit()}>決める</Button>
-                      </>
-                    ) : (
-                      <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', onSelect: () => startEdit(key) }]} />
-                    )}
+                    {editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', onSelect: () => startEdit(key) }]} />}
                   </GridCell>
                 </GridRow>
               )
