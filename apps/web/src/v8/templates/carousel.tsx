@@ -1,15 +1,12 @@
 'use client'
 
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
-
-
 import Card, { CardHeader } from '@/components/shared/card'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { Fragment, Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -53,6 +50,7 @@ import own from './carousel.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
+import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -559,18 +557,15 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 ) : null}
 
                 <span className={styles.pickLabel}>{`ボタン（最大 ${MAX_ACTIONS} つ）`}</span>
-                <div className={own.buttonHead} aria-hidden="true">
-                  <span className={own.colLabel}>ボタンの文字</span>
-                  <span className={own.colKind}>押したら</span>
-                  <span>中身</span>
-                </div>
                 {panel.actions.map((action, ai) => {
                   const setAction = (patch: Partial<typeof action>) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === ai ? { ...a, ...patch } : a)) })
                   return (
-                    <div key={ai} className={own.buttonBlock}>
-                    <div className={own.buttonRow} {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
-                      <SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><TextField className={own.colLabel} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField>
-                      <div className={own.colTap}>
+                    <Fragment key={ai}>
+                    <CardHeader headingLevel={3} title={`ボタン ${ai + 1}`} action={panel.actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}><Trash2 size={14} aria-hidden="true" /></IconButton> : undefined} />
+                    <div {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
+                      <SettingsFormRow layout="columns">
+                      <Field label="ボタンの文字"><SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><TextField value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField></Field>
+                      <Field label="押したら・中身">
                       <SaveErrorField names={["action"]}><TapActionField
                         name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
                         kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
@@ -595,15 +590,11 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         sources={tapSources}
                         textMax={MESSAGE_TEXT_MAX}
                       /></SaveErrorField>
-                      </div>
-                      {panel.actions.length > 1 ? (
-                        <button type="button" className={own.iconButton} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}>
-                          <Trash2 className={own.icon} aria-hidden="true" />
-                        </button>
-                      ) : null}
+                      </Field>
+                      </SettingsFormRow>
                     </div>
                     <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
-                    </div>
+                    </Fragment>
                   )
                 })}
                 <div className={own.toolRow}>

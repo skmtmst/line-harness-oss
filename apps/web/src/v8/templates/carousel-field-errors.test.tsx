@@ -34,6 +34,20 @@ const fillFirst = () => {
 }
 
 describe('カルーセルの欄ごとの誤り（B-139）', () => {
+  it('ボタンごとに文字と動きの題を付け、最後の一つを隠し、削除後も残りの値を保つ', async () => {
+    render(<Carousel />)
+    expect(screen.queryByRole('button', { name: 'カード1のボタン1を外す' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'ボタンを足す' }))
+    expect(screen.getAllByText('ボタンの文字', { exact: true }).length).toBe(2)
+    const labels = screen.getAllByText('押したら・中身', { exact: true })
+    expect(labels.length).toBe(2)
+    for (const label of labels) expect(label.closest('[data-form-row="columns"]')?.children.length).toBe(2)
+    fireEvent.change(screen.getByLabelText('カード1のボタン2の文字'), { target: { value: '残すボタン' } })
+    fireEvent.click(screen.getByRole('button', { name: 'カード1のボタン1を外す' }))
+    expect((screen.getByLabelText('カード1のボタン1の文字') as HTMLInputElement).value).toBe('残すボタン')
+    expect(screen.queryByRole('button', { name: 'カード1のボタン1を外す' })).toBeNull()
+    expect(calls.create).not.toHaveBeenCalled()
+  })
   it('2枚目の本文が空なら送らず、2枚目を開いて本文の欄を赤くし、真下に理由を出してそこへ移る。札に赤い丸', async () => {
     render(<Carousel />)
     fillFirst()

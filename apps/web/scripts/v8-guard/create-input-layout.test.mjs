@@ -64,3 +64,24 @@ test('行うことは欄が広くても白い板が狭ければ縦にし、横�
     }
   } finally { await browser.close() }
 })
+
+test('題つきの二つの欄は板の幅で縦へ切り替え、旧横配置を検出する', async () => {
+  const css = readFileSync(new URL('../../src/components/shared/settings-form-card.module.css', import.meta.url), 'utf8')
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const frameWidth of [900, 1200]) {
+      await page.setContent(`<style>:root{--polish-space-field:12px}main{container:v8-page/inline-size;width:${frameWidth}px}input{width:100%;box-sizing:border-box}${css}</style>
+        <main data-page-template="create"><div class="columnsRow" data-form-row="columns" data-form-columns="2"><div data-form-requirement="optional"><label>ボタンの文字</label><input aria-label="ボタンの文字" value="残すボタン"></div><div data-form-requirement="optional"><label>押したら・中身</label><input aria-label="URL" value="https://example.com"></div></div></main>`)
+      const rows = await page.evaluate(collectFormLayouts)
+      assert.equal(rows.length, 1)
+      assert.equal(rows[0].horizontal, frameWidth >= 1100)
+      assert.deepEqual(formColumnFindings(rows), [])
+      if (frameWidth < 1100) {
+        await page.locator('[data-form-row]').evaluate(el => el.style.setProperty('grid-template-columns', '1fr 1fr', 'important'))
+        assert.ok(formColumnFindings(await page.evaluate(collectFormLayouts)).length > 0)
+      }
+      assert.equal(await page.getByLabel('ボタンの文字').inputValue(), '残すボタン')
+    }
+  } finally { await browser.close() }
+})
