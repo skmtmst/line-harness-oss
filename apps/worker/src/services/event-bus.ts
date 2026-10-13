@@ -209,12 +209,7 @@ export async function fireEvent(
         numericValue: enrichedPayload.conversionValue,
       });
     } catch (error) {
-      console.error(JSON.stringify({
-        event: 'analytics_event_record_failed',
-        line_account_id: lineAccountId,
-        event_type: mappedType,
-        reason: error instanceof Error ? error.message : 'unknown',
-      }));
+      console.error(JSON.stringify({"code":"analytics_event_record_failed"}));
     }
   }
 
@@ -264,7 +259,7 @@ async function reevaluateRichMenuTargeting(
     if (await isOperationCapabilityStopped(db, lineAccountId, 'automation_actions')) return;
     await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
   } catch (err) {
-    console.error('[eventBus] rich menu targeting failed:', err);
+    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
   }
 }
 
@@ -281,11 +276,7 @@ export async function fireOutgoingWebhooks(
 ): Promise<void> {
   try {
     if (lineAccountId == null) {
-      console.log(JSON.stringify({
-        event: 'outgoing_webhook_line_account_unknown',
-        eventType,
-        hasFriendId: Boolean(payload.friendId),
-      }));
+      console.log(JSON.stringify({"code":"outgoing_webhook_line_account_unknown"}));
     }
     const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
@@ -322,7 +313,7 @@ export async function fireOutgoingWebhooks(
           try {
             await recordDeliveryOutcome(db, wh.id, result.ok);
           } catch (outcomeError) {
-            console.error(`送信Webhook ${wh.id} の連続失敗数を更新できませんでした:`, outcomeError);
+            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
           }
           if (execution && !result.ok) throw new Error('incoming_outgoing_delivery_failed');
           return;
@@ -366,15 +357,13 @@ export async function fireOutgoingWebhooks(
             interactionId = interaction.id;
           } catch (logError) {
             // 記録の一時障害で、本体の外部通知まで止めない。
-            console.error(`送信Webhook ${wh.id} の記録開始に失敗:`, logError);
+            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
           }
         }
         const result = await deliverOnce(wh, body, { idempotencyKey });
         const outcome = await finishOutgoingDelivery(db, queued, lease, outgoingAttemptOf(result));
         if (outcome !== 'delivered') {
-          console.error(
-            `送信Webhook ${wh.id} の初回配送失敗 (${result.attempts}回試行, 最後の応答=${result.lastStatus ?? '接続不可'}, 状態=${outcome})`,
-          );
+          console.error(JSON.stringify({"code":"services_event_bus_failed"}));
         }
         if (interactionId && lineAccountId) {
           try {
@@ -387,7 +376,7 @@ export async function fireOutgoingWebhooks(
             });
           } catch (logError) {
             // 届いた通知を、台帳更新の失敗だけで「送信失敗」とは扱わない。
-            console.error(`送信Webhook ${wh.id} の結果記録に失敗:`, logError);
+            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
           }
         }
         // 連続失敗は配送単位で数える。再送待ち(retry_wait)は未確定なので
@@ -397,7 +386,7 @@ export async function fireOutgoingWebhooks(
             await recordDeliveryOutcome(db, wh.id, outcome === 'delivered');
           } catch (outcomeError) {
             // 連続失敗数の更新は補助情報。配送結果そのものを巻き戻さない。
-            console.error(`送信Webhook ${wh.id} の連続失敗数を更新できませんでした:`, outcomeError);
+            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
           }
         }
       } catch (err) {
@@ -411,16 +400,16 @@ export async function fireOutgoingWebhooks(
               failureReason: 'unknown',
             });
           } catch (logError) {
-            console.error(`送信Webhook ${wh.id} の失敗記録に失敗:`, logError);
+            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
           }
         }
-        console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
+        console.error(JSON.stringify({"code":"services_event_bus_failed"}));
         if (execution) throw err;
       }
       });
     }
   } catch (err) {
-    console.error('fireOutgoingWebhooks error:', err);
+    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
     if (execution) throw err;
   }
 }
@@ -461,7 +450,7 @@ export async function processScoring(
     if (scoreSourceEventId) await applyScoring(db, payload.friendId, eventType, scoreSourceEventId);
     else await applyScoring(db, payload.friendId, eventType);
   } catch (err) {
-    console.error('processScoring error:', err);
+    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
     if (execution) throw err;
   }
 }
@@ -531,7 +520,7 @@ async function processAutomations(
       });
     }
   } catch (err) {
-    console.error('processAutomations error:', err);
+    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
     if (execution) throw err;
   }
 }
@@ -792,7 +781,7 @@ async function executeAction(
     }
 
     default:
-      console.warn(`未知のアクションタイプ: ${action.type}`);
+      console.warn(JSON.stringify({"code":"services_event_bus_warn"}));
   }
 }
 
@@ -828,7 +817,7 @@ export async function logOutgoingMessage(
       .run();
     return id;
   } catch (err) {
-    console.error('logOutgoingMessage failed:', err);
+    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
     return null;
   }
 }

@@ -394,7 +394,7 @@ async function measureStoredImageMetadata(
     const bytes = new Uint8Array(await object.arrayBuffer());
     return imageDimensions(bytes, media.mime_type);
   } catch (err) {
-    console.error('stored media metadata read failed:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed"}));
     return null;
   }
 }
@@ -409,7 +409,7 @@ contents.get('/api/media/quota', async (c) => {
     }
     return c.json({ success: true, data: await getMediaStorageQuota(c.env.DB, accountId) });
   } catch (err) {
-    console.error('GET /api/media/quota error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/quota"}));
     return c.json({ success: false, error: '容量を確認できませんでした' }, 503);
   }
 });
@@ -539,7 +539,7 @@ contents.post(
       }
       return c.json({ success: true, data: { sessions } }, 201);
     } catch (err) {
-      console.error('POST /api/media/upload-sessions error:', err);
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions"}));
       return c.json({ success: false, error: 'アップロードを準備できませんでした' }, 500);
     }
   },
@@ -640,13 +640,13 @@ contents.post(
           mimeType: session.expected_mime,
           sizeBytes: session.expected_size,
         }).catch((err) => {
-          console.error('upload session scan record error:', session.id, err);
+          console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"}));
           return null;
         });
         if (versionScan) {
           await runScanForStoredObject(c.env.DB, c.env.IMAGES, versionScan, session.r2_key, {
             width: session.width, height: session.height,
-          }).catch((err) => console.error('upload session scan error:', session.id, err));
+          }).catch((err) => console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"})));
         }
         return c.json({
           success: true,
@@ -666,20 +666,20 @@ contents.post(
         mimeType: media.mime_type,
         sizeBytes: media.size_bytes,
       }).catch((err) => {
-        console.error('new media scan record error:', media.id, err);
+        console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"}));
         return null;
       });
       if (newScan) {
         await runScanForStoredObject(c.env.DB, c.env.IMAGES, newScan, session.r2_key, {
           width: media.width, height: media.height,
-        }).catch((err) => console.error('new media scan error:', media.id, err));
+        }).catch((err) => console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"})));
       }
       return c.json({
         success: true,
         data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
       }, 201);
     } catch (err) {
-      console.error('POST /api/media/upload-sessions/:id/complete error:', err);
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"}));
       return c.json({ success: false, error: 'アップロードを確定できませんでした' }, 500);
     }
   },
@@ -785,7 +785,7 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
         error: '差し替え用ファイルの確認が完了していません',
       }, 409);
     }
-    console.error('POST /api/media/:id/versions error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/versions"}));
     return c.json({ success: false, error: '新しい版を追加できませんでした' }, 500);
   }
 });
@@ -823,7 +823,7 @@ contents.post(
         },
       });
     } catch (err) {
-      console.error('POST /api/media/:id/replacement-preview error:', err);
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/replacement-preview"}));
       return c.json({ success: false, error: '差し替え内容を確認できませんでした' }, 503);
     }
   },
@@ -838,7 +838,7 @@ contents.get('/api/media/counts', async (c) => {
   try {
     return c.json({ success: true, data: await mediaTabCounts(c.env.DB, accountId) });
   } catch (err) {
-    console.error('GET /api/media/counts error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/counts"}));
     return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
   }
 });
@@ -883,7 +883,7 @@ contents.get('/api/media', async (c) => {
       data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
     });
   } catch (err) {
-    console.error('GET /api/media error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -914,7 +914,7 @@ contents.get('/api/media/:id', requireDeliveryAccess('contents'), async (c) => {
       data: { item: serializeMedia(media, workerUrl, names), folderName },
     });
   } catch (err) {
-    console.error('GET /api/media/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -992,7 +992,7 @@ contents.get('/api/media/:id/download', requireRole('owner', 'admin', 'staff'), 
   try {
     return await serveMediaFile(c, { auditDownload: true, disposition: 'attachment' });
   } catch (err) {
-    console.error('GET /api/media/:id/download error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/download"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1005,7 +1005,7 @@ contents.get('/api/media/:id/content', requireRole('owner', 'admin', 'staff'), a
   try {
     return await serveMediaFile(c, { auditDownload: false, disposition: 'inline' });
   } catch (err) {
-    console.error('GET /api/media/:id/content error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/content"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1072,7 +1072,7 @@ contents.get('/api/media/:id/versions/:versionNo/download', requireRole('owner',
       },
     });
   } catch (err) {
-    console.error('GET /api/media/:id/versions/:versionNo/download error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/versions/:versionNo/download"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1131,7 +1131,7 @@ contents.get('/media/:id/content', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /media/:id/content error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /media/:id/content"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1264,7 +1264,7 @@ contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBou
         });
       } catch (scanError) {
         // 切替自体は確定済み。記録の更新は次の走査でも追いつく。
-        console.error('usage rescan after reference switch failed:', scanError);
+        console.error(JSON.stringify({"code":"routes_contents_failed","route":"PATCH /api/media/:id"}));
       }
       const fresh = await getMediaById(c.env.DB, id, accountId);
       const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
@@ -1311,7 +1311,7 @@ contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBou
       throw error;
     }
   } catch (err) {
-    console.error('PATCH /api/media/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"PATCH /api/media/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1360,7 +1360,7 @@ contents.post('/api/media/:id/archive', requireDeliveryAccess('contents'), input
   try {
     return await mediaArchiveRoute(c, true, c.req.param('id'));
   } catch (err) {
-    console.error('POST /api/media/:id/archive error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/archive"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1369,7 +1369,7 @@ contents.post('/api/media/:id/restore', requireDeliveryAccess('contents'), input
   try {
     return await mediaArchiveRoute(c, false, c.req.param('id'));
   } catch (err) {
-    console.error('POST /api/media/:id/restore error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/restore"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1402,7 +1402,7 @@ contents.get('/api/media/:id/delete-impact', requireDeliveryAccess('contents'), 
       versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
     } catch (err) {
       if (!isMissingTableError(err)) throw err;
-      console.error('GET /api/media/:id/delete-impact versions skipped:', err);
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/delete-impact"}));
       versionsReady = false;
     }
     /*
@@ -1452,7 +1452,7 @@ contents.get('/api/media/:id/delete-impact', requireDeliveryAccess('contents'), 
       },
     });
   } catch (err) {
-    console.error('GET /api/media/:id/delete-impact error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/delete-impact"}));
     return c.json(
       { success: false, error: '削除したときの影響を確認できませんでした' },
       503,
@@ -1478,7 +1478,7 @@ contents.get('/api/media/:id/replacement-impact', requireDeliveryAccess('content
       data: { ...current.impact, previewToken: current.impact.revision },
     });
   } catch (err) {
-    console.error('GET /api/media/:id/replacement-impact error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/replacement-impact"}));
     return c.json({ success: false, error: '差し替えたときの影響を確認できませんでした' }, 503);
   }
 });
@@ -1572,7 +1572,7 @@ contents.post('/api/media/:id/replace-usages', requireDeliveryAccess('contents')
     } catch (verifyError) {
       // 差し替え自体はD1のbatchで確定済み。ここで500を返すと、利用者が
       // 再実行して二重操作するため「確認できなかった」と成功レスポンスに残す。
-      console.error('media replacement verification failed:', verifyError);
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/replace-usages"}));
     }
     return c.json({
       success: true,
@@ -1591,7 +1591,7 @@ contents.post('/api/media/:id/replace-usages', requireDeliveryAccess('contents')
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    console.error('POST /api/media/:id/replace-usages error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/replace-usages"}));
     return c.json({ success: false, error: '使用先を差し替えられませんでした' }, 503);
   }
 });
@@ -1647,7 +1647,7 @@ contents.delete('/api/media/:id', requireDeliveryAccess('contents'), async (c) =
     // 画面には出てこない。
     await deleteMedia(c.env.DB, id, accountId);
     const removal = c.env.IMAGES.delete(existing.r2_key).catch((err) =>
-      console.error('R2 delete failed:', err),
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/media/:id"})),
     );
     // c.executionCtx は使えない場面で参照そのものが例外を投げるので、
     // 参照ごと守る。使えなければ待つ。実体の削除はどちらでも構わない
@@ -1659,7 +1659,7 @@ contents.delete('/api/media/:id', requireDeliveryAccess('contents'), async (c) =
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/media/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/media/:id"}));
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
@@ -2066,7 +2066,7 @@ contents.get('/api/common-vars', async (c) => {
       meta: { total, limited: total > items.length, limit },
     });
   } catch (err) {
-    console.error('GET /api/common-vars error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/common-vars"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2114,7 +2114,7 @@ contents.get('/api/common-vars/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/common-vars/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/common-vars/:id"}));
     return c.json({ success: false, error: '共通情報の詳細を確認できませんでした' }, 503);
   }
 });
@@ -2211,7 +2211,7 @@ contents.post('/api/common-vars', requireDeliveryAccess('commonVars'), inputJson
     if (err instanceof CommonVarKeyConflictError) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
-    console.error('POST /api/common-vars error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2362,7 +2362,7 @@ contents.patch('/api/common-vars/:id', requireDeliveryAccess('commonVars'), inpu
         currentVersion: err.currentVersion,
       }, 409);
     }
-    console.error('PATCH /api/common-vars/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"PATCH /api/common-vars/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2420,7 +2420,7 @@ contents.post('/api/common-vars/:id/status', requireDeliveryAccess('commonVars')
         currentVersion: err.currentVersion,
       }, 409);
     }
-    console.error('POST /api/common-vars/:id/status error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/status"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2437,7 +2437,7 @@ contents.get('/api/common-vars/:id/delete-impact', requireDeliveryAccess('common
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     return c.json({ success: true, data: serializeCommonVarDeleteImpact(existing, impact) });
   } catch (err) {
-    console.error('GET /api/common-vars/:id/delete-impact error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/common-vars/:id/delete-impact"}));
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
       503,
@@ -2497,7 +2497,7 @@ contents.post('/api/common-vars/:id/impact-preview', requireDeliveryAccess('comm
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    console.error('POST /api/common-vars/:id/impact-preview error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/impact-preview"}));
     return c.json(
       { success: false, error: '影響する場所を確認できませんでした' },
       503,
@@ -2609,7 +2609,7 @@ contents.post('/api/common-vars/:id/replace', requireDeliveryAccess('commonVars'
         currentVersion: err.currentVersion,
       }, 409);
     }
-    console.error('POST /api/common-vars/:id/replace error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/replace"}));
     return c.json({ success: false, error: '差し替えの影響を確認できませんでした' }, 503);
   }
 });
@@ -2647,7 +2647,7 @@ contents.delete('/api/common-vars/:id', requireDeliveryAccess('commonVars'), asy
     await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id, deleteReason);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/common-vars/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/common-vars/:id"}));
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
       503,
@@ -2667,7 +2667,7 @@ contents.get('/api/common-vars/:id/schedules', async (c) => {
     const items = await getCommonVarSchedules(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: items.map(serializeSchedule) });
   } catch (err) {
-    console.error('GET /api/common-vars/:id/schedules error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/common-vars/:id/schedules"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2726,7 +2726,7 @@ contents.post('/api/common-vars/:id/schedules', requireDeliveryAccess('commonVar
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    console.error('POST /api/common-vars/:id/schedules error:', err);
+    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/schedules"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2763,7 +2763,7 @@ contents.delete(
       await deleteCommonVarSchedule(c.env.DB, c.req.param('scheduleId'), existing.id);
       return c.json({ success: true, data: null });
     } catch (err) {
-      console.error('DELETE /api/common-vars/:id/schedules/:scheduleId error:', err);
+      console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/common-vars/:id/schedules/:scheduleId"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },

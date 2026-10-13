@@ -100,13 +100,13 @@ export function ProgressModal({
         // (the orchestrator finished, we should NOT degrade to polling).
         // The `completed` flag distinguishes them.
         if (cancelled || completed) return
-        console.warn('[update] SSE failed, falling back to polling', err)
+        console.warn(JSON.stringify({"code":"update_progress_modal_warn"}))
         es?.close()
         es = null
         startPolling()
       }
     } catch (e) {
-      console.warn('[update] EventSource not available, polling', e)
+      console.warn(JSON.stringify({"code":"update_progress_modal_warn"}))
       startPolling()
     }
 

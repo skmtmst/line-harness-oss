@@ -83,7 +83,7 @@ publicApi.get('/api/public/v1/tags', async (c) => {
       data: (result.results ?? []).map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
     });
   } catch (err) {
-    console.error('GET /api/public/v1/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_public_api_failed","route":"GET /api/public/v1/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -161,7 +161,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
     }
     return c.json({ success: true, data: { friendId, tagId, added } }, added ? 201 : 200);
   } catch (err) {
-    console.error('POST /api/public/v1/friends/:friendId/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_public_api_failed","route":"POST /api/public/v1/friends/:friendId/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

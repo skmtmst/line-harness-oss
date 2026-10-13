@@ -116,13 +116,7 @@ export async function processGoogleBusinessTokenKeepalive(
       refreshed += 1;
     } catch (error) {
       failed += 1;
-      console.error(
-        JSON.stringify({
-          event: 'google_business_token_keepalive_failed',
-          storeId: connection.store_id,
-          error: errorKindOf(error),
-        }),
-      );
+      console.error(JSON.stringify({"code":"google_business_token_keepalive_failed"}));
     }
   }
   return { refreshed, failed };
@@ -179,7 +173,7 @@ export async function processGoogleBusinessHourlyResync(
         // auth_expired は accessTokenForConnection 内で expired へ落とし済み。
         await setConnectionStatusForEnv(env, connection.store_id, connection.status, error.kind);
       }
-      console.error(JSON.stringify({ event: 'google_business_resync_failed', storeId: connection.store_id, error: errorKindOf(error) }));
+      console.error(JSON.stringify({"code":"google_business_resync_failed"}));
     }
   }
   return { reviewsSynced, postsSynced, skipped, failed };
@@ -256,7 +250,7 @@ export async function processGoogleBusinessDailyMetrics(
       if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
         await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
       }
-      console.error(JSON.stringify({ event: 'google_business_metrics_failed', storeId: connection.store_id, error: errorKindOf(error) }));
+      console.error(JSON.stringify({"code":"google_business_metrics_failed"}));
     }
   }
   return { synced, skipped, failed };

@@ -121,12 +121,7 @@ export async function syncBillingInvoices(
       } while (startingAfter);
     } catch (error) {
       failed += 1;
-      console.warn(JSON.stringify({
-        event: 'billing_invoice_sync_failed',
-        tenant_id: tenant.id,
-        count: tenantImported,
-        error_kind: errorKind(error),
-      }));
+      console.warn(JSON.stringify({"code":"billing_invoice_sync_failed"}));
     }
   }
 

@@ -323,7 +323,7 @@ export async function mirrorReviewNotificationStatus(
       input.status, input.now ?? new Date().toISOString(), input.photoId, input.lineAccountId,
     ).run();
   } catch (error) {
-    console.error('mirror review notification status failed', input.photoId, error);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
   }
 }
 
@@ -394,7 +394,7 @@ export async function deliverPhotoReviewNotification(
      * そのまま出ていた。他の送信失敗と同じ安全な理由へそろえる（2026-10-02）。
      * 原因を追うための生の本文はログにだけ残す。
      */
-    console.error('photo review notification failed', input.decisionId, error);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
     sendError = classifyExternalDeliveryError(error).message;
   }
   try {
@@ -410,7 +410,7 @@ export async function deliverPhotoReviewNotification(
       return { notificationStatus: finalStatus, notificationError: sendError, busy: false, relayed };
     }
   } catch (error) {
-    console.error('complete photo notification failed', input.decisionId, error);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
   }
   const state = await getPhotoNotificationState(db, {
     decisionId: input.decisionId, lineAccountId: input.lineAccountId,
@@ -780,7 +780,7 @@ nenMembers.get('/api/public/nen/gallery-preview', async (c) => {
     c.header('Cache-Control', 'public, max-age=300, s-maxage=600');
     return c.json({ success: true, data: images });
   } catch (error) {
-    console.error('NEN gallery preview sync failed', error);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"GET /api/public/nen/gallery-preview"}));
     c.header('Cache-Control', 'public, max-age=30');
     return c.json({ success: true, data: [] });
   }
@@ -843,7 +843,7 @@ nenMembers.post('/api/liff/nen/pets', inputJsonBoundary({}, { maxBytes: Math.cei
   await refreshStoredFeeding(c.env.DB, id, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
   const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(id).first<Record<string, unknown>>();
-  if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => console.error('pet card push failed', err)));
+  if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"POST /api/liff/nen/pets"}))));
   return c.json({ success: true, data: mapPet(saved || { id }, products, catalog.treatLimitPercent) }, 201);
 });
 
@@ -1149,7 +1149,7 @@ nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"d
     mimeType: body.mimeType,
     sizeBytes: bytes.byteLength,
   }).catch((err) => {
-    console.error('photo scan record error:', id, err);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"POST /api/liff/nen/photos"}));
     return null;
   });
   if (photoScan) {
@@ -1159,7 +1159,7 @@ nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"d
       sizeBytes: bytes.byteLength,
       width: dimensions.width,
       height: dimensions.height,
-    }).catch((err) => console.error('photo scan error:', id, err));
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"POST /api/liff/nen/photos"})));
   }
   await syncNenPhotoTags(c.env.DB, friend.id);
   return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
@@ -1987,7 +1987,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
         return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
       }
     }
-    console.error('photo review decision failed', error);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"PUT /api/nen-members/photos/:id/review"}));
     return c.json({ success: false, code: 'REVIEW_SAVE_FAILED', error: '保存できませんでした。もう一度お試しください' }, 500);
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
@@ -2012,7 +2012,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
         finalPointSync = 'synced';
       }
     } catch (error) {
-      console.error('photo reward initial delivery failed', error);
+      console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"PUT /api/nen-members/photos/:id/review"}));
     }
   }
   const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {
@@ -2108,7 +2108,7 @@ async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'recon
       },
     });
   } catch (error) {
-    console.error(`photo reward ${action} failed`, error);
+    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
     return c.json({ success: false, error: 'ポイントの手続きに失敗しました' }, 500);
   }
 }

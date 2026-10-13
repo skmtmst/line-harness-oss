@@ -123,7 +123,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, nex
       data: { id, key, url, mimeType, size: data.byteLength },
     }, 201);
   } catch (err) {
-    console.error('POST /api/images error:', err);
+    console.error(JSON.stringify({"code":"routes_images_failed","route":"POST /api/images"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -206,7 +206,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/images/:key error:', err);
+    console.error(JSON.stringify({"code":"routes_images_failed","route":"DELETE /api/images/:key"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

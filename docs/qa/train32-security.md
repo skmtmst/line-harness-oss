@@ -11,7 +11,7 @@
 | S09 | 他統括・停止中の移行先が通り、全店の友だち数を返した | 両端の担当範囲・統括・有効・アーカイブ・統括稼働状態を検査、件数は元店舗のみ | health-migrate.security.test.ts 7件、既存health系9件合格。対照は6件失敗 | 設定・migration不要 |
 | S11 | 個人写真・添付・任意キー・ウェビナーを公開経路から取得できることを対照で再現 | 公開配信の置き場と形式だけを許可。個人写真・旧フォーム添付は所属確認後に5分署名URL、no-store。ウェビナーは公開素材の別名も遮断 | image-access、images-public-delivery、media-usage-reference、file-scan-gate、nen-photo関連16ファイル238件成功。修正なし対照12件＋個人添付別名1件失敗 | migration・データ移動なし。既存API_KEYが署名に必要。運営はR2直公開と旧CDNキャッシュを別途確認。長時間表示で期限が切れた写真は再取得が必要 |
 | S13 | 回数の共有・メール単位の拒否・容量の事前拒否がないことを試験で再現 | 既存D1のauth_throttlesで機能別に原子的に予約。共有DB失敗時は503。画像は宣言長と読み込み中の容量で拒否 | rate-limit-shared、images-upload-sizeの14件成功、直しを外す対照12件失敗。画像・フォーム・リッチメニュー等1,031件、認証関連148件、LINE代理送信等64件成功、Worker型検査成功 | migration・新設定不要。IPはCloudflareの接続元だけ。一般APIの従来のメモリ制限は追加の短期防御として維持 |
-| S14 | 未着手 | — | — | — |
+| S14 | 例外全文・識別子入りpathのログを否定試験で再現 | 管理画面・LIFF・Workerのヘッダーを追加。consoleは固定コードとroute型。監査の詳細はD1を維持 | security-log、security-console-contract、画像等の関連試験と2系統の実ブラウザ。SDK実体の読み込み・予約・MFA入力・画像・フォント・MIME拒否・埋め込み拒否を確認 | 完全CSPはreport-only。強制する対照でNextの起動が止まる。Cloudflare側のURL記録とログ集約の伏せ字は運営が別途確認（実環境未接続） |
 | S10 | 未着手 | — | — | — |
 | S04 | 案とmigrationなしの守りを予定 | — | — | — |
 
@@ -52,3 +52,17 @@ S13同種探索: メモリの一般API制限とは別に、認証入口は接続
 本文の同種探索: 汎用画像10MiB、旧フォーム10MiB、リッチメニュー1MiB、ペットのプロフィール1,500,000 bytes・写真投稿8MiB、統括の取り込み10MiBを既存の容量のまま読みながら制限。JSONはbase64の展開率と入力欄4KiBを加えた本文上限と、既存の復号後上限を併用。LINE代理送信の本文1MiB・画像3MiBもストリームで止める。書類添付と来店スタンプの写真は既存の読みながらの制限を維持。素材の直接アップロードはR2署名と完了時のhead・メタ情報検査を使っており、Workerへ巨大な本文を読む経路ではない。
 
 S13証拠: `/tmp/train32-s13-before.log`、`/tmp/train32-s13-upload-before.log`、`/tmp/train32-s13-related.log`、`/tmp/train32-s13-auth-related.log`、`/tmp/train32-s13-final-specific.log`、`/tmp/train32-s13-control.log`、`/tmp/train32-s13-after-control.log`、`/tmp/train32-s13-typecheck.log`。本番・検証には接続せず、D1更新・設定変更・配備はしていない。
+
+S13: `cb0531f347`。追加の全体検査で、非公開アップロードと本人確認の回数を認証より先に数えると認証の拒否が503へ変わることを検出。非公開の操作は認証後に数え、閲覧のみの操作も403で先に断る。ガード網羅と回数の関連33件で確認した。回数の上限や許可の一覧を増やしていない。
+
+S11追加の探索: 無関係なプロフィール応答へ画像URLを入れて署名を作らせる余地を閉じた。スタッフはその画像を扱う正規の画面用APIからだけ発行し、写真審査の閲覧権限も確認する。画像用の欄と回答の添付だけを書き換え、名前・説明などの文字はそのまま返す。管理画面で意図的に公開する登録済み素材のPDFは既存の配信口を保つが、任意のR2のPDFは公開しない。画像の公開URLはWORKER_PUBLIC_URLとWORKER_URLの両方を扱う。
+
+S14同種探索: Worker・管理画面・LIFF・DB・共有の型・LINE SDK・MCPの実行コードを探索。1,382のconsole呼出し（205ファイル）から動的な例外・URL・識別子を取り除いた。ソースの全件検査で固定コードとroute型以外を拒否し、例外追加・生のpath・動的コード・payloadの混入を対照で検出する。監査の「誰が・何を・いつ」はD1へ残ることを既存の成功・拒否試験で確認。ログの旧形式を見ていた試験をD1と伏せ字の確認へ更新した。処理の成功・失敗・後続の継続の確認は維持した。
+
+S14ヘッダー: `_headers`を管理画面、独立LIFF、Worker配信LIFFへ追加。Workerが生成するHTMLにも同じ保護を付け、変更できないアセットのヘッダーはbodyを変えず包み直す。[Cloudflareのヘッダー仕様](https://developers.cloudflare.com/workers/static-assets/headers/)と[Viteのアセット仕様](https://developers.cloudflare.com/workers/vite-plugin/reference/static-assets/)を照合した。管理画面は他サイトの埋め込みを拒否、LIFFは自サイトとLINEの親を許す。nosniff・no-referrer・不要な機器の権限・object/base/formも設定した。
+
+S14実ブラウザ: Chromiumで実ビルドを配信し、宣言されたヘッダーを付けて確認。LINE SDKの公開配信物自体を読み込み、認証と顧客APIは人工のものへ置き換える（実LINEログインや実送信はしない）。LIFFの予約、正しい埋め込みと別サイトからの拒否が成功。管理画面のパスワード表示、二段階から回復コードへ切り替え、失敗の表示も成功。画像・フォントの読み込みと誤ったMIMEの拒否も成功。厳しいscript-srcを強制するとNextの起動が止まり、report-onlyで13件のinline違反を確認したため、nonce/hash対応までは読み込みのCSPをreport-onlyにする。CIへ同じ2命令を接続した。
+
+S14初回の全体検査は37件失敗。ログの古い形への期待、認証の順序、公開素材の試験用DB、途中で追加したHTML試験を含む。これを最終合格に数えず、順序を修正・D1の監査確認へ更新して関連を再検査。初回ブラウザも試験の文言と親側のCSPを切り分けて訂正し、強制・report-onlyの両方を実行した。ログ `/tmp/train32-s14-worker-all.log`、`/tmp/train32-s14-failures-recheck.log`、`/tmp/train32-s14-two-fixes.log`、`/tmp/train32-s14-console-contract.log`、`/tmp/train32-s14-worker-browser-fixed.log`、`/tmp/train32-s14-web-browser-final.log`、結果 `/tmp/train32-security-browser/`。正式な見た目照合はB-270により行っていない。
+
+追加コミット: S09の試験型補正 `35927f6f6b`、S11の署名する経路・欄・写真閲覧権限の補正 `f0e621da1e`、S13の認証順序 `cf5f41fe93`。S11追加の直しを外す対照も失敗し、修正版の7ファイル72件・Worker型検査が成功。

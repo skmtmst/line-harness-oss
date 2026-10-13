@@ -56,14 +56,14 @@ export async function handleRichMenuTap(
       lineAccountId,
     });
   } catch (err) {
-    console.error('[richMenuTap] failed to record tap', err);
+    console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
   }
 
   for (const tagId of target.tagIds) {
     try {
       await attachTagAndFireSideEffects(db, friend.id, tagId);
     } catch (err) {
-      console.error(`[richMenuTap] failed to attach tag ${tagId}`, err);
+      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
     }
   }
 
@@ -77,7 +77,7 @@ export async function handleRichMenuTap(
           ? JSON.stringify(['rich-menu-tap', options.sourceEventId, areaId]) : undefined,
       });
     } catch (err) {
-      console.error('[richMenuTap] failed to add score', err);
+      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
     }
   }
 
@@ -85,7 +85,7 @@ export async function handleRichMenuTap(
     try {
       await enrollFriendInScenario(db, friend.id, target.scenarioId);
     } catch (err) {
-      console.error(`[richMenuTap] failed to start scenario ${target.scenarioId}`, err);
+      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
     }
   }
 
@@ -117,7 +117,7 @@ export async function handleRichMenuTap(
             replyTokenConsumed = true;
           } catch (err) {
             // reply は 1 回きり・有効期限つき。失敗したら push で送り直す。
-            console.warn('[richMenuTap] reply failed, falling back to push', err);
+            console.warn(JSON.stringify({"code":"services_rich_menu_tap_warn"}));
             await lineClient.pushMessage(friend.line_user_id, [message]);
           }
         } else {
@@ -132,12 +132,12 @@ export async function handleRichMenuTap(
           lineAccountId,
         });
       } else if (!tpl) {
-        console.warn(`[richMenuTap] template ${target.templateId} not found`);
+        console.warn(JSON.stringify({"code":"services_rich_menu_tap_warn"}));
       } else {
-        console.warn(`[richMenuTap] template ${target.templateId} has unusable content`);
+        console.warn(JSON.stringify({"code":"services_rich_menu_tap_warn"}));
       }
     } catch (err) {
-      console.error('[richMenuTap] failed to send template', err);
+      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
     }
   }
 

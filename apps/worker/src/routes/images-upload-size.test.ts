@@ -39,4 +39,17 @@ describe('S13 image size before allocation', () => {
     const res=await instance.request('/api/images',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({data:btoa('synthetic-image'),mimeType:'image/png'})},env);
     expect(res.status).toBe(201);expect(put).toHaveBeenCalledOnce();
   });
+  it('S14 never logs the full provider exception or its token-bearing URL', async () => {
+    const marker='SYNTHETIC_PRIVATE_MARKER';
+    const put=vi.fn().mockRejectedValue(new Error(`https://synthetic.invalid/friends/synthetic-private-id?token=${marker}`));
+    const { instance,env }=app(put);const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+    try {
+      const response=await instance.request('/api/images',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({data:btoa('synthetic-image'),mimeType:'image/png'})},env);
+      expect(response.status).toBe(500);
+      expect(log).toHaveBeenCalled();
+      const output=log.mock.calls.flat().map(value=>value instanceof Error?`${value.message}\n${value.stack}`:JSON.stringify(value)).join('\n');
+      expect(output).not.toContain(marker);
+      expect(output).not.toContain('synthetic-private-id');
+    } finally { log.mockRestore(); }
+  });
 });

@@ -240,10 +240,7 @@ function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): s
 }
 
 function logAuthFailure(branch: string, error: unknown): void {
-  console.error('[admin-auth] authentication branch failed', {
-    branch,
-    name: error instanceof Error ? error.name : 'UnknownError',
-  });
+  console.error(JSON.stringify({"code":"routes_admin_auth_failed"}));
 }
 
 async function recordLoginAuditBestEffort(c: Context<Env>, staffId: string): Promise<void> {
@@ -769,7 +766,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
 adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) {
-    console.error('[admin-auth] refused login — misconfigured topology:', config.misconfigured);
+    console.error(JSON.stringify({"code":"routes_admin_auth_failed","route":"POST /api/auth/login"}));
     return c.json({ success: false, error: config.misconfigured }, 500);
   }
 
@@ -1006,7 +1003,7 @@ adminAuth.post('/api/auth/sessions/revoke-others', inputJsonBoundary(), async (c
       after: { revoked },
     });
   } catch (error) {
-    console.error('[admin-auth] sessions_revoked audit failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_admin_auth_failed","route":"POST /api/auth/sessions/revoke-others"}));
   }
   return c.json({ success: true, data: { revoked } });
 });

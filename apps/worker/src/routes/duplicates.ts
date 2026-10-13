@@ -88,7 +88,7 @@ duplicates.get('/api/duplicates/stats', requireRole('owner', 'admin', 'staff'), 
     });
     return c.json({ success: true, data: serializeDuplicatesStats(stats) });
   } catch (err) {
-    console.error('GET /api/duplicates/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_duplicates_failed","route":"GET /api/duplicates/stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

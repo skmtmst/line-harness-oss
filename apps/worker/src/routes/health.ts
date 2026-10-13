@@ -55,7 +55,7 @@ health.get('/api/accounts/health-summary', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/accounts/health-summary error:', err);
+    console.error(JSON.stringify({"code":"routes_health_failed","route":"GET /api/accounts/health-summary"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -87,7 +87,7 @@ health.get('/api/accounts/:id/health', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/accounts/:id/health error:', err);
+    console.error(JSON.stringify({"code":"routes_health_failed","route":"GET /api/accounts/:id/health"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -116,7 +116,7 @@ health.get('/api/accounts/migrations', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/accounts/migrations error:', err);
+    console.error(JSON.stringify({"code":"routes_health_failed","route":"GET /api/accounts/migrations"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -175,7 +175,7 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/accounts/:id/migrate error:', err);
+    console.error(JSON.stringify({"code":"routes_health_failed","route":"POST /api/accounts/:id/migrate"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -203,7 +203,7 @@ health.get('/api/accounts/migrations/:migrationId', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/accounts/migrations/:migrationId error:', err);
+    console.error(JSON.stringify({"code":"routes_health_failed","route":"GET /api/accounts/migrations/:migrationId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

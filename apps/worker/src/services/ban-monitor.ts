@@ -33,14 +33,14 @@ export async function checkAccountHealth(
     try {
       await checkSingleAccount(db, account);
     } catch (err) {
-      console.error(`ヘルスチェックエラー (account ${account.id}):`, err);
+      console.error(JSON.stringify({"code":"services_ban_monitor_failed"}));
     }
   }
 
   try {
     await returnRecoveredAccountsToPools(db);
   } catch (err) {
-    console.error('プールへの自動復帰に失敗しました:', err);
+    console.error(JSON.stringify({"code":"services_ban_monitor_failed"}));
   }
 }
 
@@ -148,7 +148,7 @@ async function checkSingleAccount(
   }
 
   if (riskLevel === 'danger') {
-    console.error(`⚠️ BAN検知: アカウント ${account.id} で403エラー発生。即座に確認が必要。`);
+    console.error(JSON.stringify({"code":"services_ban_monitor_failed"}));
     /*
      * 自動切替（v6-33 §11-2、X-2）。トラフィックプールに入っている
      * アカウントが danger になったら、プールの中だけで止めて、

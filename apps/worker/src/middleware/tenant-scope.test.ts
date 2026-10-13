@@ -132,14 +132,10 @@ describe('tenantScopeMiddleware', () => {
       '/api/friends?account_id=tenant-b-account', {}, environment(),
     );
 
-    expect(warn).toHaveBeenCalledWith({
-      event: 'tenant_boundary_denied',
-      staff_id: 'staff-default',
-      staff_tenant_id: DEFAULT_TENANT_ID,
-      requested_account_id: 'tenant-b-account',
-      path: '/api/friends',
-    });
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'tenant_boundary_denied' }));
     const serialized = JSON.stringify(warn.mock.calls);
+    expect(serialized).not.toContain('staff-default');
+    expect(serialized).not.toContain('tenant-b-account');
     expect(serialized).not.toContain('token-tenant-b-account');
     expect(serialized).not.toContain('secret-tenant-b-account');
   });

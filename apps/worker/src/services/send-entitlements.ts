@@ -50,7 +50,7 @@ export async function getSendPermissionForTenant(
     const entitlements = resolveEntitlements(billing);
     result = { allowed: entitlements.canSend, reason: entitlements.blockedReason, tenantId, state: entitlements.state };
   } catch (error) {
-    console.warn('send-entitlements: billing lookup failed, allowing send', error instanceof Error ? error.message : error);
+    console.warn(JSON.stringify({"code":"services_send_entitlements_warn"}));
     result = { ...ALLOW_UNKNOWN, tenantId };
   }
   cache?.set(tenantId, result);

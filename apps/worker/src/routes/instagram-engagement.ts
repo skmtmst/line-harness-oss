@@ -57,7 +57,7 @@ instagramEngagement.post('/api/integrations/ig-harness/engagement', inputJsonBou
     if (error instanceof Error && error.message.startsWith('Mileage friend not found:')) {
       return c.json({ success: false, error: 'friend_not_found' }, 404);
     }
-    console.error('IG Harness engagement mileage failed:', error);
+    console.error(JSON.stringify({"code":"routes_instagram_engagement_failed","route":"POST /api/integrations/ig-harness/engagement"}));
     return c.json({ success: false, error: 'internal_error' }, 500);
   }
 });

@@ -287,7 +287,7 @@ async function createFriendForRecipient(
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error('[line-proxy] getProfile failed', err);
+      console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
     }
 
     const friend = await upsertFriend(db, {
@@ -308,7 +308,7 @@ async function createFriendForRecipient(
     }
     return friend;
   } catch (err) {
-    console.error('[line-proxy] friend creation failed', err);
+    console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
     return null;
   }
 }
@@ -408,7 +408,7 @@ async function logProxySend(
 
     if (path === '/v2/bot/message/push' && typeof parsed.to === 'string') {
       if (!LINE_USER_ID_RE.test(parsed.to)) {
-        console.warn(`[line-proxy] push to non-user target not logged: ${parsed.to.slice(0, 4)}…`);
+        console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
         return;
       }
       const friend =
@@ -443,9 +443,7 @@ async function logProxySend(
         if (friend) rows.push(...rowsFor(friend.id, 'push'));
       }
       if (skipped > 0) {
-        console.warn(
-          `[line-proxy] multicast: ${skipped} unknown recipients not logged (friend-creation cap ${MAX_FRIEND_CREATIONS})`,
-        );
+        console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
       }
       await insertLogRows(db, rows, source, logKey);
       return;
@@ -488,17 +486,15 @@ async function logProxySend(
       }
       const rows = friendIds.flatMap((friendId) => rowsFor(friendId, null));
       await insertLogRows(db, rows, source, logKey);
-      console.log(`[line-proxy] broadcast logged for ${friendIds.length} friends`);
+      console.log(JSON.stringify({"code":"routes_line_proxy_log"}));
       return;
     }
 
     if (path === '/v2/bot/message/reply' || path === '/v2/bot/message/narrowcast') {
-      console.warn(
-        `[line-proxy] ${path} forwarded but not logged (recipient cannot be resolved)`,
-      );
+      console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
     }
   } catch (err) {
-    console.error('[line-proxy] logProxySend failed:', err);
+    console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
   }
 }
 
@@ -629,7 +625,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
-      console.error('[line-proxy] upstream fetch failed:', err);
+      console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 
