@@ -113,6 +113,21 @@ test('F2 distinguishes a column of upload instructions from a wrapped short acti
   } finally { await browser.close() }
 })
 
+test('F2 measures the name and type inside a horizontal control separately and still catches a wrapping name', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>button{display:flex;width:240px;font:13px/20px sans-serif}.labels{display:flex;flex-direction:column;min-width:0}span{display:block}</style><section data-page-template="create"><button><svg width="16" height="16"></svg><div class="labels"><span>来店アンケート</span><span>飾り・見出し1</span></div></button></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F2, 0)
+    await page.addStyleTag({ content: 'button{width:45px}' })
+    const broken = await page.evaluate(scanFixPatterns)
+    assert.ok(broken.counts.F2 > 0)
+    assert.ok(broken.findings.some(f => f.pattern === 'F2' && f.text === '来店アンケート'))
+    await page.addStyleTag({ content: 'button{width:240px}' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F2, 0)
+  } finally { await browser.close() }
+})
+
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
   try {
