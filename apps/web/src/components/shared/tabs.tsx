@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ErrorCountBadge } from './error-count-badge'
 import styles from './tabs.module.css'
 
@@ -21,6 +21,7 @@ export interface TabItem {
   /** いま開いているタブ。 */
   current?: boolean
   disabled?: boolean
+  disabledReason?: string
   onClick?: () => void
 }
 
@@ -155,7 +156,8 @@ export function Tabs({
   )
 }
 
-function Tab({ id, controls, label, href, count, countTone, errorCount, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
+function Tab({ id, controls, label, href, count, countTone, errorCount, current, disabled, disabledReason, onClick, tabIndex }: TabItem & { tabIndex: number }) {
+  const reasonId = useId()
   const classes = [styles.tab, current && styles.current].filter(Boolean).join(' ')
   const body: ReactNode = (
     <>
@@ -188,10 +190,12 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
   }
 
   return (
-    <button
+    <><button
       type="button"
       {...shared}
       aria-disabled={disabled || undefined}
+      title={disabled ? disabledReason : undefined}
+      aria-describedby={disabled && disabledReason ? reasonId : undefined}
       onClick={onClick}
       /*
        * 選択中・onClick無しのタブは押せないが disabled にはしない。
@@ -201,6 +205,6 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
       disabled={disabled}
     >
       {body}
-    </button>
+    </button>{disabled && disabledReason ? <span id={reasonId} className="sr-only">{disabledReason}</span> : null}</>
   )
 }
