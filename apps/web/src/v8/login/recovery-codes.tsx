@@ -25,7 +25,7 @@ export function RecoveryCodePanel({ codes, onContinue, continueLabel = '控え�
     <Button variant="primary" fullWidth onClick={onContinue}>{continueLabel}</Button>
     <Card surface="muted" padding="compact" layout="vertical" gap="normal">
       <SectionHeader title="控え方" />
-      <AuthActions><CopyTextButton label="コピーする" aria-label="回復コードをコピー" value={codes.join('\n')} />
+      <AuthActions><CopyTextButton size="inline" label="コピーする" aria-label="回復コードをコピー" value={codes.join('\n')} />
       <Button variant="text" size="inline" onClick={download}>ファイルに保存する</Button></AuthActions>
     </Card>
     {error ? <Notice tone="danger" message={error} /> : null}
