@@ -11,7 +11,8 @@ const DATA_RETENTION_DAYS = JSON.parse(
 export default {
   origin: "https://musubo.jp",
   previewOrigin: "https://stg.musubo.jp",
-  stagingAppOrigin: "https://nen-line-stg-admin.pages.dev",
+  // 検証環境の管理画面の公開ドメイン（apps/worker/wrangler.staging.toml の ADMIN_PUBLIC_URL と同じ）。
+  stagingAppOrigin: "https://stg-admin.musubo.jp",
   // Set only after the production /register AND /login pages have been verified.
   // Verified 2026-10-02: /register, /login and / all returned HTTP 200 with the
   // real sign-up and sign-in pages (not a fallback or error page).
