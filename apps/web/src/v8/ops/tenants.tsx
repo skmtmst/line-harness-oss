@@ -20,6 +20,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { ListPage } from '@/components/templates/list-page'
+import { PageContent } from '@/components/templates/page-frame'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import { useOpsReadOnly } from './use-ops-read-only'
@@ -203,6 +204,7 @@ export default function OpsTenantsV8() {
       </Dialog>
 }
       >
+        <PageContent>
         <Notice tone="warn">
           <ShieldCheck aria-hidden="true" />運営コンソール：契約先のデータを扱います。操作はすべて記録されます
           {opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL) === 'staging' ? '（検証環境）' : null}
@@ -253,6 +255,7 @@ export default function OpsTenantsV8() {
             })}
           </div>
         )}
+        </PageContent>
     </ListPage>
   )
 }

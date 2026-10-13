@@ -23,6 +23,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
+import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
@@ -964,7 +965,7 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4" data-design-node="acRIl">
+    <BookingLedgerFrame view={view}>
       {pageHead}
 
       {/*
@@ -1380,7 +1381,7 @@ export default function BookingsPage() {
       )}
 
       {dialogs}
-    </div>
+    </BookingLedgerFrame>
   )
 }
 

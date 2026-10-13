@@ -1,6 +1,5 @@
 'use client'
 
-import { Info } from 'lucide-react';
 import type { FriendFieldType } from '@line-crm/shared';
 import { api } from '@/lib/api';
 import { ListPageBody } from '@/components/templates';
@@ -19,7 +18,7 @@ import { FIELD_TYPE_LABELS, destinationLabel, knownUsageCount } from '@/componen
 import styles from './list.module.css';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import Notice from '@/components/shared/notice';
 import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options';
 import type { useFieldsTab } from './fields-tab'
@@ -69,6 +68,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
           <Notice tone="info">
             {host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'}
           </Notice>
+          <ListToolbarFrame><ListToolbarRow>
           <ListToolbarSearchSlot>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </ListToolbarSearchSlot>
@@ -82,8 +82,8 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
               ...(Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]).map((value) => ({ value, label: `種類：${fieldTypeWord(value)}` })),
             ]}
           /></SaveErrorField>
-          <span className={styles.toolbarSpacer} />
-          <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
+          <ListToolbarEnd><PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} /></ListToolbarEnd>
+          </ListToolbarRow></ListToolbarFrame>
         </>}
       >
         {actionError ? (
