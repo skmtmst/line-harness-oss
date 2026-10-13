@@ -269,6 +269,7 @@ export default function MediaLibraryListV8() {
     一覧・ダウンロード・登録・版追加は staff も使えるので混同しない。
   */
   const [mediaManagementPermission, setMediaManagementPermission] = useState<MediaManagementPermission>('loading')
+  const [canRegisterMedia, setCanRegisterMedia] = useState(false)
 
   const setDetailUrl = useCallback((id: string | null, mode: 'push' | 'replace' = 'push') => {
     const url = new URL(window.location.href)
@@ -299,6 +300,9 @@ export default function MediaLibraryListV8() {
       setMediaManagementPermission(
         hasDeliveryAccess(response.data, 'contents', 'edit') ? 'allowed' : 'denied',
       )
+      // Registration is available to staff, while a view-only session cannot
+      // write. Use the same verified identity as the management controls.
+      setCanRegisterMedia(!response.data.readOnly && response.data.roleBundle !== 'view_only')
     }).catch(() => {
       if (active) setMediaManagementPermission('error')
     })
@@ -1128,11 +1132,11 @@ export default function MediaLibraryListV8() {
   ]
 
   /* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */
-  const uploadButton = (
+  const uploadButton = canRegisterMedia ? (
     <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
       <Plus size={15} aria-hidden="true" />メディアを登録する
     </Button>
-  )
+  ) : null
   const selectFolder = (id: string) => {
     setFolderFilter(id)
     setPage(1)
@@ -1341,9 +1345,7 @@ export default function MediaLibraryListV8() {
                         })
                       }
                     >すべてのメディアを選択</Checkbox></SaveErrorField>
-                ) : (
-                  <span>{managementPermissionReason}。</span>
-                )}
+                ) : null}
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage}/>
             </ListPager>
           ) : null}
