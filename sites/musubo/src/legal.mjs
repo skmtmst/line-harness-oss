@@ -199,5 +199,28 @@ export function legalBody(kind, config, production) {
   } else {
     content = `<p class="legal-lead">サービスに関するご質問は、musuboの公式LINEで受け付ける予定です。</p><div class="contact-panel"><div><h2>musubo お問い合わせ窓口</h2><p>${isSupportLine(operator.supportLineUrl) ? "下のリンクから公式LINEへお進みください。" : "現在、専用の公式LINEを準備しています。受付開始後にこちらからご案内します。"}</p>${isSupportLine(operator.supportLineUrl) ? button(operator.supportLineUrl, "公式LINEで問い合わせる") : '<span class="contact-status">窓口の準備中</span>'}</div><div><p>${company}<br>電話：${pending(operator.phone, "取得中")}<br>受付時間：${pending(operator.supportHours, "準備中")}</p></div></div><p class="legal-lead">パスワード、APIキー、カード番号、お客さまの個人情報等を、お問い合わせに記載しないでください。</p>`;
   }
-  return `<div class="legal-wrap"><nav class="breadcrumb" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">/</span><span aria-current="page">${title}</span></nav><h1>${title}</h1>${notice}${kind !== "contact" ? `<p class="legal-date">${production ? `施行日：${e(legal.effectiveDate)}` : "文面作成日：2026年9月13日 · 運営者確認待ち"}</p>` : ""}<nav class="legal-nav" aria-label="関連するご案内"><a href="/terms/">利用規約</a><a href="/privacy/">プライバシーポリシー</a><a href="/legal/">特定商取引法に基づく表記</a></nav>${content}<p class="legal-back"><a href="/">← musuboのサービス紹介に戻る</a></p></div>`;
+  const en = { terms: "Terms", privacy: "Privacy", legal: "Legal", contact: "Contact" }[kind];
+  const heading =
+    kind === "legal"
+      ? '<span class="ib">特定商取引法に</span><span class="ib">基づく表記</span>'
+      : title;
+  const date =
+    kind !== "contact"
+      ? `<p class="legal-date">${production ? `施行日：${e(legal.effectiveDate)}` : "文面作成日：2026年9月13日 · 運営者確認待ち"}</p>`
+      : "";
+  // Number the articles so the table of contents can link to them.
+  const toc = [];
+  const body = content.replace(
+    /<section class="legal-section"><h2>([^<]*)<\/h2>/g,
+    (_, h) => {
+      toc.push(`<li><a href="#s${toc.length + 1}">${h}</a></li>`);
+      return `<section class="legal-section" id="s${toc.length}"><h2>${h}</h2>`;
+    },
+  );
+  const aside = toc.length
+    ? `<aside class="toc" aria-label="目次"><details><summary>CONTENTS<span class="chev" aria-hidden="true"></span></summary><ol>${toc.join("")}</ol></details></aside>`
+    : "";
+  const deco =
+    '<svg class="hero-deco" aria-hidden="true" viewBox="0 0 1400 600" preserveAspectRatio="xMaxYMid slice" fill="none"><path d="M 1500 120 C 1300 160, 1240 420, 1040 430 S 820 300, 700 520" stroke="#F3D3B8" stroke-width="80" stroke-linecap="round" opacity=".7"/><path d="M 1500 380 C 1380 400, 1320 560, 1180 640" stroke="#8FD1AC" stroke-width="56" stroke-linecap="round" opacity=".45"/></svg>';
+  return `<section class="sub-hero"><div class="sub-hero-card">${deco}<div class="sub-watermark" aria-hidden="true">${en}</div><div class="sub-hero-inner"><nav class="crumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">/</span><span aria-current="page">${title}</span></nav><div class="sub-label"><div class="rule"></div><div class="en">${en.toUpperCase()}</div></div><h1>${heading}</h1>${date}</div></div></section><section class="sub-body"><div class="wrap ${aside ? "sub-grid" : "sub-single"}">${aside}<article class="doc doc-${kind}">${notice}${body}<nav class="legal-nav" aria-label="関連するご案内"><a href="/terms/">利用規約</a><a href="/privacy/">プライバシーポリシー</a><a href="/legal/">特定商取引法に基づく表記</a></nav><p class="legal-back"><a href="/">← musuboのサービス紹介に戻る</a></p></article></div></section>`;
 }
