@@ -495,3 +495,13 @@
   :global(:root) .pageContent[data-content-layout='columns'] { flex-direction: column; align-items: stretch; }
   :global(:root) .createColumns { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 分析のカード本文。指定した口だけに共通の余白と列を持たせる。 */
+.listSection { display: flex; flex-direction: column; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); gap: var(--polish-space-card); }
+.detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-side-w); margin-right: 0; gap: var(--polish-space-card); }
+.detailColumns[data-presentation='analysis'] .detailColumnAside { display: flex; flex-direction: column; min-height: 0; padding-left: 0; border-left: 0; gap: var(--polish-space-card); }
+@container v8-page (max-width: 1099px) {
+ .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr); }
+ .detailColumns[data-presentation='analysis'] .detailColumnAside { display: none; }
+ .detailColumns[data-presentation='analysis'] .detailColumnAside[data-expanded] { display: flex; }
+}

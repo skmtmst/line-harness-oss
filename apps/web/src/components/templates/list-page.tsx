@@ -147,3 +147,8 @@ export function ListPager({ children }: { children: ReactNode }) {
 export function ListPageCards({ children, columns = 3 }: { children: ReactNode; columns?: 1 | 3 | 4 }) {
   return <div className={styles.listCards} data-card-columns={columns} style={{ '--tpl-list-card-columns': columns } as CSSProperties}>{children}</div>
 }
+
+/** カードなどの本文の余白と段の間を一覧型が持つ。 */
+export function ListPageSection({ children }: { children: ReactNode }) {
+  return <div className={styles.listSection}>{children}</div>
+}
