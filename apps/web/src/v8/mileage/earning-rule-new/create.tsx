@@ -401,7 +401,7 @@ function EarningRuleCreateBody() {
             </Field>
           </div>
           <div className={styles.field}>
-            <span className={styles.pickLabel}>付け方</span>
+            <Field label="付け方" optional={false} note="付け方は決まった数のみです">
             <Select
               aria-label="付け方"
               value="決まった数"
@@ -410,6 +410,7 @@ function EarningRuleCreateBody() {
               options={[{ value: '決まった数', label: '決まった数' }]}
               disabled
             />
+            </Field>
           </div>
         </SettingsFormRow>
       </Card>

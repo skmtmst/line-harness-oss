@@ -422,6 +422,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
             className={styles.choiceRemove}
             aria-label={`選択肢「${choice.label}」を消す`}
             disabled={choices.length <= 1 || (block.fixedField === 'allergy' && choice.isOther)}
+            title={block.fixedField === 'allergy' && choice.isOther ? '自由に書く選択肢は、アレルギーの書き足しに使うため消せません' : choices.length <= 1 ? '選択肢を1つ以上残してください' : undefined}
             onClick={() => set({ choices: choices.filter((_, i) => i !== index) })}
           >
             <X size={15} aria-hidden="true" />

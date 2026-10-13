@@ -1032,8 +1032,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       : canonicalEditorOwnsSave ? null : <>
         <Button disabled={busy} onClick={toList}>キャンセル</Button>
         {/* テキスト・カードは押せるままにし、足りない欄は保存で欄ごとに知らせる（B-139）。 */}
-        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(false)} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
-        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(true)} busy={Boolean(busy)} busyLabel="処理中…">保存する</Button>
+        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} title={!usesMessageForm() ? validation || undefined : undefined} onClick={() => save(false)} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
+        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} title={!usesMessageForm() ? validation || undefined : undefined} onClick={() => save(true)} busy={Boolean(busy)} busyLabel="処理中…">保存する</Button>
       </>
     return (
       <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId="X4JcOf">

@@ -1560,6 +1560,7 @@ function AutoReplyWizardV8Inner() {
                 variant="primary"
                 onClick={() => void publish()}
                 disabled={!publishReady || saving}
+                title={!publishReady ? dirty ? '変更を下書きに保存してから、確認と試し送りを行ってください' : gates.filter(gate => gate.state !== 'ok').map(gate => `${gate.label}：${gate.detail}`).join('／') : undefined}
                 busy={saving}
                 busyLabel="有効にしています…"
                 done={saveDone}
@@ -2334,6 +2335,7 @@ function AutoReplyWizardV8Inner() {
                     variant="primary"
                     onClick={() => void runTest()}
                     disabled={!selectedFriendId || !testMessage.trim() || saving}
+                    title={!selectedFriendId ? '試す相手を選んでください' : !testMessage.trim() ? '届いたメッセージを入力してください' : undefined}
                     busy={saving}
                     busyLabel="試しています…"
                   >
