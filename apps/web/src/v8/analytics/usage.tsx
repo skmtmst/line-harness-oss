@@ -55,7 +55,7 @@ const canTidyUsage = (item: Category) => item.unused.value !== null && item.unus
 function TidyMenu({ item }: { item: Category }) {
   const router = useRouter()
   return <span className={styles.rowMenu}>
-    <RowMenu className={styles.rowMenuButton} label={`${item.label}の操作`} items={[{ id: 'tidy', label: '片づける', onSelect: () => router.push(item.href) }]} />
+    <RowMenu appearance="box" label={`${item.label}の操作`} items={[{ id: 'tidy', label: '片づける', onSelect: () => router.push(item.href) }]} />
   </span>
 }
 
