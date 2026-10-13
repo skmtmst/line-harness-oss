@@ -284,6 +284,8 @@ jobs:
           node --test scripts/verify-no-source-visual-contracts.test.mjs
           base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
           node scripts/verify-no-source-visual-contracts.mjs --base "$base"
+          node --test apps/web/scripts/v8-guard/code-size.test.mjs
+          node apps/web/scripts/v8-guard/code-size.mjs --base "$base"
       - name: Build shared packages
         run: >-
           pnpm
