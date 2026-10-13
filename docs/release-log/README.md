@@ -71,7 +71,7 @@ CIは文書・ワークフローだけの変更や `[skip release-log]` では�
 **`docs/release-log/unreleased/` の下に、PRごとの1ファイルを作ってください。**
 
 ```
-docs/release-log/unreleased/198-kenta-auto-reply-all.md
+docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md
 ```
 
 ファイル名は `<PR番号>-<担当>-<何の話か>.md`。中身はこれまでと同じ書き方です。
