@@ -11,6 +11,7 @@ async function digest(value: string): Promise<string> {
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
 function authAttempt(c: Context<Env>): boolean {
+  if (c.req.path === '/api/auth/api-key' && ['POST','DELETE'].includes(c.req.method)) return true;
   return c.req.method === 'POST' && /^\/api\/auth\/(?:login|password\/(?:login|forgot|reset)|two-factor\/(?:verify|setup(?:\/confirm)?|recovery)|step-up)$/.test(c.req.path);
 }
 export function isUploadRequest(c: Context<Env>): boolean {
@@ -45,7 +46,7 @@ export async function preAuthSensitiveLimit(c: Context<Env>, authenticated = fal
     if (denied) return denied;
     const bytes = await readBoundedBytes(c.req.raw, 16 * 1024);
     if (bytes === null) return c.json({ success: false, code: 'auth_body_too_large', error: '送信内容が大きすぎます' }, 413);
-    c.req.raw = new Request(c.req.raw, { body: bytes });
+    c.req.raw = new Request(c.req.raw, { body: bytes.byteLength ? bytes : null });
     if (/^\/api\/auth\/password\/(?:login|forgot|reset)$/.test(c.req.path)) {
       const body = await c.req.raw.clone().json().catch(() => ({})) as { email?: unknown };
       if (typeof body.email === 'string' && body.email.trim().length <= 254) {

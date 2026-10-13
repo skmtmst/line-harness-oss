@@ -1,6 +1,7 @@
 import { mfaConfiguration, mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
+import { staffApiKey } from './staff-api-key.js';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import {
@@ -62,6 +63,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 export const adminAuth = new Hono<Env>();
 adminAuth.use('/api/auth/*', async (c, next) => { c.header('Cache-Control', 'private, no-store'); await next(); });
+adminAuth.route('/', staffApiKey);
 adminAuth.use('/api/auth/two-factor/*', async (c, next) => {
   await next();
   if (c.res.status < 400 || c.get('mfaAuditRecorded') || c.req.path.endsWith('/policy')) return;
