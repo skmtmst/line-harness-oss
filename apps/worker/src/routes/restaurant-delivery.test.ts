@@ -989,15 +989,31 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       store_id: 'store-shibuya',
       account_id: 'account-2',
       status: 'connected',
+      uber_store_name: null,
+      connected_at: null,
+      provisioned_at: null,
+      last_error: null,
+      updated_at: NOW.getTime(),
       ...overrides,
     };
     testDb.raw
       .prepare(
         `INSERT INTO rt_delivery_uber_connections
-           (store_id, account_id, status, version, created_at, updated_at)
-         VALUES (?, ?, ?, 1, ?, ?)`,
+           (store_id, account_id, status, uber_store_name, connected_at, provisioned_at,
+            last_error, version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       )
-      .run(row.store_id, row.account_id, row.status, NOW.getTime(), NOW.getTime());
+      .run(
+        row.store_id,
+        row.account_id,
+        row.status,
+        row.uber_store_name,
+        row.connected_at,
+        row.provisioned_at,
+        row.last_error,
+        NOW.getTime(),
+        row.updated_at,
+      );
   }
 
   /**
@@ -1304,5 +1320,67 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     expect(rows[0]).toMatchObject({ status: 'connected', last_error: 'auth_expired' });
     expect(JSON.stringify(rows[0])).not.toContain(PROVIDER_FREE_TEXT);
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
+  });
+
+  /* ---------------------- いまの接続の状態を読む口 ---------------------- */
+
+  describe('接続状態の読み取り（受入条件4）', () => {
+    const CONNECTION_PATH = '/api/restaurant-test/delivery/ubereats/connection';
+
+    it('まだつないでいない店舗は未接続を返し、この環境に設定があることも伝える', async () => {
+      const res = await call(CONNECTION_PATH);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        store: { id: 'store-shibuya' },
+        oauthConfigured: true,
+        connection: { status: 'disconnected', storeName: null, connectedAt: null, lastError: null },
+      });
+    });
+
+    it('つないだあとは状態と日時を返す。日時はミリ秒から直す', async () => {
+      seedConnection({
+        status: 'connected',
+        uber_store_name: '渋谷店',
+        connected_at: NOW.getTime(),
+        provisioned_at: NOW.getTime(),
+      });
+
+      const res = await call(CONNECTION_PATH);
+      const body = (await res.json()) as { connection: Record<string, unknown> };
+      expect(body.connection).toMatchObject({ status: 'connected', storeName: '渋谷店' });
+      // 秒前提の変換と混ぜると1970年になるため、ここは必ず今の時刻になること。
+      expect(body.connection.connectedAt).toBe(NOW.toISOString());
+      expect(body.connection.provisionedAt).toBe(NOW.toISOString());
+      expect(body.connection.checkedAt).toBe(NOW.toISOString());
+    });
+
+    it('ログイン済み・つなぐお店は未選択の段もそのまま返す', async () => {
+      seedConnection({ status: 'pending_store' });
+
+      const res = await call(CONNECTION_PATH);
+      expect(await res.json()).toMatchObject({
+        connection: { status: 'pending_store', storeName: null, provisionedAt: null },
+      });
+    });
+
+    it('IDとSecretが無い環境では、つなげないことを画面へ伝える', async () => {
+      delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_ID;
+      delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_SECRET;
+
+      const res = await call(CONNECTION_PATH);
+      expect(await res.json()).toMatchObject({ success: true, oauthConfigured: false });
+    });
+
+    it('読み取りのために Uber へ問い合わせない。トークンも返さない', async () => {
+      const calls = stubTokenEndpoint();
+      seedConnection({ status: 'connected', uber_store_name: '渋谷店' });
+
+      const res = await call(CONNECTION_PATH);
+      expect(res.status).toBe(200);
+      // トークンの口は1時間100回までなので、画面を開くたびに使ってはいけない。
+      expect(calls).toHaveLength(0);
+      expect(JSON.stringify(await res.json())).not.toContain('access_token');
+    });
   });
 });

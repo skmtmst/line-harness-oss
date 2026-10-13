@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Check, LogIn, Plug, Send, X } from 'lucide-react'
 import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
@@ -10,7 +11,9 @@ import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { restaurantDeliveryApi, type UberConnectionData, type UberConnectionStatus } from '@/lib/restaurant-delivery-api'
 import { formatDate } from '@/lib/format'
 import styles from './delivery.module.css'
 
@@ -22,14 +25,23 @@ import styles from './delivery.module.css'
  * 画面の作りは設定 › SNS 連携（`v8/settings/sns/sns.tsx`）に合わせ、1列のカードを縦に並べる。
  * お店での入力欄は作らない。つなぐ操作は各社のログイン、または musubo への申し込みだけ。
  *
- * いまは3社への問い合わせの返事を待っている段のため、承認された範囲
- * （「ボタンは押せない状態で用意し、回答が来た会社から中身をつなぐ」）どおり、
- * 各社の `ready` を false にして置く。返事が来た会社はここを true にすれば、
- * 下の「つなぐ → お店を選ぶ → 解除する」の流れがそのまま動く。
+ * 承認された範囲は「ボタンは押せない状態で用意し、回答が来た会社から中身をつなぐ」。
+ * Uber Eats は受け口がつながったので `ready` を true にし、ログインの経路を実際に動かす。
+ * 出前館・ロケットナウは返事待ちのため false のまま（押せないボタン＋待ちの案内）。
  *
- * 状態（接続中・接続エラー・申し込み受付中）と日付・お店の一覧は、各社の受け口が決まったあと
- * サーバから受け取る。それまでの間も画面の経路を確かめられるよう、入口の値は
- * `services` の引数で差し替えられるようにしてある（既定は下の `SERVICES`）。
+ * Uber Eats の流れ：
+ *  1. ［Uber Eats にログインしてつなぐ］→ `POST …/ubereats/connect/start` →返った認可URLへ移動。
+ *  2. Uber で「許可」→ サーバの戻り口が受け取り、この画面へ `?ubereats=pending_store` で戻る。
+ *  3. この画面は開くたびに `GET …/ubereats/connection` で本当の状態を読み直す。
+ *
+ * `pending_store`（ログイン済み・つなぐお店は未選択）は、まだ注文が入らないので
+ * 札は「未接続」のまま、承認案 `OIY4Z` の帯（Notice）で続きを伝える。新しい状態札は増やさない。
+ * つなぐお店を選ぶ段（`X5d8UF`）は Uber 側の権限が下りてから中身をつなぐため、
+ * 候補（`stores`）が入っているときだけ窓を開く。
+ *
+ * 出前館・ロケットナウの状態と日付は、各社の受け口が決まったあとサーバから受け取る。
+ * それまでの間も画面の経路を確かめられるよう、入口の値は `services` の引数で
+ * 差し替えられるようにしてある（既定は下の `SERVICES`）。
  */
 
 type DeliveryStatus = 'disconnected' | 'connected' | 'error' | 'applying'
@@ -61,8 +73,10 @@ export type DeliveryService = {
   connectedAt?: string
   checkedAt?: string
   appliedAt?: string
-  /** 接続エラー・申し込み受付中のときに状態の下へ出す囲み */
+  /** 状態の下へ出す帯（`OIY4Z` の Notice）。接続エラー・申し込み受付中・ログイン直後に使う。 */
   stateNote?: string
+  /** 帯の色。既定は状態まかせ（接続エラーだけ赤）。ログインから戻った知らせはここで指定する。 */
+  stateNoteTone?: 'warn' | 'danger'
   /** 各社のログインで許可されたお店の一覧（`X5d8UF` の選び口に出す） */
   stores?: DeliveryStore[]
 }
@@ -84,7 +98,9 @@ export const SERVICES: DeliveryService[] = [
     connect: 'login',
     guide:
       'ボタンを押すと Uber Eats のログイン画面が開きます。ふだんお使いの Uber Eats のIDでログインし、「許可」を押してください。そのあと、つなぐお店を選ぶ画面に戻ります。',
-    ready: false,
+    // Uber Eats だけ受け口がつながっている。この環境に接続の設定が無い場合は
+    // サーバの返事（oauthConfigured）で false に戻し、押させない。
+    ready: true,
     status: 'disconnected',
   },
   {
@@ -112,6 +128,78 @@ export const SERVICES: DeliveryService[] = [
 /** 返事を待っている間、押せないボタンに添える説明。 */
 const WAITING = 'いま musubo が各デリバリーサービスへ連携のお手続きを進めています。できるようになり次第、この画面からつなげます。'
 
+/** 状態の下へ出す帯の中身。 */
+type StateNote = { text: string; tone: 'warn' | 'danger' }
+
+/**
+ * サーバが持つ Uber の状態を、承認済みの4つの札（未接続・接続中・接続エラー・申し込み受付中）へ移す。
+ * `pending_store` はまだ注文が入らないので「未接続」。札は増やさず、下の帯で続きを伝える。
+ */
+const UBER_DESIGN_STATUS: Record<UberConnectionStatus, DeliveryStatus> = {
+  disconnected: 'disconnected',
+  pending_store: 'disconnected',
+  connected: 'connected',
+  expired: 'error',
+  no_permission: 'error',
+}
+
+/** サーバの状態そのものを説明する帯。 */
+const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> = {
+  pending_store: {
+    text: 'Uber Eats へのログインは受け取りました。つなぐお店を選ぶ手続きは musubo 側で続けています。選び終わると、この段が「接続中」に変わります。',
+    tone: 'warn',
+  },
+  expired: {
+    text: 'Uber Eats とのつなぎの期限が切れました。「Uber Eats にログインしてつなぐ」からもう一度ログインしてください。',
+    tone: 'danger',
+  },
+  no_permission: {
+    text: 'Uber Eats 側の許可が外れているため、注文を取り込めません。musubo が Uber Eats へ確認します。',
+    tone: 'danger',
+  },
+}
+
+/**
+ * Uber から戻ったときの `?ubereats=` の符号。サーバは分類済みの符号だけを載せる
+ * （自由文・鍵・トークンは載らない）。ここでお店向けの言い方へ直す。
+ */
+const UBER_RETURN_NOTE: Record<string, StateNote> = {
+  pending_store: UBER_STATE_NOTE.pending_store as StateNote,
+  'error:denied': { text: 'Uber Eats の画面で「許可」が押されなかったため、つなげませんでした。もう一度お試しください。', tone: 'danger' },
+  'error:invalid_state': { text: 'ログインの受け付けから時間が経ちすぎたため、やり直しが必要です。もう一度ボタンを押してください。', tone: 'danger' },
+  'error:store_missing': { text: 'このLINEアカウントにお店が紐付いていないため、つなげませんでした。musubo へお知らせください。', tone: 'danger' },
+  'error:oauth_not_configured': { text: 'musubo 側の接続の設定が足りないため、つなげませんでした。musubo が設定を確認します。', tone: 'danger' },
+  'error:encryption_key_missing': { text: 'musubo 側の設定が足りないため、つなげませんでした。musubo が設定を確認します。', tone: 'danger' },
+  'error:token_exchange_failed': { text: 'Uber Eats との通信に失敗したため、つなげませんでした。少し待ってからもう一度お試しください。', tone: 'danger' },
+}
+
+/** 表に無い符号（Uber 側の分類）も、言い方を決めて出す。符号そのものは画面に出さない。 */
+function uberReturnNote(flash: string): StateNote | undefined {
+  if (flash === '') return undefined
+  const known = UBER_RETURN_NOTE[flash]
+  if (known) return known
+  if (flash.startsWith('error:')) {
+    return { text: 'Uber Eats とのつなぎを完了できませんでした。もう一度お試しください。続くときは musubo へお知らせください。', tone: 'danger' }
+  }
+  return undefined
+}
+
+/** サーバから読んだ接続の状態を、画面の1段ぶんの書き換えへ直す。 */
+function uberPatch(data: UberConnectionData, flash: string): Partial<DeliveryService> {
+  const { connection } = data
+  const note = uberReturnNote(flash) ?? UBER_STATE_NOTE[connection.status]
+  return {
+    // この環境に接続の設定が無ければ押させない。
+    ready: data.oauthConfigured,
+    status: UBER_DESIGN_STATUS[connection.status],
+    storeName: connection.storeName ?? undefined,
+    connectedAt: connection.connectedAt ?? undefined,
+    checkedAt: connection.checkedAt ?? undefined,
+    stateNote: note?.text,
+    stateNoteTone: note?.tone,
+  }
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className={styles.row}>
@@ -128,8 +216,14 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   useHideSettingsNav()
   const role = useStaffRole()
   const canManage = canManageRole(role)
+  const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  /** Uber から戻ったときに付く符号（`?ubereats=pending_store` など）。 */
+  const uberReturn = searchParams.get('ubereats') ?? ''
 
   const [services, setServices] = useState<DeliveryService[]>(initialServices)
+  /** ログインの経路を用意している間、ボタンを押しっぱなしにしないための印。 */
+  const [busy, setBusy] = useState<DeliveryService['id'] | null>(null)
   /** 解除を確かめる窓（`kJLks`）で外そうとしている会社 */
   const [disconnecting, setDisconnecting] = useState<DeliveryService | null>(null)
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
@@ -144,22 +238,59 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   }, [])
 
   /**
+   * いまの接続の状態をサーバから読み直す。画面を開くたびと、Uber から戻った直後に通る。
+   * 読むのはサーバの受け口（D1だけ）で、ここから Uber へは問い合わせない。
+   */
+  const load = useCallback(async () => {
+    if (!selectedAccountId) return
+    try {
+      patch('uber', uberPatch(await restaurantDeliveryApi.ubereatsConnection(selectedAccountId), uberReturn))
+    } catch {
+      // 読めなかっただけなので、出ている状態はそのまま残し、つなぐ操作も止めない。
+      patch('uber', {
+        stateNote: 'いまの接続の状態を読み取れませんでした。少し待ってから画面を開き直してください。',
+        stateNoteTone: 'warn',
+      })
+    }
+  }, [patch, selectedAccountId, uberReturn])
+
+  useEffect(() => { void load() }, [load])
+
+  /**
    * つなぐボタン。
-   * login の会社は各社のログインから戻ったあと、許可されたお店を選ぶ窓（`X5d8UF`）を開く。
+   * login の会社は各社のログイン画面へ送り出す。許可されたお店の候補を受け取れている場合は、
+   * 先につなぐお店を選ぶ窓（`X5d8UF`）を開く。
    * apply の会社は musubo が申し込みを代行するため、受付中の状態にする。
    */
-  const connect = useCallback((service: DeliveryService) => {
+  const connect = useCallback(async (service: DeliveryService) => {
     if (service.connect === 'login') {
-      setPickedStoreId('')
-      setPicking({ service, stores: service.stores ?? [] })
+      if ((service.stores?.length ?? 0) > 0) {
+        setPickedStoreId('')
+        setPicking({ service, stores: service.stores ?? [] })
+        return
+      }
+      if (!selectedAccountId) return
+      setBusy(service.id)
+      try {
+        const res = await restaurantDeliveryApi.ubereatsConnectStart(selectedAccountId)
+        // 認可URLはサーバが組み立てる。鍵も合言葉も画面には来ない。
+        window.location.href = res.authorizeUrl
+      } catch {
+        setBusy(null)
+        patch(service.id, {
+          stateNote: `${service.name}のログイン画面を開けませんでした。少し待ってからもう一度お試しください。`,
+          stateNoteTone: 'danger',
+        })
+      }
       return
     }
     patch(service.id, {
       status: 'applying',
       appliedAt: new Date().toISOString(),
       stateNote: `musubo が${service.name}へ連携の申し込みを行いました。手続きが終わるまでお待ちください。`,
+      stateNoteTone: undefined,
     })
-  }, [patch])
+  }, [patch, selectedAccountId])
 
   /** 選んだお店でつなぐ（`X5d8UF` の確定）。 */
   const pickStore = useCallback(() => {
@@ -172,6 +303,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       connectedAt: now,
       checkedAt: now,
       stateNote: undefined,
+      stateNoteTone: undefined,
     })
     setPicking(null)
     setPickedStoreId('')
@@ -187,6 +319,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       checkedAt: undefined,
       appliedAt: undefined,
       stateNote: undefined,
+      stateNoteTone: undefined,
     })
     setDisconnecting(null)
   }, [disconnecting, patch])
@@ -226,10 +359,12 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
 
                 {/* 状態の注記は自作の色分け（`.note[data-tone]`）をやめ、共通の帯（Notice）に任せる
                     （B-172 status-badge）。つなぐ手順の案内は色の意味を持たないので真珠色の囲みのまま。 */}
-                {service.status === 'disconnected' ? (
+                {/* 帯を先に見るのは、ログイン済み・お店は未選択（`pending_store`）が
+                    札の上では「未接続」のままで、続きを伝えるのがこの帯だけだから。 */}
+                {service.stateNote ? (
+                  <Notice tone={service.stateNoteTone ?? (service.status === 'error' ? 'danger' : 'warn')} appearance="soft">{service.stateNote}</Notice>
+                ) : service.status === 'disconnected' ? (
                   <p className={styles.note}>{service.guide}</p>
-                ) : service.stateNote ? (
-                  <Notice tone={service.status === 'error' ? 'danger' : 'warn'} appearance="soft">{service.stateNote}</Notice>
                 ) : null}
 
                 {service.status === 'applying' ? (
@@ -245,7 +380,14 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 {canManage ? (
                   <div className={styles.actions}>
                     {service.status === 'disconnected' ? (
-                      <Button variant="primary" disabled={!usable} title={usable ? undefined : WAITING} onClick={() => connect(service)}>
+                      <Button
+                        variant="primary"
+                        disabled={!usable}
+                        title={usable ? undefined : WAITING}
+                        busy={busy === service.id}
+                        busyLabel="開いています…"
+                        onClick={() => void connect(service)}
+                      >
                         {service.connect === 'login' ? <LogIn size={15} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
                         {connectLabel(service)}
                       </Button>
