@@ -552,21 +552,21 @@ function FieldMigrate() {
           </Field></div>
         ) : null}
 
-        <DataTable density="records" label="値の移り方の見本">
+        <DataTable label="値の移り方の見本">
           <thead><TableHeadRow>
             <Th truncate>今の値</Th>
             <Th truncate>移したあと</Th>
             <Th truncate align="right">人数</Th>
           </TableHeadRow></thead>
           <tbody>
-          {sampleState === 'loading' ? <Tr><Td colSpan={3}>値の移り方を確かめています…</Td></Tr> : null}
-          {sampleState === 'error' ? <Tr><Td colSpan={3}>値の移り方を確かめられませんでした。「項目を作って事前確認」で確かめられます。</Td></Tr> : null}
-          {sampleState === 'ready' && rows.length === 0 ? <Tr><Td colSpan={3}>値が入っている友だちはいません。</Td></Tr> : null}
+          {sampleState === 'loading' ? <Tr><Td colSpan={3}><TruncatedText value="値の移り方を確かめています…" /></Td></Tr> : null}
+          {sampleState === 'error' ? <Tr><Td colSpan={3}><TruncatedText value="値の移り方を確かめられませんでした。「項目を作って事前確認」で確かめられます。" /></Td></Tr> : null}
+          {sampleState === 'ready' && rows.length === 0 ? <Tr><Td colSpan={3}><TruncatedText value="値が入っている友だちはいません。" /></Td></Tr> : null}
           {rows.map((row) => (
             <Tr key={`${row.from}:${row.to}`}>
               <Td><TruncatedText value={row.from} /></Td>
               <Td><TruncatedText value={row.to} /></Td>
-              <Td align="right">{`${formatNumber(row.count)} 人`}</Td>
+              <Td align="right"><TruncatedText value={`${formatNumber(row.count)} 人`} /></Td>
             </Tr>
           ))}
           </tbody>
