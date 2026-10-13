@@ -17,6 +17,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { DataTable, Td, Tr } from '@/components/shared/table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
@@ -583,15 +584,20 @@ export default function TemplateDetailV8() {
         )}
       >
         <div className={styles.dialogList}>
-          {usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
-            <div key={row.key} className={styles.blockedRow}>
-              <span className={styles.usageKind}>{row.kind}</span>
-              <span className={styles.dialogName} ><TruncatedText value={String(row.name ?? '')} /></span>
+          <DataTable label="使っている所" columns="var(--tpl-eds-kind-w) minmax(0, 1fr) auto" columnLayout={{
+            headHeight: 'auto', rowHeight: 'auto', gap: 'var(--polish-space-field)',
+            padding: 'var(--tpl-eds-dialog-row-pad)', bodyTextSize: 'var(--text-label)',
+          }}><tbody>{usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
+            <Tr key={row.key}>
+              <Td><TruncatedText value={row.kind} /></Td>
+              <Td grow><TruncatedText value={String(row.name ?? '')} /></Td>
+              <Td>
               {row.href
-                ? <TextLink external href={row.href} className={styles.ghostButton}>開いて差し替える</TextLink>
+                ? <TextLink external href={row.href}>開いて差し替える</TextLink>
                 : <span className={styles.dialogState}>開ける画面がありません</span>}
-            </div>
-          ))}
+              </Td>
+            </Tr>
+          ))}</tbody></DataTable>
           {usageCount > BLOCKED_VISIBLE ? <p className={styles.dialogMore}>ほか {usageCount - BLOCKED_VISIBLE} か所</p> : null}
         </div>
       </Dialog>
