@@ -1,18 +1,28 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DeliverySettingsPage, { SERVICES, type DeliveryService } from './delivery'
 
 /**
  * 設定 › デリバリー連携（`dF4Ov` ／ `OIY4Z` ／ `kJLks` ／ `X5d8UF`、2026-10-12 利用者承認）の退行試験。
  *
- * 承認された範囲では3社の `ready` が false で、画面のボタンは押せない。
+ * Uber Eats は受け口がつながったので押せる。出前館・ロケットナウは返事待ちで押せないまま。
  * 接続後の段（`OIY4Z`）と2つの窓（`kJLks` ／ `X5d8UF`）は各社の返事が来てから動く経路なので、
  * ここでは入口の値を差し替えて、そのときに出る表示と状態の変わり方を固定する。
+ *
+ * サーバの読み取りは「お店（LINEアカウント）が選ばれている」ときだけ通る。
+ * 入口の値を差し替える試験は `accountId` を null にして、読み取りが上書きしない状態にしてある。
  */
 
-const fixture = vi.hoisted(() => ({ role: { value: 'owner' as string | null } }))
+const fixture = vi.hoisted(() => ({
+  role: { value: 'owner' as string | null },
+  /** 画面の住所に付く `?ubereats=…`。Uber から戻ったときの符号を入れる。 */
+  search: { value: '' },
+  accountId: { value: null as string | null },
+  connection: vi.fn(),
+  connectStart: vi.fn(),
+}))
 
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => fixture.role.value,
@@ -23,6 +33,45 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageCrumbs: () => {},
   useHideSettingsNav: () => {},
 }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(fixture.search.value),
+}))
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: fixture.accountId.value, accounts: [] }),
+}))
+vi.mock('@/lib/restaurant-delivery-api', () => ({
+  restaurantDeliveryApi: {
+    ubereatsConnection: fixture.connection,
+    ubereatsConnectStart: fixture.connectStart,
+  },
+}))
+
+/** サーバが返す接続の状態のひな型。 */
+function connection(next: Partial<{ status: string; storeName: string | null; connectedAt: string | null; checkedAt: string | null }> = {}, oauthConfigured = true) {
+  return {
+    success: true,
+    store: { id: 'store-1', name: '本店' },
+    oauthConfigured,
+    connection: {
+      status: 'disconnected',
+      storeName: null,
+      connectedAt: null,
+      provisionedAt: null,
+      checkedAt: null,
+      lastError: null,
+      ...next,
+    },
+  }
+}
+
+const REAL_LOCATION = window.location
+
+/** 移動先だけを見るために画面の住所を差し替える（試験の中では実際に移動しない）。 */
+function stubLocation(): { href: string } {
+  const fake = { href: '' }
+  Object.defineProperty(window, 'location', { configurable: true, writable: true, value: fake })
+  return fake
+}
 
 function card(name: string) {
   return within(screen.getByRole('region', { name }))
@@ -47,11 +96,14 @@ const STORES = [
 afterEach(() => {
   cleanup()
   fixture.role.value = 'owner'
+  fixture.search.value = ''
+  fixture.accountId.value = null
+  Object.defineProperty(window, 'location', { configurable: true, writable: true, value: REAL_LOCATION })
   vi.resetAllMocks()
 })
 
 describe('設定 › デリバリー連携', () => {
-  it('DL-1：3社が承認どおりの順で出て、つなぐボタンは押せない', () => {
+  it('DL-1：3社が承認どおりの順で出て、Uber Eats だけ押せる', () => {
     render(<DeliverySettingsPage />)
 
     // 画面の題も h2 なので、箱の題だけを取り出して並びを見る。
@@ -62,9 +114,78 @@ describe('設定 › デリバリー連携', () => {
     expect(screen.getAllByText('未接続')).toHaveLength(3)
 
     const login = button('Uber Eats にログインしてつなぐ')
-    expect(login.disabled).toBe(true)
-    expect(login.title).toContain('musubo が各デリバリーサービスへ連携のお手続きを進めています')
-    expect(screen.getAllByRole('button', { name: '連携を申し込む' }).every((apply) => (apply as HTMLButtonElement).disabled)).toBe(true)
+    expect(login.disabled).toBe(false)
+    expect(login.title).toBe('')
+    // 返事待ちの2社は押せないまま、待ちの案内を添える。
+    const apply = screen.getAllByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement[]
+    expect(apply).toHaveLength(2)
+    expect(apply.every((one) => one.disabled)).toBe(true)
+    expect(apply.every((one) => one.title.includes('musubo が各デリバリーサービスへ連携のお手続きを進めています'))).toBe(true)
+  })
+
+  it('つなぐを押すと、サーバが返した Uber のログイン画面へ移る', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection())
+    fixture.connectStart.mockResolvedValue({ success: true, mode: 'connect', authorizeUrl: 'https://auth.uber.com/oauth/v2/authorize?x=1' })
+    const location = stubLocation()
+
+    render(<DeliverySettingsPage />)
+    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('acc-1'))
+
+    fireEvent.click(button('Uber Eats にログインしてつなぐ'))
+    await waitFor(() => expect(fixture.connectStart).toHaveBeenCalledWith('acc-1'))
+    expect(location.href).toBe('https://auth.uber.com/oauth/v2/authorize?x=1')
+  })
+
+  it('この環境に接続の設定が無ければ、つなぐボタンを押させない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({}, false))
+
+    render(<DeliverySettingsPage />)
+    await waitFor(() => expect(button('Uber Eats にログインしてつなぐ').disabled).toBe(true))
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+  })
+
+  it('Uber から戻った直後（お店は未選択）は未接続のまま、続きを帯で伝える', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+
+    render(<DeliverySettingsPage />)
+
+    const note = await screen.findByText(/Uber Eats へのログインは受け取りました/)
+    const uberCard = card('Uber Eats')
+    expect(uberCard.getByText('未接続')).toBeTruthy()
+    // 新しい状態札は増やさず、承認案 `OIY4Z` の帯で伝える。
+    expect(note.closest('[data-design-part="notice"]')).toBeTruthy()
+  })
+
+  it('Uber から戻った符号が失敗なら、理由を危険の帯で出す', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=error:denied'
+    fixture.connection.mockResolvedValue(connection())
+
+    render(<DeliverySettingsPage />)
+
+    const note = await screen.findByText(/「許可」が押されなかったため/)
+    const notice = note.closest('[data-design-part="notice"]')
+    expect(notice?.getAttribute('role')).toBe('alert')
+    // 符号そのものは画面に出さない。
+    expect(screen.queryByText(/error:denied/)).toBeNull()
+  })
+
+  it('サーバの状態が接続中なら、つないだお店をサーバの値で出す', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(
+      connection({ status: 'connected', storeName: '渋谷店', connectedAt: '2026-10-13T02:30:00.000Z', checkedAt: '2026-10-13T03:00:00.000Z' })
+    )
+
+    render(<DeliverySettingsPage />)
+
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    const uberCard = card('Uber Eats')
+    expect(uberCard.getByText('接続中')).toBeTruthy()
+    expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
 
   it('閲覧のみの担当にはボタンを出さない', () => {
