@@ -79,7 +79,7 @@ export default function OpsInviteV8() {
     setBusy(true)
     setError('')
     setAcceptCode(null)
-    const res = await authRequest<{ next: string; sessionToken?: string }>('/api/auth/ops-invite/accept', {
+    const res = await authRequest<{ next: string; sessionToken?: string; challengeToken?: string; twoFactorSetup?: boolean }>('/api/auth/ops-invite/accept', {
       token,
       ...(check.needsPassword ? { name: name.trim(), password } : {}),
     })
@@ -90,6 +90,12 @@ export default function OpsInviteV8() {
       return
     }
     resetAuthSelectionCleared(localStorage, sessionStorage)
+    if (res.data.challengeToken) {
+      const path = res.data.twoFactorSetup ? '/login/two-factor/setup' : '/login/two-factor';
+      window.location.assign(`${path}?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      return
+    }
+
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) {
       try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie のセッションで足りる */ }

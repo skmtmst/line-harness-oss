@@ -19,6 +19,7 @@ type MockStaff = {
 };
 
 const authMocks = vi.hoisted(() => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
   getStaffByAdminSession: vi.fn(async (): Promise<MockStaff | null> => null),
   lineAccounts: [] as Array<Record<string, unknown>>,
@@ -160,7 +161,7 @@ beforeEach(() => {
     { id: 'account-3', name: '店舗B', is_active: 1, channel_access_token: 'token-3' },
     { id: 'account-4', name: '予備', is_active: 1, channel_access_token: 'token-4' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/175_restaurant_terms_agreement.sql'), 'utf8'));
   // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので

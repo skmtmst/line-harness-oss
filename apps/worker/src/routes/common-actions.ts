@@ -130,6 +130,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
       format === 'csv' ? null : getCommonActionsSummary(c.env.DB, id),
     ]);
     if (format === 'csv') {
+      c.set('outputAudit', { count: result.items.length, accountId: id });
       return c.body(commonActionsCsv(result.items), 200, {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': 'attachment; filename="common-actions.csv"',

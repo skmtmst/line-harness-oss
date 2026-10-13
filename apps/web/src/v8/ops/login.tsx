@@ -147,7 +147,7 @@ export default function OpsLoginV8() {
             /></SaveErrorField>
 {emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}</Field></div>
           <div className={styles.field}><Field label={<>パスワード</>} htmlFor="ops-login-password" required><PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" /></Field></div>
-          <Button type="submit" variant="primary" disabled={busy !== null} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
+          <Button fullWidth type="submit" variant="primary" disabled={busy !== null} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
             <LogIn aria-hidden="true" />ログイン
           </Button>
         </form>
@@ -156,7 +156,7 @@ export default function OpsLoginV8() {
           <span>または</span>
           <span className={styles.rule} />
         </div>
-        <Button onClick={lineLogin} disabled={busy !== null} className={styles.wide} busy={busy === 'line'} busyLabel="LINEへ移動中…">
+        <Button fullWidth onClick={lineLogin} disabled={busy !== null} className={styles.wide} busy={busy === 'line'} busyLabel="LINEへ移動中…">
           <MessageCircle aria-hidden="true" />LINE でログイン
         </Button>
         <Link href="/password/forgot" className={styles.forgot}>パスワードを忘れた方はこちら</Link>

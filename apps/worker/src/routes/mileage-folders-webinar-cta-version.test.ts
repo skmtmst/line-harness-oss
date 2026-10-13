@@ -15,7 +15,7 @@ function request(path: string, method = 'GET', body?: unknown, token = 'owner-ke
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) }, { DB: sqlite.db } as Env['Bindings']);
 }
 beforeEach(() => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   sqlite.raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
     VALUES ('acc-1', 'channel-1', '本店', 'token', 'secret', ?), ('acc-2', 'channel-2', '支店', 'token', 'secret', ?)`).run(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID);
   sqlite.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, permission_keys)

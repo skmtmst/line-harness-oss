@@ -231,3 +231,6 @@ describe('権限変更の直前再認証 (N-427)', () => {
     expect(screen.queryByText('認証アプリで本人確認')).toBeNull()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

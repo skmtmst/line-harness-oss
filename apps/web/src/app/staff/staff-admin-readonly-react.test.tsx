@@ -172,3 +172,6 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
     expect(screen.getByText('対象のLINEアカウント：テスト本店')).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

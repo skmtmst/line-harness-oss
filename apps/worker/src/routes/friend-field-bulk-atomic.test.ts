@@ -58,7 +58,7 @@ describe('N-046 一括更新の原子性と冪等 (#812)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seed(testDb);
     target = createApp(testDb.db);
   });

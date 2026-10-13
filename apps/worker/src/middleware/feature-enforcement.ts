@@ -251,7 +251,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
   },
   {
     // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路（N-426）。
-    pattern: /^\/api\/auth\/two-factor\//,
+    pattern: /^\/api\/auth\/two-factor\/(verify|setup(?:\/confirm)?)$/,
     methods: ['POST'],
     accountResolver: 'none',
     classification: { kind: 'public', reason: 'ログイン中の合言葉で本人確認する二段階認証の入口' },
