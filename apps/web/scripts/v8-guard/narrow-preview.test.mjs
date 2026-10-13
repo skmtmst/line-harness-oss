@@ -25,17 +25,39 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
   const base = `http://127.0.0.1:${server.address().port}`
   const browser = await chromium.launch()
   try {
-    for (const board of ['K7HWG', 'u5YC6', 'U8Xm3X', 'JeINq', 'V6xAo']) {
-      const spec = map.boards[board]
-      const page = await browser.newPage({ viewport: { width: 1152, height: 1128 } })
+    const cases = ['K7HWG', 'u5YC6', 'U8Xm3X', 'JeINq', 'V6xAo'].map(board => ({ board, url: map.boards[board].url }))
+    cases.find(item => item.board === 'U8Xm3X').url += '?id=rule-shop'
+    cases.find(item => item.board === 'V6xAo').url += '?id=scenario-0'
+    cases.push(
+      { board: 'rich-message', url: '/templates/edit?kind=rich_message' },
+      { board: 'rich-video', url: '/templates/edit?kind=rich_video' },
+      { board: 'coupon', url: '/templates/edit?kind=coupon' },
+      { board: 'research', url: '/templates/edit?kind=research' },
+      { board: 'question', url: '/templates/questions/new' },
+    )
+    for (const { board, url } of cases) for (const width of [1152, 1440]) {
+      const page = await browser.newPage({ viewport: { width, height: 1128 } })
+      console.log(`preview ${board} ${width}`)
+      const errors = []
+      page.on('pageerror', error => errors.push(error.message))
       try {
         await stubApi(page, mockFetch)
         await page.addInitScript(init => { for (const [key, value] of Object.entries(init)) localStorage.setItem(key, value) }, PARITY_INIT)
-        const response = await page.goto(base + spec.url)
+        const response = await page.goto(base + url)
         assert.ok(response?.ok(), board)
         await page.waitForLoadState('networkidle')
         const trigger = page.locator('main [class*="asideToggle"] button:visible')
+        if (width === 1440) {
+          assert.equal(await trigger.count(), 0, `${board}: 広い板は右欄をそのまま出す`)
+          assert.ok(await page.locator('main [data-template-region="preview"]:visible').count(), `${board}: 右欄を消さない`)
+          if (board !== 'K7HWG') assert.ok(await page.locator('main [data-line-preview-part="phone"]:visible').count(), `${board}: 広い板でも見え方を出す`)
+          assert.deepEqual(errors, [], board)
+          continue
+        }
         await trigger.waitFor()
+        assert.equal(await trigger.count(), 1, board)
+        const editable = page.locator('main input[type="text"]:visible:not(:disabled):not([readonly]),main textarea:visible:not(:disabled):not([readonly])').first()
+        if (await editable.count()) await editable.fill('プレビュー確認中の入力')
         const before = await page.locator('main input:visible,main textarea:visible').evaluateAll(els => els.map(el => [el.id, el.value]))
         await trigger.click()
         const dialogs = page.locator('[role="dialog"]:visible,[role="alertdialog"]:visible')
@@ -44,8 +66,10 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
         if (board === 'K7HWG') assert.ok(await dialogs.getByText('設定内容', { exact: true }).count())
         else assert.ok(await dialogs.locator('[data-line-preview-part="phone"]:visible').count(), `${board}: 見え方そのものを出す`)
         await dialogs.getByRole('button', { name: '閉じる', exact: true }).first().click()
+        await page.locator('[role="dialog"],[role="alertdialog"]').waitFor({ state: 'hidden', timeout: 5000 })
         assert.equal(await dialogs.count(), 0, board)
         assert.deepEqual(await page.locator('main input:visible,main textarea:visible').evaluateAll(els => els.map(el => [el.id, el.value])), before, board)
+        assert.deepEqual(errors, [], board)
       } finally { await page.close() }
     }
   } finally {
