@@ -104,7 +104,7 @@ try {
       return { background: css.backgroundColor, image: css.backgroundImage, canvas, primary, core: { background: core.backgroundColor, width: parseFloat(core.width), height: parseFloat(core.height), radius: core.borderRadius }, rowHeight: el.closest('label').getBoundingClientRect().height };
     });
     const formLook = await choiceLook();
-    const correctChoice = c => c.background === c.primary && c.image === 'none' && c.core.background === c.canvas && c.core.width > 0 && c.core.width === c.core.height && (c.core.radius === '50%' || parseFloat(c.core.radius) >= c.core.width / 2);
+    const correctChoice = c => c.background === c.primary && c.image === 'none' && c.core.background === c.canvas && c.core.width === 12 && c.core.height === 12 && (c.core.radius === '50%' || parseFloat(c.core.radius) >= c.core.width / 2);
     assert.ok(correctChoice(formLook), '選択の丸は白い芯と緑の輪');
     await page.screenshot({ path: `${output}/form-${width}.png` });
     await chosen.evaluate(el => { const css = getComputedStyle(el); el.style.background = `radial-gradient(circle, ${css.getPropertyValue('--color-liff-primary')} 4px, ${css.getPropertyValue('--color-canvas')} 4px)`; });
@@ -113,6 +113,9 @@ try {
     const squareCore = await page.addStyleTag({ content: 'input[type="radio"]:checked::after { border-radius: 0 !important; }' });
     assert.equal(correctChoice(await choiceLook()), false, '白い芯が四角になる故障を検出');
     await squareCore.evaluate(el => el.remove());
+    const smallCore = await page.addStyleTag({ content: 'input[type="radio"]:checked::after { width: 9px !important; height: 9px !important; }' });
+    assert.equal(correctChoice(await choiceLook()), false, '白い芯が絵より小さい故障を検出');
+    await smallCore.evaluate(el => el.remove());
     await page.getByRole('radio', { name: 'シャンプーのみ', exact: true }).click();
     await page.waitForFunction(() => [...document.querySelectorAll('input[type=radio]')].some(el => el.checked && el.closest('label').textContent.includes('シャンプーのみ')));
     const unselected = await choiceLook();
@@ -148,5 +151,5 @@ try {
     await context.close();
   }
   writeFileSync(`${output}/results.json`, JSON.stringify(results, null, 2));
-  console.log(`LIFF layout: ${results.length}場面・故障対照21件・イベント変更の入口3幅 成功`);
+  console.log(`LIFF layout: ${results.length}場面・故障対照24件・イベント変更の入口3幅 成功`);
 } finally { await browser.close(); await fetch(`${api}/__qa/reset`, { method: 'POST' }); }

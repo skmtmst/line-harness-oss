@@ -98,7 +98,7 @@ input.choiceInput[type='checkbox']:checked, .choice input[type='checkbox']:check
 input.choiceInput[type='radio'], .choice input[type='radio'] { width: var(--liff-radio-size, 18px); height: var(--liff-radio-size, 18px); }
 input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { background: radial-gradient(circle, var(--color-selection-border) calc(var(--liff-radio-dot, 9px) / 2), var(--color-canvas) calc(var(--liff-radio-dot, 9px) / 2)); }
 .choice input.choiceInput[type='radio']:checked { position: relative; background: var(--color-liff-primary, var(--color-selection-border)); border-color: var(--color-liff-primary, var(--color-selection-border)); outline: 3px solid var(--color-liff-primary, var(--color-selection-border)); }
-.choice input.choiceInput[type='radio']:checked::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: var(--liff-radio-dot, 9px); height: var(--liff-radio-dot, 9px); border-radius: 50%; background: var(--color-canvas); }
+.choice input.choiceInput[type='radio']:checked::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: var(--liff-radio-selected-core-size, 12px); height: var(--liff-radio-selected-core-size, 12px); border-radius: 50%; background: var(--color-canvas); }
 .choice input.choiceInput[type='radio']:checked:focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }
 
 .formLabel { font-size: 15px; line-height: 22px; }
