@@ -5,7 +5,6 @@ import { CalendarDays, Play } from 'lucide-react'
 import Button from '@/components/shared/button'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
@@ -130,9 +129,7 @@ export function BasicForm({
 
       <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-audience`}>
         <CardHeader size="stacked" titleId={`${idPrefix}-audience`} title="だれに案内するか" />
-        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
-            ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
-            : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}
+        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手"><ReadValue label="案内する相手">{audienceLabel}</ReadValue>
 </Field></div>
       </Card>
     </>

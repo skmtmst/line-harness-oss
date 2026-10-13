@@ -10,7 +10,6 @@ import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
-import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
@@ -411,15 +410,7 @@ function FriendAddPublish() {
       <Card variant="form" gap="normal" className={styles.card} aria-label="テストする（送らずに判定）">
         <CardHeader size="stacked" title={<>テストする（送らずに判定）</>} meta={<>本番の登録・タグ・マイルは変えません</>} />
         <div className={styles.testRow}>
-          {canEdit ? <span className={styles.testTarget}>
-            <Select
-              aria-label="テストの送り先"
-              size="full"
-              value="self"
-              onChange={() => {}}
-              options={[{ value: 'self', label: `送り先：${me ?? 'あなた'}（自分）` }]}
-            />
-          </span> : <p className={styles.cardDesc}>送り先：{me ?? 'あなた'}（自分）</p>}
+          <p className={styles.cardDesc}>送り先：{me ?? 'あなた'}（自分）</p>
           {canEdit ? (
             <Button type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={() => void runTest()}>
               <Send size={15} aria-hidden="true" />テストする（送らずに判定）

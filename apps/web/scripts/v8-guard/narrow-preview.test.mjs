@@ -56,6 +56,7 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
     Object.assign(cases.find(item => item.board === 'K7HWG'), { label: '設定内容を見る', title: '設定内容', phone: false })
     // 作成・編集の実際の入口と保存済みID。古い一覧URLを板の名前で測らない。
     for (const [board, label, title, url = map.boards[board].url] of roles) cases.push({ board, url, label, title, phone: false })
+    cases.push({ board: 'j7PP04', url: '/webinars/new' })
     for (const { board, url, label = 'LINEの見え方を確認', title = 'LINEの見え方', phone = true } of cases) for (const width of [1152, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 1128 } })
       console.log(`preview ${board} ${width}`)
@@ -67,6 +68,11 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
         const response = await page.goto(base + url)
         assert.ok(response?.ok(), board)
         await page.waitForLoadState('networkidle')
+        if (board === 'U8Xm3X') {
+          assert.equal(await page.getByRole('button', { name: 'テストの送り先', exact: true }).count(), 0, '自己宛先だけなら選ぶ操作を置かない')
+          assert.ok(await page.getByText(/送り先：.*（自分）/).count(), '自己宛先は文字で読める')
+        }
+        if (board === 'j7PP04') assert.equal(await page.getByRole('button', { name: '案内する相手', exact: true }).count(), 0, '固定の参加者へ選ぶ操作を置かない')
         const trigger = page.locator('main [class*="asideToggle"] button:visible')
         if (width === 1440) {
           assert.equal(await trigger.count(), 0, `${board}: 広い板は右欄をそのまま出す`)
