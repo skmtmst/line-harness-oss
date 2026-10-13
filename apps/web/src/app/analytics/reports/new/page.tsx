@@ -1,5 +1,4 @@
 'use client'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -44,6 +43,7 @@ import {
   runErrorLabel,
   runStateLabel,
 } from '../../report-run-state'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },
@@ -452,6 +452,7 @@ function AnalyticsReportFormPage() {
     return trimmed !== '' && !isEmail(trimmed) ? trimmed : null
   })
   const hasInvalidEmail = invalidEmails.some(Boolean)
+  const submitDisabledReason = saving ? '保存しています' : !hasRecipient ? '受け取る人を1人以上選んでください' : hasInvalidEmail ? 'メールアドレスの形を確認してください' : undefined
 
   // R455: 保存応答が遅れて戻ったとき、別の依頼・別アカウントへ移って
   // いたらその応答を捨てる。応答のたびに「いま見ている対象」と比べる。
@@ -1047,6 +1048,8 @@ function AnalyticsReportFormPage() {
           このまま保存すると、相手の変更が消えます。入力は残っています。
         </Notice> : null}
         dirty={false}
+        previewLabel="レポートの見本を見る"
+        previewTitle="レポートの見本"
         preview={        <>
           <Card variant="aside">
             <CardHeader size="stacked" title={`${nextLabel} に、こう届きます`} meta="見本" />
@@ -1058,8 +1061,8 @@ function AnalyticsReportFormPage() {
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
-        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
+        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
@@ -1148,7 +1151,7 @@ function AnalyticsReportFormPage() {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
                 return <li key={def.id}><Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong>{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
+                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} title={!alertsEnabled ? '「大きな変化を知らせる」をオンにすると選べます' : undefined} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong>{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
                   <SettingsFormRow layout="columns">
                     <Field label={def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値' : 'しきい値'} required><NumberInput unit={def.id === 'conversions' ? '日' : '%'} id={`report-alert-${def.id}-threshold`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-threshold`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-threshold`) ? `report-alert-${def.id}-threshold-error` : undefined} type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-threshold`) && <p id={`report-alert-${def.id}-threshold-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-threshold`)}</p>}</Field>
                     <Field label="判定に必要な最低件数" required help="集計できた件数が、この数以上のときだけ判定します。"><NumberInput unit="件" id={`report-alert-${def.id}-sample`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-sample`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-sample`) ? `report-alert-${def.id}-sample-error` : undefined} type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-sample`) && <p id={`report-alert-${def.id}-sample-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-sample`)}</p>}</Field>

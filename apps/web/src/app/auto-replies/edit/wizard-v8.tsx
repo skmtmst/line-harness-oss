@@ -39,7 +39,6 @@ import {
   Mic,
   File,
   MousePointerClick,
-  Smartphone,
   List,
   Activity,
   Plus,
@@ -64,7 +63,6 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import SearchField from '@/components/shared/search-field'
-import Dialog from '@/components/shared/dialog'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
@@ -385,7 +383,6 @@ const kindOrder = (label: string) => { const i = MAIN_KINDS.indexOf(label); retu
 /** 絵 A0pDt「反応するメッセージの種類」の札の印。 */
 const KIND_ICONS: Record<string, typeof Type> = { テキスト: Type, スタンプ: Sticker, 画像: ImageIcon, 位置情報: MapPin, 動画: Video, 音声: Mic, ファイル: File, ボタンのタップ: MousePointerClick }
 
-
 /** 「返すまで待つ時間」の選択肢。 */
 const REPLY_DELAY_OPTIONS = [
   { value: '0', label: 'すぐ返す' },
@@ -450,11 +447,6 @@ function AutoReplyWizardV8Inner() {
   const step = readStep(params.get('step'))
   const [published, setPublished] = useState<{ name: string } | null>(null)
   const stage: WizardStep | 'done' = published ? 'done' : step
-  usePageTitle(
-    stage === 'done'
-      ? '自動応答・有効化完了'
-      : `自動応答ルールを${autoReplyId ? '編集' : '作成'}・${STEP_LABELS_V8[stage]}`,
-  )
 
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -462,6 +454,8 @@ function AutoReplyWizardV8Inner() {
   const savedVersionRef = useRef<number | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState('draft')
+  const pageTitle = autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'
+  usePageTitle(stage === 'done' ? '自動応答・有効化完了' : `${pageTitle}・${STEP_LABELS_V8[stage]}`)
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
   const [wasPublished, setWasPublished] = useState(false)
   const [matchedAccountId, setMatchedAccountId] = useState<string | null>(null)
@@ -473,7 +467,6 @@ function AutoReplyWizardV8Inner() {
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
   // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
   const [saveConflict, setSaveConflict] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [compareTarget, setCompareTarget] = useState<WizardForm | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
@@ -678,7 +671,6 @@ function AutoReplyWizardV8Inner() {
   }
   }, [saveErrors]);
 
-
   const loadPriorityData = useCallback(
     async (ruleId: string, accountId: string | null) => {
       setPriorityState('loading')
@@ -695,7 +687,6 @@ function AutoReplyWizardV8Inner() {
     },
     [loadOrder, loadFriendsInitial, saveErrors],
   );
-
 
   const searchFriends = useCallback(
     async (query: string) => {
@@ -1116,7 +1107,6 @@ function AutoReplyWizardV8Inner() {
 
       { if (!fieldFailure)
 
-
       setError('試し送りできませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setSaving(false)
@@ -1159,7 +1149,6 @@ function AutoReplyWizardV8Inner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-
 
       setError(
         caught instanceof ApiError && caught.status === 409
@@ -1367,15 +1356,16 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'trigger' && (
             <>
-              <CreateSummaryCard title="保存後に過去28日の反応数を表示"
-                beforeRows={<>
+              <CreateSummaryCard
+                title="過去28日で当たった数"
+                leading={<>
                   <p className={styles.countRow} aria-label="当たった受信（過去28日）">
                     <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
                     <span className={styles.countUnit}>件</span>
                   </p>
                   <p className={styles.sideHint}>いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。</p>
                 </>}
-                rows={triggerSamples.map((sample) => ({
+                rows={triggerSamples.map(sample => ({
                   key: sample.text, label: `「${sample.text}」`,
                   value: <span className={sample.hit ? styles.sampleHit : styles.sampleMiss}>{sample.hit ? '当たる' : '当たらない'}</span>,
                 }))}
@@ -1392,16 +1382,19 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'response' && (
             <>
-              <CreateSummaryCard title="送るものの確認" rows={[
-                { label: '返すもの', value: form.mode === 'silent' ? '返信しない'
-                  : form.mode === 'template' ? selectedTemplate?.name ?? 'テンプレート'
-                    : form.mode === 'inline-flex' ? 'カード' : form.mode === 'inline-image' ? '画像'
-                      : `テキスト${form.responseContent ? ` ${formatNumber(form.responseContent.length)}字` : ''}` },
-                { label: '後の処理', value: form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none') },
-                ...(form.mode === 'inline-text' && insertedLabels(form.responseContent).length > 0 ? [{
-                  label: '差し込み', value: insertedLabels(form.responseContent).map((label) => label === '名前' ? '名前（取れないときは空欄）' : label).join('・'),
-                }] : []),
-              ]} />
+              <CreateSummaryCard
+                title="送るものの確認"
+                rows={[
+                  { label: '返すもの', value: form.mode === 'silent' ? '返信しない'
+                    : form.mode === 'template' ? selectedTemplate?.name ?? 'テンプレート'
+                    : form.mode === 'inline-flex' ? 'カード'
+                    : form.mode === 'inline-image' ? '画像'
+                    : `テキスト${form.responseContent ? ` ${formatNumber(form.responseContent.length)}字` : ''}` },
+                  { label: '後の処理', value: form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none') },
+                  ...(form.mode === 'inline-text' && insertedLabels(form.responseContent).length > 0
+                    ? [{ label: '差し込み', value: insertedLabels(form.responseContent).map(label => label === '名前' ? '名前（取れないときは空欄）' : label).join('・') }] : []),
+                ]}
+              />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
@@ -1504,7 +1497,7 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
+    <SaveErrorScope errors={saveErrors}><CreatePage footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
@@ -1513,12 +1506,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
-            <div className={styles.narrowPhoneOpen}>
-              <Button onClick={() => setPreviewOpen(true)}><Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る</Button>
-            </div>
-            {renderPreview(false)}
-          </> : renderPreview(true)} previewToggle={narrow ? undefined : <Button onClick={() => setPreviewOpen(true)}>設定内容とLINEプレビューを見る</Button>} footerActions={
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
           <>
             <Button
               type="button"
@@ -1560,7 +1548,9 @@ function AutoReplyWizardV8Inner() {
                 variant="primary"
                 onClick={() => void publish()}
                 disabled={!publishReady || saving}
-                title={!publishReady ? dirty ? '変更を下書きに保存してから、確認と試し送りを行ってください' : gates.filter(gate => gate.state !== 'ok').map(gate => `${gate.label}：${gate.detail}`).join('／') : undefined}
+                title={publishReady ? undefined : dirty
+                  ? '変更を下書きに保存してから、テストと有効にする前の確認を完了してください。'
+                  : [...new Set(gates.filter(gate => gate.state !== 'ok').map(gate => gate.detail))].join(' / ')}
                 busy={saving}
                 busyLabel="有効にしています…"
                 done={saveDone}
@@ -1580,7 +1570,6 @@ function AutoReplyWizardV8Inner() {
           />
         ) : undefined} status={dirty ? '下書きに未保存の変更があります' : undefined}>
 
-
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {saveNotice ? <Notice tone="success" message={saveNotice} onClose={() => setSaveNotice('')} /> : null}
       {staleTest ? (
@@ -1590,7 +1579,6 @@ function AutoReplyWizardV8Inner() {
           onClose={() => setStaleTest(false)}
         />
       ) : null}
-
 
           {step === 'basic' && (
             <>
@@ -2295,6 +2283,7 @@ function AutoReplyWizardV8Inner() {
                   <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
                     id="wiz-test-friend"
                     size="full"
+                    className={styles.testGrow}
                     aria-label="送信者"
                     value={selectedFriendId}
                     onChange={setSelectedFriendId}
@@ -2335,7 +2324,7 @@ function AutoReplyWizardV8Inner() {
                     variant="primary"
                     onClick={() => void runTest()}
                     disabled={!selectedFriendId || !testMessage.trim() || saving}
-                    title={!selectedFriendId ? '試す相手を選んでください' : !testMessage.trim() ? '届いたメッセージを入力してください' : undefined}
+                    title={!selectedFriendId ? '送信者を選んでください' : !testMessage.trim() ? '届いたメッセージを入力してください' : undefined}
                     busy={saving}
                     busyLabel="試しています…"
                   >
@@ -2482,9 +2471,7 @@ function AutoReplyWizardV8Inner() {
             </>
           )}
 
-
       {/* ===== 下の帯 ===== */}
-
 
       <SaveConflictCompareDialog
         open={compareTarget !== null || compareError !== ''}
@@ -2497,11 +2484,6 @@ function AutoReplyWizardV8Inner() {
           setCompareError('')
         }}
       />
-
-      <Dialog open={previewOpen} title="設定内容とLINEプレビュー" onCancel={() => setPreviewOpen(false)}
-        footer={<Button onClick={() => setPreviewOpen(false)}>閉じる</Button>}>
-        {renderPreview(true)}
-      </Dialog>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

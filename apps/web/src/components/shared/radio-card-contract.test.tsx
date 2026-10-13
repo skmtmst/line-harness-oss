@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import RadioCard, { RadioCardGroup } from './radio-card'
+import { Field } from './form-controls'
 
 afterEach(cleanup)
 
@@ -81,6 +82,19 @@ describe('ラジオカード（DEEP-02）', () => {
   it('エラー状態は aria-invalid で伝える', () => {
     render(<RadioCard name="g" value="x" checked={false} onChange={() => {}} title="対象" invalid />)
     expect(screen.getByRole('radio').getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('押せない理由と元の欄の説明を入力へ結び付け、再度使えるときは理由だけを外す', () => {
+    const view = (disabled: boolean) => <Field label="送り先" note="この設定の対象です"><RadioCard name="recipient" value="a" checked={false} onChange={() => {}} title="担当者" disabled={disabled} disabledReason="接続後に選べます" /></Field>
+    const { rerender } = render(view(true))
+    const input = screen.getByRole('radio') as HTMLInputElement
+    const descriptions = () => (input.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent).filter(Boolean)
+    expect(descriptions()).toContain('接続後に選べます')
+    expect(descriptions()).toContain('この設定の対象です')
+    rerender(view(false))
+    expect(input.disabled).toBe(false)
+    expect(descriptions()).not.toContain('接続後に選べます')
+    expect(descriptions()).toContain('この設定の対象です')
   })
 
   it('icon={null} で上段の図柄なし（j8p3yj の絵どおり題＋説明のみ）', () => {

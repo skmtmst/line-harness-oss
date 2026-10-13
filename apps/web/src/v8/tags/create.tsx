@@ -198,7 +198,7 @@ function TagCreate() {
 
   if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
-  if (!canManageRole(staffRole)) return <CreatePage boardId="d9xoI" title="タグを作る" readOnly footerActions={<Button onClick={() => router.push('/tags')}>一覧へ戻る</Button>}>{null}</CreatePage>
+  if (!canManageRole(staffRole)) return <CreatePage boardId="d9xoI" title="タグを作る" help="友だちを分類するタグを作ります。作ったあとで、タグを付ける条件や動きを決められます。" readOnly footerActions={<Button onClick={() => router.push('/tags')}>一覧へ戻る</Button>}>{null}</CreatePage>
 
   const back = <></>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
@@ -215,7 +215,10 @@ function TagCreate() {
       <CreatePage
         boardId="d9xoI"
         title="タグを作る"
+        help="友だちを分類するタグを作ります。作ったあとで、タグを付ける条件や動きを決められます。"
         identity={back}
+        previewLabel="設定内容を見る"
+        previewTitle="タグの設定"
         preview={(
           <div className={styles.aside}>
             <h2 className={styles.asideTitle}>できあがるタグ</h2>

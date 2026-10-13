@@ -559,6 +559,8 @@ function ConversionCreate() {
       help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
+      previewLabel="試算を見る"
+      previewTitle="成果の試算"
       preview={viewerOnly ? undefined : previewColumn}
       footerActions={footerActions} dirty={false}
     >
@@ -572,7 +574,7 @@ function ConversionCreate() {
 
       <Card variant="form" aria-labelledby="cv-new-what">
         <CardHeader size="stacked" titleId="cv-new-what" title="何が起きたら数えますか" meta="名前は一覧で見分けるため。お客さまには見えません" />
-        <Field density="input" label="名前" htmlFor="cv-name" requirement={b244Requirements.name} error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
+        <Field requirement={b244Requirements.name} density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
           <SaveErrorField names={["name","fieldIssue","field_issue"]}><TextField
             aria-label="成果地点の名前"
             value={name}

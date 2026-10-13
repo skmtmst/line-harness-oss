@@ -2529,6 +2529,8 @@ export function NewAutomationV8({
       /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       noticeSpacing="band"
+      previewLabel="設定内容を見る"
+      previewTitle="設定内容"
       preview={sideColumn}
       status={saveStatusText}
       footerActions={(
@@ -2586,7 +2588,7 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
-        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" requirement={b244Requirements.name} error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
+        <Field requirement={b244Requirements.name} label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
           <SaveErrorField names={["name"]}><TextField
             id="v8-rule-name"
             value={name}
@@ -2714,7 +2716,7 @@ export function NewAutomationV8({
               </button>
             </div>
             <button type="button" className={styles.linkButton} onClick={() => setConditionOpen(true)}>
-              ＋「いずれか1つ以上を満たす」条件（or 条件）を足す
+              ＋「いずれか1つ以上を満たす」条件を足す
             </button>
           </>
         )}

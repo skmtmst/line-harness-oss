@@ -1,4 +1,5 @@
 'use client'
+
 import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'

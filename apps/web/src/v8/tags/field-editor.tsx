@@ -11,7 +11,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { AffixedTextField, TextField } from '@/components/shared/text-field';
-import { Field } from '@/components/shared/form-controls';
+import { Field, RequiredBadge } from '@/components/shared/form-controls';
 import { requiredText } from '@/lib/form-requirement';
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -220,6 +220,7 @@ export default function FieldEditor({
   useEffect(() => { onDraftChange?.(draftValues) }, [draftValues, onDraftChange])
   const typeLocked = mode === 'edit' || locked
   const optionsActive = NEEDS_OPTIONS.has(effectiveType) && !locked
+  const optionsDisabledReason = locked ? 'この情報欄は編集できません' : !optionsActive ? '種類が選択肢の項目のときに追加できます' : undefined
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
   const shownKey = mode === 'create' ? (fieldKey.trim() || 'pet_name') : (field?.fieldKey ?? '')
 
@@ -297,6 +298,7 @@ export default function FieldEditor({
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
                   value={value}
                   disabled={!optionsActive}
+                  title={optionsDisabledReason}
                   aria-label={`選択肢 ${index + 1}`}
                   placeholder={OPTION_EXAMPLES[index] ?? undefined}
                   onChange={(event) => setOption(index, event.target.value)}
@@ -304,7 +306,7 @@ export default function FieldEditor({
             ))}
             {fieldError('options')}
             <span>
-              <Button type="button" disabled={!optionsActive} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
+              <Button type="button" disabled={!optionsActive} title={optionsDisabledReason} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
             </span>
           </div>
           <div className={styles.defaultBox} ref={(element) => { validationRefs.current.default = element }}>
@@ -370,6 +372,8 @@ export default function FieldEditor({
         help={<>{host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}{help}</>}
         identity={host ? undefined : back}
         notice={host?.notice}
+        previewLabel="種類と設定を見る"
+        previewTitle="項目の種類と設定"
         preview={aside}
         footerActions={host ? host.footer(submit, () => guarded(onCancel)) : <>
           <Button type="button" onClick={() => guarded(onCancel)} disabled={saving}>キャンセル</Button>
@@ -392,7 +396,7 @@ export default function FieldEditor({
 
         <Card variant="form" gap="normal" aria-labelledby="ff-basic">
           <CardHeader size="stacked" titleId="ff-basic" title="基本" />
-          <Field label="項目名" requirement={nameRequirement}><SaveErrorField names={["name"]}><TextField
+          <Field requirement={nameRequirement} label="項目名"><SaveErrorField names={["name"]}><TextField
               ref={(element) => { validationRefs.current.name = element }}
               invalid={validationTarget === 'name' && Boolean(validationError)}
               aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}

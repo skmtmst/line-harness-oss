@@ -2,6 +2,7 @@
 export default function scanFormRules() {
   const root = document.querySelector('main') || document.body, findings = []
   const visible = el => {
+    if (!el) return false
     for (let p = el; p; p = p.parentElement) {
       const c = getComputedStyle(p)
       if (c.display === 'none' || c.visibility !== 'visible' || p.hidden || p.hasAttribute('inert')) return false
@@ -32,6 +33,15 @@ export default function scanFormRules() {
       + (parseFloat(css.borderLeftWidth) || 0) + (parseFloat(css.borderRightWidth) || 0)
     if (rect.width - expectedWidth > 1 / 64) add('form-required-badge', badge, '必須の札の面を文字の幅にそろえる', { width: rect.width, expectedWidth, excess: rect.width - expectedWidth })
   }
+  for (const control of root.querySelectorAll('[data-page-template="create"] button:disabled,[data-page-template="create"] input:disabled,[data-page-template="create"] select:disabled,[data-page-template="create"] textarea:disabled,[data-page-template="create"] [aria-disabled="true"]')) {
+    if (!visible(control) || control.closest('[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],.sr-only')) continue
+    const described = (control.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id))
+    const reason = control.title.trim() || control.getAttribute('aria-description')?.trim() || described.some(el => visible(el) && el.textContent.trim())
+    const lead = control.closest('[data-sticky-lead]')
+    const leadReason = lead && [...lead.querySelectorAll('[role="note"]')].some(el => visible(el) && el.textContent.trim())
+    const busy = control.closest('[aria-busy="true"]') || /読み込|保存中|送信中|処理中/.test(control.textContent)
+    if (!reason && !leadReason && !busy) add('form-action-reason', control, '押せない操作に理由を結び付ける', { count: 1 })
+  }
   for (const palette of root.querySelectorAll('[data-color-palette="inline"]')) {
     if (!visible(palette)) continue
     const radios = [...palette.querySelectorAll('[role="radio"]')].filter(visible)
@@ -54,6 +64,17 @@ export default function scanFormRules() {
   }
   for (const heading of root.querySelectorAll('h2,h3,label')) {
     if (visible(heading) && /[（(]任意[）)]/.test(heading.textContent)) add('form-optional', heading, '任意は題と分けて札で表示する', { count: 1 })
+  }
+  for (const element of root.querySelectorAll('h2,h3,label,button')) {
+    if (visible(element) && /[（(]\s*(?:and|or)\s*条件\s*[）)]/i.test(element.textContent)) add('form-copy', element, '条件の意味は日本語で表示する', { count: 1 })
+  }
+  for (const frame of root.querySelectorAll('[data-page-template="create"]')) {
+    const heading = frame.querySelector('[data-template-region="heading"]')
+    const title = heading?.querySelector('h1,h2')
+    if (!title || !visible(title)) continue
+    const helpNames = [`${title.textContent.trim()}の説明`, '画面の説明', 'この画面の説明']
+    const hasHelp = [...heading.querySelectorAll('button')].some(button => visible(button) && (helpNames.includes(button.getAttribute('aria-label')) || button.textContent.includes('この画面の説明')) && (button.hasAttribute('aria-expanded') || button.hasAttribute('aria-describedby')))
+    if (!hasHelp) add('form-help', title, '作成・編集の題から画面の説明を開く', { count: 1 })
   }
   for (const row of root.querySelectorAll('[data-form-row="name-folder"]')) {
     if (!visible(row)) continue

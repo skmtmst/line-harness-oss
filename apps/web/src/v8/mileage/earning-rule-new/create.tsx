@@ -332,6 +332,8 @@ function EarningRuleCreateBody() {
       title="たまる決めごとを作る"
       help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
+      previewLabel="試算を見る"
+      previewTitle="マイルの試算"
       preview={preview}
       hidePreviewWhenNarrow
       footerActions={(
@@ -350,7 +352,7 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-rule">
         <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
-        <Field label="名前" htmlFor="er-name" requirement={b244Requirements.name} error={errorOf('er-name')}>
+        <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
           <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <SettingsFormRow layout="columns">
@@ -394,25 +396,11 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-amount">
         <CardHeader size="stacked" titleId="er-new-amount" title="何マイル付けるか" />
-        <SettingsFormRow layout="columns">
           <div className={styles.field}>
-            <Field required label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
+            <Field required label="マイル" htmlFor="er-amount" note="付け方：決まった数" error={errorOf('er-amount')}>
               <SaveErrorField names={["amount"]}><NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} /></SaveErrorField>
             </Field>
           </div>
-          <div className={styles.field}>
-            <Field label="付け方" optional={false} note="付け方は決まった数のみです">
-            <Select
-              aria-label="付け方"
-              value="決まった数"
-              onChange={() => {}}
-              size="full"
-              options={[{ value: '決まった数', label: '決まった数' }]}
-              disabled
-            />
-            </Field>
-          </div>
-        </SettingsFormRow>
       </Card>
 
       <Card variant="form" aria-labelledby="er-new-who">

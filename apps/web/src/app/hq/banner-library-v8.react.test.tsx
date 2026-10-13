@@ -11,7 +11,7 @@ const fixture = vi.hoisted(() => ({ images: vi.fn(), projects: vi.fn(), theme: '
 const nav = vi.hoisted(() => ({ query: '', push: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace, prefetch: () => {} }), useSearchParams: () => new URLSearchParams(nav.query) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'banner-test-staff' }), useStaffRole: () => 'owner', canManageRole: () => true }))
 function image(id: string): BannerImage {return {id,projectId:'p',generationId:null,sequence:1,source:'upload',parentImageId:null,isFavorite:false,createdBy:null,createdAt:'2026-10-01T00:00:00Z',media:{id,filename:`${id}.png`,mimeType:'image/png',sizeBytes:100,width:100,height:100,url:`/${id}.png`},generation:null,deliveredAccountIds:[]}}
 beforeEach(() => {vi.clearAllMocks();
   flushListUrlState()

@@ -384,6 +384,7 @@ function InflowCreate() {
       hidePreviewWhenNarrow
       boardId="KMaMk"
       title="流入リンクを作る"
+      help="友だち追加の入口を作り、どこから来たかと、追加後に行うことを決めます。"
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}
@@ -406,7 +407,7 @@ function InflowCreate() {
 
       <Card variant="form" gap="normal" aria-labelledby="ir-new-where">
         <CardHeader size="stacked" titleId="ir-new-where" title={<>どこに置くリンクですか</>} meta={<>名前は一覧で見分けるため。お客さまには見えません</>} />
-        <SettingsFormRow layout="columns">
+        <SettingsFormRow layout="name-folder">
           <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"

@@ -23,7 +23,6 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
@@ -90,7 +89,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
   const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries> } | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * 新しく作る画面で自動保存が先に作ったテンプレート（一斉配信と同じく、
@@ -493,15 +491,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
             compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
-        side={(
+        side={(inDialog) => (
           <>
-            <div className={styles.previewToggle}>
-              <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
-            </div>
             <SenderCard emptyUsage={id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length === 0 ? 'この変更が使われる場所（0か所）。このテンプレートはまだどこからも呼ばれていません。' : undefined} />
             {id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length > 0 ? <UsageCard usedBy={editor.usedBy} published={(editor.publishedVersion ?? 0) >= 1} /> : null}
             <h2 className={styles.previewHead}>届き方</h2>
-            <div className={styles.phone}>{phone}</div>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
         status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
@@ -621,10 +616,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           </>
         )}
       </TemplateEditFrame>
-
-      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
 
       <ConfirmDialog
         open={compareOpen}

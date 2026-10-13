@@ -48,7 +48,7 @@ describe('作成の型の余白の口', () => {
     const css = read('src/components/templates/page-templates.module.css')
     expect(css).toContain(".createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }")
     expect(css).toContain(".preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }")
-    expect(css).toContain(".preview[data-preview-surface='plain'] { background: transparent; }")
+    // plain の実際の地と故障対照は create-consistency.test.mjs でCI検証する。
     const globals = read('src/app/globals.css')
     expect(globals).toMatch(/--tpl-create-flush-pad:\s*var\(--polish-space-row\) var\(--polish-space-section\) var\(--polish-space-section\);/)
     expect(globals).toMatch(/--tpl-create-flush-gap:\s*var\(--polish-space-section\);/)
