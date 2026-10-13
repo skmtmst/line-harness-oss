@@ -1,5 +1,7 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
@@ -475,10 +477,11 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
-          <div className={styles.pair}>
+          <SettingsFormRow layout="name-folder">
             <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError></Field></div>
-            <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-rich-folder"><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+            <div className={styles.field}><Field label="フォルダ" htmlFor="te-rich-folder"><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+                size="full"
                 id="te-rich-folder"
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}
@@ -491,7 +494,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                     : undefined}
               /></SaveErrorField></Field></div>
-          </div>
+          </SettingsFormRow>
         </Card>}
 
         <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">

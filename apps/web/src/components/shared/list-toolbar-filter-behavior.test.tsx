@@ -21,6 +21,26 @@ function choose(name: RegExp) {
   fireEvent.click(option.querySelector('button') ?? option)
 }
 describe('狭い欄の状態の選択', () => {
+  it('明示された用途の欄を重ねず、用途の選択と解除を保つ', () => {
+    function Named() {
+      const [shape, setShape] = useState<string | null>(null)
+      return <><output aria-label="用途の条件">{shape ?? 'all'}</output><ListToolbar filters={<ResponsiveFilterChips label="用途">
+        <FilterChip selected={shape === null} onChange={() => setShape(null)}>すべて</FilterChip>
+        <FilterChip selected={shape === 'image'} onChange={on => setShape(on ? 'image' : null)}>画像</FilterChip>
+      </ResponsiveFilterChips>} /></>
+    }
+    render(<Named />)
+    expect(screen.getAllByRole('button', { name: '用途' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: '状態' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '用途' }))
+    const image = screen.getByRole('option', { name: /画像/ })
+    fireEvent.click(image.querySelector('button') ?? image)
+    expect(screen.getByLabelText('用途の条件').textContent).toBe('image')
+    fireEvent.click(screen.getByRole('button', { name: '用途' }))
+    const all = screen.getByRole('option', { name: /すべて/ })
+    fireEvent.click(all.querySelector('button') ?? all)
+    expect(screen.getByLabelText('用途の条件').textContent).toBe('all')
+  })
   it('欄のエラーの包みと単一の選ぶ欄を保ち、文字の頭を重ねない', () => {
     render(<ListToolbar filters={<SaveErrorField names={['sort']}><Select aria-label="並び" label="並び" value="recent" onChange={() => {}} options={[{value:'recent',label:'並び：更新が新しい順'}]} /></SaveErrorField>} />)
     expect(screen.getByRole('button', { name: '並び' }).textContent).toBe('並び：更新が新しい順')

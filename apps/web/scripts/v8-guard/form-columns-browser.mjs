@@ -32,4 +32,3 @@ export default function collectFormLayouts() {
 export function formColumnFindings(rows) {
  return rows.filter(row=>row.frame==='create'&&row.frameWidth<1100&&row.horizontal).map(row=>({kind:'form-shrink',target:row.target,text:'狭い白い板では独立した入力欄を1列へ',measure:{fields:row.children,columns:row.columns.split(' ').length}}))
 }
-
