@@ -1360,7 +1360,7 @@ function AutoReplyWizardV8Inner() {
           {step === 'trigger' && (
             <>
               <CreateSummaryCard
-                title="保存したあとに、過去28日で当たった数が出ます"
+                title="過去28日で当たった数"
                 leading={<>
                   <p className={styles.countRow} aria-label="当たった受信（過去28日）">
                     <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
@@ -1551,6 +1551,9 @@ function AutoReplyWizardV8Inner() {
                 variant="primary"
                 onClick={() => void publish()}
                 disabled={!publishReady || saving}
+                title={publishReady ? undefined : dirty
+                  ? '変更を下書きに保存してから、テストと有効にする前の確認を完了してください。'
+                  : [...new Set(gates.filter(gate => gate.state !== 'ok').map(gate => gate.detail))].join(' / ')}
                 busy={saving}
                 busyLabel="有効にしています…"
                 done={saveDone}

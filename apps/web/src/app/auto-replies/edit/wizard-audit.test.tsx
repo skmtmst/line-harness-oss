@@ -94,3 +94,18 @@ it('WEB292: 入力変更後に遅れて届いた前の版の試験結果を使�
  await act(async()=>finish({success:true,data:{draftWon:true,winner:null,candidates:[],staleTest:false}}))
  expect(screen.queryByText('このルールが返します。')).toBeNull()
 })
+
+it('確認を終えるまで有効にできず、未完の確認の理由をボタンから読める', async () => {
+ net.query='id=synthetic-rule&step=confirm'
+ render(<Page/>);await act(async()=>{})
+ const button=screen.getByRole('button',{name:/^(有効にする|この内容で更新する)$/}) as HTMLButtonElement
+ expect(button.disabled).toBe(true)
+ expect(button.title).toContain('まだ試していません')
+})
+it('反応の右欄は短い題と保存前の説明を分け、未取得を0にしない', async () => {
+ net.query='id=synthetic-rule&step=trigger'
+ render(<Page/>);await act(async()=>{})
+ expect(screen.getByRole('heading',{name:'過去28日で当たった数'})).toBeTruthy()
+ expect(screen.getByText('いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。')).toBeTruthy()
+ expect(screen.getByLabelText('当たった受信（過去28日）').textContent).toContain('—')
+})
