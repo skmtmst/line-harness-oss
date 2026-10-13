@@ -528,7 +528,7 @@ try {
       '取れていない月次集計を0と表示しない')
     // R27: 行の「編集」は質問の編集へ。「…」内の操作から対象を引き継ぐ。
     await newRow.getByRole('button', { name: /その他の操作/ }).click()
-    await page.getByRole('menuitem', { name: '編集', exact: true }).click()
+    await page.getByRole('menuitem', { name: '編集する', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/form-submissions/edit'
       && url.searchParams.get('id') === 'sales-new' && url.searchParams.get('tab') === 'basic')
     const editDestination = new URL(page.url())
