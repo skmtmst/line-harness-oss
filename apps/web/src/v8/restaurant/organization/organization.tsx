@@ -32,6 +32,7 @@ import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
 import { GridTable, GridHeadRow, GridRow, GridCell, type GridTableDesign } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
+import StoreGroups from './store-groups'
 
 /*
  * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
@@ -451,6 +452,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
               onCancel={closeStoreDialog}
             />
           </Dialog>
+          <StoreGroups key={accountId} accountId={accountId} stores={data.stores} readOnly={readOnly} />
           <IntakeAddressPanel accountId={accountId} store={store} readOnly={readOnly} />
           <StatRow>
             <KpiCard title="所属ユーザー" valueText={`${members.length}名`} detail="名簿に載っている人数" icon={null} presentation="band" value={null} unit="" />
