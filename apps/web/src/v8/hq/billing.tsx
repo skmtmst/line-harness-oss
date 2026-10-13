@@ -45,7 +45,6 @@ import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
