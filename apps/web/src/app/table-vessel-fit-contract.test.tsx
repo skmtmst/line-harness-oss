@@ -1,19 +1,30 @@
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import type { BookingMenu } from '@/lib/api'
+import type { RowMenuProps } from '@/components/shared/row-actions'
 
-/*
- * 表の幅の見張り（m15c）。
- *
- * 共通の表は table-fixed のため、列幅の指定どおりに器へ収まる。
- * 逆に言うと、列幅の指定を誤るとそのままはみ出し・右空きになる。
- * 司令塔の見た目点検（1440px・表の左右の余白）で出た4件を守る。
- *
- * 決まり：最後の列（操作・状態）は中身に合わせた固定幅にし、
- * 割合の列だけでは 100% を超えない。残りは幅を指定しない列が吸う。
- * 直しを割合へ戻すと、この試験が赤くなる。
- */
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => navigation,
+}))
+vi.mock('@/components/shared/row-actions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/shared/row-actions')>()
+  return { ...actual, RowMenu: (props: RowMenuProps) => <actual.RowMenu {...props}
+    className={process.env.L2X_MENU_OWNER_FAULT && props.label !== '共通の基準' ? 'page-owned-row-menu' : props.className}
+  /> }
+})
+import { RowMenu } from '@/components/shared/row-actions'
+import { MenusTabV8 } from '@/v8/booking-menus/tabs/menus-tab'
+
+afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+/** Tables and row controls keep their shared layout and navigation. */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -30,15 +41,25 @@ function percentTotal(source: string): number {
 }
 
 describe('表は器の幅にぴったり収める', () => {
-  it('/booking/menus: V8の名前と行末操作が器からはみ出さない', () => {
-    const page = read('../v8/booking-menus/tabs/menus-tab.tsx')
-    const css = read('../v8/booking-menus/settings.module.css')
-    expect(page).toContain('className={styles.menuRow}')
-    expect(page).toContain('<RowMenu')
-    expect(page).toContain('className={styles.rowMenuButton}')
-    expect(css).toMatch(/\.colName\s*\{[^}]*flex: 1 1 0;[^}]*min-width: 0;/)
-    expect(css).toMatch(/\.rowMenuButton\s*\{[^}]*width: var\(--tpl-bm-28\)/)
-    expect(css).toMatch(/\.menuName\s*\{[^}]*max-width: 100%;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
+  it('/booking/menus: 共通の行末操作から長い名前のメニューの中身を開ける', () => {
+    const menu: BookingMenu = {
+      id: 'menu-long', name: '小型犬のトリミングとシャンプーを一緒に受けるメニュー',
+      category_label: null, description: null, duration_minutes: 60, buffer_after_minutes: 10,
+      base_price: 5000, sort_order: 0, is_active: 1, auto_tag_id: null,
+    }
+    render(<>
+      <MenusTabV8 accountId="account-test" menus={[menu]} status="ready" error={null}
+        menuCount={1} canEdit onReload={() => {}} />
+      <RowMenu label="共通の基準" appearance="box" size="row" items={[]} />
+    </>)
+    expect(screen.getByRole('button', { name: menu.name, exact: true })).toBeTruthy()
+    const trigger = screen.getByRole('button', { name: `「${menu.name}」のそのほかの操作` })
+    const reference = screen.getByRole('button', { name: '共通の基準' })
+    expect(trigger.className).toBe(reference.className)
+    expect(trigger.getAttribute('data-size')).toBe(reference.getAttribute('data-size'))
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: '中身を編集' }))
+    expect(navigation.push).toHaveBeenCalledWith('/booking/menus/new?menu=menu-long')
   })
 
   it('/events: 操作列は固定幅で、中身が器からはみ出さない', () => {
