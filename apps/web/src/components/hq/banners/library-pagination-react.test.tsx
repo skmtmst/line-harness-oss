@@ -11,7 +11,7 @@ import { flushListUrlState } from '@/components/shared/list-url-state'
 const nav = vi.hoisted(() => ({ query: '', push: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace, prefetch: () => {} }), useSearchParams: () => new URLSearchParams(nav.query) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'banner-test-staff' }), useStaffRole: () => 'owner', canManageRole: () => true }))
 
 type ImagePage = Awaited<ReturnType<typeof api.hqBanners.images.list>>
 

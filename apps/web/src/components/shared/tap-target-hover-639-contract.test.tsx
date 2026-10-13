@@ -58,8 +58,8 @@ describe('#639 主要操作の最小高さ 32px', () => {
     const list = readFileSync(join(SRC, 'v8', 'hq-banners', 'list.tsx'), 'utf8')
     const css = readFileSync(join(SRC, 'v8', 'hq-banners', 'list.module.css'), 'utf8')
     expect(list).toContain("aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}")
-    expect(css).toMatch(/\.star\s*\{[^}]*width:\s*var\(--tpl-hb-star\)/s)
-    expect(css).toMatch(/\.star\s*\{[^}]*height:\s*var\(--tpl-hb-star\)/s)
+    expect(list).toContain('<IconButton size="small" variant="plain"')
+    expect(readShared('icon-button.module.css')).toContain("[data-size='small']")
     expect(GLOBALS_CODE).toMatch(/--tpl-hb-star:\s*24px/)
 
   })

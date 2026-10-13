@@ -4,6 +4,89 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('Y14 detects static trailing text overlapping a filter and accepts separate rows and owned controls', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>section{width:1200px}#tools{position:relative;height:80px}button{position:absolute;left:0;top:0;width:80px;height:36px}#end{position:absolute;left:70px;top:6px;white-space:nowrap}</style><section data-page-template="list" data-list-skeleton><div id="tools" data-template-region="toolbar"><button>縦長</button><div id="end" data-toolbar-trailing><span>並び：作成が新しい順</span></div></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 1)
+    await page.locator('#end').evaluate(el => { el.style.left = '88px' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0)
+    await page.locator('#end').evaluate(el => { el.style.left = '70px'; el.style.top = '42px' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0, 'another row does not overlap')
+    await page.locator('#end').evaluate(el => { el.style.left = '200px'; el.style.top = '0'; el.innerHTML = '<button>並び：作成が新しい順</button>' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0, 'text inside its own button is not a separate tool')
+  } finally { await browser.close() }
+})
+
+test('X8 detects open explanation controls without a matching body in their page scope', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1)
+    await page.locator('button').evaluate(el => el.setAttribute('aria-expanded', 'false'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0, 'closed unmounted explanation is allowed')
+    await page.locator('button').evaluate(el => el.setAttribute('aria-expanded', 'true'))
+    await page.locator('section').evaluate(el => el.insertAdjacentHTML('beforeend', '<div data-screen-explanation id="body">元の説明</div>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.locator('[data-screen-explanation]').evaluate(el => el.outerHTML = '<section data-page-template="detail"><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header><div data-screen-explanation id="body">別の型の説明</div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1, 'another template body cannot satisfy the outer control')
+  } finally { await browser.close() }
+})
+
+test('X7 detects missing explanation controls even for closed bodies and keeps nested scopes separate', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="settings"><header data-template-region="heading"><h2>設定</h2></header><div id="explanation" data-screen-explanation>説明本文</div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1)
+    await page.locator('[data-screen-explanation]').evaluate(el => { el.hidden = true })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1, 'closed retained body still requires its control')
+    await page.locator('header').evaluate(el => el.insertAdjacentHTML('beforeend', '<button data-screen-explanation-toggle aria-controls="explanation" aria-expanded="false">この画面の説明</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.locator('section').evaluate(el => el.insertAdjacentHTML('beforeend', '<section data-page-template="detail"><header data-template-region="heading"><h2>詳細</h2></header><div id="nested-explanation" data-screen-explanation>別の説明</div></section>'))
+    const nested = await page.evaluate(scanFixPatterns)
+    assert.equal(nested.counts.F4, 1, 'nested missing control is counted once in its own scope')
+    assert.equal(nested.inventory[0].explanationBodies, 1)
+    assert.equal(nested.inventory[1].explanationBodies, 1)
+    await page.locator('[data-page-template="detail"] header').evaluate(el => el.insertAdjacentHTML('beforeend', '<button data-screen-explanation-toggle aria-controls="nested-explanation">この画面の説明</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.setContent('<section data-page-template="detail"><header data-template-region="heading"><h2>説明のない詳細</h2></header></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+  } finally { await browser.close() }
+})
+
+test('X1/X2 use folder capability across widths; X3 checks all heading types', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    await page.setContent(`<section data-page-template="list" data-list-skeleton="templates"><header data-template-region="heading"><h2>一覧</h2><button>この画面の説明</button><button aria-label="一覧の説明">？</button><div data-heading-actions></div></header><div data-list-folders="false"><div data-template-region="toolbar"><a href="/new">決めごとを作る</a></div><span data-list-name><span data-folder-dot>○</span>名前</span></div></section>`)
+    const before=await page.evaluate(scanFixPatterns)
+    assert.equal(before.counts.F9,2)
+    assert.equal(before.counts.F3,1)
+    await page.evaluate(() => {
+      const heading=document.querySelector('header')
+      heading.querySelector('[data-heading-actions]').append(document.querySelector('a'))
+      document.querySelector('[data-folder-dot]').remove()
+      const help=heading.querySelector('[aria-label]');heading.insertBefore(help,heading.querySelector('button'))
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3,0)
+    await page.evaluate(() => {
+      document.querySelector('[data-list-folders]').dataset.listFolders='true'
+      document.querySelector('[data-template-region="toolbar"]').append(document.querySelector('a'))
+      document.querySelector('[data-list-name]').insertAdjacentHTML('afterbegin','<span data-folder-dot>○</span>')
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0, 'collapsed folder-capable lists retain tools and dots')
+    await page.evaluate(() => {
+      document.querySelector('section').dataset.pageTemplate='create'
+      const heading=document.querySelector('header');heading.append(heading.querySelector('[aria-label]'))
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3,1,'all templates check help order')
+  } finally {await browser.close()}
+})
+
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
   try {

@@ -55,7 +55,9 @@
           ],
           "components": [
             "Card",
-            "CardHeader"
+            "CardHeader",
+            "CardContent",
+            "ListPageCards"
           ],
           "vars": [
             "--card-shadow",
@@ -469,7 +471,9 @@
             "apps/web/src/components/shared/folder-row-actions.tsx",
             "apps/web/src/components/shared/folder-add-dialog.tsx",
             "apps/web/src/components/shared/folder-editor-dialog.tsx",
-            "apps/web/src/components/shared/folder-dot.tsx"
+            "apps/web/src/components/shared/folder-dot.tsx",
+          "apps/web/src/components/shared/list-folder-context.tsx",
+          "apps/web/src/components/templates/list-page.tsx"
           ],
           "components": [
             "ManagedFolderPanel",
@@ -2677,6 +2681,8 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/toggle.tsx",
+            "apps/web/src/components/shared/icon-button.tsx",
+            "apps/web/src/components/shared/icon-button.module.css",
             "apps/web/src/components/shared/checkbox.tsx",
             "apps/web/src/components/shared/segmented.tsx",
             "apps/web/src/components/shared/radio-card.tsx",
@@ -2688,6 +2694,7 @@
           ],
           "components": [
             "Toggle",
+            "IconButton",
             "Checkbox",
             "SegmentedControl",
             "RadioCard",

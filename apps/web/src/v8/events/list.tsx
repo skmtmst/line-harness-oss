@@ -341,12 +341,12 @@ export default function EventsListV8() {
     },
   ]
 
-  /* 作るボタン。見るだけの人には置かず、場所だけ空ける（2026-10-06 オーナー決定）。 */
+  /* 作る場所と余白は共通フォルダ列へ。閲覧のみでは出さない。 */
   const createButton = canEdit ? (
     <Button variant="primary" href="/events/new" className="v8-folder-create w-full">
       <Plus size={15} aria-hidden="true" />イベントを作る
     </Button>
-  ) : <span className={styles.createSpace} aria-hidden="true" />
+  ) : null
 
   const folderRows = managedFolderNavRows('event', folders, { allId: '', unfiledId: UNFILED })
 
@@ -366,6 +366,8 @@ export default function EventsListV8() {
       unfiledCount={unfiledCount}
       onAddStart={closeDetail}
       placeholder="例：教室"
+      createAction={createButton}
+      reserveCreateSpace={false}
     >
       {foldersError ? (
         <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
@@ -531,18 +533,15 @@ export default function EventsListV8() {
               const when = whenText(e.next_slot_starts_at)
               return (
                 <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
-                  <NameCell name={(
+                  <NameCell selection={folderMove.checkbox(e)} name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
-                        <>{folderMove.checkbox(e)}
                           <RowNameLink
                             href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                             title={`${e.name}の詳細を見る`}
                             aria-label={`「${e.name}」の詳細を見る`}
-                            className={styles.nameButton}
                           >
                             {e.name}
                           </RowNameLink>
-                        </>
                       </ContextMenu>
                     )} folder={folderDotOf(e.folderId)}
                   />
@@ -689,7 +688,7 @@ export default function EventsListV8() {
           ))}
         </KpiBand>
       )}
-      folders={<>{createButton}{folderPanel}</>}
+      folders={folderPanel}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{toolbar}</>}
       pagination={pager}
