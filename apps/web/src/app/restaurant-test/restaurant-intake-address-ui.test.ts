@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, test } from 'vitest'
 
 const consoleSource = readFileSync(new URL('../../v8/restaurant/organization/organization.tsx', import.meta.url), 'utf8')

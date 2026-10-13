@@ -25,13 +25,13 @@ test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯�
         <div class="field"><span class="required" data-required-badge>必須</span><input aria-label="探す欄"></div>
         <div hidden><span class="required" data-required-badge>必須</span></div></main>`)
       const findings = await page.evaluate(scanFormRules)
-      assert.equal(findings.length, 1)
-      assert.equal(findings[0].kind, 'form-required-badge')
-      assert.ok(findings[0].measure.excess > 100, '伸びた面の実寸を確認する')
+      assert.deepEqual(findings, [], '共通の札は文字幅に収まる')
+      await page.addStyleTag({ content: '.field > [data-required-badge]{align-self:stretch}' })
+      const stretched = (await page.evaluate(scanFormRules)).filter(f => f.kind === 'form-required-badge')
+      assert.equal(stretched.length, 1)
+      assert.ok(stretched[0].measure.excess > 100, '伸びた面の実寸を確認する')
       await page.addStyleTag({ content: '.field > [data-required-badge]{align-self:flex-start}' })
       assert.deepEqual(await page.evaluate(scanFormRules), [])
-      await page.addStyleTag({ content: '.field > [data-required-badge]{align-self:stretch}' })
-      assert.equal((await page.evaluate(scanFormRules)).filter(f => f.kind === 'form-required-badge').length, 1)
     }
   } finally { await browser.close() }
 })

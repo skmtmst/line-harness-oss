@@ -37,7 +37,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     if (!column) return [el]
     if ([...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) return [el]
     return [...el.children].filter(child => visible(child) && child.textContent.trim()
-      && !child.matches('svg') && !child.querySelector('br')).flatMap(shortControlParts)
+      && !child.matches('svg')).flatMap(shortControlParts)
   }
   const canvas = document.createElement('canvas').getContext('2d')
   const roots = [...document.querySelectorAll('[data-page-template]')].filter(visible)
