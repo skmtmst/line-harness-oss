@@ -64,12 +64,12 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
   return <SaveErrorScope errors={saveErrors}>
     <ConfirmDialog open={guard.leaveTarget !== null} title="入力を破棄しますか？" description="保存していない行うことの変更があります。" confirmLabel="破棄して移動する" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {loadError ? <Notice tone="danger" message="動きの対象を読み込めませんでした。" action={<Button onClick={() => setAttempt(n => n + 1)}>もう一度読み込む</Button>} /> : null}
-    <ActionList<Ref> value={draft} onChange={setDraft} readOnly={readOnly || busy} idOf={(_, index) => String(index)} titleOf={action => action.displayName} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? action.refKind}
+    <ActionList<Ref> value={draft} onChange={setDraft} readOnly={readOnly || busy} idOf={(_, index) => String(index)} titleOf={action => action.displayName} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? ({ automation: 'オートメーションを動かす', conversion: '成果を記録する' }[action.refKind] ?? '登録済みの操作')}
       choices={draft.length >= 20 ? [] : KINDS.map(kind => ({ id: kind.id, label: kind.label, disabled: !resources, disabledReason: loadError ? '候補を読み直してください' : '候補を読み込んでいます', make: () => ({ refKind: kind.id, refId: '', refVersionId: null, displayName: kind.label }),
         picker: { title: `${kind.label}対象を選ぶ`, items: items(kind.id), apply: targetFromIds } }))}
       renderEditor={(action, update, index) => <SaveErrorField names={[`actions.${index}.refId`, "refId", "actions"]}><EntityPickerField label="操作の対象" noun="対象" items={items(action.refKind)} value={action.refId} onChange={id => update(target(action, id))} /></SaveErrorField>} />
     {error ? <Notice tone="danger" action={<Button onClick={() => guard.guarded(onSaved)}>最新の内容を読み込む</Button>}>{error}</Notice> : null}
-    {readOnly ? null : <Button disabled={!dirty || busy} busy={busy} onClick={() => void save()}>行うことを保存する</Button>}
+    {readOnly ? null : <Button disabled={!dirty || busy} title={busy ? '保存しています' : !dirty ? '行うことを変更すると保存できます' : undefined} busy={busy} onClick={() => void save()}>行うことを保存する</Button>}
   </SaveErrorScope>
   function targetFromIds(action: Ref, ids: string[]) { return target(action, ids[0]) }
 }

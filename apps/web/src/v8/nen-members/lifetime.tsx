@@ -223,7 +223,7 @@ export default function LifetimeV8({
 
         {readonly ? null : (
           <div className={styles.lifeAdd}>
-            <button type="button" className={styles.textAction} disabled={drafts.length >= MAX_MILESTONES} onClick={() => openEdit(drafts.length)}>
+            <button type="button" className={styles.textAction} disabled={drafts.length >= MAX_MILESTONES} title={drafts.length >= MAX_MILESTONES ? '節目は12個までです' : undefined} onClick={() => openEdit(drafts.length)}>
               ＋ 節目を足す
             </button>
           </div>
@@ -232,8 +232,8 @@ export default function LifetimeV8({
 
       {readonly ? null : (
         <div className={styles.saveRow}>
-          <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
+          <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '節目を変更すると保存できます' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />保存して EC へ同期する
           </Button>
         </div>
