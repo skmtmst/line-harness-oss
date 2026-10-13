@@ -1,0 +1,12 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.timestamp {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  column-gap: var(--tpl-slot-gap);
+  white-space: nowrap;
+  width: max-content;
+}
+.timestamp > span { white-space: nowrap; }
+}

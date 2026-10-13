@@ -4,6 +4,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import FilterChip from './filter-chip'
 import { ResponsiveFilterChips } from './list-toolbar'
+import ListToolbar from './list-toolbar'
+import Select from './select'
+import { SaveErrorField } from './save-form-errors'
 
 afterEach(cleanup)
 function Harness({ multiple = false, withAll = false }: { multiple?: boolean; withAll?: boolean }) {
@@ -18,6 +21,10 @@ function choose(name: RegExp) {
   fireEvent.click(option.querySelector('button') ?? option)
 }
 describe('狭い欄の状態の選択', () => {
+  it('欄のエラーの包みと単一の選ぶ欄を保ち、文字の頭を重ねない', () => {
+    render(<ListToolbar filters={<SaveErrorField names={['sort']}><Select aria-label="並び" label="並び" value="recent" onChange={() => {}} options={[{value:'recent',label:'並び：更新が新しい順'}]} /></SaveErrorField>} />)
+    expect(screen.getByRole('button', { name: '並び' }).textContent).toBe('並び：更新が新しい順')
+  })
   it('未選択をすべてと表示し、選ぶ・解除する操作を元の絞り込みへ返す', () => {
     render(<Harness />)
     expect(screen.getByRole('button', { name: '状態' }).textContent?.trim()).toBe('状態：すべて')

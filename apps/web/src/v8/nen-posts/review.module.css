@@ -341,9 +341,6 @@
 }
 
 /* まとめての帯（共通部品）。表の下に置く。 */
-.bulkRow {
-  min-width: 0;
-}
 .bulkSummary {
   display: flex;
   flex-direction: column;

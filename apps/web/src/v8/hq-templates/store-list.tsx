@@ -1,4 +1,9 @@
 'use client'
+
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import ListDateTime from '@/components/shared/list-date-time'
+import StatusBadge from '@/components/shared/status-badge'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import TagPill from '@/components/shared/tag-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -13,7 +18,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
 import KpiBand from '@/components/shared/kpi-band'
@@ -25,9 +30,9 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
-import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
-import { distributedAccountsLine, templateSubLine } from './list-row'
+import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
 import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
 import storeStyles from '../templates/list.module.css'
 import hqStyles from './store-list.module.css'
@@ -70,16 +75,9 @@ const WORDS: Record<TemplateType, { title: string; item: string; create: string;
   scenario: { title: 'シナリオ', item: 'シナリオ', create: 'シナリオを作る', search: 'シナリオ名で探す', column: 'シナリオ', description: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。' },
 }
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** M月D日（店の一覧と同じ。時刻は title）。 */
-function monthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
-}
 
 /**
  * 公開の札（店と同じ3つ：公開中／未公開の変更／下書きだけ。絵 i0Ao0R）。統括では「配ったか」で決める：
@@ -218,8 +216,8 @@ export default function HqStoreList(props: HqStoreListProps) {
   const bandKpis = type === 'tag' ? tagKpis : kpis
 
   const tabs = kind && onKindChange ? (
-    <div className={storeStyles.tabsBox}>
       <Tabs
+        size="compact"
         label={`${words.title}の種類`}
         items={KIND_TABS.map((tab) => ({
           label: tab.label,
@@ -228,7 +226,6 @@ export default function HqStoreList(props: HqStoreListProps) {
           onClick: () => { onKindChange(tab.kind); setPage(1) },
         }))}
       />
-    </div>
   ) : undefined
 
   const createButton = (full: boolean) => !canEdit ? null : (
@@ -272,9 +269,9 @@ export default function HqStoreList(props: HqStoreListProps) {
       addFolderLabel="フォルダを追加"
       rows={folderLoadFailed ? [] : folderRows}
     >
-      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <p className={storeStyles.folderNote}>
-        {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
-      </p>}
+      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <FolderPanelNote itemLabel={words.item}>
+        {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。' : undefined}
+      </FolderPanelNote>}
     </FolderPanel>
   )
 
@@ -382,6 +379,7 @@ export default function HqStoreList(props: HqStoreListProps) {
    *   回答フォーム wZPua：状態・配布先・更新・［配る］・「…」
    * ［配る］の列は見出しが空の幅60（絵の「列 配る」）、「…」との間は 16。閲覧のみ（配れない人）には列ごと出さない。
    */
+  const narrow = useNarrowViewport()
   const rankOf = new Map(type === 'rich_menu'
     ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
     : [])
@@ -402,10 +400,9 @@ export default function HqStoreList(props: HqStoreListProps) {
   const stateCell = (row: HqTemplate) => {
     const state = stateOf(row)
     return (
-      <span className={storeStyles.publishPill} data-tone={state.tone}>
-        <span className={storeStyles.publishDot} aria-hidden="true" />
+      <StatusBadge tone={state.tone === 'live' ? 'success' : state.tone === 'changes' ? 'warning' : 'neutral'}>
         {state.label}
-      </span>
+      </StatusBadge>
     )
   }
   /* 列の幅（col）と中身の箱（Td）は列ごとに書く（className を変数で渡すと見張りが読めない）。 */
@@ -413,11 +410,14 @@ export default function HqStoreList(props: HqStoreListProps) {
   const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={storeStyles.cellPlain} title={title}>{text}</Td>
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
-    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => boxedTd('kind', <span className={storeStyles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span>) },
+    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => {
+      const label = !row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : KIND_LABEL[row.kind] ?? emptyValue('unknown')
+      return boxedTd('kind', label === emptyValue('unknown') ? label : <TagPill name={label} />)
+    } },
     { key: 'state', head: '公開', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
-    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+    ...(!narrow ? [{ key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row: HqTemplate) => plainTd('updated', <ListDateTime value={row.updated_at} />, row.updated_at) },] : []),
   ] : type === 'tag' ? [
     { key: 'friends', head: '人数', col: <col key="friends" className={storeStyles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? emptyValue('unknown') : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
     { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? emptyValue('unknown')) },
@@ -434,7 +434,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ] : [
     { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
-    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', <ListDateTime value={row.updated_at} />, row.updated_at) },
   ]
   const body = !ready ? (
     <div className={storeStyles.stateCard} role="status">
@@ -453,7 +453,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     />
   ) : (
     <div className={`${storeStyles.tableWrap} ${storeStyles.hqTable}`}>
-      <DataTable>
+      <DataTable columnSizing="content">
         <colgroup>
           {type === 'rich_menu' ? <col className={storeStyles.colSelect} /> : null}
           <col />
@@ -508,10 +508,9 @@ export default function HqStoreList(props: HqStoreListProps) {
     </div>
   )
 
-  const summary = `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件`
-  const pager = !ready || filtered.length === 0 ? null : pageCount > 1 ? (
-    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={storeStyles.pagerCount}>{summary}</span>} />
-  ) : <p className={storeStyles.pagerSolo}>{summary}</p>
+  const pager = !ready || filtered.length === 0 ? null : (
+    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} range={{ total: filtered.length, first: (current - 1) * pageSize + 1, last: Math.min(current * pageSize, filtered.length) }} />
+  )
 
   if (type === 'tag' && attribute.tab !== 'tags') {
     return <SaveErrorScope errors={saveErrors}><OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} /></SaveErrorScope>
@@ -526,7 +525,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       help={words.description}
       tabs={type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
       stats={(
-        <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {bandKpis.map((kpi) => (
             <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}

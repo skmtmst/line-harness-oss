@@ -1,6 +1,7 @@
 import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportNewPage from './reports/new/page'
@@ -156,10 +157,7 @@ function button(label: string): HTMLButtonElement {
 }
 
 function sectionCheckbox(title: string): HTMLInputElement {
-  const strong = Array.from(host.querySelectorAll('strong')).find((item) => item.textContent?.trim() === title)
-  const input = strong?.closest('label')?.querySelector('input[type="checkbox"]') as HTMLInputElement | null
-  if (!input) throw new Error(`「${title}」のチェックが見つかりません`)
-  return input
+  return within(host).getByRole('checkbox', { name: new RegExp(`^${title}`) }) as HTMLInputElement
 }
 
 function numberInput(ariaLabel: string): HTMLInputElement {

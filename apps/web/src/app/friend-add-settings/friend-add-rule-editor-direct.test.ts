@@ -17,7 +17,7 @@ describe('友だち追加時配信の編集: 社内メモと実行条件の分�
   it('友だち条件は構造化 Condition Builder でJSONとして保存する', () => {
     expect(EDITOR).toContain('ConditionBuilder')
     expect(EDITOR).toContain('JSON.stringify(pruned)')
-    expect(EDITOR).toContain('対象をしぼる（任意）')
+    expect(EDITOR).toContain('title="対象をしぼる" optional')
   })
 
   it('以前のメモ形式の条件は配信対象にせず、作り直しを促す', () => {

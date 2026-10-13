@@ -74,7 +74,7 @@ describe('ListRange 統一（監査6 #667）', () => {
       } else if (path === '../../app/rich-menus/page.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + 1')
         expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
-        expect(source).toContain('formatNumber(groupTotal)')
+        expect(source).toContain('total: groupTotal')
         expect(source).toContain('<Pagination page=')
         expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webhooks/interactions.tsx') {
@@ -87,12 +87,12 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('<Pagination')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
-        expect(source).toContain('<ListRange total={shown.length}')
+        expect(source).toContain('range={{ total: shown.length')
         expect(source).toContain('<Pagination page=')
         expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webinars/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + visibleItems.length')
-        expect(source).toContain('paginationSummary(visibleTotal,')
+        expect(source).toContain('range={{ total: visibleTotal')
         expect(source).toContain('const pager = hasListData ?')
       } else if (path === '../../v8/nen-campaigns/list.tsx') {
         expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')

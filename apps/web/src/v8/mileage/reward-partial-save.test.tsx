@@ -3,7 +3,8 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {fireEvent} from '@testing-library/react';
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
-const f=vi.hoisted(()=>({push:vi.fn(),create:vi.fn(),test:vi.fn(),save:vi.fn(),publish:vi.fn()}));
+const f=vi.hoisted(()=>({push:vi.fn(),create:vi.fn(),test:vi.fn(),save:vi.fn(),publish:vi.fn(),role:'owner' as string|null}));
+vi.mock('@/lib/staff-role',async original=>({...await original<typeof import('@/lib/staff-role')>(),useStaffRole:()=>f.role}));
 vi.mock('next/link',()=>({default:({children,...props}:React.ComponentProps<'a'>)=><a {...props}>{children}</a>}));
 vi.mock('next/navigation',()=>({useRouter:()=>({push:f.push,replace:vi.fn()}),useSearchParams:()=>new URLSearchParams('')}));
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'synthetic-account',accounts:[],loading:false})}));
@@ -12,7 +13,7 @@ vi.mock('@/lib/api',async(importOriginal)=>({...await importOriginal<typeof impo
 import Editor from '@/v8/mileage/reward-edit';
 let root:ReturnType<typeof createRoot>,host:HTMLDivElement;
 beforeEach(()=>{
- vi.clearAllMocks();let n=0;
+ vi.clearAllMocks();f.role='owner';let n=0;
  f.create.mockImplementation(async(_account,draft)=>({success:true,data:{id:`synthetic-${++n}`,status:'draft',currentDraftVersionId:`v-${n}`,currentVersion:{revision:1},...draft}}));
  f.save.mockResolvedValue({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-1',currentVersion:{revision:2}}});
  f.test.mockResolvedValue({success:true,data:{canDeliver:true,requiredMiles:100}});
@@ -56,3 +57,11 @@ it('B-246：公開だけ失敗したら下書きを重ねず、入力変更後�
   ['synthetic-1','synthetic-account','v-1',1],['synthetic-1','synthetic-account','v-2',2],
  ])
 })
+it.each([null,'staff','viewer'])('役割%sでは保存・公開・交換テストを出さず変更APIも呼ばない',async role=>{
+ f.role=role;
+ await act(async()=>root.render(<Editor/>));
+ expect(host.textContent).toContain('閲覧のみ');
+ expect(host.textContent).toContain('一覧へ戻る');
+ expect([...host.querySelectorAll('button')].some(button=>/下書きを保存|保存して出す|自分で交換をテスト/.test(button.textContent??''))).toBe(false);
+ expect(f.create).not.toHaveBeenCalled();expect(f.save).not.toHaveBeenCalled();expect(f.test).not.toHaveBeenCalled();
+});

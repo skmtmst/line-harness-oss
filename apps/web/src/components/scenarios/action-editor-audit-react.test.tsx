@@ -5,7 +5,7 @@
  * 中身を入れたかたまり・条件なし（null）は保存できる。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ActionEditor from './action-editor'
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -98,18 +98,18 @@ async function openCondition() {
 }
 
 function orAddButton() {
-  return screen.getByRole('button', { name: /いずれか1つ以上を満たす.*を追加/ })
+  return screen.getByRole('button', { name: 'いずれか条件のかたまりを足す' })
 }
 
 function kindPickers() {
-  return screen.getAllByRole('combobox', { name: '追加する条件を選ぶ' })
+  return screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
 }
 
 function pickKind(field: HTMLElement, query: string) {
-  fireEvent.focus(field)
-  fireEvent.change(field, { target: { value: query } })
-  fireEvent.keyDown(field, { key: 'ArrowDown' })
-  fireEvent.keyDown(field, { key: 'Enter' })
+  fireEvent.click(field)
+  const dialog = screen.getByRole('dialog', { name: '条件を選ぶ', hidden: true })
+  fireEvent.click(within(dialog).getByRole('radio', { name: query, hidden: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '条件を足す', hidden: true }))
 }
 
 async function saveCondition() {

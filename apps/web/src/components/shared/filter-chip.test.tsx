@@ -16,6 +16,18 @@ const CSS = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
 const CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('絞り込み札 FilterChip（m13i）', () => {
+  it('条件の選択と窓の開閉を別の属性で伝える', () => {
+    const onChange = vi.fn()
+    const {container, rerender} = render(<FilterChip selected={false} onChange={onChange} aria-haspopup="dialog" aria-expanded={false}>配信日</FilterChip>)
+    const button = container.querySelector('button')!
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog')
+    fireEvent.click(button)
+    expect(onChange).toHaveBeenCalledWith(true)
+    rerender(<FilterChip selected={false} onChange={onChange} aria-haspopup="dialog" aria-expanded>配信日</FilterChip>)
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+  })
   it('押せるボタンとして描き、選んでいない時は印を出さない', () => {
     const onChange = vi.fn()
     const { container } = render(

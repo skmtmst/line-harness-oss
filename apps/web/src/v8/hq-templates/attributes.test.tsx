@@ -107,7 +107,7 @@ it('統括の情報欄のフォルダも保存色を読み、色の保存に失�
   render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「基本情報」の操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
-  const dialog = within(screen.getByRole('dialog', { name: 'フォルダを直す' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'フォルダを編集する' }))
   fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：紫' }))
   fireEvent.click(screen.getByRole('radio', { name: 'ピンク' }))
   fireEvent.click(dialog.getByRole('button', { name: '保存する' }))

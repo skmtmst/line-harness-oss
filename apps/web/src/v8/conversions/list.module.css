@@ -170,8 +170,6 @@
   margin-bottom: var(--tpl-cn-notice-after);
 }
 /* 道具の段の右：よく使う絞り込み（左に印）・並び。 */
-.sortBox { width: var(--tpl-cn-sort-w); }
-.sortBox :global(*) { max-width: 100%; }
 .savedBox { position: relative; width: var(--tpl-cn-saved-w); }
 .savedBox :global(*) { max-width: 100%; }
 .savedBox :global(button) { width: 100%; padding-left: var(--tpl-cn-saved-pad-start); }

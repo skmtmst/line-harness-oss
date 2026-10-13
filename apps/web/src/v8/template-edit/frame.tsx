@@ -13,6 +13,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import type { TemplateEditHost } from './host'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import tpl from '@/components/templates/page-templates.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
 import styles from './edit.module.css'
@@ -56,9 +57,10 @@ export function TemplateEditFrame({
         help={description}
       />
       {band ? <div className={styles.bandRow}>{band}</div> : null}
+      <div className={tpl.asideToggle}><PreviewLauncher>{side}</PreviewLauncher></div>
       <div className={tpl.split} data-template-region="body">
         <div className={tpl.createContent} data-template-region="content">{children}</div>
-        <aside className={styles.side} data-template-region="preview">
+        <aside className={styles.side} data-template-region="preview" data-preview-narrow="hidden">
           <div className={styles.sideContent}>{side}</div>
         </aside>
       </div>

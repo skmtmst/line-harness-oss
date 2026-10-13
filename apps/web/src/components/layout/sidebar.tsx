@@ -739,7 +739,8 @@ export default function Sidebar({
             機能設定を読み込めませんでした。
           </Notice>
         )}
-        {visibleSections.map((section) => {
+        {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}
+        {visibleSections.filter((section) => isHq || section.id !== 'settings').map((section) => {
           /*
            * ★V8（夕44-A）：組の見出しは押せる開閉。畳んだ組は見出しだけ
            * 残るので、組が丸ごと消えることはない。見出しの無い組（統括）は

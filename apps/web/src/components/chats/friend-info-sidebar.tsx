@@ -8,12 +8,13 @@ import TagOverflow from '@/components/shared/tag-overflow'
 import { DragHandle } from '@/components/shared/row-actions'
 import Link from 'next/link'
 import CustomerInfoPanel from '@/components/shared/customer-info-panel'
+import CustomerInfoMileage, { type CustomerMileageState } from '@/components/shared/customer-info-mileage'
 import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
 import { Children, cloneElement, isValidElement, useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { api, ApiError, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import { api, ApiError, type FriendUpcoming } from '@/lib/api'
 import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -336,10 +337,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [sectionOrder, setSectionOrder] = useState<DetailSectionKey[]>(DEFAULT_SECTION_ORDER)
   const [hiddenSections, setHiddenSections] = useState<DetailSectionKey[]>([])
   const [prefsLoaded, setPrefsLoaded] = useState(false)
-  type MileageState =
-    | { kind: 'loading' }
-    | { kind: 'error' }
-    | { kind: 'data'; summary: MileageSummary; history: MileageHistoryItem[] }
+  type MileageState = CustomerMileageState
   const [mileage, setMileage] = useState<MileageState>({ kind: 'loading' })
 
   useEffect(() => {
@@ -895,61 +893,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
    * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
    * v7 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
    */
-  const renderMileage = (friend: FriendDetail) => (
-<div data-customer-section="mileage" style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
-              <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
-              {mileage.kind === 'loading' ? (
-                <DelayedSkeleton loading skeleton={<div className="h-24 animate-pulse rounded-card bg-shell" />} />
-              ) : mileage.kind === 'error' ? (
-                /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
-                <div className="space-y-1.5">
-                  <p className="text-micro text-danger">マイルを読み込めませんでした</p>
-                  <button
-                    type="button"
-                    onClick={() => setMileageRetry((key) => key + 1)}
-                    className="text-action text-micro font-semibold underline underline-offset-2"
-                  >
-                    再試行する
-                  </button>
-                </div>
-              ) : (
-                <div className="border-hairline bg-canvas rounded-control border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-ink-faint text-nano font-semibold">{mileage.summary.programName}</p>
-                      <p className="text-ink mt-0.5 text-xl font-bold tabular-nums">
-                        {formatNumber(mileage.summary.available)}
-                        <span className="text-ink-faint ml-1 text-micro font-semibold">mile</span>
-                      </p>
-                      <p className="text-ink-faint text-nano">利用可能</p>
-                    </div>
-                    {mileage.summary.pending > 0 && (
-                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-nano font-medium">
-                        確定待ち {formatNumber(mileage.summary.pending)}
-                      </span>
-                    )}
-                  </div>
-
-                  {mileage.history.length > 0 ? (
-                    <div className="border-hairline mt-3 space-y-1.5 border-t pt-2.5">
-                      {mileage.history.slice(0, 3).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-2 text-nano">
-                          <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
-                          <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
-                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount ?? 0)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-ink-faint border-hairline mt-3 border-t pt-2.5 text-nano">
-                      まだマイル履歴はありません
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-  )
   const renderSupport = (friend: FriendDetail) => (
 <div data-customer-section="support" style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-3 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
@@ -1206,7 +1149,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const renderRichMenu = (friend: FriendDetail) => (
 <div data-customer-section="richMenu" style={sectionStyle('richMenu')} className={`${sectionVisibility('richMenu')} p-4`}>
               <h4 className="text-micro font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
-              <p className="text-micro text-ink-faint mb-1">現在の設定</p>
               {richMenu.kind === 'loading' ? (
                 <p className="text-micro text-ink-faint italic">読み込み中...</p>
               ) : richMenu.kind === 'error' ? (
@@ -1277,9 +1219,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div> : null}
               {null}
             </div>
-
-            {/* Harness Mileage — canonical user identity across LINE accounts */}
-            {renderMileage(friend)}
 
             {/* Status / Operator */}
             {/*
@@ -1681,19 +1620,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   sections={[
                     { key: 'support', label: '対応', action: canEditChat ? <Button variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</Button> : null, content: <>
                       {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
-                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }]} />
+                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} />
                         {sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-upcoming'?: boolean }>(child) && child.props['data-customer-upcoming'])}
                       </>}
-                      <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} />
+                      {editingSupport ? <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} /> : null}
                     </> },
                     { key: 'tags', label: 'タグ', action: canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen(value => !value)}>{tagPickerOpen ? '閉じる' : '編集'}</Button> : null, content: <>
                       <TagOverflow maxVisible={2}>{(effectiveTags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" onRemove={canEditFriend && tagPickerOpen && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />)}</TagOverflow>
-                      {(effectiveTags ?? []).length === 0 ? 'タグなし' : null}
+                      {(effectiveTags ?? []).length === 0 ? 'なし' : null}
                       {sectionBody(renderTags(friend)).filter(child => isValidElement<{ id?: string }>(child) && child.props.id === 'inbox-panel-tag-picker')}
                     </> },
-                    { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
-                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集</Link> : null, content: sectionBody(renderRichMenu(friend)) },
-                    { key: 'memo', label: 'メモ', action: canEditChat ? <Button variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</Button> : null, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || 'まだありません' },
+                    { key: 'mileage', label: 'マイル', action: mileage.kind === 'data' && isOwnerOrAdmin(staffRole) ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(friend.id)}`} variant="text" size="inline">編集</Button> : null, content: <CustomerInfoMileage state={mileage} onRetry={() => setMileageRetry(key => key + 1)} /> },
+                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Button href="/rich-menus" variant="text" size="inline">編集</Button> : null, content: sectionBody(renderRichMenu(friend)) },
+                    { key: 'memo', label: 'メモ', action: canEditChat ? <Button variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</Button> : null, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || '未設定' },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {
                     if (!isValidElement<{ 'data-customer-section'?: string; children?: React.ReactNode }>(child)) return []

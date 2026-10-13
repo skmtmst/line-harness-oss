@@ -388,11 +388,15 @@ describe('V8-B 申込者（Mu8qW）', () => {
     broadcastsSend.mockResolvedValue({})
     await renderV8()
     const input = document.querySelector('#ev-bk-message') as HTMLInputElement
+    const disabledSend = [...document.querySelectorAll('button')].find((b) => b.textContent === '送る')!
+    expect(disabledSend.disabled).toBe(true)
+    expect(disabledSend.title).toBe('メッセージを入力してください')
     await act(async () => {
       fireEvent.change(input, { target: { value: '当日は動きやすい服装でお越しください' } })
     })
     await flush()
     const send = [...document.querySelectorAll('button')].find((b) => b.textContent === '送る')
+    expect(send!.title).toBe('')
     await act(async () => { send!.click() })
     await flush()
     expect(previewOccurrenceBroadcast, '対象の確定を叩く').toHaveBeenCalled()

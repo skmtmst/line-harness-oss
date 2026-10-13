@@ -33,6 +33,7 @@ describe('U027: シナリオ一覧のフォルダ領域を折り畳む', () => {
     // 板 `wjfLe`：フォルダの列は道具の段の「フォルダ：すべて」へ畳まれる。
     // B-244：作成とフォルダの口を型へ渡す。
     expect(LIST).toContain('collapsedFolders={<>{createButton(false)}{folderSelect}</>}')
+    expect(LIST).toMatch(/<Select\b[^>]*aria-label="フォルダ"[^>]*value=\{folderFilter\}[^>]*onChange=\{setFolderFilter\}/)
     expect(LIST).toContain('フォルダ：すべて')
     expect(LIST).toContain('aria-label="フォルダ"')
   })

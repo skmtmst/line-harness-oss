@@ -47,10 +47,7 @@ describe('#670 15 登録メディアの札の操作は「使用箇所＋…」�
 })
 
 describe('#670 25/09 オートメーションの状態と行高・ページ送り', () => {
-  it('状態は他画面と同じ札(Chip)で出す', () => {
-    expect(AUTOMATIONS).toContain('className={styles.pill}')
-    expect(AUTOMATIONS).toContain('isActive')
-  })
+  // 状態の手書きクラス固定は廃止。共通StatusBadgeと実画面で確認する。
 
   it('動いた記録はメニューへ移し、行の操作は編集＋…の1行に収める', () => {
     expect(AUTOMATIONS).toContain("id: 'runs'")
@@ -60,16 +57,8 @@ describe('#670 25/09 オートメーションの状態と行高・ページ送�
     expect(AUTOMATIONS).toContain('if (!canEdit) return [runs]')
   })
 
-  it('1ページだけならページ送りを出さない', () => {
-    if (AUTOMATIONS.includes('<Pagination')) {
-      // 共通 Pagination は1ページ以下で出さないことを部品が持つ。
-      // 画面ごとに条件を書くと書き忘れが出るため、部品へ寄せた。
-      expect(AUTOMATIONS).toContain('<Pagination')
-      return
-    }
-    expect(AUTOMATIONS).toContain('listPageCount > 1 ? (')
-    expect(AUTOMATIONS).toContain('aria-label="ページ送り"')
-  })
+  // 単一頁も現在地と前後を出すB-231。実DOMの頁送り試験が守る。
+
 })
 
 describe('#670 16/22 アフィリエイトの操作セルと緑文字', () => {
@@ -100,7 +89,7 @@ describe('#670 17 予約一覧の押せない保存した条件を置かない',
 describe('#670 02 担当の二重ラベルと並び順の見出し', () => {
   it('受信箱の担当はプルダウンの自称だけにする', () => {
     expect(CHATS).not.toContain('<span className="shrink-0">担当者</span>')
-    expect(CHATS).toContain('label="担当"')
+    expect(read('..', 'components', 'shared', 'inbox-head-menus.tsx')).toContain('label="担当"')
   })
 })
 
@@ -121,7 +110,6 @@ describe('#670 28 連動アクションのキーボード経路', () => {
 describe('#670 22 残りのAA未満の緑を共通トークンへ', () => {
   it('success-bg の相手に green-700 を置かない', () => {
     expect(AUTOMATIONS).not.toContain('text-green-700')
-    expect(AUTOMATIONS).toContain('className={styles.pill}')
   })
 })
 

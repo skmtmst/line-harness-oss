@@ -1,8 +1,10 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowMenu } from '@/components/shared/row-actions';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -11,7 +13,7 @@ import { RowNameLink } from '@/components/shared/table';
 
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { formatListTimestamp, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
@@ -36,7 +38,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -44,8 +46,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import { ListPager } from '@/components/templates/list-page'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import { ListPagePagination } from '@/components/templates/list-page'
+import Pagination from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table';
@@ -153,11 +155,9 @@ function rowView(reminder: ReminderRow) {
   return { status: statusKeyOf(reminder), subtitle: `${base}・${timing}` }
 }
 
-const NEXT_SEND_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
-
-/** 「次に送る」の表示（板 `apLqS`：`10/1（水）18:00`）。店舗時間帯（JST）で出す。 */
+/** 次に送る日時は、別年でも時刻を残す。 */
 function formatNextSend(iso: string | null | undefined): string {
-  return polishFormatDate(iso, { style: 'list' })
+  return formatListTimestamp(iso)
 }
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
@@ -882,7 +882,7 @@ export default function RemindersListV8() {
                       aria-label="このページのリマインダをすべて選択"
                     /></SaveErrorField>
                   </Th>
-                ) : <Th className={styles.selectCell}><span className="sr-only">選択できません</span></Th>}
+                ) : <Th className={styles.selectCell}><UnavailableSelection label="このページのリマインダをすべて選択" /></Th>}
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
@@ -896,7 +896,7 @@ export default function RemindersListV8() {
                       ? emptyValue('unknown')
                       : `${formatNumber(row.plannedDeliveries)}通`
                 const nextSend =
-                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : emptyValue('unknown')
+                  view.status === 'active' ? <ListDateTime value={row.nextScheduledAt} /> : emptyValue('unknown')
                 return (
                   <Tr interactive
                     highlighted={duplicateFeedback.highlightedId === row.id}
@@ -921,7 +921,7 @@ export default function RemindersListV8() {
                           aria-label={`${row.name}を選択`}
                         /></SaveErrorField>
                       </Td>
-                    ) : <Td className={styles.selectCell} />}
+                     ) : <Td className={styles.selectCell}><UnavailableSelection label={`${row.name}を選択`} /></Td>}
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
@@ -1111,10 +1111,10 @@ export default function RemindersListV8() {
           </BulkBar>
         ) : null}
 
-        <ListPager>
+        <ListPagePagination>
           <Pagination page={reminderList.page} pageCount={reminderList.pageCount} onPageChange={reminderList.setPage}
-            summary={paginationSummary(reminderList.total, (reminderList.page - 1) * reminderList.limit + 1, Math.min(reminderList.page * reminderList.limit, reminderList.total))} />
-        </ListPager>
+            range={{ total: reminderList.total, first: (reminderList.page - 1) * reminderList.limit + 1, last: Math.min(reminderList.page * reminderList.limit, reminderList.total) }} />
+        </ListPagePagination>
       </>
     )
 

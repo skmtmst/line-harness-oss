@@ -48,8 +48,8 @@
 | V8-B | ws9wt | 分析 友だちの増減 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
 | V8-B | yvOtn | 分析 配信の反応 V8 | /analytics | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
 | V8-B | AzrZq | 分析 成果地点ごとのレポート V8 | /analytics?view=conversion-report | `app/analytics/page.tsx` | `v8/analytics/analytics.tsx`<br>`v8/analytics/funnel-form.tsx` |
-| V8-B | G83vi | 分析 レポートを作る（競合）V8 | /analytics/reports/new | `app/analytics/reports/new/page.tsx` | `app/analytics/reports/new/report-head-v8.tsx` |
-| V8-B | H5UoIu | 分析 レポートを作る V8 | /analytics/reports/new | `app/analytics/reports/new/page.tsx` | `app/analytics/reports/new/report-head-v8.tsx` |
+| V8-B | G83vi | 分析 レポートを作る（競合）V8 | /analytics/reports/new | `app/analytics/reports/new/page.tsx` | `app/analytics/reports/new/page.tsx` |
+| V8-B | H5UoIu | 分析 レポートを作る V8 | /analytics/reports/new | `app/analytics/reports/new/page.tsx` | `app/analytics/reports/new/page.tsx` |
 | V8 | G4GejG | 自動応答 かんたんに作る（小窓 560）V8（機能追加 F-7・API待ち） | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |
 | V8 | G8i4xP | ★V8 自動応答 一覧の状態 | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |
 | V8 | i8F12 | 自動応答 止めるダイアログ V8 | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |

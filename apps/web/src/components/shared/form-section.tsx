@@ -1,18 +1,13 @@
 import type { ReactNode } from 'react'
-import styles from './form-section.module.css'
+import Card, { CardHeader } from './card'
 
-/** 設定フォームの段（gjUz3・hiBO8）。説明は題の下、操作は右に置く。 */
-export default function FormSection({ title, id, description, children, action }: {
+/** 設定フォームの段。共通カードの余白・見出しをそのまま使う。 */
+export default function FormSection({ title, id, description, children, action, variant = 'form' }: {
   title: string; id: string; description?: ReactNode; children: ReactNode; action?: ReactNode
+  variant?: 'form' | 'aside'
 }) {
-  return <section className={styles.section} aria-labelledby={id}>
-    <div className={styles.header}>
-      <div className={styles.heading}>
-        <h2 id={id} className={styles.title}>{title}</h2>
-        {description ? <p className={styles.description}>{description}</p> : null}
-      </div>
-      {action}
-    </div>
+  return <Card variant={variant} aria-labelledby={id}>
+    <CardHeader size="stacked" titleId={id} title={title} meta={description} action={action} />
     {children}
-  </section>
+  </Card>
 }

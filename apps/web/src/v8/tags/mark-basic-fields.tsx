@@ -1,5 +1,6 @@
 'use client'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import FolderColorButton from '@/components/shared/folder-color-button'
 import { markNameRequirement } from './mark-requirement'
 import type { Ref } from 'react'
 import { TextField } from '@/components/shared/text-field'
@@ -20,27 +21,12 @@ const COLORS = [
 export default function MarkBasicFields({ name, color, onName, onColor, nameDuplicates = [], disabled = false, error, nameRef }: { name: string; color: string; onName: (name: string) => void; onColor: (color: string) => void; nameDuplicates?: string[]; disabled?: boolean; error?: string; nameRef?: Ref<HTMLInputElement> }) {
   return (
             <Card variant="form" gap="normal" aria-labelledby="mark-basic">
-              <div className={styles.cardHead}><h2 className={styles.cardTitle} id="mark-basic">基本</h2></div>
-              <Field label="マーク名" requirement={markNameRequirement} error={error}><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} className={styles.input} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
-
+              <CardHeader size="stacked" titleId="mark-basic" title="基本" />
+              <Field label="マーク名" requirement={markNameRequirement} error={error}><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" /></Field>
               <div className={styles.colorField} role="group" aria-labelledby="mark-color">
                 <span className={styles.labelStrong} id="mark-color">色</span>
-                <span className={styles.colorRow}>
-                  {COLORS.map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => onColor(item.value)}
-                      aria-label={item.name}
-                      title={item.name}
-                      aria-pressed={color.toLowerCase() === item.value.toLowerCase()}
-                      className={styles.colorSwatch}
-                      style={{ backgroundColor: item.value }}
-                    />
-                  ))}
-                </span>
+                <FolderColorButton appearance="palette" label="マークの色" colors={COLORS} value={color} disabled={disabled} onChange={next => { if (next) onColor(next) }} />
                 <p className={styles.keyNote}>赤・オレンジ・緑・青・紫・グレー（色と名前の両方で見分ける）</p>
               </div>
             </Card>
