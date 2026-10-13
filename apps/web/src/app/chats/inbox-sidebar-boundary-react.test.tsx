@@ -179,8 +179,8 @@ describe('受信箱の右の列のエラー境界', () => {
     expect(failure!.textContent).toContain('顧客情報を読み込めませんでした')
 
     // 文字があるだけでなく、押せるボタンであること。
-    const retry = [...failure!.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'もう一度試す')
-    expect(retry, 'もう一度試すボタン').toBeTruthy()
+    const retry = [...failure!.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'もう一度読み込む')
+    expect(retry, 'もう一度読み込むボタン').toBeTruthy()
     expect(retry!.disabled).toBe(false)
 
     fixture.sidebarThrows = false

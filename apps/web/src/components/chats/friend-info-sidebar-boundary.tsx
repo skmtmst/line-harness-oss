@@ -1,7 +1,7 @@
 'use client'
 
 import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react'
-import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 
 interface Props {
   /** 表示中の友だち。変わったら失敗の表示を捨てて、新しい相手で描き直す。 */
@@ -38,7 +38,7 @@ export default class FriendInfoSidebarBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // 原因を追えるよう開発者向けには残す。画面には内部の文言を出さない。
-    console.error('FriendInfoSidebar crashed', error, info.componentStack)
+    console.error('inbox customer panel crashed', error, info.componentStack)
   }
 
   private retry = () => {
@@ -48,11 +48,9 @@ export default class FriendInfoSidebarBoundary extends Component<Props, State> {
   render() {
     if (this.state.failed) {
       return (
-        <div role="alert" data-friend-info-sidebar-state="failed" className="h-full w-full space-y-2 bg-canvas p-4">
-          <p className="text-xs text-danger">顧客情報を読み込めませんでした</p>
-          <Button variant="secondary" size="compact" type="button" onClick={this.retry}>
-            もう一度試す
-          </Button>
+        // 失敗の1枚は共通の部品で出す（言葉・押し口「もう一度読み込む」をほかの画面とそろえる）。
+        <div data-friend-info-sidebar-state="failed" className="h-full w-full bg-canvas">
+          <ListState kind="error" title="顧客情報を読み込めませんでした" onRetry={this.retry} />
         </div>
       )
     }
