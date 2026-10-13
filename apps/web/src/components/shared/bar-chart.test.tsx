@@ -261,3 +261,10 @@ describe('日別の増減と出来事の役目', () => {
     expect(container.querySelector('[data-chart-event]')).toBeNull()
   })
 })
+
+
+it('既定のダッシュボードは従来の読み上げ用見出しを保つ', () => {
+  render(<BarChart items={SAMPLE} layout="dashboard" legend={[{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]} />)
+  const table = screen.getByRole('table', { name: '日ごとの増減' })
+  expect([...table.querySelectorAll('thead th')].map(header => header.textContent)).toEqual(['日付', '増えた', '減った'])
+})
