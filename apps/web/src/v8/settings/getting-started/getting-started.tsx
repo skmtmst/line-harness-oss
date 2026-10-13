@@ -9,7 +9,6 @@
  * はじめの設定の口（`'v8'` の6段）と、段2を確かめる機能設定の実物。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
@@ -18,7 +17,10 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import { ProgressBar } from '@/components/shared/progress'
+import { GridTable, GridRow, GridCell } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import {
@@ -104,24 +106,24 @@ export default function GettingStartedV8() {
           <>
             <div className={styles.progress} role="note">
               <strong className={styles.progressText}>{progressHeadline(steps)}</strong>
-              <progress className={styles.bar} value={done} max={Math.max(steps.length, 1)} aria-hidden="true" />
+              <ProgressBar className={styles.bar} value={100 * done / Math.max(steps.length, 1)} label="はじめの設定の進み具合" />
             </div>
 
             <Card padding="rows" overflow="hidden">
-              <ol className={styles.steps} aria-label="はじめの設定の順路">
+              <GridTable label="はじめの設定の順路" framed={false} design={{ columns: "max-content minmax(0, 1fr) max-content", gap: "var(--polish-space-field)", rowPadding: "0 var(--polish-space-card)", fontSize: "var(--text-body)" }}>
                 {steps.map((step) => <StepRow key={step.key} step={step} />)}
-              </ol>
+              </GridTable>
             </Card>
 
             <div className={styles.bottom}>
               {reasons.length > 0 ? (
-                <Card layout="vertical" className={styles.card} contentPadding="var(--tpl-sa-card-pad)" gap="var(--tpl-sa-card-gap)" aria-label="いま止まっている理由">
-                  <h2 className={styles.cardTitle}>いま止まっている理由</h2>
+                <Card variant="form" className={styles.card} aria-label="いま止まっている理由">
+                  <CardHeader size="stacked" title="いま止まっている理由" />
                   {reasons.map((line) => <p key={line} className={styles.cardLine}>{line}</p>)}
                 </Card>
               ) : null}
-              <Card layout="vertical" className={styles.card} contentPadding="var(--tpl-sa-card-pad)" gap="var(--tpl-sa-card-gap)" aria-label="気をつけること">
-                <h2 className={styles.cardTitle}>気をつけること</h2>
+              <Card variant="form" className={styles.card} aria-label="気をつけること">
+                <CardHeader size="stacked" title="気をつけること" />
                 <p className={styles.cardLine}>
                   {CARE_LINES[0]}
                   <br />
@@ -140,23 +142,17 @@ export default function GettingStartedV8() {
 function StepRow({ step }: { step: StepResult }) {
   const done = step.state === 'done'
   return (
-    <li className={styles.step} data-step-state={step.state}>
-      <span className={done ? `${styles.mark} ${styles.markDone}` : styles.mark} aria-hidden="true">
-        {done ? <Check size={14} strokeWidth={3} /> : step.ordinal}
-      </span>
-      <div className={styles.stepBody}>
-        <p className={done ? `${styles.stepTitle} ${styles.stepTitleDone}` : styles.stepTitle}>{step.title}</p>
-        <p className={styles.stepSub}>{step.sub}</p>
-      </div>
-      <div className={styles.stepSide}>
-        {done ? (
-          <StatusBadge tone="success" size="compact">済み</StatusBadge>
-        ) : step.action ? (
+    <GridRow data-step-state={step.state}>
+      <GridCell><StatusBadge tone={done ? 'success' : 'neutral'} dot={false}>{done ? '✓' : step.ordinal}</StatusBadge></GridCell>
+      <GridCell><div className={styles.stepBody}>
+        <strong><TruncatedText value={step.title} /></strong>
+        <span className={styles.stepSub}><TruncatedText value={step.sub} /></span>
+      </div></GridCell>
+      <GridCell align="right">
+        {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action ? (
           <Button href={step.action.href} variant="secondary">{step.action.label}</Button>
-        ) : (
-          <span className={styles.stepBlocked}>{step.blockedReason}</span>
-        )}
-      </div>
-    </li>
+        ) : <span className={styles.stepBlocked}>{step.blockedReason}</span>}
+      </GridCell>
+    </GridRow>
   )
 }

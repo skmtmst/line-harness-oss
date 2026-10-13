@@ -27,3 +27,9 @@ html:root .tooltip { background: var(--color-canvas); color: var(--color-ink); b
 /* まとめの小さい棒（運営 CyW0E）：棒100＋月の名前20。数は焦点・乗せた時にも読める。 */
 html:root .plot[data-presentation='summary'] { height: var(--tpl-chart-summary-plot-h); margin: 0 0 calc(var(--space-16) + var(--space-4)); }
 html:root .plot[data-presentation='summary'] .axis { top: calc(100% + var(--space-4)); }
+
+/* 軸だけ間引く。棒・読み上げ・焦点の吹き出しは全件残す。 */
+html:root .axis { left: 50%; right: auto; width: max-content; max-width: none; transform: translateX(-50%); overflow: visible; }
+html:root .axis[hidden] { display: none; }
+html:root .axis[data-axis-edge='first'] { left: 0; transform: none; }
+html:root .axis[data-axis-edge='last'] { left: auto; right: 0; transform: none; }

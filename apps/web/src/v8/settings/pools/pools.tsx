@@ -14,7 +14,8 @@ import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConfl
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Info, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import Card, { CardHeader } from '@/components/shared/card'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -138,10 +139,7 @@ export default function PoolsV8() {
                 <PoolCard key={pool.id} pool={pool} accounts={accounts} canManage={canManage} onChange={() => void load()} />
               ))}
             </div>
-            <p className={styles.notice} role="note">
-              <Info size={16} aria-hidden="true" className={styles.noticeIcon} />
-              <span>「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。</span>
-            </p>
+            <Notice tone="info">「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。</Notice>
           </>
         )}
       </SettingsPage>
@@ -225,13 +223,9 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   }
 
   return (
-    <section className={styles.card} aria-label={pool.name}>
-      <div className={styles.cardHead}>
-        <div className={styles.cardTitleBox}>
-          <h2 className={styles.cardTitle} title={pool.name}>{pool.name}</h2>
-          <p className={styles.slug} title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
-        </div>
-        {canManage ? (
+    <Card variant="form" aria-label={pool.name}>
+      <CardHeader size="stacked" title={pool.name} meta={`slug：${pool.slug}${isMain ? '・既定' : ''}`} action={
+        canManage ? (
           <div className={styles.menuBox}>
             <RowMenu
               label={`${pool.name}の操作`}
@@ -241,12 +235,11 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
               items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
             />
           </div>
-        ) : null}
-      </div>
-      <div className={styles.urlRow}>
+        ) : null} />
+      <Card layout="horizontal" surface="muted" padding="compact" gap="var(--polish-space-row)">
         <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
         <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
-      </div>
+      </Card>
       {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
@@ -273,7 +266,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
           setDeleteError('')
         }}
       />
-    </section>
+    </Card>
   )
 }
 
@@ -351,32 +344,32 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
           const name = acc?.name ?? m.lineAccountId
           const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
-            <li key={m.id} className={styles.member}>
+            <li key={m.id}><Card layout="horizontal" surface="muted" padding="compact" gap="var(--polish-space-row)">
               <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
                 <Button variant="secondary" onClick={() => { setRemoveError(''); setRemoveTarget({ id: m.id, name }) }}>外す</Button>
               ) : null}
-            </li>
+            </Card></li>
           )
         })}
         {members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
       </ul>
       {listError ? (
-        <Notice tone="danger" >{listError}{' '}<button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button></Notice>
+        <Notice tone="danger" >{listError}{' '}<Button type="button" variant="text" onClick={() => void reload()}>もう一度読み込む</Button></Notice>
       ) : null}
       {canManage && candidates.length > 0 ? (
         <div className={styles.menuBox}>
-          <button
+          <Button
             ref={addRef}
             type="button"
-            className={styles.addLink}
+            variant="text"
             aria-haspopup="menu"
             aria-expanded={addOpen}
             onClick={() => setAddOpen(!addOpen)}
           >
             ＋ アカウントを追加
-          </button>
+          </Button>
           <ActionMenu
             open={addOpen}
             anchorRef={addRef}

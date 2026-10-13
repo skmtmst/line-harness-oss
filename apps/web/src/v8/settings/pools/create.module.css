@@ -8,19 +8,6 @@
   gap: var(--tpl-sb-group-gap);
 }
 
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sb-row-sub-gap);
-}
-
-.cardTitle {
-  margin: 0;
-  font-size: var(--tpl-sb-group-title);
-  font-weight: 700;
-  line-height: var(--tpl-st2-pc-title-lh);
-}
-
 .cardSub,
 .hint {
   margin: 0;
@@ -39,16 +26,6 @@
   font-size: var(--text-label);
   font-weight: 500;
   line-height: var(--tpl-st2-pc-label-lh);
-}
-
-.account {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-st2-pc-account-gap);
-  padding: var(--tpl-st2-pc-account-pad);
-  border-radius: var(--tpl-sb-seg-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
 }
 
 .accountName {
@@ -116,10 +93,6 @@
   margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
-}
-
-.retry {
-  text-decoration: underline;
 }
 
 .btnIcon {

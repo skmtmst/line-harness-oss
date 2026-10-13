@@ -59,7 +59,7 @@ it('閲覧のみには作る・編集・変更・停止・発行のボタンを�
   render(<OrganizationV8 />)
   expect(await screen.findByText('試験担当')).toBeTruthy()
   expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
-  for (const name of ['店舗を追加する', '編集', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
+  for (const name of ['店舗を追加する', '編集する', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
 })
@@ -98,7 +98,8 @@ it('ユーザーの保存中は窓の×・キャンセル・Escで閉じられ�
 it('WEB169：店舗編集のタイムゾーンは日本時間の表示だけ', async () => {
   render(<OrganizationV8 />)
   await screen.findAllByText('試験店')
-  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  fireEvent.click(screen.getByRole('button', { name: '試験店のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
   expect(screen.queryByRole('textbox', { name: 'タイムゾーン' })).toBeNull()
   expect(screen.getByRole('dialog').textContent).toContain('日本時間（Asia/Tokyo）')
 })
@@ -109,4 +110,12 @@ it('B-241 login candidate failure shows retry rather than an empty selector',asy
  const error=await screen.findByText('ログインメンバーを読み込めませんでした')
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('ログインメンバーを読み込めませんでした')).toBeNull())
+})
+
+it('未発行の取り込みアドレスは未設定で表示し、発行の操作を保つ', async () => {
+  render(<OrganizationV8 />)
+  const heading = await screen.findByText('予約メール取り込みアドレス')
+  await waitFor(() => expect(fixture.listIntakeAddresses).toHaveBeenCalledWith('account-1', 'store'))
+  await waitFor(() => expect(heading.closest('section')!.textContent).toContain('未設定'))
+  expect(within(heading.closest('section')!).getByRole('button', { name: 'アドレスを発行' })).toBeTruthy()
 })
