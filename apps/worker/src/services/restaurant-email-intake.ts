@@ -245,12 +245,7 @@ async function markRawStorageFailure(
     await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
       SET status = 'storage_failed', r2_key = '' WHERE id = ?`).bind(inboundId).run();
   } catch (recordError) {
-    console.error(JSON.stringify({
-      event: 'restaurant_email_storage_failure_record_failed',
-      inboundId,
-      error: String(recordError),
-      originalError: String(error),
-    }));
+    console.error(JSON.stringify({"code":"restaurant_email_storage_failure_record_failed"}));
   }
 }
 
@@ -291,13 +286,7 @@ async function quarantineRestaurantEmail(
   }
   await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
     SET r2_key = ?, status = 'quarantined' WHERE id = ?`).bind(objectKey, claim.id).run();
-  console.warn(JSON.stringify({
-    event: 'restaurant_email_quarantined',
-    reason,
-    objectKey,
-    domain: parts?.domain ?? null,
-    rawSize: message.rawSize,
-  }));
+  console.warn(JSON.stringify({"code":"restaurant_email_quarantined"}));
   return { quarantined: true, duplicate: false, objectKey };
 }
 
@@ -456,11 +445,7 @@ export async function deleteExpiredRestaurantRawEmails(
       deleted += results.length;
     } catch (error) {
       failed += results.length;
-      console.error(JSON.stringify({
-        event: 'restaurant_raw_mail_retention_failed',
-        count: results.length,
-        error: String(error),
-      }));
+      console.error(JSON.stringify({"code":"restaurant_raw_mail_retention_failed"}));
       break;
     }
   }

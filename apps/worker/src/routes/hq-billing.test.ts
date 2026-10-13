@@ -413,11 +413,7 @@ describe('課金 Webhook', () => {
     expect(res.status).toBe(200);
     expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
-    expect(info).toHaveBeenCalledWith(JSON.stringify({
-      message: 'billing webhook: charge.refunded 対象外',
-      eventId: 'evt_ec_refund',
-      reason: 'Stripe Billing請求書でない',
-    }));
+    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
   });
 
   it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
@@ -449,11 +445,7 @@ describe('課金 Webhook', () => {
 
     expect(res.status).toBe(200);
     expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledWith(JSON.stringify({
-      message: 'billing webhook: charge.refunded 対象外',
-      eventId: 'evt_pi_no_invoice',
-      reason: 'Stripe Billing請求書でない',
-    }));
+    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
   });
 
   it('請求書IDがあっても更新対象がなければ警告する', async () => {
@@ -466,12 +458,7 @@ describe('課金 Webhook', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({
-      message: 'billing webhook: charge.refunded 更新対象なし',
-      eventId: 'evt_missing_invoice_refund',
-      invoiceId: 'in_missing',
-      reason: 'billing_invoice_not_found',
-    }));
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_warn', route: 'POST /api/hq/billing/webhook' }));
   });
 
   it('知らない顧客の請求書はイベントだけ記録し、請求書行は作らない', async () => {

@@ -174,14 +174,7 @@ describe('buildNenFlexMessage', () => {
       // 発動したら不具合が起きているということなので、黙って切らず記録する。
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
-      expect(logged).toMatchObject({
-        event: 'nen_body_truncated_at_send',
-        campaignKey: campaign.campaign_key,
-        field: 'body',
-        beforeLength: 300 * 40,
-        afterLength: NEN_CAMPAIGN_BODY_MAX_LENGTH,
-        droppedLength: 300 * 40 - NEN_CAMPAIGN_BODY_MAX_LENGTH,
-      });
+      expect(logged).toEqual({ code: 'nen_body_truncated_at_send' });
     });
 
     it('差し込み後に上限内に収まる本文はそのまま切られず、記録も残さない', () => {
@@ -207,13 +200,9 @@ describe('buildNenFlexMessage', () => {
 
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
-      expect(logged).toMatchObject({
-        event: 'nen_column_intro_truncated',
-        title: title.slice(0, 120),
-        afterLength: 1500,
-      });
-      expect(logged.beforeLength).toBeGreaterThan(1500);
-      expect(logged.droppedLength).toBe(logged.beforeLength - 1500);
+      expect(logged).toEqual({ code: 'nen_column_intro_truncated' });
+      expect(JSON.stringify(logged)).not.toContain(title);
+      expect(Object.keys(logged)).toEqual(['code']);
     });
 
     it('1500字に収まる入力はそのまま切られず、記録も残さない', () => {

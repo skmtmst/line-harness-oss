@@ -29,7 +29,7 @@ errorMessages.get('/api/error-messages', requireRole('owner', 'admin', 'staff'),
       })),
     });
   } catch (err) {
-    console.error('GET /api/error-messages error:', err);
+    console.error(JSON.stringify({"code":"routes_error_messages_failed","route":"GET /api/error-messages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

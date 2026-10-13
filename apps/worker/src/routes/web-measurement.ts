@@ -159,12 +159,12 @@ webMeasurement.post('/api/public/web-conversions', inputJsonBoundary(), async (c
         });
       } catch (err) {
         // アカウント境界・停止中などは1地点の失敗で他を止めない。
-        console.error('web-conversions track failed:', err instanceof Error ? err.message : 'unknown');
+        console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"POST /api/public/web-conversions"}));
       }
     }
     return c.body(null, 204, corsHeaders());
   } catch (err) {
-    console.error('POST /api/public/web-conversions error:', err);
+    console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"POST /api/public/web-conversions"}));
     return c.body(null, 204, corsHeaders());
   }
 });
@@ -205,7 +205,7 @@ webMeasurement.get(
         })),
       });
     } catch (err) {
-      console.error('GET /api/measurement-sites error:', err);
+      console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"GET /api/measurement-sites"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -241,7 +241,7 @@ webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), inp
     auditLog(c, 'measurement_site.create', { kind: 'measurement_site', id: site.id }, { lineAccountId: accountId });
     return c.json({ success: true, data: { id: site.id, label: site.label, domains: site.domains } });
   } catch (err) {
-    console.error('POST /api/measurement-sites error:', err);
+    console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"POST /api/measurement-sites"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -276,7 +276,7 @@ webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin')
     auditLog(c, 'measurement_site.update', { kind: 'measurement_site', id: site.id }, { lineAccountId: site.line_account_id });
     return c.json({ success: true, data: { id: site.id } });
   } catch (err) {
-    console.error('PATCH /api/measurement-sites/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"PATCH /api/measurement-sites/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -325,7 +325,7 @@ webMeasurement.post(
     try {
       return await changeSiteStopState(c, c.req.param('id'), true);
     } catch (err) {
-      console.error('POST /api/measurement-sites/:id/stop error:', err);
+      console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"POST /api/measurement-sites/:id/stop"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -338,7 +338,7 @@ webMeasurement.post(
     try {
       return await changeSiteStopState(c, c.req.param('id'), false);
     } catch (err) {
-      console.error('POST /api/measurement-sites/:id/resume error:', err);
+      console.error(JSON.stringify({"code":"routes_web_measurement_failed","route":"POST /api/measurement-sites/:id/resume"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },

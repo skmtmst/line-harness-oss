@@ -136,7 +136,7 @@ async function findMatches(
       // 例外のままにして、0件と偽らない。
       if (!isMissingSourceTable(err, source.table)
         && !(source.refKind === 'template' && isMissingSourceTable(err, 'broadcast_message_assets'))) throw err;
-      console.error(`media usage single scan skipped ${source.table}:`, err);
+      console.error(JSON.stringify({"code":"services_media_usage_scan_failed"}));
       skippedTables.push(source.table);
     }
   }
@@ -162,7 +162,7 @@ export async function scanSingleMediaUsage(
     versionTokens = await getMediaUsageMatchTokens(db, item.id);
   } catch (err) {
     if (!isMissingSourceTable(err, 'media_versions')) throw err;
-    console.error('media usage single scan skipped media_versions:', err);
+    console.error(JSON.stringify({"code":"services_media_usage_scan_failed"}));
     skippedTables.push('media_versions');
   }
   const found = await findMatches(db, usageMatchTokens(item, versionTokens));
@@ -275,7 +275,7 @@ export async function scanMediaUsage(
     // 一時的なD1障害まで「走査済み」にすると、1周後の整理で使用先を消してしまう。
     if (!isMissingSourceTable(err, source.table)
         && !(source.refKind === 'template' && isMissingSourceTable(err, 'broadcast_message_assets'))) throw err;
-    console.error(`media usage scan skipped ${source.table}:`, err);
+    console.error(JSON.stringify({"code":"services_media_usage_scan_failed"}));
     sourceMissing = true;
   }
 

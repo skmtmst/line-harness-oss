@@ -176,7 +176,7 @@ describe('train30 MFA policy and recovery', () => {
     expect((await request('/api/friends', undefined, token, 'GET', overrides)).status).toBe(200);
     expect((await json(await request('/api/auth/two-factor/policy', undefined, token, 'GET', overrides))).data).toMatchObject({ required: false, configured: false, notice: '二段階認証の鍵が未設定のため、必須にできません' });
     expect((await request('/api/auth/two-factor/policy', { required: true }, token, 'PUT', overrides)).status).toBe(400);
-    expect(log).toHaveBeenCalledWith('[auth] MFA_KEY_UNAVAILABLE: 二段階認証の鍵が未設定のため、必須にできません'); log.mockRestore();
+    expect(log).toHaveBeenCalledWith(JSON.stringify({code:'mfa_key_unavailable'})); log.mockRestore();
   });
   it('a missing key does not bypass an existing personal enrollment', async () => {
     await seed(); await enroll();

@@ -74,11 +74,7 @@ export async function refreshRecentAnalyticsProjections(
     else result.mismatched = 1;
   } catch (error) {
     result.failed = 1;
-    console.error(JSON.stringify({
-      event: 'analytics_projection_failed',
-      line_account_id: account.id,
-      reason: error instanceof Error ? error.message : 'unknown',
-    }));
+    console.error(JSON.stringify({"code":"analytics_projection_failed"}));
   } finally {
     // 成否に関係なく次のアカウントへ進め、大きい・壊れた1社が他社を塞がないようにする。
     await saveAnalyticsProjectionSchedulerCursor(db, account.id, cutoffAt);

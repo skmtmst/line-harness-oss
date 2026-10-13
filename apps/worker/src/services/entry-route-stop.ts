@@ -108,7 +108,7 @@ export async function getActiveStopSuppressionSafe(
   try {
     return await lookup(db, { lineAccountId, lineUserId });
   } catch (err) {
-    console.error('Stop suppression lookup failed (fail-closed):', err);
+    console.error(JSON.stringify({"code":"services_entry_route_stop_failed"}));
     return 'unknown';
   }
 }

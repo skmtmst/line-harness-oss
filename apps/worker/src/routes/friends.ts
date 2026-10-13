@@ -266,7 +266,7 @@ friends.get('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), 
     const items = await Promise.all(rows.map((row) => serializeFriendSavedView(c.env.DB, row)));
     return c.json({ success: true, data: { items, total: items.length } });
   } catch (error) {
-    console.error('GET /api/friends/saved-views error:', error);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/saved-views"}));
     return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
   }
 });
@@ -324,7 +324,7 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
     if (error instanceof SyntaxError) {
       return inputError(c, { success: false, error: '送信内容のJSONが正しくありません' }, 400, []);
     }
-    console.error('POST /api/friends/saved-views error:', error);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/saved-views"}));
     return c.json({ success: false, error: '保存した検索を作成できませんでした' }, 500);
   }
 });
@@ -859,7 +859,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
         });
       } catch (error) {
         // 集計台帳の一時失敗で、友だち一覧そのものを表示不能にしない。
-        console.error('saved search usage record error:', error);
+        console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends"}));
       }
     }
 
@@ -875,7 +875,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       },
     });
   } catch (err) {
-    console.error('GET /api/friends error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -901,7 +901,7 @@ friends.get('/api/friends/add-breakdown', async (c) => {
     const data = await getFriendAddBreakdown(c.env.DB, safeDays, statsScope);
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/friends/add-breakdown error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/add-breakdown"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -925,7 +925,7 @@ friends.get('/api/friends/count', async (c) => {
     }
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    console.error('GET /api/friends/count error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/count"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -955,7 +955,7 @@ friends.get('/api/friends/ref-stats', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/ref-stats error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/ref-stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -993,7 +993,7 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
     ]);
     return c.json({ success: true, data: { summary, history, insights, connections } });
   } catch (err) {
-    console.error('GET /api/friends/:id/mileage error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/mileage"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1188,7 +1188,7 @@ friends.get('/api/friends/:id/upcoming', requireVisibleFriend, async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id/upcoming error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/upcoming"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1215,7 +1215,7 @@ friends.get('/api/friends/stats', async (c) => {
     const stats = await getFriendStats(c.env.DB, statsScope);
     return c.json({ success: true as const, data: stats });
   } catch (err) {
-    console.error('GET /api/friends/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/stats"}));
     return c.json({ success: false as const, error: '友だちの集計を取得できませんでした' }, 500);
   }
 });
@@ -1315,7 +1315,7 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1344,7 +1344,7 @@ friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, async (c)
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id/form-submissions error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/form-submissions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1432,7 +1432,7 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
 
     return c.json({ success: true, data: null }, 201);
   } catch (err) {
-    console.error('POST /api/friends/:id/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1450,7 +1450,7 @@ friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'st
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/friends/:id/tags/:tagId error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"DELETE /api/friends/:id/tags/:tagId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1507,7 +1507,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
       },
     });
   } catch (err) {
-    console.error('PUT /api/friends/:id/metadata error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"PUT /api/friends/:id/metadata"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1532,7 +1532,7 @@ friends.get('/api/friends/:id/messages', requireVisibleFriend, async (c) => {
       .all<{ id: string; direction: string; messageType: string; content: string; createdAt: string }>();
     return c.json({ success: true, data: result.results.reverse() });
   } catch (err) {
-    console.error('GET /api/friends/:id/messages error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/messages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1695,7 +1695,7 @@ friends.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/friends/:id/timeline error:', error);
+      console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/timeline"}));
       return c.json({ success: false, error: '友だちの履歴を読み込めませんでした' }, 500);
     }
   },
@@ -1856,7 +1856,7 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
         nextRetryAt: null,
         now: failedAt,
       });
-      console.error('POST /api/friends/:id/messages prepare failed:', prepareError);
+      console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/messages"}));
       return c.json({
         success: false,
         error: '送信の準備に失敗しました',
@@ -1931,7 +1931,7 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
-    console.error('POST /api/friends/:id/messages error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/messages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -30,7 +30,7 @@ function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
     return inputError(c, { success: false, error: error.message, code: error.code }, error.status as ContentfulStatusCode, bulkErrorFields(error.code));
   }
-  console.error('friend bulk run error:', error);
+  console.error(JSON.stringify({"code":"routes_friend_bulk_runs_failed"}));
   return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);
 }
 
@@ -46,7 +46,7 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   try {
     c.executionCtx.waitUntil(promise);
   } catch {
-    void promise.catch((error) => console.error('friend bulk background error:', error));
+    void promise.catch((error) => console.error(JSON.stringify({"code":"routes_friend_bulk_runs_failed"})));
   }
 }
 

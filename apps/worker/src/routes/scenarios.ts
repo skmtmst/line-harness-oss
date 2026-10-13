@@ -76,11 +76,7 @@ function scenarioContractError(c: Context<Env>, error: unknown): Response {
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  console.error(JSON.stringify({
-    event: 'scenario_v6_contract_failed',
-    path: c.req.path,
-    reason: error instanceof Error ? error.message : String(error),
-  }));
+  console.error(JSON.stringify({"code":"scenario_v6_contract_failed"}));
   return c.json({ success: false, error: 'シナリオの情報を処理できませんでした' }, 500);
 }
 
@@ -469,7 +465,7 @@ scenarios.patch('/api/scenarios/reorder', requireDeliveryAccess('scenarios'), in
     await reorderScenarios(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/scenarios/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PATCH /api/scenarios/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -599,7 +595,7 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/scenarios error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -624,7 +620,7 @@ scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/scenarios/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -690,7 +686,7 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
 
     return c.json({ success: true, data: serializeScenario(scenario) }, 201);
   } catch (err) {
-    console.error('POST /api/scenarios error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -797,7 +793,7 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, inputJsonBounda
 
     return c.json({ success: true, data: serializeScenario(updated) });
   } catch (err) {
-    console.error('PUT /api/scenarios/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -824,7 +820,7 @@ scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), a
       .map(({ id: referrerId, name }) => ({ id: referrerId, name }));
     return c.json({ success: true, data: { items, total: items.length } });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/move-referrers error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/move-referrers"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -844,7 +840,7 @@ scenarios.delete('/api/scenarios/:id', requireDeliveryAccess('scenarios'), requi
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
       return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
     }
-    console.error('DELETE /api/scenarios/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -971,7 +967,7 @@ scenarios.post('/api/scenarios/:id/steps', requireDeliveryAccess('scenarios'), r
 
     return c.json({ success: true, data: serializeStep(step) }, 201);
   } catch (err) {
-    console.error('POST /api/scenarios/:id/steps error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/steps"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1188,7 +1184,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
 
     return c.json({ success: true, data: serializeStep(updated) });
   } catch (err) {
-    console.error('PUT /api/scenarios/:id/steps/:stepId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id/steps/:stepId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1200,7 +1196,7 @@ scenarios.delete('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scen
     await deleteScenarioStep(c.env.DB, stepId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/scenarios/:id/steps/:stepId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/steps/:stepId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1275,7 +1271,7 @@ scenarios.post('/api/scenarios/:id/steps/reorder', requireDeliveryAccess('scenar
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/scenarios/:id/steps/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/steps/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1395,7 +1391,7 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
       },
     });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/preview error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/preview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1414,7 +1410,7 @@ scenarios.get('/api/scenarios/:id/stats', scenarioPermission('view'), async (c) 
     const stats = await computeScenarioStats(c.env.DB, scenarioId);
     return c.json({ success: true, data: stats });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1584,7 +1580,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireDeliveryAccess('sce
     }
     return c.json({ success: true, data: serializeFriendScenario(enrollment) }, 201);
   } catch (err) {
-    console.error('POST /api/scenarios/:id/enroll/:friendId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/enroll/:friendId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1632,7 +1628,7 @@ scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJ
         : '分岐または完了後の移動が循環しているため公開できません';
       return c.json({ success: false, error: reason, code: 'PUBLISH_CYCLE' }, 409);
     }
-    console.error('POST /api/scenarios/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/publish"}));
     return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
   }
 });
@@ -1761,7 +1757,7 @@ scenarios.get('/api/scenarios/:id/actions', scenarioPermission('view'), async (c
       .all<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: (rows.results ?? []).map(serializeAction) });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/actions error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/actions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1860,7 +1856,7 @@ scenarios.post('/api/scenarios/:id/actions', requireDeliveryAccess('scenarios'),
       .first<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: row ? serializeAction(row) : null });
   } catch (err) {
-    console.error('POST /api/scenarios/:id/actions error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/actions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1934,7 +1930,7 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('sce
       .first<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: row ? serializeAction(row) : null });
   } catch (err) {
-    console.error('PUT /api/scenarios/:id/actions/:actionId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id/actions/:actionId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1947,7 +1943,7 @@ scenarios.delete('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('
       .run();
     return c.json({ success: true });
   } catch (err) {
-    console.error('DELETE /api/scenarios/:id/actions/:actionId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/actions/:actionId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2025,7 +2021,7 @@ async function runTestSend(
     }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
-    console.error('scenario test-send error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed"}));
     return c.json(
       { success: false, error: `テスト送信に失敗しました: ${(err as Error).message}` },
       502,
@@ -2065,7 +2061,7 @@ scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
     });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/triggers error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/triggers"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2109,7 +2105,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, input
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
     });
   } catch (err) {
-    console.error('POST /api/scenarios/:id/triggers error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/triggers"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2140,7 +2136,7 @@ scenarios.delete(
       await removeScenarioTrigger(c.env.DB, c.req.param('id'), c.req.param('triggerId'));
       return c.json({ success: true });
     } catch (err) {
-      console.error('DELETE /api/scenarios/:id/triggers/:triggerId error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/triggers/:triggerId"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2304,7 +2300,7 @@ scenarios.post(
         };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/pause error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/pause"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2345,7 +2341,7 @@ scenarios.post(
         return { status: 200, body: { success: true, data: serializeFriendScenario(resumed) } };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/resume error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/resume"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2380,7 +2376,7 @@ scenarios.post(
         return { status: 200, body: { success: true, data: serializeFriendScenario(retried) } };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/retry error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/retry"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2446,7 +2442,7 @@ scenarios.post(
         return { status: 200, body: { success: true, data: serializeFriendScenario(moved) } };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/move error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/move"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },

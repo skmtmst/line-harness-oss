@@ -538,7 +538,7 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), inputJsonBoundary(), a
       existingAccount: Boolean(inDefault),
     });
   } catch (error) {
-    console.error('POST /api/ops/members invite mail error:', error);
+    console.error(JSON.stringify({"code":"routes_ops_failed","route":"POST /api/ops/members"}));
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
   await recordPlatformAudit(db, {
@@ -568,7 +568,7 @@ ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(),
       existingAccount: Boolean(target.password_hash),
     });
   } catch (error) {
-    console.error('POST /api/ops/members/:staffId/resend-invite mail error:', error);
+    console.error(JSON.stringify({"code":"routes_ops_failed","route":"POST /api/ops/members/:staffId/resend-invite"}));
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
   return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } });

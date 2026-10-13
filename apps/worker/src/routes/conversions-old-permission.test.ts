@@ -10,6 +10,9 @@ import type { Env } from '../index.js';
 // M7: 承認 PATCH の監査は成功確定後に残す。400/404 の失敗では
 //     `conversion.approval.update` の監査を残さない。
 const dbMocks = {
+  recordAuditEvent: vi.fn(async () => undefined),
+  maskAuditIp: () => null,
+  auditDeviceFamily: () => null,
   getConversionPoints: vi.fn(),
   getConversionEvents: vi.fn(),
   getConversionApprovalQueue: vi.fn(),
@@ -83,9 +86,8 @@ function request(
 }
 
 function auditLogged(calls: unknown[][]): boolean {
-  return calls.some((args) => typeof args[0] === 'string'
-    && args[0].includes('"tag":"audit"')
-    && args[0].includes('"action":"conversion.approval.update"'));
+  return dbMocks.recordAuditEvent.mock.calls.some((args) =>
+    (args as unknown as [unknown, { action: string }])[1].action === 'conversion.approval.update');
 }
 
 beforeEach(() => {

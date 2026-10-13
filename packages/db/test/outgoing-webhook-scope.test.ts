@@ -98,14 +98,14 @@ describe('送信Webhookのアカウント・統括分離', () => {
     try {
       const rows = await getActiveOutgoingWebhooksByEvent(db, 'message_received', 'account-a');
       expect(rows.map((row) => row.id)).toEqual(['webhook-a']);
-      // 壊れた行は webhookId 付きで安全に記録する（秘密値・URLは出さない）。
+      // The fixed code reports the failure; customer identifiers and URLs stay out of logs.
       const events = errorLog.mock.calls
         .map((call) => String(call[0]))
         .filter((text) => text.includes('outgoing_webhook_event_types_broken'));
       expect(events).toHaveLength(2);
       for (const text of events) {
-        const parsed = JSON.parse(text) as { webhookId: string };
-        expect(['webhook-broken-json', 'webhook-broken-array']).toContain(parsed.webhookId);
+        expect(JSON.parse(text)).toEqual({ code: 'outgoing_webhook_event_types_broken' });
+        expect(text).not.toContain('webhook-broken');
         expect(text).not.toContain('https://example.com');
       }
     } finally {
