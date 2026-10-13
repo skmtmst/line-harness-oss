@@ -184,8 +184,8 @@
 .legend[data-layout='dashboard'] .swatch { width: var(--tpl-db-swatch); height: var(--tpl-db-swatch); border-radius: var(--tpl-db-swatch-r); }
 .legend[data-layout='dashboard'] .swatchRemoved { background: var(--tpl-db-chart-bar-blocked); }
 
-.swatchBroadcast { background: var(--color-icon-tile-blue); }
-.swatchScenario { background: var(--color-icon-tile-purple); }
+.swatchBroadcast { background: var(--color-status-info); }
+.swatchScenario { background: var(--color-avatar-purple-ink); }
 .eventMark { display: inline-block; flex-shrink: 0; width: var(--tpl-an-mark); height: var(--tpl-an-mark); border-radius: var(--tpl-an-mark-radius); }
 .legend[data-layout='analytics'] { justify-content: flex-start; flex-wrap: wrap; gap: var(--tpl-an-legend-gap); padding: 0; margin: 0; list-style: none; font-size: var(--text-caption); line-height: var(--tpl-an-text-lh); }
 .legend[data-layout='analytics'] .legendItem { gap: var(--tpl-an-swatch-gap); }
