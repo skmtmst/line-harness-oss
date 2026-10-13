@@ -96,14 +96,71 @@ const ribbon = `<svg id="ribbon" aria-hidden="true" fill="none" preserveAspectRa
 const mark = (size = 28) =>
   `<svg width="${size}" height="${size}" aria-hidden="true"><use href="#mk"/></svg>`;
 
+// JSON-LD is an inert data block (not executed), so it is compatible with script-src 'self'.
+const jsonLd = (data) =>
+  `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
+
+export function structuredData({ path, heading, config, origin }) {
+  const org = {
+    "@type": "Organization",
+    "@id": `${origin}/#organization`,
+    name: config.operator.name,
+    url: `${origin}/`,
+    logo: `${origin}/assets/icon-512.png`,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: config.operator.address,
+      addressCountry: "JP",
+    },
+    ...(isSupportLine(config.operator.supportLineUrl)
+      ? {
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer support",
+            url: config.operator.supportLineUrl,
+            availableLanguage: "ja",
+          },
+        }
+      : {}),
+  };
+  const graph = [
+    org,
+    {
+      "@type": "WebSite",
+      "@id": `${origin}/#website`,
+      name: "musubo",
+      url: `${origin}/`,
+      inLanguage: "ja",
+      publisher: { "@id": `${origin}/#organization` },
+    },
+  ];
+  if (path !== "/" && heading)
+    graph.push({
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "ホーム", item: `${origin}/` },
+        { "@type": "ListItem", position: 2, name: heading, item: `${origin}${path}` },
+      ],
+    });
+  return jsonLd({ "@context": "https://schema.org", "@graph": graph });
+}
+
+export function notFoundBody() {
+  return `<section class="sub-hero"><div class="sub-hero-card"><div class="sub-watermark" aria-hidden="true">404</div><div class="sub-hero-inner"><div class="sub-label"><div class="rule"></div><div class="en">404 NOT FOUND</div></div><h1>ページが見つかりません</h1><p class="sub-lead">お探しのページは、URLが変わったか、削除された可能性があります。お手数ですが、トップページからお進みください。</p><p class="nf-actions">${button("/", "musuboのトップへ")}<a class="text-link" href="/contact/">お問い合わせ</a></p></div></div></section>`;
+}
+
 export function layout({
   title,
   description,
   path = "/",
+  heading,
   body,
   config,
   production,
+  noindex = false,
 }) {
+  const origin = production ? config.origin : config.previewOrigin;
+  const pageUrl = `${origin}${path}`;
   const app = escapeHtml(
     production ? config.productionAppOrigin : config.stagingAppOrigin,
   );
@@ -113,10 +170,15 @@ export function layout({
   return `<!doctype html>
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}">
-<meta name="robots" content="${production ? "index,follow" : "noindex,nofollow"}">
-${production ? `<link rel="canonical" href="${escapeHtml(config.origin + path)}">` : ""}
-<meta name="theme-color" content="#143e34"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:type" content="website"><meta property="og:locale" content="ja_JP">
-<link rel="icon" href="/assets/symbol.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/site.css"><script src="/assets/site.js" defer></script></head>
+<meta name="robots" content="${production && !noindex ? "index,follow" : "noindex,nofollow"}">
+${production && !noindex ? `<link rel="canonical" href="${escapeHtml(pageUrl)}">` : ""}
+<meta name="theme-color" content="#143e34">
+<meta property="og:site_name" content="musubo"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:type" content="website"><meta property="og:locale" content="ja_JP"><meta property="og:url" content="${escapeHtml(pageUrl)}">
+<meta property="og:image" content="${escapeHtml(origin)}/assets/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="musubo そのつながりを、もっと、育てよう。お店とお客さまを結ぶ、LINE運用ツール">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeHtml(title)}"><meta name="twitter:description" content="${escapeHtml(description)}"><meta name="twitter:image" content="${escapeHtml(origin)}/assets/og.png">
+<link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png"><link rel="icon" href="/assets/favicon-16.png" sizes="16x16" type="image/png"><link rel="icon" href="/assets/symbol.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/assets/site.webmanifest">
+<link rel="stylesheet" href="/assets/site.css"><script src="/assets/site.js" defer></script>
+${noindex ? "" : structuredData({ path, heading, config, origin })}</head>
 <body class="${path === "/" ? "home" : "sub"}"><a class="skip-link" href="#main">本文へ移動</a>${preview}
 ${symbols}
 <div id="page">
@@ -157,7 +219,7 @@ ${path === "/" ? ribbon : ""}
     <div class="contact">お問い合わせは公式LINEから（24時間受付）。返信は平日10:00〜18:00（土日祝・年末年始を除く）。</div>
   </div>
   <div class="wrap legal">
-    <span>© ${new Date().getFullYear()} musubo</span><span>LINEはLINEヤフー株式会社の商標または登録商標です。musuboは同社の公式サービスではありません。</span>
+    <span>© ${new Date().getFullYear()} ${escapeHtml(config.operator.name)}</span><span>LINEはLINEヤフー株式会社の商標または登録商標です。musuboは同社の公式サービスではありません。</span>
   </div>
 </footer>
 </div>

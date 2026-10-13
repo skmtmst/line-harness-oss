@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import config from "./site.config.mjs";
-import { isHttpsOrigin, layout, publicationIssues } from "./src/shared.mjs";
+import { isHttpsOrigin, layout, notFoundBody, publicationIssues } from "./src/shared.mjs";
 import { home } from "./src/home.mjs";
 import { legalBody } from "./src/legal.mjs";
 
@@ -52,23 +52,38 @@ export async function build({
         `正式公開を停止しました。未確定項目：${issues.join("、")}`,
       );
   }
+  // Titles put the page content first ("内容 | サイト名"); descriptions summarise the page
+  // and invite the next step (about 140 characters or more).
   const pages = [
     {
       path: "/",
-      title: "musubo｜人と人を結ぶ、LINE運用ツール",
+      title: "お店とお客さまを結ぶLINE運用ツール | musubo",
       description:
-        "そのつながりを、もっと育てよう。LINEの配信・友だち管理・チャット・フォーム・予約・複数店舗の管理をひとつに。musuboで、お客さまと向き合う時間を。",
+        "musubo（ムスボ）は、LINE公式アカウントにつないで使う運用ツールです。一斉配信やステップ配信、友だち管理、1対1チャット、回答フォームと予約、リッチメニューやAIバナー生成、GoogleビジネスプロフィールとInstagramへの同時投稿、複数店舗の管理までをひとつの画面で。30日間の無料トライアルで、まずは使い心地をお確かめください。",
       body: home(settings, production),
     },
     ...Object.entries({
-      terms: "利用規約",
-      privacy: "プライバシーポリシー",
-      legal: "特定商取引法に基づく表記",
-      contact: "お問い合わせ",
-    }).map(([kind, title]) => ({
+      terms: [
+        "利用規約",
+        "LINE運用ツール「musubo」の利用規約です。利用登録とアカウントの管理、サービスの内容と外部サービス（LINE公式アカウント・Googleビジネスプロフィール等）との連携、30日間の無料トライアルと利用料金、更新・解約・返金、配信内容とお客さまの情報、AI機能、禁止事項などの利用条件を定めています。お申込みの前にご確認ください。",
+      ],
+      privacy: [
+        "プライバシーポリシー",
+        "LINE運用ツール「musubo」のプライバシーポリシーです。取り扱う情報と利用目的、お店からお預かりする情報の扱い、委託先と外部サービス、Googleビジネスプロフィール・Instagram連携で取り扱うデータ、安全管理、保存期間と削除、開示・訂正・利用停止等の請求方法とお問い合わせ窓口をご案内します。",
+      ],
+      legal: [
+        "特定商取引法に基づく表記",
+        "LINE運用ツール「musubo」の特定商取引法に基づく表記です。役務提供事業者と所在地、お問い合わせ窓口、販売価格・利用料金、料金以外に必要な費用、お支払方法と時期、30日間の無料トライアル、契約期間・自動更新・解約、返金の条件、動作環境をまとめています。お申込みの前にご確認ください。",
+      ],
+      contact: [
+        "お問い合わせ",
+        "LINE運用ツール「musubo」へのお問い合わせは、公式LINEで受け付けています。ご質問やご相談は、友だち追加してトークからメッセージを送るだけ。公式LINEは24時間受付、返信は平日10:00〜18:00（土日祝・年末年始を除く）です。運営会社の情報や、お問い合わせの際の注意点もこちらでご確認いただけます。",
+      ],
+    }).map(([kind, [title, description]]) => ({
       path: `/${kind}/`,
-      title: `${title}｜musubo`,
-      description: `musuboの${title}をご案内します。`,
+      title: `${title} | musubo`,
+      heading: title,
+      description,
       body: legalBody(kind, settings, production),
     })),
   ];
@@ -83,6 +98,23 @@ export async function build({
       extractInlineStyles(layout({ ...page, config: settings, production }), styles),
     );
   }
+  // Custom 404 (served through ErrorDocument). Not listed in the sitemap and never indexed.
+  await writeFile(
+    join(output, "404.html"),
+    extractInlineStyles(
+      layout({
+        path: "/404.html",
+        title: "ページが見つかりません | musubo",
+        description:
+          "お探しのページは見つかりませんでした。URLが変わったか、削除された可能性があります。musuboのトップページから、できること・はじめ方・料金・よくある質問をご覧いただけます。",
+        body: notFoundBody(),
+        config: settings,
+        production,
+        noindex: true,
+      }),
+      styles,
+    ),
+  );
   // The CSP allows only same-origin stylesheets, so style="" attributes from the design
   // markup become generated classes appended to site.css.
   const cssFile = join(output, "assets", "site.css");
@@ -111,11 +143,11 @@ export async function build({
       );
   // Xserver subdomains live under the apex web root. Deny the alternate apex path.
   const hostGuard = production
-    ? ""
+    ? `RewriteEngine On\nRewriteCond %{HTTPS} !on\nRewriteRule ^ ${settings.origin}%{REQUEST_URI} [R=301,L]\n`
     : `RewriteEngine On\nRewriteCond %{HTTP_HOST} !^${previewHost}(?::80|:443)?$ [NC]\nRewriteRule ^ - [F,L]\nRewriteCond %{HTTPS} !on\nRewriteRule ^ ${settings.previewOrigin}%{REQUEST_URI} [R=301,L]\n`;
   await writeFile(
     join(output, ".htaccess"),
-    `${hostGuard}Options -Indexes\nDirectoryIndex index.html\n<IfModule mod_headers.c>\n Header always set X-Content-Type-Options "nosniff"\n Header always set Referrer-Policy "strict-origin-when-cross-origin"\n Header always set X-Frame-Options "DENY"\n Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"\n${production ? "" : ' Header always set X-Robots-Tag "noindex, nofollow"\n'} Header always set Cache-Control "no-cache"\n</IfModule>\n`,
+    `${hostGuard}Options -Indexes\nDirectoryIndex index.html\nErrorDocument 404 /404.html\n<IfModule mod_headers.c>\n Header always set X-Content-Type-Options "nosniff"\n Header always set Referrer-Policy "strict-origin-when-cross-origin"\n Header always set X-Frame-Options "DENY"\n Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"\n${production ? "" : ' Header always set X-Robots-Tag "noindex, nofollow"\n'} Header always set Cache-Control "no-cache"\n</IfModule>\n`,
   );
   return { output, paths: pages.map((page) => page.path) };
 }

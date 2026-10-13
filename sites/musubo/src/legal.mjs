@@ -218,7 +218,7 @@ export function legalBody(kind, config, production) {
     },
   );
   const aside = toc.length
-    ? `<aside class="toc" aria-label="目次"><details open><summary>CONTENTS<span class="chev" aria-hidden="true"></span></summary><ol>${toc.join("")}</ol></details></aside>`
+    ? `<aside class="toc" aria-label="目次"><details><summary>CONTENTS<span class="chev" aria-hidden="true"></span></summary><ol>${toc.join("")}</ol></details></aside>`
     : "";
   const deco =
     '<svg class="hero-deco" aria-hidden="true" viewBox="0 0 1400 600" preserveAspectRatio="xMaxYMid slice" fill="none"><path d="M 1500 120 C 1300 160, 1240 420, 1040 430 S 820 300, 700 520" stroke="#F3D3B8" stroke-width="80" stroke-linecap="round" opacity=".7"/><path d="M 1500 380 C 1380 400, 1320 560, 1180 640" stroke="#8FD1AC" stroke-width="56" stroke-linecap="round" opacity=".45"/></svg>';

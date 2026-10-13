@@ -148,7 +148,7 @@
   /* ---------- Ribbon: one path woven through [data-rib] waypoints, drawn as you scroll ---------- */
   const page = $('page'), main = $('rbMain'), flow = $('rbFlow'), svg = $('ribbon'), grad = $('rbG');
   const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let L = 0, H = 0, samples = null, cur = 0;
+  let L = 0, H = 0, samples = null, cur = 0; // H: page height the samples were built for
 
   function build() {
     const W = page.clientWidth, h = page.scrollHeight;
@@ -183,31 +183,50 @@
     flow.setAttribute('stroke-width', Math.max(3, sw * 0.06));
     L = main.getTotalLength();
     main.style.strokeDasharray = `${L} ${L}`;
-    const N = 800;
-    samples = [];
-    for (let i = 0; i <= N; i++) { const len = (L * i) / N; samples.push({ len, y: main.getPointAtLength(len).y }); }
+    // ~1 sample per 40px is plenty for mapping scroll position to path length.
+    const N = Math.min(240, Math.max(60, Math.round(h / 40)));
+    samples = new Array(N + 1);
+    for (let i = 0; i <= N; i++) { const len = (L * i) / N; samples[i] = { len, y: main.getPointAtLength(len).y }; }
     H = h;
+    wake();
   }
 
+  // Rebuild at most once per frame, however many resize/font events arrive.
+  let buildQueued = false;
+  function scheduleBuild() {
+    if (buildQueued) return;
+    buildQueued = true;
+    requestAnimationFrame(() => { buildQueued = false; measure(); build(); });
+  }
+
+  // The draw-on animation only runs while the ribbon is catching up with the scroll position.
+  let running = false;
+  function targetLength() {
+    if (reduced) return L;
+    const targetY = -page.getBoundingClientRect().top + (window.innerHeight || 800) * 0.9;
+    let lo = 0, hi = samples.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (samples[mid].y >= targetY) hi = mid; else lo = mid + 1; }
+    return samples[lo].y >= targetY ? samples[lo].len : L;
+  }
   function tick() {
-    if (samples) {
-      if (Math.abs(page.scrollHeight - H) > 4) build();
-      const vh = window.innerHeight || 800;
-      const targetY = -page.getBoundingClientRect().top + vh * 0.9;
-      let target = L;
-      if (!reduced) {
-        const s = samples.find((p) => p.y >= targetY);
-        target = s ? s.len : L;
-      }
-      cur += (target - cur) * 0.06;
-      main.style.strokeDashoffset = L - cur;
-    }
+    if (!samples) { running = false; return; }
+    const target = targetLength();
+    cur += (target - cur) * 0.06;
+    if (Math.abs(target - cur) < 0.5) cur = target;
+    main.style.strokeDashoffset = L - cur;
+    if (cur === target) { running = false; return; }
+    requestAnimationFrame(tick);
+  }
+  function wake() {
+    if (running) return;
+    running = true;
     requestAnimationFrame(tick);
   }
 
   measure();
   build();
-  new ResizeObserver(() => { measure(); build(); }).observe(page);
-  if (document.fonts) document.fonts.ready.then(build);
-  requestAnimationFrame(tick);
+  new ResizeObserver(scheduleBuild).observe(page);
+  if (document.fonts) document.fonts.ready.then(scheduleBuild);
+  window.addEventListener('scroll', wake, { passive: true });
+  window.addEventListener('resize', wake, { passive: true });
 })();
