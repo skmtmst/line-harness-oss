@@ -607,22 +607,6 @@
   align-items: center;
   gap: 8px;
 }
-/* 「60 分あける」：文字のように見える数の欄（押すと直せる）。 */
-.toggleNum {
-  width: 4ch;
-  padding: 0;
-  border: 0;
-  border-bottom: 1px dashed var(--color-control-border);
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  text-align: right;
-}
-.toggleUnit {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  white-space: nowrap;
-}
 
 /* 絵 rfhIf「本文」：箱の中に 文 → 間24 → 差し込む・札・字数。 */
 .bodyBox {
@@ -689,7 +673,7 @@
   background: var(--color-canvas); color: var(--color-ink-faint);
 }
 .kwInput input { min-width: 0; flex: 1 1 0; border: 0; outline: 0; background: transparent; font-size: var(--text-label); }
-.kwInput[data-invalid], .bodyBox[data-invalid], .compositeField[data-invalid], .toggleNum[aria-invalid='true'] {
+.kwInput[data-invalid], .bodyBox[data-invalid], .compositeField[data-invalid] {
   outline: 1px solid var(--color-danger);
   outline-offset: -1px;
 }
@@ -761,6 +745,5 @@
 .starterSection { gap: var(--tpl-ar-starter-gap); }
 
 .kwInput:has([aria-invalid='true']) { outline-color: var(--color-danger); }
-.toggleNum[aria-invalid='true'] { outline: var(--tpl-bd-focus) solid var(--color-danger); }
 
 .stepTrigger .kindField { gap: var(--tpl-body-gap); }
