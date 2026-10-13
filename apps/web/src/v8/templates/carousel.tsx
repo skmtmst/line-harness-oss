@@ -1,6 +1,7 @@
 'use client'
 
 import Card, { CardHeader } from '@/components/shared/card'
+import { CreatePage } from '@/components/templates/create-page'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -387,11 +388,11 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
 
   if (host ? host.readOnly : !canMutate) {
     return (
-      <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
+      <SaveErrorScope errors={saveErrors}><CreatePage boardId="J60utH" title="カルーセル" help="カルーセルの作成・変更はオーナーと管理者だけができます" readOnly footerActions={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
         <></>
 
-      </TemplateEditFrame></SaveErrorScope>
+      </CreatePage></SaveErrorScope>
     )
   }
 

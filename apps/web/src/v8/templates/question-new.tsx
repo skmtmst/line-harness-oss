@@ -2,6 +2,7 @@
 
 
 import Card, { CardHeader } from '@/components/shared/card'
+import { CreatePage } from '@/components/templates/create-page'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
 import SegmentedControl from '@/components/shared/segmented'
@@ -243,10 +244,10 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
   if (host ? host.readOnly : !canMutate) {
     return (
-      <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="l87p1J" title="質問テンプレート" description="質問テンプレートの作成・変更はオーナーと管理者だけができます" side={null}>
+      <SaveErrorScope errors={saveErrors}><CreatePage boardId="l87p1J" title="質問テンプレート" help="質問テンプレートの作成・変更はオーナーと管理者だけができます" readOnly footerActions={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
         <></>
-      </TemplateEditFrame></SaveErrorScope>
+      </CreatePage></SaveErrorScope>
     )
   }
 
