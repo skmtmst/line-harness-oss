@@ -131,6 +131,23 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const explained = el.title || (el.getAttribute('aria-describedby') || '').split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())
       if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
     }
+    // A read-only sort description is still painted text. Control-only overlap
+    // scans miss it when a shrinking filter group spills over its neighbour.
+    for (const end of all('[data-template-region="toolbar"] [data-toolbar-trailing]')) {
+      const toolbar = end.closest('[data-template-region="toolbar"]')
+      const controls = [...toolbar.querySelectorAll('button,input,select,summary,a[href]')].filter(el => visible(el) && !end.contains(el))
+      const walker = document.createTreeWalker(end, 4)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const el = node.parentElement
+        if (!node.textContent.trim() || !visible(el) || el.closest('button,input,select,summary,a[href],svg')) continue
+        const range = document.createRange(); range.selectNodeContents(node)
+        if ([...range.getClientRects()].some(text => controls.some(control => {
+          const rect = control.getBoundingClientRect()
+          return Math.min(text.right, rect.right) - Math.max(text.left, rect.left) > 1
+            && Math.min(text.bottom, rect.bottom) - Math.max(text.top, rect.top) > 1
+        }))) add('F6', el, 'toolbar trailing text overlaps another control')
+      }
+    }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const cell of all('[data-list-action-cell]')) {
       const tools = [...cell.querySelectorAll('button,a[role="button"]')].filter(visible)

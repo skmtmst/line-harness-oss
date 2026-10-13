@@ -4,6 +4,21 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('Y14 detects static trailing text overlapping a filter and accepts separate rows and owned controls', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>section{width:1200px}#tools{position:relative;height:80px}button{position:absolute;left:0;top:0;width:80px;height:36px}#end{position:absolute;left:70px;top:6px;white-space:nowrap}</style><section data-page-template="list" data-list-skeleton><div id="tools" data-template-region="toolbar"><button>縦長</button><div id="end" data-toolbar-trailing><span>並び：作成が新しい順</span></div></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 1)
+    await page.locator('#end').evaluate(el => { el.style.left = '88px' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0)
+    await page.locator('#end').evaluate(el => { el.style.left = '70px'; el.style.top = '42px' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0, 'another row does not overlap')
+    await page.locator('#end').evaluate(el => { el.style.left = '200px'; el.style.top = '0'; el.innerHTML = '<button>並び：作成が新しい順</button>' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0, 'text inside its own button is not a separate tool')
+  } finally { await browser.close() }
+})
+
 test('X8 detects open explanation controls without a matching body in their page scope', async () => {
   const browser = await chromium.launch()
   try {

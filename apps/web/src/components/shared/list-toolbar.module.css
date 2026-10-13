@@ -188,7 +188,7 @@
 .slotsEnd { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; min-width: 0; gap: var(--tpl-list-gap); }
 html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-width: max-content; max-width: none; flex: none; }
 
-.filterChoices, .filterWide { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.filterChoices, .filterWide { display: flex; flex: none; align-items: center; gap: var(--space-8); min-width: 0; }
 .filterNarrow { display: none; }
 
 
