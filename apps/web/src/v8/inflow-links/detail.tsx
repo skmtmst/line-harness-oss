@@ -1,4 +1,5 @@
 'use client'
+import PageSizeSelect from '@/components/shared/page-size-select'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RowNameLink } from '@/components/shared/table'
@@ -87,7 +88,6 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -634,13 +634,7 @@ function InflowDetailContent() {
               /></SaveErrorField>
             </div>
             <div className={styles.sizeBox}>
-              <SaveErrorField names={["friendPageSize","friend_page_size"]}><Select
-                aria-label="表示件数"
-                size="page-size"
-                value={String(friendPageSize)}
-                options={PAGE_SIZE_OPTIONS}
-                onChange={(value) => { setFriendPageSize(Number(value)); setFriendPage(1) }}
-              /></SaveErrorField>
+              <SaveErrorField names={["friendPageSize","friend_page_size"]}><PageSizeSelect label={null} value={friendPageSize} onChange={(value) => { setFriendPageSize(value); setFriendPage(1) }} /></SaveErrorField>
             </div>
           </div>
           {friendsState === 'error' ? (

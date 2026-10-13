@@ -19,6 +19,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
+import { PageFrame } from '@/components/templates/page-frame'
 import { useOpsReadOnly } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError, Field } from '@/components/shared/form-controls'
@@ -355,7 +356,7 @@ export default function OpsSupportV8() {
 
 
   return (
-    <div data-design-node="P0jhqO">
+    <PageFrame kind="list" boardId="P0jhqO" standalone skeleton>
       <OpsHead
         title="お問い合わせ"
         description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
@@ -578,7 +579,7 @@ export default function OpsSupportV8() {
           </div>
         </Dialog>
       ) : null}
-    </div>
+    </PageFrame>
   )
 }
 

@@ -26,6 +26,8 @@ import ImageFrame from '@/components/shared/image-frame'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /*
  * ★V8 統括のお問い合わせ（Pencil `b8xBtZ`。運営の LINE を登録する窓を開いた状態が `D6fh3`）。
@@ -219,7 +221,7 @@ export default function HqSupportV8() {
           }}
         >
           <div className={styles.pair}>
-            <Field label="種類" htmlFor={`${uid}-kind`}>
+            <Field label="種類" htmlFor={`${uid}-kind`} required>
               <SaveErrorField names={["kind","input.kind"]}><Select
                 aria-label="種類"
                 id={`${uid}-kind`}
@@ -244,7 +246,7 @@ export default function HqSupportV8() {
             </Field>
           </div>
 
-          <Field label="件名" htmlFor={`${uid}-subject`} tone="large">
+          <Field label="件名" htmlFor={`${uid}-subject`} tone="large" required>
             <SaveErrorField names={["subject","input.subject"]}><TextField
               id={`${uid}-subject`}
               value={input.subject}
@@ -256,7 +258,7 @@ export default function HqSupportV8() {
             /></SaveErrorField>
           </Field>
 
-          <Field label="本文" htmlFor={`${uid}-body`}>
+          <Field label="本文" htmlFor={`${uid}-body`} required>
             <SaveErrorField names={["body","input.body"]}><TextArea
               id={`${uid}-body`}
               value={input.body}
@@ -310,8 +312,8 @@ export default function HqSupportV8() {
 
           <div className={styles.actions}>
             <Button onClick={clear} disabled={sending}>内容をクリア</Button>
-            <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)} busy={sending} busyLabel="送信中…">
-              <Plus aria-hidden="true" className={styles.buttonIcon} />送信
+            <Button variant="primary" title={sending ? '送信しています' : blocked || undefined} onClick={() => void send()} disabled={sending || Boolean(blocked)} busy={sending} busyLabel="送信中…">
+              <Plus aria-hidden="true" className={styles.buttonIcon} />送信する
             </Button>
           </div>
         </form>
@@ -328,31 +330,31 @@ export default function HqSupportV8() {
           ) : history.length === 0 ? (
             <p className={styles.empty}>まだ問い合わせはありません。</p>
           ) : (
-            <div className={styles.table} role="table" aria-label="これまでの問い合わせ">
-              <div className={styles.head} role="row">
-                <span role="columnheader">受付番号</span>
-                <span role="columnheader">件名</span>
-                <span role="columnheader">種類</span>
-                <span role="columnheader">状態</span>
-                <span role="columnheader">更新</span>
-              </div>
+            <GridTable label="これまでの問い合わせ" design={{ columns: 'var(--tpl-hq-col-ticket) minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-ticket)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
+              <GridHeadRow>
+                <GridCell role="columnheader">受付番号</GridCell>
+                <GridCell role="columnheader">件名</GridCell>
+                <GridCell role="columnheader">種類</GridCell>
+                <GridCell role="columnheader">状態</GridCell>
+                <GridCell role="columnheader">更新</GridCell>
+              </GridHeadRow>
               {history.slice(0, 10).map((item) => (
-                <div key={item.id} className={styles.row} role="row">
-                  <span role="cell">{item.ticketLabel ?? emptyValue('unknown')}</span>
-                  <span role="cell" className={styles.subjectCell}>
-                    <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className={styles.subject} title={item.subject}>{item.subject}</Link>
+                <GridRow key={item.id}>
+                  <GridCell>{item.ticketLabel ?? emptyValue('unknown')}</GridCell>
+                  <GridCell className={styles.subjectCell}>
+                    <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`}><TruncatedText value={item.subject} /></Link>
                     {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
                       <span className={styles.replyNote}>運営からの返信 {item.replies.length} 件・開いて続きを送れます</span>
                     ) : null}
-                  </span>
-                  <span role="cell" className={styles.cell} title={item.kindLabel}>{supportKindWord(item.kind, item.kindLabel)}</span>
-                  <span role="cell">
+                  </GridCell>
+                  <GridCell>{supportKindWord(item.kind, item.kindLabel)}</GridCell>
+                  <GridCell>
                     <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>
-                  </span>
-                  <span role="cell">{supportTime(item.createdAt)}</span>
-                </div>
+                  </GridCell>
+                  <GridCell><span className={styles.shortText}>{supportTime(item.createdAt)}</span></GridCell>
+                </GridRow>
               ))}
-            </div>
+            </GridTable>
           )}
         </section>
       </div>
@@ -360,6 +362,6 @@ export default function HqSupportV8() {
   )
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; tone?: 'large'; children: ReactNode }) {
-  return <SharedField label={label} htmlFor={htmlFor}>{children}</SharedField>
+function Field({ label, htmlFor, children, required }: { label: string; htmlFor: string; tone?: 'large'; children: ReactNode; required?: boolean }) {
+  return <SharedField label={label} htmlFor={htmlFor} required={required}>{children}</SharedField>
 }

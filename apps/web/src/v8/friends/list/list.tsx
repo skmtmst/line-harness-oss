@@ -1,10 +1,10 @@
 'use client'
+import PageSizeSelect from '@/components/shared/page-size-select'
 
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
-import { FolderDotName } from '@/components/shared/folder-dot';
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
@@ -684,15 +684,13 @@ export default function FriendsListV8() {
         <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" width={147} value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
           options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
-        <button
-          type="button"
-          aria-pressed={advanced !== null}
-          onClick={() => setAdvancedOpen(true)}
-          className={advanced ? `${styles.textButton} ${styles.textButtonOn}` : styles.textButton}
+        <FilterChip
+          selected={advanced !== null}
+          onChange={() => setAdvancedOpen(true)}
         >
           <SlidersHorizontal size={16} aria-hidden="true" />
           詳細条件
-        </button>
+        </FilterChip>
         <span className={styles.spacer} />
         {savedSearchEnabled ? (
           <Button type="button" variant="secondary" onClick={() => setSavedOpen(true)}>
@@ -721,13 +719,7 @@ export default function FriendsListV8() {
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
-        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
-          aria-label="表示件数"
-          size="page-size"
-          value={String(pageSize)}
-          onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
-          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
-        /></SaveErrorField>
+        <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
           aria-label="並び順"
           treatment="text"
@@ -828,7 +820,7 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <FolderDotName><RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink></FolderDotName>
+                  <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
                 </Td>
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (

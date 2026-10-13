@@ -248,6 +248,7 @@
   white-space: nowrap;
 }
 
+.shortText { white-space: nowrap; }
 .amount {
   padding-right: var(--tpl-hq-action-pad);
   text-align: right;

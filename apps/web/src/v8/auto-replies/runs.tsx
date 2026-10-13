@@ -1,4 +1,9 @@
 'use client'
+import Card from '@/components/shared/card'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import { DashboardColumns } from '@/components/templates/dashboard-page'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 
 import { jstMonthStart, jstDateOffset } from '@/lib/jst-datetime'
 
@@ -28,7 +33,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import DateField from '@/components/shared/date-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
 import { api, ApiError } from '@/lib/api';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
@@ -39,7 +44,6 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
 import Notice from '@/components/shared/notice'
 import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
@@ -141,7 +145,6 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
   return null
 }
 
-const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 届いた言葉は「」で囲んで1行。 */
 function quoted(text: string | null): string {
@@ -466,9 +469,9 @@ export default function AutoReplyRunsV8() {
           ) : null} </>} >止まった行の理由を確認してください。「要確認」の行は届いたか分からないため、送り直しません。</Notice>
       ) : null}
 
-      <section className={styles.card} aria-label="実行の記録">
-        <div className={styles.tools}>
-          <div className={styles.searchBox}>
+      <Card padding="none" aria-label="実行の記録">
+        <ListToolbarFrame><ListToolbarRow>
+
             <SearchField
               placeholder="友だち・言葉で探す"
               aria-label="友だち・言葉で探す"
@@ -476,33 +479,27 @@ export default function AutoReplyRunsV8() {
               onChange={(value) => setSearch(value)}
               onClear={() => setSearch('')}
             />
-          </div>
+
           <SegmentedControl aria-label="結果で絞り込む" value={filter} onChange={setFilter} options={chips.map(chip=>({value:chip.key,label:chipCounts[chip.key]==null?chip.label:`${chip.label} ${formatNumber(chipCounts[chip.key]!)}`}))} />
-          <span className={styles.toolsSpacer} aria-hidden="true" />
+
           {period === 'custom' ? (
             <>
               <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" /></SaveErrorField>
               <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" /></SaveErrorField>
             </>
           ) : null}
-          <div className={styles.periodBox}>
+
             <SaveErrorField names={["period"]}><Select
               aria-label="期間"
               value={period}
               onChange={(value) => { setPeriod(value as PeriodKey); setPage(1) }}
               options={PERIOD_OPTIONS}
             /></SaveErrorField>
-          </div>
-          <div className={styles.sizeBox}>
-            <SaveErrorField names={["pageSize","limit","page_size"]}><Select
-              aria-label="1ページに出す件数"
-              size="page-size"
-              value={String(pageSize)}
-              onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
-              options={PAGE_SIZE_OPTIONS}
-            /></SaveErrorField>
-          </div>
-        </div>
+
+
+            <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} /></SaveErrorField>
+
+        </ListToolbarRow></ListToolbarFrame>
 
         {loading ? (
           <ListState kind="loading" />
@@ -513,15 +510,15 @@ export default function AutoReplyRunsV8() {
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" title="条件に合う記録はありません" description="絞り込みや検索の条件を変えてみてください。" />
         ) : (
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+              <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colWhen}>日時</Th>
                 <Th className={styles.colFriend}>友だち</Th>
                 <Th className={styles.colInput}>届いた言葉</Th>
                 <Th className={styles.colResult}>結果</Th>
-                <Th className={styles.colDone}>行ったこと</Th>
-                <Th className={styles.colTime}>時間</Th>
+                <Th grow className={styles.colDone}>行ったこと</Th>
+                <Th collapseAt="narrow" className={styles.colTime}>時間</Th>
                 <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
@@ -533,7 +530,7 @@ export default function AutoReplyRunsV8() {
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
+                  <Tr key={item.id} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>
@@ -549,22 +546,22 @@ export default function AutoReplyRunsV8() {
                       <span className={styles.input} title={`${quoted(item.inputPreview)}（きっかけ：${item.triggerLabel}）`}>{quoted(item.inputPreview)}</span>
                     </Td>
                     <Td className={styles.colResult}>{isDeliveryUnconfirmed(item) ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>}</Td>
-                    <Td className={styles.colDone}><span className={styles.done} title={done}>{done}</span></Td>
-                    <Td className={styles.colTime}>
+                    <Td grow className={styles.colDone}><TruncatedText value={done} /></Td>
+                    <Td collapseAt="narrow" className={styles.colTime}>
                       <span className={styles.time}>{item.durationMs === null ? emptyValue('unknown') : `${(item.durationMs / 1000).toFixed(1)}秒`}</span>
                     </Td>
-                    <Td className={styles.colMenu}>
+                    <ActionCell>
                       {menuItems.length > 0 ? (
                         <div className={styles.menuBox}>
                           <RowMenu
-                            label={`${name}さんの記録の操作`}
+                            size="row" label={`${name}さんの記録の操作`}
                             items={menuItems}
                             open={menuId === item.id}
                             onOpenChange={(next) => setMenuId(next ? item.id : null)}
                           />
                         </div>
                       ) : null}
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -582,48 +579,18 @@ export default function AutoReplyRunsV8() {
             />
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <div className={styles.bottom}>
-        <section className={styles.box} aria-label="言葉ごとの当たった回数">
-          <h2 className={styles.boxTitle}>言葉ごとの当たった回数</h2>
-          {loading ? (
-            <ListState kind="loading" />
-          ) : !data || data.triggerBreakdown.length === 0 ? (
-            <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、きっかけごとの件数が分かります。" />
-          ) : (
-            <dl className={styles.kv}>
-              {data.triggerBreakdown.map((item) => (
-                <div className={styles.kvRow} key={item.trigger}>
-                  <dt>{item.trigger}</dt>
-                  <dd>{`${formatNumber(item.count)} 回${item.share === null ? '' : `（${(item.share * 100).toFixed(1)}%）`}`}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </section>
-
-        <section className={styles.box} aria-label="担当者への引き継ぎ">
-          <h2 className={styles.boxTitle}>担当者への引き継ぎ</h2>
-          <dl className={styles.kv}>
-            <div className={styles.kvRow}>
-              <dt>確認待ち</dt>
-              <dd className={data && data.handovers.waiting > 0 ? styles.kvWarn : undefined}>{data ? `${formatNumber(data.handovers.waiting)}件` : emptyValue('unknown')}</dd>
-            </div>
-            <div className={styles.kvRow}>
-              <dt>対応中</dt>
-              <dd>{data ? `${formatNumber(data.handovers.inProgress)}件` : emptyValue('unknown')}</dd>
-            </div>
-            <div className={styles.kvRow}>
-              <dt>完了</dt>
-              <dd>{data ? `${formatNumber(data.handovers.completed)}件` : emptyValue('unknown')}</dd>
-            </div>
-          </dl>
-          <div className={styles.boxFoot}>
-            <Button variant="text" href="/chats">受信箱で見る</Button>
-          </div>
-        </section>
-      </div>
+      <DashboardColumns layout="cards">{[
+        <CreateSummaryCard key="triggers" title="言葉ごとの当たった回数" variant="record" rows={data ? data.triggerBreakdown.map(item => ({ key: item.trigger, label: item.trigger, value: `${formatNumber(item.count)} 回${item.share === null ? '' : `（${(item.share * 100).toFixed(1)}%）`}` })) : []}>
+          {loading ? <ListState kind="loading" /> : !data || data.triggerBreakdown.length === 0 ? <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、きっかけごとの件数が分かります。" /> : null}
+        </CreateSummaryCard>,
+        <CreateSummaryCard key="handovers" title="担当者への引き継ぎ" variant="record" rows={[
+          { label: '確認待ち', value: data ? `${formatNumber(data.handovers.waiting)}件` : emptyValue('unknown') },
+          { label: '対応中', value: data ? `${formatNumber(data.handovers.inProgress)}件` : emptyValue('unknown') },
+          { label: '完了', value: data ? `${formatNumber(data.handovers.completed)}件` : emptyValue('unknown') },
+        ]}><Button variant="text" href="/chats">受信箱で見る</Button></CreateSummaryCard>
+      ]}</DashboardColumns>
 
       {actionMessage ? <p className={styles.hint} role="status">{actionMessage}</p> : null}
 

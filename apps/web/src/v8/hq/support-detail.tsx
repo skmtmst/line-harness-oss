@@ -8,6 +8,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
@@ -249,7 +250,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
 <div className={styles.composeRow}>
                   <span className={styles.spacer} />
                   <span className={styles.sendNote}>{blocked && body ? <span className={styles.warn}>{blocked}</span> : SEND_NOTE}</span>
-                  <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
+                  <Button variant="primary" title={sending ? '送信しています' : blocked || (!detail ? 'お問い合わせを読み込んでいます' : undefined)} onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
                     <Send aria-hidden="true" className={styles.buttonIcon} />送る
                   </Button>
                 </div>
@@ -269,31 +270,13 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
             </p>
           </section>
 
-          <section className={styles.history} aria-label="これまでの問い合わせ">
-            <h2 className={styles.historyTitle}>これまでの問い合わせ</h2>
-            {history === null ? (
-              <DetailLoading />
-            ) : !Array.isArray(history) ? (
-              <p className={styles.historyEmpty}>これまでの問い合わせを読み込めませんでした。</p>
-            ) : history.length === 0 ? (
-              <p className={styles.historyEmpty}>まだ問い合わせはありません。</p>
-            ) : (
-              <ul className={styles.historyList}>
-                {history.slice(0, 10).map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`}
-                      aria-current={item.id === id ? 'page' : undefined}
-                      className={item.id === id ? `${styles.historyRow} ${styles.historyRowCurrent}` : styles.historyRow}
-                    >
-                      <span className={styles.historyName} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</span>
-                      <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <CreateSummaryCard title="これまでの問い合わせ" variant="record" rows={Array.isArray(history) ? history.slice(0, 10).map(item => ({
+            key: item.id,
+            label: <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} aria-current={item.id === id ? 'page' : undefined} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</Link>,
+            value: <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>,
+          })) : []}>
+            {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
+          </CreateSummaryCard>
         </aside>
       </div>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの続き" onConfirm={confirmLeave} onCancel={cancelLeave} />

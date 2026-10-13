@@ -1,4 +1,10 @@
 'use client'
+import TruncatedText from '@/components/shared/truncated-text'
+import Card from '@/components/shared/card'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import { DashboardColumns } from '@/components/templates/dashboard-page'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -29,7 +35,7 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
 import { useAccount } from '@/contexts/account-context';
 import { api, type FriendAddRunList } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
@@ -41,7 +47,6 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
 import Notice from '@/components/shared/notice'
 
 /*
@@ -67,7 +72,6 @@ const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
 /** CSV 書き出しの安全弁（今までと同じ：100件×50頁＝5,000件で止める）。 */
 const CSV_EXPORT_MAX_PAGES = 50
 const CSV_EXPORT_PAGE_SIZE = 100
-const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 const NO_MANAGE_NOTE = '閲覧のみで見ています。一時停止・もう一度実行はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
 
 function routeNameOf(item: RunItem): string {
@@ -493,9 +497,9 @@ function FriendAddRunsInner() {
           ) : null} </>} >案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</Notice>
       ) : null}
 
-      <section className={styles.card} aria-label="実行の記録">
-        <div className={styles.tools} role="group" aria-label="実行結果の絞り込み">
-          <div className={styles.searchBox}>
+      <Card padding="none" aria-label="実行の記録">
+        <ListToolbarFrame role="group" aria-label="実行結果の絞り込み"><ListToolbarRow>
+
             <SearchField
               placeholder="友だち・経路で探す"
               aria-label="友だち・経路で探す"
@@ -503,19 +507,13 @@ function FriendAddRunsInner() {
               onChange={(value) => setSearch(value)}
               onClear={() => setSearch('')}
             />
-          </div>
+
           <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
-          <span className={styles.toolsSpacer} aria-hidden="true" />
-          <div className={styles.sizeBox}>
-            <SaveErrorField names={["perPage","limit","per_page"]}><Select
-              aria-label="1ページに出す件数"
-              size="page-size"
-              value={String(perPage)}
-              onChange={(value) => { setPerPage(Number(value)); resetCursor() }}
-              options={PAGE_SIZE_OPTIONS}
-            /></SaveErrorField>
-          </div>
-        </div>
+
+
+            <SaveErrorField names={["perPage","limit","per_page"]}><PageSizeSelect label={null} value={perPage} onChange={(value) => { setPerPage(value); resetCursor() }} /></SaveErrorField>
+
+        </ListToolbarRow></ListToolbarFrame>
 
         {accountLoading || loading ? (
           <ListState kind="loading" />
@@ -529,15 +527,15 @@ function FriendAddRunsInner() {
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" title="条件に合う実行結果はありません" description="絞り込みを変えるか、次の友だち追加を待ってください。" />
         ) : (
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+              <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colWhen}>日時</Th>
                 <Th className={styles.colFriend}>友だち</Th>
                 <Th className={styles.colRoute}>来た経路</Th>
                 <Th className={styles.colResult}>結果</Th>
-                <Th className={styles.colDone}>行ったこと</Th>
-                <Th className={styles.colTime}>時間</Th>
+                <Th grow className={styles.colDone}>行ったこと</Th>
+                <Th collapseAt="narrow" className={styles.colTime}>時間</Th>
                 <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
@@ -549,7 +547,7 @@ function FriendAddRunsInner() {
                 const done = actionText(item)
                 const kindLabel = item.friendKind === 'first_time' ? 'はじめて' : '再追加'
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)} className={styles.when}>{jstTime(item.receivedAt)}</time>
                     </Td>
@@ -559,18 +557,18 @@ function FriendAddRunsInner() {
                     </Td>
                     <Td className={styles.colRoute}><span className={styles.route} title={route}>{route}</span></Td>
                     <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
-                    <Td className={styles.colDone}><span className={styles.done} title={done}>{done}</span></Td>
-                    <Td className={styles.colTime}><span className={styles.time}>{elapsedText(item.receivedAt, item.processedAt)}</span></Td>
-                    <Td className={styles.colMenu}>
+                    <Td grow className={styles.colDone}><TruncatedText value={done} /></Td>
+                    <Td collapseAt="narrow" className={styles.colTime}><span className={styles.time}>{elapsedText(item.receivedAt, item.processedAt)}</span></Td>
+                    <ActionCell>
                       <div className={styles.menuBox}>
                         <RowMenu
-                          label={`${name}さんの記録の操作`}
+                          size="row" label={`${name}さんの記録の操作`}
                           items={rowMenuItems(item)}
                           open={menuId === item.id}
                           onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -588,46 +586,18 @@ function FriendAddRunsInner() {
             />
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <div className={styles.bottom}>
-        <section className={styles.box} aria-label="経路ごとの内訳">
-          <h2 className={styles.boxTitle}>経路ごとの内訳</h2>
-          {routeBreakdown.length === 0 ? (
-            <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、経路ごとの人数が分かります。" />
-          ) : (
-            <dl className={styles.kv}>
-              {routeBreakdown.map(([route, count]) => (
-                <div className={styles.kvRow} key={route}>
-                  <dt>{route}</dt>
-                  <dd>{`${formatNumber(count)} 人（${Math.round((count / items.length) * 100)}%）`}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </section>
-
-        <section className={styles.box} aria-label="二重送信を防ぐ・知らせ">
-          <h2 className={styles.boxTitle}>二重送信を防ぐ・知らせ</h2>
-          <dl className={styles.kv}>
-            <div className={styles.kvRow}>
-              <dt>二重送信を防ぐ</dt>
-              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
-            </div>
-            <div className={styles.kvRow}>
-              <dt>失敗の知らせ</dt>
-              <dd>{emptyValue('unknown')}</dd>
-            </div>
-            <div className={styles.kvRow}>
-              <dt>最後に送った</dt>
-              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : emptyValue('unknown')}</dd>
-            </div>
-          </dl>
-          <div className={styles.boxFoot}>
-            <Button variant="text" href="/inflow-links">流入リンクを見る</Button>
-          </div>
-        </section>
-      </div>
+      <DashboardColumns layout="cards">{[
+        <CreateSummaryCard key="routes" title="経路ごとの内訳" variant="record" rows={routeBreakdown.map(([route, count]) => ({ key: route, label: route, value: `${formatNumber(count)} 人（${Math.round((count / items.length) * 100)}%）` }))}>
+          {routeBreakdown.length === 0 ? <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、経路ごとの人数が分かります。" /> : null}
+        </CreateSummaryCard>,
+        <CreateSummaryCard key="suppression" title="二重送信を防ぐ・知らせ" variant="record" rows={[
+          { label: '二重送信を防ぐ', value: !ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効' },
+          { label: '失敗の知らせ', value: emptyValue('unknown') },
+          { label: '最後に送った', value: <span title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : emptyValue('unknown')}</span> },
+        ]}><Button variant="text" href="/inflow-links">流入リンクを見る</Button></CreateSummaryCard>
+      ]}</DashboardColumns>
 
       {message ? <p className={styles.hint} role="status">{message}</p> : null}
 

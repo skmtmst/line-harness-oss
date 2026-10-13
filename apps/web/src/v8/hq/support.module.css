@@ -157,6 +157,7 @@
   font-size: var(--text-caption);
 }
 
+.shortText { white-space: nowrap; }
 .table {
   display: flex;
   flex-direction: column;
