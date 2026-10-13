@@ -201,7 +201,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
       actions={(
           <>
             <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void takeIn()} disabled={!file || !projectId || loading || uploading} busy={uploading} busyLabel="取り込み中…">
+            <Button variant="primary" onClick={() => void takeIn()} disabled={!file || !projectId || loading || uploading} title={loading ? 'プロジェクトを読み込んでいます。' : !projectId ? '入れるプロジェクトを選んでください。' : !file ? '取り込む画像を選んでください。' : undefined} busy={uploading} busyLabel="取り込み中…">
               <Upload aria-hidden="true" className={styles.icon} />取り込む
             </Button>
         </>
