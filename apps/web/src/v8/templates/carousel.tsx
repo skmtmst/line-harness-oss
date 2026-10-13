@@ -576,7 +576,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   const setAction = (patch: Partial<typeof action>) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === ai ? { ...a, ...patch } : a)) })
                   return (
                     <div key={ai} className={own.buttonBlock}>
-                    <div className={own.buttonRow} {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
+                    <SettingsFormRow layout="columns" {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
                       <SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField>
                       <div className={own.colTap}>
                       <SaveErrorField names={["action"]}><TapActionField
@@ -609,7 +609,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                           <Trash2 className={own.icon} aria-hidden="true" />
                         </button>
                       ) : null}
-                    </div>
+                    </SettingsFormRow>
                     <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
                     </div>
                   )

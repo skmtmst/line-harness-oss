@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { PageFrame, PageHeading, PageFooter, type PageHeadingProps } from './page-frame'
+import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
+import { PageFooter } from './page-footer'
 import { ListPageBody } from './list-page'
 
 /** 配布の板：題、数の帯、選ぶ道具、表、確認・実行の順。 */

@@ -1290,10 +1290,10 @@ function MessagesStageV8({
                     {stepShortTiming(step, settings.deliveryMode)}
                   </button>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
+                  <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, -1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
                     <ArrowUp size={15} aria-hidden="true" />前へ
                   </Button>
-                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
+                  <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, 1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
                     <ArrowDown size={15} aria-hidden="true" />後ろへ
                   </Button>
                   <Button type="button" variant="text" disabled={settings.steps.length <= 1} onClick={() => removeStep(step.stableStepId)}>

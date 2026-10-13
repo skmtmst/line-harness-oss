@@ -572,7 +572,8 @@
             "GridTable",
             "GridHeadRow",
             "GridRow",
-            "GridCell"
+            "GridCell",
+            "PersonCell"
           ],
           "vars": [
             "--color-table-head",

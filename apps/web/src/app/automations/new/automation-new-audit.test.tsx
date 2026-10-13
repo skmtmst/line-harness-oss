@@ -353,6 +353,8 @@ describe('R486・R487・R489: 共通アクションの版と公開の照合', ()
     await activateRule(el)
     expect(mockPublish).not.toHaveBeenCalled()
     expect(el.textContent).toContain('ほかの人が先にこのルールを保存しました')
+    expect(el.querySelector('[data-template-region="notice"] [data-save-conflict]')).not.toBeNull()
+    expect(el.querySelector('[data-template-region="heading"] [data-save-conflict]')).toBeNull()
     // 自分の入力は消えず、相手の保存も消えない（双方保持）。
     expect((el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement).value).toBe('動かすルール')
   })

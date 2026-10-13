@@ -20,6 +20,8 @@ import VersionCompare from '@/components/shared/version-compare'
 import { TextField, TextArea } from '@/components/shared/text-field';
 import { startChecklist } from './start-checklist';
 import styles from './detail.module.css'
+import IconButton from '@/components/shared/icon-button'
+import { reorderMoveReason } from '@/components/shared/reorder-handle'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -2560,30 +2562,32 @@ export default function ScenarioDetailV8({
                       <span className={styles.kindChip}>{kindLabel}</span>
                       {canEdit ? (
                         <span className={styles.stepOps}>
-                          <button
+                          <IconButton
                             type="button"
-                            className={styles.iconButton}
+                            size="row"
                             aria-label={`${step.stepOrder} 通目を上へ`}
                             disabled={index === 0}
+                            title={reorderMoveReason(index, sortedSteps.length, -1) ?? undefined}
                             onClick={(e) => {
                               e.stopPropagation()
                               void handleMoveStep(step.id, 'up')
                             }}
                           >
                             <ArrowUp aria-hidden />
-                          </button>
-                          <button
+                          </IconButton>
+                          <IconButton
                             type="button"
-                            className={styles.iconButton}
+                            size="row"
                             aria-label={`${step.stepOrder} 通目を下へ`}
                             disabled={index === sortedSteps.length - 1}
+                            title={reorderMoveReason(index, sortedSteps.length, 1) ?? undefined}
                             onClick={(e) => {
                               e.stopPropagation()
                               void handleMoveStep(step.id, 'down')
                             }}
                           >
                             <ArrowDown aria-hidden />
-                          </button>
+                          </IconButton>
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               appearance="plain"

@@ -134,9 +134,12 @@ describe('権限を変える確認（板 M4jS9）', () => {
   it('変える前に変更前→変更後を見せてから保存口へ送る', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
     await flush()
-    const change = host.querySelector('button[aria-label="佐藤 直人さんの権限を変更"]')
+    const change = host.querySelector('button[aria-label="佐藤 直人のその他操作"]')
     expect(change, '権限を変更ボタンがない').not.toBeNull()
     await act(async () => { (change as HTMLButtonElement).click() })
+    await flush()
+    const editAction = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(item => item.textContent?.trim() === '権限を変更する')!
+    await act(async () => { editAction.click() })
     await flush()
     // 役割を管理者から閲覧のみへ変える。
     const role = document.body.querySelector('select[aria-label="役割"]') as HTMLSelectElement | null
@@ -166,8 +169,11 @@ describe('権限を変える確認（板 M4jS9）', () => {
   it('変更の窓に最初に表示するアカウントが出て保存口へ送る（板 BHEl9）', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
     await flush()
-    const change = host.querySelector('button[aria-label="佐藤 直人さんの権限を変更"]')
+    const change = host.querySelector('button[aria-label="佐藤 直人のその他操作"]')
     await act(async () => { (change as HTMLButtonElement).click() })
+    await flush()
+    const editAction = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(item => item.textContent?.trim() === '権限を変更する')!
+    await act(async () => { editAction.click() })
     await flush()
     const edit = document.body.querySelector('[data-design-node="BHEl9"]')
     expect(edit, '変更の窓に目印がない').not.toBeNull()
