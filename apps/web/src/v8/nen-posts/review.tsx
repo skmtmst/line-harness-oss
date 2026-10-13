@@ -22,6 +22,7 @@ import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { ListPage } from '@/components/templates'
+import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
@@ -866,7 +867,7 @@ function ReviewListV8(props: ReviewListV8Props) {
   )
 
   return (
-    <div className={styles.body}>
+    <PageContent>
       {showRail ? (
         <div className={styles.reviewGrid}>
           {leftColumn}
@@ -899,8 +900,7 @@ function ReviewListV8(props: ReviewListV8Props) {
       ) : leftColumn}
 
       {status === 'pending' && canEdit ? (
-        <div className={styles.bulkRow}>
-          <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
+        <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
             <Button variant="secondary" disabled={props.bulkReviewing} onClick={props.onBulkReturn}>
               まとめて見送り
             </Button>
@@ -915,10 +915,9 @@ function ReviewListV8(props: ReviewListV8Props) {
               <Check size={15} aria-hidden="true" />まとめて採用
             </Button>
             <IconButton aria-label="選ぶのをやめる" title="選ぶのをやめる" onClick={props.onClearSelection}><X size={16} aria-hidden="true" /></IconButton>
-          </BulkBar>
-        </div>
+        </BulkBar>
       ) : null}
-    </div>
+    </PageContent>
   )
 }
 

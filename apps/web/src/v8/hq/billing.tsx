@@ -337,7 +337,7 @@ function BillingInner() {
         ) : invoices === null || invoices.length === 0 ? (
           <p className={styles.empty}>まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>
         ) : (
-          <DataTable label="支払い履歴" grid={{
+          <DataTable label="支払い履歴" columnSizing="content" grid={{
             columns: 'var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-hq-col-paystate) var(--tpl-hq-col-receipt)',
             padding: 'var(--tpl-hq-pay-row-pad)',
             headPadding: 'var(--tpl-hq-head-pad)',
@@ -347,7 +347,7 @@ function BillingInner() {
           }}>
             <thead><TableHeadRow>
               <Th>日付</Th>
-              <Th>内容</Th>
+              <Th grow>内容</Th>
               <Th align="right">金額</Th>
               <Th>状態</Th>
               <Th>領収書</Th>
@@ -355,7 +355,7 @@ function BillingInner() {
             <tbody>{invoices.map((inv) => (
               <Tr key={inv.id}>
                 <Td>{invoiceDate(inv.createdAt)}</Td>
-                <Td><TruncatedText value={inv.description ?? inv.number ?? emptyValue('unknown')} /></Td>
+                <Td grow><TruncatedText value={inv.description ?? inv.number ?? emptyValue('unknown')} /></Td>
                 <Td align="right">{yen(inv.amountYen)}</Td>
                 <Td>
                   <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</span>

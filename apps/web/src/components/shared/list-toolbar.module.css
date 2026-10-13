@@ -225,7 +225,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
   :root .slots .leading,
   :root .slotsRow > .leading { display: inline-flex; gap: var(--tpl-toolbar-gap); order: 0; }
   :root .rowBreak { display: block; flex-basis: 100%; height: 0; order: 1; }
-  :root .slotTool { display: flex; align-items: center; min-width: 0; order: 2; }
+  :root .slotTool { display: flex; align-items: center; align-self: flex-start; min-width: 0; order: 2; }
   :root .slotTool[data-toolbar-role='search'] { order: 0; flex: 1 1 var(--tpl-list-search-min); }
   :root .slotTool[data-toolbar-role='sort'] { order: 3; margin-left: auto; align-self: flex-start; }
   :root .slotTool[data-toolbar-role='count'] { order: 4; margin-left: auto; align-self: flex-start; }
