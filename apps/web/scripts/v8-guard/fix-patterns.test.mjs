@@ -4,6 +4,22 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('X8 detects open explanation controls without a matching body in their page scope', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1)
+    await page.locator('button').evaluate(el => el.setAttribute('aria-expanded', 'false'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0, 'closed unmounted explanation is allowed')
+    await page.locator('button').evaluate(el => el.setAttribute('aria-expanded', 'true'))
+    await page.locator('section').evaluate(el => el.insertAdjacentHTML('beforeend', '<div data-screen-explanation id="body">元の説明</div>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.locator('[data-screen-explanation]').evaluate(el => el.outerHTML = '<section data-page-template="detail"><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header><div data-screen-explanation id="body">別の型の説明</div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1, 'another template body cannot satisfy the outer control')
+  } finally { await browser.close() }
+})
+
 test('X7 detects missing explanation controls even for closed bodies and keeps nested scopes separate', async () => {
   const browser = await chromium.launch()
   try {

@@ -42,6 +42,12 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
         add('F4', panel, 'screen explanation body is missing its heading control')
       }
     }
+    for (const toggle of explanationToggles) {
+      if (toggle.getAttribute('aria-expanded') === 'true'
+        && !explanationBodies.some(panel => panel.id && panel.id === toggle.getAttribute('aria-controls'))) {
+        add('F4', toggle, 'open screen explanation control is missing its scoped body')
+      }
+    }
     const body = root.querySelector('[data-list-folders]')
     const hasFolders = body ? body.dataset.listFolders === 'true' : !!root.querySelector('[data-template-region="folders"], [data-toolbar-leading] [aria-label="フォルダ"]')
     if (isList && !hasFolders) {
