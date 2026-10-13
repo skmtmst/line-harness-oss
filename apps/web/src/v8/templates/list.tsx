@@ -128,7 +128,7 @@ const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 /** 削除できない窓に並べる行の数（残りは「ほか N か所」）。 */
 const BLOCKED_ROWS_SHOWN = 2
 
-/** 種類を選ぶ窓（`R9XUMr`）の6枚のカード。行き先は今ある作る画面のまま。 */
+/** 作る種類と、それぞれの作成先。 */
 const KIND_CARDS: Array<{
   key: string
   title: string
@@ -1248,10 +1248,6 @@ export default function TemplatesListV8() {
   const overlays = (
     <>
       {savedMenu}
-      {/*
-        種類を選ぶ窓（`R9XUMr`）：6つの種類（3つずつ2段）と「見本から作る」（F-5）、下に真ん中のキャンセル。
-        窓の頭は絵の値（上と左右 24・題の行 24）、キャンセルは本文の続きに置く（絵は線なし・間 20）。
-      */}
       <Dialog
         open={pickerOpen}
         title="どの種類を作りますか"
