@@ -24,7 +24,7 @@ describe('S09 legacy migration boundaries', () => {
   function request(source: string, target: string, tenantId = DEFAULT_TENANT_ID) {
     const app = new Hono<Env>();
     app.use('*', async (c, next) => {
-      c.set('staff', { id: 'env-owner', role: 'owner', name: 'Synthetic operator', tenantId });
+      c.set('staff', { id: 'env-owner', role: 'owner', name: 'Synthetic operator', readOnly: false, tenantId });
       await next();
     });
     app.route('/', health);
