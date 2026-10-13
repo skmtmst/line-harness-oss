@@ -1092,7 +1092,7 @@ contents.get('/media/:id/content', async (c) => {
     const media = await getMediaLiveTarget(c.env.DB, c.req.param('id'));
     if (!media) return c.json({ success: false, error: 'Not found' }, 404);
     if (privateImageKey(media.r2_key) || !publicImageKey(media.r2_key)
-      || !publicDeliveryContentType(media.mime_type) || await isWebinarSource(c.env.DB, media.r2_key)) {
+      || !publicDeliveryContentType(media.mime_type, true) || await isWebinarSource(c.env.DB, media.r2_key)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     // 配信の本文に埋まる公開URLも、clean の版だけ出す。

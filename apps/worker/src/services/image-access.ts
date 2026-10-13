@@ -2,6 +2,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../index.js';
 import { getVisibleLineAccountScope } from './account-access.js';
 import { verifyCallerLineIdentity } from './liff-auth.js';
+import { hasStaffPermission } from '../middleware/role-guard.js';
 
 export const PRIVATE_IMAGE_TTL_SECONDS = 300;
 export function privateImageKey(key: string): boolean {
@@ -24,8 +25,15 @@ export async function isWebinarSource(db: D1Database, key: string): Promise<bool
     .bind(key, key).first();
 }
 
-export function publicDeliveryContentType(contentType: string): boolean {
-  return /^(?:image\/(?:png|jpeg|gif|webp)|video\/mp4|audio\/(?:mp4|mpeg|x-m4a))$/i.test(contentType);
+export function publicDeliveryContentType(contentType: string, publishedDocument = false): boolean {
+  return /^(?:image\/(?:png|jpeg|gif|webp)|video\/mp4|audio\/(?:mp4|mpeg|x-m4a))$/i.test(contentType)
+    || (publishedDocument && contentType.toLowerCase() === 'application/pdf');
+}
+
+function staffImageSurface(path: string, key: string): boolean {
+  if (key.startsWith('form-uploads/')) return /^\/api\/(?:form-submissions(?:\/|$)|forms\/[^/]+\/(?:submissions|responses)(?:\/|$)|friends\/[^/]+\/(?:forms|form-submissions)(?:\/|$))/.test(path);
+  if (key.startsWith('nen-photo-review/')) return /^\/api\/nen-members(?:\/|$)/.test(path);
+  return /^\/api\/(?:nen-members|nen-pets)(?:\/|$)/.test(path);
 }
 
 async function signingKey(secret: string): Promise<CryptoKey> {
@@ -58,6 +66,11 @@ export async function privateImageSignatureValid(url: URL, secret: string | unde
 /** Ownership comes from the bucket and the friend ledger, never URL caller data. */
 export async function canSignPrivateImage(c: Context<Env>, key: string): Promise<boolean> {
   if (!privateImageKey(key) || key.includes('..') || /[\\%\x00-\x1f]/.test(key)) return false;
+  const staff = c.get('staff');
+  // A URL injected into an unrelated profile/setting response must not become a capability.
+  // These image surfaces already enforce their module and resource permissions.
+  if (staff && !staffImageSurface(c.req.path, key)) return false;
+  if (staff && key.startsWith('nen-photo-review/') && !hasStaffPermission(c, 'photo.submission.view')) return false;
   const object = await c.env.IMAGES.head(key);
   if (!object) return false;
   const friendId = object.customMetadata?.friendId
@@ -66,7 +79,6 @@ export async function canSignPrivateImage(c: Context<Env>, key: string): Promise
   const friend = await c.env.DB.prepare('SELECT line_account_id, line_user_id FROM friends WHERE id = ?')
     .bind(friendId).first<{ line_account_id: string; line_user_id: string }>();
   if (!friend?.line_account_id) return false;
-  const staff = c.get('staff');
   if (staff) return (await getVisibleLineAccountScope(c.env.DB, staff)).ids.includes(friend.line_account_id);
   const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
   return !!identity && identity.lineAccountId === friend.line_account_id && identity.lineUserId === friend.line_user_id;
@@ -78,14 +90,17 @@ export const privateImageResponseMiddleware: MiddlewareHandler<Env> = async (c, 
   if (c.res.status >= 400 || !c.res.headers.get('Content-Type')?.includes('application/json')) return;
   const body = await c.res.clone().text();
   if (!/\/images\/(?:nen-pets|nen-pet-profiles|nen-photo-review|form-uploads)\//.test(body)) return;
-  const origin = new URL(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || c.req.url).origin;
+  const configuredOrigins = [c.env.WORKER_PUBLIC_URL, c.env.WORKER_URL].filter(Boolean) as string[];
+  const origins = new Set((configuredOrigins.length ? configuredOrigins : [c.req.url]).map(value => new URL(value).origin));
   const cache = new Map<string, Promise<string>>();
-  async function walk(value: unknown): Promise<unknown> {
+  async function walk(value: unknown, field = '', answers = false): Promise<unknown> {
     if (typeof value === 'string') {
       let url: URL;
       try { url = new URL(value); } catch { return value; }
       const key = url.pathname.slice('/images/'.length);
-      if (url.origin !== origin || !url.pathname.startsWith('/images/') || !privateImageKey(key)) return value;
+      const imageField = field === 'url' || /(?:image|photo|review|preview|avatar).*url/i.test(field);
+      if ((!imageField && !(answers && key.startsWith('form-uploads/')))
+        || !origins.has(url.origin) || !url.pathname.startsWith('/images/') || !privateImageKey(key)) return value;
       let pending = cache.get(key);
       if (!pending) {
         pending = (async () => await canSignPrivateImage(c, key) && c.env.API_KEY
@@ -94,10 +109,14 @@ export const privateImageResponseMiddleware: MiddlewareHandler<Env> = async (c, 
       }
       return pending;
     }
-    if (Array.isArray(value)) return Promise.all(value.map(walk));
-    if (value && typeof value === 'object') return Object.fromEntries(await Promise.all(
-      Object.entries(value).map(async ([key, entry]) => [key, await walk(entry)]),
-    ));
+    if (Array.isArray(value)) return Promise.all(value.map(entry => walk(entry, field, answers)));
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      return Object.fromEntries(await Promise.all(Object.entries(record).map(async ([key, entry]) => [key,
+        await walk(entry, key, answers || /^(?:answers|answer|values|responses)$/.test(key)
+          || (key === 'data' && typeof record.formId === 'string' && typeof record.friendId === 'string')),
+      ])));
+    }
     return value;
   }
   const updated = await walk(JSON.parse(body));
