@@ -1542,7 +1542,7 @@ export default function AutoRepliesListV8() {
         designNode="i8F12"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        designWidth={480}
         designTop={280}
         footerAlign="center"
         titleIcon={false}
@@ -1586,7 +1586,7 @@ export default function AutoRepliesListV8() {
         designNode="u8sKN"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        designWidth={480}
         designTop={280}
         onCancel={() => {
           if (deleting) return

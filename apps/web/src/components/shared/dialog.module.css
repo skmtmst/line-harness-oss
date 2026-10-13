@@ -444,3 +444,11 @@ html:root .stepCurrent { background: var(--color-selection-border); color: var(-
 
 /* 入力を含む確認窓は、欄を本文幅にそろえる。 */
 html:root .content[data-content-layout='form'] { align-items: stretch; }
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: var(--space-8);
+}

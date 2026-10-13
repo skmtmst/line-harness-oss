@@ -354,3 +354,11 @@ html:root .body[data-content-spacing='sections'] { display: flex; flex-direction
 html:root .body[data-content-spacing='sections'] > * { flex-shrink: 0; }
 
 html:root .panel[data-viewport-inset] { max-width: calc(100vw - var(--space-16) * 2); }
+
+html:root .panel[data-height-mode='viewport']:not(.inline) {
+  height: 100dvh;
+  align-self: stretch;
+}
+html:root .panel[data-height-mode='viewport']:not(.inline) .body {
+  flex: 1 1 auto;
+}

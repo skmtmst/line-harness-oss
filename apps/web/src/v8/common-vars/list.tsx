@@ -1270,6 +1270,7 @@ function CommonVarsListInner() {
       <Dialog
         open={statusTarget !== null && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
+        designWidth={480}
         title={statusTarget ? `「${statusTarget.name}」を${statusAction === 'stop' ? '止める' : '再開する'}` : ''}
         description={
           statusAction === 'stop'
