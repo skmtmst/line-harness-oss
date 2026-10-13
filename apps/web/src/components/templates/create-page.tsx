@@ -1,5 +1,5 @@
 import { AutoFormLeaveGuard, FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import type { ReactNode } from 'react'
+import type { ReactNode, HTMLAttributes } from 'react'
 import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import PreviewLauncher from './preview-launcher'
@@ -65,4 +65,9 @@ export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, bus
     </div>
     <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>
   </PageFrame>
+}
+
+/** 右の見え方は入力の高さへ収め、長い見本だけを欄の中で送る。 */
+export function CreateColumns({ children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={styles.createColumns} data-template-region="body">{children}</div>
 }

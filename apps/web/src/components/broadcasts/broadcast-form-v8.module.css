@@ -35,7 +35,6 @@
 .header :global([data-part='stepper'] li > :last-child > :first-child) { width: 22px; height: 22px; font-size: 11px; }
 .header :global([data-part='stepper'] li > :last-child > :last-child span) { font-size: 13px; white-space: nowrap; }
 .header :global([data-part='stepper'] [aria-current='step'] > :first-child) { outline: 0; background: var(--color-ink); color: var(--color-canvas); }
-.body { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; align-items: stretch; }
 .input { min-width: 0; padding: var(--space-24); display: flex; flex-direction: column; gap: var(--space-16); }
 .section { display: flex; flex-direction: column; gap: var(--space-14); min-width: 0; }
 .root h3 { font-size: 13px; font-weight: 600; line-height: 20px; }
@@ -113,7 +112,6 @@
 .quotaTrack > div { height: 100%; background: var(--color-accent-deep); }
 .quota p { font-size: 12px; color: var(--color-ink-faint); }
 @container broadcast-create (width < 1100px) {
-  .body { grid-template-columns: minmax(0,1fr); }
   .preview { display: none; }
   .previewToggle { display: inline-flex; margin-left: auto; }
   .header { flex-wrap: wrap; gap: var(--space-12); }

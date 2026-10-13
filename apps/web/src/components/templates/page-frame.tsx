@@ -106,3 +106,8 @@ export function PageFrame({ kind, children, boardId, layout, heightMode, standal
 export function PageFooter({ actions, status, presentation }: { actions: ReactNode; status?: ReactNode; presentation?: 'distribution' }) {
   return <div className={styles.footer} data-template-region="footer"><StickyBar actions={actions} status={status} presentation={presentation} /></div>
 }
+
+/** 内容で終わる板の本文。下の24はPageFrameが持ち、本文と二重にしない。 */
+export function PageContent({ children, layout, ...props }: Omit<import('react').HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & { layout?: 'columns' }) {
+  return <div {...props} className={styles.pageContent} data-content-layout={layout} data-template-region="content">{children}</div>
+}

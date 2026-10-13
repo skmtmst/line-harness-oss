@@ -411,7 +411,9 @@
   line-height: var(--tpl-sb-ec-lh);
 }
 :root .frame[data-grid-table] .table tbody tr {min-height:var(--table-grid-row-height,0px);}
+:root .frame[data-grid-table] .table tbody tr { font-size: var(--table-body-text-size); }
 :root .frame[data-grid-table] .table thead tr {
+  font-size: var(--table-head-text-size);
   padding: var(--table-head-padding);
   background: var(--color-surface-pearl);
   box-shadow: none;

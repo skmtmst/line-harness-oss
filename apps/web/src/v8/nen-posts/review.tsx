@@ -9,6 +9,7 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
 import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import { RowMenu } from '@/components/shared/row-actions'
 import { collectUncountedListRows } from '@/components/shared/collect-list-rows'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -819,6 +820,7 @@ function ReviewListV8(props: ReviewListV8Props) {
         />
       </form>
       <span className={styles.toolsSpace} aria-hidden="true" />
+      {!adopted && status === 'pending' ? <HelpTip label="写真の見え方の説明">「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</HelpTip> : null}
       {adopted ? (
         <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
       ) : (
@@ -859,7 +861,6 @@ function ReviewListV8(props: ReviewListV8Props) {
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {props.searchQuery ? <p className={styles.toolsNote}>{`「${props.searchQuery}」で絞り込んでいます`}</p> : null}
       {state ?? cards}
-      {!state && status === 'pending' ? <p className={styles.listHint}>「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</p> : null}
       {more}
     </div>
   )

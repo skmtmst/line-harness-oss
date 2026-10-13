@@ -234,7 +234,9 @@
             "InboxPage",
             "PageExplanationProvider",
             "PageExplanationToggle",
-            "PageExplanationBody"
+            "PageExplanationBody",
+            "PageContent",
+            "CreateColumns"
           ],
           "vars": [
             "--text-title"

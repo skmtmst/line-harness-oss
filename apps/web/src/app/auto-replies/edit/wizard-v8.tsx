@@ -1367,7 +1367,7 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'trigger' && (
             <>
-              <CreateSummaryCard title="保存したあとに、過去28日で当たった数が出ます"
+              <CreateSummaryCard title="保存後に過去28日の反応数を表示"
                 beforeRows={<>
                   <p className={styles.countRow} aria-label="当たった受信（過去28日）">
                     <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>

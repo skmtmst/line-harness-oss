@@ -2,7 +2,7 @@
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
@@ -185,7 +185,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="Omqd4">
       <DetailHead {...chrome} current="comments" />
-      <div className={styles.body} data-design-node="Omqd4">
+      <PageContent layout="columns" data-design-node="Omqd4">
         <div className={styles.previewToggle}>
           <Disclosure title="視聴画面での見え方" size="compact">{previewContent}</Disclosure>
         </div>
@@ -248,7 +248,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
           <h3 id="webinar-comments-preview" className={styles.sideTitle}>視聴画面での見え方</h3>
           {previewContent}
         </aside>
-      </div>
+      </PageContent>
     </PageFrame></SaveErrorScope>
   )
 }

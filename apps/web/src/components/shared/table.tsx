@@ -145,7 +145,7 @@ export function DataTable({
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string; headTextSize?: string; bodyTextSize?: string }
   /** 補助列の内容幅を読み、名前へ残りの幅を割り当てる。 */
   columnSizing?: 'content'
 }) {
@@ -174,6 +174,8 @@ export function DataTable({
         '--table-grid-gap':grid.gap,
         '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
+        '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
+        '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
       } as CSSProperties : undefined}>{children}</table>
     </div>
   )
