@@ -35,3 +35,17 @@ test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯�
     }
   } finally { await browser.close() }
 })
+
+test('本文の外へ開いた窓の札を検出し、本文内の窓は二重に数えない', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>[data-field]{display:flex;flex-direction:column;width:300px}[data-required-badge]{display:inline-flex;padding:2px 6px}</style>
+      <main><div role="dialog"><div data-field><span data-required-badge>必須</span></div></div></main>
+      <div role="dialog"><div data-field><span data-required-badge>必須</span></div></div>
+      <div role="dialog" hidden><div data-field><span data-required-badge>必須</span></div></div>`)
+    assert.equal((await page.evaluate(scanFormRules)).length, 2)
+    await page.addStyleTag({ content: '[data-required-badge]{align-self:flex-start}' })
+    assert.deepEqual(await page.evaluate(scanFormRules), [])
+  } finally { await browser.close() }
+})

@@ -20,7 +20,9 @@ export default function scanFormRules() {
   }
   const add = (kind, el, text, measure) => findings.push({ kind, target: selector(el), text, measure })
   // 札の面は文字とその内側の余白まで。flex の stretch で帯になった実寸を拾う。
-  for (const badge of root.querySelectorAll('[data-required-badge]')) {
+  const badgeRoots = [root, ...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
+  const badges = new Set(badgeRoots.flatMap(scope => [...scope.querySelectorAll('[data-required-badge]')]))
+  for (const badge of badges) {
     if (!visible(badge) || !badge.textContent.trim()) continue
     const range = document.createRange()
     range.selectNodeContents(badge)
