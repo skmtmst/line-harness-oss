@@ -36,6 +36,7 @@ import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import InlineSettings from '@/components/shared/inline-settings'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -290,10 +291,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
         <Card variant="form" gap="normal" aria-labelledby="q-name">
           <h2 className={styles.cardTitle} id="q-name">名前とフォルダ</h2>
-          <div className={styles.row}>
-            <Field label="テンプレート名" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
-            <FieldError id="q-name-error">{fields.error('name')}</FieldError>
-            <div className={`${styles.field} ${styles.folder}`}>
+          <SettingsFormRow layout="name-folder">
+            <Field label="テンプレート名" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+              <FieldError id="q-name-error">{fields.error('name')}</FieldError>
+            </Field>
+            <div className={styles.field}>
               <span className={styles.pickLabel}>フォルダ</span>
               <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                 size="full"
@@ -314,7 +316,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                     : undefined}
               /></SaveErrorField>
             </div>
-          </div>
+          </SettingsFormRow>
         </Card>
 
         <Card variant="form" gap="normal" aria-labelledby="q-question">

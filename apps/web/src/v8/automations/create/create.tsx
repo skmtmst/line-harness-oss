@@ -2527,7 +2527,8 @@ export function NewAutomationV8({
         )
         : 'きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。'}
       /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
-      previewToggle={conflictBand}
+      notice={conflictBand}
+      noticeSpacing="band"
       previewLabel="設定内容を見る"
       previewTitle="設定内容"
       preview={sideColumn}

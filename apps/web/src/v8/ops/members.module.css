@@ -54,6 +54,7 @@
 .faint {
   color: var(--color-ink-faint);
 }
+.shortText { white-space: nowrap; }
 
 @media (max-width: 1023.98px) {
   .colMail,

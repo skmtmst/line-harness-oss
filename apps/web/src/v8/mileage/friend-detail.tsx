@@ -1,4 +1,7 @@
 'use client'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+import { formatListDateTime } from '@/lib/format'
 
 import Card from '@/components/shared/card'
 
@@ -9,7 +12,6 @@ import { MILEAGE_TABLE_LAYOUT } from './frame'
 
 import { jstMonthStart } from '@/lib/jst-datetime'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
@@ -28,7 +30,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -48,7 +50,6 @@ import { formatDay, formatNumber } from '@/lib/format'
 import {
   formatMileageChange,
   formatMileageNumber,
-  formatMileageShortDateTime,
   friendHistoryItem,
   mileageDetailHasSourceEvent,
   mileageEntryTypeLabel,
@@ -60,7 +61,6 @@ import {
   mileageStatusLabel,
   type MileageDetailHistoryItem,
 } from './display'
-import { PerPageSelect } from './parts'
 import MileageAdjustDialog from './adjust-dialog'
 import styles from './mileage.module.css'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -416,8 +416,8 @@ function FriendDetailInner() {
       {notificationRetryError ? <Notice tone="danger">{notificationRetryError}</Notice> : null}
 
       <Card overflow="hidden" aria-label="マイルの明細">
-        <div className={styles.historyTools}>
-          <div className={styles.historySearch}>
+        <ListToolbarFrame><ListToolbarRow>
+
             <SearchField
               aria-label="内容で探す"
               placeholder="内容で探す"
@@ -425,7 +425,7 @@ function FriendDetailInner() {
               onChange={setSearchInput}
               onClear={() => { setSearchInput(''); setSearch(''); setPage(1) }}
             />
-          </div>
+
           <div role="group" aria-label="種類で絞り込む" className={styles.chipGroup}>
             {chips.map((chip) => (
               <FilterChip
@@ -438,17 +438,17 @@ function FriendDetailInner() {
               </FilterChip>
             ))}
           </div>
-          <span className={styles.spacer} aria-hidden="true" />
-          <div className={styles.periodBox}>
+
+
             <SaveErrorField names={["period","page"]}><Select
               aria-label="期間"
               value={period}
               options={[{ value: 'all', label: 'すべて' }, { value: 'month', label: '今月' }]}
               onChange={(value) => { setPage(1); setPeriod(value) }}
             /></SaveErrorField>
-          </div>
-          <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
-        </div>
+
+          <PageSizeSelect label={null} value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
+        </ListToolbarRow></ListToolbarFrame>
 
         {visible.length === 0 ? (
           <ListState kind="empty"
@@ -481,7 +481,7 @@ function FriendDetailInner() {
                 return (
                   <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
-                      <time className={styles.cellSub} dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time>
+                      <time className={styles.cellSub} dateTime={item.occurredAt}>{formatListDateTime(item.occurredAt)}</time>
                     </Td>
                     <Td className={styles.colWhat}>
                       {item.restricted || item.reason == null ? (
@@ -498,7 +498,7 @@ function FriendDetailInner() {
                     <Td className={styles.colKind}>
                       <StatusBadge tone={mileageStatusTone(pill.tone)}>{pill.text}</StatusBadge>
                     </Td>
-                    <Td grow><FolderDotName><span className={styles.cellMain}>{assignee(item)}</span></FolderDotName></Td>
+                    <Td grow><span className={styles.cellMain}>{assignee(item)}</span></Td>
                     <Td align="right" className={styles.colDeltaDetail}>
                       <span className={styles.cellMain} title={'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `残高 ${formatNumber(item.balanceAfter)}` : undefined}>
                         {formatMileageChange(item.amount)}
@@ -525,12 +525,10 @@ function FriendDetailInner() {
 
         {filtered.length > 0 ? (
           <div className={styles.historyPager}>
-            <span className={styles.pagerCount}>
-              {historyPartial
-                ? `最新${formatNumber(displayedHistory.length)} 件（全${formatNumber(historyTotal ?? 0)} 件）のうち ${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} 件`
-                : `${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} 件`}
-            </span>
-            {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<>
+              {historyPartial ? `最新${formatNumber(displayedHistory.length)}件（全${formatNumber(historyTotal ?? 0)}件）のうち ` : null}
+              {paginationSummary(filtered.length, (page - 1) * pageSize + 1, Math.min(page * pageSize, filtered.length))}
+            </>} />
           </div>
         ) : null}
       </Card>

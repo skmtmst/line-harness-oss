@@ -6,11 +6,8 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import MenuSettingsPage from '@/v8/booking-menus/menu-settings-page'
-import { menuSettingsModel } from '@/v8/booking-menus/menu-settings.test.model'
 import ChannelsTabV8 from '@/v8/booking-menus/channels-tab'
 
-vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
@@ -140,25 +137,14 @@ describe('V8 予約設定', () => {
     expect(LIST).not.toContain('.at(-1)!')
   })
 
-  it('閲覧では帯を出して作成操作を隠す', async () => {
-    const { container } = render(React.createElement(MenuSettingsPage, menuSettingsModel()))
-    expect(container.querySelector('[data-read-only-notice]')).toBeTruthy()
-    await screen.findByText('まだ予約メニューがありません')
-    expect(screen.queryByRole('link', { name: /予約メニューを作る/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /予約メニューを作る/ })).toBeNull()
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {
     expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
     expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
   })
 
-  it('VFxWU: 1152の右欄は見え方ボタンと確かめるボタンの2つ', () => {
-    expect(SETTINGS_V8).toContain('LINEでの見え方を見る')
-    expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
-    expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
-    expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
     expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")

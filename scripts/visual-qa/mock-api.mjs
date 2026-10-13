@@ -2970,6 +2970,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
     return { success: true, data: RESTAURANT_SNAPSHOT }
   }
+  if (method === 'GET' && pathname === '/api/restaurant-test/store-groups') return { success: true, data: [] }
   if (method === 'GET' && pathname === '/api/restaurant-test/stores') {
     return { success: true, data: { organization: RESTAURANT_SNAPSHOT.organization, stores: RESTAURANT_SNAPSHOT.stores } }
   }

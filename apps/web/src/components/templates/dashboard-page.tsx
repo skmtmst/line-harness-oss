@@ -1,3 +1,4 @@
+import { Children } from 'react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
@@ -36,8 +37,8 @@ export function DashboardRow({ children, aside, asideRef, variant, asideSize, as
     {aside ? <aside ref={asideRef} className={styles.dashboardAside} data-template-region="aside" data-aside-size={asideSize}>{aside}</aside> : null}
   </div>
 }
-export function DashboardColumns({ children, layout }: { children: ReactNode[]; layout?: 'overview' }) {
-  return <div className={`${styles.dashboardRow} ${styles.dashboardColumns}`} data-template-region="row" data-layout={layout}>{children.map((child, index) => <div className={styles.dashboardCell} key={index}>{child}</div>)}</div>
+export function DashboardColumns({ children, layout }: { children: ReactNode[]; layout?: 'overview' | 'cards' }) {
+  return <div className={`${styles.dashboardRow} ${styles.dashboardColumns}`} data-template-region="row" data-layout={layout}>{layout === 'cards' ? Children.toArray(children) : children.map((child, index) => <div className={styles.dashboardCell} key={index}>{child}</div>)}</div>
 }
 
 /** 右の列の段。本文と同じ左右24、上下16、段間12を型が持つ。 */
