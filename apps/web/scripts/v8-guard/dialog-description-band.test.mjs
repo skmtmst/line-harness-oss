@@ -13,7 +13,7 @@ const dialog = readFileSync(new URL('../../src/components/shared/dialog.module.c
 const regressed = postcss.parse(dialog)
 const componentLayer = regressed.nodes.find(node => node.type === 'atrule' && node.name === 'layer' && node.params === 'components')
 for (const rule of [...regressed.nodes]) {
-  if (rule.type === 'rule' && rule.selector.includes('.callout') && (rule.selector.includes('.description') || rule.selector.includes('.title'))) {
+  if (rule.type === 'rule' && rule.selector.includes('.calloutDanger .description')) {
     rule.remove()
     componentLayer.append(rule)
   }
@@ -30,7 +30,7 @@ for (const width of [1152, 1440, 1920]) {
             <h2 class="title">接続を解除しますか？</h2>
             <div class="callout calloutDanger"><p class="description" id="description">書き出しが止まります。</p></div>
           </div></body></html>`)
-        for (const band of ['danger', 'warning']) {
+        for (const band of ['danger']) {
           await page.locator('[data-m1-scope]').evaluate((el, value) => {
             el.dataset.descriptionBand = value
             el.querySelector('.callout').className = `callout ${value === 'danger' ? 'calloutDanger' : 'calloutWarning'}`
@@ -68,6 +68,11 @@ for (const width of [1152, 1440, 1920]) {
           return color
         })
         assert.deepEqual(plain, { color: expectedPlainColor, fontSize: '13px', lineHeight: '20px' })
+        await page.locator('.description').evaluate(el => { el.parentElement.className = 'callout calloutWarning' })
+        assert.deepEqual(await page.locator('#description').evaluate(el => {
+          const css = getComputedStyle(el)
+          return { color: css.color, fontSize: css.fontSize, lineHeight: css.lineHeight }
+        }), plain, 'the approved warning band keeps its existing appearance')
       }
     } finally {
       await browser.close()

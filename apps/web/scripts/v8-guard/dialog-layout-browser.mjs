@@ -5,11 +5,11 @@ export function scanDialogAudit({ expectedWidth, fullForm = false, requiredActio
   const inventory = [{ kind: 'panel', width: rect.width, height: rect.height }]
   const findings = []
   const descriptionBand = panel.getAttribute('data-description-band')
-  if (descriptionBand === 'danger' || descriptionBand === 'warning') {
+  if (descriptionBand === 'danger') {
     const description = (panel.getAttribute('aria-describedby') ?? '').split(/\s+/).map(id => document.getElementById(id)).find(el => el && panel.contains(el))
     if (description) {
       const probe = document.createElement('span')
-      probe.style.color = `var(${descriptionBand === 'danger' ? '--color-danger' : '--color-warning'})`
+      probe.style.color = 'var(--color-danger)'
       panel.append(probe)
       const expectedColor = getComputedStyle(probe).color
       probe.remove()

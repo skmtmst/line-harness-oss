@@ -164,6 +164,16 @@
   padding: 10px 12px;
 }
 
+:root .calloutWarning .title,
+:root .calloutWarning .description {
+  color: var(--color-warning);
+}
+
+:root .calloutWarning .description {
+  font-size: 11px;
+  line-height: 17px;
+}
+
 /*
  * 桃の呼びかけ（YZ57z 解除：説明文だけを桃箱で囲む。題は箱の外）。
  * 板どおり地 #fdecea≒--color-danger-bg（#fce9e7）・文 #b42318≒--color-danger
@@ -357,14 +367,6 @@
 }
 
 :root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
-:root .calloutWarning .title,
-:root .calloutWarning .description {
-  color: var(--color-warning);
-}
-:root .calloutWarning .description {
-  font-size: 11px;
-  line-height: 17px;
-}
 :root .calloutDanger .description {
   color: var(--color-danger);
   font-size: 11px;
