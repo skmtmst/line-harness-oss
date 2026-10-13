@@ -271,9 +271,14 @@ test("static site does not collect information, install trackers, or embed exter
 test("mobile controls, native FAQ, reduced motion and sample disclosures are present", async () => {
   const html = await page("/");
   assert.match(html, /aria-controls="mobile-nav"/);
-  assert.equal([...html.matchAll(/data-demo="/g)].length, 3);
-  assert.equal([...html.matchAll(/<details>/g)].length, 5);
-  assert.match(html, /表示はサンプル/);
+  assert.match(html, /id="mobile-nav"[^>]*hidden/);
+  // The admin tour is drawn from inert JSON; every screen is a labelled sample.
+  const tour = JSON.parse(html.match(/<script type="application\/json" id="tourData">([^<]*)<\/script>/)[1]);
+  assert.equal(tour.length, 10);
+  assert.ok(tour.some((t) => t.name === "Instagram"));
+  // FAQ is native <details>, so it works without JavaScript.
+  assert.equal([...html.matchAll(/<details class="faq-item">/g)].length, 5);
+  assert.match(html, /画面はいずれも説明用のサンプルです/);
   assert.match(html, /実際の管理画面の表示とは異なります/);
   const css = await readFile(
     new URL("../public/assets/site.css", import.meta.url),
@@ -315,4 +320,25 @@ test("the retention notice uses the same day count as the deletion implementatio
     const html = await page(route);
     assert.match(html, new RegExp(`${spec.dataRetentionDays}日`));
   }
+});
+
+test("pages carry no inline styles or external fonts, so the strict CSP renders them as designed", async () => {
+  const css = await readFile(join(preview.output, "assets", "site.css"), "utf8");
+  for (const route of preview.paths) {
+    const html = await page(route);
+    assert.doesNotMatch(html, /\sstyle="/, `${route}: style attribute is blocked by style-src 'self'`);
+    assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic/);
+    assert.doesNotMatch(html, /<script(?![^>]*(?:src="\/assets\/site\.js"|type="application\/json"))[^>]*>/);
+    for (const [, name] of html.matchAll(/class="[^"]*\b(s-[0-9a-f]{10})\b/g))
+      assert.ok(css.includes(`.${name}{`), `${route}: missing generated rule ${name}`);
+  }
+  const js = await readFile(new URL("../public/assets/site.js", import.meta.url), "utf8");
+  assert.doesNotMatch(js, /setAttribute\(\s*["']style/);
+});
+
+test("Google Business Profile and Instagram are both described with the confirm-before-send rule", async () => {
+  const html = await page("/");
+  assert.match(html, /GoogleとInstagramへ同時に投稿/);
+  assert.match(html, /あなたが内容を確かめて実行したときだけ/);
+  assert.match(html, /自動で送ることはありません/);
 });

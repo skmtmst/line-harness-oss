@@ -1,4 +1,5 @@
-import { cp, mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import config from "./site.config.mjs";
@@ -7,6 +8,28 @@ import { home } from "./src/home.mjs";
 import { legalBody } from "./src/legal.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url));
+
+// Replace every style="..." attribute with a class whose rule carries the same declarations.
+// !important keeps the inline-style precedence the design relied on.
+export function extractInlineStyles(html, styles = new Map()) {
+  return html.replace(/<[a-zA-Z][^<>]*\sstyle="([^"]*)"[^<>]*>/g, (tag, decl) => {
+    const name = `s-${createHash("sha256").update(decl).digest("hex").slice(0, 10)}`;
+    styles.set(name, decl);
+    let out = tag.replace(/\sstyle="[^"]*"/, "");
+    if (/\sclass="/.test(out)) out = out.replace(/\sclass="([^"]*)"/, (_, c) => ` class="${c} ${name}"`);
+    else out = out.replace(/^<([a-zA-Z][\w:-]*)/, `<$1 class="${name}"`);
+    return out;
+  });
+}
+
+export function importantDeclarations(decl) {
+  return decl
+    .split(";")
+    .map((d) => d.trim())
+    .filter(Boolean)
+    .map((d) => `${d} !important`)
+    .join(";");
+}
 export async function build({
   production = false,
   settings = config,
@@ -51,11 +74,25 @@ export async function build({
   ];
   await mkdir(output, { recursive: true });
   await cp(join(root, "public"), output, { recursive: true });
+  const styles = new Map();
   for (const page of pages) {
     const target = join(output, page.path, "index.html");
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, layout({ ...page, config: settings, production }));
+    await writeFile(
+      target,
+      extractInlineStyles(layout({ ...page, config: settings, production }), styles),
+    );
   }
+  // The CSP allows only same-origin stylesheets, so style="" attributes from the design
+  // markup become generated classes appended to site.css.
+  const cssFile = join(output, "assets", "site.css");
+  await writeFile(
+    cssFile,
+    (await readFile(cssFile, "utf8")) +
+      "\n/* generated from design markup by build.mjs */\n" +
+      [...styles].map(([name, decl]) => `.${name}{${importantDeclarations(decl)}}`).join("\n") +
+      "\n",
+  );
   await writeFile(
     join(output, "robots.txt"),
     production
