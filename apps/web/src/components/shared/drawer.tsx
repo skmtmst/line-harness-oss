@@ -36,6 +36,8 @@ export type DrawerProps = {
   width?: 'narrow' | 'editor' | 'order' | 'composer'
   /** V8は480・540の2段。旧指定は共通部品で段へそろえる。 */
   designWidth?: number
+  /** 狭い画面でも外側の余白を保つ。 */
+  viewportInset?: boolean
   /** 620幅の紹介者の板など、全体に同じ余白がある型。 */
   layout?: 'inset'
   /** 題に状態の札を添える板。閉じる操作は共通のまま。 */
@@ -63,6 +65,7 @@ export default function Drawer({
   modal = true,
   width,
   designWidth,
+  viewportInset,
   layout,
   heading,
   toolbar,
@@ -106,6 +109,7 @@ export default function Drawer({
       data-width={width}
       data-layout={layout}
       data-design-width=""
+      data-viewport-inset={viewportInset || undefined}
       style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
       data-closing={leaving || undefined}
