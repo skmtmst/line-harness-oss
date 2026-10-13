@@ -86,6 +86,9 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (!visible(value) || !/^並び[：:].+/.test(value.textContent.trim())) add('F8', el, 'sort has no visible current value')
     }
     const owned = el => !!el && [...el.classList].some(cls => cssOwners.some(name => cls === name || cls.startsWith(`${name}_`)))
+    if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] > p')) {
+      if (!owned(el)) add('F5', el, 'toolbar explanation has a page CSS owner instead of shared parts')
+    }
     if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] button,[data-template-region="toolbar"] input,[data-template-region="toolbar"] select,[data-template-region="toolbar"] summary')) {
       if (owned(el) || el.matches('summary') && owned(el.closest('[data-toolbar-optional]'))
         || el.matches('input[type="checkbox"],input[type="radio"]') && owned(el.closest('label'))) continue

@@ -4,6 +4,19 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('F5 counts a page-owned explanation in the tool band and accepts shared notice ownership', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage(), owners = sharedControlOwners()
+    assert.ok(owners.includes('notice'))
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar"><p class="page_readonlyBand__abc">項目の種類を変える前の説明</p></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns, { cssOwners: owners })).counts.F5, 1)
+    await page.locator('p').evaluate(el => el.className = 'notice_notice__abc')
+    assert.equal((await page.evaluate(scanFixPatterns, { cssOwners: owners })).counts.F5, 0)
+    assert.equal(await page.locator('p').innerText(), '項目の種類を変える前の説明')
+  } finally { await browser.close() }
+})
+
 test('F1 catches a selected label ellipsized by half a pixel and accepts its exact rendered width', async () => {
   const browser = await chromium.launch()
   try {
