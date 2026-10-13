@@ -575,6 +575,7 @@ jobs:
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
       NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+      V8_SPEED_ENFORCEMENT: ${{ vars.V8_SPEED_ENFORCEMENT }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -679,50 +680,26 @@ jobs:
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
-      # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
-      # 主要10画面を V8 で開き、1画面5回測った中央値で比べる。
-      # 落とすのは悪化だけ：時間は基準より20%×CI倍率1.30、JS は1KB超の増加。
-      # ただし同じ PR で基準表を更新していれば JS 超過は通す
-      # （機能追加で JS は増える。理由は PR に書くこと）。
-      # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
-      # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed measurement and reference policy controls
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
       - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
-        # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
-        continue-on-error: true
-        # 画面の必須検査が落ちても、速度は別に測って原因を分ける。
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           V8_SPEED_PROFILE: ci
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          allow_js=0
-          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] \
-            && git diff --name-only "$BASE_SHA...$HEAD_SHA" -- apps/web/scripts/v8-guard/speed-budget.json | grep -q .; then
-            allow_js=1
-            echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
-          fi
-          ALLOW_JS_BASELINE_UPDATE="$allow_js" pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
-      - name: Train 17 absolute targets (reference)
-        continue-on-error: true
+        run: pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: Train 17 absolute targets
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
-      - name: 2000 friends meet absolute speed targets (reference)
+      - name: 2000 friends meet absolute speed targets
         id: stress_speed
-        # 速度だけ参考。測れなかったときも失敗を残し、次の工程で警告する。
-        continue-on-error: true
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           V8_SPEED_PROFILE: ci
         run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
-      - name: PERF-01 fixed list speed targets (reference)
+      - name: PERF-01 fixed list speed targets
         id: perf3_targets
-        # タグ1秒・長い処理65ms。既存の倍率付き判定とは別に固定目標を残す。
-        continue-on-error: true
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
       - name: Report speed reference results (including incomplete measurements)
