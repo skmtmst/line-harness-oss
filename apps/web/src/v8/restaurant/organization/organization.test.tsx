@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), loginMembers: vi.fn(), linkMembershipLogin: vi.fn(), updateMembership: vi.fn(), listIntakeAddresses: vi.fn(),
-  gate: vi.fn(), cancel: vi.fn(), role: 'owner' as string | null,
+  storeGroups: vi.fn(), gate: vi.fn(), cancel: vi.fn(), role: 'owner' as string | null,
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -27,6 +27,7 @@ beforeEach(() => {
   fixture.updateMembership.mockResolvedValue({ success: true })
   fixture.linkMembershipLogin.mockResolvedValue({ success: true })
   fixture.listIntakeAddresses.mockResolvedValue({ data: [] })
+  fixture.storeGroups.mockResolvedValue({ data: [] })
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 

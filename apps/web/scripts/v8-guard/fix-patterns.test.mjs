@@ -3,6 +3,63 @@ import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
+import { readFileSync } from 'node:fs'
+
+test('F3 counts spaced handwritten pager units and retains partial-read disclosure', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="detail"><nav data-pagination><span>214 件中 1〜20 件</span></nav><p class="pagerSummary">5 人中 1〜5 人</p></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3, 2)
+    await page.locator('nav span').evaluate(el => el.textContent = '最新100件（全340件）のうち 100件中 1〜20件')
+    await page.locator('p').evaluate(el => el.textContent = '5人中 1〜5人')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3, 0)
+  } finally { await browser.close() }
+})
+
+test('Z1 detects a stacked avatar even when every text node occupies one line', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="detail"><table><tbody><tr><td><span data-avatar style="display:block;width:24px;height:24px;border-radius:50%">K</span><a style="display:block">Kenta Kawano</a></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).findings.filter(f => f.reason.includes('avatar and person')).length, 1)
+    await page.addStyleTag({content:'td{display:flex;align-items:center;gap:8px}a{white-space:nowrap}'})
+    assert.equal((await page.evaluate(scanFixPatterns)).findings.filter(f => f.reason.includes('avatar and person')).length, 0)
+  } finally { await browser.close() }
+})
+
+test('Z3 detects missing canonical content inset and retains full width ordinary list tables', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>section{width:500px}div{box-sizing:border-box}p{margin:0}</style><section data-page-template="list"><div data-template-region="content"><div data-template-region="content"><p>本文</p><div data-shared-part="list-table">表</div></div></div></section>')
+    const failures = async () => (await page.evaluate(scanFixPatterns)).findings.filter(f => f.reason.includes('content right edge'))
+    assert.equal((await failures()).length, 1)
+    await page.addStyleTag({content:'[data-template-region=content] > [data-template-region=content]{padding-inline:24px}'})
+    assert.equal((await failures()).length, 0)
+    await page.locator('[data-template-region=content] > [data-template-region=content]').evaluate(el => el.replaceWith(...el.childNodes))
+    assert.equal((await failures()).length, 0)
+  } finally { await browser.close() }
+})
+
+test('Z fixes use the real shared person row and preserve the real template padding', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const tableCss = readFileSync(new URL('../../src/components/shared/table.module.css', import.meta.url), 'utf8')
+    const templateCss = readFileSync(new URL('../../src/components/templates/page-templates.module.css', import.meta.url), 'utf8').split('\n')
+      .filter(line => line.includes(' .pageContent {') || line.includes("div:not([data-template-region]):has(> [data-shared-part='list-table'])"))
+      .map(line => line.replaceAll(':global(:root)', ':root').replace(':global(div', 'div').replace(')) {', ') {')).join('\n')
+    await page.setContent(`<style>:root{--space-8:8px;--polish-space-card:16px;--polish-space-section:24px}section{width:500px}div{box-sizing:border-box}.face{width:24px;height:24px;flex:none;border-radius:50%}.name-link{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}td{width:100px}${tableCss}${templateCss}</style><section data-page-template="list" data-list-skeleton="templates"><div class="listBody"><div class="content" data-template-region="content"><div class="pageContent" data-template-region="content"><div data-shared-part="list-table"><table><tbody><tr><td><span class="person"><span class="face" data-avatar>K</span><span class="personName"><a class="name-link" title="名前が長い友だち">名前が長い友だち</a></span></span></td></tr></tbody></table></div></div></div></div></section>`)
+    const current = await page.evaluate(scanFixPatterns)
+    assert.equal(current.findings.filter(f => /avatar and person|content right edge/.test(f.reason)).length, 0)
+    assert.equal(await page.locator('.pageContent').evaluate(el => getComputedStyle(el).paddingRight), '24px')
+    await page.addStyleTag({ content: '.person{flex-direction:column !important}.pageContent{padding-right:0 !important}' })
+    const broken = await page.evaluate(scanFixPatterns)
+    assert.equal(broken.findings.filter(f => f.reason.includes('avatar and person')).length, 1)
+    assert.equal(broken.findings.filter(f => f.reason.includes('content right edge')).length, 1)
+  } finally { await browser.close() }
+})
 
 test('Y14 detects static trailing text overlapping a filter and accepts separate rows and owned controls', async () => {
   const browser = await chromium.launch()

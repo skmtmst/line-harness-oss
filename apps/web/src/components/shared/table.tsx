@@ -1,6 +1,7 @@
 'use client'
 
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
+import Avatar from './avatar'
 import React from 'react'
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
@@ -279,6 +280,18 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
 /** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
 export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>) {
   return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
+}
+
+/** 顔と名前を同じ1行に保つ。狭い列では名前だけを省略する。 */
+export function PersonCell({ name, avatarName, avatarSrc, ...cellProps }: Omit<TdProps, 'children'> & {
+  name: ReactNode
+  avatarName?: string | null
+  avatarSrc?: string | null
+}) {
+  return <Td {...cellProps} data-list-person-cell><span className={styles.person}>
+    <Avatar name={avatarName} src={avatarSrc} size={24} />
+    <span className={styles.personName}>{name}</span>
+  </span></Td>
 }
 
 /** B-194: states belong to their column; stacked badges keep the 60px row. */

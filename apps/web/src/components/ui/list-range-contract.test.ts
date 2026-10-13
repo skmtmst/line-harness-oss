@@ -112,13 +112,7 @@ describe('ListRange 統一（監査6 #667）', () => {
     },
   )
 
-  it('V8の実行結果は取得した全件数と表示範囲をページ送りへ渡す', () => {
-    const source = read('../../v8/friend-add-runs/runs.tsx')
-    expect(source).toContain('<Pagination')
-    expect(source).toContain('summary={`${formatNumber(data.total)} 件中')
-    expect(source).toContain('(cursorPage - 1) * perPage + 1')
-    expect(source).toContain('(cursorPage - 1) * perPage + items.length')
-  })
+  // 実行結果の総数・表示範囲・カーソル移動は runs-v8.react.test.tsx で実描画する。
 
   it('B-231：単一ページもカーソル式の共通ページ送りを使う', () => {
     const source = read('../../v8/friend-add/list.tsx')

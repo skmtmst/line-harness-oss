@@ -160,3 +160,6 @@ html:root .headRow[data-table-layout='columns'] { padding-inline: var(--tpl-list
 
 html:root button.rowNameLink { padding: 0; border: 0; background: none; font: inherit; color: var(--color-ink); font-weight: 700; text-align: left; cursor: pointer; }
 html:root button.rowNameLink:hover { text-decoration: underline; }
+
+html:root .person { display: flex; align-items: center; gap: var(--space-8); min-width: 0; width: 100%; flex-wrap: nowrap; }
+html:root .personName { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
