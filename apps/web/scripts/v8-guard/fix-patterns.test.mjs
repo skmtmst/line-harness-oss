@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import scanListOperations from './list-operation-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
 test('F5 counts a page-owned explanation in the tool band and accepts shared notice ownership', async () => {
@@ -165,4 +166,33 @@ test('W4 distinguishes heading actions and archive filters without board IDs',as
  const after=await page.evaluate(scanFixPatterns)
  assert.equal(after.counts.F5,0);assert.equal(after.counts.F4,0)
  }finally{await browser.close()}
+})
+
+
+test('list semantics catches two folder/create entries even when they fit, while a distinct creation action stays available', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list"><div data-template-region="toolbar"><button aria-label="フォルダ">フォルダ：すべて</button><button aria-label="フォルダで絞り込む">フォルダ：すべて</button><a href="/new">案内を作る</a><a href="/new">案内を作る</a><a href="/folder-new">フォルダを作る</a></div></section>')
+    const broken = await page.evaluate(scanListOperations)
+    assert.equal(broken.findings.length,2)
+    await page.getByRole('button',{name:'フォルダで絞り込む',exact:true}).evaluate(el=>el.remove())
+    await page.locator('a[href="/new"]').last().evaluate(el=>el.remove())
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+    assert.equal(await page.locator('a').count(),2)
+  } finally { await browser.close() }
+})
+
+test('read-only list selection is detected, while editable and row-ineligible selections are retained', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list"><div data-read-only-notice>閲覧のみ</div><table><thead><tr><th><input type="checkbox" aria-label="全部選ぶ"></th></tr></thead><tbody><tr><td><input type="checkbox" disabled title="この行は対象外" aria-label="行を選ぶ"></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,2)
+    await page.locator('[data-read-only-notice]').evaluate(el=>el.remove())
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+    await page.locator('section').evaluate(el=>{ const notice=document.createElement('div');notice.dataset.readOnlyNotice='';notice.textContent='閲覧のみ';el.prepend(notice) })
+    await page.locator('input').evaluateAll(els=>els.forEach(el=>el.remove()))
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+  } finally { await browser.close() }
 })

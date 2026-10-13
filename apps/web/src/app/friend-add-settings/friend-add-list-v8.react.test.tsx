@@ -286,3 +286,17 @@ test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 L
   })
   expect(host.textContent).toContain('閲覧のみで見ています')
 })
+
+
+test('狭い一覧の作る・フォルダを型へ一回渡し、検索・状態・件数を共通の役目へ残す', async () => {
+  vi.stubGlobal('matchMedia', () => ({matches:true,addEventListener() {},removeEventListener() {}}))
+  await act(async () => root.render(<FriendAddSettingsPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  const tools=host.querySelector('[data-template-region="toolbar"]')!
+  expect(tools.querySelectorAll('a[href="/friend-add-settings?view=new"]')).toHaveLength(1)
+  expect(tools.querySelectorAll('button[aria-label="フォルダ"]')).toHaveLength(1)
+  expect(tools.querySelector('button[aria-label="フォルダで絞り込む"]')).toBeNull()
+  expect(tools.querySelector('[data-toolbar-search] input[type="search"]')).toBeTruthy()
+  expect(tools.querySelector('[data-toolbar-trailing] [data-list-page-size]')).toBeTruthy()
+  expect(tools.querySelector('[aria-label="状態で絞り込む"]')).toBeTruthy()
+})
