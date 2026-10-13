@@ -13,7 +13,7 @@ import TruncatedText from './truncated-text'
 import SegmentedControl from './segmented'
 import Notice from './notice'
 import {BookingBlock,BookingSlot} from './booking-controls'
-import {DataTable,TableHeadRow,Th,Td,Tr} from './table'
+import {DataTable,TableHeadRow,Th,Td,Tr,RowNameButton} from './table'
 import StatusBadge from './status-badge'
 import {formatDate} from '@/lib/format'
 import RestaurantFloorMap from './restaurant-floor-map'
@@ -40,10 +40,12 @@ export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEnt
 }
 export type ReservationBoardSlot={resourceId:string;startsAt:string;href?:string}
 /** 保存先による違いは表示型と変更契約に閉じ、すべての入口を同じ盤で描く。 */
-export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',renderBody,renderList}: {
+export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',diningContentColumns=false,renderBody,renderList}: {
  renderBody?:(body:ReactNode)=>ReactNode;
  renderList?:()=>ReactNode;
  columns?:'standard'|'dining'|'today';
+ /** 指定した飲食の一覧だけ、補助列を中身で測り名前へ残り幅を配る。 */
+ diningContentColumns?:boolean;
  kind?:'people'|'seats';entries:ReservationBoardEntry[];resources:ReservationBoardResource[];axis?:ReservationAxis;onAxis?:(axis:ReservationAxis)=>void;
  canWrite?:boolean;busy?:boolean;onOpen:(id:string)=>void;onMove?:(id:string,move:ReservationBoardMove)=>Promise<void>;
  menus?:(entry:ReservationBoardEntry)=>ReactNode; actions?:(entry:ReservationBoardEntry)=>ReactNode;toolbar?:ReactNode;trailingToolbar?:ReactNode;notice?:ReactNode;floor?:RestaurantFloor;
@@ -78,12 +80,12 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  }
  const list=(rows:ReservationBoardEntry[],paper=false)=>{
   const dining=columns==='dining'||paper&&kind==='seats',today=columns==='today'&&!paper
-  return <DataTable grid={!paper?{columns:today?'60px 124px 48px 64px 100px 100px'+(actions&&canWrite?' 80px':'')+(menus&&canWrite?' 32px':''):dining?'78px 96px minmax(80px,1fr) 40px 96px 96px 80px 84px'+(actions&&canWrite?' 32px':''):'72px minmax(90px,1fr) 40px 80px 90px 90px'+(actions&&canWrite?' 100px':''),compactColumns:undefined,gap:'6px',padding:today?'7px 16px':'8px 16px',rowHeight:dining?'56px':'50px',headPadding:'10px 16px'}:undefined}><thead><TableHeadRow><Th>時刻</Th>{dining?<Th>予約元</Th>:null}<Th>{today?'名前':'お客さま'}</Th><Th>人数</Th><Th>{dining||today?'卓':'卓・担当'}</Th>{dining?<><Th>コース</Th><Th>注意事項</Th></>:<Th>{today?'経路':'予約元'}</Th>}<Th>状態</Th>{actions&&canWrite&&!paper?<Th>{dining?'':'来店'}</Th>:null}{menus&&canWrite&&!paper?<Th/>:null}</TableHeadRow></thead><tbody>{rows.map(e=><Tr key={e.kind+e.id}>
+  return <DataTable columnSizing={diningContentColumns&&dining&&!paper?'content':undefined} grid={!paper?{columns:today?'60px 124px 48px 64px 100px 100px'+(actions&&canWrite?' 80px':'')+(menus&&canWrite?' 32px':''):dining?'78px 96px minmax(80px,1fr) 40px 96px 96px 80px 84px'+(actions&&canWrite?' 32px':''):'72px minmax(90px,1fr) 40px 80px 90px 90px'+(actions&&canWrite?' 100px':''),compactColumns:undefined,gap:'6px',padding:today?'7px 16px':'8px 16px',rowHeight:dining?'56px':'50px',headPadding:'10px 16px'}:undefined}><thead><TableHeadRow><Th>時刻</Th>{dining?<Th>予約元</Th>:null}<Th grow={diningContentColumns&&dining}>{today?'名前':'お客さま'}</Th><Th>人数</Th><Th>{dining||today?'卓':'卓・担当'}</Th>{dining?<><Th>コース</Th><Th>注意事項</Th></>:<Th>{today?'経路':'予約元'}</Th>}<Th>状態</Th>{actions&&canWrite&&!paper?<Th>{dining?'':'来店'}</Th>:null}{menus&&canWrite&&!paper?<Th/>:null}</TableHeadRow></thead><tbody>{rows.map(e=><Tr key={e.kind+e.id}>
    <Td>{paper||renderedDays.length>1||dining?`${dayKey(e.startsAt).slice(5).replace('-','/')} ${hm(e.startsAt)}`:hm(e.startsAt)}</Td>
    {dining?<Td><ReservationSource value={e.source} note={e.note}/></Td>:null}
-   <Td>{paper?e.customerName:<><Button presentation="restaurant" variant="text" textTone="ink" size="inline" onClick={()=>onOpen(e.id)}>{e.customerName}</Button>{dining&&e.contactLabel?<span className={styles.contact}>{e.contactLabel}</span>:null}</>}</Td>
+   <Td grow={diningContentColumns&&dining}>{paper?e.customerName:<><>{diningContentColumns&&dining?<RowNameButton title={e.customerName} onClick={()=>onOpen(e.id)}>{e.customerName}</RowNameButton>:<Button presentation="restaurant" variant="text" textTone="ink" size="inline" onClick={()=>onOpen(e.id)}>{e.customerName}</Button>}</>{dining&&e.contactLabel?<span className={styles.contact}>{e.contactLabel}</span>:null}</>}</Td>
    <Td>{e.guestCount}</Td><Td>{e.resourceIds.length?(paper?e.resourceIds.map(id=>resources.find(r=>r.id===id)?.label??e.resourceLabel??id).join('＋'):<TruncatedText value={e.resourceIds.length>1?e.resourceIds.map(id=>resources.find(r=>r.id===id)?.label??id).join('＋'):e.resourceLabel??resources.find(r=>r.id===e.resourceIds[0])?.label??'—'}/>):<StatusBadge tone="warning">未配席</StatusBadge>}</Td>
-   {dining?<><Td>{paper?`${e.courseName??'席のみ'}${e.dining?.courseAllergens?.length?'（含む：'+e.dining.courseAllergens.join('・')+'）':''}`:<TruncatedText value={e.courseName??'席のみ'}/>}</Td><Td>{paper?[e.dining?.allergy?'予約時：'+e.dining.allergy:'',e.currentAllergy?'今回：'+e.currentAllergy:'',e.dining?.anniversary?'記念日：'+e.dining.anniversary:'',e.dining?.seatPreference?'席の好み：'+e.dining.seatPreference:''].filter(Boolean).join(' ／ ')||'—':e.currentAllergy||e.dining?.allergy?<StatusBadge size="dining" tone="info" surface="white">{e.currentAllergy||e.dining?.allergy}</StatusBadge>:'—'}</Td></>:<Td><ReservationSource value={e.source} note={e.note}/></Td>}
+   {dining?<><Td>{paper?`${e.courseName??'席のみ'}${e.dining?.courseAllergens?.length?'（含む：'+e.dining.courseAllergens.join('・')+'）':''}`:<TruncatedText value={e.courseName??'席のみ'}/>}</Td><Td>{paper?[e.dining?.allergy?'予約時：'+e.dining.allergy:'',e.currentAllergy?'今回：'+e.currentAllergy:'',e.dining?.anniversary?'記念日：'+e.dining.anniversary:'',e.dining?.seatPreference?'席の好み：'+e.dining.seatPreference:''].filter(Boolean).join(' ／ ')||'—':e.currentAllergy||e.dining?.allergy?diningContentColumns?<TruncatedText value={e.currentAllergy||e.dining?.allergy||'—'} title={e.currentAllergy||e.dining?.allergy||'—'}/>:<StatusBadge size="dining" tone="info" surface="white">{e.currentAllergy||e.dining?.allergy}</StatusBadge>:'—'}</Td></>:<Td><ReservationSource value={e.source} note={e.note}/></Td>}
    <Td>{paper?(e.holdExpiresAt?'押さえ':e.status==='confirmed'?'予約確定':(e.departedAt?'退店済み':state(e.status))):<StatusBadge tone={e.holdExpiresAt||['cancelled','no_show'].includes(e.status)?'neutral':e.status==='pending'?'warning':today&&e.status==='confirmed'?'info':'success'}>{e.holdExpiresAt?'押さえ':e.status==='confirmed'?(dining?'予約確定':'予約中'):(e.departedAt?'退店済み':state(e.status))}</StatusBadge>}</Td>{actions&&canWrite&&!paper?<Td>{actions(e)}</Td>:null}{menus&&canWrite&&!paper?<Td>{menus(e)}</Td>:null}
   </Tr>)}</tbody></DataTable>
  }
