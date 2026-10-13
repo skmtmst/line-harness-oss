@@ -105,14 +105,14 @@ export default function CsvMigrationsV8() {
           <p className={styles.small} title="Shift_JISの書き出しはまだ使えません">文字コード：UTF-8</p>
           {m.manageLocked ? <p className={styles.small}>{MANAGE_FORBIDDEN}</p> : null}
           <div className={styles.cardFoot}>
-            {m.exportResult ? (
-              <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}>
+            {m.exportResult && !m.manageLocked ? (
+              <Button variant="text" size="inline" disabled={m.busy} busy={m.downloadId === m.exportResult.id} busyLabel="保存しています…" onClick={() => void m.downloadExport(m.exportResult!.id)}>
                 {`CSVで書き出す（${m.exportResult.rowCount ?? emptyValue('unknown')}件）`}
-              </a>
+              </Button>
             ) : null}
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
             {m.manageLocked ? null : (
-              <Button variant="primary" disabled={m.busy} busy={m.busy && !m.summary} onClick={() => void m.createExport()} title="件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。">
+              <Button variant="primary" disabled={m.busy} busy={m.busy && !m.summary && !m.downloadId} onClick={() => void m.createExport()} title="件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。">
                 <Download size={14} aria-hidden="true" />
                 書き出しを作る
               </Button>
@@ -227,7 +227,7 @@ export default function CsvMigrationsV8() {
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
                         </StatusBadge>
                         {downloadable ? (
-                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${encodeURIComponent(job.id)}/download`}>CSVで書き出す</a>
+                          <Button variant="text" size="inline" disabled={m.busy} busy={m.downloadId === job.id} busyLabel="保存しています…" onClick={() => void m.downloadExport(job.id)}>CSVで書き出す</Button>
                         ) : null}
                       </span>
                     </Td>
