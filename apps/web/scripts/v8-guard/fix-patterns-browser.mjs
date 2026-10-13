@@ -34,6 +34,14 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     const isList = root.dataset.pageTemplate === 'list'
     if (isList && !root.hasAttribute('data-list-skeleton') && !root.querySelector('[data-list-skeleton]')) add('F4', root, 'list template is missing its shared standard and audit scope')
     const heading = root.querySelector('[data-template-region="heading"],[data-template-region="header"]')
+    const explanationBodies = [...root.querySelectorAll('[data-screen-explanation]')]
+      .filter(el => el.closest('[data-page-template]') === root)
+    const explanationToggles = heading ? [...heading.querySelectorAll('[data-screen-explanation-toggle]')].filter(visible) : []
+    for (const panel of explanationBodies) {
+      if (!panel.id || !explanationToggles.some(toggle => toggle.getAttribute('aria-controls') === panel.id)) {
+        add('F4', panel, 'screen explanation body is missing its heading control')
+      }
+    }
     const body = root.querySelector('[data-list-folders]')
     const hasFolders = body ? body.dataset.listFolders === 'true' : !!root.querySelector('[data-template-region="folders"], [data-toolbar-leading] [aria-label="フォルダ"]')
     if (isList && !hasFolders) {
@@ -53,6 +61,8 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     inventory.push({
       board: root.dataset.designNode, template: root.dataset.pageTemplate, frame: root.dataset.heightMode,
       help: heading ? [...heading.querySelectorAll('button')].filter(visible).map(el => el.getAttribute('aria-label') || el.textContent.trim()) : [],
+      explanationBodies: explanationBodies.length,
+      explanationToggles: explanationToggles.length,
       folders: all('[data-template-region="folders"]').length,
       folderCapability: isList ? hasFolders : null,
       folderDots: all('[data-list-name] [data-folder-dot]').length,

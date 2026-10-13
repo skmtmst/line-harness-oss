@@ -4,6 +4,28 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('X7 detects missing explanation controls even for closed bodies and keeps nested scopes separate', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="settings"><header data-template-region="heading"><h2>設定</h2></header><div id="explanation" data-screen-explanation>説明本文</div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1)
+    await page.locator('[data-screen-explanation]').evaluate(el => { el.hidden = true })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1, 'closed retained body still requires its control')
+    await page.locator('header').evaluate(el => el.insertAdjacentHTML('beforeend', '<button data-screen-explanation-toggle aria-controls="explanation" aria-expanded="false">この画面の説明</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.locator('section').evaluate(el => el.insertAdjacentHTML('beforeend', '<section data-page-template="detail"><header data-template-region="heading"><h2>詳細</h2></header><div id="nested-explanation" data-screen-explanation>別の説明</div></section>'))
+    const nested = await page.evaluate(scanFixPatterns)
+    assert.equal(nested.counts.F4, 1, 'nested missing control is counted once in its own scope')
+    assert.equal(nested.inventory[0].explanationBodies, 1)
+    assert.equal(nested.inventory[1].explanationBodies, 1)
+    await page.locator('[data-page-template="detail"] header').evaluate(el => el.insertAdjacentHTML('beforeend', '<button data-screen-explanation-toggle aria-controls="nested-explanation">この画面の説明</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.setContent('<section data-page-template="detail"><header data-template-region="heading"><h2>説明のない詳細</h2></header></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+  } finally { await browser.close() }
+})
+
 test('X1/X2 use folder capability across widths; X3 checks all heading types', async () => {
   const browser=await chromium.launch()
   try {
