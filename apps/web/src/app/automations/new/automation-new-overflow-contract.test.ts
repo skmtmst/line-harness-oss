@@ -1,27 +1,30 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import { createElement } from 'react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ActionRow } from '@/components/shared/action-list'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../../v8/automations/create/create.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, '../../../components/shared/action-list.module.css'), 'utf8')
+afterEach(cleanup)
 
-/*
- * #973 U023: 自動化の新規作成（/automations/new）で
- * 「すること」と「付けるタグ」などの対象設定が2列のまま潰れていた。
- */
-describe('自動化作成のはみ出し（#973 U023）', () => {
-  it('共通の処理の行は狭い幅で折り返し、設定は縦に並ぶ', () => {
-    expect(PAGE).toContain('<ActionList<ActionDraft>')
-    expect(CSS).toContain('@media (max-width: 600px)')
-    expect(CSS).toContain('.row { flex-wrap: wrap; }')
-    expect(CSS).toContain('.editor { display: flex; flex-direction: column;')
-    expect(CSS).toContain('.title, .titleButton { flex-basis: 100%; order: 1; }')
-  })
-
-  it('固定最小幅の2列（190px+260px）は390pxを通らないので持たない', () => {
-    expect(CSS).not.toContain('minmax(190px')
-    expect(CSS).not.toContain('minmax(260px, 1.2fr)')
+describe('自動化作成の行の構造（#973 U023）', () => {
+  it('名前と値は同じまとまり、設定欄は行の操作から独立して描く', () => {
+    const { container } = render(createElement(ActionRow, {
+      title: '本人にLINEで知らせる', kind: 'LINE', number: 1, open: true,
+      onToggle: () => {}, extra: '成果1件ごとに',
+    }, createElement('input', { 'aria-label': 'すること', defaultValue: 'LINEで知らせる' }),
+    createElement('input', { 'aria-label': '対象', defaultValue: '付けるタグ' })))
+    const row = container.querySelector('[data-action-row]')!
+    const name = within(row as HTMLElement).getByRole('button', { name: '本人にLINEで知らせる' })
+    const value = within(row as HTMLElement).getByText('成果1件ごとに')
+    expect(name.parentElement).toBe(value.parentElement)
+    const operation = screen.getByRole('button', { name: '1つ目の行うことのその他操作' })
+    expect(name.parentElement?.contains(operation)).toBe(false)
+    const inputs = screen.getAllByRole('textbox')
+    expect(inputs.map(input => input.getAttribute('aria-label'))).toEqual(['すること', '対象'])
+    expect(inputs[0].parentElement).toBe(inputs[1].parentElement)
+    expect(inputs[0].parentElement?.parentElement).toBe(row)
+    expect(inputs[0].parentElement?.contains(name)).toBe(false)
+    expect((inputs[0] as HTMLInputElement).value).toBe('LINEで知らせる')
+    expect((inputs[1] as HTMLInputElement).value).toBe('付けるタグ')
   })
 })

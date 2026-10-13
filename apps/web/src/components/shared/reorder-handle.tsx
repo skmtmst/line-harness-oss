@@ -220,6 +220,8 @@ export function useReorder<T>({
     return !blocked && from >= 0 && to >= 0 && to < ids.length
   }
 
+  const moveReason = (id: string, direction: ReorderDirection) => reorderMoveReason(ids.indexOf(id), ids.length, direction, disabledReason)
+
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
@@ -262,14 +264,14 @@ export function useReorder<T>({
         id: 'move-up',
         label: '上へ',
         disabled: from <= 0,
-        disabledReason: from <= 0 ? 'いちばん上です' : undefined,
+        disabledReason: moveReason(id, -1) ?? undefined,
         onSelect: () => { moveBy(id, -1, 'menu'); onDone?.() },
       },
       {
         id: 'move-down',
         label: '下へ',
         disabled: from < 0 || from >= ids.length - 1,
-        disabledReason: from >= ids.length - 1 ? 'いちばん下です' : undefined,
+        disabledReason: moveReason(id, 1) ?? undefined,
         onSelect: () => { moveBy(id, 1, 'menu'); onDone?.() },
       },
     ]
@@ -287,10 +289,20 @@ export function useReorder<T>({
     blocked,
     moveBy,
     canMoveBy,
+    moveReason,
     handleProps,
     rowProps,
     menuItems,
     /** ReorderHandle に渡す onMove・disabledReason。 */
     handle,
   }
+}
+
+/** 矢印・メニュー・つまみが同じ並びと禁止理由を読む。保存の口は画面が保つ。 */
+export function reorderMoveReason(index: number, count: number, direction: ReorderDirection, blockedReason?: string | null): string | null {
+  if (blockedReason) return blockedReason
+  if (index < 0 || index >= count) return 'この項目が見つかりません'
+  if (index + direction < 0) return 'いちばん上です'
+  if (index + direction >= count) return 'いちばん下です'
+  return null
 }

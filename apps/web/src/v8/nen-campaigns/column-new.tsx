@@ -33,6 +33,7 @@ import styles from './form.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { ColumnPreviewCard } from './preview'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8-B コラムを書く（`yRDwW`）。
@@ -197,14 +198,14 @@ export default function ColumnNew() {
         <CardHeader size="stacked" titleId="nen-col-title-heading" title={<>題名と分類</>} />
         <Field label="題名" required><SaveErrorField names={["title","draft.title"]}><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-title-error">{errorFor('title')}</FieldError></Field>
-        <div className={styles.row}>
+        <SettingsFormRow layout="columns">
           <Field label="分類"><SaveErrorField names={["category","draft.category"]}><TextField id="nen-col-category" aria-describedby={errorFor('category') ? 'nen-col-category-error' : undefined} aria-label="分類" value={draft.category} invalid={Boolean(errorFor('category'))} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-category-error">{errorFor('category')}</FieldError></Field>
           <div className={styles.field}>
             <span className={styles.labelSmall}>前のコラムを下敷きにする</span>
             <Link href="/nen-campaigns?tab=columns" className={styles.linkAction}>一覧で元のコラムを選びます →</Link>
           </div>
-        </div>
+        </SettingsFormRow>
         <Field label="概要（LINE のカードに出る短い紹介文）"><SaveErrorField names={["excerpt","draft.excerpt"]}><TextField id="nen-col-excerpt" aria-describedby={errorFor('excerpt') ? 'nen-col-excerpt-error' : undefined} aria-label="概要" value={draft.excerpt} invalid={Boolean(errorFor('excerpt'))} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-excerpt-error">{errorFor('excerpt')}</FieldError></Field>
       </Card>
@@ -213,9 +214,10 @@ export default function ColumnNew() {
         <CardHeader size="stacked" titleId="nen-col-link" title={<>記事のリンク</>} />
         <Field label="記事の URL" required><SaveErrorField names={["articleUrl","draft.articleUrl","article_url","draft.article_url"]}><TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-articleUrl-error">{errorFor('articleUrl')}</FieldError></Field>
-        <div className={styles.field} id="nen-col-imageUrl" tabIndex={-1}>
-          <span className={styles.label}>画像</span>
+        <div id="nen-col-imageUrl" tabIndex={-1}>
+          <Field label="画像">
           <SaveErrorField names={["imageUrl","draft.imageUrl","image_url","draft.image_url"]}><MediaSlot
+            size="compact"
             title="画像を追加"
             previewAlt="コラムの画像"
             value={draft.imageUrl || null}
@@ -227,6 +229,7 @@ export default function ColumnNew() {
             onChange={(url) => set({ imageUrl: url ?? '' })}
             urlEntry={{ value: draft.imageUrl, onChange: (url) => set({ imageUrl: url }), label: '画像の URL', placeholder: 'https://cdn.example.com/...' }}
           /></SaveErrorField>
+          </Field>
         </div>
       </Card>
 
@@ -241,7 +244,7 @@ export default function ColumnNew() {
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-when" data-nen-part="publish">
         <CardHeader size="stacked" titleId="nen-col-when" title={<>いつ・だれに出しますか</>} meta={<>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります</>} />
-        <div className={styles.row}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.labelRow}>
 
@@ -271,19 +274,19 @@ export default function ColumnNew() {
             /></SaveErrorField>
             <FieldError id="nen-col-targetTagId-error">{errorFor('targetTagId')}</FieldError>
           </div>
-        </div>
+        </SettingsFormRow>
         {publishOpen ? (
-          <div className={styles.row}>
+          <SettingsFormRow layout="columns">
             <div className={styles.field}><Field label="公開日時（日本時間・）" htmlFor="nen-col-publishedAt"><SaveErrorField names={["publishedAt","draft.publishedAt","published_at","draft.published_at"]}><DateTimeField id="nen-col-publishedAt" aria-label="公開日時（日本時間）" aria-describedby={errorFor('publishedAt') ? 'nen-col-publishedAt-error' : undefined} value={draft.publishedAt} invalid={Boolean(errorFor('publishedAt'))} onChange={(value) => set({ publishedAt: value })} /></SaveErrorField>
 {errorFor('publishedAt') ? <FieldError id="nen-col-publishedAt-error">{errorFor('publishedAt')}</FieldError> : <span className={styles.muted}>空のままなら公開日時は入りません。日本時間で保存します。</span>}</Field></div>
             <span aria-hidden="true" />
-          </div>
+          </SettingsFormRow>
         ) : null}
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-read">
         <CardHeader size="stacked" titleId="nen-col-read" title={<>読んだ人にすること</>} />
-        <div className={styles.row}>
+        <SettingsFormRow layout="columns">
           <Field label="読了イベント名"><SaveErrorField names={["completionEventName","draft.completionEventName","completion_event_name","draft.completion_event_name"]}><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></SaveErrorField></Field>
           <div className={styles.field}>
             <span className={styles.labelSmall}>読了後に付けるタグ</span>
@@ -297,7 +300,7 @@ export default function ColumnNew() {
               onChange={(value) => set({ completionTagId: value })}
             /></SaveErrorField>
           </div>
-        </div>
+        </SettingsFormRow>
       </Card>
       <Drawer open={previewOpen} title="配信のプレビュー" width="narrow" onClose={() => setPreviewOpen(false)}>{preview}</Drawer>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />

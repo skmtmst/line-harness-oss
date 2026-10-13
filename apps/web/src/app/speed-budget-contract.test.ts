@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  applyJsBaselineAllowance,
+  budgetExceedances,
   expandFriends,
   gotoTarget,
   judge,
@@ -20,6 +20,8 @@ import {
   SPEED_ROUTES,
   targetMisses,
 } from '../../scripts/v8-guard/speed-budget.mjs'
+
+import { speedEnforcement, speedSummary } from '../../scripts/v8-guard/speed-outcome.mjs'
 
 const BUDGET_PATH = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -134,28 +136,28 @@ describe('3回測って真ん中', () => {
   })
 })
 
-describe('同じPRで基準更新があればJS超過は通す', () => {
+describe('速度超過は記録し、共通設定で強制判定へ戻せる', () => {
   const over = [row({ jsBytes: 900000 + 2048 })]
   const mixed = [row({ jsBytes: 900000 + 2048 }), row({ name: 'slow', route: '/slow', showMs: 9999, lcpMs: 1, pressMs: 1, longTaskMs: 0, jsBytes: 1 })]
 
-  it('基準更新なしではJS超過で落ちる', () => {
-    const { failures, notices } = applyJsBaselineAllowance(judge(over, { friends: base() }), false)
-    expect(failures.length).toBeGreaterThan(0)
-    expect(notices).toEqual([])
+  it('JS超過を許可へ移さず、実測と上限を記録する', () => {
+    expect(budgetExceedances(over, { friends: base() })).toEqual([
+      { screen: 'friends', metric: 'jsBytes', value: 902048, limit: 901024, unit: 'B', check: 'budget' },
+    ])
   })
 
-  it('基準更新ありではJS超過を通し、時間の悪化は通さない', () => {
-    const judged = judge(mixed, { friends: base(), slow: base({ showMs: 100 }) })
-    const { failures, notices } = applyJsBaselineAllowance(judged, true)
-    expect(notices.length).toBe(1)
-    expect(failures.length).toBe(1)
-    expect(failures[0]).toContain('slow')
+  it('時間とJSの超過を両方保持し、切り替えだけで強制判定へ戻せる', () => {
+    const exceeded = budgetExceedances(mixed, { friends: base(), slow: base({ showMs: 100 }) })
+    expect(exceeded.map(row => row.screen)).toEqual(['friends', 'slow'])
+    expect(speedEnforcement({})).toBe('report')
+    expect(speedEnforcement({ V8_SPEED_ENFORCEMENT: 'enforce' })).toBe('enforce')
+    expect(() => speedEnforcement({ V8_SPEED_ENFORCEMENT: 'unknown' })).toThrow()
   })
 
-  it('JS超過の文に理由の書き方（同じPRで基準更新・PRに理由）が出る', () => {
-    const [line] = judge(over, { friends: base() })
-    expect(line).toContain('同じPRで基準を更新')
-    expect(line).toContain('理由をPRに書く')
+  it('概要は画面・項目・実測・上限・超えた量を表へ出す', () => {
+    const summary = speedSummary(budgetExceedances(over, { friends: base() }))
+    expect(summary).toContain('速さの上限を超えた物')
+    expect(summary).toContain('friends | jsBytes | 902048B | 901024B | +1024B')
   })
 })
 

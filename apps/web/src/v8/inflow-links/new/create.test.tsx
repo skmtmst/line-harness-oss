@@ -121,6 +121,17 @@ describe('V8 流入リンクを作る', () => {
     expect(posted[0]).toMatchObject({ genre: '店頭', name: '店頭POP', lineAccountId: 'account-a' })
   })
 
+  it('題の説明を開閉しても、入力を保ち発行しない', async () => {
+    await mount()
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '説明を読んでいる途中の入口' } })
+    const help = screen.getByRole('button', { name: '流入リンクを作るの説明' })
+    await act(async () => { help.click() })
+    expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('友だち追加の入口')
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('false')
+    expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('説明を読んでいる途中の入口')
+    expect(posted).toHaveLength(0)
+  })
   it('入力が不足すると最初の欄へ移り、欄ごとの理由を出し、発行しない', async () => {
     await mount()
     const scroll = vi.fn()

@@ -33,6 +33,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card, { CardHeader } from '@/components/shared/card'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
@@ -452,7 +453,7 @@ export default function NewCommonVarV8() {
 
       <Card variant="form" gap="normal" aria-labelledby="cv-new-name-heading">
         <CardHeader size="stacked" titleId="cv-new-name-heading" title="名前と差し込み名" />
-        <div className={styles.nameRow}>
+        <SettingsFormRow layout="name-folder">
           <div className={styles.field}><Field density="input" required label="共通情報名（友だちには見えません）" htmlFor="cv-name"><SaveErrorField names={["name"]}><TextField
               id="cv-name"
               type="text"
@@ -470,8 +471,8 @@ export default function NewCommonVarV8() {
               title={`${name.length}/${NAME_MAX}文字`}
             /></SaveErrorField>
 <VarFieldError message={nameFieldError} /></Field></div>
-          <div className={`${styles.field} ${styles.folderField}`}><Field density="input" label="フォルダ" htmlFor="cv-folder"><div className={styles.selectBox}>
-              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
+          <div className={styles.field}><Field density="input" label="フォルダ" htmlFor="cv-folder"><div className={styles.selectBox}>
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect size="full"
                 aria-label="フォルダ"
                 id="cv-folder"
                 value={folderId}
@@ -490,7 +491,7 @@ export default function NewCommonVarV8() {
                 </Button>
               </div>
             ) : null}</Field></div>
-        </div>
+        </SettingsFormRow>
         <div className={styles.field}><Field density="input" note={<>
             半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
           </>} required label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
@@ -590,14 +591,14 @@ export default function NewCommonVarV8() {
 
       <Card variant="form" gap="normal" aria-labelledby="cv-new-period-heading">
         <CardHeader size="stacked" titleId="cv-new-period-heading" title="使える期間" meta="空なら期間を決めません。予約した配信は、送り始める時刻で判断します" />
-        <div className={styles.periodGrid}>
+        <SettingsFormRow layout="columns" columns={3}>
 
           <Field density="input" label="始まり" htmlFor="cv-valid-from"><SaveErrorField names={["validFrom","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
           <Field density="input" label="終わり" htmlFor="cv-valid-until"><SaveErrorField names={["validUntil","valid_until"]}><DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
           <div className={styles.selectBox}>
             <Field density="input" label="期間の外では" htmlFor="cv-expiry-behavior"><SaveErrorField names={["expiryBehavior","expiry_behavior"]}><Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} /></SaveErrorField></Field>
           </div>
-        </div>
+        </SettingsFormRow>
         <VarFieldError message={periodFieldError} />
         {expiryBehavior === 'fallback' && (
           <div className={styles.field}><Field density="input" label="代替値" htmlFor="cv-fallback-value">{type === 'boolean' ? (

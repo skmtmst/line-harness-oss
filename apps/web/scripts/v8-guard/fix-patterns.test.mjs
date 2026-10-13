@@ -2,7 +2,206 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import scanListOperations from './list-operation-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
+import { readFileSync } from 'node:fs'
+
+test('F3 counts spaced handwritten pager units and retains partial-read disclosure', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="detail"><nav data-pagination><span>214 件中 1〜20 件</span></nav><p class="pagerSummary">5 人中 1〜5 人</p></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3, 2)
+    await page.locator('nav span').evaluate(el => el.textContent = '最新100件（全340件）のうち 100件中 1〜20件')
+    await page.locator('p').evaluate(el => el.textContent = '5人中 1〜5人')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3, 0)
+  } finally { await browser.close() }
+})
+
+test('Z1 detects a stacked avatar even when every text node occupies one line', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="detail"><table><tbody><tr><td><span data-avatar style="display:block;width:24px;height:24px;border-radius:50%">K</span><a style="display:block">Kenta Kawano</a></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).findings.filter(f => f.reason.includes('avatar and person')).length, 1)
+    await page.addStyleTag({content:'td{display:flex;align-items:center;gap:8px}a{white-space:nowrap}'})
+    assert.equal((await page.evaluate(scanFixPatterns)).findings.filter(f => f.reason.includes('avatar and person')).length, 0)
+  } finally { await browser.close() }
+})
+
+test('Z3 detects missing canonical content inset and retains full width ordinary list tables', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>section{width:500px}div{box-sizing:border-box}p{margin:0}</style><section data-page-template="list"><div data-template-region="content"><div data-template-region="content"><p>本文</p><div data-shared-part="list-table">表</div></div></div></section>')
+    const failures = async () => (await page.evaluate(scanFixPatterns)).findings.filter(f => f.reason.includes('content right edge'))
+    assert.equal((await failures()).length, 1)
+    await page.addStyleTag({content:'[data-template-region=content] > [data-template-region=content]{padding-inline:24px}'})
+    assert.equal((await failures()).length, 0)
+    await page.locator('[data-template-region=content] > [data-template-region=content]').evaluate(el => el.replaceWith(...el.childNodes))
+    assert.equal((await failures()).length, 0)
+  } finally { await browser.close() }
+})
+
+test('Z fixes use the real shared person row and preserve the real template padding', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const tableCss = readFileSync(new URL('../../src/components/shared/table.module.css', import.meta.url), 'utf8')
+    const templateCss = readFileSync(new URL('../../src/components/templates/page-templates.module.css', import.meta.url), 'utf8').split('\n')
+      .filter(line => line.includes(' .pageContent {') || line.includes("div:not([data-template-region]):has(> [data-shared-part='list-table'])"))
+      .map(line => line.replaceAll(':global(:root)', ':root').replace(':global(div', 'div').replace(')) {', ') {')).join('\n')
+    await page.setContent(`<style>:root{--space-8:8px;--polish-space-card:16px;--polish-space-section:24px}section{width:500px}div{box-sizing:border-box}.face{width:24px;height:24px;flex:none;border-radius:50%}.name-link{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}td{width:100px}${tableCss}${templateCss}</style><section data-page-template="list" data-list-skeleton="templates"><div class="listBody"><div class="content" data-template-region="content"><div class="pageContent" data-template-region="content"><div data-shared-part="list-table"><table><tbody><tr><td><span class="person"><span class="face" data-avatar>K</span><span class="personName"><a class="name-link" title="名前が長い友だち">名前が長い友だち</a></span></span></td></tr></tbody></table></div></div></div></div></section>`)
+    const current = await page.evaluate(scanFixPatterns)
+    assert.equal(current.findings.filter(f => /avatar and person|content right edge/.test(f.reason)).length, 0)
+    assert.equal(await page.locator('.pageContent').evaluate(el => getComputedStyle(el).paddingRight), '24px')
+    await page.addStyleTag({ content: '.person{flex-direction:column !important}.pageContent{padding-right:0 !important}' })
+    const broken = await page.evaluate(scanFixPatterns)
+    assert.equal(broken.findings.filter(f => f.reason.includes('avatar and person')).length, 1)
+    assert.equal(broken.findings.filter(f => f.reason.includes('content right edge')).length, 1)
+  } finally { await browser.close() }
+})
+
+test('Y14 detects static trailing text overlapping a filter and accepts separate rows and owned controls', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>section{width:1200px}#tools{position:relative;height:80px}button{position:absolute;left:0;top:0;width:80px;height:36px}#end{position:absolute;left:70px;top:6px;white-space:nowrap}</style><section data-page-template="list" data-list-skeleton><div id="tools" data-template-region="toolbar"><button>縦長</button><div id="end" data-toolbar-trailing><span>並び：作成が新しい順</span></div></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 1)
+    await page.locator('#end').evaluate(el => { el.style.left = '88px' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0)
+    await page.locator('#end').evaluate(el => { el.style.left = '70px'; el.style.top = '42px' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0, 'another row does not overlap')
+    await page.locator('#end').evaluate(el => { el.style.left = '200px'; el.style.top = '0'; el.innerHTML = '<button>並び：作成が新しい順</button>' })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F6, 0, 'text inside its own button is not a separate tool')
+  } finally { await browser.close() }
+})
+
+test('X8 detects open explanation controls without a matching body in their page scope', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1)
+    await page.locator('button').evaluate(el => el.setAttribute('aria-expanded', 'false'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0, 'closed unmounted explanation is allowed')
+    await page.locator('button').evaluate(el => el.setAttribute('aria-expanded', 'true'))
+    await page.locator('section').evaluate(el => el.insertAdjacentHTML('beforeend', '<div data-screen-explanation id="body">元の説明</div>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.locator('[data-screen-explanation]').evaluate(el => el.outerHTML = '<section data-page-template="detail"><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header><div data-screen-explanation id="body">別の型の説明</div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1, 'another template body cannot satisfy the outer control')
+  } finally { await browser.close() }
+})
+
+test('X7 detects missing explanation controls even for closed bodies and keeps nested scopes separate', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="settings"><header data-template-region="heading"><h2>設定</h2></header><div id="explanation" data-screen-explanation>説明本文</div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1)
+    await page.locator('[data-screen-explanation]').evaluate(el => { el.hidden = true })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 1, 'closed retained body still requires its control')
+    await page.locator('header').evaluate(el => el.insertAdjacentHTML('beforeend', '<button data-screen-explanation-toggle aria-controls="explanation" aria-expanded="false">この画面の説明</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.locator('section').evaluate(el => el.insertAdjacentHTML('beforeend', '<section data-page-template="detail"><header data-template-region="heading"><h2>詳細</h2></header><div id="nested-explanation" data-screen-explanation>別の説明</div></section>'))
+    const nested = await page.evaluate(scanFixPatterns)
+    assert.equal(nested.counts.F4, 1, 'nested missing control is counted once in its own scope')
+    assert.equal(nested.inventory[0].explanationBodies, 1)
+    assert.equal(nested.inventory[1].explanationBodies, 1)
+    await page.locator('[data-page-template="detail"] header').evaluate(el => el.insertAdjacentHTML('beforeend', '<button data-screen-explanation-toggle aria-controls="nested-explanation">この画面の説明</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+    await page.setContent('<section data-page-template="detail"><header data-template-region="heading"><h2>説明のない詳細</h2></header></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F4, 0)
+  } finally { await browser.close() }
+})
+
+test('X1/X2 use folder capability across widths; X3 checks all heading types', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    await page.setContent(`<section data-page-template="list" data-list-skeleton="templates"><header data-template-region="heading"><h2>一覧</h2><button>この画面の説明</button><button aria-label="一覧の説明">？</button><div data-heading-actions></div></header><div data-list-folders="false"><div data-template-region="toolbar"><a href="/new">決めごとを作る</a></div><span data-list-name><span data-folder-dot>○</span>名前</span></div></section>`)
+    const before=await page.evaluate(scanFixPatterns)
+    assert.equal(before.counts.F9,2)
+    assert.equal(before.counts.F3,1)
+    await page.evaluate(() => {
+      const heading=document.querySelector('header')
+      heading.querySelector('[data-heading-actions]').append(document.querySelector('a'))
+      document.querySelector('[data-folder-dot]').remove()
+      const help=heading.querySelector('[aria-label]');heading.insertBefore(help,heading.querySelector('button'))
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3,0)
+    await page.evaluate(() => {
+      document.querySelector('[data-list-folders]').dataset.listFolders='true'
+      document.querySelector('[data-template-region="toolbar"]').append(document.querySelector('a'))
+      document.querySelector('[data-list-name]').insertAdjacentHTML('afterbegin','<span data-folder-dot>○</span>')
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F9,0, 'collapsed folder-capable lists retain tools and dots')
+    await page.evaluate(() => {
+      document.querySelector('section').dataset.pageTemplate='create'
+      const heading=document.querySelector('header');heading.append(heading.querySelector('[aria-label]'))
+    })
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F3,1,'all templates check help order')
+  } finally {await browser.close()}
+})
+
+test('F1 reads painted labels without counting an enlarged radio hit target as clipped text', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>label{position:relative;display:flex;width:max-content;height:20px;font:13px/20px sans-serif}label::before{content:"";position:absolute;inset:-3px}span{white-space:nowrap}</style><section data-page-template="create"><label><span>リッチメッセージ</span></label></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+    await page.addStyleTag({ content: 'label{width:40px;overflow:hidden}' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F1 > 0)
+    await page.addStyleTag({ content: 'label{width:max-content;height:8px;overflow:hidden}' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F1 > 0)
+  } finally { await browser.close() }
+})
+
+test('F2 distinguishes a column of upload instructions from a wrapped short action label', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>button{display:flex;flex-direction:column;width:240px;font:13px/20px sans-serif}span{display:block}</style><section data-page-template="create"><button><span>画像を追加</span><span>ドラッグ＆ドロップ<br>またはクリック</span><span>PNG・JPEG・10MBまで</span></button></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F2, 0)
+    await page.addStyleTag({ content: 'button{width:45px}' })
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+    await page.setContent('<section data-page-template="create"><button style="width:40px;font:13px/20px sans-serif">変更を保存する</button></section>')
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F2 > 0)
+  } finally { await browser.close() }
+})
+
+test('F5 counts a page-owned explanation in the tool band and accepts shared notice ownership', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage(), owners = sharedControlOwners()
+    assert.ok(owners.includes('notice'))
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar"><p class="page_readonlyBand__abc">項目の種類を変える前の説明</p></div></section>')
+    assert.equal((await page.evaluate(scanFixPatterns, { cssOwners: owners })).counts.F5, 1)
+    await page.locator('p').evaluate(el => el.className = 'notice_notice__abc')
+    assert.equal((await page.evaluate(scanFixPatterns, { cssOwners: owners })).counts.F5, 0)
+    assert.equal(await page.locator('p').innerText(), '項目の種類を変える前の説明')
+  } finally { await browser.close() }
+})
+
+test('F1 catches a selected label ellipsized by half a pixel and accepts its exact rendered width', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><span data-select-value style="display:inline-block;font:13px Arial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォルダ：すべて</span><span data-list-name style="display:inline-block;width:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">省略してよい名前</span></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+    const fullWidth = await page.locator('[data-select-value]').evaluate(el => el.getBoundingClientRect().width)
+    await page.locator('[data-select-value]').evaluate((el, width) => el.style.width = `${width - .5}px`, fullWidth)
+    const deficit = await page.locator('[data-select-value]').evaluate(el => {
+      const range = document.createRange(); range.selectNodeContents(el)
+      return range.getBoundingClientRect().width - el.getBoundingClientRect().width
+    })
+    assert.ok(deficit > 0 && deficit < 1, 'the regression is smaller than the former one-pixel tolerance')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 1)
+    await page.locator('[data-select-value]').evaluate((el, width) => el.style.width = `${width}px`, fullWidth)
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1, 0)
+  } finally { await browser.close() }
+})
 
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
   const browser=await chromium.launch()
@@ -133,4 +332,33 @@ test('W4 distinguishes heading actions and archive filters without board IDs',as
  const after=await page.evaluate(scanFixPatterns)
  assert.equal(after.counts.F5,0);assert.equal(after.counts.F4,0)
  }finally{await browser.close()}
+})
+
+
+test('list semantics catches two folder/create entries even when they fit, while a distinct creation action stays available', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list"><div data-template-region="toolbar"><button aria-label="フォルダ">フォルダ：すべて</button><button aria-label="フォルダで絞り込む">フォルダ：すべて</button><a href="/new">案内を作る</a><a href="/new">案内を作る</a><a href="/folder-new">フォルダを作る</a></div></section>')
+    const broken = await page.evaluate(scanListOperations)
+    assert.equal(broken.findings.length,2)
+    await page.getByRole('button',{name:'フォルダで絞り込む',exact:true}).evaluate(el=>el.remove())
+    await page.locator('a[href="/new"]').last().evaluate(el=>el.remove())
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+    assert.equal(await page.locator('a').count(),2)
+  } finally { await browser.close() }
+})
+
+test('read-only list selection is detected, while editable and row-ineligible selections are retained', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list"><div data-read-only-notice>閲覧のみ</div><table><thead><tr><th><input type="checkbox" aria-label="全部選ぶ"></th></tr></thead><tbody><tr><td><input type="checkbox" disabled title="この行は対象外" aria-label="行を選ぶ"></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,2)
+    await page.locator('[data-read-only-notice]').evaluate(el=>el.remove())
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+    await page.locator('section').evaluate(el=>{ const notice=document.createElement('div');notice.dataset.readOnlyNotice='';notice.textContent='閲覧のみ';el.prepend(notice) })
+    await page.locator('input').evaluateAll(els=>els.forEach(el=>el.remove()))
+    assert.equal((await page.evaluate(scanListOperations)).findings.length,0)
+  } finally { await browser.close() }
 })

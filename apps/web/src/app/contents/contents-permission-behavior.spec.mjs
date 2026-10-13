@@ -187,20 +187,22 @@ function permissionNote(page) {
   return page.getByRole('note').filter({ hasText: '閲覧のみで見ています。' })
 }
 
-async function expectManagementHidden(page) {
+async function expectManagementHidden(page, { canRegister = false } = {}) {
   const menu = await openMediaMenu(page)
   await expect(menu).toBeVisible()
   for (const name of ['使用箇所を見る', '名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する', '別のメディアに差し替える']) {
     /* 無効な項目に理由が付いて読み上げ名が長くなっても、隠す契約の違反として検出する。 */
     await expect(menu.getByRole('menuitem', { name })).toHaveCount(0)
   }
-  /* 閲覧・登録・ダウンロードはstaffも使える。管理操作と混同しない。 */
+  /* 閲覧・ダウンロードは残す。登録は確認済みの書込み可能なstaffだけに出す。 */
   await expect(menu.getByRole('menuitem', { name: 'プレビュー', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'ダウンロード', exact: true })).toBeVisible()
   await expect(page.getByRole('checkbox', { name: `${MEDIA_NAME}を選ぶ`, exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /選択したメディアを削除/ })).toHaveCount(0)
   await expect(page.getByText('すべてのメディアを選択', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true }).first()).toBeVisible()
+  const register = page.getByRole('button', { name: 'メディアを登録する', exact: true })
+  if (canRegister) await expect(register.first()).toBeVisible()
+  else await expect(register).toHaveCount(0)
 }
 
 /** 使用箇所の照会に加え、編集・削除等の書き込み要求も実際に監視する。 */
@@ -245,6 +247,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
 
     releaseRole()
     await expect(permissionNote(page)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true }).first()).toBeVisible()
     await openUsage(page)
     await expect.poll(() => management.requests).toEqual(['GET /api/media/media-delete-target/delete-impact'])
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
@@ -275,10 +278,28 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
 
     await openContents(page)
     await expect(permissionNote(page)).toContainText('管理者だけができます')
-    await expectManagementHidden(page)
+    await expectManagementHidden(page, { canRegister: true })
     expect(management.requests).toEqual([])
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'メディアを登録する', exact: true }).first().click()
+    await expect(page.getByRole('dialog', { name: 'ファイルを入れる', exact: true })).toBeVisible()
+    expect(management.requests).toEqual([])
   })
+
+  for (const restriction of [{ readOnly: true }, { roleBundle: 'view_only' }]) {
+    test(`閲覧専用（${Object.keys(restriction)[0]}）は登録を隠し、プレビューとダウンロードを保つ`, async ({ page }) => {
+      const management = managementRequestLog()
+      await stubApi(page, {
+        role: 'staff',
+        staffMe: async () => ok({ id: 'viewer-1', name: 'Viewer', role: 'staff', email: null, ...restriction }),
+        onRequest: management.onRequest,
+      })
+      await openContents(page)
+      await expectManagementHidden(page)
+      expect(management.requests).toEqual([])
+    })
+  }
 
   /*
     役割が読めない壊れ方は2通りある。**どちらもfail-closedでなければならない。**

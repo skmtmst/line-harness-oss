@@ -81,7 +81,7 @@ function latestPill(item: SavedAnalyticsSummary) {
 function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
   const router = useRouter()
   return <span className={styles.rowMenu}>
-    <RowMenu className={styles.rowMenuButton} label={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
+    <RowMenu appearance="box" label={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
   </span>
 }
 

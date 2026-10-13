@@ -44,6 +44,7 @@ import NumberInput from '@/components/shared/number-field'
 import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 マイル「使い道を作る・編集する」（板 `L2Bzp`）。
@@ -410,6 +411,8 @@ function RewardEditorInner() {
       boardId="L2Bzp"
       title="使い道を作る"
       help="マイルと交換できる特典を決めます。出すと、お客さまの LINE（マイルの画面）に並びます。"
+      previewLabel="お客さまの見え方を見る"
+      previewTitle="お客さまの見え方"
       preview={preview}
       hidePreviewWhenNarrow
       footerActions={<>
@@ -437,19 +440,19 @@ function RewardEditorInner() {
 
       <Card variant="form" aria-label="基本">
         <CardHeader size="stacked" title="基本" />
-        <div className={styles.grid2}>
-          <Field label="名前" htmlFor="reward-name" requirement={rewardNameRequirement} error={touched ? rewardNameRequirement.check(form.name) : undefined}>
+        <SettingsFormRow layout="columns">
+          <Field requirement={rewardNameRequirement} label="名前" htmlFor="reward-name" error={touched ? rewardNameRequirement.check(form.name) : undefined}>
             <SaveErrorField names={["name","form.name"]}><TextField id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" /></SaveErrorField>
           </Field>
-          <Field label="必要マイル" htmlFor="reward-miles" requirement={rewardMilesRequirement} error={errorOf('必要マイルは1以上の整数で入力してください')}>
+          <Field requirement={rewardMilesRequirement} label="必要マイル" htmlFor="reward-miles" error={errorOf('必要マイルは1以上の整数で入力してください')}>
             <SaveErrorField names={["requiredMiles","form.requiredMiles","required_miles","form.required_miles"]}><NumberInput numericText id="reward-miles" inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" /></SaveErrorField>
           </Field>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card variant="form" aria-label="渡すもの">
         <CardHeader size="stacked" title="渡すもの" />
-        <div className={styles.grid2}>
+        <SettingsFormRow layout="columns">
           <SelectField label="交換後に渡すもの" htmlFor="reward-action" requirement={rewardActionRequirement(form.rewardKind)}
             help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
           >
@@ -480,7 +483,7 @@ function RewardEditorInner() {
               options={KINDS.map((kind) => ({ value: kind.value, label: kind.label }))}
             /></SaveErrorField>
           </SelectField>
-        </div>
+        </SettingsFormRow>
         <SelectField label="渡せなかったとき" htmlFor="reward-failure" help="マイルは交換の時点で引かれます。渡せなかったときの決めごとがないと、引かれたまま何も届きません">
           <SaveErrorField names={["failurePolicy","form.failurePolicy","failure_policy","form.failure_policy"]}><Select
             id="reward-failure"
@@ -525,27 +528,27 @@ function RewardEditorInner() {
 
       <Card variant="form" aria-label="出す数と期間">
         <CardHeader size="stacked" title="出す数と期間" />
-        <div className={styles.grid2}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}><Field label="出す数" htmlFor="reward-stock"><SaveErrorField names={["stockLimit","form.stockLimit","stock_limit","form.stock_limit"]}><NumberInput numericText id="reward-stock" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.stockLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? 'reward-stock-error' : undefined} inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" /></SaveErrorField>
 {errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? <p id="reward-stock-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.stockLimit}</p> : null}</Field></div>
           <div className={styles.field}><Field label="1人あたり" htmlFor="reward-per-friend"><SaveErrorField names={["perFriendLimit","form.perFriendLimit","per_friend_limit","form.per_friend_limit"]}><NumberInput numericText id="reward-per-friend" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.perFriendLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? 'reward-per-friend-error' : undefined} inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" /></SaveErrorField>
 {errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? <p id="reward-per-friend-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.perFriendLimit}</p> : null}</Field></div>
-        </div>
-        <div className={styles.grid2}>
+        </SettingsFormRow>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}><Field label="交換開始" htmlFor="reward-starts"><SaveErrorField names={["startsAt","form.startsAt","starts_at","form.starts_at"]}><DateTimeField id="reward-starts" aria-label="交換開始" value={form.startsAt} onChange={(v) => set('startsAt', v)} /></SaveErrorField></Field></div>
           <div className={styles.field}><Field label="交換終了" htmlFor="reward-ends"><SaveErrorField names={["endsAt","form.endsAt","ends_at","form.ends_at"]}><DateTimeField id="reward-ends" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} invalid={Boolean(errorOf('交換終了は交換開始より後にしてください'))} aria-describedby={errorOf('交換終了は交換開始より後にしてください') ? 'reward-ends-error' : undefined} placeholder="期限なし" /></SaveErrorField>
 {errorOf('交換終了は交換開始より後にしてください') ? <p id="reward-ends-error" className={styles.error} role="alert">交換終了は交換開始より後にしてください</p> : null}</Field></div>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card variant="form" aria-labelledby="mileage-reward-extra">
         <CardHeader size="stacked" titleId="mileage-reward-extra" title={<>そのほか <OptionalBadge /></>} />
-        <div className={styles.grid2}>
+        <SettingsFormRow layout="columns">
           <Field label="交換後に使える日数" htmlFor="reward-expires" help="空欄なら期限なし" error={errorOf(LIMIT_FIELD_ERRORS.benefitExpiresDays)}>
             <SaveErrorField names={["benefitExpiresDays","form.benefitExpiresDays","benefit_expires_days","form.benefit_expires_days"]}><NumberInput numericText id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" /></SaveErrorField>
           </Field>
           <div />
-        </div>
+        </SettingsFormRow>
         <Field label="説明" htmlFor="reward-description" help="一覧と交換の画面に出ます。空でも出せます">
           <SaveErrorField names={["description","form.description"]}><TextArea id="reward-description" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} /></SaveErrorField>
         </Field>

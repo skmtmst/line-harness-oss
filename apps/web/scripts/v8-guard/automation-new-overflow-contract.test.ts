@@ -23,19 +23,17 @@ describe('自動化作成のはみ出し（#973 U023）', () => {
     try {
       const page = await browser.newPage({ viewport: { width: 390, height: 800 } })
       await page.setContent(html)
-      const positions = async () => {
-        const name = await page.getByRole('button', { name: '本人にLINEで知らせる', exact: true }).boundingBox()
-        const icon = await page.locator('[data-action-row] svg').first().boundingBox()
-        const value = await page.getByText('成果1件ごとに', { exact: true }).boundingBox()
-        if (!name || !icon || !value) throw new Error('行うことの名前・記号・値が表示されていません')
-        return { nameTop: name.y, iconBottom: icon.y + icon.height, valueTop: value.y, nameBottom: name.y + name.height,
-          overflow: await page.evaluate(() => document.documentElement.scrollWidth - innerWidth) }
-      }
+      const positions = () => page.evaluate(() => {
+        const name = document.querySelector('[data-action-name]')!.getBoundingClientRect()
+        const icon = document.querySelector('[data-action-row] svg')!.getBoundingClientRect()
+        const value = document.querySelector('[data-action-value]')!.getBoundingClientRect()
+        return { nameTop: name.top, iconBottom: icon.bottom, valueTop: value.top, nameBottom: name.bottom, overflow: document.documentElement.scrollWidth - innerWidth }
+      })
       const good = await positions()
       expect(good.nameTop).toBeGreaterThan(good.iconBottom)
       expect(good.valueTop).toBeGreaterThanOrEqual(good.nameBottom)
       expect(good.overflow).toBe(0)
-      await page.addStyleTag({ content: `.${styles.row}{flex-wrap:nowrap!important}` })
+      await page.addStyleTag({ content: `.${styles.details}{flex-basis:auto!important;flex-wrap:nowrap!important;order:0!important}` })
       const broken = await positions()
       expect(broken.nameTop <= broken.iconBottom || broken.valueTop < broken.nameBottom || broken.overflow > 0).toBe(true)
     } finally { await browser.close() }

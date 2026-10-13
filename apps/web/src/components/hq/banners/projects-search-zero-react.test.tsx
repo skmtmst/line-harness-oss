@@ -21,7 +21,7 @@ vi.hoisted(() => {
 const nav = vi.hoisted(() => ({ query: '', push: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace, prefetch: () => {} }), useSearchParams: () => new URLSearchParams(nav.query) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'banner-test-staff' }), useStaffRole: () => 'owner', canManageRole: () => true }))
 
 
 const PROJECTS: BannerProject[] = [
@@ -104,7 +104,7 @@ describe('R605 検索0件の件数と空状態（本物のReact）', () => {
     expect(text).not.toContain('1〜0件')
     expect(text).not.toContain('〜0件')
     // 件数は0件。
-    expect(container.querySelectorAll('article[aria-label]')).toHaveLength(0)
+    expect(container.querySelectorAll(':is(article,[data-design-part="card"])[aria-label]')).toHaveLength(0)
     // 空状態は絞り込みの結果が0件の文言で、作る口は出さない。
     expect(text).toContain('条件に合うものがありません')
     expect(text).not.toContain('最初のプロジェクトを作る')
@@ -125,6 +125,6 @@ describe('R605 検索0件の件数と空状態（本物のReact）', () => {
     const text = container.textContent ?? ''
     expect(text).toContain('春のキャンペーン')
     expect(text).toContain('夏のセール')
-    expect(container.querySelectorAll('article[aria-label]')).toHaveLength(2)
+    expect(container.querySelectorAll(':is(article,[data-design-part="card"])[aria-label]')).toHaveLength(2)
   })
 })

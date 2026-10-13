@@ -2,15 +2,15 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ query: 'id=synthetic-rule&step=response', getDraft: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), saveDraft: vi.fn(), testDraft: vi.fn(), accounts: [{id:'synthetic-account'}] }))
+const net = vi.hoisted(() => ({ query: 'id=synthetic-rule&step=response', getDraft: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), saveDraft: vi.fn(), testDraft: vi.fn(), accounts: [{id:'synthetic-account'}], pageTitle: vi.fn(), liveStatus: 'published' }))
 vi.mock('next/navigation', () => ({useRouter: () => ({replace: (url: string) => {net.query = url.split('?')[1]}, push: vi.fn()}), useSearchParams: () => new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId: 'synthetic-account', accounts: net.accounts})}))
-vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: () => {}}))
+vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: net.pageTitle}))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({enabled: () => false, status: 'ready'}) }))
 vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner', canManageRole: () => true}))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({default: () => null, useActionOptions: () => ({tags:[],fields:[],marks:[],scenarios:[],vars:[]})}))
 vi.mock('@/components/shared/select', () => ({ default: ({value,onChange,options,...props}: {value: string; onChange: (value: string) => void; options: Array<{value: string; label: string}>; 'aria-label'?: string}) => <select aria-label={props['aria-label']} value={value} onChange={e=>onChange(e.target.value)}>{options.map((o)=><option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
-vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:true}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft},templates:{list:async()=>({success:true,data:[]})},folders:{list:async()=>({success:true,data:[]})},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
+vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft},templates:{list:async()=>({success:true,data:[]})},folders:{list:async()=>({success:true,data:[]})},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
 import Page from './wizard-v8'
 const DRAFT = {
   autoReplyId: 'synthetic-rule',
@@ -51,7 +51,7 @@ const DRAFT = {
 }
 
 beforeEach(()=> {
- net.query='id=synthetic-rule&step=response';net.accounts=[{id:'synthetic-account'}];vi.clearAllMocks()
+ net.liveStatus='published';net.query='id=synthetic-rule&step=response';net.accounts=[{id:'synthetic-account'}];vi.clearAllMocks()
  net.getDraft.mockResolvedValue({success:true,data:DRAFT});net.validateDraft.mockResolvedValue({success:true,data:{errors:[],warnings:[],conflicts:[]}})
  net.list.mockResolvedValue({success:true,data:[]});net.saveDraft.mockResolvedValue({success:true,data:{...DRAFT,versionNumber:2}})
 })
@@ -94,3 +94,26 @@ it('WEB292: 入力変更後に遅れて届いた前の版の試験結果を使�
  await act(async()=>finish({success:true,data:{draftWon:true,winner:null,candidates:[],staleTest:false}}))
  expect(screen.queryByText('このルールが返します。')).toBeNull()
 })
+
+it('確認を終えるまで有効にできず、未完の確認の理由をボタンから読める', async () => {
+ net.query='id=synthetic-rule&step=confirm'
+ render(<Page/>);await act(async()=>{})
+ const button=screen.getByRole('button',{name:/^(有効にする|この内容で更新する)$/}) as HTMLButtonElement
+ expect(button.disabled).toBe(true)
+ expect(button.title).toContain('まだ試していません')
+})
+it('反応の右欄は短い題と保存前の説明を分け、未取得を0にしない', async () => {
+ net.query='id=synthetic-rule&step=trigger'
+ render(<Page/>);await act(async()=>{})
+ expect(screen.getByRole('heading',{name:'過去28日で当たった数'})).toBeTruthy()
+ expect(screen.getByText('いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。')).toBeTruthy()
+ expect(screen.getByLabelText('当たった受信（過去28日）').textContent).toContain('—')
+})
+
+it.each(['draft','published'])('Y3 IDを持つ%sの状態から、題とパンくずの両方を決める',async status=>{
+ net.liveStatus=status;net.query='id=synthetic-rule&step=basic';render(<Page/>);await act(async()=>{});
+ const title=status==='draft'?'ルールを作る':'ルールを編集';
+ expect(screen.getByRole('heading',{name:title,level:2})).toBeTruthy();
+ expect(net.pageTitle).toHaveBeenLastCalledWith(`${title}・基本設定`);
+ expect(net.getDraft).toHaveBeenCalledTimes(1);
+});

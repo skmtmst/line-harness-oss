@@ -45,15 +45,29 @@ function useToolbarFit() {
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
 const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean }>({ leading: null })
 const FrameContext = createContext(false)
-export function ListToolbarLeading({ children, leading, persistent }: { children: ReactNode; leading: ReactNode; persistent?: boolean }) {
+export function ListToolbarLeading({ children, leading, persistent, accessory }: { children: ReactNode; leading: ReactNode; persistent?: boolean; accessory?: ReactNode }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
-  const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? Children.toArray(children.props.children) : null
+  const flatten = (items: ReactNode, prefix = ''): ReactNode[] => Children.toArray(items).flatMap((node, index) => {
+    if (!isValidElement<{ children?: ReactNode }>(node)) return [node]
+    const key = `${prefix}${node.key ?? index}`
+    return node.type === Fragment ? flatten(node.props.children, `${key}/`) : [cloneElement(node, { key })]
+  })
+  const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? flatten(children.props.children) : null
   const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
     && (node.type === ListToolbar || node.type === ListToolbarFrame || node.type === Fragment && containsLayout(Children.toArray(node.props.children))))
-  const needsFrame = nodes && nodes.some(node => isValidElement(node) && node.type === ListToolbarRow) && !containsLayout(nodes)
-  const tools = needsFrame ? <ListToolbarFrame>{nodes.map((node, index) => isValidElement(node) && node.type === ListToolbarRow
-    ? node : <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>)}</ListToolbarFrame> : children
-  return <LeadingContext.Provider value={{ leading, persistent }}>{tools}</LeadingContext.Provider>
+  const containsTool = (node: ReactNode): boolean => isValidElement<{ children?: ReactNode }>(node)
+    && ([ListToolbarRow, ListToolbarSearchSlot, SearchField, Select, PageSizeSelect].includes(node.type as typeof ListToolbarRow)
+      || Children.toArray(node.props.children).some(containsTool))
+  const needsFrame = nodes && nodes.some(containsTool) && !containsLayout(nodes)
+  // 案内文は道具より前の段。作る・フォルダ・検索の間に挟まない。
+  const notices = needsFrame ? nodes.filter(node => isValidElement(node) && node.type === 'p') : []
+  const tools = needsFrame ? <>{notices}<ListToolbarFrame>{[...nodes.filter(node => !notices.includes(node)), accessory].map((node, index) => {
+    if (!node) return null
+    if (isValidElement<{ children?: ReactNode }>(node) && node.type === 'span' && node.props.children == null) return null
+    if (isValidElement(node) && node.type === ListToolbarRow || !containsTool(node) && node !== accessory) return node
+    return <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>
+  })}</ListToolbarFrame></> : <>{children}{accessory}</>
+  return <LeadingContext.Provider value={{ leading: contentSizedSelects(leading), persistent }}>{tools}</LeadingContext.Provider>
 }
 
 export type ListToolbarSearch = {
@@ -250,13 +264,32 @@ export function ListToolbarSort(props: ListToolbarSortProps) {
 }
 
 /** B-191/192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
+function contentSizedSelect(child: React.ReactElement<SelectProps>) {
+  return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || toolbarRole(child) === 'count' })
+}
+
+/** 畳んだ欄の入力だけを直し、作る操作や子のキーはそのまま渡す。 */
+function contentSizedSelects(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) {
+    const children = node.map(contentSizedSelects)
+    return children.every((child, index) => child === node[index]) ? node : children
+  }
+  if (isValidElement<SelectProps>(node) && node.type === Select && !node.props.iconOnly) return contentSizedSelect(node)
+  if (isValidElement<{ children?: ReactNode }>(node) && node.props.children) {
+    const children = contentSizedSelects(node.props.children)
+    return children === node.props.children ? node : cloneElement(node, {}, children)
+  }
+  return node
+}
+
 function compactFilterGroups(node: ReactNode): ReactNode {
   const children = Children.toArray(node)
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
     return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
   return children.map(child => {
+    if (isValidElement(child) && child.type === ResponsiveFilterChips) return child
     if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
-      return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || toolbarRole(child) === 'count' })
+      return contentSizedSelect(child)
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
       const nested = compactFilterGroups(child.props.children)
       // Field wrappers receive one control, not a one-element children array.

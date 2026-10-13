@@ -38,6 +38,7 @@ import styles from './search-edit.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 タグ：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
@@ -893,6 +894,8 @@ export default function SavedSearchEditV8() {
           original.isShared ? '全員に共有' : '自分だけ',
           headUsageText(original.usedIn),
         ].join('・')}
+        previewLabel="検索結果と使用状況を見る"
+        previewTitle="検索結果と使っている所"
         preview={side}
         destructive={(
           <StickyBarAction label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />
@@ -902,7 +905,7 @@ export default function SavedSearchEditV8() {
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
             <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={14} aria-hidden="true" />複製して保存する</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} title={!dirty ? '変更した内容はありません' : undefined} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
           </>
         )} dirty={false}
       >
@@ -967,7 +970,7 @@ export default function SavedSearchEditV8() {
 
         <Card variant="form" gap="normal" aria-label="友だち一覧での見せ方">
           <CardHeader size="stacked" title="友だち一覧での見せ方" />
-          <div className={styles.listRow}>
+          <SettingsFormRow layout="columns">
             <div className={styles.field}>
               <span className={styles.label}>並び順</span>
               {/* R188：一覧の実装は友だち追加日順。最終接触と書くと運用者の意図とずれる。 */}
@@ -977,7 +980,7 @@ export default function SavedSearchEditV8() {
               <span className={styles.label}>表示件数</span>
               <SaveErrorField names={["limit","conditions.list?.limit","list?.limit"]}><Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size} 件` }))} width={120} /></SaveErrorField>
             </div>
-          </div>
+          </SettingsFormRow>
           <p className={styles.hint}>{`表示列：${conditions.list?.columns?.join('・') || '名前・タグ・担当者'}`}</p>
         </Card>
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageContent } from '@/components/templates/page-frame'
+
 /*
  * ★V8 統括の請求（Pencil `JB8V1`）。
  *
@@ -21,6 +23,8 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ListPage } from '@/components/templates'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import TruncatedText from '@/components/shared/truncated-text'
+import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -43,7 +47,6 @@ import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -175,7 +178,7 @@ function BillingInner() {
 
   const frame = (body: React.ReactNode) => (
     <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
-      <div className={styles.body}>{body}</div>
+      <PageContent>{body}</PageContent>
     </ListPage>
   )
 
@@ -273,7 +276,7 @@ function BillingInner() {
               </ul>
               <div className={styles.planFoot}>
                 {isCurrent ? (
-                  <Button disabled className={styles.planButton}>
+                  <Button disabled title="現在利用中のプランです" className={styles.planButton}>
                     <Check aria-hidden="true" className={styles.buttonIcon} />いまのプラン
                   </Button>
                 ) : isOwner && changeRoute ? (
@@ -338,7 +341,7 @@ function BillingInner() {
           <p className={styles.empty}>まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>
         ) : (
           <DataTable label="支払い履歴" columnSizing="content" grid={{
-            columns: 'var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-hq-col-paystate) var(--tpl-hq-col-receipt)',
+            columns: 'var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-rt-col-130) max(var(--tpl-hq-col-receipt), var(--row-action-width, 0px))',
             padding: 'var(--tpl-hq-pay-row-pad)',
             headPadding: 'var(--tpl-hq-head-pad)',
             gap: 'var(--tpl-hq-col-gap)',
@@ -358,9 +361,9 @@ function BillingInner() {
                 <Td grow><TruncatedText value={inv.description ?? inv.number ?? emptyValue('unknown')} /></Td>
                 <Td align="right">{yen(inv.amountYen)}</Td>
                 <Td>
-                  <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</span>
+                  <StatusBadge tone={inv.status === 'paid' ? 'success' : inv.status === 'open' || inv.status === 'draft' ? 'info' : 'neutral'}>{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</StatusBadge>
                 </Td>
-                <Td>
+                <Td align="right" data-list-action-cell>
                   {inv.hostedUrl ? (
                     <Button size="compact" external href={inv.hostedUrl}>
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書

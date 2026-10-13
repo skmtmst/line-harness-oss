@@ -9,10 +9,10 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     counts[pattern]++
     findings.push({ pattern, reason, text: el.textContent?.trim().slice(0, 90) ?? '', label: el.getAttribute('aria-label') })
   }
-  const textRects = el => {
+  const textRects = (el, exclude) => {
     const rects = [], walker = document.createTreeWalker(el, 4)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (!node.textContent.trim() || !visible(node.parentElement) || node.parentElement.closest('svg')) continue
+      if (!node.textContent.trim() || !visible(node.parentElement) || node.parentElement.closest('svg') || exclude?.contains(node.parentElement)) continue
       const range = document.createRange(); range.selectNodeContents(node)
       for (const r of range.getClientRects()) if (r.width && r.height) rects.push(r)
     }
@@ -31,15 +31,72 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
   const roots = [...document.querySelectorAll('[data-page-template]')].filter(visible)
   for (const root of roots) {
     const all = selector => [...root.querySelectorAll(selector)].filter(visible)
+    // Z1: text can be one line while its avatar has moved above it.
+    for (const cell of all('tbody td,[role="row"] [role="cell"]')) {
+      const avatar = [...cell.querySelectorAll('[data-avatar],[aria-hidden="true"]')].find(el => {
+        const r = el.getBoundingClientRect(), radius = getComputedStyle(el).borderRadius
+        return visible(el) && !el.matches('svg') && (el.hasAttribute('data-avatar') || r.width <= 56 && r.height <= 56 && (radius === '50%' || parseFloat(radius) >= Math.min(r.width, r.height) / 2))
+      })
+      if (!avatar) continue
+      const face = avatar.getBoundingClientRect()
+      const names = textRects(cell, avatar)
+      if (names.length && !names.some(r => Math.min(r.bottom, face.bottom) > Math.max(r.top, face.top))) add('F2', cell, 'avatar and person name occupy separate vertical rows')
+    }
+    // Z3: canonical content owns an inset, whereas a full-bleed list table does not.
+    for (const content of all('[data-template-region="content"]')) {
+      if (content.parentElement?.closest('[data-template-region="content"]')) continue
+      const children = [...content.children].filter(visible)
+      const inset = parseFloat(getComputedStyle(content).paddingRight) || 0
+      const nestedContent = children.find(el => el.matches('[data-template-region="content"]'))
+      const body = nestedContent ?? (root.dataset.pageTemplate === 'settings' || inset > 0 ? content : null)
+      if (!body) continue
+      const blocks = [...body.children].filter(el => visible(el) && !el.matches('[role="dialog"],[role="menu"]'))
+      if (!blocks.length) continue
+      const gap = root.getBoundingClientRect().right - Math.max(...blocks.map(el => el.getBoundingClientRect().right))
+      if (gap < 8) add('F6', body, 'content right edge is less than 8px from the white page edge')
+    }
     const isList = root.dataset.pageTemplate === 'list'
     if (isList && !root.hasAttribute('data-list-skeleton') && !root.querySelector('[data-list-skeleton]')) add('F4', root, 'list template is missing its shared standard and audit scope')
     const heading = root.querySelector('[data-template-region="heading"],[data-template-region="header"]')
+    const explanationBodies = [...root.querySelectorAll('[data-screen-explanation]')]
+      .filter(el => el.closest('[data-page-template]') === root)
+    const explanationToggles = heading ? [...heading.querySelectorAll('[data-screen-explanation-toggle]')].filter(visible) : []
+    for (const panel of explanationBodies) {
+      if (!panel.id || !explanationToggles.some(toggle => toggle.getAttribute('aria-controls') === panel.id)) {
+        add('F4', panel, 'screen explanation body is missing its heading control')
+      }
+    }
+    for (const toggle of explanationToggles) {
+      if (toggle.getAttribute('aria-expanded') === 'true'
+        && !explanationBodies.some(panel => panel.id && panel.id === toggle.getAttribute('aria-controls'))) {
+        add('F4', toggle, 'open screen explanation control is missing its scoped body')
+      }
+    }
+    const body = root.querySelector('[data-list-folders]')
+    const hasFolders = body ? body.dataset.listFolders === 'true' : !!root.querySelector('[data-template-region="folders"], [data-toolbar-leading] [aria-label="フォルダ"]')
+    if (isList && !hasFolders) {
+      for (const el of all('[data-template-region="toolbar"] a[href], [data-template-region="toolbar"] button')) {
+        if (/作る|登録する|追加する/.test(el.textContent) && !el.hasAttribute('aria-haspopup')) add('F9',el,'folderless list creation belongs in heading actions')
+      }
+      for (const el of all('[data-list-name] [data-folder-dot]')) add('F9',el,'folderless list name has a folder dot')
+    }
+    if (heading) {
+      const controls = [...heading.querySelectorAll('button')].filter(visible)
+      const explanation = controls.find(el => /この画面の説明/.test(el.textContent))
+      const help = controls.find(el => /^[?？]$/.test(el.textContent.trim()))
+      if (help && explanation && (help.compareDocumentPosition(explanation) & Node.DOCUMENT_POSITION_PRECEDING)) add('F3',heading,'heading help must precede screen explanation')
+    }
     if (heading) for (const chip of [...heading.querySelectorAll('button.v6-filter-chip')].filter(visible)) add('F5',chip,'heading action uses a filter chip instead of a shared button')
     for (const chip of all('button.v6-filter-chip')) if (/^アーカイブ済み(?:\s*\d+)?$/.test(chip.textContent.trim()) && !chip.querySelector('svg')) add('F4',chip,'archive filter is missing its shared icon')
     inventory.push({
       board: root.dataset.designNode, template: root.dataset.pageTemplate, frame: root.dataset.heightMode,
       help: heading ? [...heading.querySelectorAll('button')].filter(visible).map(el => el.getAttribute('aria-label') || el.textContent.trim()) : [],
+      explanationBodies: explanationBodies.length,
+      explanationToggles: explanationToggles.length,
       folders: all('[data-template-region="folders"]').length,
+      folderCapability: isList ? hasFolders : null,
+      folderDots: all('[data-list-name] [data-folder-dot]').length,
+      headingCreates: heading ? [...heading.querySelectorAll('a[href],button')].filter(el => visible(el) && /作る|登録する|追加する/.test(el.textContent)).length : 0,
       folderSelect: all('[data-toolbar-leading] button[aria-haspopup="listbox"]').filter(el => /フォルダ/.test(el.getAttribute('aria-label') ?? el.textContent)).length,
       folderCreate: all('[data-template-region="folders"] button').filter(el => /フォルダ.*追加/.test(el.textContent)).length,
       checks: all('tbody input[type="checkbox"]').length,
@@ -55,8 +112,10 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const rects = textRects(el)
       if (!rects.length) continue
       const paintedWidth = Math.max(...rects.map(r=>r.right)) - Math.min(...rects.map(r=>r.left))
-      if (paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
-        || el.scrollHeight > el.clientHeight + 1) add('F1', el, 'short text does not fit')
+      const selectedValueContentWidth = el.getBoundingClientRect().width - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
+      const selectedValueIsEllipsized = el.matches('[data-select-value]') && css.textOverflow === 'ellipsis' && paintedWidth > selectedValueContentWidth
+      if (selectedValueIsEllipsized || paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
+        || rects.some(r => r.top < el.getBoundingClientRect().top + (parseFloat(css.paddingTop) || 0) - 1 || r.bottom > el.getBoundingClientRect().bottom - (parseFloat(css.paddingBottom) || 0) + 1)) add('F1', el, 'short text does not fit')
     }
     for (const el of all('input[type="search"]')) {
       if (el.value || !el.placeholder) continue
@@ -64,11 +123,19 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (canvas.measureText(el.placeholder).width > el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1) add('F1', el, 'search placeholder does not fit')
     }
     for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button')) {
-      if (lines(el) > 1) add('F2', el, 'short text wraps')
+      // A column of title/instructions is a composite control. Audit each
+      // short label; explicit line breaks in instructions are intentional.
+      const css = getComputedStyle(el)
+      const composite = el.matches('button') && css.display.includes('flex') && css.flexDirection === 'column'
+      const targets = composite ? [...el.children].filter(child => visible(child) && child.textContent.trim() && !child.matches('svg') && !child.querySelector('br')) : [el]
+      for (const target of targets) if (lines(target) > 1) add('F2', target, 'short text wraps')
     }
     for (const el of all('button,a[role="button"],[data-page-title]')) {
       if (/\d+\s+件表示/.test(el.textContent) && el.matches('button') && !el.querySelector('button')) add('F3', el, 'page size does not use the shared compact wording')
       if (/^(直す|編集|編集をする)$/.test(el.textContent.trim()) || /（任意）/.test(el.textContent) && el.matches('[data-page-title]')) add('F3', el, 'noncanonical action or optional title')
+    }
+    for (const el of all('[data-pagination] > span,[data-pagination-summary],span[class*="pager"],p[class*="pager"]')) {
+      if (/(?:[\d,]+|—)\s+(?:件|人)中/.test(el.textContent)) add('F3', el, 'pagination count contains spaced handwritten units')
     }
     for (const el of all('[data-unknown-value],td:not([data-list-name-cell]) [data-design-node="xRvDB"],td:not([data-list-name-cell]),[data-kpi-detail] [role="note"]')) {
       if (el.matches('td') && el.querySelector('[data-unknown-value]')) continue
@@ -84,6 +151,9 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (!visible(value) || !/^並び[：:].+/.test(value.textContent.trim())) add('F8', el, 'sort has no visible current value')
     }
     const owned = el => !!el && [...el.classList].some(cls => cssOwners.some(name => cls === name || cls.startsWith(`${name}_`)))
+    if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] > p')) {
+      if (!owned(el)) add('F5', el, 'toolbar explanation has a page CSS owner instead of shared parts')
+    }
     if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] button,[data-template-region="toolbar"] input,[data-template-region="toolbar"] select,[data-template-region="toolbar"] summary')) {
       if (owned(el) || el.matches('summary') && owned(el.closest('[data-toolbar-optional]'))
         || el.matches('input[type="checkbox"],input[type="radio"]') && owned(el.closest('label'))) continue
@@ -97,6 +167,23 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     for (const el of all('[data-template-region="toolbar"] button:disabled,[data-template-region="toolbar"] input:disabled')) {
       const explained = el.title || (el.getAttribute('aria-describedby') || '').split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())
       if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
+    }
+    // A read-only sort description is still painted text. Control-only overlap
+    // scans miss it when a shrinking filter group spills over its neighbour.
+    for (const end of all('[data-template-region="toolbar"] [data-toolbar-trailing]')) {
+      const toolbar = end.closest('[data-template-region="toolbar"]')
+      const controls = [...toolbar.querySelectorAll('button,input,select,summary,a[href]')].filter(el => visible(el) && !end.contains(el))
+      const walker = document.createTreeWalker(end, 4)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const el = node.parentElement
+        if (!node.textContent.trim() || !visible(el) || el.closest('button,input,select,summary,a[href],svg')) continue
+        const range = document.createRange(); range.selectNodeContents(node)
+        if ([...range.getClientRects()].some(text => controls.some(control => {
+          const rect = control.getBoundingClientRect()
+          return Math.min(text.right, rect.right) - Math.max(text.left, rect.left) > 1
+            && Math.min(text.bottom, rect.bottom) - Math.max(text.top, rect.top) > 1
+        }))) add('F6', el, 'toolbar trailing text overlaps another control')
+      }
     }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const cell of all('[data-list-action-cell]')) {
@@ -146,6 +233,7 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     }
   }
   const listPages = roots.filter(root=>root.dataset.pageTemplate==='list').length
-  if (!listPages) counts.F10 = null // This detector measures the narrow list shape, not other templates.
-  return { counts, findings, inventory, coverage: { pages: roots.length, listPages, notApplicable: listPages ? [] : ['F10: narrow list shape'], templates: [...new Set(roots.map(root=>root.dataset.pageTemplate))], DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9',...(listPages ? ['F10'] : [])], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6' } }
+  const formPages = roots.filter(root=>root.dataset.pageTemplate==='create').length
+  if (!listPages && !formPages) counts.F10 = null
+  return { counts, findings, inventory, coverage: { pages: roots.length, listPages, formPages, notApplicable: listPages || formPages ? [] : ['F10: narrow list or form shape'], templates: [...new Set(roots.map(root=>root.dataset.pageTemplate))], DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9',...(listPages || formPages ? ['F10'] : [])], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6; form geometry: form-rules and form-columns' } }
 }

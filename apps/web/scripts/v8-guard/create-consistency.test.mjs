@@ -1,0 +1,75 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { chromium } from '@playwright/test'
+import scanCreateConsistency from './create-consistency-browser.mjs'
+import { assessAgainstBase, measurePage, record, validateAllowances } from './layout-defects.mjs'
+const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8');
+const actions=()=>readFileSync(new URL('../../src/components/shared/action-list.module.css',import.meta.url),'utf8');
+const row='<div class="item" data-action-row><div class="row"><span class="icon">◆</span><div class="details"><button class="titleButton" data-action-name>本人にLINEで知らせる</button><div class="extra" data-action-value>成果1件ごとに</div></div><button aria-label="その他操作">…</button></div></div>';
+const html=css=>`<style>${globals}${css}</style><div data-theme="v8"><main style="width:650px"><section data-page-template="create">${row}</section></main></div>`;
+test('Y1 実物の行CSSで名前と値は同じ文字サイズで隣り合い、広い名前枠へ戻す故障を落とす',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();await page.setContent(html(actions()));const good=await page.evaluate(scanCreateConsistency);assert.equal(good.counts.Y1,0,JSON.stringify(good.rows));
+ await page.addStyleTag({content:'.titleButton{flex:1}.extra{font-size:16px}'});assert.ok((await page.evaluate(scanCreateConsistency)).counts.Y1>0);
+ await page.setContent(html(actions()));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y1,0);
+ }finally{await browser.close()}
+});
+
+test('Y2 実物の作成型CSSで右欄は白い板と同じ地、灰色へ戻す故障を落としplainも保つ',async()=>{
+ const css=readFileSync(new URL('../../src/components/templates/page-templates.module.css',import.meta.url),'utf8').replace(/:global\(([^()]*)\)/g,'$1');
+ const content=`<style>${globals}${css}</style><div data-theme="v8"><main style="width:900px"><section class="frame" data-standalone data-page-template="create"><aside class="preview" data-template-region="preview"><div class="previewContent">設定のカード</div></aside></section></main></div>`;
+ const browser=await chromium.launch();try{const page=await browser.newPage();await page.setContent(content);assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y2,0);
+ await page.addStyleTag({content:'[data-page-template="create"] .preview{background:#f7f8fa!important}'});assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y2,1);
+ await page.setContent(content.replace('class="preview"','class="otherRail"')+'<style>.otherRail{width:380px;padding:24px;background:#f7f8fa}</style>');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y2,0);
+ await page.setContent(content);await page.locator('.preview').evaluate(e=>e.setAttribute('data-preview-surface','plain'));assert.equal(await page.locator('.preview').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+ }finally{await browser.close()}
+});
+
+test('Y3 作る題と編集のパンくずの不一致を落とし、同じ状態の題なら通す',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();await page.setContent('<nav aria-label="パンくず"><h1>ルールを編集・基本設定</h1></nav><main><section data-page-template="create"><h2>ルールを作る</h2></section></main>');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,1);
+ await page.locator('nav h1').evaluate(e=>e.textContent='ルールを作る・基本設定');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,0);
+ await page.locator('main h2').evaluate(e=>e.textContent='ルールを編集');await page.locator('nav h1').evaluate(e=>e.textContent='ルールを編集・基本設定');assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y3,0);
+ }finally{await browser.close()}
+});
+
+test('Y4 主保存の実SVGを数え、チェック・印なし・二重印の故障を落とす',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();
+ const button=icons=>`<main><div data-sticky-actions><button class="button_primary_x">${icons}保存する</button></div></main>`;
+ const svg=kind=>`<svg class="lucide lucide-${kind}" width="16" height="16"><path d="M0 0L16 16" /></svg>`;
+ for(const icons of [svg('check'),'',svg('save')+svg('check')]){await page.setContent(button(icons));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,1);}
+ await page.setContent(button(svg('save')));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,0);
+ await page.locator('button').evaluate(e=>{e.textContent='保存中…';e.setAttribute('aria-busy','true')});assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
+ await page.setContent(button(svg('arrow-right')).replace('保存する','次へ'));assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
+ }finally{await browser.close()}
+});
+
+test('Y1〜Y4の説明値を保ち、数値の実測で本線比較・新規・件数増加・悪化を判定する',async()=>{
+ const browser=await chromium.launch();try{const page=await browser.newPage();
+ const fixtures=[
+  ['form-action-value','<main><div data-action-row style="--tpl-action-row-gap:12px"><span data-action-name style="font-size:14px">名前</span><span data-action-value style="font-size:16px">値</span></div></main>','nameSize'],
+  ['form-preview-surface','<main><section data-page-template="create" style="background:white"><aside data-template-region="preview" style="background:#f7f8fa">見本</aside></section></main>','bg'],
+  ['form-create-title','<nav aria-label="パンくず"><h1>ルールを編集</h1></nav><main><h2>ルールを作る</h2></main>','breadcrumb'],
+  ['form-save-icon','<main><div data-sticky-actions><button class="button_primary_x">保存する<svg class="lucide lucide-check" width="16" height="16"></svg></button></div></main>','icons'],
+ ];
+ for(const [kind,markup,detailKey] of fixtures){
+  await page.setContent(markup);
+  const findings=(await measurePage(page)).filter(f=>f.kind===kind);
+  assert.equal(findings.length,1,kind);
+  const f=findings[0];assert.ok(detailKey in f.detail,kind);
+  assert.ok(Object.values(f.measure).every(n=>Number.isFinite(n)&&n>=0),JSON.stringify(f));
+  const fixed=validateAllowances(record(findings,'/fixture',1152,'既存の故障対照'));
+  const compare=values=>assessAgainstBase(values,findings,'/fixture',1152);
+  assert.equal(compare(findings).existing.length,1,kind);
+  assert.equal(compare([]).failures.length,0,kind);
+  assert.equal(compare([f,f]).failures.length,1,kind);
+  assert.equal(compare([{...f,target:'aside.new'}]).failures.length,1,kind);
+  for(const key of Object.keys(f.measure)){
+   const worse={...f,measure:{...f.measure,[key]:f.measure[key]+1}};
+   assert.equal(compare([worse]).failures.length,1,kind+' '+key);
+   assert.equal(assessAgainstBase([worse],findings,'/fixture',1152,fixed).failures.length,1,kind+' 固定許可');
+  }
+  assert.equal(assessAgainstBase(findings,[],'/fixture',1152).failures.length,1,kind+' 新規');
+  assert.throws(()=>validateAllowances([{...fixed[0],measure:f.detail}]),kind+' 説明値を許可の実寸に混ぜない');
+ }
+ }finally{await browser.close()}
+});
