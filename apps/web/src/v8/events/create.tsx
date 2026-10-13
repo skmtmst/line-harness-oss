@@ -40,6 +40,7 @@ const eventRequirements = {
 }
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { EVENT_NAME_MAX_LENGTH, EVENT_DESCRIPTION_MAX_LENGTH, resolveEventMultiAccountIds } from '@/components/events/event-draft-shared'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 イベント予約「イベントを作る」（Pencil `d4adD4`）。
@@ -333,7 +334,7 @@ function EventsCreateV8Inner() {
             placeholder="開催趣旨・注意事項・持ち物など"
             onChange={(event) => update('description', event.target.value || null)}
           /></SaveErrorField></Field></div>
-        <div className={styles.pair}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}><Field label="場所" htmlFor="ev-new-venue"><SaveErrorField names={["venue_name","draft.venue_name"]}><TextField
               id="ev-new-venue"
               value={draft.venue_name ?? ''}
@@ -352,7 +353,7 @@ function EventsCreateV8Inner() {
             /></SaveErrorField></Field>
             {fieldErrors['ev-new-url'] ? <p id="ev-new-url-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-url']}</p> : null}
           </div>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-target">
@@ -381,7 +382,7 @@ function EventsCreateV8Inner() {
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-slot">
         <CardHeader size="stacked" titleId="ev-new-slot" title="最初の予約枠" meta="あとから回を足せます（中身を見る → 回を足す）" />
-        <div className={styles.pair}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}><Field requirement={eventRequirements.date} label="日付" htmlFor="ev-new-date"><SaveErrorField names={["date"]}><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} /></SaveErrorField>
 {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}</Field></div>
           <Field requirement={eventRequirements.start} label={<span id="ev-new-time-label">開始</span>} htmlFor="ev-new-start" error={fieldErrors['ev-new-start'] || fieldErrors['ev-new-end']}>
@@ -393,8 +394,8 @@ function EventsCreateV8Inner() {
             </div>
             {fieldErrors['ev-new-start'] || fieldErrors['ev-new-end'] ? <p id="ev-new-time-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-start'] || fieldErrors['ev-new-end']}</p> : null}
           </Field>
-        </div>
-        <div className={styles.pair}>
+        </SettingsFormRow>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}><Field requirement={eventRequirements.capacity} label="定員" htmlFor="ev-new-cap"><SaveErrorField names={["capacity"]}><NumberInput numericText
               id="ev-new-cap"
               inputMode="numeric"
@@ -415,12 +416,12 @@ function EventsCreateV8Inner() {
               options={PER_FRIEND_OPTIONS}
             /></SaveErrorField>
           </Field>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-rules">
         <CardHeader size="stacked" titleId="ev-new-rules" title="申し込みのきまり" />
-        <div className={styles.pair}>
+        <SettingsFormRow layout="columns">
           <Field label="申し込みの上限" htmlFor="ev-new-cutoff">
 
             <SaveErrorField names={["NONE","entry_cutoff_hours_before","draft.entry_cutoff_hours_before","_n_o_n_e"]}><Select
@@ -447,8 +448,8 @@ function EventsCreateV8Inner() {
               options={APPROVAL_OPTIONS}
             /></SaveErrorField>
           </Field>
-        </div>
-        <div className={styles.pair}>
+        </SettingsFormRow>
+        <SettingsFormRow layout="columns">
           <Field label="満席になったとき" htmlFor="ev-new-waitlist">
 
             <SaveErrorField names={["waitlist_enabled","draft.waitlist_enabled"]}><Select
@@ -460,7 +461,7 @@ function EventsCreateV8Inner() {
             /></SaveErrorField>
           </Field>
           <span className={styles.field} aria-hidden="true" />
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-questions">

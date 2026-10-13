@@ -16,6 +16,7 @@ import scanPanelBlank from './panel-blank-browser.mjs'
 import scanBlankGap from './blank-gap-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
+import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
@@ -97,6 +98,7 @@ export function identifyStableTargets(findings) {
     : f)
 }
 export async function measurePage(page) {
+  const formColumns = formColumnFindings(await page.evaluate(collectFormLayouts))
   const panels = await page.evaluate(scanPanelBlank)
   // 下の空白は panel-blank に一本化。blankfix の途中・横・数の帯は残す。
   const gaps = await page.evaluate(scanBlankGap, { skipPanelBottom: true, exactSelectors: true, selectorDepth: 32, selectorLimit: 4096 })
@@ -110,7 +112,7 @@ export async function measurePage(page) {
       extra.push({kind:'blank-kpi',target:b.sel.replace(/__[\w-]+/g,''),text:'数の帯の全マスが高い',measure:{minExcess:Math.min(...b.cardH.map((h,i)=>h-b.contentH[i]-16)),maxExcess:Math.max(...b.cardH.map((h,i)=>h-b.contentH[i]-16))}})
   }
   for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
-  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules)]
+  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules), ...formColumns]
   return await page.evaluate(identifyStableTargets, findings)
 }
 async function measureRoute(browser, baseUrl, route, width) {

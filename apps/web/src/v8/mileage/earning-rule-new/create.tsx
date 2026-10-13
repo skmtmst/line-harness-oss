@@ -42,6 +42,7 @@ import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
@@ -352,7 +353,7 @@ function EarningRuleCreateBody() {
         <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
           <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.pickLabel}>きっかけ</span>
@@ -379,7 +380,7 @@ function EarningRuleCreateBody() {
               options={selected.sources.map(([optionValue, label]) => ({ value: optionValue, label }))}
             /></SaveErrorField>
           </div>
-        </div>
+        </SettingsFormRow>
         <button type="button" className={styles.linkButton} onClick={() => setShowConditions((v) => !v)} aria-expanded={showConditions}>
           ＋ 条件を足す（タグ・友だち情報など）
         </button>
@@ -393,7 +394,7 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-amount">
         <CardHeader size="stacked" titleId="er-new-amount" title="何マイル付けるか" />
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <Field required label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
               <SaveErrorField names={["amount"]}><NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} /></SaveErrorField>
@@ -410,7 +411,7 @@ function EarningRuleCreateBody() {
               disabled
             />
           </div>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card variant="form" aria-labelledby="er-new-who">
@@ -431,7 +432,7 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-limit">
         <CardHeader size="stacked" titleId="er-new-limit" title="付けすぎを防ぐ" />
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.pickLabel}>1日に数える回数</span>
             <SaveErrorField names={["dailyCap","daily_cap"]}><Select
@@ -456,8 +457,8 @@ function EarningRuleCreateBody() {
               ]}
             /></SaveErrorField>
           </div>
-        </div>
-        <div className={styles.fieldRow}>
+        </SettingsFormRow>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.label}>開始日</span>
             <SaveErrorField names={["validFrom","valid_from"]}><DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" /></SaveErrorField>
@@ -470,7 +471,7 @@ function EarningRuleCreateBody() {
             <SaveErrorField names={["validUntil","valid_until"]}><DateField id="er-until" value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" invalid={Boolean(errorOf('er-until'))} aria-describedby={errorOf('er-until') ? 'er-until-error' : undefined} /></SaveErrorField>
             {errorOf('er-until') ? <p id="er-until-error" className={styles.error} role="alert">{errorOf('er-until')}</p> : null}
           </div>
-        </div>
+        </SettingsFormRow>
         {/* 絵には無いが、倍率・期限・取り消し・通知・すぐ動かすの欄は落とさない（段の最後に畳んで置く）。 */}
         <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
           <div className={styles.detailsBody}>

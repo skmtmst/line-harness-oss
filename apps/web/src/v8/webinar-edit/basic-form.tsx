@@ -13,6 +13,7 @@ import { ReadValue } from './parts'
 import styles from './form.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
@@ -81,7 +82,7 @@ export function BasicForm({
             onBlur={onBlurTitle}
           /></SaveErrorField>
 {fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
-        <div className={styles.pair}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <Field label="公開ページの URL" help="アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。" htmlFor={`${idPrefix}-slug`}><SaveErrorField names={["slug","values.slug"]}><TextField
               id={`${idPrefix}-slug`}
@@ -102,7 +103,7 @@ export function BasicForm({
 {folderState === 'error' ? (
               <p className={styles.help}>フォルダを読み込めませんでした。<Button size="compact" onClick={onReloadFolders}>もう一度読み込む</Button></p>
             ) : null}</Field></div>
-        </div>
+        </SettingsFormRow>
         <div className={styles.field}><Field label="案内文" htmlFor={`${idPrefix}-description`}><SaveErrorField names={["description","values.description"]}><TextField
             id={`${idPrefix}-description`}
             value={values.description}

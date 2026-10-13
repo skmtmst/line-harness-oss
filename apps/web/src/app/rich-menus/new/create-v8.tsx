@@ -111,6 +111,7 @@ import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
 import RichMenuSchedules from '@/v8/rich-menu-edit/schedules'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
@@ -2096,7 +2097,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       <>
         <Card variant="form" gap="normal">
           <SectionHeader title="名前とフォルダ" />
-          <div className={styles.fieldGrid}>
+          <SettingsFormRow layout="name-folder">
             <Field requirement={fields.requirement('name')} label="メニュー名（友だちには見えません）" htmlFor="rm-name" error={fields.error('name')}>
               <SaveErrorField names={["name"]}><TextInput {...fields.bind('name')} id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：通常メニュー（会員向け）" invalid={fields.invalid('name')} /></SaveErrorField>
             </Field>
@@ -2113,7 +2114,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
                     : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} /></SaveErrorField>
             </Field>
-          </div>
+          </SettingsFormRow>
           <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" requirement={fields.requirement('chatbar')} error={fields.error('chatbar')}>
             <SaveErrorField names={["chatBarText","chat_bar_text"]}><TextInput {...fields.bind('chatbar')} id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => setChatBarText(e.target.value)} placeholder="メニュー" invalid={fields.invalid('chatbar')} /></SaveErrorField>
           </Field>
