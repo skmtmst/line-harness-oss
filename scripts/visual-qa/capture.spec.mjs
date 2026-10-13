@@ -112,6 +112,8 @@ for (const width of WIDTHS) {
       await expectLanded(page, TAGS_PATH)
       const kind = { 'tags-empty': 'empty', 'tags-error': 'error', 'tags-forbidden': 'error' }[state.name]
       await expect(page.locator(`[data-list-state="${kind}"]`)).toBeVisible()
+      const title = { 'tags-empty': 'まだタグがありません', 'tags-error': 'タグを読み込めませんでした', 'tags-forbidden': 'タグを見る権限がありません' }[state.name]
+      await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
 
       const overflow = await page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -171,8 +173,8 @@ function previewData(rows, ready, skipped, invalid, representative = false) {
   }
 }
 
-async function expectCsvDialogFitsViewport(page, designNode) {
-  const fit = await page.locator(`[data-design-node="${designNode}"]`).evaluate((panel) => {
+async function expectCsvDialogFitsViewport(page, label) {
+  const fit = await page.getByRole('dialog', { name: label, exact: true }).evaluate((panel) => {
     const rect = panel.getBoundingClientRect()
     return {
       documentOverflow: document.documentElement.scrollWidth - window.innerWidth,
@@ -180,9 +182,9 @@ async function expectCsvDialogFitsViewport(page, designNode) {
       right: rect.right - window.innerWidth,
     }
   })
-  expect(fit.documentOverflow, `${designNode}: ページ全体の横スクロール`).toBeLessThanOrEqual(1)
-  expect(fit.left, `${designNode}: 左側の見切れ`).toBeGreaterThanOrEqual(0)
-  expect(fit.right, `${designNode}: 右側の見切れ`).toBeLessThanOrEqual(0)
+  expect(fit.documentOverflow, `${label}: ページ全体の横スクロール`).toBeLessThanOrEqual(1)
+  expect(fit.left, `${label}: 左側の見切れ`).toBeGreaterThanOrEqual(0)
+  expect(fit.right, `${label}: 右側の見切れ`).toBeLessThanOrEqual(0)
 }
 
 async function openCsvImport(page, width, rows) {
@@ -191,7 +193,7 @@ async function openCsvImport(page, width, rows) {
   await page.goto(`${BASE}${TAGS_PATH}`, { waitUntil: 'networkidle' })
   await expectLanded(page, TAGS_PATH)
   await page.getByRole('button', { name: 'CSVで一括登録する', exact: true }).click()
-  await expect(page.locator('[data-design-node="H374MR"]')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'CSVでタグを一括登録', exact: true })).toBeVisible()
   if (rows) {
     const csv = ['タグ名,フォルダ', ...rows.map((row) => `"${row.name}","${row.folderName}"`)].join('\r\n')
     await page.locator('[role="dialog"] input[type="file"][accept*=".csv"]').setInputFiles({
@@ -209,7 +211,7 @@ test.describe('4-1 タグCSV一括登録', () => {
 for (const width of WIDTHS) {
   test(`${width}px タグCSV一括登録・選択（tags-csv-select）`, async ({ page }) => {
     await openCsvImport(page, width)
-    await expectCsvDialogFitsViewport(page, 'H374MR')
+    await expectCsvDialogFitsViewport(page, 'CSVでタグを一括登録')
     await expect(page.locator('main').first()).toBeVisible()
   })
 
@@ -222,8 +224,8 @@ for (const width of WIDTHS) {
     }))
     await openCsvImport(page, width, rows)
     await page.getByRole('button', { name: '取り込む内容を確認' }).click()
-    await expect(page.locator('[data-design-node="sfTEW"]')).toBeVisible()
-    await expectCsvDialogFitsViewport(page, 'sfTEW')
+    await expect(page.getByRole('dialog', { name: '取り込む内容の確認', exact: true })).toBeVisible()
+    await expectCsvDialogFitsViewport(page, '取り込む内容の確認')
     await expect(page.locator('main').first()).toBeVisible()
   })
 
@@ -247,8 +249,8 @@ for (const width of WIDTHS) {
     await openCsvImport(page, width, rows)
     await page.getByRole('button', { name: '取り込む内容を確認' }).click()
     await page.getByRole('button', { name: '412件を登録する' }).click()
-    await expect(page.locator('[data-design-node="op1rh"]')).toBeVisible()
-    await expectCsvDialogFitsViewport(page, 'op1rh')
+    await expect(page.getByRole('dialog', { name: '412件を登録しました', exact: true })).toBeVisible()
+    await expectCsvDialogFitsViewport(page, '412件を登録しました')
     await expect(page.locator('main').first()).toBeVisible()
   })
 
@@ -274,8 +276,8 @@ for (const width of WIDTHS) {
     await openCsvImport(page, width, rows)
     await page.getByRole('button', { name: '取り込む内容を確認' }).click()
     await page.getByRole('button', { name: '412件を登録する' }).click()
-    await expect(page.locator('[data-design-node="QzRsJ"]')).toBeVisible()
-    await expectCsvDialogFitsViewport(page, 'QzRsJ')
+    await expect(page.getByRole('dialog', { name: '402件を登録し、10件は入りませんでした', exact: true })).toBeVisible()
+    await expectCsvDialogFitsViewport(page, '402件を登録し、10件は入りませんでした')
     await expect(page.locator('main').first()).toBeVisible()
   })
 }
