@@ -11,7 +11,7 @@ import styles from './create-parts.module.css'
 export type SummaryRow = { label: ReactNode; value: ReactNode; key?: string }
 
 /** 右の列の「設定内容」の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13/700/19・行は上下9＋下線・字12/17。 */
-export function CreateSummaryCard({ title = '設定内容', rows, children, leading, beforeRows, description, variant, completionIcon }: { title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; leading?: ReactNode; beforeRows?: ReactNode; description?: ReactNode; completionIcon?: ReactNode; variant?: 'link' | 'record' }) {
+export function CreateSummaryCard({ title = '設定内容', rows, children, leading, beforeRows, description, variant, completionIcon }: { title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; leading?: ReactNode; beforeRows?: ReactNode; description?: ReactNode; completionIcon?: ReactNode; variant?: 'link' | 'record' | 'completion' }) {
   return (
     <section className={styles.summary} data-part="create-summary" data-variant={variant}>
       {completionIcon ? <div className={styles.summaryCompletion}>

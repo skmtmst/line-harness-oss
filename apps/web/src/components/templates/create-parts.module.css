@@ -59,6 +59,16 @@
   white-space: nowrap;
 }
 
+/* 完了の本文では項目ごとに値の開始位置をそろえ、長い結果も読めるようにする。 */
+.summary[data-variant='completion'] .row { justify-content: flex-start; }
+.summary[data-variant='completion'] .rowLabel { flex: 0 0 var(--tpl-bd-row-label); }
+.summary[data-variant='completion'] .rowValue {
+  flex: 1;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* RaMf3 の発行されるリンク。既定の設定内容の箱の寸法は変えない。 */
 .summary[data-variant='link'] { gap: var(--tpl-side-card-gap); }
 .summaryHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); }

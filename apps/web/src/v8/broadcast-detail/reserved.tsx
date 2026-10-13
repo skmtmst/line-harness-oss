@@ -127,7 +127,7 @@ export default function Reserved({
       titleAccessory={<StatusBadge tone="info">予約中</StatusBadge>}
       summary={summary} summaryLabel="次にできることとメッセージ"
       summaryPreview={{ label: '次の操作とメッセージを見る', title: '次にできることとメッセージ' }}>
-      <CreateSummaryCard completionIcon={<CalendarCheck />} title="一斉配信を予約しました" description="送る前にもう一度、対象の人数を数え直します" rows={rows}>
+      <CreateSummaryCard variant="completion" completionIcon={<CalendarCheck />} title="一斉配信を予約しました" description="送る前にもう一度、対象の人数を数え直します" rows={rows}>
         <Notice tone="info" message={notificationText || '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。'} />
         <div className={styles.doneButtons}><Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}><Eye aria-hidden="true" />予約の内容を見る</Button></div>
       </CreateSummaryCard>
