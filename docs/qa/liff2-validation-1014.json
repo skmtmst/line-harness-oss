@@ -1,0 +1,39 @@
+{
+  "productCommit": "75de8023fbdc2ca4a3fd2067e2ca7696d558af5f",
+  "captureHead": "f4a6c417763c5fb7d6f5f311a95b79d96a3ee3bf",
+  "testedDevelopmentSha": "9613559dcbdf279b69a13db7a840345550a1a59d",
+  "sourceSha": "7f761b26835058117d07a8345d531d28040ddd87a983ce0ff17739ce18cbae39",
+  "boards": 34,
+  "opened": 32,
+  "comparable": 31,
+  "stateBlocked": [
+    "XafWh",
+    "B5SbF"
+  ],
+  "referenceMissing": [
+    "sAnyy"
+  ],
+  "sbsFiles": 102,
+  "qaSdkBoards": 34,
+  "pageErrors": 0,
+  "relatedTestsPassed": 217,
+  "layoutScenes": 15,
+  "faultControls": 15,
+  "lintErrors": 0,
+  "lintWarnings": 14,
+  "formalPassesAdded": 0,
+  "captureScriptSha": "a8f6920daa8141f4ebde5bdec510bf85fedc00fcd4382e97f738fc7b8d9738c6",
+  "openingSha": "346cf7317e15ecbfcaeed71333ec6b0e8f1cf48d410168ccc5e520bd9207df8e",
+  "qaMockSha": "5ef1bbc76116bcc01f75f8f80c89a134aadf44c436c05f9de96bf1d73bb51ed6",
+  "externalEvidence": "/Users/kentakenta/lh-work/design/v8/review/MATCH-ANALYSIS-1011/measure2/match2/LIFF2",
+  "invalidAttempts": [
+    "attempt-source-changed",
+    "attempt-mobile-overflow"
+  ],
+  "widths": [
+    375,
+    414,
+    310
+  ],
+  "meanCaptureSeconds": 4.82
+}
