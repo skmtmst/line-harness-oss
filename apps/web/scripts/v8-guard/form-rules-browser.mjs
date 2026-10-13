@@ -19,6 +19,17 @@ export default function scanFormRules() {
     return parts.join(' > ')
   }
   const add = (kind, el, text, measure) => findings.push({ kind, target: selector(el), text, measure })
+  // 札の面は文字とその内側の余白まで。flex の stretch で帯になった実寸を拾う。
+  for (const badge of root.querySelectorAll('[data-required-badge]')) {
+    if (!visible(badge) || !badge.textContent.trim()) continue
+    const range = document.createRange()
+    range.selectNodeContents(badge)
+    const rect = badge.getBoundingClientRect(), textRect = range.getBoundingClientRect()
+    const css = getComputedStyle(badge)
+    const expectedWidth = textRect.width + (parseFloat(css.paddingLeft) || 0) + (parseFloat(css.paddingRight) || 0)
+      + (parseFloat(css.borderLeftWidth) || 0) + (parseFloat(css.borderRightWidth) || 0)
+    if (rect.width - expectedWidth > 1 / 64) add('form-required-badge', badge, '必須の札の面を文字の幅にそろえる', { width: rect.width, expectedWidth, excess: rect.width - expectedWidth })
+  }
   for (const palette of root.querySelectorAll('[data-color-palette="inline"]')) {
     if (!visible(palette)) continue
     const radios = [...palette.querySelectorAll('[role="radio"]')].filter(visible)
