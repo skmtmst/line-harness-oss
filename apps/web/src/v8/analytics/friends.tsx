@@ -44,7 +44,7 @@ type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
 
 function DailyBars({ days, campaigns, selected, onSelect }: { days: Day[]; campaigns: Campaign[]; selected: string; onSelect: (date: string) => void }) {
-  return <BarChart items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
+  return <BarChart showLegend={false} items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
 }
 
 /** 経路の内訳は概要の後に読む（2つの重い集計を同時に走らせない）。 */
