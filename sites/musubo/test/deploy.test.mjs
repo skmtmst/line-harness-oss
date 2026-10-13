@@ -96,6 +96,10 @@ test("update program for the installed review site is valid bash, verified, back
   assert.ok(firstInstallToSite > script.indexOf("started=1"));
   assert.throws(() => remoteUpdate("../../escape", "fixtureuser", sums), /Invalid/);
   assert.throws(() => validateChecksums("bad"), /全件|形式/);
+  const dup = sums.split("\n");
+  dup[1] = dup[0];
+  assert.throws(() => validateChecksums(dup.join("\n")), /全件/);
+  assert.match(script, /find "\$root" -mindepth 1 -type f/); // every depth is inventoried
   assert.throws(
     () => validateChecksums(sums.replace("index.html", "../index.html")),
     /形式/,

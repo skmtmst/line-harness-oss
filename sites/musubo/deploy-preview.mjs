@@ -148,7 +148,8 @@ export function validateInstalledState({ rootNames, files, symlinks }) {
 
 export function validateChecksums(value) {
   const checksumLines = sortedLines(value);
-  if (checksumLines.length !== publicFiles.length)
+  const named = new Set(checksumLines.map((line) => line.slice(66)));
+  if (checksumLines.length !== publicFiles.length || named.size !== publicFiles.length)
     throw new Error("現在配信中のハッシュを全件取得できませんでした");
   for (const line of checksumLines) {
     const match = line.match(/^([0-9a-f]{64})  (.+)$/);
@@ -205,7 +206,7 @@ trap finish EXIT
 test "$(readlink -f "$root")" = "$root"
 test ! -L "$root"
 test "$(find "$root" -mindepth 1 -maxdepth 1 -printf '%f\\n' | LC_ALL=C sort | tr '\\n' '|')" = ${quote(rootInventory)}
-test "$(find "$root" -mindepth 1 -maxdepth 2 -type f -printf '%P\\n' | LC_ALL=C sort | tr '\\n' '|')" = ${quote(fileInventory)}
+test "$(find "$root" -mindepth 1 -type f -printf '%P\\n' | LC_ALL=C sort | tr '\\n' '|')" = ${quote(fileInventory)}
 test -z "$(find "$root" -type l -print -quit)"
 cd "$root"
 printf '%s\\n' ${quote(verifiedBefore)} | sha256sum -c -
@@ -290,7 +291,7 @@ async function main() {
   } else {
     validateInstalledState({
       rootNames: remote(`find ${quote(target)} -mindepth 1 -maxdepth 1 -printf '%f\\n'`),
-      files: remote(`find ${quote(target)} -mindepth 1 -maxdepth 2 -type f -printf '%P\\n'`),
+      files: remote(`find ${quote(target)} -mindepth 1 -type f -printf '%P\\n'`),
       symlinks: remote(`find ${quote(target)} -type l -printf '%P\\n'`),
     });
     beforeChecksums = validateChecksums(
