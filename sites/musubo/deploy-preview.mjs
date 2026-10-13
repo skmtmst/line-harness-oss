@@ -1,4 +1,5 @@
-// First installation only. Subsequent updates deliberately require a new audit.
+// Installs stg.musubo.jp once from the audited initial state, then updates only the reviewed
+// installed state (same file inventory, verified hashes, backup and automatic restore).
 // No production build, DNS, Worker, database or mail configuration operations.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -103,6 +104,138 @@ echo "復元用バックアップ: $backup/before.tar.gz"
 `;
 }
 
+// ---- updates of an installed review site -------------------------------------------------
+export const installedRootNames = [
+  ".htaccess",
+  ".user.ini",
+  "assets",
+  "contact",
+  "default_page.png",
+  "index.html",
+  "legal",
+  "privacy",
+  "robots.txt",
+  "sitemap.xml",
+  "terms",
+];
+export const installedFiles = [...publicFiles, ".user.ini", "default_page.png"];
+const sortedLines = (value) =>
+  String(value)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
+
+export function isInitialState(names) {
+  return (
+    sortedLines(names).join("\n") ===
+    [".user.ini", "default_page.png", "index.html"].join("\n")
+  );
+}
+
+export function validateInstalledState({ rootNames, files, symlinks }) {
+  if (sortedLines(rootNames).join("\n") !== [...installedRootNames].sort().join("\n"))
+    throw new Error(
+      `確認用サイトの直下に想定外の差分があります。上書きせず停止します: ${sortedLines(rootNames).join(", ")}`,
+    );
+  if (sortedLines(files).join("\n") !== [...installedFiles].sort().join("\n"))
+    throw new Error(
+      `確認用サイトの配信ファイルに想定外の差分があります。上書きせず停止します: ${sortedLines(files).join(", ")}`,
+    );
+  if (sortedLines(symlinks).length)
+    throw new Error("確認用サイトにシンボリックリンクがあります。配備しません");
+}
+
+export function validateChecksums(value) {
+  const checksumLines = sortedLines(value);
+  if (checksumLines.length !== publicFiles.length)
+    throw new Error("現在配信中のハッシュを全件取得できませんでした");
+  for (const line of checksumLines) {
+    const match = line.match(/^([0-9a-f]{64})  (.+)$/);
+    if (!match || !publicFiles.includes(match[2]))
+      throw new Error("現在配信中のハッシュ形式が不正です");
+  }
+  return checksumLines.join("\n");
+}
+
+export function remoteUpdate(id, user, beforeChecksums) {
+  if (!/^\d{14}-[0-9a-f]{12}$/.test(id)) throw new Error("Invalid release ID");
+  const verifiedBefore = validateChecksums(beforeChecksums);
+  const { target, lock, backups } = deploymentPaths(user);
+  const backup = `${backups}/stg-${id}`;
+  const rootInventory = [...installedRootNames].sort().join("|") + "|";
+  const fileInventory = [...installedFiles].sort().join("|") + "|";
+  const installLines = publicFiles
+    .map((file) => `install -m 644 ${quote(`${backup}/payload/${file}`)} ${quote(`${target}/${file}`)}`)
+    .join("\n");
+  const restoreLines = publicFiles
+    .map((file) => `install -m 644 ${quote(`${backup}/before/${file}`)} ${quote(`${target}/${file}`)}`)
+    .join("\n");
+  return `set -euo pipefail
+root=${quote(target)}
+lock=${quote(lock)}
+backup=${quote(backup)}
+for attempt in {1..30}; do
+  if mkdir "$lock" 2>/dev/null; then acquired=1; break; fi
+  sleep 2
+done
+test "\${acquired:-0}" = 1 || { echo '別の配備が実行中です。ロックは削除しません。'; exit 1; }
+started=0
+finish() {
+  status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ] && [ "$started" = 1 ]; then
+    set +e
+${restoreLines}
+    cd "$root"
+    sha256sum -c "$backup/BEFORE_SHA256SUMS"
+    restore_status=$?
+    set -e
+    if [ "$restore_status" -eq 0 ]; then
+      echo '更新に失敗したため、更新前の確認用サイトへ復元しました。'
+    else
+      echo '復元後のハッシュ照合に失敗しました。バックアップを保全しています。' >&2
+      status=70
+    fi
+  fi
+  rmdir "$lock" || { echo '配備ロックを解放できませんでした。' >&2; [ "$status" -ne 0 ] || status=71; }
+  exit "$status"
+}
+trap finish EXIT
+test "$(readlink -f "$root")" = "$root"
+test ! -L "$root"
+test "$(find "$root" -mindepth 1 -maxdepth 1 -printf '%f\\n' | LC_ALL=C sort | tr '\\n' '|')" = ${quote(rootInventory)}
+test "$(find "$root" -mindepth 1 -maxdepth 2 -type f -printf '%P\\n' | LC_ALL=C sort | tr '\\n' '|')" = ${quote(fileInventory)}
+test -z "$(find "$root" -type l -print -quit)"
+cd "$root"
+printf '%s\\n' ${quote(verifiedBefore)} | sha256sum -c -
+umask 077
+mkdir -p ${quote(backups)}
+mkdir "$backup"
+printf '%s\\n' ${quote(verifiedBefore)} > "$backup/BEFORE_SHA256SUMS"
+tar -czf "$backup/before.tar.gz" -C "$root" .
+tar -tzf "$backup/before.tar.gz" >/dev/null
+mkdir "$backup/before"
+tar -xzf "$backup/before.tar.gz" -C "$backup/before"
+cd "$backup/before"
+sha256sum -c "$backup/BEFORE_SHA256SUMS"
+cat > "$backup/payload.tar.gz"
+tar -tzf "$backup/payload.tar.gz" >/dev/null
+mkdir "$backup/payload"
+tar -xzf "$backup/payload.tar.gz" -C "$backup/payload"
+cd "$backup/payload"
+sha256sum -c SHA256SUMS
+test "$(find . -type f -printf '%P\\n' | LC_ALL=C sort | tr '\\n' '|')" = ${quote([...publicFiles, "SHA256SUMS"].sort().join("|") + "|")}
+umask 022
+started=1
+${installLines}
+cd "$root"
+sha256sum -c "$backup/payload/SHA256SUMS"
+echo '確認用サイトを更新し、配信ハッシュを照合しました。DNS・本番サイトは変更していません。'
+echo "復元用バックアップ: $backup/before.tar.gz"
+`;
+}
+
 async function main() {
   const flags = process.argv.slice(2);
   if (flags.some((flag) => flag !== "--apply") || flags.length > 1)
@@ -146,10 +279,24 @@ async function main() {
   ];
   const remote = (command, input) =>
     run("ssh", [...sshArgs, command], { input });
-  const indexHash = remote(
-    `sha256sum ${quote(`${target}/index.html`)} | cut -d ' ' -f 1`,
-  ).trim();
-  validateInitialState(remote(`ls -1A ${quote(target)}`), indexHash);
+  const names = remote(`ls -1A ${quote(target)}`);
+  const firstInstall = isInitialState(names);
+  let beforeChecksums = "";
+  if (firstInstall) {
+    const indexHash = remote(
+      `sha256sum ${quote(`${target}/index.html`)} | cut -d ' ' -f 1`,
+    ).trim();
+    validateInitialState(names, indexHash);
+  } else {
+    validateInstalledState({
+      rootNames: remote(`find ${quote(target)} -mindepth 1 -maxdepth 1 -printf '%f\\n'`),
+      files: remote(`find ${quote(target)} -mindepth 1 -maxdepth 2 -type f -printf '%P\\n'`),
+      symlinks: remote(`find ${quote(target)} -type l -printf '%P\\n'`),
+    });
+    beforeChecksums = validateChecksums(
+      remote(`cd ${quote(target)} && sha256sum ${publicFiles.map(quote).join(" ")}`),
+    );
+  }
   const work = await mkdtemp(join(tmpdir(), "musubo-xserver-"));
   const output = join(work, "public");
   await build({ output });
@@ -163,7 +310,7 @@ async function main() {
       throw new Error(`確認用の安全表示がありません: ${file}`);
   }
   console.log(
-    `対象: ${config.previewOrigin} / ${target}\nSHA: ${sha}\nモード: ${apply ? "apply" : "dry-run"}\n生成物: ${work}`,
+    `対象: ${config.previewOrigin} / ${target}\nSHA: ${sha}\n種別: ${firstInstall ? "初回設置" : "更新"}\nモード: ${apply ? "apply" : "dry-run"}\n生成物: ${work}`,
   );
   // Always print a real no-write transfer comparison before any remote write.
   const transport = ["ssh", ...sshArgs.slice(0, -1)].map(quote).join(" ");
@@ -185,14 +332,17 @@ async function main() {
   );
   await writeFile(join(output, "SHA256SUMS"), checksums.join("\n") + "\n");
   const archive = join(work, "payload.tar.gz");
-  run("tar", ["-czf", archive, "-C", output, ...publicFiles, "SHA256SUMS"]);
+  // macOS tar would otherwise add AppleDouble (._*) files that the strict inventory rejects.
+  run("tar", ["-czf", archive, "-C", output, ...publicFiles, "SHA256SUMS"], {
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
+  });
   const id =
     new Date().toISOString().replace(/\D/g, "").slice(0, 14) +
     "-" +
     sha.slice(0, 12);
   console.log(
     remote(
-      `bash -c ${quote(remoteInstall(id, user))}`,
+      `bash -c ${quote(firstInstall ? remoteInstall(id, user) : remoteUpdate(id, user, beforeChecksums))}`,
       await readFile(archive),
     ),
   );

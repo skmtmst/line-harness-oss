@@ -68,3 +68,44 @@ test("the audited subdomain initial state is accepted but an existing htaccess i
     /変更/,
   );
 });
+
+test("update program for the installed review site is valid bash, verified, backed up and self-restoring", async () => {
+  const {
+    remoteUpdate,
+    validateInstalledState,
+    validateChecksums,
+    isInitialState,
+    installedRootNames,
+    installedFiles,
+  } = await import("../deploy-preview.mjs");
+  const sums = publicFiles.map((f, i) => `${String(i).padStart(64, "a")}  ${f}`).join("\n");
+  const script = remoteUpdate("20261013083000-123456789abc", "fixtureuser", sums);
+  execFileSync("bash", ["-n"], { input: script });
+  assert.match(script, /\.musubo-stg-site-deploy\.lock/);
+  assert.match(script, /musubo-site-backups\/stg-/);
+  assert.doesNotMatch(
+    script,
+    /install -m 644 [^\n]+ '\/home\/fixtureuser\/musubo\.jp\/public_html\/(?!stg\.musubo\.jp\/)/,
+  );
+  assert.doesNotMatch(script, /rm -|--delete|wrangler|\.env/);
+  assert.match(script, /trap finish EXIT/);
+  assert.match(script, /BEFORE_SHA256SUMS/);
+  assert.ok(script.indexOf("tar -czf") < script.indexOf("started=1"));
+  assert.ok(script.indexOf("sha256sum -c SHA256SUMS") < script.indexOf("started=1"));
+  const firstInstallToSite = script.search(/install -m 644 '[^']+\/payload\/[^']+' '\/home\/fixtureuser\/musubo\.jp\/public_html\/stg\.musubo\.jp\//);
+  assert.ok(firstInstallToSite > script.indexOf("started=1"));
+  assert.throws(() => remoteUpdate("../../escape", "fixtureuser", sums), /Invalid/);
+  assert.throws(() => validateChecksums("bad"), /全件|形式/);
+  assert.throws(
+    () => validateChecksums(sums.replace("index.html", "../index.html")),
+    /形式/,
+  );
+
+  assert.equal(isInitialState(".user.ini\ndefault_page.png\nindex.html"), true);
+  assert.equal(isInitialState(installedRootNames.join("\n")), false);
+  const ok = { rootNames: installedRootNames.join("\n"), files: installedFiles.join("\n"), symlinks: "" };
+  assert.doesNotThrow(() => validateInstalledState(ok));
+  assert.throws(() => validateInstalledState({ ...ok, rootNames: ok.rootNames + "\nindex.php" }), /想定外/);
+  assert.throws(() => validateInstalledState({ ...ok, files: ok.files + "\nassets/extra.js" }), /想定外/);
+  assert.throws(() => validateInstalledState({ ...ok, symlinks: "index.html" }), /シンボリック/);
+});
