@@ -182,7 +182,7 @@ export default function OpsTenantsV8() {
                 </span></Td>
                 <DateCell collapseAt="narrow"><span data-list-date-time>{formatDate(row.created_at).replace(/-/g, '/')}</span></DateCell>
                 <DateCell title={formatDateTime(row.last_login_at)}><span data-list-date-time>{monthDay(row.last_login_at)}</span></DateCell>
-                <Td collapseAt="narrow">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</Td>
+                <Td collapseAt="narrow">{row.featurePacks.includes('restaurant') ? <StatusBadge dot={false}>使う</StatusBadge> : emptyValue('unknown')}</Td>
               </Tr>
             })}</tbody>
           </DataTable>}
