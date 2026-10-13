@@ -528,7 +528,7 @@ export default function AutomationListV8() {
                   <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td grow>
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
-                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <span className={styles.name}><TruncatedText value={String(item.name ?? '')} /></span>}
+                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <TruncatedText value={String(item.name ?? '')} />}
                       </FolderDotName>
                     </Td>
                     <Td className={styles.colTrigger}><TruncatedText value={trigger} /></Td>

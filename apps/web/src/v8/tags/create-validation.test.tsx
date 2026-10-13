@@ -18,6 +18,20 @@ vi.mock('@/lib/api', async (original) => {
 import TagCreate from './create'
 afterEach(() => { cleanup(); vi.clearAllMocks(); net.role = 'admin' })
 
+test.each(['admin', 'viewer'])('役割%sでも題の説明を読み、閉じて入力を保てる', async role => {
+  net.role = role
+  render(<TagCreate />)
+  const help = await screen.findByRole('button', { name: 'タグを作るの説明' })
+  const name = screen.queryByLabelText('タグ名')
+  if (name) fireEvent.change(name, { target: { value: '説明を読んでいる途中の入力' } })
+  fireEvent.click(help)
+  expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('友だちを分類するタグ')
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(help.getAttribute('aria-expanded')).toBe('false')
+  if (name) expect((name as HTMLInputElement).value).toBe('説明を読んでいる途中の入力')
+  expect(net.create).not.toHaveBeenCalled()
+})
+
 test('未入力で保存すると名前欄に理由を一度だけ出し、そこへ移動して送信を止める', async () => {
   const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined)
   render(<TagCreate />)

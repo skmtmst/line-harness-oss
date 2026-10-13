@@ -53,7 +53,7 @@ afterEach(cleanup)
 test('最新100件より多いとき、今月の数は「数えられません」、件数は一部と書く', async () => {
   render(<FriendDetailV8 />)
   await screen.findByText('最新100 件だけでは数えられません')
-  expect(screen.getByText(/最新100 件（全340 件）のうち/)).toBeTruthy()
+  expect(screen.getByText(/最新100件（全340件）のうち/)).toBeTruthy()
 })
 
 test('未公開のランクを最高到達にせず、未取得の接続先と付与回数を0にしない', async () => {

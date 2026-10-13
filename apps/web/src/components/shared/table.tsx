@@ -1,6 +1,7 @@
 'use client'
 
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
+import Avatar from './avatar'
 import React from 'react'
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
@@ -281,16 +282,30 @@ export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>)
   return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
 }
 
+/** 顔と名前を同じ1行に保つ。狭い列では名前だけを省略する。 */
+export function PersonCell({ name, avatarName, avatarSrc, ...cellProps }: Omit<TdProps, 'children'> & {
+  name: ReactNode
+  avatarName?: string | null
+  avatarSrc?: string | null
+}) {
+  return <Td {...cellProps} data-list-person-cell><span className={styles.person}>
+    <Avatar name={avatarName} src={avatarSrc} size={24} />
+    <span className={styles.personName}>{name}</span>
+  </span></Td>
+}
+
 /** B-194: states belong to their column; stacked badges keep the 60px row. */
 export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'className'> & { primary?: ReactNode }) {
   return <Td {...cellProps} className={shell.statusCell} data-list-status-cell><div className={shell.statusStack}>{primary ? <span className={shell.statusPrimary}>{primary}</span> : null}{children}</div></Td>
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, annotation, className, grow }: {
+export function NameCell({ name, folder, annotation, selection, className, grow }: {
   name: ReactNode
   /** 名前の横の状態札。名前やリンクの中には入れない。 */
   annotation?: ReactNode
+  /** Selection stays outside the truncatable name, including its context menu. */
+  selection?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
   /** 列の余りを名前へ配る。見出しの Th と同じ役割を渡す。 */
@@ -298,7 +313,7 @@ export function NameCell({ name, folder, annotation, className, grow }: {
 }) {
   return (
     <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
+      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
     </td>
   )
 }

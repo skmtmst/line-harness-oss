@@ -27,15 +27,11 @@
 }
 
 .searchBox { width: var(--tpl-fa-search-w); }
-.folderSelect { width: var(--tpl-fa-folder-w); }
-.folderSelect :global(*) { max-width: 100%; }
-.folderSelect :global(button) { width: 100%; }
 .chips {
   display: flex;
   align-items: center;
   gap: var(--tpl-toolbar-gap);
 }
-.spacer { flex: 1 1 0; }
 
 .narrowTools {
   display: flex;
@@ -208,10 +204,6 @@
 .menuBox {
   display: flex;
   align-items: center;
-}
-.menuButton {
-  width: var(--tpl-fa-col-menu);
-  height: var(--tpl-fa-col-menu);
 }
 
 .footNote {

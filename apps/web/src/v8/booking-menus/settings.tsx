@@ -1,6 +1,5 @@
 'use client'
 
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
@@ -27,11 +26,11 @@ import {
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Check, Smartphone } from 'lucide-react'
-import StickyBar from '@/components/shared/sticky-bar'
+import { CreatePage } from '@/components/templates/create-page'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -83,7 +82,7 @@ import {
 } from './tabs/shared'
 import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
-import { PageHeading } from '@/components/templates/page-frame'
+
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /*
@@ -185,7 +184,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   const [staffMatrices, setStaffMatrices] = useState<Record<string, StaffMenuMatrix[]>>({})
   const [staffExtras, setStaffExtras] = useState<Record<string, { work: string | null; calendar: 'loading' | 'connected' | 'none' | 'error' }>>({})
   /** 板 VFxWU（1152）：畳んだスマホの代わりに開く見え方窓。 */
-  const [phoneOpen, setPhoneOpen] = useState(false)
   const [members, setMembers] = useState<StaffMember[]>([])
   const [resources, setResources] = useState<BookingResource[] | null>(null)
   const [resourcesStatus, setResourcesStatus] = useState<LoadStatus>('loading')
@@ -506,10 +504,23 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     )
   }, [tab, menus, menusStatus, previewMenu, staff, designationFree, staffStatus, preview, closedWeekdays, phoneView])
 
+  const previewContent = <>
+            <div className={styles.sideActions}>
+              {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+            </div>
+            <p className={styles.sideTitle}>お客さまの予約画面</p>
+            {phone}
+            {previewUrl ? null : (
+              <p className={styles.sideLineLink}>このアカウントには予約画面のURLがまだありません</p>
+            )}
+  </>
+
   return (
     <V8TabEditContext.Provider value={registerTabEdit}>
-      <div className={styles.shell} data-design-node="owaS3">
-        <PageHeading title={<>予約設定</>}
+      <CreatePage
+        boardId={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}
+        dirty={false}
+        readOnly={Boolean(accountId && tabReadOnly)} title={<>予約設定</>}
         help={<>お客さまの予約画面に出るメニュー・時間・ルールを決めます</>}
         tabs={<><Tabs
               label="予約設定のタブ"
@@ -518,16 +529,33 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 current: item.key === tab,
                 onClick: () => requestTab(item.key),
               }))}
-            /></>} />
+            /></>}
 
-        {accountId && tabReadOnly ? (
-          <div className={styles.readOnlyRow} data-design="Bar">
-            <ReadOnlyNotice />
-          </div>
-        ) : null}
 
-        <div className={styles.body} data-design="Body">
-          <div className={tab === 'channels' ? `${styles.main} ${styles.mainChannels}` : styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}>
+        preview={tab === 'channels' ? undefined : previewContent}
+        previewToggle={tab === 'channels' ? undefined : <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+        footerActions={tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
+                <>
+                  <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      if (!tabEdit.dirty) {
+                        notifyToast('変更はありません。')
+                        return
+                      }
+                      tabEdit.onSave()
+                    }}
+                    disabled={tabEdit.saving}
+                    busy={tabEdit.saving}
+
+                  >
+                    <Check size={15} aria-hidden="true" />{tabEdit.saveLabel ?? '保存する'}
+                  </Button>
+                </>
+              ) : null}
+        status={tabEdit?.dirty ? `${tabEdit.subject}があります` : undefined}
+      >
             {!accountId ? (
               <StateCard
                 icon={<AccountIcon />}
@@ -602,61 +630,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
             ) : (
               <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} />
             )}
-          </div>
-
-          {/* 予約経路の連携は横に広い表なので、右のスマホを出さず全幅にする（絵 ZyDd6）。 */}
-          {tab === 'channels' ? null : (
-          <aside className={styles.side} data-design="Side">
-            <div className={styles.sideActions}>
-              <span className={styles.sidePhoneButton}>
-                <Button onClick={() => setPhoneOpen(true)}><Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る</Button>
-              </span>
-              {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
-            </div>
-            <p className={styles.sideTitle}>お客さまの予約画面</p>
-            <div className={styles.sidePhone}>{phone}</div>
-            {previewUrl ? null : (
-              <p className={styles.sideLineLink}>このアカウントには予約画面のURLがまだありません</p>
-            )}
-          </aside>
-          )}
-        </div>
-
-        {/* 下の帯（追従・常に画面の下）。キャンセル・保存は中央（絵 yRPxl・x1OZS6）。
-            変えられない人（閲覧のみ）には押せないボタンを置かないので帯ごと出さない。 */}
-        {tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
-          <div className={styles.saveBarWrap} data-design="Savebar">
-            <StickyBar
-              status={tabEdit.dirty ? (
-                <span className={styles.saveBarStatus}>
-                  <span className={styles.saveBarStatusDot} aria-hidden="true" />
-                  {tabEdit.subject}があります
-                </span>
-              ) : undefined}
-              actions={(
-                <>
-                  <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      if (!tabEdit.dirty) {
-                        notifyToast('変更はありません。')
-                        return
-                      }
-                      tabEdit.onSave()
-                    }}
-                    disabled={tabEdit.saving}
-                    busy={tabEdit.saving}
-
-                  >
-                    <Check size={15} aria-hidden="true" />{tabEdit.saveLabel ?? '保存する'}
-                  </Button>
-                </>
-              )}
-            />
-          </div>
-        ) : null}
-      </div>
+      </CreatePage>
 
       {/* タブをまたぐときの破棄確認（タブ内のデータは外れると消える）。 */}
       <ConfirmDialog
@@ -675,14 +649,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-      {/* 板 VFxWU（1152）：畳んだスマホの代わりに見せる窓。実行ボタンなしの参照窓。 */}
-      <Dialog
-        open={phoneOpen}
-        title="お客さまの予約画面"
-        onCancel={() => setPhoneOpen(false)}
-      >
-        {phone}
-      </Dialog>
+
     </V8TabEditContext.Provider>
   )
 }

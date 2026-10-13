@@ -53,6 +53,10 @@
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
 :global(:root) .content { min-width: 0; }
+:global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
+@container v8-page (max-width: 1099px) {
+  :global(:root) .listCards[data-card-columns='4'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 :global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global(:root) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
@@ -86,10 +90,12 @@
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global(:root) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
+/* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
+:global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
-:global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
+:global(:root) .frame[data-page-template='create'] [data-template-region='preview'][data-preview-surface='plain'] { background: transparent; }
 :global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
 :global(:root) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
 /*
@@ -182,6 +188,11 @@
 :global(:root) .dashboardColumns .dashboardCell { padding-inline: 20px; }
 :global(:root) .dashboardColumns[data-layout='overview'] { min-height: var(--tpl-db-columns-min-h); }
 :global(:root) .dashboardColumns[data-layout='overview'] .dashboardCell { padding-inline: var(--polish-space-section); }
+:global(:root) .dashboardColumns[data-layout='cards'] > * { align-self: start; }
+:global(:root) .dashboardColumns[data-layout='cards'] { min-height: 0; border: 0; gap: var(--polish-space-card); align-items: start; }
+@container v8-page (width < 1100px) {
+  :global(:root) .dashboardColumns[data-layout='cards'] { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
+}
 :global(:root) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: var(--polish-space-field); }
 :global(:root) .dashboardRow[data-row='link'] .dashboardAside { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 :global(:root) .dashboardAsideSection { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card) var(--polish-space-section); }
@@ -442,7 +453,7 @@
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }
 
 /* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */
-:global(:root) [data-list-skeleton] .content :global(div:has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }
+:global(:root) [data-list-skeleton] .content :global(div:not([data-template-region]):has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 
 /* B-233：白い板の下は24。操作の帯は専用の下端を持つ。 */
 :global(:root) .frame:not([data-page-template="inbox"]):not(:has([data-shared-part="sticky-bar"])) { padding-bottom: var(--polish-space-section); }
@@ -460,6 +471,8 @@
 /* 申込者の数の帯も、本文と同じ左右24・上16。 */
 :global(:root) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }
 
+/* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
+:global(:root) fieldset.createContent { border: 0; margin: 0; }
 /* Collapsed list folders keep the complete selected label. */
 :global(:root) .collapsedSelect { width: max-content; flex: none; }
 
@@ -469,7 +482,7 @@
 /* 受信箱も白い板の下に24を残し、本文だけを送る。 */
 :global(:root) .frame[data-page-template='inbox'] { padding-bottom: var(--polish-space-section); }
 /* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
-:global(:root) fieldset.createContent { border: 0; margin: 0; }
+
 
 /* No-choice lists retain their create action even without other tools. */
 :global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }

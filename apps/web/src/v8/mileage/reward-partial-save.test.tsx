@@ -35,6 +35,14 @@ it('OPS-C01 交換テスト後の保存は同じ下書きを継続する',async(
  expect(f.push).toHaveBeenCalled();
 });
 
+it.each([null,'staff','viewer'])('役割%sでは保存・公開・交換テストを出さず変更APIも呼ばない',async role=>{
+ f.role=role;
+ await act(async()=>root.render(<Editor/>));
+ expect(host.textContent).toContain('閲覧のみ');
+ expect(host.textContent).toContain('一覧へ戻る');
+ expect([...host.querySelectorAll('button')].some(button=>/下書きを保存|保存して出す|自分で交換をテスト/.test(button.textContent??''))).toBe(false);
+ expect(f.create).not.toHaveBeenCalled();expect(f.save).not.toHaveBeenCalled();expect(f.test).not.toHaveBeenCalled();
+});
 it('B-246：公開だけ失敗したら下書きを重ねず、入力変更後は新しい版で公開する',async()=>{
  const { ApiError } = await import('@/lib/api')
  f.publish.mockReset().mockRejectedValueOnce(new ApiError(500,'人工の公開失敗')).mockResolvedValue({success:true,data:{id:'synthetic-1',status:'published'}})
@@ -57,11 +65,3 @@ it('B-246：公開だけ失敗したら下書きを重ねず、入力変更後�
   ['synthetic-1','synthetic-account','v-1',1],['synthetic-1','synthetic-account','v-2',2],
  ])
 })
-it.each([null,'staff','viewer'])('役割%sでは保存・公開・交換テストを出さず変更APIも呼ばない',async role=>{
- f.role=role;
- await act(async()=>root.render(<Editor/>));
- expect(host.textContent).toContain('閲覧のみ');
- expect(host.textContent).toContain('一覧へ戻る');
- expect([...host.querySelectorAll('button')].some(button=>/下書きを保存|保存して出す|自分で交換をテスト/.test(button.textContent??''))).toBe(false);
- expect(f.create).not.toHaveBeenCalled();expect(f.save).not.toHaveBeenCalled();expect(f.test).not.toHaveBeenCalled();
-});

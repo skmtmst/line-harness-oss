@@ -26,6 +26,8 @@ import layout from './layout.module.css'
 import styles from './shifts.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { PageHeading } from '@/components/templates/page-frame'
+import { CreatePage } from '@/components/templates/create-page'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -1073,12 +1075,46 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     : <span aria-label={label} className={`${styles.time} ${styles.timeText}`}>{value || emptyValue('unknown')}</span>
   )
 
-  return (
-    <SaveErrorScope errors={saveErrors}><div className={layout.shell} data-design-node={node}>
-      <Head self={isSelf} />
+  const previewContent = <>
+          {previewUrl ? (
+            <div className={layout.sideActions}>
+              <Button href={previewUrl} className={styles.sideButton}><Smartphone className={styles.btnIcon} aria-hidden="true" />お客さまに見える画面を確かめる</Button>
+            </div>
+          ) : null}
+          <p className={layout.sideTitle} title={`お客さまの予約画面（${isSelf ? 'あなた' : `${staff.display_name}さん`}を指名したとき）`}>
+            お客さまの予約画面（{isSelf ? 'あなた' : `${staff.display_name}さん`}を指名したとき）
+          </p>
+          <>
+            <PhoneDatetimeStep
+              menu={previewMenu}
+              staffName={staff.display_name}
+              slots={slots}
+              closedDates={closedDates}
+              closedWeekdays={closedWeekdays}
+              status={previewLoading ? 'loading' : previewError ? 'error' : 'ready'}
+              onRetry={selectedAccountId && menuId ? () => { void loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current) } : undefined}
+            />
+          </>
+          {previewUrl ? null : <p className={layout.cardNote}>このアカウントには予約画面のURLがまだありません</p>}
+          {!hasActiveMenu ? <p className={layout.cardNote}>公開中のメニューがないため、枠は出ません。</p> : null}
+          <p className={layout.cardNote}>日ごとのシフトがある日はそちらが優先、ない日はいつもの勤務時間どおりです。外の予定は枠を閉じます。</p>
+          <div className={styles.marks} aria-label={`${staff.display_name}の予約枠（14日分）`}>
+            {previewMarks.map((item) => (
+              <span key={item.date} className={styles.mark} title={shortDay(item.date)}>
+                <span className={styles.markDay}>{Number(item.date.slice(8, 10))}</span>
+                <span data-mark={item.mark}>{item.mark}</span>
+              </span>
+            ))}
+          </div>
+</>
 
-      <div className={layout.body} data-design="Body">
-        <div className={layout.main}>
+  return (
+    <SaveErrorScope errors={saveErrors}><CreatePage boardId={node} dirty={false} footerActions={null}
+        title={isSelf ? '自分の勤務' : '勤務とシフト'}
+        help={isSelf ? 'あなたの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。ほかの人の勤務は管理者だけが開けます。' : '担当スタッフの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。'}
+        preview={previewContent}
+        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+      >
           {isSelf ? (
             <p className={styles.linkBand} data-design="Info">{staffLabel(staff)}としてひも付いています。ひも付けを変えるときはオーナーか管理者に頼んでください。</p>
           ) : (
@@ -1356,41 +1392,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {calendarFormError ? <p className={layout.fieldError} role="alert">{calendarFormError}</p> : null}
             </Card>
           </fieldset>
-        </div>
 
-        <aside className={layout.side} aria-label="お客さまの予約画面の見え方" data-design="Side">
-          {previewUrl ? (
-            <div className={layout.sideActions}>
-              <Button href={previewUrl} className={styles.sideButton}><Smartphone className={styles.btnIcon} aria-hidden="true" />お客さまに見える画面を確かめる</Button>
-            </div>
-          ) : null}
-          <p className={layout.sideTitle} title={`お客さまの予約画面（${isSelf ? 'あなた' : `${staff.display_name}さん`}を指名したとき）`}>
-            お客さまの予約画面（{isSelf ? 'あなた' : `${staff.display_name}さん`}を指名したとき）
-          </p>
-          <div className={layout.phoneSlot}>
-            <PhoneDatetimeStep
-              menu={previewMenu}
-              staffName={staff.display_name}
-              slots={slots}
-              closedDates={closedDates}
-              closedWeekdays={closedWeekdays}
-              status={previewLoading ? 'loading' : previewError ? 'error' : 'ready'}
-              onRetry={selectedAccountId && menuId ? () => { void loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current) } : undefined}
-            />
-          </div>
-          {previewUrl ? null : <p className={layout.cardNote}>このアカウントには予約画面のURLがまだありません</p>}
-          {!hasActiveMenu ? <p className={layout.cardNote}>公開中のメニューがないため、枠は出ません。</p> : null}
-          <p className={layout.cardNote}>日ごとのシフトがある日はそちらが優先、ない日はいつもの勤務時間どおりです。外の予定は枠を閉じます。</p>
-          <div className={styles.marks} aria-label={`${staff.display_name}の予約枠（14日分）`}>
-            {previewMarks.map((item) => (
-              <span key={item.date} className={styles.mark} title={shortDay(item.date)}>
-                <span className={styles.markDay}>{Number(item.date.slice(8, 10))}</span>
-                <span data-mark={item.mark}>{item.mark}</span>
-              </span>
-            ))}
-          </div>
-        </aside>
-      </div>
+      </CreatePage>
 
       <ConfirmDialog
         open={removeTarget !== null}
@@ -1416,6 +1419,6 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         onCancel={() => setConfirmDisconnect(false)}
         onConfirm={() => disconnectCalendar()}
       />
-    </div></SaveErrorScope>
+    </SaveErrorScope>
   )
 }

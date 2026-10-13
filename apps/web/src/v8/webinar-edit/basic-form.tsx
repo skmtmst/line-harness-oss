@@ -5,7 +5,6 @@ import { CalendarDays, Play } from 'lucide-react'
 import Button from '@/components/shared/button'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
@@ -13,6 +12,7 @@ import { ReadValue } from './parts'
 import styles from './form.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
@@ -81,7 +81,7 @@ export function BasicForm({
             onBlur={onBlurTitle}
           /></SaveErrorField>
 {fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
-        <div className={styles.pair}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <Field label="公開ページの URL" help="アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。" htmlFor={`${idPrefix}-slug`}><SaveErrorField names={["slug","values.slug"]}><TextField
               id={`${idPrefix}-slug`}
@@ -102,7 +102,7 @@ export function BasicForm({
 {folderState === 'error' ? (
               <p className={styles.help}>フォルダを読み込めませんでした。<Button size="compact" onClick={onReloadFolders}>もう一度読み込む</Button></p>
             ) : null}</Field></div>
-        </div>
+        </SettingsFormRow>
         <div className={styles.field}><Field label="案内文" htmlFor={`${idPrefix}-description`}><SaveErrorField names={["description","values.description"]}><TextField
             id={`${idPrefix}-description`}
             value={values.description}
@@ -129,9 +129,7 @@ export function BasicForm({
 
       <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-audience`}>
         <CardHeader size="stacked" titleId={`${idPrefix}-audience`} title="だれに案内するか" />
-        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
-            ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
-            : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}
+        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手"><ReadValue label="案内する相手">{audienceLabel}</ReadValue>
 </Field></div>
       </Card>
     </>

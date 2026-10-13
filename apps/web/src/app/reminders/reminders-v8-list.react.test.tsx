@@ -210,7 +210,7 @@ test('v8 の行の「登録者を管理」「配信予定を見る」「実行�
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 a5C1p。
-test('v8 の閲覧のみ（a5C1p）は選ぶ枠だけを残し、作る・一括・変更の操作を出さず、閲覧のみの帯を出す', async () => {
+test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操作を出さず、閲覧のみの帯を出す', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = (url) => {
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'viewer' } })
@@ -226,9 +226,7 @@ test('v8 の閲覧のみ（a5C1p）は選ぶ枠だけを残し、作る・一括
   expect(actionTexts.some((text) => text.includes('リマインダを作る'))).toBe(false)
   expect(actionTexts.some((text) => text.includes('フォルダを追加'))).toBe(false)
   const selections = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
-  expect(selections.length).toBeGreaterThan(0)
-  expect(selections.every(input => input.disabled)).toBe(true)
-  expect(selections.every(input => input.title.includes('閲覧のみ'))).toBe(true)
+  expect(selections).toHaveLength(0)
   const trigger = [...host.querySelectorAll('button')]
     .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
   await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })

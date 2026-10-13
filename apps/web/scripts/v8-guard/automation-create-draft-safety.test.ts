@@ -20,8 +20,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
  *      手元の応答表で真似すると**その作りごと間違って写す**危険がある。
  */
 
-const WEB_ROOT = fileURLToPath(new URL('../../../../', import.meta.url))
-const WORKER_SRC = fileURLToPath(new URL('../../../../../worker/src/', import.meta.url))
+const WEB_ROOT = fileURLToPath(new URL('../../', import.meta.url))
+const WORKER_SRC = fileURLToPath(new URL('../../../worker/src/', import.meta.url))
 const requireFromWorker = createRequire(`${WORKER_SRC}index.ts`)
 const API_ORIGIN = 'http://api.line-harness.test'
 const ACCOUNT_A = 'account-a'

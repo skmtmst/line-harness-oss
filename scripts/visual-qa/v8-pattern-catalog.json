@@ -55,7 +55,9 @@
           ],
           "components": [
             "Card",
-            "CardHeader"
+            "CardHeader",
+            "CardContent",
+            "ListPageCards"
           ],
           "vars": [
             "--card-shadow",
@@ -216,6 +218,8 @@
         "code": {
           "files": [
             "apps/web/src/components/templates/page-frame.tsx",
+            "apps/web/src/components/templates/create-page.tsx",
+            "apps/web/src/components/shared/create-page.tsx",
             "apps/web/src/components/shared/page-header.tsx",
             "apps/web/src/components/shared/help-tip.tsx",
             "apps/web/src/components/shared/page-explanation.tsx",
@@ -469,7 +473,9 @@
             "apps/web/src/components/shared/folder-row-actions.tsx",
             "apps/web/src/components/shared/folder-add-dialog.tsx",
             "apps/web/src/components/shared/folder-editor-dialog.tsx",
-            "apps/web/src/components/shared/folder-dot.tsx"
+            "apps/web/src/components/shared/folder-dot.tsx",
+          "apps/web/src/components/shared/list-folder-context.tsx",
+          "apps/web/src/components/templates/list-page.tsx"
           ],
           "components": [
             "ManagedFolderPanel",
@@ -566,7 +572,8 @@
             "GridTable",
             "GridHeadRow",
             "GridRow",
-            "GridCell"
+            "GridCell",
+            "PersonCell"
           ],
           "vars": [
             "--color-table-head",
@@ -1325,8 +1332,15 @@
       ],
       "owner": {
         "code": {
-          "files": [],
-          "components": [],
+          "files": [
+            "apps/web/src/components/shared/action-list.tsx",
+            "apps/web/src/components/shared/action-list.module.css",
+            "apps/web/src/components/shared/fixed-action-list.tsx"
+          ],
+          "components": [
+            "ActionList",
+            "FixedActionList"
+          ],
           "vars": []
         },
         "pen": [],
@@ -2677,6 +2691,8 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/toggle.tsx",
+            "apps/web/src/components/shared/icon-button.tsx",
+            "apps/web/src/components/shared/icon-button.module.css",
             "apps/web/src/components/shared/checkbox.tsx",
             "apps/web/src/components/shared/segmented.tsx",
             "apps/web/src/components/shared/radio-card.tsx",
@@ -2688,6 +2704,7 @@
           ],
           "components": [
             "Toggle",
+            "IconButton",
             "Checkbox",
             "SegmentedControl",
             "RadioCard",
