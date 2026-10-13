@@ -520,7 +520,7 @@ function Responses() {
                   <Card variant="form" padding="roomy" gap="var(--polish-space-row)" aria-label={labels[longKey] ?? longKey}>
                     <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`}
                       action={<Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button>} />
-                    <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns"><tbody>
+                    <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) 0' }}><tbody>
                       {recents.slice(0, 2).map((item) => {
                         const text = String((item.data as Record<string, unknown>)[longKey])
                         return (
