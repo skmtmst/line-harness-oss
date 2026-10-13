@@ -199,7 +199,8 @@ export default function scanOwnerRules() {
   for (const panel of document.querySelectorAll('[data-design-part="drawer"]')) {
     if (!visible(panel) || innerWidth < 540) continue
     const width = panel.getBoundingClientRect().width
-    const allowed = panel.getAttribute('data-width') === 'composer' ? [Math.min(1160, innerWidth)] : [480, 540]
+    const viewportWidth = innerWidth - (panel.hasAttribute('data-viewport-inset') ? 32 : 0)
+    const allowed = panel.getAttribute('data-width') === 'composer' ? [Math.min(1160, viewportWidth)] : [480, 540]
     if (!allowed.some(value => Math.abs(width - value) <= 1)) add('drawerwidth', panel, { width, expected: allowed.join('/') })
   }
   return findings

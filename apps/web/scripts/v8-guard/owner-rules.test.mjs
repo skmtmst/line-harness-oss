@@ -278,3 +278,21 @@ test('B-243：引き出し600への画面側上書きを検出し、480/540と�
     }
   } finally { await browser.close() }
 })
+
+test('余白を指定した広い引き出しは3幅で収まり、元の幅や余分な縮小を検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const viewport of [1152, 1440, 1920]) {
+      await page.setViewportSize({ width: viewport, height: 900 })
+      const expected = Math.min(1160, viewport - 32)
+      for (const width of [expected, expected - 32, expected + 32]) {
+        await page.setContent(shell(`<aside data-design-part="drawer" data-width="composer" data-viewport-inset style="width:${width}px;height:300px;background:white">内容</aside>`))
+        const failures = (await page.evaluate(scan)).filter(f => f.kind === 'drawerwidth')
+        assert.equal(failures.length, width === expected ? 0 : 1)
+      }
+      await page.setContent(shell(`<aside data-design-part="drawer" data-width="composer" style="width:${Math.min(1160, viewport)}px;height:300px;background:white">内容</aside>`))
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'drawerwidth').length, 0)
+    }
+  } finally { await browser.close() }
+})
