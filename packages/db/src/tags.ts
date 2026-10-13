@@ -904,7 +904,7 @@ export async function createTagsBulk(
           : { status: 'skipped' };
       });
     } catch (error) {
-      console.error(`createTagsBulk rows ${offset + 1}-${offset + chunk.length} error:`, error);
+      console.error(JSON.stringify({"code":"src_tags_failed"}));
       prepared.forEach((row, index) => {
         if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = { status: 'failed' };
@@ -1139,7 +1139,7 @@ export async function addTagToFriend(
         occurredAt: now,
       });
     } catch (error) {
-      console.error('tag mileage enqueue failed:', error);
+      console.error(JSON.stringify({"code":"src_tags_failed"}));
       if (options?.strictSideEffects) throw error;
     }
     // 「タグが付いた」を成果として数える(#648)。
@@ -1166,7 +1166,7 @@ export async function addTagToFriend(
         throw new Error(`tag conversion record failed: ${conversion.failed}`);
       }
     } catch (error) {
-      console.error('tag conversion record failed:', error);
+      console.error(JSON.stringify({"code":"src_tags_failed"}));
       if (options?.strictSideEffects) throw error;
     }
   }

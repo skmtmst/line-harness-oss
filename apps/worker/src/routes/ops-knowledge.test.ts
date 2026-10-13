@@ -149,7 +149,7 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
     expect((await knowledgeForTicket(store.db, requestId)).job?.status).toBe('queued');
     expect(store.raw.prepare('SELECT stage FROM hq_support_requests WHERE id = ?').get(requestId)).toEqual({ stage: 'resolved' });
     expect(store.raw.prepare('SELECT error_code FROM platform_knowledge_jobs').get()).toEqual({ error_code: 'generation_failed' });
-    expect(logger).toHaveBeenCalledWith('[knowledge] generation failed', { name: 'Error' });
+    expect(logger).toHaveBeenCalledWith(JSON.stringify({ code: 'services_platform_knowledge_failed' }));
     expect(JSON.stringify(logger.mock.calls)).not.toContain('provider echoed private conversation');
     logger.mockRestore();
   });

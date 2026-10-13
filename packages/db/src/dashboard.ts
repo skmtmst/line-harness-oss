@@ -811,7 +811,7 @@ export async function getDashboardOverview(
       return value;
     } catch (error) {
       partialFailures.push(name);
-      console.error(`[dashboard] ${name} failed`, error);
+      console.error(JSON.stringify({"code":"src_dashboard_failed"}));
       return fallback;
     }
   };

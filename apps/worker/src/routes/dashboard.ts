@@ -285,7 +285,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/dashboard/overview error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/overview"}));
     return c.json({ success: false as const, error: 'ダッシュボードの数を取得できませんでした' }, 500);
   }
 });
@@ -377,7 +377,7 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       },
     });
   } catch (err) {
-    console.error('GET /api/dashboard/organization-overview error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/organization-overview"}));
     return c.json({ success: false as const, error: '全体の運用数を取得できませんでした' }, 500);
   }
 });
@@ -401,7 +401,7 @@ dashboard.get('/api/dashboard/preferences', async (c) => {
     }
     return c.json({ success: true as const, data: { source: 'builtin' as const, version: 0, cards: null, updatedAt: null } });
   } catch (err) {
-    console.error('GET /api/dashboard/preferences error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/preferences"}));
     return c.json({ success: false as const, error: 'ダッシュボードの配置を取得できませんでした' }, 500);
   }
 });
@@ -427,7 +427,7 @@ dashboard.put('/api/dashboard/preferences', inputJsonBoundary(), async (c) => {
     auditLog(c, 'dashboard.preference.update', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: { source: 'personal' as const, version: saved.row.version, cards, updatedAt: saved.row.updated_at } });
   } catch (err) {
-    console.error('PUT /api/dashboard/preferences error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"PUT /api/dashboard/preferences"}));
     return c.json({ success: false as const, error: 'ダッシュボードの配置を保存できませんでした' }, 500);
   }
 });
@@ -440,7 +440,7 @@ dashboard.delete('/api/dashboard/preferences', async (c) => {
     auditLog(c, 'dashboard.preference.reset', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: null });
   } catch (err) {
-    console.error('DELETE /api/dashboard/preferences error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"DELETE /api/dashboard/preferences"}));
     return c.json({ success: false as const, error: 'ダッシュボードの配置を初期化できませんでした' }, 500);
   }
 });
@@ -460,7 +460,7 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), inputJ
     auditLog(c, 'dashboard.preference.default.update', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: { version: saved.version, cards, updatedAt: saved.updated_at } });
   } catch (err) {
-    console.error('PUT /api/dashboard/preferences/default error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"PUT /api/dashboard/preferences/default"}));
     return c.json({ success: false as const, error: '会社の既定配置を保存できませんでした' }, 500);
   }
 });
@@ -484,7 +484,7 @@ dashboard.get('/api/dashboard/upcoming', async (c) => {
     });
     return c.json({ success: true as const, data });
   } catch (err) {
-    console.error('GET /api/dashboard/upcoming error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/upcoming"}));
     return c.json({ success: false as const, error: '今後の予定を取得できませんでした' }, 500);
   }
 });
@@ -515,7 +515,7 @@ dashboard.get('/api/dashboard/delivery-failure-origins', async (c) => {
     });
     return c.json({ success: true as const, data });
   } catch (err) {
-    console.error('GET /api/dashboard/delivery-failure-origins error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/delivery-failure-origins"}));
     return c.json({ success: false as const, error: '失敗の出どころを取得できませんでした' }, 500);
   }
 });
@@ -541,7 +541,7 @@ dashboard.get('/api/list-stats', async (c) => {
         };
     return c.json({ success: true as const, data: await getListStats(c.env.DB, scope) });
   } catch (err) {
-    console.error('GET /api/list-stats error:', err);
+    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/list-stats"}));
     return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);
   }
 });

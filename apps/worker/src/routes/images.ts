@@ -1,10 +1,11 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
+import { isWebinarSource, privateImageKey, privateImageSignatureValid, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 import { imageDimensions } from '../services/media-metadata.js';
 
 const images = new Hono<Env>();
@@ -27,7 +28,15 @@ async function ownedImage(c: Context<Env>, key: string) {
 
 
 // POST /api/images — upload image (base64 or binary)
-images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
+images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, next) => {
+  const json = /^application\/json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '');
+  // Base64 expands three bytes into four, with a small allowance for JSON fields.
+  const max = json ? Math.ceil((10 * 1024 * 1024) / 3) * 4 + 4096 : 10 * 1024 * 1024;
+  const bytes = await readBoundedBytes(c.req.raw, max);
+  if (bytes === null) return c.json({ success: false, code: 'image_too_large', error: 'Image too large (max 10MB)' }, 413);
+  c.req.raw = new Request(c.req.raw, { body: bytes });
+  await next();
+}, inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
   try {
     const staff = c.get('staff');
     const scope = await getVisibleLineAccountScope(c.env.DB, staff);
@@ -114,7 +123,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoun
       data: { id, key, url, mimeType, size: data.byteLength },
     }, 201);
   } catch (err) {
-    console.error('POST /api/images error:', err);
+    console.error(JSON.stringify({"code":"routes_images_failed","route":"POST /api/images"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -143,6 +152,13 @@ images.get('/images/*', async (c) => {
   if (key.startsWith('nen-photo-originals/') || key.startsWith('private/') || /^hq-templates\/[^/]+\/pending\//.test(key)) {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
+  const isPrivate = privateImageKey(key);
+  if (isPrivate ? !await privateImageSignatureValid(new URL(c.req.url), c.env.API_KEY) : !publicImageKey(key)) {
+    return c.json({ success: false, error: 'Image not found' }, 404);
+  }
+  // Webinar originals use the existing enrollment-gated playback API.
+  // A webinar may refer to a media key, so namespace checks alone are insufficient.
+  if (!isPrivate && await isWebinarSource(c.env.DB, key)) return c.json({ success: false, error: 'Image not found' }, 404);
   // 検査が終わるまで出さない。記録が無い古いファイルは通す。
   const gateKind = key.startsWith('form-uploads/')
     ? 'form_file'
@@ -165,9 +181,11 @@ images.get('/images/*', async (c) => {
   }
 
   const contentType = object.httpMetadata?.contentType || 'image/png';
+  if (!isPrivate && !publicDeliveryContentType(contentType)) return c.json({ success: false, error: 'Image not found' }, 404);
   const headers = new Headers();
   headers.set('Content-Type', contentType);
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  headers.set('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=300');
+  headers.set('Referrer-Policy', 'no-referrer');
   headers.set('ETag', object.etag);
   // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
   headers.set('X-Content-Type-Options', 'nosniff');
@@ -188,7 +206,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/images/:key error:', err);
+    console.error(JSON.stringify({"code":"routes_images_failed","route":"DELETE /api/images/:key"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

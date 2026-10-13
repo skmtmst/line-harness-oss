@@ -13,6 +13,7 @@ import {
   type IntegrationApiTokenRow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 
@@ -35,7 +36,7 @@ function bearerToken(c: Context<Env>): string | null {
 async function requireToken(
   c: Context<Env>,
   scope: IntegrationApiScope,
-): Promise<{ token: IntegrationApiTokenRow } | { error: Response }> {
+): Promise<{ token: IntegrationApiTokenRow; canSeeUnassigned: boolean } | { error: Response }> {
   const presented = bearerToken(c);
   if (!presented) {
     return { error: c.json({ success: false, error: 'Bearer token is required' }, 401) };
@@ -56,7 +57,11 @@ async function requireToken(
       }, 503),
     };
   }
-  return { token };
+  // Resolve ownership from the token's account, never a caller-supplied tenant.
+  const account = await c.env.DB.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
+    .bind(token.line_account_id).first<{ tenant_id: string | null }>();
+  if (!account) return { error: c.json({ success: false, error: 'Invalid or revoked token' }, 401) };
+  return { token, canSeeUnassigned: (account.tenant_id ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID };
 }
 
 /**
@@ -70,15 +75,15 @@ publicApi.get('/api/public/v1/tags', async (c) => {
     const result = await c.env.DB.prepare(
       `SELECT id, name, color
          FROM tags
-        WHERE (line_account_id = ? OR line_account_id IS NULL) AND status = 'active'
+        WHERE (line_account_id = ? OR (? = 1 AND line_account_id IS NULL)) AND status = 'active'
         ORDER BY display_order ASC, name ASC`,
-    ).bind(auth.token.line_account_id).all<{ id: string; name: string; color: string }>();
+    ).bind(auth.token.line_account_id, auth.canSeeUnassigned ? 1 : 0).all<{ id: string; name: string; color: string }>();
     return c.json({
       success: true,
       data: (result.results ?? []).map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
     });
   } catch (err) {
-    console.error('GET /api/public/v1/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_public_api_failed","route":"GET /api/public/v1/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -130,6 +135,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
         WHERE id = ? AND status = 'active'`,
     ).bind(tagId).first<{ id: string; line_account_id: string | null; manual_assignment_allowed: number }>();
     if (!tag
+      || (tag.line_account_id === null && !auth.canSeeUnassigned)
       || (tag.line_account_id !== null && tag.line_account_id !== lineAccountId)
       || Number(tag.manual_assignment_allowed ?? 1) !== 1) {
       return c.json({ success: false, error: 'Tag not found' }, 404);
@@ -155,7 +161,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
     }
     return c.json({ success: true, data: { friendId, tagId, added } }, added ? 201 : 200);
   } catch (err) {
-    console.error('POST /api/public/v1/friends/:friendId/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_public_api_failed","route":"POST /api/public/v1/friends/:friendId/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -220,7 +220,7 @@ export async function processStepDeliveries(
   // an uncertain attempt older than 24 hours is held for operator review.
   const recovered = await recoverStuckDeliveries(db);
   if (recovered > 0) {
-    console.warn(`[step-delivery] recovered ${recovered} stuck 'delivering' enrollment(s)`);
+    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
   }
 
   const now = jstNow();
@@ -258,7 +258,7 @@ export async function processStepDeliveries(
             title: `friend_scenario:${fs.scenario_id}`,
           });
         } catch (skipError) {
-          console.error(`[step-delivery] skipped ledger write failed for ${fs.id}:`, skipError);
+          console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
         }
         await db.prepare(
           `UPDATE friend_scenarios
@@ -295,15 +295,13 @@ export async function processStepDeliveries(
       const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions, credentialKey);
       if (sent) sendCount++;
     } catch (err) {
-      console.error(`Error processing friend_scenario ${fs.id}:`, err);
+      console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
       // A permanent LINE 4xx (invalid/unreachable recipient, invalid payload,
       // unauthorized channel, etc.) must not be recovered and retried forever.
       // 408/409/429 are transient and retain the existing 5-minute recovery.
       if (isPermanentLineDeliveryError(err)) {
         await pauseFriendScenarioDelivery(db, fs.id);
-        console.warn(
-          `[step-delivery] paused enrollment=${fs.id} after permanent LINE ${getLineApiErrorStatus(err)}`,
-        );
+        console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
       }
       // Continue with next one.
     }
@@ -412,9 +410,7 @@ async function processSingleDelivery(
   );
   if (!friend) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    console.warn(
-      `[step-delivery] paused enrollment=${fs.id}: no following friend for scenario account=${scenarioRow.line_account_id}`,
-    );
+    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
     return false;
   }
   if (!friend.is_following) {
@@ -434,9 +430,7 @@ async function processSingleDelivery(
   const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
   if (!source) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    console.warn(
-      `[step-delivery] paused enrollment=${fs.id}: no pinned published version for scenario=${fs.scenario_id}`,
-    );
+    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
     return false;
   }
   const steps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
@@ -454,9 +448,7 @@ async function processSingleDelivery(
    */
   const audience = parseCondition(source.audienceConditionJson);
   if (source.audienceConditionJson && !audience) {
-    console.error(
-      `[step-delivery] unreadable audience condition scenario=${fs.scenario_id} — paused enrollment=${fs.id}`,
-    );
+    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
     await pauseFriendScenarioDelivery(db, fs.id);
     return false;
   }
@@ -529,9 +521,7 @@ async function processSingleDelivery(
    */
   const stepTarget = parseCondition(currentStep.target_condition_json);
   if (currentStep.target_condition_json && !stepTarget) {
-    console.error(
-      `[step-delivery] unreadable target condition step=${currentStep.id} — skipping this step`,
-    );
+    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
   }
   const stepTargeted = currentStep.target_condition_json
     ? stepTarget
@@ -652,9 +642,7 @@ async function processSingleDelivery(
     const account = await getLineAccountById(db, deliveryAccountId, credentialKey);
     if (!account) {
       await pauseFriendScenarioDelivery(db, fs.id);
-      console.warn(
-        `[step-delivery] paused enrollment=${fs.id}: missing LINE account=${deliveryAccountId}`,
-      );
+      console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
       return false;
     }
     const { LineClient: LC } = await import('@line-crm/line-sdk');
@@ -731,7 +719,7 @@ async function processSingleDelivery(
     try {
       await addTagToFriend(db, friend.id, currentStep.on_reach_tag_id);
     } catch (err) {
-      console.error(`[scenario] tag attach failed step=${currentStep.id}:`, err);
+      console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
     }
   }
 
@@ -791,7 +779,7 @@ export async function finishScenario(
       });
     }
   } catch (err) {
-    console.error(`[step-delivery] on-complete (${mode}) failed scenario=${scenarioId}`, err);
+    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
   }
 
   await runScenarioActions(db, {
@@ -837,17 +825,12 @@ export async function evaluateCondition(
   if (!step.condition_type) return true;
 
   if (!isSupportedConditionType(step.condition_type)) {
-    console.error(
-      `[scenario] unknown condition_type "${step.condition_type}" for friend=${friendId} — skipping step. ` +
-        `Supported types: ${SUPPORTED_CONDITION_TYPES.join(', ')}`,
-    );
+    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
     return false;
   }
 
   if (!step.condition_value) {
-    console.error(
-      `[scenario] condition_type=${step.condition_type} is set but condition_value is empty for friend=${friendId} — skipping step`,
-    );
+    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
     return false;
   }
 
@@ -894,9 +877,7 @@ export async function evaluateCondition(
       try {
         raw = JSON.parse(step.condition_value);
       } catch {
-        console.error(
-          `[scenario] malformed condition_value JSON for friend=${friendId} type=${step.condition_type} — skipping step`,
-        );
+        console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
         return false;
       }
       if (
@@ -909,9 +890,7 @@ export async function evaluateCondition(
         // 既存行や直接 INSERT された行で {"key":"x"} のように value が欠落しているケースは
         // friend.metadata[x] === undefined と比較されて「key 不在の全友だち」に一致する
         // (= 同じ OSS issue #120 の over-delivery を再現する) ので明示的にスキップする。
-        console.error(
-          `[scenario] condition_value missing key/value for friend=${friendId} type=${step.condition_type} — skipping step`,
-        );
+        console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
         return false;
       }
       const parsed = raw as { key: string; value: unknown };

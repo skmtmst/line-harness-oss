@@ -2,7 +2,7 @@ import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
-import { inputError, inputJsonBoundary, validatedInputBody } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes, validatedInputBody } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
@@ -747,7 +747,7 @@ async function writeLegacyFriendFields(
       const checked = validateFriendFieldValue(target, rawForCheck);
       if (!checked.ok) {
         result.failed += 1;
-        console.error('form -> friend_fields invalid:', checked.error);
+        console.error(JSON.stringify({"code":"routes_forms_failed"}));
         continue;
       }
       await setFriendFieldValue(db, {
@@ -760,7 +760,7 @@ async function writeLegacyFriendFields(
       result.succeeded += 1;
     } catch (error) {
       result.failed += 1;
-      console.error('form -> friend_fields failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
     }
   }
   return result;
@@ -867,7 +867,7 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     }
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/forms error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -912,7 +912,7 @@ forms.get('/api/forms/unassigned', requireRole('owner', 'admin'), async (c) => {
     );
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/forms/unassigned error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/unassigned"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -983,7 +983,7 @@ forms.get('/api/forms/:id', async (c) => {
       }) };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/forms/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1042,7 +1042,7 @@ forms.post('/api/forms/:id/publish', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (err) {
-    console.error('POST /api/forms/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/publish"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1086,7 +1086,7 @@ forms.post('/api/forms/:id/test-token', inputJsonBoundary(), async (c) => {
     // 生の合言葉はこの応答でしか返さない。台帳からは読み出せない。
     return c.json({ success: true, data: { token, expiresAt } });
   } catch (err) {
-    console.error('POST /api/forms/:id/test-token error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/test-token"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1168,7 +1168,7 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
 
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
-    console.error('POST /api/forms error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1195,7 +1195,7 @@ forms.post('/api/forms/drafts', inputJsonBoundary({"name":["string"],"accountId"
     });
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
-    console.error('POST /api/forms/drafts error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/drafts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1259,7 +1259,7 @@ forms.post('/api/forms/:id/duplicate', inputJsonBoundary(), async (c) => {
     const withFolder = source.folder_id ? await getFormById(c.env.DB, copy.id) : copy;
     return c.json({ success: true, data: serializeForm(withFolder ?? copy) }, 201);
   } catch (err) {
-    console.error('POST /api/forms/:id/duplicate error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/duplicate"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1413,7 +1413,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
 
     return c.json({ success: true, data: serializeForm(updated.form) });
   } catch (err) {
-    console.error('PUT /api/forms/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"PUT /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1432,7 +1432,7 @@ forms.get('/api/forms/:id/delete-impact', requireDeliveryAccess('forms'), async 
     }
     return c.json({ success: true, data: authorized.impact });
   } catch (error) {
-    console.error('GET /api/forms/:id/delete-impact error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/delete-impact"}));
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
@@ -1452,7 +1452,7 @@ const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
     }
     await next();
   } catch (error) {
-    console.error('form archive permission error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed"}));
     return c.json({ success: false, error: '回答フォームの権限を確認できませんでした' }, 503);
   }
 };
@@ -1516,7 +1516,7 @@ forms.post('/api/forms/:id/archive', requireArchiveManage, inputJsonBoundary({},
       },
     });
   } catch (error) {
-    console.error('POST /api/forms/:id/archive error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/archive"}));
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
 });
@@ -1579,7 +1579,7 @@ forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({
       },
     });
   } catch (error) {
-    console.error('POST /api/forms/:id/unarchive error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/unarchive"}));
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
 });
@@ -1630,7 +1630,7 @@ forms.delete('/api/forms/:id', async (c) => {
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/forms/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"DELETE /api/forms/:id"}));
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
@@ -1721,7 +1721,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
       },
     });
   } catch (err) {
-    console.error('GET /api/forms/:id/submissions error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/submissions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1848,7 +1848,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
             await failFormSubmitClaim(c.env.DB, scope, owner, taken.version);
           }
         } catch (error) {
-          console.error('form submit claim finalize failed:', error);
+          console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
         }
         return missing;
       },
@@ -1937,7 +1937,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
           } catch (error) {
             if (error instanceof ClaimOwnershipLost) throw error;
             // 届かなくても残りの記録へ進む。未完のまま残して次の再実行に託す。
-            console.error('Failed to send webhook fail message:', error);
+            console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
           }
         }
         // 回答行はある(この口は回答idから入る)。記録だけ揃える。
@@ -1965,7 +1965,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
             submission.destination_write_failed = 0;
             recorded = true;
           } catch (error) {
-            console.error('form destination write result failed:', error);
+            console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
           }
           if (recorded) await claimHandle.checkpoint('destination_status');
         }
@@ -2039,7 +2039,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
       throw err;
     }
   } catch (err) {
-    console.error('POST /api/forms/:id/submissions/:submissionId/retry-effects error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2137,7 +2137,7 @@ forms.post('/api/forms/:id/opened', inputJsonBoundary(), async (c) => {
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/forms/:id/opened error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/opened"}));
     return c.json({ success: true }); // non-blocking, always succeed
   }
 });
@@ -2212,7 +2212,7 @@ forms.post('/api/forms/:id/partial', inputJsonBoundary({"data":["object"]}), asy
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/forms/:id/partial error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/partial"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2305,7 +2305,8 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     }
 
-    const data = await c.req.arrayBuffer();
+    const data = await readBoundedBytes(c.req.raw, FORM_UPLOAD_MAX_BYTES);
+    if (data === null) return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     if (data.byteLength === 0) {
       return inputError(c, { success: false, error: 'ファイルが空です' }, 400, []);
     }
@@ -2347,7 +2348,7 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       mimeType,
       sizeBytes: formBytes.byteLength,
     }).then((scan) => markFileScanClean(c.env.DB, scan.id))
-      .catch((err) => console.error('form file scan record error:', key, err));
+      .catch((err) => console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/files"})));
 
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json(
@@ -2355,7 +2356,7 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       201,
     );
   } catch (err) {
-    console.error('POST /api/forms/:id/files error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/files"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2412,7 +2413,7 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
     }
     return c.json({ success: true, data: { answers, createdAt: latest.created_at } });
   } catch (err) {
-    console.error('GET /api/forms/:id/my-latest error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/my-latest"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2836,7 +2837,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
           await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner, claimCtx.version);
         }
       } catch (error) {
-        console.error('form submit claim finalize failed:', error);
+        console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
       }
       return missing;
     };
@@ -2984,7 +2985,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
         submission.destination_write_failed = result.failed;
       } catch (error) {
         // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開時に残す。
-        console.error('form destination write result failed:', error);
+        console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
         return;
       }
       if (claimCtx) {
@@ -3127,7 +3128,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
             } catch (error) {
               if (error instanceof ClaimOwnershipLost) throw error;
               // 届かなくても回答の保存へ進む。再開時に送り直す。
-              console.error('Failed to send webhook fail message:', error);
+              console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
             }
           }
           // Still save the submission for records
@@ -3174,7 +3175,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
       sourceEventId: submission.id,
       metadata: { formId, submissionId: submission.id },
     }).catch((error) => {
-      console.error('form conversion record failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
       return null;
     });
     if (executionCtx) executionCtx.waitUntil(recordFormConversion());
@@ -3213,7 +3214,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
         }),
       ]).then((results) => {
         for (const result of results) {
-          if (result.status === 'rejected') console.error('form action event failed:', result.reason);
+          if (result.status === 'rejected') console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
         }
       }),
     );
@@ -3254,7 +3255,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
       return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
     }
-    console.error('POST /api/forms/:id/submit error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3339,7 +3340,7 @@ async function runFormPostEffects(input: {
       });
       awarded = true;
     } catch (error) {
-      console.error('form_submitted mileage failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
     }
     if (awarded && claim) await claim.checkpoint('mileage');
   }
@@ -3713,7 +3714,7 @@ async function runFormPostEffects(input: {
     } catch (error) {
       if (error instanceof ClaimOwnershipLost) throw error;
       if (['metadata','layout_effects','legacy_fields'].includes(effect.step)) registrationsReady = false;
-      console.error('Form side-effect failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
       continue;
     }
     if (claim) await claim.checkpoint(effect.step);
@@ -3733,7 +3734,7 @@ async function runFormPostEffects(input: {
       submission.destination_write_failed = destinationWriteResult.failed;
     } catch (error) {
       // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開・再実行時に残す。
-      console.error('form destination write result failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
       return;
     }
     if (claim) await claim.checkpoint('destination_status');

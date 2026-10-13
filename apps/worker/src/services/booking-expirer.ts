@@ -118,7 +118,7 @@ export async function runExpirer(
       reason: 'request_ttl_expired',
       actorType: 'system',
       occurredAt: params.now.toISOString(),
-    }).catch((error) => console.error('booking audit (expire) failed:', error));
+    }).catch((error) => console.error(JSON.stringify({"code":"services_booking_expirer_failed"})));
     await db
       .prepare(
         `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status IN ('pending','failed')`,
@@ -138,7 +138,7 @@ export async function runExpirer(
         cancelReason: `booking_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      console.error('reminder cancel (booking expired) failed:', error);
+      console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
     }
     try {
       const accessToken = await resolveLineCredential(
@@ -197,11 +197,11 @@ export async function runExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        console.error('reminder repair (booking leftover) failed:', error);
+        console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
       }
     }
   } catch (error) {
-    console.error('reminder repair (booking leftover scan) failed:', error);
+    console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
   }
 
   const idempotencyPurged = await purgeExpiredIdempotency(db, params.now);

@@ -1,4 +1,4 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -1336,7 +1336,7 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     }
     return c.json({ success: true, data: items });
   } catch (error) {
-    console.error('GET /api/rich-menu-groups error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups"}));
     return c.json({ success: false, error: 'リッチメニュー一覧を取得できませんでした' }, 503);
   }
 });
@@ -1355,7 +1355,7 @@ richMenuGroups.get(
       }
       return c.json({ success: true, data: impact });
     } catch (error) {
-      console.error('GET /api/rich-menu-groups/:groupId/delete-impact error:', error);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/delete-impact"}));
       return c.json(
         { success: false, error: '削除したときの影響を確認できませんでした' },
         503,
@@ -1491,7 +1491,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireDel
       },
     });
   } catch (error) {
-    console.error('POST /api/rich-menu-groups/:groupId/preview-targets error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/preview-targets"}));
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 });
@@ -1513,7 +1513,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/usages', async (c) => {
       },
     });
   } catch (error) {
-    console.error('GET /api/rich-menu-groups/:groupId/usages error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/usages"}));
     return c.json({ success: false, error: '使用先を確認できませんでした' }, 503);
   }
 });
@@ -1713,14 +1713,14 @@ richMenuGroups.post('/api/rich-menu-groups', requireDeliveryAccess('richMenus'),
         try {
           await c.env.IMAGES.delete(key);
         } catch {
-          console.error('POST /api/rich-menu-groups image apply orphan cleanup failed:', key);
+          console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups"}));
         }
         throw dbError;
       }
       const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
       return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
     } catch (error) {
-      console.error('POST /api/rich-menu-groups image apply error:', error);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups"}));
       return c.json(
         {
           success: false,
@@ -1893,7 +1893,7 @@ richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireDeliveryAccess('r
   try {
     impact = await getRichMenuDeleteImpact(c.env.DB, groupId);
   } catch (error) {
-    console.error('DELETE /api/rich-menu-groups/:groupId impact error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"DELETE /api/rich-menu-groups/:groupId"}));
     return c.json(
       { success: false, error: '削除したときの影響を確認できませんでした' },
       503,
@@ -1956,7 +1956,8 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
     return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
   }
 
-  const buf = new Uint8Array(await c.req.arrayBuffer());
+  const buf = await readBoundedBytes(c.req.raw, 1024 * 1024);
+  if (buf === null) return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
   const validation = validateRichMenuImage(buf, buf.byteLength);
   if (!validation.ok) return inputError(c, { success: false, error: validation.error }, 400, ["pages"]);
 
@@ -1981,9 +1982,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
       await c.env.IMAGES.delete(key);
     } catch {
       // 片付けの失敗は元の失敗に付けない。ログだけ残す。
-      console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image orphan cleanup failed:', key);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/pages/:pageId/image"}));
     }
-    console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image db error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/pages/:pageId/image"}));
     return c.json(
       {
         success: false,
@@ -3005,7 +3006,7 @@ richMenuGroups.post(
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      console.error('rich_menu.reconcile audit insert failed:', auditError);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/reconcile"}));
     }
 
     return c.json({
@@ -3299,7 +3300,7 @@ richMenuGroups.post(
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      console.error('rich_menu.duplicate audit insert failed:', auditError);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/duplicate"}));
     }
 
     return c.json(
@@ -3410,7 +3411,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/audience-summary', async (c) 
       },
     });
   } catch (error) {
-    console.error('GET /api/rich-menu-groups/:groupId/audience-summary error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/audience-summary"}));
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 });
@@ -3680,7 +3681,7 @@ richMenuGroups.post(
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        console.error('rich_menu.test_apply audit insert failed:', auditError);
+        console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/test-apply"}));
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);
@@ -3820,7 +3821,7 @@ richMenuGroups.post(
             }
           }
         } catch (aliasError) {
-          console.warn('[test-apply revert] alias cleanup failed (non-fatal):', aliasError);
+          console.warn(JSON.stringify({"code":"routes_rich_menu_groups_warn","route":"POST /api/rich-menu-groups/:groupId/test-apply/revert"}));
         }
       }
       await deleteRichMenuShells(line, testShellIds);
@@ -3850,7 +3851,7 @@ richMenuGroups.post(
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        console.error('rich_menu.test_apply_revert audit insert failed:', auditError);
+        console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/test-apply/revert"}));
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);

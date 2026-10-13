@@ -365,7 +365,7 @@ export async function claimWebhookInteractionRetryAndInsert(
     try {
       await deletePendingWebhookInteraction(db, retryId, original.line_account_id);
     } catch (error) {
-      console.error('webhook_interaction_logs の孤児行の後始末に失敗:', error);
+      console.error(JSON.stringify({"code":"src_webhooks_failed"}));
     }
   }
   return { claimed: claimChanged && insertChanged, retryId };
@@ -475,7 +475,7 @@ export async function listWebhookInteractions(
     await markStalePendingWebhookInteractions(db, input.lineAccountId);
   } catch (error) {
     // 回収だけの失敗で一覧そのものを止めない。
-    console.error('webhook_interaction_logs の滞留回収に失敗:', error);
+    console.error(JSON.stringify({"code":"src_webhooks_failed"}));
   }
   const clauses = ['l.line_account_id=?', 'l.created_at>=?', "l.status!='retried'"];
   const binds: unknown[] = [input.lineAccountId, cutoff];
@@ -817,10 +817,7 @@ export async function resolveWebhookSecret(
   if (row.secret_encrypted) {
     const parsed = parseStoredSecret(row.secret_encrypted);
     if (!parsed) {
-      console.error(JSON.stringify({
-        event: 'webhook_secret_unknown_format',
-        webhookId: row.id ?? null,
-      }));
+      console.error(JSON.stringify({"code":"webhook_secret_unknown_format"}));
       throw new Error('Unable to decrypt webhook secret');
     }
     const set = await readWebhookKeySet(keys);
@@ -830,11 +827,7 @@ export async function resolveWebhookSecret(
         : [set.current, ...set.previous])
       : [];
     if (candidates.length === 0) {
-      console.error(JSON.stringify({
-        event: 'webhook_secret_key_unavailable',
-        webhookId: row.id ?? null,
-        keyId: parsed.keyId,
-      }));
+      console.error(JSON.stringify({"code":"webhook_secret_key_unavailable"}));
       throw new Error('Unable to decrypt webhook secret');
     }
     for (const candidate of candidates) {
@@ -845,11 +838,7 @@ export async function resolveWebhookSecret(
         if (parsed.keyId) break;
       }
     }
-    console.error(JSON.stringify({
-      event: 'webhook_secret_decrypt_failed',
-      webhookId: row.id ?? null,
-      keyId: parsed.keyId,
-    }));
+    console.error(JSON.stringify({"code":"webhook_secret_decrypt_failed"}));
     throw new Error('Unable to decrypt webhook secret');
   }
   return row.secret;
@@ -874,10 +863,7 @@ export async function resolvePreviousWebhookSecret(
       keys,
     );
   } catch {
-    console.error(JSON.stringify({
-      event: 'webhook_secret_previous_decrypt_failed',
-      webhookId: row.id ?? null,
-    }));
+    console.error(JSON.stringify({"code":"webhook_secret_previous_decrypt_failed"}));
     return null;
   }
 }
@@ -1466,15 +1452,11 @@ export async function getActiveOutgoingWebhooksByEvent(
     try {
       types = JSON.parse(w.event_types);
     } catch {
-      console.error(
-        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'malformed_json' }),
-      );
+      console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
       continue;
     }
     if (!Array.isArray(types)) {
-      console.error(
-        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'event_types_not_array' }),
-      );
+      console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
       continue;
     }
     if (types.includes(eventType) || types.includes('*')) matched.push(w);

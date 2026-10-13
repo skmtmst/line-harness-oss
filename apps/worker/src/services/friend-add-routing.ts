@@ -181,7 +181,7 @@ export async function loadFriendAddRouting(
     return normalizeRouting(JSON.parse(raw));
   } catch {
     // 壊れた JSON が入っていても配信は止めない。設定していない扱いにする。
-    console.error(`[friend-add-routing] broken JSON for account=${accountId}`);
+    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
     return null;
   }
 }
@@ -1241,7 +1241,7 @@ export async function evaluateFriendAddFriendCondition(
 }> {
   const ast = parseFriendAddConditionAst(definition.friendCondition);
   if (!ast.ok) {
-    console.error(`[friend-add-routing] friendCondition rejected (${ast.error}) — skipped the rule`);
+    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
     // 旧形式の自由文は「作り直してほしい」を画面へ出すため従来の理由のまま。
     // 木の形が壊れているものは別の理由で分ける。
     return {
@@ -1329,7 +1329,7 @@ export async function evaluateFriendAddRuleConditions(
    */
   const ast = parseFriendAddConditionAst(input.definition.friendCondition);
   if (!ast.ok) {
-    console.error(`[friend-add-routing] friendCondition rejected (${ast.error}) — skipped the rule`);
+    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
     return {
       matched: false,
       reason: ast.error === 'legacy_text' || ast.error === 'not_json'
@@ -1350,9 +1350,7 @@ export async function evaluateFriendAddRuleConditions(
     collectFriendAddReferences(input.definition),
   );
   if (unusable.length > 0) {
-    console.error(
-      `[friend-add-routing] rule references ids this account cannot use — skipped: ${unusable.join(', ')}`,
-    );
+    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
     return { matched: false, reason: 'reference_out_of_account' };
   }
   const condition = await evaluateFriendAddFriendCondition(db, input.definition, input.friendId);
@@ -1453,7 +1451,7 @@ async function runActions(
       }
     } catch (err) {
       // 1つ失敗しても残りは実行する。配信そのものは止めない。
-      console.error(`[friend-add-routing] action ${action.kind} failed:`, err);
+      console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
       failed += 1;
       if (actionRunId) {
         await finishFriendAddActionRun(db, {
@@ -1534,7 +1532,7 @@ export async function retryFailedFriendAddActions(
       });
       await finishFriendAddActionRun(db, { id: run.id, status: 'completed' });
     } catch (error) {
-      console.error('[friend-add-routing] retry action failed:', error);
+      console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
       await finishFriendAddActionRun(db, {
         id: run.id,
         status: 'failed',
@@ -1977,10 +1975,7 @@ export async function applyFriendAddRouting(
       };
     }
     if (classifiedKind === 'returning' && routing.returning.mode === 'other') {
-      console.warn(
-        `[friend-add-routing] ②で「別のシナリオ」を選んでシナリオが未設定のため配信しません`
-        + `（friend=${friend.id}）。画面の設定を見直してください。`,
-      );
+      console.warn(JSON.stringify({"code":"services_friend_add_routing_warn"}));
       const actionResult = await runActions(
         db, friend.id, routing.returning.actions, push, routingContext?.fence,
         routingContext?.eventId ? {

@@ -73,7 +73,7 @@ trafficPools.get('/api/traffic-pools', async (c) => {
     const pools = await getTrafficPools(c.env.DB);
     return c.json({ success: true, data: pools.map(serialize) });
   } catch (err) {
-    console.error('GET /api/traffic-pools error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -125,7 +125,7 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/traffic-pools/accounts error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools/accounts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -216,7 +216,7 @@ trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), inputJsonBounda
     if (err instanceof TrafficPoolSaveConflict) {
       return c.json({ success: false, code: 'save_conflict', error: 'ほかの人が先に保存しました。入力は残っています。', updatedAt: err.updatedAt, data: { updatedAt: err.updatedAt } }, 409);
     }
-    console.error('PUT /api/traffic-pools/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"PUT /api/traffic-pools/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -238,7 +238,7 @@ trafficPools.delete('/api/traffic-pools/:id', requireRole('owner'), async (c) =>
     await deleteTrafficPool(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/traffic-pools/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"DELETE /api/traffic-pools/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -261,7 +261,7 @@ trafficPools.get('/api/traffic-pools/:id/accounts', async (c) => {
     const accounts = await getPoolAccounts(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: accounts.map(serializePoolAccount) });
   } catch (err) {
-    console.error('GET /api/traffic-pools/:id/accounts error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools/:id/accounts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -282,7 +282,7 @@ trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), input
     if (err?.message?.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'Account already in this pool' }, 409);
     }
-    console.error('POST /api/traffic-pools/:id/accounts error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"POST /api/traffic-pools/:id/accounts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -295,7 +295,7 @@ trafficPools.put('/api/traffic-pools/:id/accounts/:accountId', requireRole('owne
     if (!result) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('PUT /api/traffic-pools/:id/accounts/:accountId error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"PUT /api/traffic-pools/:id/accounts/:accountId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -307,7 +307,7 @@ trafficPools.delete('/api/traffic-pools/:id/accounts/:accountId', requireRole('o
     if (!deleted) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true });
   } catch (err) {
-    console.error('DELETE /api/traffic-pools/:id/accounts/:accountId error:', err);
+    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"DELETE /api/traffic-pools/:id/accounts/:accountId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

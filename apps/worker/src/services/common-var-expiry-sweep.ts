@@ -49,13 +49,7 @@ export async function sweepCommonVarExpiryNotices(
       result.notified += notified;
     } catch (error) {
       result.errors += 1;
-      console.error(
-        JSON.stringify({
-          event: 'common_var_expiry_notice_error',
-          varId: candidate.id,
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
+      console.error(JSON.stringify({"code":"common_var_expiry_notice_error"}));
     }
   }
   return result;

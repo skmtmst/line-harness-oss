@@ -98,12 +98,7 @@ export async function recordConversionSourceEvent(
 
   if (!isConversionSourceType(event.sourceType)) {
     // 未対応イベントは捨てず、運用者が後で辿れる形で残す(#648 完了条件)。
-    console.log(JSON.stringify({
-      event: 'conversion_source_unmatched',
-      source_type: event.sourceType,
-      friend_id: event.friendId,
-      source_event_id: event.sourceEventId,
-    }));
+    console.log(JSON.stringify({"code":"conversion_source_unmatched"}));
     return { ...empty, skipped: 'unknown_source' };
   }
   if (!event.friendId?.trim() || !event.sourceEventId?.trim()) {
@@ -179,11 +174,7 @@ export async function recordConversionSourceEvent(
         continue;
       }
       failed += 1;
-      console.error('conversion source record failed:', {
-        sourceType: event.sourceType,
-        conversionPointId: point.point_id,
-        reason: error instanceof Error ? error.message : 'unknown',
-      });
+      console.error(JSON.stringify({"code":"src_conversion_event_sources_failed"}));
     }
   }
   return { matched: points.length, recorded, failed, excluded, skipped: null };

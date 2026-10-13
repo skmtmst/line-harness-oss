@@ -225,7 +225,8 @@ describe('POST /api/nen-campaigns/columns', () => {
     );
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ success: false, error: 'column_create_failed' });
-    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('failed to create NEN column draft'));
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('routes_nen_campaigns_failed'));
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('no such table');
     consoleError.mockRestore();
   });
 });
