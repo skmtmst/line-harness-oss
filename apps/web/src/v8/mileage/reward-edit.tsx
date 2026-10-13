@@ -411,6 +411,8 @@ function RewardEditorInner() {
       boardId="L2Bzp"
       title="使い道を作る"
       help="マイルと交換できる特典を決めます。出すと、お客さまの LINE（マイルの画面）に並びます。"
+      previewLabel="お客さまの見え方を見る"
+      previewTitle="お客さまの見え方"
       preview={preview}
       hidePreviewWhenNarrow
       footerActions={<>

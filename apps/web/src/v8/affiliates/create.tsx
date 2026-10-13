@@ -364,6 +364,8 @@ export default function CreateAffiliateV8() {
       boardId="RaMf3"
       title="アフィリエイターを作る"
       help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
+      previewLabel="紹介リンクを見る"
+      previewTitle="紹介リンク"
       preview={preview}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>

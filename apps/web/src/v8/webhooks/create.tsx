@@ -359,6 +359,8 @@ function WebhooksCreateV8Inner() {
       boardId="hsD8e"
       title="送り先を作る"
       help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
+      previewLabel="送るデータを見る"
+      previewTitle="送るデータの見本"
       preview={preview}
       status="下書き（まだ動いていません）"
       footerActions={(

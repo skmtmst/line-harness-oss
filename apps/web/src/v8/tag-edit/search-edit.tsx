@@ -893,6 +893,8 @@ export default function SavedSearchEditV8() {
           original.isShared ? '全員に共有' : '自分だけ',
           headUsageText(original.usedIn),
         ].join('・')}
+        previewLabel="検索結果と使用状況を見る"
+        previewTitle="検索結果と使っている所"
         preview={side}
         destructive={(
           <StickyBarAction label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />

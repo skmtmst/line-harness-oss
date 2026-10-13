@@ -262,6 +262,8 @@ export default function AffiliateOfferCreateV8() {
 
       title="案件を作る"
       help="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
+      previewLabel="アフィリエイターの見え方を見る"
+      previewTitle="アフィリエイターの見え方"
       preview={preview}
       status={canEdit ? (saving ? '保存しています' : createdId ? '下書きを保存済み・続きを作れます' : undefined) : undefined}
       footerActions={(

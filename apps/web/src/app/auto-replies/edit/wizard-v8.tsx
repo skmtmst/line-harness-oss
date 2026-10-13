@@ -1509,7 +1509,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={renderPreview(true)} footerActions={
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
           <>
             <Button
               type="button"

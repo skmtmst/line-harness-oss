@@ -1048,6 +1048,8 @@ function AnalyticsReportFormPage() {
           このまま保存すると、相手の変更が消えます。入力は残っています。
         </Notice> : null}
         dirty={false}
+        previewLabel="レポートの見本を見る"
+        previewTitle="レポートの見本"
         preview={        <>
           <Card variant="aside">
             <CardHeader size="stacked" title={`${nextLabel} に、こう届きます`} meta="見本" />

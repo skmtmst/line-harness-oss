@@ -292,6 +292,8 @@ function EventsCreateV8Inner() {
       boardId="d4adD4"
       title="イベントを作る"
       help="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
+      previewLabel="申込ページを見る"
+      previewTitle="申込ページ"
       preview={side}
       status={saving ? '保存しています…' : undefined}
       footerActions={(

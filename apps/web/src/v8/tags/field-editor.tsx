@@ -372,6 +372,8 @@ export default function FieldEditor({
         help={<>{host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}{help}</>}
         identity={host ? undefined : back}
         notice={host?.notice}
+        previewLabel="種類と設定を見る"
+        previewTitle="項目の種類と設定"
         preview={aside}
         footerActions={host ? host.footer(submit, () => guarded(onCancel)) : <>
           <Button type="button" onClick={() => guarded(onCancel)} disabled={saving}>キャンセル</Button>

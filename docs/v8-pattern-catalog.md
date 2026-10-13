@@ -146,6 +146,7 @@
 - **B-245の持ち主**：`components/shared/page-explanation.tsx` の `PageExplanationProvider`・`PageExplanationToggle`・`PageExplanationBody`。型の題の横と既存の説明の位置へ置き、人・画面ごとの開閉を覚える。欄や数の用語説明は `HelpTip`、一時的な失敗・閲覧のみは `Notice` のまま。
 - **作る型の説明**：`components/templates/create-page.tsx` と `components/shared/create-page.tsx` の `CreatePage` が `help` を題の型へ渡す。監査では直接渡した説明文字列を操作と分け、再公開の入口から実際の持ち主まで照合する。説明内の生のボタンや、同名の手書きの型は操作の検査を続ける。
 - **狭い板の右欄**：`CreatePage` の `preview` と `TemplateEditFrame` の `side` は、窓か右欄かを受け取る描画の口も使える。幅で畳む入口と窓は型へ任せ、窓の中にもう一度見え方を開くボタンを置かない。設定の情報と実際の見え方は保持する。
+- **右欄の役目の文字**：`CreatePage` の `previewLabel` / `previewTitle` は、`PreviewLauncher` の既存の `label` / `title` へ渡す。設定・試算・紹介リンクなどをLINEの見え方と呼ばず、画面は今の右欄の役目だけを渡す。手順で内容が変わる時はその段に合わせる。入口や窓を画面で作り足さない。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-frame.tsx`・`apps/web/src/components/shared/page-header.tsx`・`apps/web/src/components/shared/help-tip.tsx`（部品 `PageHeading`・`PageTitle`・`PageFrame`・`ListPage`・`CreatePage`・`DetailPage`・`DashboardPage`・`SettingsPage`・`AnalyticsPage`・`InboxPage`）
   - 読む変数：`--text-title`
 - **持ち主（Pen）**：`EnlYo`「板の頭」・`KjC1z`「？」

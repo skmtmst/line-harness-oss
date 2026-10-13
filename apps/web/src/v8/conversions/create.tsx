@@ -559,6 +559,8 @@ function ConversionCreate() {
       help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
+      previewLabel="試算を見る"
+      previewTitle="成果の試算"
       preview={viewerOnly ? undefined : previewColumn}
       footerActions={footerActions} dirty={false}
     >

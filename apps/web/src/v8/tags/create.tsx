@@ -217,6 +217,8 @@ function TagCreate() {
         title="タグを作る"
         help="友だちを分類するタグを作ります。作ったあとで、タグを付ける条件や動きを決められます。"
         identity={back}
+        previewLabel="設定内容を見る"
+        previewTitle="タグの設定"
         preview={(
           <div className={styles.aside}>
             <h2 className={styles.asideTitle}>できあがるタグ</h2>

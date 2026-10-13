@@ -735,6 +735,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : null}
       noticeSpacing="band"
       preview={preview}
+      previewLabel={step === 'basic' ? '設定内容を見る' : undefined}
+      previewTitle={step === 'basic' ? '設定内容' : undefined}
       footerActions={canEdit ? (
         <>
           <Button href="/friend-add-settings">キャンセル</Button>

@@ -332,6 +332,8 @@ function EarningRuleCreateBody() {
       title="たまる決めごとを作る"
       help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
+      previewLabel="試算を見る"
+      previewTitle="マイルの試算"
       preview={preview}
       hidePreviewWhenNarrow
       footerActions={(

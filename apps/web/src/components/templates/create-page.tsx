@@ -19,6 +19,9 @@ export interface CreatePageProps extends PageHeadingProps {
   heightMode?: 'viewport' | 'content'
   children: ReactNode
   preview?: ReactNode | ((inDialog: boolean) => ReactNode)
+  /** 畳んだ右欄の役目。LINE以外の設定・試算にも同じ入口を使う。 */
+  previewLabel?: string
+  previewTitle?: string
   /** 狭い板でプレビューを開くボタン・パネルは画面が持つ。 */
   previewToggle?: ReactNode
   /** ★V8：狭い板（白い板 1100 未満）で右の列の余白を 16 に詰める（絵 kmTab）。渡さなければ今までどおり 24。 */
@@ -50,7 +53,7 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   const Content = contentDisabled === undefined ? 'div' : 'fieldset'
   const aside = typeof preview === 'function' ? preview(false) : preview
   const dialogPreview = typeof preview === 'function' ? preview(true) : preview
@@ -60,7 +63,7 @@ export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, bus
     {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
-    {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher>{dialogPreview}</PreviewLauncher>}</div> : null}
+    {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
       <Content className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing} disabled={contentDisabled} aria-label={contentDisabled === undefined ? undefined : contentLabel ?? '入力内容'}>{children}</Content>
       {preview ? <aside className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{aside}</div></aside> : null}
