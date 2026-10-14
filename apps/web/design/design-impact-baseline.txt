@@ -237,6 +237,7 @@ shared-button-importer v8/mileage/adjust-dialog.tsx
 # ★V8 予約設定（owaS3 ほか）を src/v8/booking-menus に書き直した。
 shared-button-importer v8/booking-menus/assign.tsx
 shared-button-importer v8/booking-menus/channels-tab.tsx
+shared-button-importer v8/booking-menus/channels-tables.tsx
 shared-button-importer v8/booking-menus/menu-form.tsx
 shared-button-importer v8/booking-menus/staff-edit-dialog.tsx
 shared-button-importer v8/booking-menus/tabs/holidays-tab.tsx

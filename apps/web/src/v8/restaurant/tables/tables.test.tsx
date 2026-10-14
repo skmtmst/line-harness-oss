@@ -62,6 +62,9 @@ describe('BERxg 座席・卓管理', () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     const board = document.querySelector('[data-design-node="BERxg"]')!
+    const icons = document.querySelectorAll('[data-kpi-icon] svg')
+    expect(icons).toHaveLength(4)
+    for (const icon of icons) expect(icon.classList.contains('lucide-inbox')).toBe(true)
     for (const label of ['卓数', '総席数', '結合可能', '個室', '卓の詳細', '自動配席ルール']) expect(board.textContent).toContain(label)
     expect(screen.getByText('結合のルール')).not.toBeNull()
     expect(screen.getByText('T3 · 窓側4人卓')).not.toBeNull()

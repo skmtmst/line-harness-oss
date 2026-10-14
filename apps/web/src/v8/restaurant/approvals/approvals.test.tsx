@@ -48,7 +48,9 @@ it('管理者は承認待ちのカードで承認でき、改定の前後と差�
   expect(await screen.findByText('価格改定')).toBeTruthy()
   expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-inbox')).toHaveLength(4)
   expect(screen.getByText('¥3,800')).toBeTruthy()
-  expect(screen.getByText('期限を書いてください')).toBeTruthy()
+  const reason = screen.getByText('期限を書いてください').closest('[role=note]')!
+  expect(reason.getAttribute('data-appearance')).toBe('soft')
+  expect(reason.querySelector('svg')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '承認する' }))
   await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'approve', undefined))
 })
