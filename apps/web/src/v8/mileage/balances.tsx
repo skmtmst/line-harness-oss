@@ -20,6 +20,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -454,7 +455,7 @@ export default function BalancesTab() {
             <Th align="right" className={styles.colChange}>今月の増減</Th>
             <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
             <Th collapseAt="narrow" className={styles.colLast}>最終行動</Th>
-            <Th className={styles.colOpsBalance}>操作</Th>
+            <Th align="right" className={styles.colOpsMenu}>操作</Th>
           </TableHeadRow>
         </thead>
         <tbody>
@@ -484,12 +485,11 @@ export default function BalancesTab() {
                 <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
                 <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
                 <Td collapseAt="narrow" className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
-                <Td className={styles.colOpsBalance}>
-                  <span className={styles.rowActions}>
-                    <Button href={href}>明細を見る</Button>
-                    {/* 閲覧のみの人には増減を出さない。 */}
-                    {!readonly ? <Button href={`${href}&adjust=1`}>増減</Button> : null}
-                  </span>
+                <Td align="right" className={styles.colOpsMenu}>
+                  <RowMenu size="small" label={`${member.displayName}の操作`} items={[
+                    { id: 'detail', label: '明細を見る', href },
+                    ...(!readonly ? [{ id: 'adjust', label: '増減', href: `${href}&adjust=1` }] : []),
+                  ]} />
                 </Td>
               </Tr>
             )
@@ -518,12 +518,9 @@ export default function BalancesTab() {
     table
   )
 
-  const pager = !loading && !loadError && members.length > 0 && pageCount > 1 ? (
+  const pager = !loading && !loadError && members.length > 0 ? (
     <div className={styles.pagerRow}>
-      <span className={styles.pagerCount}>
-        {`${formatMileageNumber(filteredTotal)} 人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))} 人`}
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
+      <Pagination page={currentPage} pageCount={pageCount} range={{ total: filteredTotal, first: offset + 1, last: Math.min(offset + members.length, filteredTotal), unit: '人' }} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
     </div>
   ) : null
   /* 絵 CJlf4：表 → ページ送り → 下の案内の順。 */

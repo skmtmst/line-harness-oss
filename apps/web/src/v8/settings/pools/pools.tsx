@@ -14,7 +14,7 @@ import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConfl
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Copy, Plus } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -238,7 +238,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         ) : null} />
       <Card layout="horizontal" surface="muted" padding="compact" gap="var(--polish-space-row)">
         <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
-        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
+        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー" variant="secondary" label="公開 URL コピー" icon={<Copy size={14} aria-hidden="true" />} />
       </Card>
       {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
@@ -344,7 +344,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
           const name = acc?.name ?? m.lineAccountId
           const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
-            <li key={m.id}><Card layout="horizontal" surface="muted" padding="compact" gap="var(--polish-space-row)">
+            <li key={m.id}><Card frame="inset" layout="horizontal" surface="inset" corner="control" padding="compact" gap="var(--polish-space-row)">
               <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
@@ -364,6 +364,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
             ref={addRef}
             type="button"
             variant="text"
+            textTone="accent"
             aria-haspopup="menu"
             aria-expanded={addOpen}
             onClick={() => setAddOpen(!addOpen)}
