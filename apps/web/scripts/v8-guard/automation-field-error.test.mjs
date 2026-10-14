@@ -1,12 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { PARITY_INIT } from '../../../../scripts/visual-qa/v8-parity.mjs'
 import { stubApi } from './speed-budget.mjs'
 import { mockFetch } from './mock-local.mjs'
 
 test('保存の入力エラーは1440・1152で名前の下へ出し、画面の右端を越えない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     for (const width of [1440, 1152]) {
       const page = await browser.newPage({ viewport: { width, height: 1128 }, reducedMotion: 'reduce' })

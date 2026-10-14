@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import { assessAgainstBase } from './layout-defects.mjs'
 
@@ -15,7 +15,7 @@ test('既存の伸びた必須札も検出し、基準版へ同じ崩れを置�
 
 test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯を3幅で検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/form-controls.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1440, 1152, 1920]) {
@@ -37,7 +37,7 @@ test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯�
 })
 
 test('本文の外へ開いた窓の札を検出し、本文内の窓は二重に数えない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>[data-field]{display:flex;flex-direction:column;width:300px}[data-required-badge]{display:inline-flex;padding:2px 6px}</style>

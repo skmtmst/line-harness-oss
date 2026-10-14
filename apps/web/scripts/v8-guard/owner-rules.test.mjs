@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,7 +13,7 @@ const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
 const table = body => `<div role="table" data-shared-part="list-table" style="width:600px">${body}</div>`
 test('同じ面の編集本文は描いた文字の余白を測り、余白0・別枠の端接触は止める', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     const content = (padding, ownFrame = '') => shell(`<section style="width:240px;height:120px;background:white;border:1px solid gray"><div contenteditable="true" role="textbox" style="height:100%;padding:${padding}px;background:white;${ownFrame}">編集する本文</div></section>`)
@@ -30,7 +30,7 @@ test('同じ面の編集本文は描いた文字の余白を測り、余白0・�
   } finally { await browser.close() }
 })
 test('本文と差し込みの一つの枠は読み込み順によらず内側の影を外し、外側のフォーカスを保つ', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const bodyCSS = readFileSync(new URL('../../src/components/shared/message-insert-row.module.css', import.meta.url), 'utf8')
@@ -47,7 +47,7 @@ test('本文と差し込みの一つの枠は読み込み順によらず内側�
   } finally { await browser.close() }
 })
 test('B-245：共通の説明ボタンは青で出し、印だけの手書きや頭の外の青は検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const control = (label, classes = 'page-explanation_toggle__test') => `<button type="button" class="${classes}" data-shared-part="page-explanation-toggle" aria-controls="explanation" aria-expanded="false" style="color:#2563eb;background:transparent;border:0">${label}</button>`
@@ -92,7 +92,7 @@ const repairs = {
 }
 
 test('14種類を実寸で故障注入し、修正すれば検出0（ブラウザ1つ）', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({viewport:{width:1152,height:900}})
     for (const [kind,html] of Object.entries(cases)) {
@@ -127,7 +127,7 @@ test('14種類を実寸で故障注入し、修正すれば検出0（ブラウ�
   } finally { await browser.close() }
 })
 test('操作帯の前の余白は、印付きのボタンや入力の下端から測る', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const control of [
@@ -161,7 +161,7 @@ test('新規の故障をCLIが非0で止める。理由なしの除外は使え�
 })
 
 test('共通スマホの外枠・島・上の帯と画像枠は除外し、隣の黒い箱と余白不足は落とす', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1152, 1440, 1920]) {
@@ -182,7 +182,7 @@ test('共通スマホの外枠・島・上の帯と画像枠は除外し、隣�
 })
 
 test('一覧の判定を足しても、既存GridTableの幅による畳み方を失わない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8')
@@ -196,7 +196,7 @@ test('一覧の判定を足しても、既存GridTableの幅による畳み方�
 
 
 test('共通の余白が実際に16pxになり、カレンダーを一覧の器に変えない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
@@ -209,7 +209,7 @@ test('共通の余白が実際に16pxになり、カレンダーを一覧の器�
 
 
 test('選ぶ箱の短い題は1行、状態の隣の短いマークは切れない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
@@ -222,7 +222,7 @@ test('選ぶ箱の短い題は1行、状態の隣の短いマークは切れな�
 
 
 test('閉じた設定は描画扱いにせず、開いたら重なり・黒い面を検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(shell('<details><summary>設定</summary><div style="position:relative;background:#222;color:white;width:200px;height:80px"><span style="display:block">中の文字その一</span><span style="display:block;margin-top:-20px">中の文字その二</span></div></details>'))
@@ -235,7 +235,7 @@ test('閉じた設定は描画扱いにせず、開いたら重なり・黒い�
 })
 
 test('編集用の吹き出しをLINEの見本と取り違えず、本当の重なりを検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const bubble = '<div class="bubble" style="position:relative;width:300px;height:150px"><span style="display:block">編集の文字その一</span><span style="display:block;margin-top:-20px">編集の文字その二</span><textarea style="position:absolute;left:0;top:30px;width:300px;height:100px" aria-label="本文"></textarea></div>'
@@ -249,7 +249,7 @@ test('編集用の吹き出しをLINEの見本と取り違えず、本当の重�
 })
 
 test('窓の中のスクロールの続きを余白不足と誤判定せず、実際の下端の不足は落とす', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage({viewport:{width:1152,height:900}})
     const content='<section style="border:1px solid;width:320px;height:180px;padding:16px;display:flex;flex-direction:column"><h2 style="margin:0">題</h2><div style="min-height:0;flex:1;overflow-y:auto"><p style="height:300px">続きは送って読める内容</p></div><footer>下の操作</footer></section>'
@@ -261,7 +261,7 @@ test('窓の中のスクロールの続きを余白不足と誤判定せず、�
 })
 
 test('列で組む表も見出しと本文の右端・中央・左余白がそろう', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
@@ -302,7 +302,7 @@ test('列で組む表も見出しと本文の右端・中央・左余白がそ�
 })
 
 test('B-243：引き出し600への画面側上書きを検出し、480/540と配信作成1160は通す', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({viewport:{width:1440,height:900}})
     for (const width of [480,540,600,1160]) {
@@ -314,7 +314,7 @@ test('B-243：引き出し600への画面側上書きを検出し、480/540と�
 })
 
 test('余白を指定した広い引き出しは3幅で収まり、元の幅や余分な縮小を検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const viewport of [1152, 1440, 1920]) {

@@ -1,14 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
 import scanOwnerRules from './owner-rules-browser.mjs'
 
 test('名前とフォルダは板が狭い時だけ縦にし、横に戻す故障を検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/settings-form-card.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const [width, frameWidth] of [[1152, 900], [1440, 1200], [1920, 1600]]) {
@@ -31,7 +31,7 @@ test('名前とフォルダは板が狭い時だけ縦にし、横に戻す故�
 
 test('開閉の段は題の空白を守り、内側を押し込む故障を検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/disclosure.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>:root{--card-edge:#ddd;--radius-card:12px;--color-canvas:#fff;--text-label:13px;--text-body:14px}*{box-sizing:border-box}details{width:400px}.body input{width:100%;height:36px}${css}</style>
@@ -45,7 +45,7 @@ test('開閉の段は題の空白を守り、内側を押し込む故障を検�
 
 test('行うことは欄が広くても白い板が狭ければ縦にし、横の故障を検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/tap-action-field.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const frameWidth of [900, 1200]) {
@@ -67,7 +67,7 @@ test('行うことは欄が広くても白い板が狭ければ縦にし、横�
 
 test('題つきの二つの欄は板の幅で縦へ切り替え、旧横配置を検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/settings-form-card.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const frameWidth of [900, 1200]) {

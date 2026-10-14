@@ -1,13 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import scanListOperations from './list-operation-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 import { readFileSync } from 'node:fs'
 
 test('F3 counts spaced handwritten pager units and retains partial-read disclosure', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="detail"><nav data-pagination><span>214 件中 1〜20 件</span></nav><p class="pagerSummary">5 人中 1〜5 人</p></section>')
@@ -19,7 +19,7 @@ test('F3 counts spaced handwritten pager units and retains partial-read disclosu
 })
 
 test('Z1 detects a stacked avatar even when every text node occupies one line', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="detail"><table><tbody><tr><td><span data-avatar style="display:block;width:24px;height:24px;border-radius:50%">K</span><a style="display:block">Kenta Kawano</a></td></tr></tbody></table></section>')
@@ -30,7 +30,7 @@ test('Z1 detects a stacked avatar even when every text node occupies one line', 
 })
 
 test('Z3 detects missing canonical content inset and retains full width ordinary list tables', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<style>section{width:500px}div{box-sizing:border-box}p{margin:0}</style><section data-page-template="list"><div data-template-region="content"><div data-template-region="content"><p>本文</p><div data-shared-part="list-table">表</div></div></div></section>')
@@ -44,7 +44,7 @@ test('Z3 detects missing canonical content inset and retains full width ordinary
 })
 
 test('Z fixes use the real shared person row and preserve the real template padding', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const tableCss = readFileSync(new URL('../../src/components/shared/table.module.css', import.meta.url), 'utf8')
@@ -63,7 +63,7 @@ test('Z fixes use the real shared person row and preserve the real template padd
 })
 
 test('Y14 detects static trailing text overlapping a filter and accepts separate rows and owned controls', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<style>section{width:1200px}#tools{position:relative;height:80px}button{position:absolute;left:0;top:0;width:80px;height:36px}#end{position:absolute;left:70px;top:6px;white-space:nowrap}</style><section data-page-template="list" data-list-skeleton><div id="tools" data-template-region="toolbar"><button>縦長</button><div id="end" data-toolbar-trailing><span>並び：作成が新しい順</span></div></div></section>')
@@ -78,7 +78,7 @@ test('Y14 detects static trailing text overlapping a filter and accepts separate
 })
 
 test('X8 detects open explanation controls without a matching body in their page scope', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list" data-list-skeleton><header data-template-region="heading"><button data-screen-explanation-toggle aria-controls="body" aria-expanded="true">この画面の説明</button></header></section>')
@@ -94,7 +94,7 @@ test('X8 detects open explanation controls without a matching body in their page
 })
 
 test('X7 detects missing explanation controls even for closed bodies and keeps nested scopes separate', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="settings"><header data-template-region="heading"><h2>設定</h2></header><div id="explanation" data-screen-explanation>説明本文</div></section>')
@@ -116,7 +116,7 @@ test('X7 detects missing explanation controls even for closed bodies and keeps n
 })
 
 test('X1/X2 use folder capability across widths; X3 checks all heading types', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     await page.setContent(`<section data-page-template="list" data-list-skeleton="templates"><header data-template-region="heading"><h2>一覧</h2><button>この画面の説明</button><button aria-label="一覧の説明">？</button><div data-heading-actions></div></header><div data-list-folders="false"><div data-template-region="toolbar"><a href="/new">決めごとを作る</a></div><span data-list-name><span data-folder-dot>○</span>名前</span></div></section>`)
@@ -146,7 +146,7 @@ test('X1/X2 use folder capability across widths; X3 checks all heading types', a
 })
 
 test('F1 reads painted labels without counting an enlarged radio hit target as clipped text', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<style>label{position:relative;display:flex;width:max-content;height:20px;font:13px/20px sans-serif}label::before{content:"";position:absolute;inset:-3px}span{white-space:nowrap}</style><section data-page-template="create"><label><span>リッチメッセージ</span></label></section>')
@@ -159,7 +159,7 @@ test('F1 reads painted labels without counting an enlarged radio hit target as c
 })
 
 test('F2 distinguishes a column of upload instructions from a wrapped short action label', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<style>button{display:flex;flex-direction:column;width:240px;font:13px/20px sans-serif}span{display:block}</style><section data-page-template="create"><button><span>画像を追加</span><span>ドラッグ＆ドロップ<br>またはクリック</span><span>PNG・JPEG・10MBまで</span></button></section>')
@@ -172,7 +172,7 @@ test('F2 distinguishes a column of upload instructions from a wrapped short acti
 })
 
 test('F2 measures the name and type inside a horizontal control separately and still catches a wrapping name', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<style>button{display:flex;width:240px;font:13px/20px sans-serif}.labels{display:flex;flex-direction:column;min-width:0}span{display:block}</style><section data-page-template="create"><button><svg width="16" height="16"></svg><div class="labels"><span>来店アンケート</span><span>飾り・見出し1</span></div></button></section>')
@@ -187,7 +187,7 @@ test('F2 measures the name and type inside a horizontal control separately and s
 })
 
 test('F5 counts a page-owned explanation in the tool band and accepts shared notice ownership', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage(), owners = sharedControlOwners()
     assert.ok(owners.includes('notice'))
@@ -200,7 +200,7 @@ test('F5 counts a page-owned explanation in the tool band and accepts shared not
 })
 
 test('F1 catches a selected label ellipsized by half a pixel and accepts its exact rendered width', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><span data-select-value style="display:inline-block;font:13px Arial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォルダ：すべて</span><span data-list-name style="display:inline-block;width:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">省略してよい名前</span></section>')
@@ -219,7 +219,7 @@ test('F1 catches a selected label ellipsized by half a pixel and accepts its exa
 })
 
 test('F9 detects a left aligned action slot and accepts shared right alignment', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     await page.setContent('<style>td{width:180px;padding:8px;text-align:left}button{width:36px}</style><section data-page-template="list" data-list-skeleton="templates"><table><tbody><tr><td data-list-action-cell><button>…</button></td></tr></tbody></table></section>')
@@ -230,7 +230,7 @@ test('F9 detects a left aligned action slot and accepts shared right alignment',
 })
 
 test('F1 counts clipped numeric notes independently from truncatable names and body', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     await page.setContent('<style>td{width:40px}span{display:block;width:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><section data-page-template="list" data-list-skeleton="templates"><table><tbody><tr><td data-list-number><span>1,900</span><span>対象外 12 回</span></td></tr></tbody></table></section>')
@@ -241,7 +241,7 @@ test('F1 counts clipped numeric notes independently from truncatable names and b
 })
 
 test('F7 counts unknown annotations in a cell and KPI note while retaining known values', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><table><tbody><tr><td>—（未取得）</td><td>0</td><td>未設定</td><td>なし</td></tr></tbody></table><div data-kpi-detail><span role="note">今日 —（未取得）</span></div></section>')
@@ -257,7 +257,7 @@ test('F5 checks rendered toolbar control ownership without board exceptions', as
   const owners = sharedControlOwners()
   assert.ok(owners.includes('button'))
   assert.ok(owners.includes('v6-filter-chip'))
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar"><button class="button_button__abc">作成する</button><button class="v6-filter-chip">公開中</button><button class="page_ghostButton__abc">保存する</button></div></section>')
@@ -274,7 +274,7 @@ test('F5 checks rendered toolbar control ownership without board exceptions', as
 })
 
 test('F1/F2/F3/F7/F9/F10 count defects, preserve presence and ignore truncated names', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>*{box-sizing:border-box}body{margin:0}section{width:852px}button{height:36px}th{white-space:nowrap}table{width:100%}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden}</style><section data-page-template="list" data-design-node="fixture" data-height-mode="content">
@@ -304,7 +304,7 @@ test('F1/F2/F3/F7/F9/F10 count defects, preserve presence and ignore truncated n
 
 
 test('W1 scans linked creation and native selects across the whole template toolbar', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>*{box-sizing:border-box}section{width:900px}a,button,select,input{display:inline-flex;height:36px;padding:0 12px;border:1px solid;align-items:center;font:13px Arial}a{width:max-content}div{display:flex;gap:8px}input{width:280px}</style><section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar" style="display:block"><div data-toolbar-leading><a href="/new">送り先を作る</a><select aria-label="フォルダ"><option>フォルダ：すべて</option></select><input type="search"></div><div><select aria-label="状態"><option>状態：すべて</option></select><button>よく使う絞り込み</button><button>20件表示</button></div></div></section>`)
@@ -320,7 +320,7 @@ test('W1 scans linked creation and native selects across the whole template tool
 
 
 test('W2 and W3 count empty folder rails and spaced page-size wording', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list" data-list-skeleton="templates" style="width:1200px"><aside data-template-region="folders"><nav><button>すべて</button></nav></aside><button>20 件表示</button></section>')
@@ -337,7 +337,7 @@ test('W2 and W3 count empty folder rails and spaced page-size wording', async ()
 
 
 test('W4 distinguishes heading actions and archive filters without board IDs',async()=>{
- const browser=await chromium.launch()
+ const browser=await connectGuardBrowser()
  try{const page=await browser.newPage()
  await page.setContent('<section data-page-template="list" data-list-skeleton style="width:1200px"><header data-template-region="heading"><button class="v6-filter-chip">管理者確認</button></header><button class="v6-filter-chip">アーカイブ済み</button></section>')
  const before=await page.evaluate(scanFixPatterns)
@@ -350,7 +350,7 @@ test('W4 distinguishes heading actions and archive filters without board IDs',as
 })
 
 test('F2 measures each short title in a compound choice and catches wrapped children', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>button{display:flex;align-items:center;width:260px}.text{display:flex;flex-direction:column}span{font:14px/20px Arial}</style>
@@ -374,7 +374,7 @@ test('F2 measures each short title in a compound choice and catches wrapped chil
 })
 
 test('list semantics catches two folder/create entries even when they fit, while a distinct creation action stays available', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list"><div data-template-region="toolbar"><button aria-label="フォルダ">フォルダ：すべて</button><button aria-label="フォルダで絞り込む">フォルダ：すべて</button><a href="/new">案内を作る</a><a href="/new">案内を作る</a><a href="/folder-new">フォルダを作る</a></div></section>')
@@ -388,7 +388,7 @@ test('list semantics catches two folder/create entries even when they fit, while
 })
 
 test('read-only list selection is detected, while editable and row-ineligible selections are retained', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<section data-page-template="list"><div data-read-only-notice>閲覧のみ</div><table><thead><tr><th><input type="checkbox" aria-label="全部選ぶ"></th></tr></thead><tbody><tr><td><input type="checkbox" disabled title="この行は対象外" aria-label="行を選ぶ"></td></tr></tbody></table></section>')

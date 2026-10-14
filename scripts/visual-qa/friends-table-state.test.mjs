@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from '../../apps/web/scripts/v8-guard/browser-session.mjs'
 import { friendsTableReady } from './friends-table-state.mjs'
 
 let browser
-before(async () => { browser = await chromium.launch() })
+before(async () => { browser = await connectGuardBrowser() })
 after(async () => { await browser?.close() })
 async function fixture(delta = 0, count = 2000, rendered = 12) {
   const page = await browser.newPage()
