@@ -58,7 +58,7 @@ describe('お客さまの交換と振込先', () => {
     vi.mocked(affiliateSelfApi.saveBank).mockRejectedValueOnce(new Error('保存できませんでした')).mockResolvedValueOnce({ ...bank, version: 8 });
     render(<AffiliatePayments editable />);
     fireEvent.click(await screen.findByRole('button', { name: '振込先を編集する' }));
-    const number = screen.getByLabelText('口座番号') as HTMLInputElement;
+    const number = await screen.findByLabelText('口座番号') as HTMLInputElement;
     expect(number.value).toBe('');
     fireEvent.click(screen.getByRole('button', { name: '保存する' }));
     expect(screen.getByText('口座番号を1〜8桁の数字で入力してください')).toBeTruthy();
@@ -80,7 +80,7 @@ describe('お客さまの交換と振込先', () => {
     vi.mocked(affiliateSelfApi.saveBank).mockRejectedValue(new SelfApiError(409, {}, '振込先が更新されています'));
     render(<AffiliatePayments editable />);
     fireEvent.click(await screen.findByRole('button', { name: '振込先を編集する' }));
-    fireEvent.change(screen.getByLabelText('口座番号'), { target: { value: '12345678' } });
+    fireEvent.change(await screen.findByLabelText('口座番号'), { target: { value: '12345678' } });
     fireEvent.click(screen.getByRole('button', { name: '保存する' }));
     fireEvent.click(screen.getByRole('button', { name: '保存する' }));
     await screen.findByText('振込先が更新されています');

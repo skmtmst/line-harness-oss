@@ -10,6 +10,16 @@ async function centered(button) {
   })
   expect(position.align).toBe('center'); expect(position.delta).toBeLessThanOrEqual(1)
 }
+async function detailTypography(page, label) {
+  const heading = page.getByRole('heading', { name: label, exact: true })
+  const value = heading.locator('..').locator('strong')
+  const typography = el => { const style = getComputedStyle(el); return { size: parseFloat(style.fontSize), weight: Number(style.fontWeight) } }
+  const headingStyle = await heading.evaluate(typography)
+  const valueStyle = await value.evaluate(typography)
+  expect(headingStyle.size).toBeLessThanOrEqual(12)
+  expect(valueStyle).toEqual({ size: 13, weight: 600 })
+  expect(headingStyle.weight).toBeLessThan(valueStyle.weight)
+}
 for (const width of [1152,1440,1920]) test(`MFA input, one-time display and centered auth buttons at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
   const errors = []; page.on('pageerror', error => errors.push(error.message))
@@ -26,6 +36,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/login'); await centered(page.getByRole('button', { name: 'ログイン', exact: true }))
+  const brandStyle = await page.locator('[aria-hidden="true"]').filter({ hasText: 'm' }).first().evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })
   await page.goto('/password/reset?token=fixture-reset')
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await page.goto('/login/two-factor#lh_2fa=fixture-challenge&lh_method=password')
@@ -35,6 +46,14 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`verify-${width}.png`) })
   await page.getByRole('button', { name: '回復コードを使う' }).click()
   await expect(page.getByRole('textbox')).toHaveCount(8)
+  const hint = page.getByText('控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。', { exact: true })
+  expect(await hint.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeLessThanOrEqual(12)
+  const back = page.getByRole('link', { name: 'ログインに戻る', exact: true })
+  const method = page.getByRole('button', { name: '6桁のコードで入る', exact: true })
+  const textStyle = el => { const style = getComputedStyle(el); return { size: style.fontSize, weight: style.fontWeight, color: style.color, background: style.backgroundColor } }
+  expect(await back.evaluate(textStyle)).toEqual(await method.evaluate(textStyle))
+  const mark = page.locator('[data-auth-layout="admin"] > div:first-child > span[aria-hidden="true"]')
+  expect(await mark.evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })).toEqual(brandStyle)
   expect(await page.getByRole('group', { name: '回復コード（8文字）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await page.getByRole('textbox', { name: '1文字目' }).evaluate(el => {
     const event = new Event('paste', { bubbles: true }); Object.defineProperty(event, 'clipboardData', { value: { getData: () => '7k2q-9fxm' } }); el.dispatchEvent(event)
@@ -50,6 +69,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`setup-${width}.png`) })
   await page.getByRole('textbox', { name: '1桁目' }).fill('123456')
   await expect(page.getByRole('list', { name: '8個の回復コード' }).getByRole('listitem')).toHaveCount(8)
+  expect(await page.getByRole('button', { name: '回復コードをコピー' }).evaluate(textStyle)).toEqual(await page.getByRole('button', { name: 'ファイルに保存する' }).evaluate(textStyle))
   await centered(page.getByRole('button', { name: '控えました。ログインする' }))
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'ファイルに保存する' }).click(); expect((await download).suggestedFilename()).toBe('musubo-recovery-codes.txt')
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
@@ -75,6 +95,9 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
   })
   await page.goto('/staff')
   await expect(page.getByRole('heading', { name: '自分の二段階認証' })).toBeVisible()
+  await detailTypography(page, '認証アプリ')
+  await detailTypography(page, '回復コード')
+  await detailTypography(page, '登録済み')
   await expect(page.getByText(/回復コードの残りが2個です/)).toBeVisible()
   await page.getByRole('heading', { name: '自分の二段階認証' }).scrollIntoViewIfNeeded()
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`personal-${width}.png`), fullPage: true })

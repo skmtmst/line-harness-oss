@@ -524,8 +524,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   if (!canEdit) {
     return (
       <Drawer
-      width="narrow"
-      heightMode="viewport"
+      width="narrow" heightMode="viewport"
         open={open}
         title="誕生日クーポンの決めごと"
         description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
@@ -543,8 +542,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   }
   return (
     <Drawer
-      width="narrow"
-      heightMode="viewport"
+      width="narrow" heightMode="viewport"
       open={open}
       title="誕生日クーポンの決めごと"
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
