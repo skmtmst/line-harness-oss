@@ -56,7 +56,8 @@
 .time {
   line-height: var(--tpl-st2-od-small-lh);
   flex-shrink: 0;
-  width: var(--tpl-st2-od-time-w);
+  min-width: var(--tpl-st2-od-time-w);
+  width: max-content;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   white-space: nowrap;

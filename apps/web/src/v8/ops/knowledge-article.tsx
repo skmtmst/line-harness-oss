@@ -196,7 +196,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             </Checkbox></SaveErrorField>
             {ticket ? <Checkbox checked={ticket.resolved} disabled onCheckedChange={() => {}}>元の問い合わせ {ticket.label} が「解決」になっている</Checkbox> : null}
             {ticketBlocked ? <Notice tone="danger">元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。</Notice> : null}
-            <Notice tone="info">承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</Notice>
+            <p className={parts.dialogNote}>承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</p>
           </div>
         </Dialog>
       )}
