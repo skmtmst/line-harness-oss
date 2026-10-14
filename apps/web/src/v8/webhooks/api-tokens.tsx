@@ -20,7 +20,7 @@ import { DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
 import { ListPage } from '@/components/templates'
-import { Check,KeyRound,LayoutTemplate,Plus,RefreshCw } from 'lucide-react'
+import { Check,Coins,Gift,KeyRound,LayoutTemplate,Plus,RefreshCw,Wallet } from 'lucide-react'
 import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import styles from './api-tokens.module.css'
@@ -83,7 +83,12 @@ export default function WebhooksApiTokensV8() {
             outgoing: overview.outgoingCount === null ? null : overview.outgoing,
             incomingCount: overview.incomingCount,
             summary: overview.summary,
-          })}
+          }).map(cell => ({
+            ...cell,
+            icon: cell.key === 'sent' ? <Coins aria-hidden="true" />
+              : cell.key === 'failed' ? <Gift aria-hidden="true" />
+                : cell.key === 'incoming' ? <Wallet aria-hidden="true" /> : cell.icon,
+          }))}
         />
       </>}
       overlays={<>
@@ -198,10 +203,7 @@ export default function WebhooksApiTokensV8() {
           <p className={styles.createRule}>鍵の発行・入れ替え・停止は統括だけができます</p>
         </div>
 
-        <div className={styles.infoBand} role="note">
-          <KeyRound size={16} aria-hidden="true" />
-          <p>鍵は発行したときに1回だけ表示されます。外の仕組みに書き写してから閉じてください。入れ替えると、今の鍵はすぐ使えなくなります。</p>
-        </div>
+        {canManage ? <Notice tone="info" icon={<KeyRound size={16} aria-hidden="true" />}>鍵は発行したときに1回だけ表示されます。外の仕組みに書き写してから閉じてください。入れ替えると、今の鍵はすぐ使えなくなります。</Notice> : null}
 
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
 
