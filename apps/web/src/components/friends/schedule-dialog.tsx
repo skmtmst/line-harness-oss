@@ -120,7 +120,6 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       onClose()
     } catch {
       // 結果が分からない失敗では鍵を残し、同じ予約の再試行を二重に作らない。
-      if (completed) onReserved()
       setError(`${completed ? `${completed}件は予約済みです。残りを` : ''}予約できませんでした。通信状態を確認して、もう一度お試しください。`)
     } finally {
       setBusy(false)

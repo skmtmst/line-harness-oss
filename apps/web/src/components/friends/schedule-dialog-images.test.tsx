@@ -13,9 +13,9 @@ beforeEach(() => {
   schedule.mockReset().mockResolvedValue({ success: true, data: { id: 'scheduled' } })
 })
 afterEach(cleanup)
-function open() {
+function open(closeOnReserved = false) {
   const onClose = vi.fn(), onReserved = vi.fn()
-  render(<ScheduleDialog friendId="friend" friendName="ソラ" accountId="account" onClose={onClose} onReserved={onReserved} />)
+  render(<ScheduleDialog friendId="friend" friendName="ソラ" accountId="account" onClose={onClose} onReserved={closeOnReserved ? onClose : onReserved} />)
   return { onClose, onReserved }
 }
 async function upload(size = 20) {
@@ -42,7 +42,7 @@ it('画像の成功後に文が通信失敗した場合、文だけを同じ鍵�
   reserve()
   await screen.findByText(/1件は予約済みです/)
   expect(onClose).not.toHaveBeenCalled()
-  expect(onReserved).toHaveBeenCalledTimes(1)
+  expect(onReserved).not.toHaveBeenCalled()
   expect(screen.queryByAltText('予約する画像')).toBeNull()
   expect((screen.getByRole('textbox', { name: '送るもの' }) as HTMLTextAreaElement).value).toBe('明日のご案内です')
   const key = schedule.mock.calls[1][2]
@@ -51,6 +51,18 @@ it('画像の成功後に文が通信失敗した場合、文だけを同じ鍵�
   expect(schedule).toHaveBeenCalledTimes(3)
   expect(schedule.mock.calls[2]).toEqual(schedule.mock.calls[1])
   expect(schedule.mock.calls[2][2]).toBe(key)
+  expect(onReserved).toHaveBeenCalledTimes(1)
+})
+
+it('予約成功通知で窓を閉じる呼び元にも、部分成功を完了として通知しない', async () => {
+  const { onClose } = open(true)
+  await upload()
+  fireEvent.change(screen.getByRole('textbox', { name: '送るもの' }), { target: { value: '明日のご案内' } })
+  schedule.mockResolvedValueOnce({ success: true, data: { id: 'image' } }).mockRejectedValueOnce(new Error('network'))
+  reserve()
+  await screen.findByText(/1件は予約済みです/)
+  expect(onClose).not.toHaveBeenCalled()
+  expect((screen.getByRole('textbox', { name: '送るもの' }) as HTMLTextAreaElement).value).toBe('明日のご案内')
 })
 
 it('画像の結果が不明なら画像を残し、同じ日時と内容では同じ鍵を使う', async () => {
