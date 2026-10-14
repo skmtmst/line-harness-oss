@@ -54,6 +54,8 @@ tags: [memory, core]
 
 ## 進行中（2026-10-14）
 
+- measure2・L18は広告/来店スタンプの2仲間で区切り。共通DataTable.controlsの明示2接続（FDBsG/byCFU）とp0kA3の媒体Selectで直接3板。製品be48f6/b312、計測266af（裸thの箱を文字と数えるedgeをRangeへ、12px基準と故障検出を保持）。関係51＋構造21＋追加媒体7/型/lint0エラー/型新規0、共通実寸26/制御列1/計測18＋CLI1成功（重複）。最終266の本番ビルド/15条件は全3幅の崩れ/列/横/操作/更新/例外0、先行FDB/設定/記録12成功は8fの出所保持。全保護331/332・35板1736差/cFo1440欠測はL17と全属性一致・追加0、差分mapの5板10条件は266で全0。写真/候補/正式追加0、旧鍵照合と開き方は司令塔へ。予想3/4=75%＋部分、カード3、73.64分/直接3=24.55分で速度改善なし（枠待ち/検査入口の手戻り）。詳細docs/qa/measure2-l-table-controls-1014.mdと外部L18/RESULT。次は撮影係の3板確認→旧鍵/残る列配分。Pen/親EC/migration/DB/配備/push/PRなし、コミットまで。下のL17は前回。
+
 - measure2・L17は共通ページ送り/タブの2束で区切り。製品464099b1f6、本線d12包含、直接7板。ListPaginationの3接続/HistoryPager/DetailHead→Tabs、1ページ/0件/未知総数/詳細→設定の履歴を保持。関連223＋接続3/履歴18/空16/戻り21（重複）・型/lintエラー0/本番ビルド/写真なし最終24幅の崩れ/横/操作/更新0。aIN1152通常/閲覧の既存F10各1を保持。保護175板332中331取得・35板1736差/欠測cFo2p1440/終了2、初回と全差一致・追加0。今回4板CVz5d/hadfk/usDpO/z2dgwと他31を分け、鍵は司令塔へ。予想5/6=83.3%、下限12.66分/直接板、枠待ちで速さ改善なし。Pen/候補/正式追加/親EC/migration/DB/配備/push/PRなし、コミットまで。詳細docs/qa/measure2-l-pagination-tabs-1014.md、外部L17/RESULT。次は鍵照合/撮影→残る一覧接続。下のL16は回収済み。
 
 - measure2・L16の中断検査はL17再開時に回収済み。e32の本番ビルド/60幅は57取得、gBrCz-edit1152は同SHA/scannerの別1幅で復旧、MJoJR3幅の型なしを保持。layout/横/例外/更新0、h1G4dの一般表の旧密度F2=30を保持。YXrF6保存Check/l4qsT取込Downloadの関連61/型/lint/長さは既存成功を再利用。撮影/左右/点/候補は0。新L17の証拠へ付替えず、詳細docs/qa/measure2-l-review-return-1014.mdと外部L16/FINAL-RECOVERY-SUMMARY。
