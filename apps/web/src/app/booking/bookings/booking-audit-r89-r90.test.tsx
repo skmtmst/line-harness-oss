@@ -132,6 +132,16 @@ describe('監査 R90: 今月は今月の予約に絞る', () => {
     fireEvent.click(await screen.findByRole('button', { name: '予約管理の説明' }))
     expect(await screen.findByText('予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。')).toBeTruthy()
   })
+  it('今月の確定だけに数の説明の印を出し、今日の表示には足さない', async () => {
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    const help = await screen.findByRole('button', { name: '確定の説明' })
+    expect(help.querySelector('span[aria-hidden="true"]')).toBeTruthy()
+    fireEvent.click(help)
+    expect(await screen.findByText('今月の予約のうち、確定して来店を予定している件数です。')).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: /^今日/ }))
+    expect(screen.queryByRole('button', { name: '確定の説明' })).toBeNull()
+  })
   it('今月タブで一覧の取得に今月の初め〜来月の初めが入る', async () => {
     render(<BookingsPage />)
     fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
