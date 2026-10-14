@@ -192,7 +192,7 @@ export default function CsvMigrationsV8() {
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
-          <DataTable grid={{
+          <DataTable columnSizing="content" grid={{
             columns: 'var(--tpl-fr-mig-col-date) var(--tpl-fr-mig-col-kind) var(--tpl-fr-mig-col-kind) minmax(0, 1fr) var(--tpl-fr-mig-col-state)',
             padding: '0 var(--polish-space-card)',
             headPadding: 'var(--polish-space-field) var(--polish-space-card)',
@@ -206,7 +206,7 @@ export default function CsvMigrationsV8() {
                 <Th>日時</Th>
                 <Th>種類</Th>
                 <Th>件数</Th>
-                <Th>した人</Th>
+                <Th grow>した人</Th>
                 <Th>状態</Th>
               </TableHeadRow>
             </thead>
@@ -220,7 +220,7 @@ export default function CsvMigrationsV8() {
                     <Td>{slashDateTime(job.created_at)}</Td>
                     <Td><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
                     <Td>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
-                    <Td><TruncatedText value={job.created_by_name ?? emptyValue('unknown')} /></Td>
+                    <Td grow><TruncatedText value={job.created_by_name ?? emptyValue('unknown')} /></Td>
                     <Td>
                       <span className={styles.stateCell}>
                         <StatusBadge tone={job.status === 'completed' ? 'success' : job.status === 'previewed' ? 'warning' : 'neutral'} size="compact">
