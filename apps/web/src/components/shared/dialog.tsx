@@ -261,7 +261,7 @@ export default function Dialog({
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
       {titleNote ? <p className={styles.titleNote}>{titleNote}</p> : null}
-      {designLayout === 'stacked' ? null : descriptionNode}
+      {designLayout === 'stacked' || descriptionBand === 'danger' ? null : descriptionNode}
     </>
   )
   const panel = (
@@ -306,19 +306,14 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {descriptionBand === 'danger' && description ? (
-            <>
-              {titlePart}
-              <div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div>
-            </>
-          ) : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
+          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
-      {designLayout === 'stacked' ? descriptionNode : null}
+      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
@@ -364,7 +359,7 @@ export default function Dialog({
   const discardDialog = discard.confirming ? <Dialog open={discard.confirming} title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) discard.requestClose()
     }}>
       {panel}

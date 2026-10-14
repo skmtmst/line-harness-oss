@@ -53,6 +53,49 @@ for (const width of [1152, 1440, 1920]) {
 }
 
 for (const width of [1152, 1440, 1920]) {
+  test(`positioned dialog keeps its header and actions inside the viewport at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
+      await page.setContent(`<style>${globals}\n${dialog}</style><div class="overlay" data-design-top data-viewport-fit style="--dialog-design-top:147px"><div class="panel" data-m1-scope data-design-width style="--dialog-design-width:560px">
+        <div class="headerRow"><h2 class="title">臨時休業・貸切を足す</h2><button class="close">閉じる</button></div>
+        <div class="content"><div style="height:1600px">長い本文</div><label><input type="checkbox">Googleへ登録する</label></div>
+        <div class="footer"><div class="actions"><button>キャンセル</button><button>この日を閉じる</button></div></div>
+      </div></div>`)
+      const options = { viewportFit: true, fixedActions: ['閉じる', 'キャンセル', 'この日を閉じる'] }
+      for (const height of [900, 640, 360]) {
+        await page.setViewportSize({ width, height })
+        await page.waitForFunction(() => {
+          const rect = document.querySelector('.panel').getBoundingClientRect()
+          return Math.abs(rect.top - 147) < 1 && rect.bottom <= innerHeight - 15
+        })
+        const normal = await page.evaluate(scanDialogAudit, options)
+        assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+        assert.equal(await page.locator('.panel').evaluate(el => el.getBoundingClientRect().top), 147)
+        await page.locator('.content').evaluate(el => { el.scrollTop = el.scrollHeight })
+        await page.getByRole('checkbox').check()
+        await page.getByRole('button', { name: 'この日を閉じる' }).click()
+        assert.equal((await page.evaluate(scanDialogAudit, options)).findings.length, 0)
+      }
+      await page.setViewportSize({ width, height: 360 })
+      await page.locator('.overlay').evaluate(el => el.style.setProperty('--dialog-design-top', '380px'))
+      await page.waitForFunction(() => Math.abs(document.querySelector('.panel').getBoundingClientRect().top - (innerHeight / 2 - 16)) < 1)
+      assert.equal((await page.evaluate(scanDialogAudit, options)).findings.length, 0)
+      const normalHeight = await page.locator('.panel').evaluate(el => el.getBoundingClientRect().height)
+      await page.locator('.panel').evaluate(el => { el.style.maxHeight = 'calc(100dvh - 32px)' })
+      await page.waitForFunction(() => document.querySelector('.panel').getBoundingClientRect().bottom > innerHeight)
+      const broken = await page.evaluate(scanDialogAudit, options)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-viewport-bounds').length, 1)
+      assert.ok(broken.findings.some(row => row.kind === 'dialog-fixed-action-hidden'))
+      await page.locator('.panel').evaluate(el => { el.style.maxHeight = '' })
+      await page.waitForFunction(height => Math.abs(document.querySelector('.panel').getBoundingClientRect().height - height) < 1, normalHeight)
+      const restored = await page.evaluate(scanDialogAudit, options)
+      assert.equal(restored.findings.length, 0, JSON.stringify(restored))
+    } finally { await browser.close() }
+  })
+}
+
+for (const width of [1152, 1440, 1920]) {
   test(`dialog widths and nested input widths at ${width}`, async () => {
     const browser = await connectGuardBrowser()
     try {
@@ -102,5 +145,76 @@ for (const width of [1152, 1440, 1920]) {
     } finally {
       await browser.close()
     }
+  })
+}
+
+for (const width of [1152, 1440, 1920]) {
+  test(`dialog description occupies the full body below its heading at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
+      await page.setContent(`<style>${globals}</style><style>${dialog}</style><div class="panel" data-design-width style="--dialog-design-width:480px" data-m1-scope data-description-band="danger" aria-describedby="band-text">
+        <div class="headerRow"><div class="headerContent"><h2 class="title">接続を解除しますか？</h2></div><button>×</button></div>
+        <div class="descriptionBand"><div class="callout calloutDanger" data-qa-dialog-callout><p class="description" id="band-text">書き出しが止まります。シートの中身は消えません。この操作は取り消せません。</p></div></div></div>`)
+      const normal = await page.evaluate(scanDialogAudit, { expectedWidth: 480 })
+      assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+      assert.equal(await page.locator('#band-text').evaluate(el => el.getBoundingClientRect().height), 17)
+      await page.locator('[data-qa-dialog-callout]').evaluate(el => document.querySelector('.headerContent').append(el))
+      const broken = await page.evaluate(scanDialogAudit)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-description-band-width').length, 1)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-description-band-gap').length, 1)
+    } finally { await browser.close() }
+  })
+
+  test(`dialog choice cards use three equal columns within the body at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      const radio = readFileSync(new URL('../../src/components/shared/radio-card.module.css', import.meta.url), 'utf8')
+      await page.setContent(`<style>${globals}</style><style>${radio}</style><div data-m1-scope style="width:480px;padding:24px"><fieldset class="group"><legend>座れる卓</legend><div class="items" data-choice-columns="3" style="--choice-columns:3">${Array.from({length:5}, (_, index) => `<label class="card" data-choice-card><span class="title">T${index+1}</span><p class="note">2名席</p></label>`).join('')}</div></fieldset></div>`)
+      const normal = await page.evaluate(scanDialogAudit)
+      assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+      await page.locator('[data-choice-columns]').evaluate(el => { el.style.gridTemplateColumns = 'repeat(3, 160px)' })
+      const broken = await page.evaluate(scanDialogAudit)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-choice-card-overflow').length, 1)
+    } finally { await browser.close() }
+  })
+}
+
+for (const width of [1152, 1440, 1920]) {
+  test(`display columns fill the dialog body at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      await page.setContent(`<style>${globals}</style><style>${dialog}</style><div class="panel" data-m1-scope style="width:560px"><div class="content" data-content-layout="form"><div data-presentation="columns"><div aria-label="選択した列" style="border:1px solid"><div data-fixed-display-name><svg class="lucide-lock" role="img" aria-label="いつも表示する列" width="16" height="16"></svg>友だち（名前）</div></div><input type="search" aria-label="表示項目を検索" style="width:100%"></div></div></div>`)
+      assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.length, 0)
+      await page.locator('[data-content-layout]').evaluate(el => { el.removeAttribute('data-content-layout') })
+      assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.filter(row => row.kind === 'display-body-width').length, 1)
+      await page.locator('.content').evaluate(el => { el.setAttribute('data-content-layout', 'form') })
+      assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.length, 0)
+    } finally { await browser.close() }
+  })
+}
+
+for (const width of [1152, 1440, 1920]) {
+  test(`dialog recipients keep content-sized rows at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      const rows = readFileSync(new URL('../../src/components/shared/dialog-recipient-list.module.css', import.meta.url), 'utf8')
+      const badges = readFileSync(new URL('../../src/components/shared/status-badge.module.css', import.meta.url), 'utf8')
+      await page.setContent(`<style>${globals}</style><style>${rows}\n${badges}</style><div data-m1-scope style="width:512px"><table class="table" data-dialog-recipients><tbody>${['LINE', 'LINE', '画面だけ'].map(channel=>`<tr><td class="name">担当者</td><td class="role">スタッフ</td><td class="channel"><span class="badge" data-size="default" data-tone="neutral" data-design-node="xRvDB"><span>${channel}</span></span></td></tr>`).join('')}</tbody></table></div>`)
+      const normal = await page.evaluate(scanDialogAudit, { recipientRows: true })
+      assert.equal(normal.inventory.filter(row => row.kind === 'dialog-recipient-row').length, 3)
+      assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+      await page.locator('td.channel').last().evaluate(el => { el.style.paddingRight = '0px' })
+      const brokenEdge = await page.evaluate(scanDialogAudit, { recipientRows: true })
+      const geometry = await page.locator('tbody tr').last().evaluate(row => ({ row: row.getBoundingClientRect().toJSON(), cell: getComputedStyle(row.lastElementChild).paddingRight, badge: row.querySelector('.badge').getBoundingClientRect().toJSON() }))
+      assert.equal(brokenEdge.findings.filter(row => row.kind === 'dialog-recipient-edge').length, 1, JSON.stringify({ brokenEdge, geometry }))
+      await page.locator('td.channel').last().evaluate(el => { el.style.removeProperty('padding-right') })
+      assert.equal((await page.evaluate(scanDialogAudit, { recipientRows: true })).findings.length, 0)
+      await page.locator('tbody tr').first().evaluate(el => { el.style.height = '52px' })
+      assert.equal((await page.evaluate(scanDialogAudit, { recipientRows: true })).findings.filter(row => row.kind === 'dialog-recipient-row-height').length, 1)
+    } finally { await browser.close() }
   })
 }

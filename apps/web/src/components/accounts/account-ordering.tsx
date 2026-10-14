@@ -11,8 +11,9 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
+import { DialogContentRow } from '@/components/shared/dialog-form-row'
 import ListState from '@/components/shared/list-state'
-import { GripHorizontal, Save } from 'lucide-react'
+import { Grid2X2, GripHorizontal, Save } from 'lucide-react'
 import compact from './account-ordering-v8.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -300,7 +301,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
         designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
         footer={<div className={compact.footer}>
           <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} title={changed.length === 0 ? '構成を変更すると保存できます。' : undefined} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
         </div>}>
         <div className={compact.body}>
           <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>
@@ -311,12 +312,9 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
               onDrop={(event) => dropOn(event, null)}>
               {hierarchyRoots.map((account) => compactNode(account, 0))}
             </div>
-            {unassigned.length > 0 ? <Card surface="inset" contentPadding="var(--tpl-acd-dlg-band-pad)" className={compact.unassigned}>
-              <p>{`未設定のLINEアカウント：${unassigned.map((account) => account.displayName || account.name).join('・')}`}</p>
-              <div className={compact.unassignedMenus}>{unassigned.map((account) => <span key={account.id} className={compact.unassignedItem}>
-                <span className={compact.name} title={account.name}>{account.name}</span>{moveMenu(account)}
-              </span>)}</div>
-            </Card> : null}
+            {unassigned.length > 0 ? <div className={compact.unassignedMenus}>{unassigned.map((account) => <DialogContentRow key={account.id} tone="muted">
+                <Grid2X2 size={12} aria-hidden="true" /><span className={compact.name} title={`未設定のLINEアカウント：${account.displayName || account.name}`}>{`未設定のLINEアカウント：${account.displayName || account.name}`}</span>{moveMenu(account)}
+              </DialogContentRow>)}</div> : null}
             {!hierarchyRoots.length && !unassigned.length ? <ListState kind="empty" title="LINEアカウントがありません" /> : null}
           </>}
         </div>

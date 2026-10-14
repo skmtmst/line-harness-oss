@@ -338,6 +338,8 @@
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - チェック・未設定情報の行：同じファイルの `DialogContentRow` に共通 `Checkbox` または名前・操作を渡す。チェック後も行の薄い線を保ち、未設定情報は `tone="muted"` の灰色の面で1行にまとめる。
+  - 公開前の宛先：`shared/dialog-recipient-list.tsx` の `DialogRecipientList` へ実際の名前・役割・共通の通知方法の札を渡す。通常一覧の固定行高を持たず、役割を読めない時は「—」。
   - 作る種類を選ぶ窓：`shared/dialog-choice-cards.tsx` の `DialogChoiceCards` へ名前・説明・行き先を渡す。3列のカードの説明は安全に折り返し、名前は1行、クリック・キーボード・別タブで行き先を開ける。選択を保存するラジオとは分ける。
   - 使用先を示す窓：`shared/dialog-usage-table.tsx` の `DialogUsageTable` へ種類・名前・行き先を渡す。フォルダの丸を出さず、名前の省略と全文確認・外部の行き先の印1つを共通部品で保つ。
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
@@ -381,6 +383,8 @@
 
 <a id="picker-field"></a>
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
+
+- 電話予約で検索した友だちの行は `shared/friend-match-row.tsx` の `FriendMatchRow`。選択の薄い帯、名前/補足、選ぶ/選び直すを1行で持ち、行の内側へ別の選択枠を重ねない。
 
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
 - 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。

@@ -3,7 +3,8 @@ import Toggle from '@/components/shared/toggle';
 
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
-import { Check, CircleCheck, Minus, Plus } from 'lucide-react'
+import { Check, Minus, Plus } from 'lucide-react'
+import FriendMatchRow from '@/components/shared/friend-match-row'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
@@ -197,14 +198,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             {friends.slice(0, 3).map((item) => {
               const selected = friend?.lineUid === item.lineUid
               return (
-                <button key={item.lineUid} type="button" className={styles.friendRow} aria-pressed={selected} onClick={() => choose(selected ? null : item)}>
-                  <span className={styles.friendFace} aria-hidden="true">{item.name.slice(0, 1)}</span>
-                  <span className={styles.friendName}>
-                    <span className={styles.friendNameMain}>{item.name}</span>
-                    <span className={styles.friendNameSub}>{item.phone ? `LINE の友だち・${item.phone}` : 'LINE の友だち'}</span>
-                  </span>
-                  {selected ? <span className={styles.friendPicked}><CircleCheck size={18} aria-hidden="true" />選択中</span> : <span className={styles.friendPick}>選ぶ</span>}
-                </button>
+                <FriendMatchRow key={item.lineUid} name={item.name} selected={selected} inset onSelect={() => choose(selected ? null : item)} description={item.phone ? `LINE の友だち・${item.phone}` : 'LINE の友だち'} />
               )
             })}
           </div>

@@ -905,14 +905,21 @@
             "apps/web/src/components/shared/action-words.ts",
             "apps/web/src/components/shared/dialog-choice-cards.tsx",
             "apps/web/src/components/shared/dialog-choice-cards.module.css",
-            "apps/web/src/components/shared/dialog-usage-table.tsx"
+            "apps/web/src/components/shared/dialog-usage-table.tsx",
+        "apps/web/src/components/shared/dialog-form-row.tsx",
+        "apps/web/src/components/shared/dialog-content-row.module.css",
+        "apps/web/src/components/shared/dialog-recipient-list.tsx",
+        "apps/web/src/components/shared/dialog-recipient-list.module.css"
           ],
           "components": [
             "Dialog",
             "ConfirmDialog",
             "DialogSteps",
             "DialogChoiceCards",
-            "DialogUsageTable"
+            "DialogUsageTable",
+        "DialogFormRow",
+        "DialogContentRow",
+        "DialogRecipientList"
           ],
           "vars": [
             "--radius-panel",
@@ -1062,13 +1069,16 @@
       "owner": {
         "code": {
           "files": [
-            "apps/web/src/components/shared/entity-picker.tsx"
+            "apps/web/src/components/shared/entity-picker.tsx",
+            "apps/web/src/components/shared/friend-match-row.tsx",
+            "apps/web/src/components/shared/friend-match-row.module.css"
           ],
           "components": [
             "EntityPickerSummary",
             "EntityPickerField",
             "HqAccountPickerField",
-            "HqAccountSelectField"
+            "HqAccountSelectField",
+            "FriendMatchRow"
           ],
           "vars": []
         },
