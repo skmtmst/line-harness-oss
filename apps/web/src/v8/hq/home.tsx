@@ -534,8 +534,8 @@ export default function HqHomeV8() {
                     <p className={styles.name} title={name}>
                       <FolderDotName folder={folderDotOf(account)}>{name}</FolderDotName>
                     </p>
-                    {/* B-31：名前の下は1行で省略し、全文は title。 */}
-                    <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
+                    {/* 補足の全文は、共通の省略表示から確認できる。 */}
+                    <p className={styles.meta}><TruncatedText value={metaOf(account)} /></p>
                   </div>
                   <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </div>
@@ -580,7 +580,7 @@ export default function HqHomeV8() {
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
                     <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
-                    <span className={styles.meta}>{metaOf(account)}</span>
+                    <span className={styles.meta}><TruncatedText value={metaOf(account)} /></span>
                   </span>
                 </span>
                 <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
