@@ -3,7 +3,7 @@
 import Toggle from '@/components/shared/toggle'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, CalendarDays, CircleHelp, Columns2, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
+import { Bookmark, CalendarDays, Check, CircleHelp, Columns2, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
 import type { NenCampaignSetting, NenColumn, NenColumnMetrics, NenDeliveryDetail, NenDeliveryList, NenFlowMetrics } from '@/lib/api';
 import { useListItemHref } from '@/components/shared/list-navigation';
 
@@ -511,7 +511,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   if (!canEdit) {
     return (
       <Drawer
-      width="narrow"
+      width="narrow" heightMode="viewport"
         open={open}
         title="誕生日クーポンの決めごと"
         description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
@@ -529,7 +529,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   }
   return (
     <Drawer
-      width="narrow"
+      width="narrow" heightMode="viewport"
       open={open}
       title="誕生日クーポンの決めごと"
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
@@ -538,7 +538,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
       footer={(
         <div className={styles.drawerFoot}>
           <Button type="button" disabled={saving} onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => { if (fields.submit()) onSave() }}>設定を保存する</Button>
+          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => { if (fields.submit()) onSave() }}><Check size={16} aria-hidden />設定を保存する</Button>
         </div>
       )}
     >
