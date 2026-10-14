@@ -3,7 +3,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check, Send } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -344,7 +344,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         designNode="qUdNh"
         designWidth={620}
         designTop={185}
-        confirmIcon={<Check size={15} aria-hidden="true" />}
+        confirmIcon={<Send size={15} aria-hidden="true" />}
         title="変更内容を確認"
         cancelLabel="戻って直す"
         confirmLabel={`変えて ${preview?.total_confirmed ?? 0} 人にお知らせする`}

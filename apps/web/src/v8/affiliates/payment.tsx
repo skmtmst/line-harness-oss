@@ -18,11 +18,10 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import ListPagination from '@/components/shared/list-pagination'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
-import { ListPagePagination } from '@/components/templates'
+import { PAYMENT_SECURITY_NOTICE, PaymentPagination } from './payment-footer'
 import { currentSettlementPeriod, formatDate, formatMonthDay, formatYen, pageCountOf, pageOf, periodText } from './display'
 import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
@@ -441,13 +440,12 @@ export default function PaymentTab() {
   ) : (
     <>
       {table}
+      <p className={styles.footNote}>{PAYMENT_SECURITY_NOTICE}</p>
     </>
   )
 
   const pager = ready ? (
-    <ListPagePagination>
-      <ListPagination total={shown.length} page={currentPage} pageSize={pageSize} unit="人" onPageChange={setPage} />
-    </ListPagePagination>
+    <PaymentPagination total={shown.length} page={currentPage} pageSize={pageSize} pageCount={pageCount} onPageChange={setPage} />
   ) : undefined
 
   const actions = readonly ? undefined : (
@@ -473,7 +471,7 @@ export default function PaymentTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><AffiliateFrame
-      help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
+      help={PAYMENT_SECURITY_NOTICE}
       actions={actions}
       stats={stats}
       toolbar={toolbar}

@@ -363,3 +363,37 @@ test('SL-C03: 日付付き休憩も409では編集を残し、選んだ読み直
   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'最新を読み込んで続ける'}))})
   expect(screen.getByRole('button',{name:'休憩 16:00〜17:00'})).toBeTruthy()
 })
+
+
+test('勤務の5段は共通の見出しを使い、保存の操作と入力の役目を保つ', async () => {
+  render(<StaffShiftsV8 staffId="bs-1" />)
+  await screen.findByRole('button', { name: 'この日を足す' })
+  for (const name of ['いつもの勤務時間', '休憩', 'この日だけ（休み・シフト・休憩）', '何週分かのシフトを作る', 'Google カレンダー']) {
+    const heading = screen.getByRole('heading', { name, exact: true })
+    expect(heading.closest('[data-design-node="t0jk8p"]')).toBeTruthy()
+    expect(heading.closest('section')?.getAttribute('aria-labelledby')).toBe(heading.id)
+  }
+  expect(screen.getAllByRole('button', { name: '保存', exact: true })).toHaveLength(2)
+  expect(screen.getByRole('button', { name: '月〜金 13:00〜14:00 の休憩を削除' }).getAttribute('data-design-node')).toBe('H0V8EK')
+  expect(within(document.querySelector('[aria-labelledby="bks-gen"]') as HTMLElement).getAllByText('必須')).toHaveLength(2)
+  const weeks = screen.getByRole('spinbutton', { name: 'まとめて作る週の数' })
+  expect(weeks.closest('[data-form-row="columns"]')?.getAttribute('data-form-columns')).toBe('2')
+  expect(weeks.getAttribute('min')).toBe('1')
+  expect(weeks.getAttribute('max')).toBe('12')
+  fireEvent.change(weeks, { target: { value: '7' } })
+  expect((weeks as HTMLInputElement).value).toBe('7')
+  const calendar = screen.getByRole('textbox', { name: 'カレンダーのID' })
+  expect(calendar.getAttribute('data-design-node')).toBe('Ume2U')
+  fireEvent.change(calendar, { target: { value: 'calendar@example.invalid' } })
+  expect((calendar as HTMLInputElement).value).toBe('calendar@example.invalid')
+})
+
+
+test('休みを追加する入力列は開いた状態も間隔の見張りの対象', async () => {
+  render(<StaffShiftsV8 staffId="bs-1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'この日を足す' }))
+  fireEvent.click(screen.getByRole('button', { name: '足す種別' }))
+  fireEvent.click(within(await screen.findByRole('option', { name: 'この日だけの休み' })).getByRole('button'))
+  const memo = screen.getByRole('textbox', { name: '休みの理由' })
+  expect(memo.closest('[data-shift-day-entry="closed"]')).not.toBeNull()
+})

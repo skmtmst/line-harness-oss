@@ -50,6 +50,10 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     ] } })
     render(<ReservationsPage />)
     await screen.findByText('山田 太郎')
+    const icons = document.querySelectorAll('[data-kpi-icon] svg')
+    expect(icons).toHaveLength(4)
+    for (const icon of icons) expect(icon.classList.contains('lucide-inbox')).toBe(true)
+    expect(screen.getByRole('button', { name: /電話の予約を入れる/ }).querySelector('svg')?.classList.contains('lucide-phone')).toBe(true)
     const band = await waitFor(() => {
       const found = document.querySelector('[data-closure-day]')
       if (!found) throw new Error('まだ')

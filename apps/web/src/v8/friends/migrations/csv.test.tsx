@@ -45,3 +45,15 @@ test('書き出し直後の保存も同じ認証付き操作へ渡す', () => {
   fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す（2件）' }))
   expect(model.download).toHaveBeenCalledWith('new-export')
 })
+
+
+test('CSVを追加する欄をキー操作でき、閲覧者はファイルを追加できない', () => {
+  const { rerender } = render(<Csv />)
+  const zone = screen.getByRole('button', { name: 'CSVを追加', exact: true })
+  expect(zone.querySelector('button')).toBeNull()
+  const input = zone.querySelector('input')!; const opened = vi.fn(); input.addEventListener('click', opened)
+  fireEvent.keyDown(zone, { key: 'Enter' }); expect(opened).toHaveBeenCalledTimes(1)
+  model.locked = true; rerender(<Csv />)
+  fireEvent.keyDown(zone, { key: 'Enter' }); expect(opened).toHaveBeenCalledTimes(1)
+  expect(zone.getAttribute('aria-disabled')).toBe('true')
+})

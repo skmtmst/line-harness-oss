@@ -6,7 +6,7 @@
  * - 頭：銀行用 CSV…・支払明細をまとめて出す
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AffiliateShell } from '@/v8/affiliates/frame'
 
 const fixture = vi.hoisted(() => ({
@@ -104,6 +104,26 @@ describe('aINnz 支払いタブの絵合わせ', () => {
     expect(head.getByRole('button', { name: '銀行用 CSV…' })).toBeTruthy()
     expect(head.getByRole('button', { name: '支払明細をまとめて出す' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '成果とアフィリエイトの説明' }))
-    expect(screen.getByText(/口座番号は本人だけに表示します/)).toBeTruthy()
+    expect(within(document.querySelector('[data-template-region="heading"]') as HTMLElement).getByText(/口座番号は本人だけに表示します/)).toBeTruthy()
   })
 })
+
+ test('支払いが1ページでも件数と現在地を残し、本文に口座の案内を置く', async () => {
+  const container = renderTab()
+  const pager = await screen.findByRole('navigation', { name: 'ページ送り' })
+  expect(pager.textContent).toContain('2人中 1〜2人')
+  expect(pager.querySelector('[aria-current="page"]')?.textContent).toBe('1')
+  for (const name of ['前のページ', '次のページ']) {
+   const button = screen.getByRole('button', { name }) as HTMLButtonElement
+   expect(button.disabled).toBe(true)
+   expect(button.title).not.toBe('')
+  }
+  expect(container.querySelector('[data-template-region="body"]')?.textContent).toContain('口座番号は本人だけに表示します。')
+ })
+ test('支払いが0件になっても0件のページ送りを残す', async () => {
+  renderTab()
+  await screen.findByRole('navigation', { name: 'ページ送り' })
+  fireEvent.change(screen.getByRole('searchbox', { name: '名前・振込先で探す' }), { target: { value: '一致しない名前' } })
+  await screen.findByText('条件に合うものはありません')
+  expect(screen.getByRole('navigation', { name: 'ページ送り' }).querySelector('[data-pagination-summary]')?.textContent).toBe('0人')
+ })

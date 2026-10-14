@@ -1,7 +1,7 @@
 'use client'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
+import { Check, Globe, HelpCircle, History, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import { TextArea } from '@/components/shared/text-field'
@@ -26,7 +26,7 @@ import { ListPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
 import { DetailColumns } from '@/components/templates/detail-columns'
-import { CreateSummaryCard } from '@/components/templates/create-parts'
+import { PhotoReviewHelp, PublicationRules } from './review-summary'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
@@ -562,16 +562,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   }
 
   const tabLabel = (base: string, count: number) => (!countsReady ? base : hasMorePhotos ? `${base} ${count}+` : `${base} ${count}`)
-  const kpiHelp = (label: string, help: string) => (
-    <button type="button" className={styles.kpiMore} title={help} aria-label={`${label}：${help}`}><MoreHorizontal size={16} aria-hidden="true" /></button>
-  )
+
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId={boardNode(view, status, canEdit)}
       headingSize="regular"
       title="投稿"
-      help="お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。"
+      help={<PhotoReviewHelp pending={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`}
+        adopted={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'}
+        rejected={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} />}
       actions={<Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>}
       tabs={
         <div className={styles.tabs} data-design-node="photo-tabs-v8">
@@ -596,19 +596,15 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <div className={styles.stats}>
             <KpiBand data-design="KPIs" aria-label="投稿の数の帯">
               <KpiCard presentation="band" title="審査待ち" icon={<History size={13} aria-hidden="true" />}
-                menu={kpiHelp('審査待ち', `まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`)}
                 value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚"
                 detail={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
               <KpiCard presentation="band" title="今月 採用" icon={<HelpCircle size={13} aria-hidden="true" />}
-                menu={kpiHelp('今月 採用', hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です')}
                 value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'}
                 detail={policyPoints == null ? '1 枚ごとに —' : `1 枚ごとに ${formatNumber(policyPoints)} マイル`} />
               <KpiCard presentation="band" title="今月 見送り" icon={<HelpCircle size={13} aria-hidden="true" />}
-                menu={kpiHelp('今月 見送り', hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です')}
                 value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'}
                 detail={`理由：${topReason}`} />
               <KpiCard presentation="band" title="公式サイト掲載" icon={<Undo2 size={13} aria-hidden="true" />}
-                menu={kpiHelp('公式サイト掲載', 'いま載っている写真の枚数です')}
                 value={publishedCount} unit={publishedCount == null ? '' : '枚'} detail="いま載っている写真" />
             </KpiBand>
           </div>
@@ -1274,11 +1270,11 @@ function PublicationsV8({
         onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
         <ol>{orderItems?.map((item, index) => <li key={text(item.id)} className={styles.orderRow}>
           <span className={styles.orderName}>{index+1}・{photoPetDisplayName(item.pet_name, { honorific: false })}</span>
-          <span className={styles.orderButtons}><Button disabled={index === 0 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
-          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
+          <span className={styles.orderButtons}><Button disabled={index === 0 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === 0 ? 'これより上には移動できません' : undefined} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
+          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === orderItems.length-1 ? 'これより下には移動できません' : undefined} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
         </li>)}</ol>
       </Dialog>
-      {notice && !withdrawTarget ? <Notice tone="danger" message={notice} /> : null}
+      {notice && !withdrawTarget && !editing && !orderItems ? <Notice tone="danger" message={notice} /> : null}
       {state === 'loading' ? (
         <ListState kind="loading" title="公式サイト掲載中の写真を読み込んでいます" />
       ) : state === 'forbidden' ? (
@@ -1289,9 +1285,7 @@ function PublicationsV8({
         <ListState kind="empty" emptyPreset="readonly" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" />
       ) : (
         <DetailColumns presentation="card" asideLabel="出すときの決めごと" expanded={rulesOpen} onExpandedChange={setRulesOpen}
-          aside={<CreateSummaryCard title="出すときの決めごと" rows={[]} description={<>投稿のときに公開への同意をいただいた写真だけを出します<br />名前は写真ごとに伏せられます<br />公開の期限は設けていません。外す操作をするまで掲載され続けます<br />外しても採用時のマイルは戻りません<br />原本は公開しません。選んだ場所へ公開用画像を出します</>}>
-            {canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void openOrder()} busy={Boolean(busyId)} busyLabel="処理中…">並び順を変える</Button> : null}
-          </CreateSummaryCard>}>
+          aside={<PublicationRules canEdit={canEdit} busy={Boolean(busyId)} onOrder={() => void openOrder()} />}>
           <section data-design-node="photo-pubs-table-v8">
             <div className={styles.tableWrap}>
               <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-field)', padding: '0 var(--polish-space-card)', collapseScope: 'page' }}>

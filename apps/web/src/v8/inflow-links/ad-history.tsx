@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import StatusBadge from '@/components/shared/status-badge'
 import { notifyToast } from '@/components/shared/toast'
 import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from './ad-shared'
@@ -190,7 +191,7 @@ export default function AdHistoryV8() {
             <SaveErrorField names={["status"]}><Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} /></SaveErrorField>
           </span>
           <span className={styles.selectBox}>
-            <SaveErrorField names={["media"]}><Select aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
+            <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" noun="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
           </span>
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>

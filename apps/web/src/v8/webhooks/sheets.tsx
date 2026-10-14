@@ -189,7 +189,7 @@ export default function WebhooksSheetsV8() {
             ) : null}
             {groups.length > 0 ? (
               <>
-                <DataTable aria-label="同期の記録" density="records" columnSizing="content">
+                <DataTable aria-label="同期の記録" columnSizing="content">
                   <thead>
                     <TableHeadRow>
                   <Th>日時</Th>

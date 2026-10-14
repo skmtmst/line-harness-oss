@@ -137,3 +137,17 @@ it('有効化した後は説明をカードに残し、一覧・実行結果・�
  expect(screen.getByRole('link',{name:'実行結果を見る'}).getAttribute('href')).toBe('/auto-replies/runs?id=synthetic-rule')
  expect(screen.getByRole('link',{name:'もう1つ作る'}).getAttribute('href')).toBe('/auto-replies/edit')
 })
+
+it('言葉条件は検索の印、次へは文頭の矢印を持ち、保存して次の手順へ進める', async () => {
+ net.query='id=synthetic-rule&step=trigger'
+ render(<Page/>);await act(async()=>{})
+ const choice=screen.getByRole('radio',{name:/言葉で反応する/}).closest('label')!
+ expect(choice.querySelector('svg.lucide-text-search')).not.toBeNull()
+ const next=screen.getByRole('button',{name:/次へ/})
+ expect(next.firstElementChild?.classList.contains('lucide-arrow-right')).toBe(true)
+ fireEvent.click(screen.getByRole('button',{name:'部分一致（含む）'}))
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'下書きとして保存'})))
+ await act(async()=>fireEvent.click(next))
+ expect(net.query).toContain('step=response')
+ expect(net.saveDraft).toHaveBeenCalled()
+})

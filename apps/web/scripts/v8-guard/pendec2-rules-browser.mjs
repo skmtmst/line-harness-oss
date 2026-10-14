@@ -68,9 +68,19 @@ export default function scanPendec2Rules() {
   }
   for(const card of all(choiceSelector)) {
     const radio=card.querySelector('input[type="radio"]'), r=card.getBoundingClientRect()
-    if(!radio || !visible(radio)) { add('choice-radio',card,{count:1}); continue }
+    if(!radio) { add('choice-radio',card,{count:1}); continue }
     const rr=radio.getBoundingClientRect()
-    if(Math.abs(r.right-rr.right-16)>2 || Math.abs(rr.top-r.top-16)>2) add('choice-radio',card,{excess:Math.ceil(Math.max(Math.abs(r.right-rr.right-16),Math.abs(rr.top-r.top-16)))})
+    if(card.dataset.choiceIndicator==='check') {
+      const checks=[...card.querySelectorAll('[data-choice-check]')].filter(check=>{
+        const box=check.getBoundingClientRect(), c=css(check)
+        return visible(check.parentElement) && box.width>0 && box.height>0 && c.visibility!=='hidden' && +c.opacity>0
+      })
+      if(visible(radio) || checks.length!==(radio.checked && !radio.disabled ? 1 : 0)) add('choice-check',card,{count:1})
+      for(const check of checks) if(css(check).color!=='rgb(8, 122, 62)') add('choice-check-color',card,{count:1})
+    } else {
+      if(!visible(radio)) { add('choice-radio',card,{count:1}); continue }
+      if(Math.abs(r.right-rr.right-16)>2 || Math.abs(rr.top-r.top-16)>2) add('choice-radio',card,{excess:Math.ceil(Math.max(Math.abs(r.right-rr.right-16),Math.abs(rr.top-r.top-16)))})
+    }
     if(radio.checked) { const c=css(card); if(!['rgb(241, 248, 243)','rgb(232, 245, 236)'].includes(c.backgroundColor) || ![c.borderTopColor,c.outlineColor].includes('rgb(8, 122, 62)')) add('choice-color',card,{count:1}) }
   }
   for(const pager of all('[data-pagination],nav[class*="pagination_pagination"]')) {

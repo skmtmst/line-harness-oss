@@ -4,7 +4,7 @@ import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bookmark, CircleDashed, Filter, ArrowRight, MousePointerClick, Send } from 'lucide-react';
+import { ArrowRight, Bookmark, CircleDashed, Filter, MousePointerClick, Send } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -98,7 +98,7 @@ function updatedText(search: SavedSearch): string {
   return `${who}・${day}`
 }
 
-export default function SearchesTab({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
+export default function SearchesTab({ accountId, canEdit, explanation = false }: { accountId: string | null; canEdit: boolean; explanation?: boolean }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [items, setItems] = useState<SavedSearch[]>([])
@@ -403,7 +403,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td className={styles.searchColOpen}>
                   {search.lineAccountId ? (
                     <Button href={`/friends?savedSearch=${search.id}`} aria-label={`「${search.name}」で友だち一覧を開く`}>
-                      <ArrowRight size={15} aria-hidden="true" />友だち一覧へ
+                      <ArrowRight size={16} aria-hidden="true" />友だち一覧へ
                     </Button>
                   ) : null}
                 </Td>
@@ -450,6 +450,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       <ListPageBody
         skeleton
+        explanation={explanation ? '友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。' : undefined}
         listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
           <ListToolbarSearchSlot>

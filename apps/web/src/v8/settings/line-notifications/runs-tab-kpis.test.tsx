@@ -44,4 +44,7 @@ test('ページだけから数えたと書き、メールで送ったは数え�
   await waitFor(() => expect(screen.getByText(/このページの2件から・対応不要/)).toBeTruthy())
   expect(screen.queryByText('この7日')).toBeNull()
   expect(screen.getByText('お知らせの記録で見られます')).toBeTruthy()
+  const blocked = screen.getByText('ブロック').closest('[data-kpi-presentation]')
+  expect(blocked).not.toBeNull()
+  expect(blocked!.querySelector('svg.lucide-user-x')).not.toBeNull()
 })

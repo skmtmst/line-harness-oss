@@ -9,7 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
-import { ListPage } from '@/components/templates'
+import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -20,6 +20,7 @@ import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -333,6 +334,7 @@ export default function WebhooksInteractionsV8() {
           options={[{ value: '7', label: 'この7日' }, { value: '30', label: 'この30日' }, { value: '90', label: 'この90日' }]}
         /></SaveErrorField>
       </div>
+      <SaveErrorField names={["limit"]}><PageSizeSelect value={limit} onChange={(value) => { setLimit(value); setPage(1) }} label={null} /></SaveErrorField>
       {/* 閲覧のみには押せない「まとめてやり直す」を置かない。 */}
       {canRetry ? (
         <Button
@@ -430,22 +432,10 @@ export default function WebhooksInteractionsV8() {
     )
   }
 
-  /* ページ送りは表のすぐ下・注はその下（絵 Uv9AA）。型の pagination 枠は本文の後ろに来るので、本文の中に置く。 */
   const pager = loaded && data.total > 0 ? (
-    <div className={styles.pagerRow}>
-      <span className={styles.pagerLead}>
-        <span className={styles.pagerCount}>{`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`}</span>
-        <span className={styles.smallSelect}>
-          <SaveErrorField names={["limit"]}><Select
-            aria-label="1ページに出す件数"
-            value={String(limit)}
-            onChange={(value) => { setLimit(Number(value)); setPage(1) }}
-            options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
-          /></SaveErrorField>
-        </span>
-      </span>
-      <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} ariaLabel="やり取りの記録のページ送り" />
-    </div>
+    <ListPagePagination>
+      <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} ariaLabel="やり取りの記録のページ送り" range={{ total: data.total, first: rangeFirst, last: rangeLast }} />
+    </ListPagePagination>
   ) : null
 
   return (
@@ -470,6 +460,7 @@ export default function WebhooksInteractionsV8() {
           trailing={trailing}
         />
       </>}
+      pagination={pager}
       overlays={<>
         {selected ? (
           <InteractionDialog
@@ -500,7 +491,6 @@ export default function WebhooksInteractionsV8() {
       </>}
     >
       {listBody}
-      {pager}
 
     </ListPage>
   )

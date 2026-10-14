@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck, SlidersHorizontal, RotateCcw, Trash2 } from 'lucide-react'
+import { RotateCcw, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import FormDocumentRetention from '@/components/shared/form-document-retention'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -35,6 +35,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
+const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
 /* 板の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -190,8 +191,8 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
-      explanation={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
+        {SAFETY_NOTICE}
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -223,11 +224,8 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
-      explanation={DESCRIPTION}>
-
-
-      <Notice tone="info" icon={<ShieldCheck size={16} aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
+        {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
 

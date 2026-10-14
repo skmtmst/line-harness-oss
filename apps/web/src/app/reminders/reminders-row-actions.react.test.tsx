@@ -123,14 +123,14 @@ describe('リマインダ一覧の行操作', () => {
     expect(menu!.textContent).toContain('削除')
   })
 
-  it('メニューの「削除」は確認の窓を出し、詳細へは移動しない', async () => {
+  it('メニューの「削除する」は確認の窓を出し、詳細へは移動しない', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
     const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const item = [...document.querySelectorAll('[role="menuitem"]')]
-      .find((el) => el.textContent === '削除') as HTMLButtonElement
+      .find((el) => el.textContent === '削除する') as HTMLButtonElement
     await act(async () => { item.click() })
     await flush()
     // 削除の確認が出る（確認の窓は body 直下の portal）。行の詳細遷移（router.push）は動かない。
@@ -145,7 +145,7 @@ describe('リマインダ一覧の行操作', () => {
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const item = [...document.querySelectorAll('[role="menuitem"]')]
-      .find((el) => el.textContent === '削除') as HTMLButtonElement
+      .find((el) => el.textContent === '削除する') as HTMLButtonElement
     await act(async () => { item.click() })
     await flush()
     const confirm = [...document.body.querySelectorAll('button')]

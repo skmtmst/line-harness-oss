@@ -196,8 +196,10 @@ describe('V8 ウェビナーの編集', () => {
     const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
     expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
-    expect(stats?.textContent).toContain('フォーム送信?9人')
-    expect(stats?.textContent).not.toContain('フォーム送信?9件')
+    const metric = [...(stats?.querySelectorAll('[data-kpi-presentation]') ?? [])].find(item => item.querySelector('[data-kpi-label]')?.textContent === 'フォーム送信')
+    expect(metric?.querySelector('[data-kpi-number]')?.textContent).toBe('9')
+    expect(metric?.textContent).toContain('9人')
+    expect(metric?.textContent).not.toContain('9件')
   })
 
   it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {

@@ -684,22 +684,22 @@ function Overview({
       <KpiBand density="compact">
         {isSent ? (
           <>
-            <KpiCard title="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} icon={null} presentation="band" />
-            <KpiCard title="開いた" value={insightReady ? opened : null} unit="人" detail={waiting ?? `開封 ${rateText(openRate)}`} icon={null} presentation="band" />
-            <KpiCard title="押した" value={insightReady ? insight?.uniqueClick ?? null : null} unit="人" detail={waiting ?? `クリック ${rateText(insight?.clickRate)}`} icon={null} presentation="band" />
+            <KpiCard title="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} presentation="band" />
+            <KpiCard title="開いた" value={insightReady ? opened : null} unit="人" detail={waiting ?? `開封 ${rateText(openRate)}`} presentation="band" />
+            <KpiCard title="押した" value={insightReady ? insight?.uniqueClick ?? null : null} unit="人" detail={waiting ?? `クリック ${rateText(insight?.clickRate)}`} presentation="band" />
             {/* ブロックは単独では取れない。届かなかった数（送信失敗を含む）を出し、内訳は下の「エラー」に書く。 */}
-            <KpiCard title="ブロック" value={failedCount} unit="人" detail={rateText(total > 0 ? failedCount / total : null)} icon={null} presentation="band" />
+            <KpiCard title="ブロック" value={failedCount} unit="人" detail={rateText(total > 0 ? failedCount / total : null)} presentation="band" />
           </>
         ) : (
           <>
             <KpiCard title="送信"
               value={broadcast.successCount}
               unit="件"
-              detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'} icon={null} presentation="band"
+              detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'} presentation="band"
             />
-            <KpiCard title="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" icon={null} presentation="band" />
-            <KpiCard title="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} icon={null} presentation="band" />
-            <KpiCard title="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} icon={null} presentation="band" />
+            <KpiCard title="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" presentation="band" />
+            <KpiCard title="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} presentation="band" />
+            <KpiCard title="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} presentation="band" />
           </>
         )}
       </KpiBand>
