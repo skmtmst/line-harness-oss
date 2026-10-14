@@ -1,6 +1,7 @@
 'use client'
 
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
+import { CircleCheck, Users } from 'lucide-react'
 
 /**
  * 予約設定の右欄に出す「お客さまの予約画面」の写し（★V8 `owaS3` 右のスマホ）。
@@ -174,13 +175,13 @@ export function LiffPhoneStaffStep({
         {designationFree && (
           <div className={`${styles.phoneCard} ${styles.phoneCardPicked}`}>
             <span className={`${styles.phoneAvatar} ${styles.phoneAvatarPlain}`} aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10" cy="7" r="3.2"/><path d="M4 16.5c1.2-3 3.4-4.5 6-4.5s4.8 1.5 6 4.5"/></svg>
+              <Users size={20} aria-hidden="true" />
             </span>
             <span className={styles.phoneCardBody}>
               <span className={styles.phoneCardName}>指名なし</span>
               <span className={styles.phoneCardDesc}>いちばん早く空いている人</span>
             </span>
-            <svg className={styles.phoneCardCheck} width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M5.5 10.4 8.7 13.6 14.5 6.8" fill="none" stroke="var(--color-canvas)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <CircleCheck className={styles.phoneCardCheck} size={20} aria-hidden="true" />
           </div>
         )}
         {shown.length === 0 && !designationFree ? (
