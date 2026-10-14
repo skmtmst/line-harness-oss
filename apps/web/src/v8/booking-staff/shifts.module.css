@@ -172,7 +172,6 @@
 
 .exEdit { display: flex; align-items: center; gap: var(--tpl-bks-row-gap); padding-bottom: var(--tpl-bks-row-gap); }
 
-button
 .dayAdd {
   display: flex;
   flex-wrap: wrap;

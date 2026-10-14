@@ -387,3 +387,13 @@ test('勤務の5段は共通の見出しを使い、保存の操作と入力の�
   fireEvent.change(calendar, { target: { value: 'calendar@example.invalid' } })
   expect((calendar as HTMLInputElement).value).toBe('calendar@example.invalid')
 })
+
+
+test('休みを追加する入力列は開いた状態も間隔の見張りの対象', async () => {
+  render(<StaffShiftsV8 staffId="bs-1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'この日を足す' }))
+  fireEvent.click(screen.getByRole('button', { name: '足す種別' }))
+  fireEvent.click(within(await screen.findByRole('option', { name: 'この日だけの休み' })).getByRole('button'))
+  const memo = screen.getByRole('textbox', { name: '休みの理由' })
+  expect(memo.closest('[data-shift-day-entry="closed"]')).not.toBeNull()
+})

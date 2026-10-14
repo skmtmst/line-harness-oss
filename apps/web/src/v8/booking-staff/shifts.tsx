@@ -1289,7 +1289,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 )
               })}
               {dayAddOpen && canEdit ? (
-                <div className={styles.dayAdd}>
+                <div className={styles.dayAdd} data-shift-day-entry={dayAddKind}>
                   <span className={styles.kindBox}>
                     <SaveErrorField names={["dayAddKind","day_add_kind"]}><Select
                       aria-label="足す種別"
