@@ -149,7 +149,8 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(regular).toEqual(expect.arrayContaining(['編集する', '実行結果を見る', '止める', '保管する']))
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     const sink = await openMenu('経路が分からなかった人')
-    expect(sink).toContain('止める')
+    expect(sink).toContain('止められない理由を見る')
+    expect(sink).not.toContain('止める')
     expect(sink).not.toContain('保管する')
   })
 

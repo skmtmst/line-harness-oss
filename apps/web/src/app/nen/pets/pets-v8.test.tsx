@@ -93,7 +93,7 @@ describe('マイペット V8', () => {
     const { container } = render(<PetsPageV8 accountId="account-a" tab="feeding" onChangeTab={() => undefined} />)
     await screen.findByText('主食（お客さまが選ぶ、ふだんのごはん）')
     expect(container.querySelector('[data-design-node="h7A2F"]')).toBeTruthy()
-    expect(screen.getByText('今日の目安の計算')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '今日の目安の計算' })).toBeTruthy()
     expect(screen.getByText('安静時エネルギー')).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
   })

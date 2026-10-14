@@ -26,3 +26,18 @@ it('枠を外した入力段へ箱用の余白を追加せず、枠のある箱�
   expect(cards[0].hasAttribute('data-card-unframed')).toBe(true)
   expect(cards[1].hasAttribute('data-card-unframed')).toBe(false)
 })
+
+it.each([undefined, 'natural'] as const)('横のカードは指定された高さの揃え方を保つ（%s）', cardHeight => {
+  const frames: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => { frames.push(cb); return frames.length })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const naturalHeight = this.textContent === '短文' ? 80 : 100
+    const height = Math.max(naturalHeight, parseFloat(this.style.minHeight) || 0)
+    return { top: 0, left: 0, right: 200, bottom: height, x: 0, y: 0, width: 200, height, toJSON() {} }
+  })
+  const { container } = render(<div data-card-height={cardHeight} style={{ display: 'grid' }}><Card>短文</Card><Card>長い内容</Card></div>)
+  frames.splice(0).forEach(cb => cb(0))
+  const cards = container.querySelectorAll<HTMLElement>('[data-design-part="card"]')
+  expect([...cards].map(card => card.style.minHeight)).toEqual(cardHeight === 'natural' ? ['', ''] : ['100px', '100px'])
+})

@@ -13,7 +13,7 @@ import { RowNameLink } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Users, Timer, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -439,13 +439,13 @@ export default function AutoReplyRunsV8() {
 
       <div className={styles.kpis}>
       <KpiBand data-design="KPIs">
-        <KpiCard presentation="band" icon={null} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
+        <KpiCard presentation="band" icon={<MessageSquare size={14} aria-hidden="true" />} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
           detail={`累計 ${data ? formatNumber(data.summary.totalHits) : emptyValue('unknown')}回`} />
-        <KpiCard presentation="band" icon={null} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
+        <KpiCard presentation="band" icon={<Users size={14} aria-hidden="true" />} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
           detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
-        <KpiCard presentation="band" icon={null} title="失敗した処理" value={data ? failedCount : null} unit="件"
+        <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗した処理" value={data ? failedCount : null} unit="件"
           detail={failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です'} />
-        <KpiCard presentation="band" icon={null} title="平均で返すまで"
+        <KpiCard presentation="band" icon={<Timer size={14} aria-hidden="true" />} title="平均で返すまで"
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
           detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>

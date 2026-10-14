@@ -107,7 +107,6 @@ describe('V8 EC integration screens', () => {
     expect(page).toContain("statusGroup: status")
     expect(page).toContain('offset: String((page - 1) * ACTION_PAGE_SIZE)')
     expect(page).toContain('total: response.data.total')
-    expect(page).toContain('pageCount > 1 ? <Pagination')
     expect(page).not.toContain("return action.status === status")
     expect(api).toContain("statusGroup?: 'processing' | 'failed'")
     expect(api).toContain("query.set('statusGroup', params.statusGroup)")

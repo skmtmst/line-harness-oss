@@ -48,7 +48,7 @@ export default function StatusView({
       </span>
     ) : tone === 'muted' ? (
       <span
-        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-chip text-liff-idle"
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-chip text-ink-secondary"
         aria-hidden="true"
       >
         <Icon name={icon} className="h-9 w-9" />

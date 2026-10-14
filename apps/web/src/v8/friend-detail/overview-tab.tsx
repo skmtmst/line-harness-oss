@@ -115,14 +115,15 @@ export default function OverviewTab({
           state={data.fieldsStatus === 'error' ? 'error' : data.fieldsStatus === 'ready' ? 'ready' : 'loading'}
           onRetry={() => void data.loadFields()}
           canEdit={perms.saveFields}
+          actionWording
           hiddenPersonalCount={data.hiddenPersonalCount}
           sections={[
-            { key: 'support', label: '対応', action: perms.editSupport ? <button type="button" className={styles.groupLink} onClick={onEditSupport}>編集</button> : null, content: <><dl className={styles.kvList}>
+            { key: 'support', label: '対応', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={onEditSupport}>編集</Button> : null, content: <><dl className={styles.kvList}>
             <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
             <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
             <Kv label="最後の連絡">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : emptyValue('unknown')}</Kv>
           </dl></> },
-            { key: 'tags', label: 'タグ', action: perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集</Link> : null, content: <><div className={styles.tags}>
+            { key: 'tags', label: 'タグ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><div className={styles.tags}>
             {friend.tags?.length
               ? <TagOverflow maxVisible={2}>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
               : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
@@ -153,7 +154,7 @@ export default function OverviewTab({
                 : emptyValue('unknown')}
             </p>
           )}</> },
-            { key: 'memo', label: 'メモ', action: perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集</Link> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
+            { key: 'memo', label: 'メモ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
           more={<div className={styles.more}>
             {starred.length > 0 ? (
               <section className={styles.group} aria-label="★つき友だち情報">

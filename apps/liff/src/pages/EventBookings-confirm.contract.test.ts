@@ -1,6 +1,17 @@
+// @vitest-environment happy-dom
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { createElement, type ReactNode } from 'react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import EventBookings from './EventBookings.js';
+
+const calls = vi.hoisted(() => ({ read: vi.fn(), cancel: vi.fn(), leave: vi.fn() }));
+vi.mock('../lib/api.js', () => ({ api: { myEventBookings: calls.read, cancelMyEventBooking: calls.cancel, cancelMyEventWaitlist: calls.leave } }));
+vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 /**
  * イベント予約の取り消し確認を、ブラウザの `confirm()` から
@@ -65,13 +76,26 @@ describe('イベント予約の取り消し確認', () => {
     expect(page).toContain('setPendingCancel(b)');
   });
 
-  it('題は日時＋行事の問いかけで、ボタンは「閉じる」と取り消し', () => {
-    expect(page).toContain('をキャンセルしますか');
-    expect(page).toContain('cancelLabel="閉じる"');
-    expect(page).toContain('confirmLabel="キャンセルする"');
-    expect(page).toContain('destructive');
-    expect(page).toContain('キャンセル待ちの方へ順番に案内されます');
-    expect(page).toContain('前日を過ぎるとここからは変えられません');
+  it('題は日時＋行事の問いかけで、閉じると送らず、取り消しを確認して予約IDだけ送る', async () => {
+    const booking = { id: 'booking-confirm', event_id: 'event-confirm', source: 'booking', status: 'confirmed', event_name: '撮影会', slot_starts_at: '2099-10-20T10:00:00Z', slot_ends_at: '2099-10-20T11:00:00Z', cancel_deadline_hours_before: 24 };
+    calls.read.mockResolvedValue({ items: [booking] });
+    calls.cancel.mockResolvedValue({ ok: true });
+    render(createElement(MemoryRouter, null, createElement(EventBookings)));
+    fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
+    const confirmation = screen.getByRole('alertdialog');
+    expect(confirmation.getAttribute('aria-label')).toBe('10/20 19:00 の撮影会をキャンセルしますか');
+    expect(within(confirmation).getByText('10/20 19:00 の撮影会をキャンセルしますか')).toBeTruthy();
+    expect(within(confirmation).getByText(/キャンセル待ちの方へ順番に案内されます/)).toBeTruthy();
+    expect(within(confirmation).getByText(/前日を過ぎるとここからは変えられません/)).toBeTruthy();
+    expect(within(confirmation).getByRole('button', { name: 'キャンセルする' })).toBeTruthy();
+    fireEvent.click(within(confirmation).getByRole('button', { name: '閉じる' }));
+    expect(calls.cancel).not.toHaveBeenCalled();
+    expect(calls.leave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセルする' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
+    await waitFor(() => expect(calls.cancel).toHaveBeenCalledWith('booking-confirm'));
+    expect(calls.cancel).toHaveBeenCalledTimes(1);
+    expect(calls.leave).not.toHaveBeenCalled();
   });
 
   it('取り消しの確認窓に V8 の板の印 nUYyb を付けている', () => {

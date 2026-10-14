@@ -164,6 +164,15 @@ export default function QuickSendV8({
     && estimate !== null
     && (!needsCountConfirmation || countMatched)
     && !busy
+  const sendDisabledReason = !text.trim() ? '送る本文を入力してください。'
+    : text.length > TEXT_LIMIT ? `本文は${TEXT_LIMIT}文字以内で入力してください。`
+      : target !== 'all' && !tagId ? '送る相手のタグを選んでください。'
+        : when !== 'now' && !scheduledValue ? '送る日時を選んでください。'
+          : needsApproval && !approverId ? '承認を頼む相手を選んでください。'
+            : approvalConfig === null ? error ? '配信の承認設定を確認できません。もう一度開き直してください。' : '配信の承認設定を確認しています。'
+              : estimate === null ? error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
+                : needsCountConfirmation && !countMatched ? '確認した対象人数を入力してください。'
+                  : busy ? '送っています。完了までお待ちください。' : undefined
 
   /** 差し込む：今のカーソルの位置に {{name}} を入れる（送るときに名前へ置き換わる形。{名前} は置き換わらずに届いていた）。 */
   const insertName = () => {
@@ -272,7 +281,7 @@ export default function QuickSendV8({
           </Link>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} busy={busy} busyLabel="送っています…">
+          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} title={!canSend ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
             <Send size={15} aria-hidden="true" />{sendLabel}
           </Button>
           <span className={styles.spacer} aria-hidden="true" />

@@ -160,7 +160,6 @@ function FriendDetailV8Inner() {
         titleAccessory={status ? <StatusBadge tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
         actions={<><span className={styles.menuAnchor}>
           <RowMenu
-            className={styles.square}
             label="その他の操作"
             menuLabel="関連する画面を開く"
             items={secondaryActions}

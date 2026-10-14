@@ -560,7 +560,7 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
 
     await loadAllPages()
 
-    expect(host.textContent).toContain('201 件中')
+    expect(host.querySelector('[data-pagination-summary]')?.textContent?.replace(/\s/g, '')).toContain('201件中')
     const search = host.querySelector('input[type="search"]') as HTMLInputElement
     await act(async () => { fireEvent.change(search, { target: { value: '参加者 201' } }) })
     await new Promise((resolve) => setTimeout(resolve, 350))

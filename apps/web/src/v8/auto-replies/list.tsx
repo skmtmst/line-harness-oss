@@ -50,7 +50,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -1543,7 +1543,7 @@ export default function AutoRepliesListV8() {
         designNode="i8F12"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        designWidth={480}
         designTop={280}
         footerAlign="center"
         titleIcon={false}
@@ -1587,7 +1587,8 @@ export default function AutoRepliesListV8() {
         designNode="u8sKN"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        footerAlign="start"
+        designWidth={480}
         designTop={280}
         onCancel={() => {
           if (deleting) return
@@ -1595,7 +1596,7 @@ export default function AutoRepliesListV8() {
           setPendingDelete(null)
         }}
         footer={
-          <div className={styles.deleteFooter}>
+          <DialogActions>
             <Button
               type="button"
               variant="danger"
@@ -1606,7 +1607,6 @@ export default function AutoRepliesListV8() {
             >
               削除する
             </Button>
-            <div className={styles.deleteAlternatives}>
               <Button
                 type="button"
                 variant="secondary"
@@ -1630,8 +1630,7 @@ export default function AutoRepliesListV8() {
                   代わりに止める
                 </Button>
               ) : null}
-            </div>
-          </div>
+          </DialogActions>
         }
       >
         <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />

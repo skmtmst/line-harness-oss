@@ -20,7 +20,7 @@ import { notifyToast } from './toast'
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
-  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0,
+  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false,
 }: {
   friendId: string
   profile?: { name: string | null; pictureUrl?: string | null; addedAt: string }
@@ -31,6 +31,7 @@ export default function CustomerInfoPanel({
   sections: CustomerInfoSection[]
   more?: ReactNode
   extraSections?: CustomerInfoSection[]
+  actionWording?: boolean
   hiddenPersonalCount?: number
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -79,7 +80,7 @@ export default function CustomerInfoPanel({
     {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
       <div className={styles.head}>
         <h3>基本</h3>
-        {canEdit && state === 'ready' && !editing ? <Button variant="text" size="inline" onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
+        {canEdit && state === 'ready' && !editing ? <Button variant="text" size="inline" actionWording={actionWording} onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
       </div>
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>

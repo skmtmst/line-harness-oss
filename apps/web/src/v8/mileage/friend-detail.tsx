@@ -1,4 +1,5 @@
 'use client'
+import { mileageAssignee as assignee } from './display'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import { formatListDateTime } from '@/lib/format'
@@ -96,13 +97,6 @@ const KIND_PILL: Record<Kind, { text: string; tone: 'active' | 'neutral' | 'warn
   voided: { text: '取り消し', tone: 'warn' },
 }
 
-function assignee(item: MileageDetailHistoryItem): string {
-  if (item.mode === 'manual') {
-    return item.restricted ? '権限の外側の記録' : item.executedByStaffName ?? '実行者は未取得'
-  }
-  if (item.entryType === 'spend') return '本人'
-  return '自動'
-}
 
 function FriendDetailInner() {
   const searchParams = useSearchParams()
@@ -405,7 +399,8 @@ function FriendDetailInner() {
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="確定待ち" value={pendingMiles} unit="マイル"
             detail={historyPartial
               ? `最新${formatNumber(displayedHistory.length)} 件のうち ${pendingItems.length} 件が確定待ち`
-              : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち` : '確定待ちはありません'} />
+              : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち`
+                : pendingMiles > 0 ? '確定待ちの残高があります。明細を確認してください' : '確定待ちはありません'} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
             detail={<span title={rewardedActions === null ? '付与記録の回数は未取得' : `${formatNumber(rewardedActions)} 回の付与記録`}>{monthComplete
               ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
