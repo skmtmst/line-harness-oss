@@ -16,10 +16,10 @@ export function FlowEditor({ flow, name, draft, readOnly, busy, onChange, onSave
   onChange: (draft: FlowDraft) => void; onSave: () => void
 }) {
   return <FormSection id={`followup-${flow.id}`} title={name}>
-    <Field label="タイトル"><SaveErrorField names={["title"]}>
+    <Field label="タイトル" fill><SaveErrorField names={["title"]}>
       <TextField value={draft.title} onChange={event => onChange({ ...draft, title: event.target.value })} readOnly={readOnly} disabled={busy} />
     </SaveErrorField></Field>
-    <Field label="本文"><SaveErrorField names={["body"]}>
+    <Field label="本文" fill><SaveErrorField names={["body"]}>
       <TextArea value={draft.body} onChange={event => onChange({ ...draft, body: event.target.value })} readOnly={readOnly} disabled={busy} />
     </SaveErrorField></Field>
     {readOnly ? null : <Button disabled={busy} busy={busy} onClick={onSave}>下書きを保存する</Button>}
