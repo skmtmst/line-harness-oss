@@ -54,7 +54,9 @@ tags: [memory, core]
 
 ## 進行中（2026-10-14）
 
-- measure2・L16は列車36本線d12a5a3565のmerge途中から再開しf900a27277で両側の機能/検査/記録を保持して完了。YXrF6保存/l4qsT取込の印を正のButtonへ追加。関連61/型/lintエラー0/長さ0/新規ソース固定0成功。B-295で撮影/左右/点/候補更新は撮影係へ、次は2仲間の3幅崩れだけ。Pen/G画面/親EC/migration/DB/配備/push/PRなし、コミットまで。詳細docs/qa/measure2-l-review-return-1014.md。下のL15は前回。
+- measure2・L17は共通ページ送り/タブの2束で区切り。製品464099b1f6、本線d12包含、直接7板。ListPaginationの3接続/HistoryPager/DetailHead→Tabs、1ページ/0件/未知総数/詳細→設定の履歴を保持。関連223＋接続3/履歴18/空16/戻り21（重複）・型/lintエラー0/本番ビルド/写真なし最終24幅の崩れ/横/操作/更新0。aIN1152通常/閲覧の既存F10各1を保持。保護175板332中331取得・35板1736差/欠測cFo2p1440/終了2、初回と全差一致・追加0。今回4板CVz5d/hadfk/usDpO/z2dgwと他31を分け、鍵は司令塔へ。予想5/6=83.3%、下限12.66分/直接板、枠待ちで速さ改善なし。Pen/候補/正式追加/親EC/migration/DB/配備/push/PRなし、コミットまで。詳細docs/qa/measure2-l-pagination-tabs-1014.md、外部L17/RESULT。次は鍵照合/撮影→残る一覧接続。下のL16は回収済み。
+
+- measure2・L16の中断検査はL17再開時に回収済み。e32の本番ビルド/60幅は57取得、gBrCz-edit1152は同SHA/scannerの別1幅で復旧、MJoJR3幅の型なしを保持。layout/横/例外/更新0、h1G4dの一般表の旧密度F2=30を保持。YXrF6保存Check/l4qsT取込Downloadの関連61/型/lint/長さは既存成功を再利用。撮影/左右/点/候補は0。新L17の証拠へ付替えず、詳細docs/qa/measure2-l-review-return-1014.mdと外部L16/FINAL-RECOVERY-SUMMARY。
 
 - measure2・L15は4b4f866734の続きから、卓の詳細の固定幅/空の高さと台帳の月の名前を修正中。b8252707a6、本線7a910b56cf包含、開始未コミット0/doctor合格。月の新しい形は追加指定で台帳だけ使い、未指定の盤は保持。関連37と追加範囲28（重複あり）/故障5/見張り関連45/型/lint/長さ/新規ソース/型新規0が成功。製品はコミット済み・クリーン。19場面3幅の2仲間と窓/別表示/左右/鍵は重い枠待ちで未実施、候補/正式追加0。前回の合格と検査/46板の原因表は保持。Pen/G画面/親EC/push/PR/migration/DB/配備なし。詳細docs/qa/measure2-l-reading-1014.mdと外部L15。下のL14は前回。
 

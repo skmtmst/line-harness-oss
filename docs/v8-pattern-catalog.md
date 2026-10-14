@@ -287,9 +287,10 @@
 ## pagination ページ送り
 
 - **役目**：ページを送り、10・20・50件を切り替える
-- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/list-pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`ListPagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
 - **持ち主（Pen）**：`jX2Uw`「ページ送り」
   - 注：PageSizeSelect は shared が持つ（B-172）。
+  - 手元に全件がある一覧は `ListPagination` へ total/page/pageSize/unit を渡す。範囲とページ数を部品が決め、1ページ・0件でも枠を残す。カーソル式や総数未取得は既存の `Pagination`／`CursorPagination` を使う。
 - **見つけ方（コード）**：
   - own-size：`\b(const|let)\s+\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\w*\s*=` — 件数の定数を画面ごとに持つ
   - own-range-text：`summary`／`pagerSummary` で件数文を組む — `Pagination.range` へ総数・先頭・末尾・単位だけを渡す（L組差し戻しB）。
