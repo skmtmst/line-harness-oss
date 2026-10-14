@@ -6,7 +6,7 @@ import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ExternalLink } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { validateFlexContent } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
@@ -17,7 +17,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { DataTable, Td, Tr } from '@/components/shared/table'
+import { DataTable, NameCell, Td, Tr } from '@/components/shared/table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
@@ -590,10 +590,10 @@ export default function TemplateDetailV8() {
           }}><tbody>{usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
             <Tr key={row.key} data-table-layout="columns">
               <Td style={{ flex: '0 0 var(--tpl-eds-kind-w)' }}><TruncatedText value={row.kind} /></Td>
-              <Td grow><TruncatedText value={String(row.name ?? '')} /></Td>
+              <NameCell grow name={String(row.name ?? '')} />
               <Td>
               {row.href
-                ? <TextLink external href={row.href}>開いて差し替える</TextLink>
+                ? <Button variant="text" external href={row.href}>開いて差し替える<ArrowUpRight size={12} aria-hidden="true" /></Button>
                 : <span className={styles.dialogState}>開ける画面がありません</span>}
               </Td>
             </Tr>
