@@ -747,7 +747,7 @@ const EmergencyControlV8 = (
         open={confirmMode !== null}
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
-        tone="default"
+        tone="default" contentLayout="form"
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
           ? '止める前に、何と何人に関わるかを実測で確かめました。'
