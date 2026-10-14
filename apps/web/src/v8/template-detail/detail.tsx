@@ -15,6 +15,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
 import Dialog from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
@@ -589,12 +590,10 @@ export default function TemplateDetailV8() {
       </Dialog>
 
       {/* 使っていないときの削除の確認（V6JFnd）。 */}
-      <ConfirmDialog
+      <TemplateDeleteDialog
         open={deleteOpen && usageCount === 0}
         title={`テンプレート「${template.name}」を削除しますか？`}
         description={templateDeleteDescription(usageCount)}
-        confirmLabel="削除する"
-        destructive
         busy={deleting}
         error={deleteError}
         onConfirm={() => remove()}
@@ -603,7 +602,6 @@ export default function TemplateDetailV8() {
           setDeleteOpen(false)
           setDeleteError('')
         }}
-        designNode="V6JFnd"
       />
 
       <ConfirmDialog

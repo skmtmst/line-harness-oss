@@ -593,7 +593,7 @@ function ReminderDetailV8() {
         actions={(
           <>
             <Button onClick={() => setConfirmPause(false)} disabled={pausing}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void runPause()} disabled={pausing} busy={pausing} busyLabel="止めています…">
+            <Button widthReserve="idle" variant="primary" onClick={() => void runPause()} disabled={pausing} busy={pausing} busyLabel="止めています…">
               <Pause size={15} aria-hidden="true" />一時停止する
             </Button>
           </>

@@ -213,6 +213,7 @@ export default function ReferencePickerDialog({
           <Button
             variant="primary"
             disabled={picks.length === 0}
+            disabledReason={picks.length === 0 ? '使う画像を選んでください。' : undefined}
             onClick={() => onPick(picks, pickedImages.map(({ image }) => image))}
           >
             <Check aria-hidden="true" className="h-4 w-4" />

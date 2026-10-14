@@ -1540,7 +1540,7 @@ export default function AutoRepliesListV8() {
         }
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
-        designNode="i8F12"
+        designNode="i8F12" actionWidthReserve="idle"
         confirmation
         designLayout="stacked"
         designWidth={480}
