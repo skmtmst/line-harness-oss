@@ -84,6 +84,8 @@ export type DialogProps = {
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
   confirmDisabledReason?: string
+  actionWidthReserve?: 'states' | 'idle'
+  confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
   /** 実行中の文字。Buttonのbusyへ渡す。 */
@@ -158,6 +160,8 @@ export default function Dialog({
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
   confirmDisabledReason,
+  actionWidthReserve,
+  confirmPlacement,
   onConfirm,
   onCancel,
   children,
@@ -274,6 +278,7 @@ export default function Dialog({
       data-size={size}
       data-design-layout={designLayout}
       data-confirm-first={confirmFirst || undefined}
+      data-confirm-placement={confirmPlacement}
       data-layout={layout}
       data-description-band={descriptionBand}
       data-footer-align={footerAlign}
@@ -329,6 +334,7 @@ export default function Dialog({
             data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
             variant={primaryAction === 'cancel' ? 'primary' : undefined}
             className={styles.designButton}
+            widthReserve={actionWidthReserve}
             ref={primaryAction === 'cancel' ? cancelRef : undefined}
             onClick={discard.requestClose}
             disabled={busy}
@@ -340,6 +346,7 @@ export default function Dialog({
             data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
+            widthReserve={actionWidthReserve}
             onClick={runConfirm}
             disabled={busy || confirmDisabled} title={confirmDisabled ? confirmDisabledReason : undefined} busy={busy} busyLabel={busyLabel}>
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}

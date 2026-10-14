@@ -1,9 +1,34 @@
-export function scanDialogActions({ align, leadingAction, descriptionGap = false } = {}) {
+export function scanDialogActions({ align, leadingAction, descriptionGap = false, naturalWidth = false, confirmPlacement } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const findings = [], inventory = []
   const visible = el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0
   const actions = panel.querySelector('[data-dialog-actions]')
+  if (naturalWidth || confirmPlacement) {
+    if (!actions) findings.push({ pattern: 'F9', kind: 'dialog-actions-missing' })
+    else {
+      const buttons = [...actions.querySelectorAll('button')].filter(visible)
+      if (naturalWidth) for (const button of buttons) {
+        const actual = button.getBoundingClientRect().width
+        const sample = button.cloneNode(true)
+        sample.removeAttribute('id')
+        sample.setAttribute('aria-hidden', 'true')
+        sample.style.cssText = 'position:absolute;visibility:hidden;width:max-content;min-width:0;max-width:none;flex:none;pointer-events:none'
+        actions.append(sample)
+        const expected = sample.getBoundingClientRect().width
+        sample.remove()
+        inventory.push({ kind: 'dialog-action-width', label: button.innerText.trim(), actual, expected })
+        if (Math.abs(actual - expected) > 1) findings.push({ pattern: 'F6', kind: 'dialog-action-width', label: button.innerText.trim(), actual, expected })
+      }
+      if (confirmPlacement === 'start') {
+        const box = actions.getBoundingClientRect(), css = getComputedStyle(actions)
+        const left = box.left + parseFloat(css.paddingLeft), right = box.right - parseFloat(css.paddingRight)
+        const cancel = buttons[0]?.getBoundingClientRect(), confirm = buttons[1]?.getBoundingClientRect()
+        if (!cancel || !confirm || Math.abs(confirm.left - left) > 1 || Math.abs((cancel.left + cancel.right - left - right) / 2) > 1)
+          findings.push({ pattern: 'F9', kind: 'dialog-delete-cancel-placement' })
+      }
+    }
+  }
   if (align || leadingAction) {
     const buttons = actions ? [...actions.querySelectorAll('button')].filter(visible) : []
     if (!buttons.length) findings.push({ pattern: 'F9', kind: 'dialog-actions-missing' })

@@ -43,6 +43,19 @@ for (const width of [1152, 1440, 1920]) {
       await page.locator('.actionLead').evaluate(el => el.style.marginRight = '0')
       await page.waitForFunction(() => document.querySelector('.actions').getBoundingClientRect().right - [...document.querySelectorAll('.actions button')].at(-1).getBoundingClientRect().right > 10)
       assert.equal((await page.evaluate(scanDialogActions, { leadingAction: '一覧から外す' })).findings.length, 1)
+      await page.locator('.actionLead').evaluate(el => el.remove())
+      await page.locator('.panel').evaluate(el => { el.dataset.confirmPlacement = 'start' })
+      const deletion = { naturalWidth: true, confirmPlacement: 'start' }
+      const normalDelete = await page.evaluate(scanDialogActions, deletion)
+      assert.equal(normalDelete.findings.length, 0, JSON.stringify(normalDelete))
+      await page.locator('.actions > button').last().evaluate(el => { el.style.width = '300px' })
+      const wide = await page.evaluate(scanDialogActions, deletion)
+      assert.equal(wide.findings.filter(x => x.kind === 'dialog-action-width').length, 1)
+      await page.locator('.actions > button').last().evaluate(el => { el.style.width = '' })
+      await page.locator('.panel').evaluate(el => { delete el.dataset.confirmPlacement })
+      assert.equal((await page.evaluate(scanDialogActions, deletion)).findings.filter(x => x.kind === 'dialog-delete-cancel-placement').length, 1)
+      await page.locator('.panel').evaluate(el => { el.dataset.confirmPlacement = 'start' })
+      assert.equal((await page.evaluate(scanDialogActions, deletion)).findings.length, 0)
     } finally { await browser.close() }
   })
 }
