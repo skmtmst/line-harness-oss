@@ -13,7 +13,8 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
+import CheckCard from '@/components/shared/check-card'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -451,7 +452,6 @@ export default function MenuFormV8() {
   usePageCrumbs([
     { label: '予約', href: '/booking/bookings' },
     { label: '予約設定', href: '/booking/menus' },
-    { label: editTarget ? 'メニューを直す' : 'メニューを作る' },
   ])
 
   function toggleAssigned(id: string) {
@@ -890,10 +890,6 @@ export default function MenuFormV8() {
         ? '変更を保存する'
         : '保存して公開'
 
-  const checkMark = (
-    <svg width="10" height="8" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 4l2.5 2.5L9 1" /></svg>
-  )
-
   const previewContent = <>
           <div className={shell.sideActions}>
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
@@ -1027,7 +1023,7 @@ export default function MenuFormV8() {
 
               </Field>
               <Field label="金額" help="空なら、お客さまにはお問い合わせと出します">
-                <SaveErrorField names={["basePrice","base_price"]}><AffixedTextField startAdornment="¥"
+                <SaveErrorField names={["basePrice","base_price"]}><AffixedTextField layout="field" startAdornment="¥"
                   type="number"
                   min={0}
                   value={basePrice}
@@ -1037,7 +1033,7 @@ export default function MenuFormV8() {
                 /></SaveErrorField>
               </Field>
               <Field label="予約したときのマイル" optional={false} help="お店全体の設定で決まります" note={<TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink>}>
-              <SaveErrorField names={["bookingMileage","booking_mileage"]}><AffixedTextField
+              <SaveErrorField names={["bookingMileage","booking_mileage"]}><AffixedTextField layout="field"
                   readOnly endAdornment="マイル"
                   value={
                     mileageStatus === 'loading' ? '…'
@@ -1081,26 +1077,19 @@ export default function MenuFormV8() {
               </p>
             ) : (
               <>
-                <div className={styles.staffRow} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
+                <SettingsFormRow layout="columns" columns={3} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
                     // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
                     const label = `${person.display_name || person.name}${person.role && person.role !== 'トリマー' ? `（${person.role}）` : ''}`
                     return (
-                      <button
-                        key={person.id}
-                        type="button"
-                        aria-pressed={on}
-                        title={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined}
-                        className={`${styles.staffChip} ${on ? styles.staffChipOn : ''}`}
-                        onClick={() => toggleAssigned(person.id)}
-                      >
-                        <span className={styles.chipBox} aria-hidden="true">{checkMark}</span>
-                        {label}
-                      </button>
+                      <CheckCard key={person.id} size="row" checked={on}
+                        invalid={!!fieldErrors.staff && assigned.size === 0}
+                        title={<span title={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined}>{label}</span>}
+                        onChange={() => toggleAssigned(person.id)} />
                     )
                   })}
-                </div>
+                </SettingsFormRow>
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
@@ -1265,17 +1254,11 @@ export default function MenuFormV8() {
                   {resourceChoices.map((item) => {
                     const on = resourceIds.has(item.id)
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        aria-pressed={on}
+                      <Checkbox key={item.id} checked={on}
                         disabled={Boolean(editTarget && (!canManageResources || resourceSaving || saving || !item.isActive && !on))}
-                        className={`${styles.check} ${on ? styles.checkOn : ''}`}
-                        onClick={() => toggleResource(item.id)}
-                      >
-                        <span className={styles.checkBox} aria-hidden="true">{checkMark}</span>
+                        onCheckedChange={() => toggleResource(item.id)}>
                         {item.name}{!item.isActive ? '（停止中）' : ''}
-                      </button>
+                      </Checkbox>
                     )
                   })}
                 </div>

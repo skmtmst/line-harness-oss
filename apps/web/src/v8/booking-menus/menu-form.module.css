@@ -130,62 +130,6 @@
   white-space: nowrap;
 }
 
-/* ===== 担当スタッフ（3つ並ぶ選ぶ札） ===== */
-
-.staffRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-bm-8);
-}
-
-.staffChip {
-  display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  gap: var(--tpl-bm-10);
-  min-width: 0;
-  padding: var(--tpl-bm-8) var(--tpl-bm-12);
-  border: 0;
-  outline: 1px solid var(--color-hairline);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  line-height: var(--tpl-bm-19);
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.staffChipOn {
-  outline: var(--tpl-bm-2) solid var(--color-accent);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  background: var(--color-success-bg);
-}
-
-.chipBox {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-bm-16);
-  height: var(--tpl-bm-16);
-  border-radius: var(--radius-mini);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  background: var(--color-canvas);
-  color: transparent;
-}
-
-.staffChipOn .chipBox,
-.checkOn .checkBox {
-  outline-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-canvas);
-}
-
 /* 文字・間・トグル（行の高さはトグルの20）。 */
 .toggleLine {
   display: flex;
@@ -316,34 +260,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-bm-24);
-}
-
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bm-8);
-  /* 全体のボタンの最低の高さ（32）を受けない。絵 QqER7 の行は 20。 */
-  min-height: var(--tpl-bm-20);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  line-height: var(--tpl-bm-20);
-  cursor: pointer;
-}
-
-.checkBox {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-bm-18);
-  height: var(--tpl-bm-18);
-  border-radius: var(--radius-mini);
-  outline: var(--tpl-bm-2) solid var(--color-control-border);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  background: var(--color-canvas);
-  color: transparent;
 }
 
 /* お支払い（準備中）。 */

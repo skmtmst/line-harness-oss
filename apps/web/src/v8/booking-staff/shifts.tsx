@@ -13,7 +13,10 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import IconButton from '@/components/shared/icon-button'
+import StatusBadge from '@/components/shared/status-badge'
+import Card, { CardHeader } from '@/components/shared/card'
+import { TextField } from '@/components/shared/text-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -1140,10 +1143,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           <fieldset className={styles.fieldset}>
             {/* いつもの勤務時間 */}
             <Card variant="form" gap="normal" aria-labelledby="bks-week" data-design="Week"><fieldset disabled={savingRules} className={styles.fieldset}>
-              <div className={layout.cardHead}>
-                <h2 id="bks-week" className={layout.cardTitle}>いつもの勤務時間</h2>
-                {canEdit ? <Button onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>保存</Button> : null}
-              </div>
+              <CardHeader size="stacked" titleId="bks-week" title="いつもの勤務時間" action={canEdit ? <Button onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>保存</Button> : undefined} />
               <p className={layout.cardNote}>曜日ごとの出勤時間です。空けた曜日は枠が出ません。日ごとのシフトがある日はそちらが優先されます。</p>
               {STAFF_DAYS.map((day) => {
                 const row = draft[day.weekday] ?? EMPTY_RULE_DRAFT
@@ -1173,25 +1173,20 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
             {/* 休憩 */}
             <Card variant="form" gap="normal" aria-labelledby="bks-breaks" data-design="Breaks"><fieldset disabled={savingBreaks} className={styles.fieldset}>
-              <div className={layout.cardHead}>
-                <h2 id="bks-breaks" className={layout.cardTitle}>休憩</h2>
-                {canEdit ? <Button onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>保存</Button> : null}
-              </div>
+              <CardHeader size="stacked" titleId="bks-breaks" title="休憩" action={canEdit ? <Button onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>保存</Button> : undefined} />
               <p className={layout.cardNote}>いつもの勤務時間の中の休み時間です。休憩の時間は予約枠から除きます。</p>
               {breakGroups.length === 0 ? <p className={layout.cardNote}>休憩はありません。</p> : breakGroups.map((group) => (
                 <div key={group.key} className={styles.breakRow}>
                   <span className={styles.daysPick}>
                     {canEdit ? <>
-                    <button
-                      type="button"
-                      className={styles.daysButton}
+                    <Button variant="text" size="compact" textTone="ink"
                       aria-expanded={openDaysFor === group.key}
                       aria-label={`休憩の曜日（${weekdaySetLabel(group.weekdays)}）を選ぶ`}
                       title="押すと曜日を選べます"
                       onClick={() => setOpenDaysFor((current) => (current === group.key ? null : group.key))}
                     >
                       {weekdaySetLabel(group.weekdays)}
-                    </button>
+                    </Button>
                     {openDaysFor === group.key ? (
                       <span className={styles.daysPanel} role="group" aria-label="休憩の曜日">
                         {STAFF_DAYS.map((day, saveFieldIndex) => (
@@ -1213,14 +1208,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   <span className={styles.tilde}>〜</span>
                   {timeBox('休憩の終わり', group.end, (v) => updateBreakGroup(group.key, { end: v }))}
                   {canEdit ? (
-                    <button
-                      type="button"
-                      className={styles.iconButton}
+                    <IconButton
                       onClick={() => setBreakGroups((current) => current.filter((item) => item.key !== group.key))}
                       aria-label={`${weekdaySetLabel(group.weekdays)} ${group.start}〜${group.end} の休憩を削除`}
                     >
-                      <Trash2 className={styles.icon} aria-hidden="true" />
-                    </button>
+                      <Trash2 aria-hidden="true" />
+                    </IconButton>
                   ) : null}
                 </div>
               ))}
@@ -1236,7 +1229,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
             {/* この日だけ（休み・シフト・休憩） */}
             <Card variant="form" gap="normal" aria-labelledby="bks-days" data-design="Special"><fieldset disabled={savingShift || dayAddBusy || deleting} className={styles.fieldset}>
-              <div className={layout.cardHead}><h2 id="bks-days" className={layout.cardTitle}>この日だけ（休み・シフト・休憩）</h2></div>
+              <CardHeader size="stacked" titleId="bks-days" title="この日だけ（休み・シフト・休憩）" />
               <p className={layout.cardNote}>その日だけ休む・時間を変える・休憩を足すときに使います。いつもの勤務時間より優先されます。</p>
               {dayRows.length === 0 ? (
                 <p className={layout.cardNote}>この日だけの休み・シフト・休憩はありません。いつもの勤務時間どおりに枠が出ます。</p>
@@ -1249,33 +1242,30 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                     <div className={styles.exLine}>
                       <span className={styles.exDate}>{shortDay(row.date)}</span>
                       {row.kind === 'exception' ? (
-                        <span className={styles.pill} data-tone="off"><span className={styles.pillDot} aria-hidden="true" />{exceptionBadge(row.item)}</span>
+                        <StatusBadge tone="neutral">{exceptionBadge(row.item)}</StatusBadge>
                       ) : !canEdit ? (
                         // 閲覧のみ：押して直す口は置かず、時間だけを見せる。
-                        <span className={styles.pill} data-tone={row.kind === 'shift' ? 'on' : 'break'}>
-                          <span className={styles.pillDot} aria-hidden="true" />
+                        <StatusBadge tone={row.kind === 'shift' ? 'success' : 'info'}>
                           {row.kind === 'shift' ? `${row.item.start_time}〜${row.item.end_time}` : `休憩 ${row.item.start}〜${row.item.end}`}
-                        </span>
+                        </StatusBadge>
                       ) : (
-                        <button
-                          type="button"
-                          className={styles.pill}
-                          data-tone={row.kind === 'shift' ? 'on' : 'break'}
+                        <Button variant="text" size="compact" textTone="ink"
                           onClick={() => setEditingDayRow(isEditing ? null : rowKey)}
                           aria-expanded={isEditing}
                           title={row.kind === 'shift' ? '押すとこの日の時間を直せます' : '押すとこの日の休憩の時間を直せます'}
                         >
-                          <span className={styles.pillDot} aria-hidden="true" />
+                          <StatusBadge tone={row.kind === 'shift' ? 'success' : 'info'}>
                           {row.kind === 'shift'
                             ? `${shiftRows[row.item.id]?.start ?? row.item.start_time}〜${shiftRows[row.item.id]?.end ?? row.item.end_time}`
                             : `休憩 ${row.item.start}〜${row.item.end}`}
-                        </button>
+                          </StatusBadge>
+                        </Button>
                       )}
                       <span className={styles.exMemo}>{row.kind === 'exception' ? (row.item.reason ?? '') : ''}</span>
                       {canEdit ? (
-                        <button type="button" className={styles.iconButton} onClick={() => setRemoveTarget(row)} aria-label={`${shortDay(row.date)} の${kindLabel}を削除`}>
-                          <Trash2 className={styles.icon} aria-hidden="true" />
-                        </button>
+                        <IconButton onClick={() => setRemoveTarget(row)} aria-label={`${shortDay(row.date)} の${kindLabel}を削除`}>
+                          <Trash2 aria-hidden="true" />
+                        </IconButton>
                       ) : null}
                     </div>
                     {isEditing && row.kind === 'shift' ? (
@@ -1319,7 +1309,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       {timeBox('この日の終わり', dayAddEnd, setDayAddEnd)}
                     </>
                   ) : (
-                    <SaveErrorField names={["dayAddMemo","reason","day_add_memo"]}><input type="text" value={dayAddMemo} onChange={(e) => setDayAddMemo(e.target.value)} placeholder="理由（任意・例：研修のため）" aria-label="休みの理由" className={`${layout.input} ${styles.memo}`} /></SaveErrorField>
+                    <SaveErrorField names={["dayAddMemo","reason","day_add_memo"]}><TextField type="text" value={dayAddMemo} onChange={(e) => setDayAddMemo(e.target.value)} placeholder="理由（任意・例：研修のため）" aria-label="休みの理由" className={styles.memo} /></SaveErrorField>
                   )}
                   <Button variant="primary" onClick={() => void addDayEntry()} disabled={dayAddBusy || savingShift} busy={dayAddBusy}>足す</Button>
                 </div>
@@ -1335,14 +1325,11 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
             {/* 何週分かのシフトを作る（作るための欄だけなので、閲覧のみには出さない） */}
             {canEdit ? <Card variant="form" gap="normal" aria-labelledby="bks-gen">
-              <div className={layout.cardHead}><h2 id="bks-gen" className={layout.cardTitle}>何週分かのシフトを作る</h2></div>
+              <CardHeader size="stacked" titleId="bks-gen" title="何週分かのシフトを作る" />
               <p className={layout.cardNote}>いつもの勤務時間から、日ごとのシフトをまとめて作ります。作ったあと1日ずつ直せます。</p>
               <div className={styles.genRow}>
-                <div className={layout.field}>
-                  <span className={layout.label}>開始日</span>
-                  <span className={styles.dateBox}><SaveErrorField names={["genFrom","from_date","gen_from"]}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></SaveErrorField></span>
-                </div>
-                <div className={layout.field}><Field label="週の数（1〜12）" htmlFor="bks-weeks"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} /></SaveErrorField></Field></div>
+                <Field required label="開始日"><span className={styles.dateBox}><SaveErrorField names={["genFrom","from_date","gen_from"]}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></SaveErrorField></span></Field>
+                <div className={layout.field}><Field required label="週の数（1〜12）" htmlFor="bks-weeks"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} /></SaveErrorField></Field></div>
                 {canEdit ? (
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">
                     <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る
@@ -1355,13 +1342,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
             {/* Google カレンダー */}
             <Card variant="form" gap="normal" aria-labelledby="bks-cal">
-              <div className={layout.cardHead}><h2 id="bks-cal" className={layout.cardTitle}>Google カレンダー</h2></div>
+              <CardHeader size="stacked" titleId="bks-cal" title="Google カレンダー" />
               <p className={layout.cardNote}>{isSelf
                 ? 'あなたの Google カレンダーの予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。'
                 : '予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。ほかの予約サービスがこのカレンダーへ書き出せば、そちらの予約でも自動で枠が埋まります。'}</p>
               {!serviceConfigured ? <p className={layout.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p> : null}
               <div className={styles.calRow}>
-                <div className={`${layout.field} ${styles.calField}`}><Field label="カレンダーの ID" htmlFor="bks-cal-id"><SaveErrorField names={["calendarInput","calendarId","calendar_input","calendar_id"]}><input
+                <div className={`${layout.field} ${styles.calField}`}><Field label="カレンダーの ID" htmlFor="bks-cal-id"><SaveErrorField names={["calendarInput","calendarId","calendar_input","calendar_id"]}><TextField
                     id="bks-cal-id"
                     aria-label="カレンダーのID"
                     value={calendarId ? (calendarInput || calendarId) : calendarInput}
@@ -1371,9 +1358,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                     }}
                     placeholder="例：example@example.invalid"
                     readOnly={!canEdit}
-                    className={layout.input}
                   /></SaveErrorField></Field></div>
-                {calendarId ? <span className={styles.pill} data-tone="on"><span className={styles.pillDot} aria-hidden="true" />つながっている</span> : null}
+                {calendarId ? <StatusBadge tone="success">つながっている</StatusBadge> : null}
               </div>
               {calendarId ? (
                 <p className={styles.calMeta}>

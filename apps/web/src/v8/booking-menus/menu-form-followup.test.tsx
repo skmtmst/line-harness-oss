@@ -9,7 +9,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const nav = vi.hoisted(() => ({ menu: null as string | null, push: vi.fn() }))
+const nav = vi.hoisted(() => ({ menu: null as string | null, push: vi.fn(), crumbs: [] as unknown[] }))
 const net = vi.hoisted(() => ({
   createMenu: vi.fn(), updateMenu: vi.fn(), putStaffMenus: vi.fn(), saveMenuResources: vi.fn(),
   menus: [] as unknown[],
@@ -21,7 +21,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/booking/menus/new',
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', selectedAccount: null }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: (crumbs: unknown[]) => { nav.crumbs = crumbs } }))
 vi.mock('./lib/edit-permission', () => ({ useBookingEdit: () => true }))
 vi.mock('@/lib/use-feature-access', () => ({ usePermissionAccess: () => true }))
 vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn(), notifySaved: vi.fn() }))
@@ -73,7 +73,7 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
     render(<MenuFormV8 />)
     await settle()
     fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カット' } })
-    fireEvent.click(screen.getByRole('button', { name: /高田/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /高田/ }))
     const publish = () => screen.getAllByRole('button').find((b) => b.className.includes('primary') || b.textContent?.includes('公開')) as HTMLButtonElement
     await act(async () => { publish().click() })
     await settle()
@@ -95,7 +95,7 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
     net.saveMenuResources.mockResolvedValue({ data: { version: 5 } })
     render(<MenuFormV8 />)
     await settle()
-    fireEvent.click(screen.getByRole('button', { name: /台1/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /台1/ }))
     await act(async () => { screen.getByRole('button', { name: /変更を保存する/ }).click() })
     await settle()
     expect(net.saveMenuResources).toHaveBeenCalledWith('a', 'm1', expect.objectContaining({ resources: [] }))
@@ -131,8 +131,36 @@ it('担当の一覧に新しいメニューがまだなくても、割当を明�
   render(<MenuFormV8 />)
   await settle()
   fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {target: {value: 'カット'}})
-  fireEvent.click(screen.getByRole('button', {name: /高田/}))
+  fireEvent.click(screen.getByRole('checkbox', {name: /高田/}))
   fireEvent.click(screen.getByRole('button', {name: '保存して公開'}))
   await settle()
   expect(net.putStaffMenus).toHaveBeenCalledWith('a', 's1', expect.arrayContaining([expect.objectContaining({menu_id: 'new-1', is_offered: true})]))
+})
+
+
+it('担当と設備を本物のチェックで選び、選択と解除を独立して保持する', async () => {
+  render(<MenuFormV8 />)
+  await settle()
+  const staff = screen.getByRole('checkbox', { name: '高田', exact: true }) as HTMLInputElement
+  const resource = screen.getByRole('checkbox', { name: '台1', exact: true }) as HTMLInputElement
+  expect(staff.checked).toBe(false)
+  expect(resource.checked).toBe(false)
+  fireEvent.click(staff)
+  fireEvent.click(resource)
+  expect(staff.checked).toBe(true)
+  expect(resource.checked).toBe(true)
+  fireEvent.click(staff)
+  expect(staff.checked).toBe(false)
+  expect(resource.checked).toBe(true)
+  fireEvent.click(resource)
+  expect(resource.checked).toBe(false)
+})
+
+it('作成の道順は親のリンクだけを渡し、現在地を共通の題へ任せる', async () => {
+  render(<MenuFormV8 />)
+  await settle()
+  expect(nav.crumbs).toEqual([
+    { label: '予約', href: '/booking/bookings' },
+    { label: '予約設定', href: '/booking/menus' },
+  ])
 })
