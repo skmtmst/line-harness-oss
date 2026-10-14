@@ -1,4 +1,5 @@
 'use client'
+import { localJst, toJstIso } from './video-time'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
@@ -11,7 +12,6 @@ const b244Requirements = {
 }
 
 
-import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
@@ -54,15 +54,6 @@ const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 /** JST の「10/8（木）20:00」。 */
 function shortJst(iso: string): string {
   return polishFormatDate(iso, { style: 'list', fallback: '—' })
-}
-/** datetime-local の字面を JST で（`2026-10-01T10:00`）。 */
-function localJst(value: string | null | undefined): string {
-  if (!value) return ''
-  const time = Date.parse(value)
-  return Number.isNaN(time) ? '' : new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
-}
-function toJstIso(local: string): string {
-  return datetimeLocalJstToUtcIso(local)
 }
 
 function ruleView(rule: WebinarScheduleRule): { kind: string; tone: 'success' | 'neutral' | 'warn'; detail: string } {

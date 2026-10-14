@@ -17,34 +17,14 @@ import Button from './ui/Button.js';
  */
 export type SlotPick = { date: string; start: string; startUtc?: string; timeZone?: string };
 
-/** 日時を選ぶ段の見せ方。'list' が週5日の並び (M2p63S)、'calendar' が月の表 (k3aJKU)。 */
-export type DateView = 'list' | 'calendar';
+import { storedView, rememberView, type DateView } from './date-view-storage.js';
+export type { DateView } from './date-view-storage.js';
 
-const VIEW_STORAGE_KEY = 'liff-booking-date-view';
 /** 週の並びは5日ぶんずつ。送ると次の5日へ。 */
 const WEEK_DAYS = 5;
 /** 空き枠の口は28日までしか受けないので、月ぶんは割って呼ぶ。 */
 const CHUNK_DAYS = 28;
 const WEEKDAY_JP = '日月火水木金土';
-
-/** 端末に覚えた見せ方。読めないときは黙って null（設定の値に戻る）。 */
-function storedView(): DateView | null {
-  try {
-    const value = window.localStorage.getItem(VIEW_STORAGE_KEY);
-    return value === 'list' || value === 'calendar' ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-/** 切り替えた見せ方を端末に覚える。書けないときは黙って諦める。 */
-function rememberView(view: DateView): void {
-  try {
-    window.localStorage.setItem(VIEW_STORAGE_KEY, view);
-  } catch {
-    /* 書けない端末では次回も設定の値で開く */
-  }
-}
 
 function monthOf(date: string): string {
   return date.slice(0, 7);

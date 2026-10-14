@@ -5,7 +5,6 @@ const b244Requirements = {
   rule_name: requiredText("設定名を入力してください。"),
 }
 
-import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { SaveConflictBand } from '@/components/shared/save-conflict';

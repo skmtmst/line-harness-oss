@@ -14,27 +14,13 @@ import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
-/** 札の文字は設計どおり (★V8 y1bs9A：申し込み済み・キャンセル待ち…)。意味は今の状態名のまま変えない。 */
-const statusMeta: Record<string, { text: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
-  confirmed: { text: '申し込み済み', tone: 'confirmed' },
-  waitlisted: { text: 'キャンセル待ち', tone: 'pending' },
-  requested: { text: '承認待ち', tone: 'pending' },
-  rejected: { text: '見送り', tone: 'neutral' },
-  cancelled: { text: 'キャンセル', tone: 'neutral' },
-  expired: { text: '期限切れ', tone: 'neutral' },
-  attended: { text: '参加済', tone: 'neutral' },
-  no_show: { text: '不参加', tone: 'neutral' },
-};
+import { statusMeta, canLeaveWaitlist } from './event-bookings-policy.js';
 
 function canCancel(b: EventBookingMine): boolean {
   if (b.status !== 'requested' && b.status !== 'confirmed') return false;
   if (b.cancel_deadline_hours_before == null) return false;
   const deadlineMs = new Date(b.slot_starts_at).getTime() - b.cancel_deadline_hours_before * 3600_000;
   return deadlineMs > Date.now();
-}
-
-function canLeaveWaitlist(b: EventBookingMine): boolean {
-  return b.source === 'waitlist' && (b.status === 'waitlisted' || b.status === 'waiting' || b.status === 'offered');
 }
 
 /**

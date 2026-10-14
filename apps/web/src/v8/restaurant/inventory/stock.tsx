@@ -1,4 +1,5 @@
 'use client'
+import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, BookOpen, Check, Trash2 } from 'lucide-react'
@@ -45,25 +46,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
  */
 
-type Alloc = { ota: number; line: number; walkin: number }
-type Hours = RestaurantOpeningDay[]
-
-type SlotInfo = {
-  row: RestaurantInventory
-  time: string
-  seats: number
-  tables: RestaurantTable[]
-  free: number
-  ratio: number
-}
-
-type Conflict = {
-  who: string
-  at: string
-  scope: string
-  attemptedAlloc: Alloc | null
-  attemptedHours: Hours | null
-}
 
 const allocOf = (row: RestaurantInventory | undefined): Alloc =>
   row ? { ota: row.ota_capacity, line: row.line_capacity, walkin: row.walk_in_capacity } : { ota: 0, line: 0, walkin: 0 }

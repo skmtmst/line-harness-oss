@@ -1,4 +1,5 @@
 'use client'
+import { ACTION_STATUS, FAILURE_KIND_LABEL } from './execution-status'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -18,7 +19,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -27,9 +27,7 @@ import {
   fetchApi,
   type EcActionExecution,
   type EcActionExecutionList,
-  type EcActionExecutionStatus,
   type EcCommerceOverview,
-  type EcFailureKind,
   type EcOrder,
 } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -38,7 +36,7 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import EcConnector from './connector'
 import EcSubscriptions from './subscriptions'
 import { Tabs } from '@/components/shared/tabs'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
@@ -66,26 +64,6 @@ const TABS: ReadonlyArray<{ key: EcTabKey; label: string; href: string }> = [
   { key: 'connector', label: 'つなぎ先', href: '/ec-commerce?tab=connector' },
 ]
 
-/* 失敗・見送りの分類（app/ec-commerce/ec-failure.ts の写し。表示語だけ）。 */
-const FAILURE_KIND_LABEL: Record<EcFailureKind, string> = {
-  unlinked: '未連携',
-  not_following: 'フォロー外',
-  permission: '権限・認証',
-  communication: '通信の失敗',
-  rejected: '送信の拒否',
-  by_setting: '設定で停止',
-  internal: '処理の失敗',
-}
-
-type StatusTone = StatusBadgeTone
-const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: StatusTone }> = {
-  pending: { label: '処理中', tone: 'info' },
-  processing: { label: '処理中', tone: 'info' },
-  succeeded: { label: '処理完了', tone: 'success' },
-  skipped: { label: '送信なし', tone: 'neutral' },
-  retryable_failed: { label: '失敗', tone: 'danger' },
-  permanent_failed: { label: '失敗', tone: 'danger' },
-}
 
 /* 「したこと」列。worker が実際に行う処理を運用の言葉で書く（今の画面と同じ）。 */
 const ACTION_LABEL: Record<string, string> = {

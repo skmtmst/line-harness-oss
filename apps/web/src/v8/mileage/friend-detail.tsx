@@ -1,4 +1,5 @@
 'use client'
+import { mileageAssignee as assignee } from './display'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import { formatListDateTime } from '@/lib/format'
@@ -96,13 +97,6 @@ const KIND_PILL: Record<Kind, { text: string; tone: 'active' | 'neutral' | 'warn
   voided: { text: '取り消し', tone: 'warn' },
 }
 
-function assignee(item: MileageDetailHistoryItem): string {
-  if (item.mode === 'manual') {
-    return item.restricted ? '権限の外側の記録' : item.executedByStaffName ?? '実行者は未取得'
-  }
-  if (item.entryType === 'spend') return '本人'
-  return '自動'
-}
 
 function FriendDetailInner() {
   const searchParams = useSearchParams()
