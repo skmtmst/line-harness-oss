@@ -9,6 +9,24 @@ import { assessAgainstBase, measurePage, record, validateAllowances } from './la
 const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8');
 const actions=()=>readFileSync(new URL('../../src/components/shared/action-list.module.css',import.meta.url),'utf8');
 const row='<div class="item" data-action-row><div class="row"><span class="icon">◆</span><div class="details"><button class="titleButton" data-action-name>本人にLINEで知らせる</button><div class="extra" data-action-value>成果1件ごとに</div></div><button aria-label="その他操作">…</button></div></div>';
+
+test('名前の行の右端は共通選択の外枠で測り、外枠が縮む故障を検出する', async () => {
+ const css = readFileSync(new URL('../../src/components/shared/entity-picker.module.css', import.meta.url), 'utf8')
+ const browser = await chromium.launch()
+ try {
+  const page = await browser.newPage()
+  for (const width of [1152, 1440, 1920]) {
+   await page.setViewportSize({width, height:900})
+   await page.setContent(`<style>${globals.replace(/@theme\s*\{/g, ':root {')}${css}*{box-sizing:border-box}</style><div data-theme="v8"><main><div data-form-row="name-folder" style="display:grid;grid-template-columns:1fr 200px;gap:16px;width:600px"><div>名前</div><div><div class="field" data-entity-picker-field><button class="fieldTrigger" aria-haspopup="dialog">分類</button><span class="fieldValue">分類なし</span></div></div></div></main></div>`)
+   const defects = () => page.evaluate(scanFormRules).then(rows => rows.filter(row => row.kind === 'form-row-end'))
+   const inset = await page.locator('[data-entity-picker-field]').evaluate(el => el.getBoundingClientRect().right - el.querySelector('button').getBoundingClientRect().right)
+   assert.equal(inset, 1, '共通枠のborderの内側にある操作を測ると1pxになる')
+   assert.equal((await defects()).length, 0)
+   await page.addStyleTag({content:'[data-entity-picker-field]{width:calc(100% - 10px)}'})
+   assert.equal((await defects()).length, 1, '外枠の不足は許可せず検出する')
+  }
+ } finally { await browser.close() }
+})
 const html=css=>`<style>${globals}${css}</style><div data-theme="v8"><main style="width:650px"><section data-page-template="create">${row}</section></main></div>`;
 test('Y1 実物の行CSSで名前と値は同じ文字サイズで隣り合い、広い名前枠へ戻す故障を落とす',async()=>{
  const browser=await chromium.launch();try{const page=await browser.newPage();await page.setContent(html(actions()));const good=await page.evaluate(scanCreateConsistency);assert.equal(good.counts.Y1,0,JSON.stringify(good.rows));

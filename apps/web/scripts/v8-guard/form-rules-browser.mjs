@@ -79,7 +79,8 @@ export default function scanFormRules() {
     const last = row.lastElementChild
     const controls = [...last.querySelectorAll('input:not([type="hidden"]),button[aria-haspopup]')].filter(visible)
     for (const control of controls) {
-      const delta = row.getBoundingClientRect().right - control.getBoundingClientRect().right
+      const boundary = control.closest('[data-entity-picker-field]') ?? control
+      const delta = row.getBoundingClientRect().right - boundary.getBoundingClientRect().right
       if (Math.abs(delta) > 1 / 64) add('form-row-end', control, '並んだ最後の欄を行の右端へそろえる', { delta: Math.abs(delta) })
     }
   }
