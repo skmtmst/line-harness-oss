@@ -151,6 +151,17 @@ describe('R94 編集画面の常設導線', () => {
   })
 })
 
+it('詳細タブから設定へ戻っても履歴を増やさない', async () => {
+  await act(async () => root.render(<EditWebinarPage />))
+  await flush()
+  const settings = host.querySelector('[role="tablist"] [role="tab"]') as HTMLButtonElement
+  const historyLength = window.history.length
+  await act(async () => settings.click())
+  await flush()
+  expect(window.location.search).toContain('pane=basic')
+  expect(window.history.length).toBe(historyLength)
+})
+
 describe('現役の設定から参加者へ移る口', () => {
   it.each(['owner', 'staff'])('%s は設定のメニューから参加者へ移れる', async (role) => {
     navFixture.role = role
