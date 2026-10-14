@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
-import Icon from './Icon.js';
+import Icon from './Icon';
 import styles from './Button.module.css';
 
 /**

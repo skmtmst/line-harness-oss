@@ -25,6 +25,7 @@ export default function SegmentedControl<T extends string>({
   disabled = false,
   appearance = 'track',
   equalWidth = false,
+  fit,
 }: {
   id?: string
   invalid?: boolean
@@ -53,6 +54,8 @@ export default function SegmentedControl<T extends string>({
   appearance?: 'track' | 'choices' | 'reservation' | 'intake-stop'
   /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
   equalWidth?: boolean
+  /** 文字の幅へ器を収める。縦の入力・カードで横いっぱいに伸ばさない。 */
+  fit?: 'content'
 }) {
   const field = useFieldContext()
   const bad = invalid || field?.invalid
@@ -98,6 +101,7 @@ export default function SegmentedControl<T extends string>({
       data-size={size}
       data-appearance={appearance}
       data-equal-width={equalWidth || undefined}
+      data-segmented-fit={fit}
       onKeyDown={onKeyDown}
     >
       {appearance === 'track' ? <span

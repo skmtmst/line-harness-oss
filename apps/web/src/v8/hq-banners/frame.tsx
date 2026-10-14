@@ -27,6 +27,7 @@ export default function BannerDialogFrame({
   actionsAlign = 'center',
   designNode,
   role = 'dialog',
+  contentLayout,
   children,
 }: {
   open: boolean
@@ -43,10 +44,11 @@ export default function BannerDialogFrame({
   designNode: string
   /** 危ない操作の確かめは alertdialog。 */
   role?: 'dialog' | 'alertdialog'
+  contentLayout?: 'form'
   children?: ReactNode
 }) {
   return <Dialog open={open} title={title} onCancel={onClose} busy={busy} error={error} designNode={designNode}
-    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation footer={actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
+    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation contentLayout={contentLayout} footer={actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
     designWidth={kind === 'detail' || kind === 'reference' ? 960 : kind === 'upload' ? 720 : 560}>
     {description ? <p>{description}</p> : null}{children}
   </Dialog>

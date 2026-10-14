@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {chromium} from '@playwright/test'
+import {connectGuardBrowser} from './browser-session.mjs'
 import {screenReady} from './screen-ready.mjs'
 
 test('readiness ignores closed error/loading panels but rejects a visible failure',async()=>{
- const browser=await chromium.launch()
+ const browser=await connectGuardBrowser()
  try{const page=await browser.newPage()
  await page.setContent('<html data-theme="v8"><main><h1>一覧</h1><section hidden><p data-list-state="error">読み込めませんでした</p><p aria-busy="true">読み込み中</p></section><table><tr><td>値</td></tr></table></main></html>')
  assert.equal(await page.evaluate(screenReady,{route:'/webhooks'}),true)

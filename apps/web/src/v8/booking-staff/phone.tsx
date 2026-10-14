@@ -42,8 +42,8 @@ export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>)
   return `¥${polishFormatNumber(menu.base_price)}`
 }
 
-function PhoneChrome({ step, children, foot, interactive = false }: { step: number; children: React.ReactNode; foot: React.ReactNode; interactive?: boolean }) {
-  return <LiffPhoneFrame role={interactive ? 'group' : undefined} step={step} footer={<div className={styles.foot}>{foot}</div>}><div className={styles.body}>{children}</div></LiffPhoneFrame>
+function PhoneChrome({ step, children, foot, interactive = false, bodyScroll = false }: { step: number; children: React.ReactNode; foot: React.ReactNode; interactive?: boolean; bodyScroll?: boolean }) {
+  return <LiffPhoneFrame role={interactive ? 'group' : undefined} step={step} footer={<div className={styles.foot}>{foot}</div>}><div className={styles.body} data-body-scroll={bodyScroll || undefined}>{children}</div></LiffPhoneFrame>
 }
 
 function CheckMark() {
@@ -68,11 +68,12 @@ export function PhoneStaffStep({ menu, staff, designationFree, status = 'ready' 
   status?: 'loading' | 'ready' | 'error'
 }) {
   const shown = staff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
-  const people = shown.slice(0, designationFree ? 2 : 3)
+  const people = shown
   const empty = shown.length === 0 && !designationFree
   return (
     <PhoneChrome
       step={2}
+      bodyScroll
       foot={<>
         <span className={styles.cta} data-off={empty || undefined}>日時を選ぶ</span>
         <span className={styles.back}>← メニューを選び直す</span>

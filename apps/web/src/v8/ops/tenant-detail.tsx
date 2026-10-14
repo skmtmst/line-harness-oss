@@ -1,5 +1,6 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
+import type { FormRequirement } from '@/lib/form-requirement'
 import { ChevronLeft, LogIn } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -332,12 +333,14 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
   const [error, setError] = useState('')
   const label = target === 'suspended' ? '停止する' : target === 'archived' ? 'アーカイブする' : '再開する'
   const needsName = target !== 'active'
-  const ready = reason.trim().length >= 4 && (!needsName || confirmName === tenantName)
+  const nameRequirement: FormRequirement = { required: needsName, check: value => !needsName || value === tenantName ? null : '契約先の名前をそのまま入力してください' }
+  const reasonRequirement: FormRequirement = { required: true, check: value => value.trim().length >= 4 ? null : '理由を4文字以上で入力してください' }
+  const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
 
   const submit = async () => {
     if (busy) return
-    if (!ready) {
-      setError(needsName && confirmName !== tenantName ? '契約先の名前をそのまま入力してください' : '理由を4文字以上で入力してください')
+    if (problem) {
+      setError(problem)
       return
     }
     setBusy(true)
@@ -372,9 +375,9 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
               : '再開すると、権限者がまたログインできるようになります。'}
         </p>
         {needsName ? (
-          <Field label="確認のため、契約先の名前をそのまま入力"><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
+          <Field label="確認のため、契約先の名前をそのまま入力" requirement={nameRequirement}><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
         ) : null}
-        <Field label="理由（4文字以上）" required><SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></SaveErrorField></Field>
+        <Field label="理由（4文字以上）" requirement={reasonRequirement}><SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" /></SaveErrorField></Field>
       </div>
     </Dialog>
   )

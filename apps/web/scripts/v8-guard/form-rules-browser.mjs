@@ -11,6 +11,7 @@ export default function scanFormRules() {
     const r = el.getBoundingClientRect()
     return r.width > 0 && r.height > 0
   }
+
   const selector = el => {
     const parts = []
     for (let p = el; p && p !== root.parentElement; p = p.parentElement) {
@@ -20,6 +21,29 @@ export default function scanFormRules() {
     return parts.join(' > ')
   }
   const add = (kind, el, text, measure) => findings.push({ kind, target: selector(el), text, measure })
+  for (const input of root.querySelectorAll('input[placeholder]')) {
+    if (!visible(input) || !/言葉を入れて.*Enter/.test(input.placeholder)) continue
+    const entry = input.closest('[data-keyword-input]')
+    const frame = entry?.firstElementChild ?? input
+    const css = getComputedStyle(frame)
+    const hasFrame = (css.borderTopStyle !== 'none' && parseFloat(css.borderTopWidth) > 0) || (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0)
+    const field = input.closest('[data-form-requirement]')
+    const unnamedLabel = field?.querySelector('label')?.textContent.trim() === ''
+    if (!hasFrame || unnamedLabel) add('form-keyword-input', input, '言葉を足す欄は箱つきで、名前のない札を出さない', { frame: Number(hasFrame), unnamedLabel: Number(unnamedLabel) })
+  }
+  // 札の面は文字とその内側の余白まで。flex の stretch で帯になった実寸を拾う。
+  const badgeRoots = [root, ...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
+  const badges = new Set(badgeRoots.flatMap(scope => [...scope.querySelectorAll('[data-required-badge]')]))
+  for (const badge of badges) {
+    if (!visible(badge) || !badge.textContent.trim()) continue
+    const range = document.createRange()
+    range.selectNodeContents(badge)
+    const rect = badge.getBoundingClientRect(), textRect = range.getBoundingClientRect()
+    const css = getComputedStyle(badge)
+    const expectedWidth = textRect.width + (parseFloat(css.paddingLeft) || 0) + (parseFloat(css.paddingRight) || 0)
+      + (parseFloat(css.borderLeftWidth) || 0) + (parseFloat(css.borderRightWidth) || 0)
+    if (rect.width - expectedWidth > 1 / 64) add('form-required-badge', badge, '必須の札の面を文字の幅にそろえる', { width: rect.width, expectedWidth, excess: rect.width - expectedWidth })
+  }
   for (const control of root.querySelectorAll('[data-page-template="create"] button:disabled,[data-page-template="create"] input:disabled,[data-page-template="create"] select:disabled,[data-page-template="create"] textarea:disabled,[data-page-template="create"] [aria-disabled="true"]')) {
     if (!visible(control) || control.closest('[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],.sr-only')) continue
     const described = (control.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id))

@@ -26,6 +26,23 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('空白の差し戻し理由を送らず、入力すると操作できる', async () => {
+  render(<ApprovalsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '差戻し' }))
+  const submit = screen.getByRole('button', { name: '差し戻す' }) as HTMLButtonElement
+  expect(submit.disabled).toBe(true)
+  expect(submit.title).toBe('差し戻す理由を入力してください')
+  const reason = screen.getByRole('textbox')
+  fireEvent.change(reason, { target: { value: '   ' } })
+  expect(submit.disabled).toBe(true)
+  expect(fixture.decideApproval).not.toHaveBeenCalled()
+  fireEvent.change(reason, { target: { value: '  原価を確認してください  ' } })
+  expect(submit.disabled).toBe(false)
+  expect(submit.title).toBe('')
+  fireEvent.click(submit)
+  await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'return', '原価を確認してください'))
+})
+
 it('管理者は承認待ちのカードで承認でき、改定の前後と差戻しのコメントが見える', async () => {
   render(<ApprovalsV8 />)
   expect(await screen.findByText('価格改定')).toBeTruthy()

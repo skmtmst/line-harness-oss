@@ -88,6 +88,9 @@
   --liff-radius-lg: 14px;
   --liff-radius-night-action: 12px;
   --liff-radius-stamp-control: 8px;
+  --liff-stamp-card-radius: 16px;
+  --liff-stamp-slot-max: 52px;
+  --liff-stamp-ring-geometry: inset 0 0 0 1px;
   --liff-document-empty-height: 110px;
   --liff-document-preview-height: 118px;
   --liff-document-radius: 12px;

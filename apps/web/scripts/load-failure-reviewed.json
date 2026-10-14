@@ -350,7 +350,7 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/restaurant/organization/organization.tsx",
+    "filename": "src/v8/restaurant/organization/organization-forms.tsx",
     "fingerprint": "32dbd7c759d8c097",
     "disposition": "error-visible",
     "count": 1,
@@ -392,7 +392,7 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/v8/webhooks/api-tokens.tsx",
+    "filename": "src/v8/webhooks/use-api-tokens.tsx",
     "fingerprint": "3fe44ad892d4f483",
     "disposition": "error-visible",
     "count": 1,

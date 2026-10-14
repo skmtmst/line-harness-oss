@@ -27,6 +27,7 @@ describe('ダイアログの琥珀帯', () => {
       />,
     )
     expect(html).toContain('data-qa-dialog-callout')
+    expect(html).toContain('data-description-band="warning"')
     expect(html).toContain('止めているあいだ')
   })
 

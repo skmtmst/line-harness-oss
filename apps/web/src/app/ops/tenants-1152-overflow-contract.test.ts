@@ -1,21 +1,32 @@
-/**
- * 1152幅の横はみ出し契約（契約先一覧 /ops → tenants）。
- * QA 1003-1459 の offRight で表が器からはみ出していた。
- * 統括名は伸び縮み（省略＋title 済み）・利用/請求と操作は中身幅へ。v8 のみ。
- */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import OpsTenantsV8 from '@/v8/ops/tenants'
 
-const PAGE = readFileSync(resolve(__dirname, "../../v8/ops/tenants.tsx"), "utf-8");
-const CSS = readFileSync(resolve(__dirname, "../../v8/ops/tenants.module.css"), "utf-8");
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/tenants' }))
+vi.mock('@/v8/ops/use-ops-read-only', () => ({ useOpsReadOnly: () => false }))
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
+  api: { ops: { tenants: async () => ({ success: true, summary: { active: 1, trialing: 0, suspended: 0, pastDue: 0 }, data: [{
+    id: 'tenant', name: '検証商事', status: 'active', plan_status: 'active', plan_key: 'standard',
+    account_count: 2, staff_count: 5, created_at: '2026-04-01T00:00:00Z', last_login_at: '2026-10-01T00:00:00Z',
+    current_period_ends_at: '2026-11-01T00:00:00Z', trial_ends_at: null, featurePacks: ['restaurant'],
+  }] }) } },
+}))
+afterEach(cleanup)
 
-describe("tenants 一覧の1152幅", () => {
-  it("名前の列は伸び縮みし、狭い幅では補助列を畳む", () => {
-    expect(PAGE).toContain('className={parts.grow} role="cell"')
-    expect(PAGE).toContain('<TruncatedText')
-    expect(PAGE).toContain('href={tenantDetailHref(row.id)}')
-    expect(CSS).toContain('@media (max-width: 1023.98px)')
-    expect(CSS).toContain('display: none')
-  })
+it('名前と詳細への入口を保ち、狭幅の補助列を見出しと本文で同じように指定する', async () => {
+  render(React.createElement(OpsTenantsV8))
+  const name = await screen.findByRole('link', { name: '検証商事' })
+  expect(name.getAttribute('href')).toBe('/ops/tenants/detail?id=tenant')
+  expect(name.getAttribute('title')).toBe('検証商事')
+  const row = name.closest('tr')!
+  for (const label of ['店舗', '権限者', '契約日', '飲食店機能']) {
+    const head = screen.getByRole('columnheader', { name: label })
+    const index = [...head.parentElement!.children].indexOf(head)
+    expect(head.getAttribute('data-cell-collapse')).toBe('narrow')
+    expect(row.children[index].getAttribute('data-cell-collapse')).toBe('narrow')
+  }
+  expect(row.querySelector('[data-list-number]')?.textContent).toBe('2')
 })

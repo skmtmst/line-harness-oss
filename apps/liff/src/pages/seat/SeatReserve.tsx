@@ -43,9 +43,7 @@ import SeatConfirm from './SeatConfirm.js';
 import SeatDone from './SeatDone.js';
 import SeatMine from './SeatMine.js';
 
-type View = 'pick' | 'confirm' | 'done' | 'mine';
-type Course = import('@line-crm/shared').RestaurantCustomerCourse;
-type Store = { id: string; name: string; timezone: string };
+import type { View, Course, Store } from './seat-reserve-types.js';
 
 const STEPS = ['人数・日時・コース', '確認'];
 const DEFAULT_GUESTS = 2;
