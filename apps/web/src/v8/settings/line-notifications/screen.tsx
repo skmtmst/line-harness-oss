@@ -1,7 +1,6 @@
 'use client'
 import { requiredText } from '@/lib/form-requirement'
 const notificationTitleRequirement = requiredText('通知の見出しを入力してください。')
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { RowActions } from '@/components/shared/row-actions'
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -1009,8 +1008,7 @@ function LineNotificationsPage() {
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
       unit={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
       valueTextWithUnit
-      detail={kpi.note === '取得失敗' ? '取得失敗' : null}
-      help={kpi.note || undefined}
+      detail={kpi.note || null}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
       action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}
@@ -1208,6 +1206,7 @@ function LineNotificationsPage() {
   return <SaveErrorScope errors={saveErrors}><SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
     layout="narrow-nav"
+    contentLayout={tab === 'customer' ? 'wide' : undefined}
     actions={tab === 'operator' && expandedSetting === null && canManage ? <>
       <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
@@ -1345,12 +1344,11 @@ function LineNotificationsPage() {
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" description="札や検索を外すと、すべて出ます" action={<Button variant="secondary" onClick={() => setFilter('all')}>条件を外す</Button>} />
-        : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) var(--tpl-sb-ln-col-when) var(--tpl-sb-ln-col-who) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit)', compactColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit)', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
+        : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) max-content', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
           <thead>
             <TableHeadRow>
-              <Th>お知らせの種類（きっかけ）</Th>
-              <Th>いつ送るか</Th>
-              <Th>だれに</Th>
+              <Th>種類・きっかけ</Th>
+              <Th>いつ・だれに</Th>
               <Th>この30日</Th>
               <Th>状態</Th>
               <Th>出す</Th>
@@ -1363,9 +1361,8 @@ function LineNotificationsPage() {
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
-                <Td><FolderDotName>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</FolderDotName></Td>
-                <Td className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</Td>
-                <Td className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</Td>
+                <Td>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</Td>
+                <Td><div><TruncatedText value={timingLabel(setting)} /></div><div><TruncatedText value={audienceLabel(setting)} /></div></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>

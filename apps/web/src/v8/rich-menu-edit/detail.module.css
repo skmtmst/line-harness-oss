@@ -9,7 +9,7 @@
 .loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
 
 .split { display: flex; flex: 1; min-width: 0; }
-.content { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-content-gap); min-width: 0; padding: var(--tpl-eds-content-pad); }
+.content { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-content-gap); min-width: 0; }
 .aside { display: flex; flex-direction: column; flex-shrink: 0; gap: var(--tpl-eds-aside-gap); width: var(--tpl-eds-aside-w); padding: var(--tpl-eds-aside-pad); border-left: 1px solid var(--color-hairline); }
 
 /* 終わった帯（薄い緑）・止まった帯（琥珀）。 */

@@ -4,7 +4,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useStaffRole } from '@/lib/staff-role';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { CircleAlert } from 'lucide-react';
@@ -25,19 +25,11 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { DetailLoading } from '@/components/templates/detail-page';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { ListPageSection } from '@/components/templates/list-page'
 import Notice from '@/components/shared/notice'
 import { notifySaved } from '@/components/shared/toast'
 
-/*
- * ★V8 リッチメニューの詳細（公開した・公開の進み）`hKr8f`。一から書いた画面（2026-10-07）。
- *
- * /rich-menus/edit?id=… を手順の指定（?step=）なしで開いたときの画面。
- * 公開中のメニュー：公開の進み・公開の履歴とLINEとの照合・いまの状態を見せ、編集はウィザード（?step=shape）へ。
- * 下書き：見せる物が無いので、そのままウィザードへ送る。
- *
- * 公開の進み・履歴・失敗だけのやり直し・照合と修復・取り下げ・複製は、既存のAPIと確認を使う。
- * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
- */
 
 type Group = {
   id: string
@@ -72,6 +64,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [diffs, setDiffs] = useState<ReconcileDiff[] | null>(null)
   const [checkedAt, setCheckedAt] = useState<Date | null>(null)
   const [checking, setChecking] = useState(false)
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [checkError, setCheckError] = useState('')
   const [fixOpen, setFixOpen] = useState(false)
   const [fixing, setFixing] = useState(false)
@@ -336,8 +329,32 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="hKr8f">
       <PageFrame kind="create">
         <PageHeading title={group.name} identity={backLink} help={head} />
-        <div className={styles.split}>
-          <div className={styles.content}>
+        <ListPageSection><DetailColumns presentation="notification" asideLabel="いまの状態と操作" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
+
+            {canOperate ? (
+              <div className={styles.sideActions}>
+                <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=shape`} variant="secondary"><Pencil size={14} aria-hidden="true" />編集する</Button>
+                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
+                <RowMenu label="そのほかの操作" menuLabel={`リッチメニュー「${group.name}」の操作`} items={menuItems} />
+              </div>
+            ) : (
+              <div className={styles.sideActions}>
+                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
+              </div>
+            )}
+            {canOperate || role === null ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</ReadOnlyNotice></div>}
+            <section className={styles.aboutBox} aria-label="いまの状態">
+              <h2 className={styles.aboutTitle}>いまの状態</h2>
+              <dl className={styles.aboutList}>
+                <div className={styles.aboutRow}><dt>状態</dt><dd className={styles.stateOk}>公開中</dd></div>
+                <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
+                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
+                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
+              </dl>
+            </section>
+
+</>}>
+<div className={styles.content}>
             {failed ? (
               <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
             ) : progress?.completed ? (
@@ -374,7 +391,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
             {canInspectOperations ? <section className={styles.card} aria-label="公開の履歴とLINEとの照合">
               <div className={styles.cardTitles}>
-                <h2 className={styles.cardTitle}>公開の履歴とLINEとの照合</h2>
+                <h2 className={styles.cardTitle}><ShieldCheck size={15} aria-hidden="true" />公開の履歴とLINEとの照合</h2>
                 <p className={styles.cardNote} title={publishedInfo}>管理画面の記録と、LINE上の状態がずれていないかを見ます</p>
               </div>
               {!runsError && draftDiffers === true ? <Notice tone="warn" message="編集中の下書きは公開中の版と違います。公開すると、この下書きで上書きされます。" /> : null}
@@ -395,9 +412,9 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 {diffs && diffs.length > 0 && canOperate ? (
                   <Button variant="secondary" onClick={() => { setDialogError(''); setFixOpen(true) }}>ずれを直す</Button>
                 ) : null}
-                <button type="button" className={styles.ghostButton} onClick={() => void check()} disabled={checking}>
-                  {checking ? '照らし合わせています…' : 'もう一度照らし合わせる'}
-                </button>
+                <Button variant="text" size="compact" onClick={() => void check()} disabled={checking} busy={checking} busyLabel="照らし合わせています…">
+                  <RefreshCw size={14} aria-hidden="true" />もう一度照らし合わせる
+                </Button>
               </div>
               {runsError ? <p className={styles.cardNote}>{runsError}</p> : runs === null ? null : runs.length === 0 ? <p className={styles.cardNote}>まだ公開の履歴はありません。</p> : (
                 <div className={styles.runList}>
@@ -417,31 +434,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               )}
             </section> : null}
           </div>
-
-          <aside className={styles.aside}>
-            {canOperate ? (
-              <div className={styles.sideActions}>
-                <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=shape`} variant="secondary"><Pencil size={14} aria-hidden="true" />編集する</Button>
-                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
-                <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`リッチメニュー「${group.name}」の操作`} items={menuItems} />
-              </div>
-            ) : (
-              <div className={styles.sideActions}>
-                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
-              </div>
-            )}
-            {canOperate || role === null ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</ReadOnlyNotice></div>}
-            <section className={styles.aboutBox} aria-label="いまの状態">
-              <h2 className={styles.aboutTitle}>いまの状態</h2>
-              <dl className={styles.aboutList}>
-                <div className={styles.aboutRow}><dt>状態</dt><dd className={styles.stateOk}>公開中</dd></div>
-                <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
-                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
-                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
-              </dl>
-            </section>
-          </aside>
-        </div>
+</DetailColumns></ListPageSection>
       </PageFrame>
 
       <ConfirmDialog

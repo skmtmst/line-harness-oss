@@ -5,7 +5,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Download, Pencil, RotateCw, User } from 'lucide-react'
+import { CircleHelp, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, User } from 'lucide-react'
 import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
@@ -483,7 +483,7 @@ function Responses() {
                 <Notice tone="danger" role="status"
                   heading={`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}
                   message={`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}
-                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>} />
+                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><CircleHelp size={14} aria-hidden="true" />{`その${incompleteItems.length} 件を見る`}</Button>} />
               ) : null}
               {summaries.map((fieldSummary) => {
                 const block = blockByKey(fieldSummary.key)
