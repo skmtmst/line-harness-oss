@@ -24,6 +24,7 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
+import Card from '@/components/shared/card'
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
@@ -167,7 +168,7 @@ export default function DuplicatesListV8() {
           </Button>
         </div>
 
-        <section className={styles.panel} aria-labelledby="dup-candidates-title">
+        <Card variant="records" aria-labelledby="dup-candidates-title">
           <h3 id="dup-candidates-title" className={styles.panelTitle}>重複の候補</h3>
           <DataTable className={styles.table}>
             <colgroup>
@@ -246,10 +247,10 @@ export default function DuplicatesListV8() {
               <Pagination page={d.page} pageCount={pageCount} onPageChange={d.setPage} disabled={d.candidatesLoading} ariaLabel="重複候補のページ" />
             </div>
           ) : null}
-        </section>
+        </Card>
 
         {d.data ? (
-          <section className={styles.panel} aria-labelledby="dup-accounts-title">
+          <Card variant="records" aria-labelledby="dup-accounts-title">
             <div className={styles.panelHead}>
               <h3 id="dup-accounts-title" className={styles.panelTitle}>アカウントごとの重なり</h3>
               <p className={styles.panelSub}>どのアカウントに重複が偏っているか</p>
@@ -287,11 +288,11 @@ export default function DuplicatesListV8() {
                 </tbody>
               </DataTable>
             )}
-          </section>
+          </Card>
         ) : null}
 
         {d.data && d.data.perAccount.length >= 2 && d.data.pairwiseOverlap ? (
-          <section className={styles.panel} aria-labelledby="dup-matrix-title">
+          <Card variant="records" aria-labelledby="dup-matrix-title">
             <div className={styles.panelHead}>
               <h3 id="dup-matrix-title" className={styles.panelTitle}>アカウント間 重複マトリクス</h3>
               <p className={styles.panelSub}>同じ人が両方にいる数</p>
@@ -316,7 +317,7 @@ export default function DuplicatesListV8() {
                 ))}
               </tbody>
             </DataTable>
-          </section>
+          </Card>
         ) : null}
       </div>
     </PageFrame>

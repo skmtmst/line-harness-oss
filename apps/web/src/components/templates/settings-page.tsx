@@ -1,6 +1,7 @@
 'use client'
 
 import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
+import { ListFolderContext } from '@/components/shared/list-folder-context'
 import type { ReactNode } from 'react'
 import PreviewLauncher from './preview-launcher'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -31,5 +32,5 @@ export function SettingsPage({ boardId, heightMode, standalone, layout, navigati
     </div>
     {savePlacement === 'content' ? null : footer}
   </PageFrame>
-  return explanation ? <PageExplanationProvider pageKey={explanationKey ?? `settings:${typeof heading.title === 'string' ? heading.title : boardId ?? 'screen'}`}>{page}</PageExplanationProvider> : page
+  return <ListFolderContext.Provider value={false}>{explanation ? <PageExplanationProvider pageKey={explanationKey ?? `settings:${typeof heading.title === 'string' ? heading.title : boardId ?? 'screen'}`}>{page}</PageExplanationProvider> : page}</ListFolderContext.Provider>
 }
