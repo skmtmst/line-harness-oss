@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenPetListData, NenPetRow } from '@/lib/nen-pets-api'
 import type { NenFeedingData } from '@/lib/nen-ranks-api'
@@ -115,10 +115,14 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-circle-minus')).toHaveLength(1)
     expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-undo-2')).toHaveLength(1)
     await click(byLabel('主食で絞り込む'))
-    await click(byText('いつものごはん'))
+    await click(screen.getByRole('radio', { name: 'いつものごはん' }))
+    expect(listCalls().some(([path]) => String(path).includes('product=st-1'))).toBe(false)
+    await click(byText('選ぶ'))
     expect(listCalls().some(([path]) => String(path).includes('product=st-1'))).toBe(true)
     await click(byLabel('主食で絞り込む'))
-    await click(byText('すべて'))
+    await click(screen.getByRole('radio', { name: 'すべて' }))
+    expect(String(listCalls().at(-1)?.[0])).toContain('product=st-1')
+    await click(byText('選ぶ'))
     expect(String(listCalls().at(-1)?.[0])).not.toContain('product=st-1')
     LIST.products = []
   })

@@ -145,10 +145,15 @@ describe('広告への送信履歴（p0kA3）', () => {
       let option: HTMLElement | undefined
       for (let i = 0; i < 40 && !option; i++) {
         await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
-        option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes(label))
+        option = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')].find(item => item.getAttribute('aria-label') === label)
       }
       expect(option).toBeDefined()
-      await act(async () => { option!.querySelector('button')!.click() })
+      const before = host.querySelector('tbody')?.textContent
+      await act(async () => { option!.click() })
+      expect(host.querySelector('tbody')?.textContent).toBe(before)
+      const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(item => item.textContent?.trim() === '選ぶ')!
+      expect(confirm.disabled).toBe(false)
+      await act(async () => { confirm.click() })
     }
     await choose('Google広告')
     expect(host.querySelector('tbody')?.textContent).toContain('初回購入')

@@ -12,6 +12,7 @@ import Pagination from '@/components/shared/pagination'
 import TruncatedText from '@/components/shared/truncated-text'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
 import { nenPetsApi, petAnimalTypeLabel, type NenPetKpis, type NenPetListData, type NenPetRow, type NenPetSort } from '@/lib/nen-pets-api'
@@ -98,8 +99,9 @@ export default function PetsListV8({
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
         /></SaveErrorField>
-        <SaveErrorField names={["product","query.product"]}><Select
+        <SaveErrorField names={["product","query.product"]}><EntitySelect
           aria-label="主食で絞り込む"
+          noun="主食"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}
