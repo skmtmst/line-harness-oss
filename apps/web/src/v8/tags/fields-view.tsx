@@ -26,8 +26,9 @@ import { fieldTypeWord } from './fields-list-model'
 import FieldsTable from './fields-table'
 
 export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
-  const { accountId, canEdit, host, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton } = model
+  const { accountId, canEdit, host, explanation, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton } = model
   const table = <FieldsTable {...model} />
+  const operationHelp = canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'
   return (
     <>
       {host?.kpis ?? <KpiBand data-design="KPIs" className={styles.kpis}>
@@ -46,7 +47,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
 
       <ListPageBody
         skeleton
-        listHelp={canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'}
+        explanation={explanation ? operationHelp : undefined} listHelp={explanation ? undefined : operationHelp}
         folders={<>
           <FolderPanel
             createAction={createButton(true)}

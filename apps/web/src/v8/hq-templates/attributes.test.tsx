@@ -22,6 +22,22 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 describe('統括の情報欄・対応マーク', () => {
+  it('情報欄の操作説明を題から開閉し、単独の質問印を置かない', async () => {
+    window.localStorage.clear()
+    render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+    await screen.findByText('愛犬のお名前')
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    expect(toggle.closest('[data-template-region="heading"]')).toBeTruthy()
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(body.textContent).toContain('並べ替えはつまんで上下')
+    expect(body.closest('[data-list-toolbar]')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(true)
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(false)
+  })
+
   it('対応マークの説明は題から開閉し、数の帯と道具の間に一度だけ出す', async () => {
     window.localStorage.clear()
     mocks.list.mockResolvedValue([mark.template]); mocks.get.mockResolvedValue(mark)

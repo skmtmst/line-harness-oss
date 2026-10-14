@@ -15,7 +15,7 @@ import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/compone
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
 
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -603,7 +603,7 @@ export default function BroadcastListV8() {
     setShowCreate(true)
   }
 
-  /* ===== 数の帯（1440：予約中・今月の送信枠・今月の配信・平均の開封率。1152：送信枠の代わりに下書き） ===== */
+  /* 送信枠は表示幅にかかわらず、同じ月の使用量から残りを出す。 */
   const quotaRemaining = quota?.limit != null && quota?.used != null ? quota.limit - quota.used : null
   const kpiPending = listKpis === undefined
   const kpis = [
@@ -615,25 +615,16 @@ export default function BroadcastListV8() {
       unit: '件',
       detail: <span title="今日の予約件数は取得していません">今日 {emptyValue('unknown')}</span>,
     },
-    narrow
-      ? {
-          key: 'draft',
-          title: '下書き',
-          icon: FilePen,
-          value: kpiPending ? null : (listKpis?.drafts ?? chipCount(statusCounts, 'draft')),
-          unit: '件',
-          detail: '編集の途中',
-        }
-      : {
-          key: 'quota',
-          title: '今月の送信枠',
-          icon: Gauge,
-          value: quotaRemaining,
-          unit: '通 残り',
-          detail: quota?.limit != null && quota?.used != null
-            ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
-            : '送信枠を確認できません',
-        },
+    {
+      key: 'quota',
+      title: '今月の送信枠',
+      icon: Gauge,
+      value: quotaRemaining,
+      unit: '通 残り',
+      detail: quota?.limit != null && quota?.used != null
+        ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
+        : '送信枠を確認できません',
+    },
     {
       key: 'thisMonth',
       title: '今月の配信',
