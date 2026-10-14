@@ -18,6 +18,7 @@ import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
 import Dialog from './dialog'
 import TagPill from './tag-pill'
+import useNarrow from './use-picker-narrow'
 
 /*
  * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（B-155・163・164・165・175）。
@@ -67,20 +68,6 @@ function inFolder(item: EntityPickerItem, folder: string) {
 function matches(item: EntityPickerItem, query: string) {
   const q = query.trim().toLocaleLowerCase()
   return !q || item.name.toLocaleLowerCase().includes(q) || Boolean(item.keywords?.toLocaleLowerCase().includes(q)) || Boolean(item.content?.toLocaleLowerCase().includes(q))
-}
-
-/** 窓の幅が狭いときはフォルダの列を選ぶ欄に畳む（白い板 1100px 未満で畳む決まりに合わせる）。 */
-function useNarrow(threshold: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [narrow, setNarrow] = useState(false)
-  useEffect(() => {
-    const node = ref.current
-    if (!node || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < threshold))
-    observer.observe(node)
-    return () => observer.disconnect()
-  })
-  return [ref, narrow] as const
 }
 
 function CreateLink({ href, label }: { href?: string; label?: string }) {
