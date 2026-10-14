@@ -1,10 +1,6 @@
 'use client'
 
-import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
-  draft_code: requiredText("卓番を入れてください。"),
-  draft_label: requiredText("表示名を入れてください。"),
-}
+import { tableRequirements as b244Requirements } from './requirements'
 
 import {reservationBoardApi} from '@/lib/api-reservation-board'
 import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
@@ -310,10 +306,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
               <SaveErrorField names={["seatType","draft.seatType","seat_type","draft.seat_type"]}><Select aria-label="席種" size="full" value={draft.seatType} onChange={(value) => setDraft({ ...draft, seatType: value })} options={SEAT_TYPE_OPTIONS} /></SaveErrorField>
             </DialogField>
             <div className={styles.pair}>
-              <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity}>
+              <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity} requirement={b244Requirements.draft_min_capacity}>
                 <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity}>
+              <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity} requirement={b244Requirements.draft_max_capacity}>
                 <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} /></SaveErrorField>
               </Field>
             </div>

@@ -43,6 +43,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('BERxg 座席・卓管理', () => {
+  it('最小・最大人数は必須として読み上げ、空欄なら卓を作らない', async () => {
+    render(<TablesPage />)
+    await screen.findByText('卓の詳細')
+    fireEvent.click(screen.getByRole('button', { name: /卓を追加する/ }))
+    for (const label of ['最小人数', '最大人数']) {
+      expect(screen.getByLabelText(label).getAttribute('aria-required')).toBe('true')
+    }
+    fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
+    fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '窓側' } })
+    fireEvent.change(screen.getByLabelText('最小人数'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    expect(await screen.findByText('最小人数は1以上の整数にしてください。')).toBeTruthy()
+    expect(fixture.createTable).not.toHaveBeenCalled()
+  })
+
   it('数4・フロアマップ・卓の詳細・自動配席ルールが出て、結合グループに札が付く', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
