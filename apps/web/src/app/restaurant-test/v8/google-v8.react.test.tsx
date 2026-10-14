@@ -64,7 +64,7 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     expect(board.textContent).toContain('佐藤 S.')
     expect(board.textContent).toContain('下書きを作る')
     expect(board.textContent).toContain('返信を見る')
-    fireEvent.click(screen.getByRole('button',{name:'一覧の操作の説明'}))
+    expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
     expect(screen.getByText(/^返信文は手で書くか/)).toBeTruthy()
   })
 
