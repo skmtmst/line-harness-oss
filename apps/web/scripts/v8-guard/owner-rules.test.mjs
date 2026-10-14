@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process'
 import scan from './owner-rules-browser.mjs'
 import { assess, record, measurePage } from './layout-defects.mjs'
 import './list-row-height.test.mjs'
+import './csv-publication-layout.test.mjs'
 
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
