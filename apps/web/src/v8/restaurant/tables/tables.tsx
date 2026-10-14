@@ -249,7 +249,6 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={undefined} presentation="band" />
       </StatRow>
       <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
-        <div className={styles.detailPanel}>
         <Panel fusion title="卓の詳細" flush>
           <ul className={styles.detailList}>
             {rows.map((item) => (
@@ -265,7 +264,6 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
             ))}
           </ul>
         </Panel>
-        </div>
       )}>
         <div className={styles.floorPanel}>
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}

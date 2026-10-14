@@ -343,6 +343,8 @@
 .detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-floor-aside-w); }
+/* 枠を持つ詳細カードの高さは内容で決め、図面の高さへ引き伸ばさない。 */
+.detailColumns[data-detail-columns='restaurant-tables'] .detailColumnAside { min-height: 0; }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnMain { gap: var(--tpl-rs-body-gap); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnAside { padding-left: 0; border-left: 0; }
 .detailColumns[data-presentation='notification'] { grid-template-columns: minmax(0, 1fr) var(--tpl-hb2-op-side-w); gap: var(--tpl-hb2-op-gap); margin-right: 0; }
