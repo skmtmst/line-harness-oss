@@ -46,6 +46,7 @@
   max-height: var(--tpl-inbox-tp-body-max);
   box-shadow: var(--tpl-inbox-line-top);
 }
+:root .tpBody { flex: none; }
 .tpSide {
   display: grid;
   grid-template-rows: 1fr auto;
