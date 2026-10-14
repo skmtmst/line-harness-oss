@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { connectGuardBrowser } from './browser-session.mjs'
 import scanCreateConsistency from './create-consistency-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
+import scanFixPatterns from './fix-patterns-browser.mjs'
 
 import { assessAgainstBase, measurePage, record, validateAllowances } from './layout-defects.mjs'
 const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8');
@@ -12,7 +13,7 @@ const row='<div class="item" data-action-row><div class="row"><span class="icon"
 
 test('名前の行の右端は共通選択の外枠で測り、外枠が縮む故障を検出する', async () => {
  const css = readFileSync(new URL('../../src/components/shared/entity-picker.module.css', import.meta.url), 'utf8')
- const browser = await chromium.launch()
+ const browser = await connectGuardBrowser()
  try {
   const page = await browser.newPage()
   for (const width of [1152, 1440, 1920]) {
@@ -115,3 +116,32 @@ test('Y1〜Y4の説明値を保ち、数値の実測で本線比較・新規・�
  }
  }finally{await browser.close()}
 });
+
+
+test('最近の配信の日時と複製操作は全3幅で離れ、接触と重なりの故障を止める', async () => {
+ const css = readFileSync(new URL('../../src/components/broadcasts/broadcast-form-v8.module.css', import.meta.url), 'utf8').replace(/:global\(([^()]*)\)/g, '$1')
+ const globalCss = globals.replace(/@theme\s*\{/g, ':root {')
+ const browser = await connectGuardBrowser()
+ try {
+  const page = await browser.newPage()
+  const content = root => `<style>${globalCss}${css}*{box-sizing:border-box}button{font:inherit}</style><div data-theme="v8"><main><section data-page-template="create"><div class="${root ? 'root' : ''}" style="width:650px"><div class="recentRow"><svg width="14" height="14"></svg><span class="recentName">長い最近の配信の名前</span><span>2026/10/14 11:00 送信 ・ 34,080 人</span><button>複製する</button></div></div></section></main></div>`
+  const scan = () => page.evaluate(scanFixPatterns).then(result => result.findings.filter(row => row.reason.includes('recent broadcast metadata')))
+  for (const width of [1152, 1440, 1920]) for (const root of [false, true]) {
+   await page.setViewportSize({ width, height: 900 })
+   await page.setContent(content(root))
+   assert.equal((await scan()).length, 0)
+   const gap = await page.locator('.recentRow').evaluate(row => {
+    const range = document.createRange(); range.selectNodeContents(row.children[2])
+    return row.children[3].getBoundingClientRect().left - range.getBoundingClientRect().right
+   })
+   assert.ok(gap >= 8, `gap=${gap}, width=${width}, root=${root}`)
+   assert.ok(await page.locator('.recentRow').evaluate(row => parseFloat(getComputedStyle(row).paddingTop) > 0))
+   await page.addStyleTag({ content: '.recentRow{gap:0}' })
+   assert.equal((await scan()).length, 1, '文字と操作の接触を拾う')
+   await page.addStyleTag({ content: '.recentRow button{transform:translateX(-4px)}' })
+   assert.equal((await scan()).length, 1, '重なりも拾う')
+   await page.setContent(content(root))
+   assert.equal((await scan()).length, 0, '共通CSSへ戻すと解消')
+  }
+ } finally { await browser.close() }
+})
