@@ -1,7 +1,6 @@
 'use client'
 
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
-
 import Pagination from '@/components/shared/pagination'
 import { ListPagePagination } from '@/components/templates'
 
@@ -43,15 +42,6 @@ import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
-/*
- * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
- *
- * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
- * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
- * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
- */
 
 type ViewKey = 'affiliate' | 'offer'
 
