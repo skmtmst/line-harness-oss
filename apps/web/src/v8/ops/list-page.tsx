@@ -4,7 +4,6 @@ import { ListPage, type ListPageProps } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
-import SearchField from '@/components/shared/search-field'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 
@@ -18,7 +17,7 @@ export function OpsListPage({ stats, ...props }: ListPageProps) {
 
 export function OpsListToolbar({ search, filters, trailing }: Pick<ComponentProps<typeof ListToolbar>, 'search' | 'filters' | 'trailing'>) {
   return <ListToolbarFrame><ListToolbarRow>
-    {search ? <ListToolbarSearchSlot width={search.width}><SearchField value={search.value} onChange={search.onChange} onClear={() => search.onChange('')} placeholder={search.placeholder} aria-label={search.label ?? search.placeholder} maxLength={search.maxLength} loading={search.loading} /></ListToolbarSearchSlot> : null}
+    {search ? <ListToolbarSearchSlot width={search.width} search={search} /> : null}
     {filterItems(filters)}
     {trailing ? <ListToolbarEnd>{trailing}</ListToolbarEnd> : null}
   </ListToolbarRow></ListToolbarFrame>

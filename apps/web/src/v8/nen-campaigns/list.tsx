@@ -168,7 +168,7 @@ function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] 
 }
 
 /** 表の下の件数とページ送り。2ページ以上は共通のページ送り（件数の文つき）、1ページでも件数は出す。 */
-function Pager({ total, page, size, onPage }: { total: number; page: number; size: number; onPage: (page: number) => void }) {
+export function Pager({ total, page, size, onPage }: { total: number; page: number; size: number; onPage: (page: number) => void }) {
   const pageCount = Math.max(1, Math.ceil(total / size))
   return (
     <div className={styles.pagerRow}>

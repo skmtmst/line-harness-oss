@@ -235,7 +235,7 @@ function CompareInner() {
                     ) : null}
 <div className={styles.panelActions}>
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
-                      <Button type="button" variant="primary" onClick={submit} disabled={!ready} busy={review.deciding} busyLabel="処理中…">判定する</Button>
+                      <Button type="button" variant="primary" onClick={submit} disabled={!ready} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : !reason.trim() ? '判定の理由を入れてください' : !linkedReady ? '使う値と3つの確認を選んでください' : undefined} busy={review.deciding} busyLabel="処理中…">判定する</Button>
                     </div></Field></div>
                   <div className={styles.historyCard}>
                     <p className={styles.panelTitle}>判定の履歴</p>

@@ -24,7 +24,7 @@ const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
 export const keyOf = f => JSON.stringify([f.kind, f.target, f.other || '', f.text])
-const KINDS = ['form-action-value', 'form-preview-surface', 'form-create-title', 'form-save-icon', 'form-help', 'form-copy', 'form-shrink', 'form-color', 'form-footer-action', 'form-optional', 'form-row-end', 'control-overlap', 'control-blocked', 'liffshadow', 'liffradio', 'canvasbottom', 'kpiblank', 'kpialign', 'kpimenu', 'cardspill', 'cardbottom', 'segempty', 'segselected', 'segstyle', 'choice-radio', 'choice-color', 'pageredge', 'rowmenu', 'bandtouch', 'customer-edit', 'insertoutside', 'insertlegacy', 'internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname', 'requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu']
+const KINDS = ['form-keyword-input', 'form-action-value', 'form-preview-surface', 'form-create-title', 'form-save-icon', 'form-help', 'form-copy', 'form-shrink', 'form-color', 'form-footer-action', 'form-optional', 'form-row-end', 'control-overlap', 'control-blocked', 'liffshadow', 'liffradio', 'canvasbottom', 'kpiblank', 'kpialign', 'kpimenu', 'cardspill', 'cardbottom', 'segempty', 'segselected', 'segstyle', 'choice-radio', 'choice-color', 'pageredge', 'rowmenu', 'bandtouch', 'customer-edit', 'insertoutside', 'insertlegacy', 'internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname', 'requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu']
 export function validateAllowances(allowances) {
   if (!Array.isArray(allowances)) throw new Error('許可リストは配列です')
   const keys = new Set()
@@ -79,7 +79,7 @@ export function assessAgainstBase(findings, baseFindings, route, width, allowanc
   })
   // 固定の許可の上限を変えない。同じ項目の件数を二重に足すこともない。
   const fixedKeys = new Set(allowances.filter(a => a.route === route && a.width === width).map(keyOf))
-  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'form-action-reason'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
+  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'form-required-badge', 'form-action-reason'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
     .filter(a => !fixedKeys.has(keyOf(a)))
   const baseKeys = new Set(baseline.map(keyOf))
   const result = assess(findings, route, width, [...allowances, ...baseline])

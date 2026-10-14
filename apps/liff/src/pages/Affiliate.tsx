@@ -270,7 +270,7 @@ function CopyButton({
 
   return (
     <>
-      <Button variant="secondary" className="w-auto shrink-0"
+      <Button variant={compact ? 'inline-action' : 'secondary'} className="w-auto shrink-0"
         type="button"
         onClick={handleCopy}
       >
@@ -590,7 +590,7 @@ function CompactOfferRow({
       <p className="min-w-0 flex-1 truncate text-xs text-ink" title={offer.name}>
         {offer.name}・リンクを発行する
       </p>
-      <Button variant="secondary" className="w-auto shrink-0"
+      <Button variant="inline-action"
         type="button"
         onClick={() => void handleEnroll()}
         disabled={busy || offer.halted}

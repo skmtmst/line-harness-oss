@@ -143,7 +143,7 @@ export default function OpsTenantsV8() {
   const kpiLoading = loading && !summary
 
   return (
-    <OpsListPage boardId="XWtYC" title="契約先アカウント" help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
+    <OpsListPage boardId="XWtYC" title="契約先アカウント" readOnly={readOnly} help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
       actions={readOnly ? null : <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>}
         stats={<KpiBand>
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />

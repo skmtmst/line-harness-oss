@@ -1,7 +1,6 @@
 'use client'
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
 import { Download, Eye, PencilLine } from 'lucide-react';
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared';
@@ -9,7 +8,6 @@ import { api, ApiError, type ScenarioRuns } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { useStaffRole } from '@/lib/staff-role';
 import { DetailPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
@@ -87,7 +85,6 @@ export default function ScenarioResultsV8() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  const role = useStaffRole()
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみは購読を変える操作（…）を隠す。
   const featureAccess = useFeatureAccess('scenarios')
   const canEdit = featureAccess

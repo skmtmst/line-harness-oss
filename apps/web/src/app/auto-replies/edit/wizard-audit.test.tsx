@@ -2,7 +2,7 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ query: 'id=synthetic-rule&step=response', getDraft: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), saveDraft: vi.fn(), testDraft: vi.fn(), accounts: [{id:'synthetic-account'}], pageTitle: vi.fn(), liveStatus: 'published' }))
+const net = vi.hoisted(() => ({ query: 'id=synthetic-rule&step=response', getDraft: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), saveDraft: vi.fn(), testDraft: vi.fn(), publishDraft: vi.fn(), accounts: [{id:'synthetic-account'}], pageTitle: vi.fn(), liveStatus: 'published' }))
 vi.mock('next/navigation', () => ({useRouter: () => ({replace: (url: string) => {net.query = url.split('?')[1]}, push: vi.fn()}), useSearchParams: () => new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId: 'synthetic-account', accounts: net.accounts})}))
 vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: net.pageTitle}))
@@ -10,7 +10,7 @@ vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({e
 vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner', canManageRole: () => true}))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({default: () => null, useActionOptions: () => ({tags:[],fields:[],marks:[],scenarios:[],vars:[]})}))
 vi.mock('@/components/shared/select', () => ({ default: ({value,onChange,options,...props}: {value: string; onChange: (value: string) => void; options: Array<{value: string; label: string}>; 'aria-label'?: string}) => <select aria-label={props['aria-label']} value={value} onChange={e=>onChange(e.target.value)}>{options.map((o)=><option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
-vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft},templates:{list:async()=>({success:true,data:[]})},folders:{list:async()=>({success:true,data:[]})},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
+vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft,publishDraft:net.publishDraft},templates:{list:async()=>({success:true,data:[]})},folders:{list:async()=>({success:true,data:[]})},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
 import Page from './wizard-v8'
 const DRAFT = {
   autoReplyId: 'synthetic-rule',
@@ -117,3 +117,23 @@ it.each(['draft','published'])('Y3 IDを持つ%sの状態から、題とパン�
  expect(net.pageTitle).toHaveBeenLastCalledWith(`${title}・基本設定`);
  expect(net.getDraft).toHaveBeenCalledTimes(1);
 });
+
+it('有効化した後は説明をカードに残し、一覧・実行結果・次の作成へ進める', async () => {
+ net.liveStatus='draft';net.query='id=synthetic-rule&step=priority'
+ net.testDraft.mockResolvedValue({success:true,data:{draftWon:true,winner:null,candidates:[],staleTest:false}})
+ net.publishDraft.mockResolvedValue({success:true,data:{}})
+ const view=render(<Page/>);await act(async()=>{})
+ fireEvent.change(document.querySelector('#wiz-test-message') as HTMLInputElement,{target:{value:'test'}})
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'試す',exact:true})))
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'次へ：確認',exact:true})))
+ view.rerender(<Page/>);await act(async()=>{})
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'有効にする',exact:true})))
+ expect(net.publishDraft).toHaveBeenCalledTimes(1)
+ expect(screen.getByRole('heading',{name:'「J7 synthetic reply」を有効にしました'})).toBeTruthy()
+ const description=screen.getByText('これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。')
+ expect(description.closest('[data-design-node="t0jk8p"]')).not.toBeNull()
+ expect(description.closest('[role="tooltip"]')).toBeNull()
+ expect(screen.getByRole('link',{name:'一覧へ戻る'}).getAttribute('href')).toBe('/auto-replies')
+ expect(screen.getByRole('link',{name:'実行結果を見る'}).getAttribute('href')).toBe('/auto-replies/runs?id=synthetic-rule')
+ expect(screen.getByRole('link',{name:'もう1つ作る'}).getAttribute('href')).toBe('/auto-replies/edit')
+})

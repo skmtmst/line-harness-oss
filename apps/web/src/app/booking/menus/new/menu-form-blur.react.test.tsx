@@ -114,6 +114,19 @@ async function renderForm() {
 }
 
 describe('メニュー作成（V8）の欄を離れたときの確かめ', () => {
+  test('必須の入力と読むマイルを区別し、名前と分類は共通の入力行へ渡す', async () => {
+    await renderForm()
+    const name = screen.getByPlaceholderText('例：トリミング（小型犬）')
+    const duration = screen.getByLabelText('かかる時間（分）')
+    expect(name.getAttribute('aria-required')).toBe('true')
+    expect(duration.getAttribute('aria-required')).toBe('true')
+    expect(name.closest('[data-form-row="name-folder"]')?.contains(screen.getByLabelText('分類'))).toBe(true)
+    const mileage = screen.getByLabelText('予約したときのマイル（お店全体の設定）') as HTMLInputElement
+    expect(mileage.disabled).toBe(false)
+    expect(mileage.readOnly).toBe(true)
+    expect(mileage.closest('[data-form-row="columns"]')?.contains(duration)).toBe(true)
+    expect(fixture.createMenu).not.toHaveBeenCalled()
+  })
   test('空の名前欄を離れると保存前に欄の下へ直し方が出る', async () => {
     await renderForm()
     const name = screen.getByPlaceholderText("例：トリミング（小型犬）")

@@ -20,9 +20,9 @@ import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
 import '../../../../liff/src/index.css';
 import LiffHeader from '../../../../liff/src/components/ui/LiffHeader.js';
+import LivePlayerControls from '../../../../liff/src/components/ui/LivePlayerControls.js';
 import LoadingView from '../../../../liff/src/components/LoadingView.js';
 import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
-import Icon from '../../../../liff/src/components/ui/Icon.js';
 import StatusView from '../../../../liff/src/components/ui/StatusView.js';
 import Button from '../../../../liff/src/components/ui/Button.js';
 import { TextInput, FieldCount } from '../../../../liff/src/components/forms/controls.js';
@@ -891,21 +891,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
           {header}
       <div className="relative aspect-video w-full shrink-0 bg-night-panel">
         <video ref={videoRef} className="aspect-video w-full" playsInline />
-        {!ended && (
-          <span className={`absolute left-2 top-2 rounded px-2 py-0.5 text-xs font-bold ${IS_PREVIEW || state.replay ? 'bg-gray-600' : 'bg-red-600'}`}>
-            {IS_PREVIEW ? 'PREVIEW' : state.replay ? 'REPLAY' : '● LIVE'}
-          </span>
-        )}
-        {!ended && (
-          <Button variant="nightSound"
-            className="absolute right-2 top-2"
-            onClick={toggleMute}
-            aria-label={muted ? '音声をオンにする' : '音声をオフにする'}
-          >
-            <Icon name="volume-x" className="h-3.5 w-3.5" />
-            {muted ? '音声をオンにする' : '音声をオフにする'}
-          </Button>
-        )}
+        {!ended && <LivePlayerControls mode={IS_PREVIEW ? 'preview' : state.replay ? 'replay' : 'live'} muted={muted} onToggleMute={toggleMute} />}
         {needsTap && muted && !ended && (
           <button
             className="absolute inset-0 flex items-center justify-center bg-black/60"
@@ -976,7 +962,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
             </div>
           ) : (
             <div key={item.key} className="mb-2">
-              <span className={item.mine ? 'font-medium text-night-mine' : 'font-medium text-gray-400'}>
+              <span data-liff-comment-author className={item.mine ? 'font-medium text-night-mine' : 'text-night-body'}>
                 {item.authorName}
               </span>{' '}
               <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}

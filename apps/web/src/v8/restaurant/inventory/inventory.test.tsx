@@ -135,6 +135,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
     await screen.findByText('19:00 の卓')
     expect(screen.queryByRole('button', { name: /開ける時間と配分を保存/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '＋ 時間帯を足す' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '媒体の受付を閉じる' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('閲覧のみで見ています。')
   })
 
   it('埋まっている卓は個室→テーブル→カウンターの順、3つ以上の連番は「〜」で縮める', () => {

@@ -15,9 +15,10 @@ import styles from './tag-picker-field.module.css'
 
 export type TagPickerOption = { id: string; name: string; groupId?: string | null; isStarred?: boolean; lineAccountId?: string | null }
 /** 案A：欄全体が押せる。窓を開いても、選ぶまで保存値は変えない。 */
-export default function TagPickerField({ label = 'タグを付ける', value, onChange, options, accountId, readOnly = false, disabled = false, invalid = false, multiple = true, id: fieldId, buttonRef, describedBy }: {
+export default function TagPickerField({ label = 'タグを付ける', value, onChange, options, accountId, readOnly = false, disabled = false, disabledReason, invalid = false, multiple = true, id: fieldId, buttonRef, describedBy }: {
   label?: string; value: string[]; onChange: (ids: string[]) => void; options?: readonly TagPickerOption[]
   accountId?: string | null; readOnly?: boolean; disabled?: boolean; invalid?: boolean; multiple?: boolean; id?: string; buttonRef?: Ref<HTMLButtonElement>; describedBy?: string
+  disabledReason?: string
 }) {
   const account = useTapActionAccount()
   const id = accountId === undefined ? account?.selectedAccountId ?? null : accountId
@@ -55,7 +56,7 @@ export default function TagPickerField({ label = 'タグを付ける', value, on
     return <TagPill size="xs" key={key} name={names[index]} color={folder ? folderDisplayColor(folder) : null} />
   }) : <span className={styles.placeholder}>タグを選ぶ</span>}</span>
   return <>
-    {readOnly ? <div className={styles.field}>{selection}</div> : <button id={fieldId} ref={buttonRef} aria-describedby={describedBy} type="button" className={styles.field} aria-label={`${label}：${value.length ? '変える' : '選ぶ'}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} disabled={disabled} onClick={() => { setOpen(true); void load() }}>
+    {readOnly ? <div className={styles.field}>{selection}</div> : <button id={fieldId} ref={buttonRef} aria-describedby={describedBy} type="button" className={styles.field} aria-label={`${label}：${value.length ? '変える' : '選ぶ'}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} disabled={disabled} title={disabled ? disabledReason : undefined} onClick={() => { setOpen(true); void load() }}>
       <TagIcon size={14} aria-hidden="true" />{selection}<span className={styles.change}>{value.length ? '変える' : '選ぶ'}</span><ChevronRight size={14} aria-hidden="true" />
     </button>}
     {open ? <TagPickerDialog key={id ?? "hq"} multiple={multiple} items={items} folders={folders} folderFailed={folderFailed} status={status} initialIds={value} accountId={id} onCreated={tag => { createdItems.current.push(tag); setItems(current => [...current.filter(item => item.id !== tag.id), tag]) }} onCancel={() => setOpen(false)} onConfirm={ids => { onChange(ids); setOpen(false) }} onRetry={() => void load()} /> : null}

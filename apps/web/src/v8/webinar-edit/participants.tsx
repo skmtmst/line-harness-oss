@@ -14,12 +14,13 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import {
   ApiError,
   downloadApiFile,
@@ -46,7 +47,6 @@ import styles from './participants.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 ウェビナーの参加者（Pencil uNsEy）。
@@ -189,10 +189,10 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     body = <ListState kind="empty" title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} />
   } else {
     body = (
-      <DataTable className={styles.table} aria-label="参加者一覧">
+      <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-wb-col-gap)', padding: '0 var(--tpl-list-inset)' }} aria-label="参加者一覧">
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>参加者</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>参加者</Th>
             <Th className={styles.colWhen}>最終参加</Th>
             <Th className={styles.colWatch}>視聴</Th>
             <Th className={styles.colAction}>アクション</Th>
@@ -205,25 +205,22 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, webinar.durationSeconds)) * 100))
             const badge = actionBadge(participant)
             return (
-              <Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}>
-                <Td className={styles.colName}><FolderDotName>
-                  <RowNameLink href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</RowNameLink>
+              <Tr data-row-id={participant.friendId} key={participant.friendId} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}>
+                <Td grow><FolderDotName>
+                  <RowNameLink href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name}>{name}</RowNameLink>
 
                 </FolderDotName></Td>
                 <Td className={styles.colWhen}><span className={styles.main} title={[joinNote(participant), joinKindLabel(participant)].filter(Boolean).join("・")}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
                   <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
-                  <span className={styles.sub}>{participantStateLabel(participant, webinar.durationSeconds)}</span>
+                  <TruncatedText className={styles.sub} value={participantStateLabel(participant, webinar.durationSeconds)} />
                 </Td>
                 <Td className={styles.colAction}>
-                  <span className={styles.pill} data-tone={badge.done ? 'done' : 'neutral'}>
-                    <span className={styles.pillDot} aria-hidden="true" />
-                    {badge.label}
-                  </span>
+                  <StatusBadge tone={badge.done ? 'success' : 'neutral'}>{badge.label}</StatusBadge>
                 </Td>
-                <Td className={styles.colDetail}>
+                <ActionCell className={styles.colDetail}>
                   <Button href={`/chats?friend=${encodeURIComponent(participant.friendId)}`}>チャットを見る →</Button>
-                </Td>
+                </ActionCell>
               </Tr>
             )
           })}
@@ -239,7 +236,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   return (
     <PageFrame kind="list" boardId="uNsEy">
       <DetailHead {...chrome} current="participants" actions={csvButton} />
-      <ListPageBody listHelp={<> 名前から友だちの詳細、「チャットを見る」からトークを開きます。
+      <ListPageBody listHelpPlacement="end" listHelp={<> 名前から友だちの詳細、「チャットを見る」からトークを開きます。
             {rule ? ` 視聴完了＝動画の9割（${fmtSec(rule.completionThresholdSeconds)}）以上を見た人。` : ''}
             {measurement?.state === 'unavailable' ? ` ${measurement.reason}。個人の分類は「計測外」になります。` : ''} </>}
         stats={<>
@@ -254,10 +251,8 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             ))}
           </KpiBand>
         </>}
-        toolbar={<>
-          <div className={styles.noticeRow}>
-          </div>
-          {csvError ? <div className={styles.noticeRow}><Notice tone="danger">{csvError}</Notice></div> : null}
+        toolbar={<ListToolbarFrame>
+          {csvError ? <Notice tone="danger">{csvError}</Notice> : null}
           <ListToolbar
             search={{ placeholder: '友だちの名前で探す', label: '友だちの名前で探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
             filters={(
@@ -270,19 +265,15 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
               </div>
             )}
             trailing={<>
-              <div className={styles.savedBox}>
-                <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-                <SaveErrorField names={["filter"]}><Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} /></SaveErrorField>
-              </div>
+              <Select size="content" icon={<Bookmark size={15} aria-hidden="true" />} aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />
               <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} options={[10, 20, 50]} label={null} />
             </>}
           />
-        </>}
+        </ListToolbarFrame>}
         pagination={<>
           {state === 'ready' && searched.length > 0 ? (
             <ListPagePagination>
-              <span className={styles.pagerCount}>{`${formatNumber(searched.length)} 件中 ${from}〜${to} 件`}</span>
-              <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" />
+              <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" range={{ total: searched.length, first: from, last: to }} />
             </ListPagePagination>
           ) : null}
         </>}
