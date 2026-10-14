@@ -1107,29 +1107,17 @@ export default function MenuFormV8() {
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
             {ownRules ? (
-              <>
-                <div className={styles.ruleRow}>
-                  <span className={styles.ruleLabel}>先の予約が取れる範囲</span>
-                  <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                    <SaveErrorField names={["windowDays","window_days"]}><NumberInput type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
-                    <span className={styles.unitSuffix}>日先まで</span>
-                  </span>
-                </div>
-                <div className={styles.ruleRow}>
-                  <span className={styles.ruleLabel}>受付の締め切り</span>
-                  <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                    <SaveErrorField names={["cutoffHours","cutoff_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" /></SaveErrorField>
-
-                  </span>
-                </div>
-                <div className={styles.ruleRow}>
-                  <span className={styles.ruleLabel}>キャンセルの期限</span>
-                  <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                    <SaveErrorField names={["cancelDeadlineHours","cancel_deadline_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" /></SaveErrorField>
-
-                  </span>
-                </div>
-              </>
+              <SettingsFormRow layout="columns" columns={3}>
+                <Field label="先の予約が取れる範囲">
+                  <SaveErrorField names={["windowDays","window_days"]}><NumberInput unit="日先まで" type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
+                </Field>
+                <Field label="受付の締め切り">
+                  <SaveErrorField names={["cutoffHours","cutoff_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" /></SaveErrorField>
+                </Field>
+                <Field label="キャンセルの期限">
+                  <SaveErrorField names={["cancelDeadlineHours","cancel_deadline_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" /></SaveErrorField>
+                </Field>
+              </SettingsFormRow>
             ) : (
               <>
                 <div className={styles.ruleRow}>
@@ -1149,9 +1137,9 @@ export default function MenuFormV8() {
               </>
             )}
             <div className={styles.changeRow}>
-              <button type="button" className={styles.changeLink} onClick={() => setOwnRules((v) => !v)}>
-                {ownRules ? 'お店のきまりに戻す' : <><Pencil size={15} aria-hidden="true" />このメニューだけ変える</>}
-              </button>
+              <Button variant="text" textTone="ink" onClick={() => setOwnRules((v) => !v)}>
+                {ownRules ? 'お店のきまりに戻す' : <><Pencil aria-hidden="true" />このメニューだけ変える</>}
+              </Button>
             </div>
           </Card>
 
@@ -1280,22 +1268,11 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            <div className={styles.payHead}>
-              <h2 className={shell.sectionTitle}>お支払い</h2>
-              <StatusBadge tone="warning" size="compact">お店で払うのみ</StatusBadge>
-            </div>
+            <CardHeader size="stacked" title="お支払い" action={<StatusBadge tone="warning" size="compact">お店で払うのみ</StatusBadge>} />
             <p className={shell.sectionDesc}>決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</p>
-            <div className={styles.payRow} role="radiogroup" aria-label="お支払い方法">
-              <span className={`${styles.payOption} ${styles.payOptionOn}`} role="radio" aria-checked="true">
-                <span className={styles.payDot} aria-hidden="true" />お店で払う
-              </span>
-              <span className={styles.payOption} role="radio" aria-checked="false" aria-disabled="true" title="決済サービスをつなぐと選べます">
-                <span className={styles.payDot} aria-hidden="true" />オンラインで先払い
-              </span>
-              <span className={styles.payOption} role="radio" aria-checked="false" aria-disabled="true" title="決済サービスをつなぐと選べます">
-                <span className={styles.payDot} aria-hidden="true" />どちらでも
-              </span>
-            </div>
+            <Field label="お支払い方法" optional={false} help="オンラインで先払い・どちらでもは、決済サービスをつなぐまで選べません。">
+              <TextField readOnly value="お店で払う" />
+            </Field>
           </Card>
 
           {saveError && (

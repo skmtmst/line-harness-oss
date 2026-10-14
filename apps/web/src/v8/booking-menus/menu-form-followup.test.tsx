@@ -6,6 +6,7 @@
  * - 064：開いただけで「直しかけ」にしない（受付の日数・時間の欄）
  */
 import React from 'react'
+import buttonStyles from '@/components/shared/button.module.css'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -163,4 +164,20 @@ it('作成の道順は親のリンクだけを渡し、現在地を共通の題�
     { label: '予約', href: '/booking/bookings' },
     { label: '予約設定', href: '/booking/menus' },
   ])
+})
+
+it('メニュー固有ルールの操作と支払いは共通の部品で、選べない方法を操作にしない', async () => {
+  render(<MenuFormV8 />)
+  await settle()
+  const rules = screen.getByRole('button', { name: 'このメニューだけ変える', exact: true })
+  expect(rules.classList.contains(buttonStyles.button)).toBe(true)
+  fireEvent.click(rules)
+  expect(screen.getByRole('spinbutton', { name: '受付の締め切り（時間前）' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'お店のきまりに戻す', exact: true }))
+  expect(screen.queryByRole('spinbutton', { name: '受付の締め切り（時間前）' })).toBeNull()
+  expect(screen.getByRole('heading', { name: 'お支払い', exact: true }).closest('[data-design-node="t0jk8p"]')).toBeTruthy()
+  const payment = screen.getByRole('textbox', { name: 'お支払い方法', exact: true }) as HTMLInputElement
+  expect(payment.readOnly).toBe(true)
+  expect(payment.value).toBe('お店で払う')
+  expect(screen.queryByRole('radiogroup', { name: 'お支払い方法' })).toBeNull()
 })

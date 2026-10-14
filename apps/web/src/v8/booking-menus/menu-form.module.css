@@ -179,48 +179,9 @@
   text-align: right;
 }
 
-.ruleOwn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bm-6);
-}
-
-.ruleOwn input {
-  width: var(--tpl-bm-72);
-  height: var(--tpl-bm-26);
-  padding: 0 var(--tpl-bm-8);
-  border: 0;
-  outline: 1px solid var(--color-control-border);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  font-size: var(--tpl-bm-13);
-  text-align: right;
-}
-
 .changeRow {
   display: flex;
   justify-content: flex-end;
-}
-
-.changeLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bm-6);
-  height: var(--tpl-bm-36);
-  padding: 0 var(--tpl-bm-14);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  line-height: var(--tpl-bm-20);
-  cursor: pointer;
-}
-
-.changeLink:hover {
-  background: var(--color-canvas-sunken);
 }
 
 /* ===== そのほか（灰の段に白い小段） ===== */
@@ -262,64 +223,8 @@
   gap: var(--tpl-bm-24);
 }
 
-/* お支払い（準備中）。 */
-.payHead {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-bm-8);
-}
-
-.payRow {
-  display: flex;
-  gap: var(--tpl-bm-8);
-}
-
-.payOption {
-  display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  gap: var(--tpl-bm-8);
-  padding: var(--tpl-bm-10) var(--tpl-bm-12);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  line-height: var(--tpl-bm-19);
-}
-
-.payOption[aria-disabled='true'] {
-  color: var(--color-ink-secondary);
-}
-
-.payOptionOn {
-  outline: var(--tpl-bm-2) solid var(--color-accent);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  background: var(--color-success-bg);
-}
-
-.payDot {
-  flex-shrink: 0;
-  width: var(--tpl-bm-16);
-  height: var(--tpl-bm-16);
-  border-radius: var(--radius-pill);
-  outline: var(--tpl-bm-2) solid var(--color-control-border);
-  outline-offset: calc(var(--tpl-bm-2) * -1);
-}
-
-.payOptionOn .payDot {
-  outline: var(--tpl-bm-5) solid var(--color-accent);
-  outline-offset: calc(var(--tpl-bm-5) * -1);
-}
-
-
-
 .saveNote {
   margin: 0;
   color: var(--color-status-warn-deep);
   font-size: var(--tpl-bm-13);
 }
-
-.staffRow[aria-invalid='true'] { outline: var(--tpl-bm-2) solid var(--color-danger); }
