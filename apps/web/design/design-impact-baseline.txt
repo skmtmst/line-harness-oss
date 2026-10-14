@@ -336,6 +336,7 @@ shared-button-importer v8/reminders/ui.tsx
 shared-button-importer v8/webinar-edit/analytics.tsx
 shared-button-importer v8/webinar-edit/basic-form.tsx
 shared-button-importer v8/webinar-edit/basic.tsx
+shared-button-importer v8/webinar-edit/comment-stats.tsx
 shared-button-importer v8/webinar-edit/comments.tsx
 shared-button-importer v8/webinar-edit/cta.tsx
 shared-button-importer v8/webinar-edit/edit.tsx

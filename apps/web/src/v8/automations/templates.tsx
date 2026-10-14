@@ -8,6 +8,9 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { ListPageCards } from '@/components/templates/list-page'
+import TruncatedText from '@/components/shared/truncated-text'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -207,27 +210,26 @@ export default function AutomationTemplatesV8() {
         {visible.length === 0 ? (
           <ListState kind="empty" title="条件に合う見本はありません" description="きっかけの札を外すと、すべて出ます。" />
         ) : (
-          <ul className={styles.grid} aria-label="見本">
+          <div role="list" aria-label="見本"><ListPageCards columns={4}>
             {visible.map((item) => {
               const triggerText = templateTriggerText(item.triggerLabel)
               return (
-                <li key={item.key} className={styles.card}>
+                <Card key={item.key} role="listitem" layout="vertical" padding="compact" gap="tight">
                   <h2 className={styles.cardTitle} title={item.name}>{item.name}</h2>
                   <dl className={styles.facts}>
                     <div className={styles.fact}>
                       <dt>きっかけ</dt>
-                      <dd title={triggerText}>{triggerText}</dd>
+                      <dd><TruncatedText value={triggerText} /></dd>
                     </div>
                     <div className={styles.fact}>
                       <dt>すること</dt>
-                      <dd title={item.actionLabel}>{item.actionLabel}</dd>
+                      <dd><TruncatedText value={item.actionLabel} /></dd>
                     </div>
                   </dl>
                   <span className={styles.cardSpacer} aria-hidden="true" />
                   {canEdit ? (
                     <Button
                       variant="secondary"
-                      className={styles.cardButton}
                       disabled={creating !== null}
                       busy={creating === item.key}
                       busyLabel="下書きを作っています…"
@@ -236,10 +238,10 @@ export default function AutomationTemplatesV8() {
                       この見本で下書きを作る
                     </Button>
                   ) : null}
-                </li>
+                </Card>
               )
             })}
-          </ul>
+          </ListPageCards></div>
         )}
         <p className={styles.note}>実行まで確認できた見本だけを、ここへ表示します。見本に実データは入っていません。見本から作る下書きは、選んだアカウントだけに保存します。</p>
       </>

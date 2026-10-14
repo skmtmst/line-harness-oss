@@ -1,5 +1,4 @@
 'use client'
-
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
@@ -23,9 +22,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
-
+import type { ChannelsSummary } from './channels-summary'
 type LoadStatus = 'loading' | 'ready' | 'error'
-
 const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> = {
   line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
   manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
@@ -33,7 +31,6 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
   google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む' },
   epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む' },
 }
-
 function formatReadAt(value: string | null): string {
   return polishFormatDate(value, { style: 'list' })
 }
@@ -132,7 +129,6 @@ function ConnectDialog({
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
-
 
       setError(describeApiFailure(e, 'つなげませんでした。ID を確かめてやり直してください。')) }
     } finally {
@@ -246,12 +242,13 @@ export function ConflictDialog({
 }
 
 /** 予約経路の連携タブ（ZyDd6）。スタッフの Google カレンダーと予約経路の一覧。 */
-export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { accountId: string; canEdit: boolean; staff?: BookingStaff[] }) {
+export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummaryChange }: { accountId: string; canEdit: boolean; staff?: BookingStaff[]; onSummaryChange?: (summary: ChannelsSummary) => void }) {
   const saveErrors = useSaveFormErrors()
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   const [data, setData] = useState<BookingChannelsData | null>(null)
+  const loadedAccountId = useRef('')
   const [calendars, setCalendars] = useState<Record<string, string>>({})
   const [conflicts, setConflicts] = useState<BookingConflict[]>([])
   const [connectTarget, setConnectTarget] = useState<BookingChannelStaff | null>(null)
@@ -290,7 +287,6 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       setSavingAssign(false)
     }
   }
-
   /* WEB058：アカウントを変えたら、前のアカウントの遅い応答（一覧・重なり・カレンダー）を捨てる。 */
   const loadGeneration = useRef(0)
   useEffect(() => {
@@ -314,6 +310,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       if (!alive()) return
       if (!channelsRes.success) throw new Error(channelsRes.error)
       if (!conflictsRes.success) throw new Error(conflictsRes.error)
+      loadedAccountId.current = accountId
       setData(channelsRes.data)
       setConflicts(conflictsRes.data.conflicts)
       setStatus('ready')
@@ -339,7 +336,6 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       const fieldFailure = saveErrors.capture(e)
       { if (!fieldFailure)
 
-
       setError(describeApiFailure(e, '予約経路を読み込めませんでした。')) }
       setStatus('error')
     }
@@ -348,6 +344,10 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    onSummaryChange?.({ accountId: data ? loadedAccountId.current : accountId, status, data, conflicts: conflicts.length })
+  }, [accountId, status, data, conflicts.length, onSummaryChange])
 
   const firstConflict = conflicts[0] ?? null
 

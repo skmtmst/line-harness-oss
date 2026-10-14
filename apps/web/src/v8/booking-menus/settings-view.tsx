@@ -1,6 +1,7 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import ChannelsSummaryBand, { type ChannelsSummary } from './channels-summary'
 import { Check, Smartphone } from 'lucide-react'
 import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
@@ -15,6 +16,8 @@ import type { useBookingSettings } from './settings'
 import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, V8_TABS } from './settings-parts'
 
 export default function BookingSettingsView({ accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, hasChanges, registerTabEdit, switchTarget, setSwitchTarget, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, phone }: ReturnType<typeof useBookingSettings> & { phone: ReactNode }) {
+  const [channelsSummary, setChannelsSummary] = useState<ChannelsSummary | null>(null)
+  const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
               {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
@@ -33,7 +36,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
         dirty={false}
         readOnly={Boolean(accountId && tabReadOnly)} title={<>予約設定</>}
         help={<>お客さまの予約画面に出るメニュー・時間・ルールを決めます</>}
-        tabs={<><Tabs
+        tabs={<>{tab === 'channels' && accountId ? <ChannelsSummaryBand summary={currentSummary} /> : null}<Tabs
               label="予約設定のタブ"
               items={V8_TABS.map((item) => ({
                 label: item.label,
@@ -139,7 +142,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                 onReload={reloadCore}
               />
             ) : (
-              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} />
+              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} onSummaryChange={setChannelsSummary} />
             )}
       </CreatePage>
 
