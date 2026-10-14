@@ -22,7 +22,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
-import { Check, Plus } from 'lucide-react'
+import { Check, Inbox, Plus } from 'lucide-react'
 import SeatTile from '@/components/shared/seat-tile'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
@@ -242,10 +242,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   return (
     <SaveErrorScope errors={saveErrors}><>
       <StatRow fusion>
-        <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={undefined} presentation="band" />
-        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={undefined} presentation="band" />
-        <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={undefined} presentation="band" />
-        <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={undefined} presentation="band" />
+        <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
       <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
         <div className={styles.detailPanel}>
