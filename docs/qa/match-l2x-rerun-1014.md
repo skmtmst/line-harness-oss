@@ -25,3 +25,17 @@ Q5lOCc・X0QrW0・PftqN・OylSV・R8tlbw・Eo56k・h7dmB・DrwMm・PZBVb・BygrU
 検証の入口はブラウザスキルを読み、Chrome接続を確認。板ごとの権限/API/選択状態は指定の既存撮影道具を使う（操作の事実を記録）。その道具の元コードや見張りの上限/許可は変更しない。
 
 外部記録：`~/lh-work/design/v8/review/MATCH-ANALYSIS-1011/measure2/match2/L2x/resume-1410/`。START、AUTO-MERGE-PROOF、REFERENCE-BEFORE、requested-cases、試験ログを保持。追加実装0、Pen・合格台帳・親EC・DB・migration・配備・push・PR変更なし。
+
+## 終了時点：写し更新で停止（未完了）
+
+- 本線取り込みはaa12ec2aab。クリーンな同版の本番形式ビルドと配信版の一致を確認。
+- fresh-checkは「絵（Pen）が写しより新しい」で終了1。本線遅れ0、サーバー版は一致。V8.pen mtime=1791955393、COPIES-STAMP=1791939958。印を変更せず、司令塔へ写し更新を依頼。新左右は0/34。
+- 写しに依存しない実装17板51場面を取得し、崩れ/横はみ出し/例外/更新要求/実寸の指摘0、未取得0。通知履歴2板6場面のF10は対象外、残45は0。静的候補262件は未分類で、手書き0とは呼ばない。
+- 全112板の現在の数は再集計せず、初回49/修正前58/予想13〜15の未採点を保持。今回の追加修正0・修正による0追加0。機械0を目視合格へ広げない。
+- 鍵不足0。175板332場面を比較し、未取得0・差7板218項目・終了1。CyW0E/DA0Ag/H5UoIu/JeINq/Td4TN/hadfk/iLJmw。鍵の更新なし。
+- 差のある本線との読み先はDA0Ag（Webhook）/hadfk（紹介）。残5板は本線との差のある読み先なし。依存照合は因果関係を確定する物ではない。H5UoIu/Td4TNの右欄の灰→白は指定列車のY2、ほかの差は司令塔へ。
+- 右画像2枚を目視し、OylSVの一括バーの置き場とQ5lOCcの注意札の角は既存課題として保持。新しいPen修正案は作らない。既報Jn95h/hEDTKを継続。
+
+実装側の画像・数はresume-1410/counts-images・counts.json・counts.tsv。これは新しい左右画像や合格候補ではない。正式な鍵の結果は`~/lh-work/design/v8/locks/checks/2026-10-14T05-40-30-812Z-67766/RESULT.json`。外部FINAL.md/LOCK-SUMMARY.json/LEARN.mdに渡し方と次の手順を記録。
+
+次は司令塔の写し更新後、fresh-checkを通して17板の1440/1152を撮り直し、左右34枚を出す。今の最優先作業は未完了。記録の追加コミットは文書だけで、撮影したaa12の製品コードを変更しない。
