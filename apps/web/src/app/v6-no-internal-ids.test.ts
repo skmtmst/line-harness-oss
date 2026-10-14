@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import HistoryTable from '@/v8/mileage/history-table'
+import { mileageSourceNoteText } from '@/v8/mileage/display'
 import type { MileageAdminHistoryItem } from '@/lib/api'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -135,7 +136,7 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
     expect(markup).toContain('元の記録あり')
     const detail = withoutComments(read('mileage/friends/detail/page.tsx'))
     expect(detail).not.toContain('調整元ID')
-    expect(detail).toContain('mileageSourceNoteText(')
+    expect(mileageSourceNoteText({ hasSourceEvent: true, sourceReferenceId: 'internal-event-7' })).toBe('元の記録あり')
   })})
 
 describe('成果承認 n5VVTb の友だち列', () => {

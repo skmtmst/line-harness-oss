@@ -92,4 +92,3 @@ for (const width of [1152, 1440, 1920]) {
 const output = process.env.DIALOG_DESCRIPTION_REPORT || '/tmp/v8-guard/dialog-description-band.json'
 mkdirSync(dirname(output), { recursive: true })
 writeFileSync(output, JSON.stringify(results, null, 2) + '\n')
-

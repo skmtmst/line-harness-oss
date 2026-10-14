@@ -15,9 +15,9 @@ vi.mock('next/navigation', async () => ({
 }))
 vi.mock('@/components/shared/row-actions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/components/shared/row-actions')>()
-  return { ...actual, RowMenu: (props: RowMenuProps) => <actual.RowMenu {...props}
-    className={process.env.L2X_MENU_OWNER_FAULT && props.label !== '共通の基準' ? 'page-owned-row-menu' : props.className}
-  /> }
+  return { ...actual, RowMenu: (props: RowMenuProps) => React.createElement(actual.RowMenu, {
+    ...props, className: process.env.L2X_MENU_OWNER_FAULT && props.label !== '共通の基準' ? 'page-owned-row-menu' : props.className,
+  }) }
 })
 import { RowMenu } from '@/components/shared/row-actions'
 import { MenusTabV8 } from '@/v8/booking-menus/tabs/menus-tab'
@@ -47,11 +47,11 @@ describe('表は器の幅にぴったり収める', () => {
       category_label: null, description: null, duration_minutes: 60, buffer_after_minutes: 10,
       base_price: 5000, sort_order: 0, is_active: 1, auto_tag_id: null,
     }
-    render(<>
-      <MenusTabV8 accountId="account-test" menus={[menu]} status="ready" error={null}
-        menuCount={1} canEdit onReload={() => {}} />
-      <RowMenu label="共通の基準" appearance="box" size="row" items={[]} />
-    </>)
+    render(React.createElement(React.Fragment, null,
+      React.createElement(MenusTabV8, { accountId: 'account-test', menus: [menu], status: 'ready', error: null,
+        menuCount: 1, canEdit: true, onReload: () => {} }),
+      React.createElement(RowMenu, { label: '共通の基準', appearance: 'box', size: 'row', items: [] }),
+    ))
     expect(screen.getByRole('button', { name: menu.name, exact: true })).toBeTruthy()
     const trigger = screen.getByRole('button', { name: `「${menu.name}」のそのほかの操作` })
     const reference = screen.getByRole('button', { name: '共通の基準' })
