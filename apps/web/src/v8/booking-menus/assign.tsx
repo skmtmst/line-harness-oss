@@ -350,7 +350,7 @@ export default function AssignMatrixV8() {
                   キャンセル
                 </Button>
                 <Button
-                  variant="primary"
+                  variant="primary" icon={<Check size={15} aria-hidden="true" />}
                   onClick={() => {
                     if (!dirty) {
                       notifyToast('変更はありません。')
@@ -363,7 +363,7 @@ export default function AssignMatrixV8() {
                   busy={saving}
 
                 >
-                  <Check size={15} aria-hidden="true" />保存する
+                  保存する
                 </Button>
               </>
             ) : null}

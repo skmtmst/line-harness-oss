@@ -1,5 +1,6 @@
 'use client'
 
+import TruncatedText from '@/components/shared/truncated-text'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
@@ -201,7 +202,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
                 <span className={styles.staffCellMain}>{offered}つ</span>
               ) : (
                 <span className={styles.cellWarn}>
-                  0<span className={styles.staffCellSub}>予約画面に出ません</span>
+                  0<span className={styles.staffCellSub}><TruncatedText value="予約画面に出ません" /></span>
                 </span>
               )}
             </span>
