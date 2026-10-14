@@ -31,6 +31,15 @@
   outline-color: transparent;
   box-shadow: none;
 }
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border='dividers'] {
+  border-block: 0;
+}
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:first-child {
+  padding-inline-start: 0;
+}
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:last-child {
+  padding-inline-end: 0;
+}
 :root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
   border-right: 1px solid var(--tpl-band-line);
 }

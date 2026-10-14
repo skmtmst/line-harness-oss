@@ -93,7 +93,7 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     expect(help.getAttribute('aria-expanded')).toBe('false')
     await act(async () => { help.click() })
     expect(help.getAttribute('aria-expanded')).toBe('true')
-    expect(host.querySelector('[role="note"]')?.textContent).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
+    expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).toContain('代わりに起票する')
