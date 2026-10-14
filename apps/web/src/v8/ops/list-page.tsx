@@ -3,8 +3,9 @@ import { ShieldCheck } from 'lucide-react'
 import { ListPage, type ListPageProps } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
+import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 
 export function OpsListPage({ stats, ...props }: ListPageProps) {
@@ -27,6 +28,10 @@ function filterItems(children: ReactNode, prefix = ''): ReactNode[] {
   return Children.toArray(children).flatMap((node, index) => {
     if (!isValidElement<{ children?: ReactNode }>(node)) return [node]
     const key = `${prefix}${node.key ?? index}`
-    return node.type === Fragment ? filterItems(node.props.children, `${key}/`) : [cloneElement(node, { key })]
+    if (node.type !== Fragment) return [cloneElement(node, { key })]
+    const items = Children.toArray(node.props.children)
+    return items.length > 1 && items.every(item => isValidElement(item) && item.type === FilterChip)
+      ? [<ResponsiveFilterChips key={key}>{items}</ResponsiveFilterChips>]
+      : filterItems(node.props.children, `${key}/`)
   })
 }

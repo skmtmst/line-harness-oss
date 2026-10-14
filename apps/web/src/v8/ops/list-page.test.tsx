@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { fireEvent, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { OpsListToolbar } from './list-page'
 
@@ -40,4 +41,20 @@ it('各絞り込みへ共通の道具の間隔を渡す', async () => {
     host.remove()
     errors.mockRestore()
   }
+})
+
+it('状態の札は共通の縮め方と選択を保つ', () => {
+  const onChange = vi.fn()
+  const view = render(<OpsListToolbar filters={<>
+    <FilterChip selected={false} onChange={onChange}>有効</FilterChip>
+    <FilterChip selected onChange={vi.fn()}>停止中</FilterChip>
+  </>} />)
+  try {
+    const chips = view.container.querySelectorAll('[data-filter-chips] button')
+    expect(chips).toHaveLength(2)
+    expect(view.container.querySelector('[data-filter-collapsed], [data-filter-chips]')).not.toBeNull()
+    fireEvent.click(chips[0])
+    expect(onChange).toHaveBeenCalledWith(true)
+    expect(chips[1].getAttribute('aria-pressed')).toBe('true')
+  } finally { view.unmount() }
 })
