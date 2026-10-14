@@ -74,7 +74,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <DataTable columnSizing="content">
           <thead><TableHeadRow><Th grow>お知らせ</Th><Th>配信のタイミング</Th><Th>状態</Th></TableHeadRow></thead>
           <tbody>{flows.map(flow => <Tr key={flow.id}>
-            <Td grow><RowNameButton aria-pressed={selected?.id === flow.id} onClick={() => setSelectedId(flow.id)}>{nameOf(flow)}</RowNameButton></Td>
+            <Td grow><RowNameButton selected={selected?.id === flow.id} onClick={() => setSelectedId(flow.id)}>{nameOf(flow)}</RowNameButton></Td>
             <Td>{timingLabel(flow)}</Td>
             <Td><StatusBadge tone="warning">{flow.delivery_mode === 'disabled' ? '送信しない' : 'プレビューのみ'}</StatusBadge></Td>
           </Tr>)}</tbody>

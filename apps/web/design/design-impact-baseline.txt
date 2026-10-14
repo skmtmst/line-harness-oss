@@ -355,7 +355,7 @@ shared-button-importer v8/restaurant/google/posts.tsx
 shared-button-importer v8/restaurant/google/profile.tsx
 shared-button-importer v8/restaurant/google/reviews.tsx
 shared-button-importer v8/restaurant/google/settings.tsx
-shared-button-importer v8/restaurant/line-followup/line-followup.tsx
+shared-button-importer v8/restaurant/line-followup/flow-editor.tsx
 shared-button-importer v8/restaurant/organization/organization.tsx
 shared-button-importer v8/restaurant/store-new/store-new.tsx
 # ★V8 飲食店テスト（在庫 Y8SjT2・予約台帳 l9NlC0・座席 BERxg・メニュー MJoJR）。src/v8/restaurant に一から書いた。
