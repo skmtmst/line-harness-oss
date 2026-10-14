@@ -54,6 +54,8 @@ type CommonProps = {
 type NativeButtonProps = CommonProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'href' | 'aria-busy'> & {
     href?: never
+    /** 既存の無効条件に対応する理由。押せる状態では表示しない。 */
+    disabledReason?: string | null
     /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
     ref?: React.Ref<HTMLButtonElement>
     /**
@@ -168,6 +170,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     doneLabel = '保存しました',
     widthReserve = 'states',
     disabled,
+    disabledReason,
     ref,
     onClick,
     ...buttonProps
@@ -269,6 +272,8 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      title={disabled && disabledReason ? disabledReason : buttonProps.title}
+      aria-description={disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
       aria-label={iconButtonLabel(props)}
       onClick={handleClick}
     >

@@ -13,6 +13,23 @@ vi.mock('@/lib/api', async (original) => {
 import { TagEditForm } from './edit-form'
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
+test('ひな形の空名は押せない理由を出し、入力したら外す', () => {
+  const save = vi.fn()
+  render(<TagEditForm tag={{ id: 't1', name: '', status: 'active' } as Tag} groups={[]} dependencies={null} accountId="" readOnly={false} conflict={false} compareBusy={false} onCompare={vi.fn()} onReloadLatest={vi.fn()} retroactiveReference={false} initialActions={[]} saving={false} error="" onCancel={vi.fn()} onSave={save} onDelete={vi.fn()}
+    host={{ title: 'タグのひな形を作る', saveLabel: '保存する', description: '', preview: () => null, allowedActionTypes: [], onSaveAnother: vi.fn(), onSaveDraft: vi.fn(), initialValues: { name: '', groupId: '', isStarred: false, linked: false, rewardMiles: 0, referralRewardMiles: 0, multiplierBps: null, multiplierPriority: 0, applyToExisting: false, reapplyPolicy: 'first_only', actions: [] } }} />)
+  for (const name of ['下書きを保存', '保存する']) {
+    const button = screen.getByRole('button', { name }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-description')).toBe('タグの名前を入れてください')
+  }
+  fireEvent.change(screen.getByLabelText('タグ名'), { target: { value: '会員' } })
+  for (const name of ['下書きを保存', '保存する']) {
+    const button = screen.getByRole('button', { name }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    expect(button.hasAttribute('aria-description')).toBe(false)
+  }
+})
+
 test('タグ編集の未入力は名前欄へ移動し、保存も上の重複通知も出さない', () => {
   const save = vi.fn()
   const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined)

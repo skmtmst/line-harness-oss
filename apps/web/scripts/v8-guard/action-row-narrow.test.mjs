@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 
 const webRoot = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(new URL('../../package.json', import.meta.url))
@@ -38,7 +38,7 @@ const html = `<style>${globals}${css}body{margin:0}</style><div data-theme="v8">
  */
 
   test('狭い幅では名前と値を2段目に折り返し、右端を越えない（故障対照付き）', async () => {
-    const browser = await chromium.launch()
+    const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width: 390, height: 800 } })
       await page.setContent(html)
@@ -59,7 +59,7 @@ const html = `<style>${globals}${css}body{margin:0}</style><div data-theme="v8">
   })
 
   test('設定欄は縦に並び、190px+260pxの2列へ戻す故障を検出する', async () => {
-    const browser = await chromium.launch()
+    const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width: 390, height: 800 } })
       await page.setContent(html)

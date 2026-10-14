@@ -333,6 +333,8 @@
 
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
+  - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：
@@ -510,6 +512,7 @@
 - **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
 
 - **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
+- 言葉を足す欄は `shared/keyword-input.tsx`。枠と検索印は `AffixedTextField`、幅は既存の言葉入力用の値を使う。Enter・カンマ・離れる操作で確定し、日本語の変換中は確定しない。条件や重複の判断は画面が渡す。
 
 - **10-12の色選択の変わり形（F組）**：固定色をその場で選ぶ欄は`FolderColorButton`の`appearance="palette"`。丸は24px、選んだ色に輪。保存色が候補外でも現在色の選択を出す。色の名前・選択・矢印キーは同じ正本が持つ。既定のフォルダ色メニューは保つ。
 

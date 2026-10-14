@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './visual-state-browser.mjs'
 
 test('painted preview ground is checked independently of its media card', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<main><aside data-template-region="preview" style="background:#f7f8fa;padding:24px"><article style="background:white">LINE見本</article></aside></main>')
@@ -17,7 +17,7 @@ test('painted preview ground is checked independently of its media card', async 
 })
 
 test('avatar and name share a line while a secondary description may sit below', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<main><table><tr><td><div id="person"><span data-avatar style="display:block;width:32px;height:32px">K</span><div><span>Kenta</span><p>説明の2行目</p></div></div></td></tr></table></main>')
@@ -30,7 +30,7 @@ test('avatar and name share a line while a secondary description may sit below',
 })
 
 test('capture proves the requested conflict instead of another validation error', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const expectedState = { name: '同時保存', requiredText: ['ほかの人が先に保存'], forbiddenText: ['紹介コードが使われています'] }
@@ -46,7 +46,7 @@ test('capture proves the requested conflict instead of another validation error'
 })
 
 test('legacy initial faces in a friend column are measured without Avatar markers', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<main><table><thead><tr><th>友だち</th></tr></thead><tbody><tr><td><span aria-hidden="true" style="display:block;width:32px;height:32px;border-radius:50%">K</span><a href="/friends/detail?id=fixture">Kenta</a></td></tr></tbody></table></main>')

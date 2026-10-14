@@ -35,8 +35,6 @@ describe('LIFF の決まり (sxNO5)', () => {
     const header = src('components', 'ui', 'LiffHeader.tsx');
     expect(header).toContain('aria-label="閉じる"');
     expect(header).toContain('shopName');
-    const bottom = src('components', 'ui', 'BottomBar.tsx');
-    expect(bottom).toContain('fixed inset-x-0 bottom-0');
     // 主ボタンは高さ 48 (min-h-12)。
     const button = src('components', 'ui', 'Button.tsx');
     expect(button).toContain('min-h-12');

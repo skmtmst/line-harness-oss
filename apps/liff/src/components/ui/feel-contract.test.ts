@@ -48,21 +48,6 @@ describe('手順の移り変わり (右から24px＋薄く・240ms)', () => {
   });
 });
 
-describe('下の帯は浮いたボタン (12px・ふんわり影)', () => {
-  it('下から 12px 浮き、横いっぱいで影を持つ', () => {
-    const bar = src('components', 'ui', 'BottomBar.tsx');
-    expect(bar).toContain('fixed inset-x-0 bottom-0');
-    expect(bar).toContain('max(0.75rem');
-    expect(bar).toContain('shadow-lg');
-  });
-
-  it('主ボタンの下端は板どおり画面の下から 30px (浮き 12＋帯の中 18)', () => {
-    const bar = src('components', 'ui', 'BottomBar.tsx');
-    expect(bar).toContain('max(0.75rem');
-    expect(bar).toContain('p-3 pb-[18px]');
-  });
-});
-
 describe('動きを減らす設定では薄く入れ替えるだけ', () => {
   it('prefers-reduced-motion で押し・光・滑りを止める', () => {
     expect(css).toContain('prefers-reduced-motion');

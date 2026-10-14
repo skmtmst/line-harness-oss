@@ -359,3 +359,12 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.paperPhoto).toHaveBeenCalledWith('acc-1', 'ph-9'))
   })
 })
+
+it('変更していない設定は保存しない理由を出し、変更後に外す', async () => {
+ render(<VisitStampsV8 />)
+ await screen.findByDisplayValue(card.name)
+ for (const name of ['キャンセル','保存する']) expect(screen.getByRole('button',{name}).getAttribute('aria-description')).toBe('変更していません')
+ fireEvent.change(screen.getByDisplayValue(card.name), {target:{value:'新しいカード名'}})
+ const save = screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement
+ expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)
+})

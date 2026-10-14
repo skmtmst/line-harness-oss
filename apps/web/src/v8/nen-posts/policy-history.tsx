@@ -101,7 +101,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
     finally { setSaving(false) }
   }
   return <SaveErrorScope errors={saveErrors}><>
-    <Dialog open={open} designNode="N1br7" designWidth={640} designTop={220} title="版の履歴（報酬の決まり）" description="保存するたびに版が1つ増えます。前の版は変わりません。「この版に戻す」は、その中身で新しい版を作ります。" busy={saving} onCancel={onClose} footer={<div className={styles.dialogFoot}><Button variant="secondary" disabled={saving} onClick={onClose}>閉じる</Button></div>}>
+    <Dialog open={open && !(createOpen && canEdit)} designNode="N1br7" designWidth={640} designTop={220} title="版の履歴（報酬の決まり）" description="保存するたびに版が1つ増えます。前の版は変わりません。「この版に戻す」は、その中身で新しい版を作ります。" busy={saving} onCancel={onClose} footer={<div className={styles.dialogFoot}><Button variant="secondary" disabled={saving} onClick={onClose}>閉じる</Button></div>}>
       <div className={styles.dialogStack}>
       {loading ? <ListState kind="loading" title="版を読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => void load()} /> : <>
         <div className={styles.historyTable}><DataTable><thead><TableHeadRow><Th>版</Th><Th>保存日時</Th><Th>保存した人</Th><Th>内容</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead><tbody>

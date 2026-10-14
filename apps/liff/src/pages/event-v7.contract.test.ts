@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import Badge from '../components/ui/Badge.js';
+import { statusMeta } from './event-bookings-policy.js';
 
 /**
  * LIFF ★V7 その2 (イベント) の契約。
@@ -155,8 +159,10 @@ describe('自分のイベントは期限まで取り消せる', () => {
   });
 
   it('札は文字で出す (申し込み済み・承認待ち)', () => {
-    expect(bookings).toContain("'申し込み済み'");
-    expect(bookings).toContain("'承認待ち'");
+    for (const [status, label] of [['confirmed', '申し込み済み'], ['requested', '承認待ち']]) {
+      const meta = statusMeta[status];
+      expect(renderToStaticMarkup(React.createElement(Badge, { tone: meta.tone, children: meta.text }))).toContain(label);
+    }
     expect(bookings).toContain('<Badge');
   });
 

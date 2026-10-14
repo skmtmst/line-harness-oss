@@ -19,6 +19,7 @@ export default function StatusBadge({
   helpHref,
   dot = true,
   surface = 'tinted',
+  distinctFrom,
   ...props
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
   children?: ReactNode
@@ -33,6 +34,8 @@ export default function StatusBadge({
   size?: 'default' | 'compact' | 'micro' | 'annotation' | 'dining' | 'delivery'
   /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
   surface?: 'tinted' | 'white'
+  /** 同じ状態を既に表示しているとき、指定した札だけを省く。 */
+  distinctFrom?: string
   /**
    * 札の意味（例：審査中・保留・期限切れの違い）。札のすぐ右の「？」へ入れる
    * （★V7・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
@@ -50,6 +53,8 @@ export default function StatusBadge({
 }) {
   const baseLabel = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
   const label = typeof baseLabel === 'string' ? normalizeStatusWord(baseLabel) : baseLabel
+  if (typeof label === 'string' && distinctFrom !== undefined
+    && normalizeStatusWord(statusLabel(label.trim())) === normalizeStatusWord(statusLabel(distinctFrom.trim()))) return null
   const classes = [styles.badge, styles[tone], size === 'compact' || size === 'delivery' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')

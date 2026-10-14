@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { fitListSearchPlaceholder } from '../../src/components/shared/search-field-size.mjs'
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
@@ -9,7 +9,7 @@ import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from '../.
 import { fitSelectContent } from '../../src/components/shared/select-content-size.mjs'
 
 test('numeric support columns reserve the full note instead of the old truncation budget', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>${css('data-table')}*{box-sizing:border-box}.frame{width:400px}table{width:100%;table-layout:fixed}td,th{padding:0 8px;font:13px sans-serif}td:nth-child(2),th:nth-child(2){width:44px}td:nth-child(3),th:nth-child(3){width:60px}span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><section data-page-template="list" data-list-skeleton="templates"><div class="frame" data-column-sizing="content"><table class="table"><thead><tr><th>名前</th><th>この30日</th><th>操作</th></tr></thead><tbody><tr><td data-cell-grow><span data-list-name>決めごとの名前</span></td><td data-list-number><span>1,900</span><span>対象外 12 回</span></td><td><button>…</button></td></tr></tbody></table></div></section>`)
@@ -30,7 +30,7 @@ const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
 
 test('an explicit plain preview keeps the reading detail ground through creation-only CSS changes', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const styles = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
@@ -52,7 +52,7 @@ test('an explicit plain preview keeps the reading detail ground through creation
 })
 
 test('a compact listbox control keeps its shared square while text selects fit their label', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>${read('../../src/app/globals.css')}${css('icon-button')}${css('select')}${css('list-toolbar')}</style><main><div class="toolbar"><div class="root" data-select-icon-only><button class="button" data-size="compact" data-icon-only aria-haspopup="listbox" aria-label="よく使う絞り込み"><svg width="16" height="16"></svg><span hidden>停止中のみ</span></button></div><div class="root standard"><button class="trigger" aria-haspopup="listbox"><span class="value">状態：すべて</span></button></div></div></main>`)
@@ -69,7 +69,7 @@ test('a compact listbox control keeps its shared square while text selects fit t
 })
 
 test('KPI filtering and navigation actions have the same line height; a normal button minimum stretches the band', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const card = action => `<div class="card" data-kpi-presentation="band"><div class="head"><p class="label">空のまま使われている</p></div><p class="value"><span class="number">1</span><span class="unit">件</span></p><p class="detail"><span class="detailText">空欄のまま送られます</span>${action}</p></div>`
@@ -85,7 +85,7 @@ test('KPI filtering and navigation actions have the same line height; a normal b
 })
 
 test('a compact registration action keeps the existing one-line row height; a tall action expands it', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('button')}\ntable{border-collapse:collapse}tr{height:52px}td{padding:0}</style><table><tbody><tr><td>登録済みの経路</td></tr><tr><td><button class="button secondary compact" data-row-quick-action>登録する</button></td></tr></tbody></table></html>`)
@@ -100,7 +100,7 @@ test('a compact registration action keeps the existing one-line row height; a ta
 })
 
 test('B-191: list placeholders remain readable at both widths; fixed-width regression is detected', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1440, 1152]) {
@@ -121,7 +121,7 @@ test('B-191: list placeholders remain readable at both widths; fixed-width regre
 })
 
 test('list columns give spare width to the name and remeasure changed data', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const columns of [false, true]) {
@@ -151,7 +151,7 @@ test('list columns give spare width to the name and remeasure changed data', asy
 })
 
 test('content-sized list selects stay readable; real band width decides chip collapse', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('select')}\n*{box-sizing:border-box} .band{display:flex;gap:8px;width:800px} .row{display:contents} .search{flex:0 1 240px;min-width:180px;--list-search-content-min:180px} .chips{width:400px;flex:none} .count{width:100px;flex:none}</style><section data-list-skeleton><div class="band" data-list-toolbar><div class="row"><div class="search" data-toolbar-search>検索</div><span class="chips" data-filter-width="400">状態</span><div class="content root"><button class="trigger"><span class="value" data-select-value>並び：件数が多い順</span><svg class="chevron"></svg></button></div><div class="count">件数</div></div></div></section></html>`)
@@ -172,7 +172,7 @@ test('content-sized list selects stay readable; real band width decides chip col
 })
 
 test('a notice owns its full row; a zero-width tool band with clipped controls fails', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}</style><section data-list-skeleton data-template-region="toolbar"><div class="slots" data-list-toolbar data-toolbar-layout="slots" style="width:800px"><div data-design-part="notice">案内</div><div class="toolbar" data-list-toolbar data-toolbar-layout="band"><button style="width:100px;flex:none">探す</button></div></div></section></html>`)
@@ -184,7 +184,7 @@ test('a notice owns its full row; a zero-width tool band with clipped controls f
 })
 
 test('collapsed controls still wrap when their minimum widths cannot fit and return to one row', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{flex:none;width:150px;height:36px}</style><section data-list-skeleton><div class="slots" data-list-toolbar data-toolbar-layout="slots" style="width:852px"><div class="slotsRow"><button>作る</button><button>フォルダ</button><div class="searchSlot" data-toolbar-search style="--list-search-content-min:190px;--list-search-width:280px">検索</div><button>並び</button><button>件数</button><span class="filterChoices" data-filter-width="460"><button>状態</button></span></div></div></section></html>`)
@@ -200,7 +200,7 @@ test('collapsed controls still wrap when their minimum widths cannot fit and ret
 })
 
 test('a requested secondary toolbar stays on its own row even when the primary controls fit', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar data-toolbar-layout="band" data-toolbar-fit="single" style="width:800px"><button style="width:200px;flex:none">検索</button><div class="secondary" data-toolbar-secondary><button style="width:300px;flex:none">並び</button></div></div></section></html>`)
@@ -211,7 +211,7 @@ test('a requested secondary toolbar stays on its own row even when the primary c
 })
 
 test('page size wrappers use the same readable width as their control', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('select')}\n*{box-sizing:border-box}.oldCount{width:96px}.toolbar{width:300px}.trigger{height:36px}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><div class="trailing"><div class="oldCount" data-per-page-select><div class="root content"><button class="trigger" aria-haspopup="listbox"><span class="value" data-select-value>50 件表示</span><svg class="chevron"></svg></button></div></div></div></div></section></html>`)
@@ -226,7 +226,7 @@ test('page size wrappers use the same readable width as their control', async ()
 })
 
 test('U1: timestamps stay on one line and their columns reserve the full current or previous year', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const flex of [false, true]) {
@@ -247,7 +247,7 @@ test('U1: timestamps stay on one line and their columns reserve the full current
 })
 
 test('U4: a sort keeps its visible current value; hiding it behind an icon is detected', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('select')}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><span data-list-sort><div class="root content"><button class="trigger" aria-haspopup="listbox"><span class="value" data-select-value>並び：新しい順</span></button></div></span></div></section></html>`)
@@ -260,7 +260,7 @@ test('U4: a sort keeps its visible current value; hiding it behind an icon is de
 })
 
 test('U5: optional controls reserve the overflowing readable width and keep the adjacent control gap', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1440, 1152]) {
@@ -278,7 +278,7 @@ test('U5: optional controls reserve the overflowing readable width and keep the 
 })
 
 test('U6/V3: full KPI notes wrap, actions get their next line and the strip keeps equal cells', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const card = (detail, action='') => `<div class="card" data-design-version="v8" data-kpi-presentation="band"><div class="head"><p class="label">未設定</p></div><p class="value"><span class="number" data-kpi-number>2</span></p><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note">${detail}</span>${action}</p></div>`
@@ -301,7 +301,7 @@ test('U6/V3: full KPI notes wrap, actions get their next line and the strip keep
 })
 
 test('V1: readable stacked rows keep the count in the last row on the right; upper and left counts fail', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;width:100px;flex:none}</style><section data-list-skeleton style="width:852px"><div class="slots" data-list-toolbar data-toolbar-layout="slots-stacked"><div class="slotsRow" data-toolbar-row data-toolbar-fit="single"><button>作る</button><button>探す</button></div><div class="slotsRow" data-toolbar-row data-toolbar-fit="single"><button>絞り込む</button><span class="slotsEnd" data-toolbar-end><span data-list-page-size><button>20件表示</button></span></span></div></div></section></html>`)
@@ -316,7 +316,7 @@ test('V1: readable stacked rows keep the count in the last row on the right; upp
 })
 
 test('V2: a collapsed folder reserves its readable selected width instead of a fixed narrow wrapper', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
     const templateCss = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
@@ -329,7 +329,7 @@ test('V2: a collapsed folder reserves its readable selected width instead of a f
 })
 
 test('F6: KPI necessary height follows painted lines with fixed spacing, forced height and padding fail', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const markup = note => `<html><style>${read('../../src/app/globals.css')}\n${css('kpi-card')}\n${read('../../src/components/shared/kpi-band-v8.css')}\n*{box-sizing:border-box}p{margin:0}</style><section data-list-skeleton style="width:700px"><div data-kpi-strip data-kpi-presentation="band"><div class="card" data-design-version="v8" data-kpi-presentation="band"><div class="head"><p class="label">件数</p></div><div class="valueRow"><p class="value"><span class="number" data-kpi-number>2</span></p></div><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note">${note}</span></p></div></div></section></html>`
@@ -349,7 +349,7 @@ test('F6: KPI necessary height follows painted lines with fixed spacing, forced 
 })
 
 test('F6: all list pagers own one layer of padding, including lists without skeleton markers', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const templateCss = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
@@ -364,7 +364,7 @@ test('F6: all list pagers own one layer of padding, including lists without skel
 })
 
 test('F1/F6: stacked state badges keep their text and the 60px row with common spacing', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('data-table')}\n${css('status-badge')}\n*{box-sizing:border-box}table{width:700px}tr{height:60px}</style><section data-list-skeleton><table><tbody><tr class="row" data-shared-part="list-row"><td class="bodyCell">名前</td><td class="bodyCell statusCell"><div class="statusStack"><span class="badge success">公開中</span><span class="badge danger compact">後処理の未完 2</span></div></td></tr></tbody></table></section></html>`)
@@ -377,7 +377,7 @@ test('F1/F6: stacked state badges keep their text and the 60px row with common s
 })
 
 test('F10: stacked callers share two narrow rows; a separate leading row fails and named overflow keeps tools usable', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({viewport:{width:1152,height:900}})
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button,input{height:36px;flex:none}.wideCreate{width:100%}</style><section data-page-template="list" data-list-skeleton style="width:852px;container-type:inline-size;container-name:v8-page"><div class="slots" data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-stacked"><span class="leading" data-toolbar-leading><a class="wideCreate" href="/new">送り先を作る</a><button style="width:150px">フォルダ：すべて</button></span><span class="rowBreak"></span><div class="slotsRow" data-toolbar-row><span class="slotTool" data-toolbar-role="search"><div class="searchSlot" data-toolbar-search><input type="search" placeholder="名前で探す"></div></span><span class="slotTool" data-toolbar-role="filter"><details class="optional" data-toolbar-optional data-collapsed><summary>配信日・検索条件</summary><div data-toolbar-optional-content><input aria-label="配信日" type="date"><button>条件を保存する</button></div></details></span></div><div class="slotsRow" data-toolbar-row><span class="slotTool" data-toolbar-role="filter"><button>状態：すべて</button></span><span class="slotTool" data-toolbar-role="count"><span data-list-page-size><button>20件表示</button></span></span></div></div></section></html>`)
@@ -397,7 +397,7 @@ test('F10: stacked callers share two narrow rows; a separate leading row fails a
 })
 
 test('named overflow measures its tools, not free space reserved for the rightmost action', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;flex:none}</style><div class="toolbar" style="width:800px"><button style="width:200px">検索</button><details class="optional" data-toolbar-optional data-toolbar-overflow-group open><summary>条件</summary><div data-toolbar-optional-content><button style="width:160px">配信日</button><button style="width:140px">保存する</button><span class="slotsEnd"><button style="width:120px">保存した検索</button></span></div></details></div>`)
@@ -412,7 +412,7 @@ test('named overflow measures its tools, not free space reserved for the rightmo
 })
 
 test('page size shares the final row with a shorter centered switch; an earlier row or inset end still fails', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({viewport:{width:1152,height:900}})
     const rule='V1 件数は最後の道具行の右'
@@ -434,7 +434,7 @@ test('page size shares the final row with a shorter centered switch; an earlier 
 })
 
 test('media cards stretch the thumbnail and its empty tiles while content owns one 16px inset', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const layoutCss = read('../../src/v8/hq-banners/list.module.css')
@@ -453,7 +453,7 @@ test('media cards stretch the thumbnail and its empty tiles while content owns o
 })
 
 test('explicit picker widths remain readable in a flex toolbar; allowing shrink clips the same labels', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const fields = [['タグ：すべて',119],['担当者：すべて',132],['シナリオ：すべて',147]]

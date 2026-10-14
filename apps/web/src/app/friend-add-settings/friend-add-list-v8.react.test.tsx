@@ -229,7 +229,8 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
     expect(labels).toContain('編集する')
     expect(labels).toContain('実行結果を見る')
     expect(labels).toContain('テストを送る')
-    expect(labels).toContain('止める')
+    expect(labels).toContain('止められない理由を見る')
+    expect(labels).not.toContain('止める')
     expect(labels).not.toContain('削除する')
     expect(menu!.textContent).toContain('この設定は消せません')
     // 板 C0lfUP：受け皿の「…」を開いた印
@@ -237,7 +238,7 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
   })
 })
 
-test('v8 の受け皿を止める選択は「止められない」確かめの小窓を出す', async () => {
+test('受け皿の理由を見ると停止できない説明を出す', async () => {
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await settle()
@@ -252,7 +253,7 @@ test('v8 の受け皿を止める選択は「止められない」確かめの�
     expect(document.querySelector('[role="menu"]')).toBeTruthy()
   })
   const stop = [...document.querySelectorAll('[role="menuitem"]')]
-    .find((item) => item.textContent?.includes('止める')) as HTMLElement
+    .find((item) => item.textContent?.includes('止められない理由を見る')) as HTMLElement
   await act(async () => { stop.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     // 板 cFo2p：止められない確かめ

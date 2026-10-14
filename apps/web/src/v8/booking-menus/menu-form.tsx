@@ -33,6 +33,10 @@ import shell from './settings.module.css'
 import styles from './menu-form.module.css'
 import { PageFrame, PageContent } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { TextField, AffixedTextField } from '@/components/shared/text-field'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import Card, { CardHeader } from '@/components/shared/card'
+import type { FormRequirement } from '@/lib/form-requirement'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -63,6 +67,9 @@ function resourceSignature(ids: Iterable<string>, quantities: Record<string, str
 type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 作りかけ／直しかけのメニューを、写し側へ渡す形にする。 */
+const menuNameRequirement: FormRequirement<unknown> = { required: true, check: bookingMenuNameError }
+const menuDurationRequirement: FormRequirement<unknown> = { required: true, check: bookingMenuDurationError }
+
 type DraftMenu = Pick<
   BookingMenu,
   'id' | 'name' | 'category_label' | 'description' | 'duration_minutes' | 'base_price' | 'price_mode' | 'sort_order' | 'is_active' | 'auto_tag_id'
@@ -687,8 +694,8 @@ export default function MenuFormV8() {
     const validationError = validate()
     if (validationError) {
       focusInvalid.current = true
-      const nameError = bookingMenuNameError(name)
-      const durationError = bookingMenuDurationError(durationMinutes)
+      const nameError = menuNameRequirement.check(name)
+      const durationError = menuDurationRequirement.check(durationMinutes)
       const bufferError = bookingMenuBufferError(bufferAfterMinutes)
       const staffError = staffStatus === 'ready' && assignedIds.length === 0 ? '担当できる人を1人以上選んでください。' : null
       setSaveError(nameError || durationError || bufferError || staffError ? null : validationError)
@@ -893,7 +900,7 @@ export default function MenuFormV8() {
           </div>
           <p className={shell.sideTitle}>お客さまの予約画面</p>
           <>
-            <LiffPhoneMenuStep
+            <LiffPhoneMenuStep categoryTone="customer"
               menus={menus.filter((menu) => menu.id !== editTarget?.id)}
               draft={draftMenu}
               status={menusStatus}
@@ -931,6 +938,8 @@ export default function MenuFormV8() {
               </Button>
             </>
           )}
+        previewLabel="お客さまの予約画面を見る"
+        previewTitle="お客さまの予約画面"
         preview={previewContent}
         previewToggle={<PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
@@ -943,23 +952,20 @@ export default function MenuFormV8() {
       )}
 
           {/* ① メニューの中身 */}
-          <section className={shell.section}>
-            <div className={shell.sectionHead}>
-              <h2 className={shell.sectionTitle}>メニューの中身</h2>
-            </div>
-            <div className={styles.nameRow}>
-              <Field label="メニュー名"><SaveErrorField names={["name"]}><input
-                  className={styles.input}
+          <Card variant="form" gap="normal">
+            <CardHeader size="stacked" title="メニューの中身" />
+            <SettingsFormRow layout="name-folder">
+              <Field label="メニュー名" requirement={menuNameRequirement}><SaveErrorField names={["name"]}><TextField
                   type="text"
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value)
                     if (fieldErrors.name !== undefined) {
-                      setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(e.target.value) ?? undefined }))
+                      setFieldErrors((previous) => ({ ...previous, name: menuNameRequirement.check(e.target.value) ?? undefined }))
                     }
                   }}
                   onBlur={() => {
-                    setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(name) ?? undefined }))
+                    setFieldErrors((previous) => ({ ...previous, name: menuNameRequirement.check(name) ?? undefined }))
                   }}
                   placeholder="例：トリミング（小型犬）"
                   aria-invalid={fieldErrors.name !== undefined}
@@ -967,8 +973,7 @@ export default function MenuFormV8() {
 {fieldErrors.name !== undefined ? (
                   <span className={styles.fieldError} role="alert">{fieldErrors.name}</span>
                 ) : null}</Field>
-              <span className={`${styles.field} ${styles.categoryField}`}>
-                <span className={styles.labelSmall}>分類</span>
+              <Field label="分類">
                 <SaveErrorField names={["categoryLabel","categoryPicking","category_label","category_picking"]}><EntitySelect
                   size="full"
                   aria-label="分類"
@@ -994,8 +999,8 @@ export default function MenuFormV8() {
                     aria-label="新しい分類の名前"
                   /></SaveErrorField>
                 )}
-              </span>
-            </div>
+              </Field>
+            </SettingsFormRow>
             <Field label="説明（お客さまに見えます）"><SaveErrorField names={["description"]}><input
                 className={styles.input}
                 type="text"
@@ -1003,12 +1008,8 @@ export default function MenuFormV8() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="例：シャンプー・カット・爪切り"
               /></SaveErrorField></Field>
-            {/* 絵 QqER7：見出しの段と欄の段を分けて3列に並べる。 */}
-            <div className={styles.grid3}>
-              <span className={styles.labelSmall}>かかる時間</span>
-              <span className={styles.labelSmall}>金額（空なら「お問い合わせ」）</span>
-              <span className={styles.labelSmall}>予約したときのマイル <TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink></span>
-              <span className={styles.unitField}>
+            <SettingsFormRow layout="columns" columns={3}>
+              <Field label="かかる時間" requirement={menuDurationRequirement}>
                 <SaveErrorField names={["durationMinutes","duration_minutes"]}><NumberInput unit="分"
                   type="number"
                   min={1}
@@ -1016,20 +1017,19 @@ export default function MenuFormV8() {
                   onChange={(e) => {
                     setDurationMinutes(e.target.value)
                     if (fieldErrors.duration !== undefined) {
-                      setFieldErrors((previous) => ({ ...previous, duration: bookingMenuDurationError(e.target.value) ?? undefined }))
+                      setFieldErrors((previous) => ({ ...previous, duration: menuDurationRequirement.check(e.target.value) ?? undefined }))
                     }
                   }}
                   onBlur={() => {
-                    setFieldErrors((previous) => ({ ...previous, duration: bookingMenuDurationError(durationMinutes) ?? undefined }))
+                    setFieldErrors((previous) => ({ ...previous, duration: menuDurationRequirement.check(durationMinutes) ?? undefined }))
                   }}
                   aria-label="かかる時間（分）"
                   aria-invalid={fieldErrors.duration !== undefined}
                 /></SaveErrorField>
 
-              </span>
-              <span className={styles.unitField}>
-                <span className={styles.unitPrefix}>¥</span>
-                <SaveErrorField names={["basePrice","base_price"]}><NumberInput
+              </Field>
+              <Field label="金額" help="空なら、お客さまにはお問い合わせと出します">
+                <SaveErrorField names={["basePrice","base_price"]}><AffixedTextField startAdornment="¥"
                   type="number"
                   min={0}
                   value={basePrice}
@@ -1037,33 +1037,28 @@ export default function MenuFormV8() {
                   placeholder="8,400"
                   aria-label="金額（円）"
                 /></SaveErrorField>
-              </span>
-              <span className={styles.unitField}>
-                <SaveErrorField names={["bookingMileage","booking_mileage"]}><input
-                  type="text"
+              </Field>
+              <Field label="予約したときのマイル" optional={false} help="お店全体の設定で決まります" note={<TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink>}>
+              <SaveErrorField names={["bookingMileage","booking_mileage"]}><AffixedTextField
+                  readOnly endAdornment="マイル"
                   value={
                     mileageStatus === 'loading' ? '…'
                       : mileageStatus === 'error' ? '未取得'
                       : bookingMileage === null ? emptyValue('unconfigured')
                       : formatNumber(bookingMileage)
                   }
-                  disabled
                   aria-label="予約したときのマイル（お店全体の設定）"
                 /></SaveErrorField>
-                <span className={styles.unitSuffix}>マイル</span>
-              </span>
-            </div>
+              </Field>
+            </SettingsFormRow>
             {fieldErrors.duration !== undefined ? (
               <span className={styles.fieldError} role="alert">{fieldErrors.duration}</span>
             ) : null}
-          </section>
+          </Card>
 
           {/* ② 担当スタッフ */}
-          <section className={shell.section}>
-            <div className={shell.sectionHead}>
-              <h2 className={shell.sectionTitle}>担当スタッフ</h2>
-              <span className={shell.sectionDesc}>1人も選ばないと、お客さまの画面に枠が出ません</span>
-            </div>
+          <Card variant="form" gap="normal">
+            <CardHeader size="stacked" title="担当スタッフ" meta="1人も選ばないと、お客さまの画面に枠が出ません" />
             {staffStatus === 'loading' ? (
               <span className="inline-block" aria-busy="true">
                 <span className="sr-only">担当を読み込んでいます</span>
@@ -1119,14 +1114,11 @@ export default function MenuFormV8() {
                 </div>
               </>
             )}
-          </section>
+          </Card>
 
           {/* ③ 予約のきまり */}
-          <section className={shell.section}>
-            <div className={shell.sectionHead}>
-              <h2 className={shell.sectionTitle}>予約のきまり</h2>
-              <span className={shell.sectionDesc}>空ならお店全体のきまり（予約のルール）を使います</span>
-            </div>
+          <Card variant="form" gap="normal">
+            <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
             {ownRules ? (
               <>
                 <div className={styles.ruleRow}>
@@ -1174,12 +1166,12 @@ export default function MenuFormV8() {
                 {ownRules ? 'お店のきまりに戻す' : <><Pencil size={15} aria-hidden="true" />このメニューだけ変える</>}
               </button>
             </div>
-          </section>
+          </Card>
 
           {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7 は灰の段に白い小段を積む。 */}
-          <section className={`${shell.section} ${styles.moreSection}`}>
-            <div className={styles.subSection}>
-              <h2 className={styles.subTitle}>受け方</h2>
+          <Card variant="form" gap="normal" surface="muted">
+            <Card variant="form" padding="compact" gap="normal">
+              <CardHeader size="stacked" headingLevel={3} title="受け方" />
               <div className={styles.fieldStack}>
                 <Field label="同時に受けられる件数"><span className={styles.unitField}>
                     <SaveErrorField names={["concurrentCapacity","concurrent_capacity"]}><NumberInput unit="件"
@@ -1214,10 +1206,10 @@ export default function MenuFormV8() {
                     <span className={styles.fieldError} role="alert">{fieldErrors.buffer}</span>
                   ) : null}</Field>
               </div>
-            </div>
+            </Card>
 
-            <div className={styles.subSection}>
-              <h2 className={styles.subTitle}>予約を受けたときにすること</h2>
+            <Card variant="form" padding="compact" gap="normal">
+              <CardHeader size="stacked" headingLevel={3} title="予約を受けたときにすること" />
               <p className="text-ink-faint text-sm">予約を受け付けたことを知らせる：日時・メニュー・場所を書いた案内をLINEへ送ります。</p>
               <p className="text-ink-faint text-sm">前日・開始前に思い出してもらう：確定した予約は、前日と設定時間前のリマインダへ登録されます。</p>
               {tagStatus === 'loading' ? (
@@ -1262,10 +1254,10 @@ export default function MenuFormV8() {
                     maxLength={200}
                   /></SaveErrorField></Field>
               )}
-            </div>
+            </Card>
 
-            <div className={styles.subSection}>
-              <h2 className={styles.subTitle}>使う設備</h2>
+            <Card variant="form" padding="compact" gap="normal">
+              <CardHeader size="stacked" headingLevel={3} title="使う設備" />
               {resourcesStatus === 'loading' ? (
                 <span className="inline-block" aria-busy="true">
                   <span className="sr-only">設備を読み込んでいます</span>
@@ -1310,7 +1302,7 @@ export default function MenuFormV8() {
                 <Button variant="secondary" size="compact" busy={resourceSaving} disabled={resourceSaving || saving !== null || resourcesStatus !== 'ready'} onClick={() => void submitResources()}>設備の割当を保存する</Button>
               ) : <p className="text-ink-faint text-sm">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>)}
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
-            </div>
+            </Card>
 
             <div className={styles.payHead}>
               <h2 className={shell.sectionTitle}>お支払い</h2>
@@ -1328,7 +1320,7 @@ export default function MenuFormV8() {
                 <span className={styles.payDot} aria-hidden="true" />どちらでも
               </span>
             </div>
-          </section>
+          </Card>
 
           {saveError && (
             <Notice tone="danger" >{saveError}</Notice>

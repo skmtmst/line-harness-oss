@@ -57,6 +57,11 @@ export default function scanPendec2Rules() {
   for(const seg of all('[data-segmented-control],[class*="segmented_root"]')) {
     const buttons=[...seg.querySelectorAll(':scope > button')].filter(visible)
     for(const b of buttons) if(!b.textContent.trim() && !b.getAttribute('aria-label')) add('segempty',b,{count:1})
+    if (buttons.length && seg.getAttribute('data-appearance') === 'track') {
+      const c = css(seg), end = Math.max(...buttons.map(button => button.getBoundingClientRect().right))
+      const tail = seg.getBoundingClientRect().right - parseFloat(c.paddingRight || '0') - end
+      if (tail > 2 && !['transparent', 'rgba(0, 0, 0, 0)'].includes(c.backgroundColor)) add('segempty', seg, { tail: Math.ceil(tail) })
+    }
     const selected=buttons.filter(b=>b.getAttribute('aria-pressed')==='true')
     if(buttons.length && selected.length!==1) add('segselected',seg,{count:Math.abs(selected.length-1) || 1})
     if(selected.length===1) { const c=css(selected[0]); if(c.backgroundColor!=='rgb(232, 245, 236)' || c.color!=='rgb(8, 122, 62)' || !framed(selected[0])) add('segstyle',selected[0],{count:1}) }

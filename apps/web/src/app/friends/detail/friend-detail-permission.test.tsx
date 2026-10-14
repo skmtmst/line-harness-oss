@@ -377,7 +377,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
 })
 
 function supportEditButtons(): HTMLButtonElement[] {
-  return Array.from(document.querySelectorAll<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="対応"] button')).filter(button => button.textContent?.trim() === '編集')
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="対応"] button')).filter(button => button.textContent?.trim() === '編集する')
 }
 
 describe('N-035 友だち詳細から担当・対応状況を変える', () => {

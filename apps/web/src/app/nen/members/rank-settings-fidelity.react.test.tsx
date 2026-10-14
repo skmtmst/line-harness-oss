@@ -16,7 +16,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 }))
 
 import MembersPageV8 from '@/v8/nen-members/members'
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true, useStaffIdentity: () => ({ id: 'test-staff' }) }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
