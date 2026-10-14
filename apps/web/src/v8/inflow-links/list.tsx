@@ -943,7 +943,7 @@ export default function InflowListV8({
             }}
           />
         ) : null}
-        {qrRoute ? <QrDialog route={qrRoute} onClose={() => setQrRoute(null)} /> : null}
+        {qrRoute ? <QrDialog route={qrRoute} routes={routes} onClose={() => setQrRoute(null)} /> : null}
         {bulkAction ? (
           <BulkDialog
             targets={selectedRoutes}

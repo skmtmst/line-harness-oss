@@ -1,6 +1,7 @@
 'use client'
 import DownloadIcon from './qr-download-icon'
 import QrStoppedNotice from './qr-stopped-notice'
+import QrRoutePicker, { type QrRoutePickerProps } from './qr-route-picker'
 import React, { useEffect, useState } from 'react'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
@@ -47,6 +48,7 @@ export function resolveOfficialProfileUrl(
 }
 
 export type FixedQrResource = {
+  routePicker?: QrRoutePickerProps
   url: string
   title: string
   stopped?: boolean
@@ -366,6 +368,7 @@ export default function QrDialog({
           </button>
         </div>
 
+        {resource?.routePicker ? <div className="mb-4"><QrRoutePicker {...resource.routePicker} /></div> : null}
         {resource?.stopped && resource.stoppedPresentation === 'notice' ? <QrStoppedNotice onClose={onClose} /> : <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {routesError ? <ListState kind="error" title="経路を読み込めませんでした" onRetry={()=>{if(routesErrorProp)onRetryRoutes?.();else setReadRetry(value=>value+1)}}/> : null}
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
