@@ -10,6 +10,15 @@ import styles from './create-parts.module.css'
 
 export type SummaryRow = { label: ReactNode; value: ReactNode; key?: string }
 
+/** 完了の印と題は中央、結果の説明は段落として読む。 */
+export function CreateCompletionHeading({ icon, title, children }: { icon: ReactNode; title: ReactNode; children: ReactNode }) {
+  return <div className={styles.completionHeading} data-part="create-completion-heading">
+    <span className={styles.completionMark} aria-hidden="true">{icon}</span>
+    <h2 className={styles.completionTitle}>{title}</h2>
+    <p className={styles.completionDescription}>{children}</p>
+  </div>
+}
+
 /** 右の列の「設定内容」の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13/700/19・行は上下9＋下線・字12/17。 */
 export function CreateSummaryCard({ title = '設定内容', rows, children, leading, beforeRows, description, variant, completionIcon }: { title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; leading?: ReactNode; beforeRows?: ReactNode; description?: ReactNode; completionIcon?: ReactNode; variant?: 'link' | 'record' | 'completion' }) {
   return (
