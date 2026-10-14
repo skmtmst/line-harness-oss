@@ -43,3 +43,12 @@ it('一覧を持たない固定QRは選ぶ欄を増やさず元の経路を表�
   expect(screen.queryByRole('combobox', { name: '流入経路' })).toBeNull()
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toMatch(/\/r\/new$/)
 })
+
+it('有効な候補がない場合は選べない経路の入口を出さず、停止案内を残す', () => {
+  render(<QrDialog route={stopped} routes={[stopped, otherStopped]} onClose={() => {}} />)
+  expect(screen.queryByRole('combobox', { name: '流入経路' })).toBeNull()
+  expect(screen.getByRole('alert').textContent).toContain('停止しています')
+  expect(screen.queryByRole('img')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'PDFで印刷' })).toBeNull()
+  expect(image).not.toHaveBeenCalled()
+})

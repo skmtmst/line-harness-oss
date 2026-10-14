@@ -29,7 +29,7 @@ export default function QrDialog({ route: initialRoute, routes, onClose }: { rou
     disabledReason={route.isActive === false ? 'この経路は停止中です。再開するまでQRコードは使えません。' : undefined}
     baseLink={referralUrl(route.refCode)} routes={[]}
     resource={{
-      routePicker: routes?.length ? { value: route.refCode, options, onChange: value => { if (routes.some(item => item.refCode === value && item.isActive)) setSelectedRef(value) } } : undefined,
+      routePicker: routes?.some(item => item.isActive) ? { value: route.refCode, options, onChange: value => { if (routes.some(item => item.refCode === value && item.isActive)) setSelectedRef(value) } } : undefined,
       url: referralUrl(route.refCode), title: `${route.name} の QR コード`,
       stopped: route.isActive === false, stoppedPresentation: 'notice',
       description: 'チラシ・店頭POPに印刷して使えます。読み取るとこの経路の画面が開きます。',

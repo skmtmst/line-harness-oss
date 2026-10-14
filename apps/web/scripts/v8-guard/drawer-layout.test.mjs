@@ -32,8 +32,15 @@ for (const width of [1152, 1440, 1920]) {
       assert.equal((await scan()).findings.length, 0)
       await page.locator('.body').evaluate(el => el.scrollTop = el.scrollHeight)
       assert.equal((await scan()).findings.length, 0)
-      await page.locator('footer').evaluate(el => el.style.marginBottom = '50px')
+      const bottom = await page.locator('footer').evaluate(el => el.getBoundingClientRect().bottom)
+      await page.locator('footer').evaluate(el => el.style.transform = 'translateY(-50px)')
+      await page.waitForFunction(expected => Math.abs(expected - document.querySelector('footer').getBoundingClientRect().bottom - 50) < 0.01, bottom)
+      const shifted = await page.locator('footer').evaluate(el => el.getBoundingClientRect().bottom)
+      assert.equal(bottom - shifted, 50)
       assert.equal((await scan()).findings.filter(row => row.kind === 'drawer-footer-position').length, 1)
+      await page.locator('footer').evaluate(el => el.style.transform = '')
+      await page.waitForFunction(expected => Math.abs(document.querySelector('footer').getBoundingClientRect().bottom - expected) < 0.01, bottom)
+      assert.equal((await scan()).findings.length, 0)
     } finally { await browser.close() }
   })
 }
