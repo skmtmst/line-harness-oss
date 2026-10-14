@@ -259,7 +259,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
           <SaveErrorField names={["name"]}><TextField id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="例：無料体験申込" /></SaveErrorField>
         </Field>
         <Field label="説明" htmlFor={descriptionId}>
-          <SaveErrorField names={["description"]}><TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明（任意）" /></SaveErrorField>
+          <SaveErrorField names={["description"]}><TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明" /></SaveErrorField>
         </Field>
         <Field label="報酬額（円）" htmlFor={rewardAmountId} error={fieldErrors.rewardAmount}>
           <SaveErrorField names={["rewardAmount","reward_amount"]}><NumberInput unit="円" id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例：3000" /></SaveErrorField>

@@ -1,3 +1,4 @@
+import { bookingHistoryItem } from '../services/booking-history-item.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../services/booking-confirmed-effects.js';
@@ -1604,7 +1605,7 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const upcoming = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.customer_note,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.status, b.customer_note,
               b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               COALESCE(m.cancel_deadline_hours_before * 60, bs.cancel_deadline_minutes_before, 1440) AS cancel_deadline_minutes_before,
@@ -1623,7 +1624,7 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1637,7 +1638,7 @@ booking.get('/api/liff/booking/me', async (c) => {
     .bind(friendId, accountId, new Date().toISOString())
     .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results.map(row => ({ ...row, cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results } satisfies BookingHistoryResponse);
+  return c.json({ upcoming: upcoming.results.map(row => ({ ...bookingHistoryItem(row), cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results.map(bookingHistoryItem) } satisfies BookingHistoryResponse);
 });
 
 // ================================================================

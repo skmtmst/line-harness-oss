@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
@@ -425,29 +426,23 @@ function InflowCreate() {
 <FieldError id="ir-name-error">{fieldErrors['ir-name']}</FieldError></Field></div>
           <div className={styles.field}>
             <Field label="フォルダ">
-            <SaveErrorField names={["genre"]}><Select
+            <SaveErrorField names={["genre"]}><FolderSelect
               id="ir-genre"
               value={genre}
-              onChange={(next) => setGenre(next)}
+              onChange={setGenre}
               aria-label="フォルダ"
               size="full"
-              options={[
-                { value: '', label: '（選ばない）' },
-                ...genres.map((item) => ({ value: item.name, label: item.name })),
-                { value: '__new', label: '新しいフォルダ…' },
-              ]}
+              colors={false}
+              unfiled={{ value: '', label: '（選ばない）' }}
+              folders={[...genres.map((item) => ({ value: item.name, label: item.name })), ...(genre === '__new' && newGenre ? [{ value: '__new', label: newGenre }] : [])]}
+              onCreate={async (name) => {
+                // フォルダの保存は、これまでと同じリンクの発行時だけ。
+                setNewGenre(name)
+                return { value: name, label: name }
+              }}
             /></SaveErrorField></Field>
           </div>
         </SettingsFormRow>
-        {genre === '__new' ? (
-          <SaveErrorField names={["newGenre","new_genre"]}><TextField
-            type="text"
-            value={newGenre}
-            onChange={(event) => setNewGenre(event.target.value)}
-            placeholder="新しいフォルダの名前"
-            aria-label="新しいフォルダの名前"
-          /></SaveErrorField>
-        ) : null}
         <Field label={<><span className={styles.labelRow}>
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
 

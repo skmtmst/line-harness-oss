@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
@@ -1655,15 +1656,12 @@ export default function AutoRepliesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
-            options={[
-              { value: '', label: '未分類' },
-              ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-            ]}
+            folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
           /></SaveErrorField>
         </div>
       </ConfirmDialog>
