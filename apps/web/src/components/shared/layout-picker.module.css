@@ -16,3 +16,7 @@
 html:root .list[data-preview='message'] .tile {
   width: 104px;
 }
+
+html:root .list:is([data-preview='menu'], [data-preview='compact-menu']) { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+html:root .list:is([data-preview='menu'], [data-preview='compact-menu']) .tile { width: auto; min-width: 0; min-height: 0; padding: var(--space-8); }
+html:root .list:is([data-preview='menu'], [data-preview='compact-menu']) .sample { max-width: 100%; }
