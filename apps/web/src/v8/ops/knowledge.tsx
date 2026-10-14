@@ -111,7 +111,7 @@ export default function OpsKnowledgeV8() {
           search={{ value: q, onChange: (value) => { setQ(value); setOffset(0) }, placeholder: 'タイトル・質問・キーワードで探す' }}
           filters={<>
             <SaveErrorField names={["kind"]}><Select size="content" aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} /></SaveErrorField>
-            <SaveErrorField names={["state"]}><Select size="content" aria-label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} /></SaveErrorField>
+            <SaveErrorField names={["state"]}><Select size="content" aria-label="状態" label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: 'すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} /></SaveErrorField>
             <SaveErrorField names={["articleKind", "article_kind"]}><Select size="content" aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} /></SaveErrorField>
           </>}
           trailing={ready ? <ListRange total={total} first={total ? offset + 1 : 0} last={Math.min(offset + rows.length, total)} /> : emptyValue('unknown')}

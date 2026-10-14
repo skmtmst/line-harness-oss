@@ -1,44 +1,44 @@
 寸法点検: 29 ファイル / setContent 205 個 / 寸法未固定の見本 53 個 / 未固定の操作部品 95 個 / HTML未解決 121 個
 警告はリスク候補です。外部CSS・親の制約は未解決。Linuxでの失敗を証明するものではありません。
-apps/web/scripts/v8-guard/action-row-narrow.test.mjs:44 (test:40) 
+apps/web/scripts/v8-guard/action-row-narrow.test.mjs:44 (test:40)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/action-row-narrow.test.mjs:65 (test:61) 
+apps/web/scripts/v8-guard/action-row-narrow.test.mjs:65 (test:61)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:29 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:29 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:31 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:31 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:35 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:35 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:37 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:37 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:40 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:40 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:42 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:42 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/b244-rules.test.mjs:44 (test:24) 
+apps/web/scripts/v8-guard/b244-rules.test.mjs:44 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:14 (test:13) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:14 (test:13)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:16 (test:13) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:16 (test:13)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:23 (test:20) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:23 (test:20)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:25 (test:20) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:25 (test:20)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:26 (test:20) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:26 (test:20)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:41 (test:37) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:41 (test:37)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:42 (test:37) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:42 (test:37)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/create-consistency.test.mjs:44 (test:37) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:44 (test:37)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/create-consistency.test.mjs:56 (test:48) 言葉の追加は札の隣の箱つき入力で、枠なしと名前なしの札を検出する
   input.field single affixedControl: 幅・高さ未固定 / 外部CSSは未解決
 apps/web/scripts/v8-guard/create-consistency.test.mjs:64 (test:48) 言葉の追加は札の隣の箱つき入力で、枠なしと名前なしの札を検出する
   input: 幅・高さ未固定
-apps/web/scripts/v8-guard/create-consistency.test.mjs:79 (test:70) 
+apps/web/scripts/v8-guard/create-consistency.test.mjs:79 (test:70)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/create-input-layout.test.mjs:16 (test:9) 名前とフォルダは板が狭い時だけ縦にし、横に戻す故障を検出する
   input: 幅・高さ未固定, input: 幅・高さ未固定 / 外部CSSは未解決
@@ -48,7 +48,7 @@ apps/web/scripts/v8-guard/create-input-layout.test.mjs:53 (test:46) 行うこと
   input: 幅・高さ未固定, input: 幅・高さ未固定 / 外部CSSは未解決
 apps/web/scripts/v8-guard/create-input-layout.test.mjs:74 (test:68) 題つきの二つの欄は板の幅で縦へ切り替え、旧横配置を検出する
   input: 幅・高さ未固定, input: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/dialog-layout.test.mjs:11 (test:7) 
+apps/web/scripts/v8-guard/dialog-layout.test.mjs:11 (test:7)
   input: 幅・高さ未固定
 apps/web/scripts/v8-guard/fix-patterns.test.mjs:25 (test:21) Z1 detects a stacked avatar even when every text node occupies one line
   a: 幅・高さ未固定
@@ -92,103 +92,103 @@ apps/web/scripts/v8-guard/form-badge-layout.test.mjs:13 (test:6) 必須札は隠
   input: 幅・高さ未固定, input: 幅・高さ未固定, input: 幅・高さ未固定 / 外部CSSは未解決
 apps/web/scripts/v8-guard/form-card-header.test.mjs:14 (test:7) 入力のカードでは見出しと本文の余白を共有し、重なる故障を検出する
   input: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/form-columns.test.mjs:21 (test:12) 
+apps/web/scripts/v8-guard/form-columns.test.mjs:21 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/form-columns.test.mjs:28 (test:12) 
+apps/web/scripts/v8-guard/form-columns.test.mjs:28 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/form-columns.test.mjs:38 (test:33) 
+apps/web/scripts/v8-guard/form-columns.test.mjs:38 (test:33)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/form-columns.test.mjs:50 (test:46) 
+apps/web/scripts/v8-guard/form-columns.test.mjs:50 (test:46)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/form-columns.test.mjs:79 (test:75) compound input internals and separate content regions are distinct from independent fields
   input: 幅・高さ未固定, input: 幅・高さ未固定, input: 幅・高さ未固定
 apps/web/scripts/v8-guard/layer-order.test.mjs:49 (test:40) folder addition keeps the common button line height in either module order
   button.button standard secondary add: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/layout-defects.test.mjs:20 (test:15) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:20 (test:15)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:22 (test:15) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:22 (test:15)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:62 (test:52) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:62 (test:52)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:64 (test:52) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:64 (test:52)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:75 (test:69) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:75 (test:69)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:77 (test:69) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:77 (test:69)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:91 (test:84) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:91 (test:84)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:95 (test:84) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:95 (test:84)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:105 (test:99) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:105 (test:99)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:109 (test:99) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:109 (test:99)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:137 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:137 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:139 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:139 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:141 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:141 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:143 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:143 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:145 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:145 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:147 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:147 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:149 (test:133) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:149 (test:133)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:160 (test:153) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:160 (test:153)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:163 (test:153) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:163 (test:153)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:212 (test:206) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:212 (test:206)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/layout-defects.test.mjs:300 (test:296) F8の見張りはフォーム内の押せない理由とその接続を検査し、既存CIでも故障を検出する
   button: 幅・高さ未固定, input: 幅・高さ未固定, button: 幅・高さ未固定
-apps/web/scripts/v8-guard/layout-defects.test.mjs:317 (test:312) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:317 (test:312)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:319 (test:312) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:319 (test:312)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:336 (test:325) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:336 (test:325)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:339 (test:325) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:339 (test:325)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:343 (test:325) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:343 (test:325)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:345 (test:325) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:345 (test:325)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:360 (test:350) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:360 (test:350)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:363 (test:350) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:363 (test:350)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:376 (test:372) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:376 (test:372)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:377 (test:372) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:377 (test:372)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/layout-defects.test.mjs:378 (test:372) 
+apps/web/scripts/v8-guard/layout-defects.test.mjs:378 (test:372)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:31 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:31 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:37 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:37 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:41 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:41 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:45 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:45 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:49 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:49 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:55 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:55 (test:12)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-row-height.test.mjs:60 (test:12) 
+apps/web/scripts/v8-guard/list-row-height.test.mjs:60 (test:12)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:15 (test:11) numeric support columns reserve the full note instead of the old truncation budget
   button: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:38 (test:32) 
+apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:38 (test:32)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:42 (test:32) 
+apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:42 (test:32)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:44 (test:32) 
+apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:44 (test:32)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:58 (test:54) a compact listbox control keeps its shared square while text selects fit their label
   button.button: 幅・高さ未固定, button.trigger: 幅・高さ未固定 / 外部CSSは未解決
@@ -208,7 +208,7 @@ apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:253 (test:249) U4: a so
   button.trigger: 幅・高さ未固定 / 外部CSSは未解決
 apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:323 (test:318) V2: a collapsed folder reserves its readable selected width instead of a fixed narrow wrapper
   button.trigger: 幅・高さ未固定, button: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:338 (test:331) 
+apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:338 (test:331)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:357 (test:351) F6: all list pagers own one layer of padding, including lists without skeleton markers
   button: 幅未固定 / 外部CSSは未解決
@@ -220,111 +220,111 @@ apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:442 (test:436) media ca
   button.mosaic: 幅・高さ未固定 / 外部CSSは未解決
 apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs:461 (test:455) explicit picker widths remain readable in a flex toolbar; allowing shrink clips the same labels
   input: 高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:15 (test:5) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:15 (test:5)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:20 (test:5) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:20 (test:5)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:34 (test:24) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:34 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:35 (test:24) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:35 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:36 (test:24) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:36 (test:24)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:48 (test:40) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:48 (test:40)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:51 (test:40) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:51 (test:40)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:64 (test:55) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:64 (test:55)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:67 (test:55) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:67 (test:55)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:80 (test:71) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:80 (test:71)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:81 (test:71) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:81 (test:71)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:103 (test:96) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:103 (test:96)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/measure2-common-values.test.mjs:104 (test:96) 
+apps/web/scripts/v8-guard/measure2-common-values.test.mjs:104 (test:96)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:21 (test:15) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:21 (test:15)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:24 (test:15) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:24 (test:15)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:26 (test:15) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:26 (test:15)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:28 (test:15) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:28 (test:15)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:39 (test:32) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:39 (test:32)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:54 (test:49) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:54 (test:49)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:99 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:99 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:101 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:101 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:106 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:106 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:108 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:108 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:110 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:110 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:112 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:112 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:114 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:114 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:116 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:116 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:118 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:118 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:121 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:121 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:123 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:123 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:125 (test:94) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:125 (test:94)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:138 (test:129) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:138 (test:129)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:140 (test:129) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:140 (test:129)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:143 (test:129) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:143 (test:129)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:171 (test:163) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:171 (test:163)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:177 (test:163) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:177 (test:163)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:189 (test:184) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:189 (test:184)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:203 (test:198) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:203 (test:198)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:216 (test:211) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:216 (test:211)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:228 (test:224) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:228 (test:224)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:242 (test:237) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:242 (test:237)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:246 (test:237) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:246 (test:237)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:256 (test:251) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:256 (test:251)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:268 (test:263) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:268 (test:263)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:309 (test:304) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:309 (test:304)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:324 (test:316) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:324 (test:316)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/owner-rules.test.mjs:328 (test:316) 
+apps/web/scripts/v8-guard/owner-rules.test.mjs:328 (test:316)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:40 (test:36) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:40 (test:36)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:52 (test:48) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:52 (test:48)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:68 (test:61) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:68 (test:61)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:70 (test:61) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:70 (test:61)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:74 (test:61) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:74 (test:61)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:76 (test:61) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:76 (test:61)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/pendec2-rules.test.mjs:119 (test:111) LIFFの実物CSSは白いカードだけに影を付け、ラジオは18・点9
   button: 幅・高さ未固定, input: 幅・高さ未固定 / 外部CSSは未解決
@@ -332,15 +332,15 @@ apps/web/scripts/v8-guard/pendec2-rules.test.mjs:136 (test:130) 実物CSS：停�
   input.radio: 幅・高さ未固定 / 外部CSSは未解決
 apps/web/scripts/v8-guard/pendec2-rules.test.mjs:148 (test:142) 実物CSS：差し込み行の項目は8px、印と字は4px。未定義の値でくっつかない
   button.button: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:163 (test:159) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:163 (test:159)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/pendec2-rules.test.mjs:176 (test:171) 共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の素の枠を消す
   button: 幅・高さ未固定 / 外部CSSは未解決
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:189 (test:183) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:189 (test:183)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:191 (test:183) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:191 (test:183)
   HTML が変数・関数。静的には読めない
-apps/web/scripts/v8-guard/pendec2-rules.test.mjs:194 (test:183) 
+apps/web/scripts/v8-guard/pendec2-rules.test.mjs:194 (test:183)
   HTML が変数・関数。静的には読めない
 apps/web/scripts/v8-guard/pendec2-rules.test.mjs:208 (test:200) 2択の器の空の尾を検出し、文字幅の器と等幅の器を保つ
   button.item selected: 幅・高さ未固定, button.item: 幅・高さ未固定 / 外部CSSは未解決
