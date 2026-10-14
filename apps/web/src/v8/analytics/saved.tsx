@@ -282,7 +282,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <p data-card-footer className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
           </Card>
         }>
-          <DataTable aria-label="保存した分析" columnSizing="content" columnLayout={TABLE_LAYOUT}>
+          <DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>
               {visibleItems.length === 0 ? <Tr><Td colSpan={5}>条件に合う保存済み分析はありません。<Button onClick={() => setQuery('')}>キャンセル</Button></Td></Tr> : visibleItems.map(item => <Tr key={item.id} data-table-layout="columns" selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)}>
