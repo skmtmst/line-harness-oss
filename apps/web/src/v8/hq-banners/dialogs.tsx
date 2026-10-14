@@ -96,10 +96,6 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               className={styles.full}
             /></SaveErrorField></Field></div>
           <div className={styles.field}>
-            <div className={styles.labelRow}>
-
-
-            </div>
             <Field label="説明" htmlFor={`${uid}-description`}><SaveErrorField names={["description"]}><TextArea
               id={`${uid}-description`}
               rows={2}

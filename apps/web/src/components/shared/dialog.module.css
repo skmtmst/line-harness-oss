@@ -451,3 +451,11 @@ html:root .content[data-content-layout='form'] { align-items: stretch; }
   width: 100%;
   gap: var(--space-8);
 }
+
+html:root .panel[data-layout='inset'] { padding: var(--polish-space-section); gap: var(--space-16); }
+html:root .panel[data-layout='inset'] > .headerRow,
+html:root .panel[data-layout='inset'] > .content { padding: 0; }
+html:root .panel[data-layout='inset'] .headerContent { gap: var(--tpl-hb-dialog-head-gap); }
+html:root .panel[data-layout='inset'] .content { align-items: stretch; }
+html:root .panel[data-layout='inset'] .actions { padding: var(--space-16) 0 0; }
+.actionLead { display: flex; margin-right: auto; }

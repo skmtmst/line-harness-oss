@@ -61,7 +61,7 @@ export type DialogProps = {
    */
   designTitleRow?: 'mark'
   /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
-  layout?: 'continuous' | 'account-inset'
+  layout?: 'continuous' | 'account-inset' | 'inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
@@ -321,7 +321,7 @@ export default function Dialog({
          * 実行ボタンの無い参照窓では「キャンセル」を出さない。閉じ方は右上の×
          * に一本化する（UI-25）。
          */
-        <div className={styles.actions}>
+        <div className={styles.actions} data-dialog-actions>
           {footerLead ? <span className={styles.footerLead}>{footerLead}</span> : null}
           <Button
             data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
@@ -377,6 +377,6 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children }: { children: ReactNode }) {
-  return <div className={styles.actions}>{children}</div>
+export function DialogActions({ children, leadingAction }: { children: ReactNode; leadingAction?: ReactNode }) {
+  return <div className={styles.actions} data-dialog-actions>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
 }

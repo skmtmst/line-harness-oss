@@ -135,6 +135,7 @@ shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/folder-editor-dialog.tsx
 shared-button-importer components/shared/use-folder-move.tsx
 shared-button-importer components/templates/detail-columns.tsx
+shared-button-importer components/shared/dialog-usage-table.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
