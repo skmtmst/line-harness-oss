@@ -14,8 +14,8 @@ export default function HistoryTable({ rows, friendName, canManage, onOpenFriend
   onOpenFriend: (id: string) => void
   onReverse: (id: string) => void
 }) {
-  return <DataTable className={`${styles.table} ${styles.historyTable}`} columnSizing="controls" data-design="visit-stamp-history" label="押した・使った記録">
-    <thead><TableHeadRow className={styles.headRow}>
+  return <DataTable className={styles.historyTable} columnSizing="controls" data-design="visit-stamp-history" label="押した・使った記録">
+    <thead><TableHeadRow>
       <Th className={styles.colWhen}>いつ</Th>
       <Th className={styles.colFriend} grow>誰に</Th>
       <Th className={styles.colCount}>何個</Th>
@@ -23,7 +23,7 @@ export default function HistoryTable({ rows, friendName, canManage, onOpenFriend
       <Th className={styles.colActor}>誰が</Th>
       <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
     </TableHeadRow></thead>
-    <tbody>{rows.map(row => <Tr key={row.id} className={styles.row} data-row-id={row.id}>
+    <tbody>{rows.map(row => <Tr key={row.id} data-row-id={row.id}>
       <Td className={styles.colWhen}><TruncatedText className={styles.plain} value={shortDateTime(row.at)} /></Td>
       <Td grow><TruncatedText className={styles.name} value={friendName(row.friendId)} /></Td>
       <Td className={styles.colCount}><TruncatedText className={`${styles.countText} ${row.reversed ? styles.countReversed : ''}`} value={row.count} /></Td>
