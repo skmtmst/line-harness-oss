@@ -9,7 +9,8 @@ import Notice from '@/components/shared/notice'
 import { Check, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import ListState from '@/components/shared/list-state'
 import { TextArea } from '@/components/shared/text-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -153,12 +154,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
       open={item !== null}
       title="差し戻しますか？"
       designNode="n4j0Rm"
+      contentLayout="form"
       onCancel={onCancel}
       footer={(
-        <div className={styles.dialogActions}>
+        <DialogActions>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
-        </div>
+        </DialogActions>
       )}
     >
       {item ? (
@@ -169,13 +171,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
+          <DialogFormRow><Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            /></SaveErrorField></Field>
+            /></SaveErrorField></Field></DialogFormRow>
 
         </div>
       ) : null}
