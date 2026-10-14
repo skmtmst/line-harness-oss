@@ -15,16 +15,7 @@ import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
-/**
- * 友だち追加のQRコード（設計 V2 1-1-1）。
- *
- * ダッシュボードの「QRを表示」から開く。設計どおり、印刷に使う大きさを
- * 選べるようにしてある。Worker の /api/qr は size と download を受けるので、
- * 保存もそのまま通る。
- *
- * PDF生成APIは無いため、ブラウザの印刷画面を開く。そこで「PDFに保存」を
- * 選べば、外部サービスへデータを送らずにPDF化できる。
- */
+/** QRの取得・画像保存はWorker、PDFはブラウザの印刷で行う。 */
 
 /*
  * 選べる大きさ（#689）。

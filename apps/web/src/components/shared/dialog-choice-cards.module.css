@@ -20,6 +20,10 @@
   text-decoration: none;
 }
 
+/* 面はカードが持ち、題のリンクだけを塗らない。 */
+html:root [data-dialog-choice-cards] a.link { background: transparent; }
+html:root [data-dialog-choice-cards] a.link:focus-visible { outline: none; }
+
 .link::after {
   position: absolute;
   inset: 0;

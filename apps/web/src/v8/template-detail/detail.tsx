@@ -6,7 +6,6 @@ import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ArrowUpRight } from 'lucide-react';
 import { validateFlexContent } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
@@ -17,7 +16,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { DataTable, NameCell, Td, Tr } from '@/components/shared/table'
+import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
@@ -584,20 +583,7 @@ export default function TemplateDetailV8() {
         )}
       >
         <div className={styles.dialogList}>
-          <DataTable label="使っている所" columnLayout={{
-            headHeight: 'auto', rowHeight: 'auto', gap: 'var(--polish-space-field)',
-            padding: 'var(--tpl-eds-dialog-row-pad)', bodyTextSize: 'var(--text-label)',
-          }}><tbody>{usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
-            <Tr key={row.key} data-table-layout="columns">
-              <Td style={{ flex: '0 0 var(--tpl-eds-kind-w)' }}><TruncatedText value={row.kind} /></Td>
-              <NameCell grow name={String(row.name ?? '')} />
-              <Td>
-              {row.href
-                ? <Button variant="text" external href={row.href}>開いて差し替える<ArrowUpRight size={12} aria-hidden="true" /></Button>
-                : <span className={styles.dialogState}>開ける画面がありません</span>}
-              </Td>
-            </Tr>
-          ))}</tbody></DataTable>
+          <DialogUsageTable rows={usageRows.slice(0, BLOCKED_VISIBLE)} />
           {usageCount > BLOCKED_VISIBLE ? <p className={styles.dialogMore}>ほか {usageCount - BLOCKED_VISIBLE} か所</p> : null}
         </div>
       </Dialog>
