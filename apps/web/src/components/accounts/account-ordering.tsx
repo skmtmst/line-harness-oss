@@ -11,6 +11,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
+import { DialogContentRow } from '@/components/shared/dialog-form-row'
 import ListState from '@/components/shared/list-state'
 import { GripHorizontal, Save } from 'lucide-react'
 import compact from './account-ordering-v8.module.css'
@@ -311,12 +312,9 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
               onDrop={(event) => dropOn(event, null)}>
               {hierarchyRoots.map((account) => compactNode(account, 0))}
             </div>
-            {unassigned.length > 0 ? <Card surface="inset" contentPadding="var(--tpl-acd-dlg-band-pad)" className={compact.unassigned}>
-              <p>{`未設定のLINEアカウント：${unassigned.map((account) => account.displayName || account.name).join('・')}`}</p>
-              <div className={compact.unassignedMenus}>{unassigned.map((account) => <span key={account.id} className={compact.unassignedItem}>
-                <span className={compact.name} title={account.name}>{account.name}</span>{moveMenu(account)}
-              </span>)}</div>
-            </Card> : null}
+            {unassigned.length > 0 ? <div className={compact.unassignedMenus}>{unassigned.map((account) => <DialogContentRow key={account.id} tone="muted">
+                <span className={compact.name} title={`未設定のLINEアカウント：${account.displayName || account.name}`}>{`未設定のLINEアカウント：${account.displayName || account.name}`}</span>{moveMenu(account)}
+              </DialogContentRow>)}</div> : null}
             {!hierarchyRoots.length && !unassigned.length ? <ListState kind="empty" title="LINEアカウントがありません" /> : null}
           </>}
         </div>

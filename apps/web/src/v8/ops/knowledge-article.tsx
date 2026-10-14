@@ -8,7 +8,7 @@ import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { KNOWLEDGE_KINDS, knowledgeTime, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -183,10 +183,10 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
           error={error || undefined}
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
-            <div className={styles.dialogActions}>
+            <DialogActions>
               <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}>保存して承認</Button>
-            </div>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? '元の問い合わせを解決にしてから承認してください' : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check aria-hidden="true" />保存して承認</Button>
+            </DialogActions>
           )}
         >
           <div className={parts.dialogBody}>
