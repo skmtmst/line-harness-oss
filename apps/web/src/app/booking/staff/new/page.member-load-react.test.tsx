@@ -144,7 +144,7 @@ describe('追加発見 ログインユーザー一覧の取得失敗と未設定
     await renderNew()
     await screen.findByText('ログインユーザーを読み込めませんでした')
 
-    const name = screen.getByPlaceholderText('田中 美咲') as HTMLInputElement
+    const name = screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement
     fireEvent.change(name, { target: { value: '田中' } })
 
     fail = false
@@ -153,6 +153,6 @@ describe('追加発見 ログインユーザー一覧の取得失敗と未設定
     fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))
     await screen.findByText('管理者（owner@example.com）')
     expect(screen.queryByText('ログインユーザーを読み込めませんでした')).toBeNull()
-    expect((screen.getByPlaceholderText('田中 美咲') as HTMLInputElement).value).toBe('田中')
+    expect((screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement).value).toBe('田中')
   })
 })

@@ -5,7 +5,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
-import { AlertCircle, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, Search, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Download, Pencil, RotateCw, User } from 'lucide-react'
 import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
@@ -38,6 +38,8 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListToolbar from '@/components/shared/list-toolbar'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
@@ -378,7 +380,7 @@ function Responses() {
   const firstKey = fieldKeys[0]
   const headLine = [
     total === null ? emptyValue('unknown') : `${formatNumber(total)}件`,
-    rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
+    rate != null ? `全回答の答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
     && items.some((item) => String((item.data as Record<string, unknown>)[key] ?? '').trim() !== ''))
@@ -441,15 +443,14 @@ function Responses() {
       {exportError ? <p className={styles.error}>{exportError}</p> : null}
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <Card variant="aside" aria-labelledby="fr-filter">
-        <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
-        <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
-        <Field label={<><Search size={15} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="名前・答えで探す（全件から）"
-            aria-label="名前・答えで探す（全件から）"
-          /></SaveErrorField></Field>
+        <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
+        <Field label="名前・答えで探す（全件から）" labelHidden><SaveErrorField names={["query"]}><ListToolbar search={{
+            updateMode: 'immediate',
+            value: query,
+            onChange: setQuery,
+            placeholder: '名前・答えで探す（全件から）',
+            label: '名前・答えで探す（全件から）',
+          }} /></SaveErrorField></Field>
       </Card>
     </div>
   )
@@ -479,14 +480,10 @@ function Responses() {
           ) : view === 'summary' ? (
             <>
               {incompleteItems.length > 0 ? (
-                <div className={styles.alert} role="status">
-                  <AlertCircle size={18} aria-hidden="true" className={styles.alertIcon} />
-                  <div className={styles.alertText}>
-                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}</p>
-                    <p className={styles.alertNote}>{`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}</p>
-                  </div>
-                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>
-                </div>
+                <Notice tone="danger" role="status"
+                  heading={`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}
+                  message={`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}
+                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>} />
               ) : null}
               {summaries.map((fieldSummary) => {
                 const block = blockByKey(fieldSummary.key)
@@ -495,8 +492,8 @@ function Responses() {
                 const kind = block ? typeLabel(block.type) : null
                 const rating = block?.type === 'rating' ? summary?.ratingFields?.find((field) => field.key === fieldSummary.key) : undefined
                 const sub = rating
-                  ? `5段階・平均 ${ratingAverageText(rating.average)}`
-                  : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)} 件が答えた`}`
+                  ? `5段階・全回答の平均 ${ratingAverageText(rating.average)}／棒は表示中の ${formatNumber(answered)} 件`
+                  : `${kind ? `${kind}・` : ''}${answered === 0 ? '表示中の回答はありません' : `表示中の ${formatNumber(answered)} 件の回答`}`
                 /* 5段階は ★5・★4・★3以下 の3段にまとめる（絵 v0SbYR）。 */
                 const values: Array<[string, number]> = block?.type === 'rating'
                   ? [
@@ -509,10 +506,7 @@ function Responses() {
                 const max = Math.max(0, ...top.map(([, count]) => count))
                 return (
                   <Card key={fieldSummary.key} variant="form" padding="roomy" aria-label={labels[fieldSummary.key] ?? fieldSummary.key}>
-                    <div className={styles.cardHead}>
-                      <h2 className={styles.cardTitle}>{labels[fieldSummary.key] ?? fieldSummary.key}</h2>
-                      <p className={styles.cardNote}>{sub}</p>
-                    </div>
+                    <CardHeader size="stacked" title={labels[fieldSummary.key] ?? fieldSummary.key} meta={sub} />
                     {answered > 0 ? (
                       <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
                     ) : null}
@@ -522,25 +516,20 @@ function Responses() {
               {longKey ? (() => {
                 const recents = items.filter((item) => String((item.data as Record<string, unknown>)[longKey] ?? '').trim() !== '')
                 return (
-                  <Card variant="form" padding="roomy" gap="var(--polish-space-row)" aria-label={labels[longKey] ?? longKey}>
-                    <div className={styles.cardHead}>
-                      <h2 className={styles.cardTitle}>{labels[longKey] ?? longKey}</h2>
-                      <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)} 件`}</p>
-                    </div>
-                    <ul className={styles.quotes}>
+                  <Card variant="records" aria-label={labels[longKey] ?? longKey}>
+                    <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`}
+                      action={<Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button>} />
+                    <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) var(--polish-space-section)' }}><tbody>
                       {recents.slice(0, 2).map((item) => {
                         const text = String((item.data as Record<string, unknown>)[longKey])
                         return (
-                          <li key={item.id} className={styles.quoteRow}>
-                            <span className={styles.quoteText} title={text}>{`「${text}」`}</span>
-                            <span className={styles.quoteWho}>{`${shortDay(item.createdAt)} ${item.friendName ?? '不明'}`}</span>
-                          </li>
+                          <Tr key={item.id} interactive={false} data-table-layout="columns">
+                            <Td grow><TruncatedText value={`「${text}」`} /></Td>
+                            <Td align="right"><TruncatedText value={`${shortDay(item.createdAt)} ${item.friendName ?? '不明'}`} /></Td>
+                          </Tr>
                         )
                       })}
-                    </ul>
-                    <div className={styles.cardFoot}>
-                      <Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button>
-                    </div>
+                    </tbody></DataTable>
                   </Card>
                 )
               })() : null}

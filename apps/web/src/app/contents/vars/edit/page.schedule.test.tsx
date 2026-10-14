@@ -105,9 +105,9 @@ function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
   return el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
-function byExactText(tag: string, text: string): HTMLElement {
+function byExactText(tag: string, text: string, explicitScope?: ParentNode): HTMLElement {
   const dialog = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]')).at(-1)
-  const scope = text === 'キャンセル' && dialog ? dialog : document
+  const scope = explicitScope ?? (text === 'キャンセル' && dialog ? dialog : document)
   const found = Array.from(scope.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
   if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
   return found as HTMLElement
@@ -177,7 +177,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
 
     await click(byExactText('button', '予定を消す'))
     expect(api.deleteSchedule).not.toHaveBeenCalled()
-    await click(byExactText('button', '削除する'))
+    await click(byExactText('button', '削除する', document.querySelector('[role="alertdialog"]')!))
     await settle()
 
     expect(api.deleteSchedule).toHaveBeenCalledWith('var-1', 's-1', 'account-1')
@@ -223,7 +223,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)) })
     await setValue(byId('cv-name'), '入力中の名前')
     await click(byExactText('button', '予定を消す'))
-    await click(byExactText('button', '削除する'))
+    await click(byExactText('button', '削除する', document.querySelector('[role="alertdialog"]')!))
     await settle()
     expect(api.deleteSchedule).toHaveBeenCalledWith('var-1', 's-1', 'account-1')
     expect((byId('cv-name') as HTMLInputElement).value).toBe('入力中の名前')

@@ -115,7 +115,7 @@ async function renderNew() {
 }
 
 async function fillAndSave() {
-  fireEvent.change(screen.getByPlaceholderText('田中 美咲'), { target: { value: '田中' } })
+  fireEvent.change(screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }), { target: { value: '田中' } })
   await pickEntities('予約を受けられるメニュー', ['カット'])
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))

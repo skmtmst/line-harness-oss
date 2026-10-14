@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { scanDialogAudit } from './dialog-layout-browser.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -54,7 +54,7 @@ for (const width of [1152, 1440, 1920]) {
 
 for (const width of [1152, 1440, 1920]) {
   test(`dialog widths and nested input widths at ${width}`, async () => {
-    const browser = await chromium.launch()
+    const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       await page.setContent(`<style>*{box-sizing:border-box}#panel{width:560px}#content{padding:24px;width:100%}#field{width:100%;display:flex;flex-direction:column}input,textarea{width:100%}</style><div id="panel" data-m1-scope role="dialog"><div id="content" data-content-layout="form"><div data-form-requirement="required" id="field"><label>理由<textarea></textarea></label><input></div></div></div>`)

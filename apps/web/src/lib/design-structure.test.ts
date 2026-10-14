@@ -28,7 +28,7 @@ const MAINB_V8_SCREENS = [
   ['/booking/staff/shifts', '@/v8/booking-staff/shifts', 'v8/booking-staff/shifts.tsx', '<PageHeading'],
   ['/booking/menus', '@/v8/booking-menus/settings', 'v8/booking-menus/settings.tsx', '<PageHeading'],
   ['/booking/menus/new', '@/v8/booking-menus/menu-form', 'v8/booking-menus/menu-form.tsx', '<PageHeading'],
-  ['/booking/staff/new', '@/v8/booking-staff/staff-new', 'v8/booking-staff/staff-new.tsx', '<PageHeading'],
+  ['/booking/staff/new', '@/v8/booking-staff/staff-new', 'v8/booking-staff/staff-new.tsx', '<CreatePage'],
   ['/booking/menus/staff', '@/v8/booking-menus/assign', 'v8/booking-menus/assign.tsx', '<PageHeading'],
   ['/contents/vars/new', '@/v8/common-vars-edit/new', 'v8/common-vars-edit/new.tsx', '<CreatePage'],
   ['/broadcasts', '@/v8/broadcasts/list', 'v8/broadcasts/list.tsx', '<ListPage'],

@@ -9,11 +9,9 @@ import Button from './button'
 import Checkbox from './checkbox'
 import FilterChip from './filter-chip'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
-import Radio from './radio'
 import SearchField from './search-field'
 import Select from './select'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
-import SelectionDialog from './selection-dialog'
 import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
 import EntityPickerWindow, { type EntityPickerWindowProps } from './entity-picker-window'
@@ -361,6 +359,7 @@ type FieldBase = {
   valuePrefix?: string
   compact?: boolean
   disabled?: boolean
+  disabledReason?: string
   readOnly?: boolean
   invalid?: boolean
   createHref?: string
@@ -405,11 +404,12 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, disabledReason, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
   color?: string | null
   disabled?: boolean; readOnly?: boolean; invalid?: boolean; id?: string
+  disabledReason?: string
   buttonRef?: Ref<HTMLButtonElement>
   describedBy?: string
   'aria-describedby'?: string
@@ -426,7 +426,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   const isInvalid = invalid || Boolean(field?.invalid)
   return <div className={styles.field} data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
-      disabled={disabled} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
+      disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
       aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}
     {Icon ? <Icon className={styles.fieldIcon} size={16} aria-hidden="true" /> : null}
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
@@ -436,7 +436,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
-    {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
+    {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
     {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix ? actionLabel : null}<ChevronRight size={16} /></span>}
   </div>
 }
@@ -457,14 +457,14 @@ export function describePicked(items: EntityPickerItem[], folders: EntityPickerF
 
 /** 画面の欄。「選んだもの（印・名前・補足）＋［選ぶ］／［変える］」の1行。押すと窓が開く。 */
 export function EntityPickerField(props: SingleField | MultiField) {
-  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
+  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, disabledReason, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
   const [open, setOpen] = useState(props.defaultOpen ??false)
   const title = props.title ?? `${noun}を選ぶ`
   const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
   const pickedColor = props.multiple ? undefined : items.find(item => item.id === props.value)?.color
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly}
       ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} compact={props.compact}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)

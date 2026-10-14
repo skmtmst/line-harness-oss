@@ -88,6 +88,7 @@ type KindFieldBase = {
   accountId?: string | null
   placeholder?: string
   disabled?: boolean
+  disabledReason?: string
   readOnly?: boolean
   invalid?: boolean
   description?: string
@@ -106,7 +107,7 @@ type KindFieldBase = {
  * 保存する値（ID）は今と同じ形で返す。
  */
 export function EntityKindField(props: KindFieldBase & ({ multiple?: false; value: string | null | undefined; onChange: (id: string) => void; clearable?: boolean } | { multiple: true; value: string[]; onChange: (ids: string[]) => void; allowEmpty?: boolean })) {
-  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview, buttonRef, describedBy: suppliedDescription } = props
+  const { kind, label, options, meta, placeholder, disabled, disabledReason, readOnly, invalid, description, id, noPreview, buttonRef, describedBy: suppliedDescription } = props
   const describedBy = [suppliedDescription, props['aria-describedby']].filter(Boolean).join(' ') || undefined
   const account = useMaybeAccount()
   const accountId = props.accountId === undefined ? account?.selectedAccountId ?? null : props.accountId
@@ -117,11 +118,11 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
   const { folders, failed, load } = useEntityFolders(kind, accountId)
   const common = {
     label, noun: def.noun, icon: def.icon, items, folders: hasFolderInfo ? folders : undefined, foldersFailed: hasFolderInfo && failed,
-    onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, readOnly, invalid, description, id, buttonRef, describedBy,
+    onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, disabledReason, readOnly, invalid, description, id, buttonRef, describedBy,
     createHref: def.createHref, createLabel: def.createLabel,
   }
   if (kind === 'tag') {
-    return <TagPickerField id={id} buttonRef={buttonRef} describedBy={describedBy} multiple={Boolean(props.multiple)} label={label} options={options.map(row => ({ id: row.id, name: row.name ?? row.label ?? '', groupId: row.groupId }))} accountId={accountId} value={props.multiple ? props.value : props.value ? [props.value] : []} onChange={ids => props.multiple ? props.onChange(ids) : props.onChange(ids[0] ?? '')} disabled={disabled} readOnly={readOnly} invalid={invalid} />
+    return <TagPickerField id={id} buttonRef={buttonRef} describedBy={describedBy} multiple={Boolean(props.multiple)} label={label} options={options.map(row => ({ id: row.id, name: row.name ?? row.label ?? '', groupId: row.groupId }))} accountId={accountId} value={props.multiple ? props.value : props.value ? [props.value] : []} onChange={ids => props.multiple ? props.onChange(ids) : props.onChange(ids[0] ?? '')} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly} invalid={invalid} />
   }
   if (props.multiple) {
     return <EntityPickerField {...common} multiple value={props.value} onChange={props.onChange} unit={def.unit} allowEmpty={props.allowEmpty ?? true} />

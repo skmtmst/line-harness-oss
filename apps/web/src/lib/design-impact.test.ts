@@ -142,7 +142,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8 タグ 保存した検索（IWnYX）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
       'v8/tags/searches-tab.tsx',
       // ★V8 タグ 友だち情報欄（q5gbcM）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
-      'v8/tags/fields-tab.tsx',
+      'v8/tags/fields-table.tsx',
       // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
       'v8/templates/list.tsx',
       // ★V8 一斉配信の一覧（l5V9a）。新しい置き場（src/v8）に一から書いた。
@@ -172,7 +172,7 @@ describe('共通部品の影響範囲', () => {
       'v8/mileage/earning-rules.tsx',
       'v8/mileage/rewards.tsx',
       'v8/mileage/balances.tsx',
-      'v8/mileage/history.tsx',
+      'v8/mileage/history-pager.tsx',
       'v8/mileage/score.tsx',
       'v8/mileage/friend-detail.tsx',
       // ★V8 予約設定のメニュー・担当スタッフのタブ（owaS3）。src/v8/booking-menus に書き直した。
@@ -198,7 +198,9 @@ describe('共通部品の影響範囲', () => {
       'v8/nen-members/list.tsx',
       // ★V8 マイペット（wTIej）・健康日記（mIwA4）を src/v8 に一から書いた。ページ送りは共通のまま。
       'v8/nen-pets/list.tsx',
+      'v8/nen-pets/parts.tsx',
       'v8/nen-health/health.tsx',
+      'v8/nen-health/parts.tsx',
       // ★V8 オートメーション（LWQXd・g98F9・LnGNw）。新しい置き場（src/v8）に一から書いた。
       'v8/automations/list.tsx',
       'v8/automations/runs.tsx',

@@ -157,7 +157,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
       footer={(
         <div className={styles.dialogActions}>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" disabled={busy || !reason.trim()} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
+          <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
         </div>
       )}
     >

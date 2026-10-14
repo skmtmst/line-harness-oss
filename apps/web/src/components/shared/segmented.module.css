@@ -21,6 +21,12 @@
   border-radius: var(--radius-control);
 }
 
+.root[data-segmented-fit='content'] {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+}
+
 /* 白いつまみ。選択項目の後ろへ位置・幅を JS で合わせる。 */
 .thumb {
   position: absolute;

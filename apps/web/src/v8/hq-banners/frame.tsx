@@ -19,6 +19,7 @@ export default function BannerDialogFrame({
   actionsAlign = 'center',
   designNode,
   role = 'dialog',
+  contentLayout,
   children,
 }: {
   open: boolean
@@ -35,11 +36,12 @@ export default function BannerDialogFrame({
   designNode: string
   /** 危ない操作の確かめは alertdialog。 */
   role?: 'dialog' | 'alertdialog'
+  contentLayout?: 'form'
   children?: ReactNode
 }) {
   const inset = kind === 'create' || kind === 'confirm' || kind === 'detail'
   return <Dialog open={open} title={title} description={inset && typeof description === 'string' ? description : undefined} onCancel={onClose} busy={busy} error={error} designNode={designNode}
-    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation layout={inset ? 'inset' : undefined} footer={inset && actions ? <DialogActions>{actions}</DialogActions> : actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
+    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation contentLayout={contentLayout} layout={inset ? 'inset' : undefined} footer={inset && actions ? <DialogActions>{actions}</DialogActions> : actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
     designWidth={kind === 'confirm' ? 480 : kind === 'detail' || kind === 'reference' ? 960 : kind === 'upload' ? 720 : 560}>
     {description && (!inset || typeof description !== 'string') ? <p>{description}</p> : null}{children}
   </Dialog>

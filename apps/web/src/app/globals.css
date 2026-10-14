@@ -1615,7 +1615,7 @@
   --tpl-sb-conflict-pad: 12px 16px; --tpl-sb-conflict-gap: 12px; --tpl-sb-conflict-icon: 18px; --tpl-sb-conflict-title: var(--polish-text-section); --tpl-sb-conflict-title-lh: 20px; --tpl-sb-conflict-lh: 19px; --tpl-sb-conflict-band-top: 16px; --tpl-sb-conflict-band-bottom: -8px;
   /* 設定の並び替え窓（ztgRD）の行。ほかの窓の寸法は変えない。 */
   --tpl-reorder-row-h: var(--polish-table-row); --tpl-reorder-row-pad: 9px 12px; --tpl-reorder-gap: 12px; --tpl-reorder-handle-w: 14px;
-  --tpl-sett-manual-cols-narrow: 40px 106px minmax(0, 1fr) 76px 76px 52px;
+  --tpl-sett-manual-cols-narrow: 40px 106px minmax(0, 1fr) var(--tpl-sb-ml-col-checked) var(--tpl-sb-ml-col-status) 52px;
   --tpl-sett-sns-cols-narrow: minmax(0, 1fr) 120px minmax(0, 1fr) 96px 72px; --tpl-sett-sns-row-pad: 9px 20px; --tpl-sett-sns-head-pad: 13px 20px; --tpl-sett-sns-row-h: var(--polish-table-row);
   --tpl-sb-dlg-w: 520px; --tpl-sb-dlg-max-h: 720px; --tpl-sb-dlg-head-pad: 14px 18px 10px; --tpl-sb-dlg-title: var(--polish-text-section); --tpl-sb-dlg-desc: var(--polish-text-support); --tpl-sb-dlg-gap: 4px; --tpl-sb-dlg-body-pad: 8px 0; --tpl-sb-dlg-group-pad: 10px 18px 4px; --tpl-sb-dlg-row-pad: 6px 18px; --tpl-sb-dlg-move: 26px; --tpl-sb-dlg-foot-pad: 12px 18px; --tpl-sb-overlay-pad: 24px; --tpl-sb-dlg-link-pad: 6px 4px;
   --tpl-sb-usage-text: var(--polish-text-note); --tpl-sb-usage-pad: 1px 7px; --tpl-sb-state-pad: 24px; --tpl-sb-skeleton-gap: 12px;
