@@ -2779,7 +2779,7 @@ export default function ScenarioDetailV8({
         <StickyBar
           destructive={
             canEdit ? (
-              <StickyBarAction
+              <StickyBarAction destructive
                 icon={Trash2}
                 label="このシナリオを削除する"
                 onClick={() => {
