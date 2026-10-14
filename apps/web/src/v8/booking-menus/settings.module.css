@@ -75,22 +75,7 @@
   line-height: var(--tpl-bm-17);
 }
 
-/* 予約のルール：見出しの段と選ぶ欄の段を3列で（x1OZS6）。 */
-.ruleGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tpl-bm-12) var(--tpl-bm-8);
-}
 
-.ruleHead {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bm-4);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-12);
-  font-weight: 600;
-  line-height: var(--tpl-bm-17);
-}
 
 /* 予約の受け方の1行（文字・間・トグル）。行の高さはトグルの20。 */
 .ruleLine {
@@ -989,11 +974,6 @@
 
 /* ===== ルール ===== */
 
-.ruleFields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tpl-bm-12);
-}
 
 .fieldLabel {
   display: block;
@@ -1561,6 +1541,12 @@
 .phoneCatNow {
   background: var(--color-ink);
   color: var(--color-canvas);
+}
+
+.phoneCatNow[data-category-tone='customer'] {
+  background: var(--v8-liff-primary-soft);
+  color: var(--v8-liff-primary);
+  outline: 1px solid var(--v8-liff-primary);
 }
 
 /* 選ぶカード（メニュー・担当）。 */

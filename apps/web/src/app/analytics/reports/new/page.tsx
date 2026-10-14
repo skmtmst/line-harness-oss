@@ -1,4 +1,5 @@
 'use client'
+
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import EntitySelect from '@/components/shared/entity-select'
@@ -178,14 +179,7 @@ const NEW_BASELINE = JSON.stringify([
 
 const ROLE_LABEL = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' } as const
 
-/*
- * メールアドレスの形の検査。裏側（apps/worker/src/routes/analytics.ts の
- * isEmail）と同じ式で、同じ行を同じ理由で止める。以前は画面で止めずに
- * 裏側が黙って落としていたので、1件でも不備があれば送信しない。
- */
-function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254
-}
+import { isEmail } from './report-email'
 
 /*
  * R454: 1回送信の結果を見る画面。しまうと一覧から消えるため、

@@ -1,5 +1,17 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import HistoryTable from '@/v8/mileage/history-table'
+import { mileageSourceNoteText } from '@/v8/mileage/display'
+import type { MileageAdminHistoryItem } from '@/lib/api'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+function historyMarkup(hasSource: boolean) {
+  const item: MileageAdminHistoryItem = { id: 'history-1', primaryFriendId: 'friend-1', displayName: '友だち', pictureUrl: null, entryType: 'grant', status: 'available', amount: 10, reason: '予約', source: 'booking', hasSourceEvent: hasSource, sourceReferenceId: hasSource ? 'internal-event-7' : null, ruleName: null, mode: 'automatic', executedByStaffName: null, lineAccountName: '店', balanceAfter: 10, occurredAt: '2026-10-13T00:00:00Z' }
+  return renderToStaticMarkup(React.createElement(HistoryTable, { items: [item], readonly: true, menuId: null, setMenuId: () => {}, openPending: () => {}, viewName: row => row.displayName }))
+}
 
 /**
  * 運用者の画面に、内部IDとデータベースの語を出さない（V6の5画面）。
@@ -118,13 +130,14 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
   })
 
   it('マイルの2画面が調整元IDを組み立てない', () => {
-    for (const path of ['mileage/mileage-history-tab.tsx', 'mileage/friends/detail/page.tsx']) {
-      const source = withoutComments(read(path))
-      expect(source, path).not.toContain('調整元ID')
-      expect(source, path).toContain('mileageSourceNoteText(')
-    }
-  })
-})
+    const markup = historyMarkup(true)
+    expect(markup).not.toContain('調整元ID')
+    expect(markup).not.toContain('internal-event-7')
+    expect(markup).toContain('元の記録あり')
+    const detail = withoutComments(read('mileage/friends/detail/page.tsx'))
+    expect(detail).not.toContain('調整元ID')
+    expect(mileageSourceNoteText({ hasSourceEvent: true, sourceReferenceId: 'internal-event-7' })).toBe('元の記録あり')
+  })})
 
 describe('成果承認 n5VVTb の友だち列', () => {
   const CELL = between(
@@ -198,17 +211,11 @@ describe('登録メディア voJtX の使用箇所', () => {
 })
 
 describe('マイルの発生元 MvZm5 / HIU5O', () => {
-  it('履歴の発生元は「元の記録あり／なし」だけを出す', () => {
-    const CELL = between(
-      read('mileage/mileage-history-tab.tsx'),
-      '<Td className={styles.colWhy}>',
-      '</Td>',
-    )
-    expect(CELL).toContain('mileageSourceNoteText({')
-    expect(CELL).not.toContain('調整元ID')
-    expect(CELL).not.toContain('title={item.sourceReferenceId')
+  it('履歴の発生元は記録の有無だけを出す', () => {
+    expect(historyMarkup(true)).toContain('元の記録あり')
+    expect(historyMarkup(false)).toContain('元の記録なし')
+    expect(historyMarkup(true)).not.toContain('internal-event-7')
   })
-
   it('マイル明細の発生元も同じ言い方にする', () => {
     const CELL = between(
       read('mileage/friends/detail/page.tsx'),

@@ -3,23 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-/*
- * 司令塔独立審査(Opus, 2026-09-09)の差し戻し: `ec-commerce-load-contract.test.ts`は
- * `readFileSync(page.tsx)` への文字列一致だけで、実行4ms・mountもレンダリングもない。
- * 逆変異(M3〜M7)を当てても表明された文字列はすべて残ったまま挙動だけが壊れるため、
- * gate内では検知できなかった。ここは本物のReact(react-dom/client)で
- * `EcCommercePage`(default export)をmountし、通信(fetchApi・api.ecCommerce)と
- * タブ・アカウント選択だけを差し替えて、実際の画面の文字と通信回数で挙動を見張る。
- * Next.jsのpage規約上 `page.tsx` は default export 以外を許さないため、
- * `EventsPanel` を個別にexportできない ―― default export をそのままmountする。
- *
- * - M3: boundTo() の先頭に `if (slot) return slot` を挿す → アカウント境界fenceが無効
- * - M4: loadRecords の guard直前に `currentAccountIdRef.current = accountId` を挿す
- *       → 古いクロージャ弾きが無効。再試行応答待ち中の切替でBの一覧が固まる
- * - M5: loadRecords の catch で overview まで pendingFor に戻す → 部分失敗保護が消える
- * - M6: `params.set('query', searchQuery)` を消す → 検索語がサーバへ行かない
- * - M7: `view: 'actions'` を消す → 新APIを使わなくなる(この PR の修正が丸ごと消える)
- */
+/* アカウント切替・部分失敗・検索・取得口を、本物の描画と通信で守る。 */
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
 
@@ -548,7 +532,7 @@ describe('R599 一覧未取得の状態別件数', () => {
     expect(statusTabText(el, '送信なし')).toBe('送信なし1')
   })
 
-  it('正常時は実数を出す', async () => {
+  it('正常時は実数と1ページの送りを出す', async () => {
     const { container: el, root: r } = mount()
     await render(el, r)
     await act(async () => { await drainMicrotasks() })
@@ -564,6 +548,9 @@ describe('R599 一覧未取得の状態別件数', () => {
 
     expect(statusTabText(el, '処理中')).toBe('処理中3')
     expect(statusTabText(el, '失敗')).toBe('失敗4')
+    expect(el.querySelector('[data-pagination]')).not.toBeNull()
+    expect(nextPageButton(el).disabled).toBe(true)
+    expect(el.querySelector('[data-pagination] button')).toHaveProperty('disabled', true)
   })
 
   it('空の一覧は「記録はありません」と実数の0を出す', async () => {

@@ -156,4 +156,15 @@ describe('撮影用の偽 API も同じ契約で読める', () => {
     viaMock();
     expect(await api.getMyLatestFormAnswer('qa-form-1')).toBeNull();
   });
+
+  test('書類の撮影口は両面の入力を返し、アップロードの応答へ面とファイル情報を残す', async () => {
+    viaMock();
+    const form = await api.getForm('qa-document');
+    expect(form.layout.sections[0].blocks[0]).toMatchObject({ type: 'file', fileKind: 'identity', fileBothSides: true, required: true });
+    for (const side of ['front', 'back'] as const) {
+      const response = await api.uploadFormFile('qa-document', new File(['qa'], `${side}.png`, { type: 'image/png' }), undefined, 'qa-document-file', side);
+      expect(response.data.file).toMatchObject({ fileId: `qa-document-${side}`, side, filename: `${side}.png`, mimeType: 'image/png', size: 2, state: 'ready' });
+    }
+    await expect(api.uploadFormFile('qa-document', new File(['qa'], 'qa.png', { type: 'image/png' }), undefined, 'wrong-block', 'front')).rejects.toMatchObject({ status: 400 });
+  });
 });
