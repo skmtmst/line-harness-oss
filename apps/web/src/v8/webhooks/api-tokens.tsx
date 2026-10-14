@@ -20,7 +20,7 @@ import { DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
 import { ListPage } from '@/components/templates'
-import { Check,KeyRound,LayoutTemplate,Plus,RefreshCw } from 'lucide-react'
+import { Check,Coins,Gift,KeyRound,LayoutTemplate,Plus,RefreshCw,Wallet } from 'lucide-react'
 import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import styles from './api-tokens.module.css'
@@ -83,7 +83,7 @@ export default function WebhooksApiTokensV8() {
             outgoing: overview.outgoingCount === null ? null : overview.outgoing,
             incomingCount: overview.incomingCount,
             summary: overview.summary,
-          })}
+          }).map((cell) => ({ ...cell, icon: cell.key === 'sent' ? <Coins size={13} aria-hidden="true" /> : cell.key === 'failed' ? <Gift size={13} aria-hidden="true" /> : cell.key === 'incoming' ? <Wallet size={13} aria-hidden="true" /> : cell.icon }))}
         />
       </>}
       overlays={<>
