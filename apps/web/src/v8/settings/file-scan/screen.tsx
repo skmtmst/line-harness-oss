@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
+import { RotateCcw, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import FormDocumentRetention from '@/components/shared/form-document-retention'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -35,6 +35,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
+const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
 /* 板の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -190,8 +191,8 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
-      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
+        {SAFETY_NOTICE}
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -223,10 +224,8 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
-      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
-
-
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
+      {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
 
@@ -312,7 +311,7 @@ export default function FileScanScreen() {
                   ? '外の検査への送信状態を確認できません。読み直してください。'
                   : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'} action={<>
           {externalConfigured ? <Button variant="secondary" type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>外の検査を止める</Button> : null}
-          <Button variant="secondary" type="button" actionWording onClick={toggleConfigOpen}><Pencil aria-hidden="true" />{configOpen ? '設定を閉じる' : '設定を編集'}</Button>
+          <Button variant="secondary" type="button" actionWording onClick={toggleConfigOpen}><SlidersHorizontal aria-hidden="true" />{configOpen ? '設定を閉じる' : '設定を編集'}</Button>
         </>} />
         {legacySecret ? <Notice tone="warn">古い鍵の名前は使えません。運営が用意した検査専用の鍵の名前へ変更してください。</Notice> : null}
         {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}

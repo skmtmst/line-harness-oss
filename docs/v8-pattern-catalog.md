@@ -244,6 +244,7 @@
 ## table 表
 
 - **役目**：表を見出し40・左右24・線は黒7%で並べる
+- 列配分：`DataTable.columnSizing="controls"` は状態札と操作の列だけ必要な自然幅を確保し、`Th/Td.grow` の名前列へ残りを配る。固定の名前・日時等の予算は保持。空の伸縮スペースは幅に含めず、前後の間は含める。`content` と未指定の表は従来どおり。
 - **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
   - 行高の対応（§6.5-3・2026-10-12 B-254）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧は、**セル内の描画文字が1行なら52、2行・3行なら60**。判定は共通表の `useListRowDensity`、値は `--tpl-list-row-h`／`--tpl-list-row-multi-h`。文字のない高さ40の見本画像は複数行相当。WQmepの受信表は絵で確認した既存の専用口60を保持。1行の `ListSkeleton` は52、一般の表・`TableSkeleton` は56。行高の正本は見た目の決まり §6.5-3。
   - 読む変数：`--color-table-head`・`--color-hairline`
@@ -289,9 +290,10 @@
 ## pagination ページ送り
 
 - **役目**：ページを送り、10・20・50件を切り替える
-- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/list-pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`ListPagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
 - **持ち主（Pen）**：`jX2Uw`「ページ送り」
   - 注：PageSizeSelect は shared が持つ（B-172）。
+  - 手元に全件がある一覧は `ListPagination` へ total/page/pageSize/unit を渡す。範囲とページ数を部品が決め、1ページ・0件でも枠を残す。カーソル式や総数未取得は既存の `Pagination`／`CursorPagination` を使う。
 - **見つけ方（コード）**：
   - own-size：`\b(const|let)\s+\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\w*\s*=` — 件数の定数を画面ごとに持つ
   - own-range-text：`summary`／`pagerSummary` で件数文を組む — `Pagination.range` へ総数・先頭・末尾・単位だけを渡す（L組差し戻しB）。
@@ -336,7 +338,11 @@
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - 作る種類を選ぶ窓：`shared/dialog-choice-cards.tsx` の `DialogChoiceCards` へ名前・説明・行き先を渡す。3列のカードの説明は安全に折り返し、名前は1行、クリック・キーボード・別タブで行き先を開ける。選択を保存するラジオとは分ける。
+  - 使用先を示す窓：`shared/dialog-usage-table.tsx` の `DialogUsageTable` へ種類・名前・行き先を渡す。フォルダの丸を出さず、名前の省略と全文確認・外部の行き先の印1つを共通部品で保つ。
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
+  - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
+  - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
   - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：
@@ -358,7 +364,7 @@
 ## picker-dialog 選ぶ窓
 
 - **役目**：作ってある物を、フォルダ・探す・見本付きの窓で選ぶ（受信箱の「テンプレートを選ぶ」の形1つ）
-- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
+- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker-window.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityPickerWindow`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
 - **持ち主（Pen）**：`S2Vgi`「選ぶ窓（正の形・B-165）」・`A1eZS`「選ぶ窓（V8-B の写し）」
   - 部品の板の html に書き出されていない ID：`S2Vgi`・`A1eZS`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：
@@ -1079,3 +1085,9 @@
 
 - 役目：顔と名前を横並び1行で読む。持ち主は shared/table.tsx の PersonCell、顔は shared/avatar.tsx。名前と既存の行き先を name、表示名を avatarName へ渡す。幅が狭い時は名前だけ省略し全文を title で読む。フォルダ付きの NameCell とは役目を分ける。
 - 件数は shared/pagination.tsx の range（total/first/last）へ。手書きの件数文を足さない。
+
+### 日別グラフの基準線と出来事
+
+- 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
+- `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
+- 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。

@@ -11,7 +11,7 @@
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 
 import { useEffect, useState } from 'react'
-import { Calculator, Download, History, PawPrint, Sparkles } from 'lucide-react'
+import { Download, History, MinusCircle, PlusCircle, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -112,9 +112,9 @@ export default function PetsV8({
       ) : null}
       <KpiBand data-design="KPIs" aria-label="ペットの数の帯">
         <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
-        <KpiCard presentation="band" title="今月の新規" icon={<Sparkles size={13} aria-hidden="true" />} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
-        <KpiCard presentation="band" title="目安を出せる" icon={<Calculator size={13} aria-hidden="true" />} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" />
-        <KpiCard presentation="band" title="体重が古い" icon={<PawPrint size={13} aria-hidden="true" />} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
+        <KpiCard presentation="band" title="今月の新規" icon={<PlusCircle size={13} aria-hidden="true" />} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
+        <KpiCard presentation="band" title="目安を出せる" icon={<MinusCircle size={13} aria-hidden="true" />} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" />
+        <KpiCard presentation="band" title="体重が古い" icon={<Undo2 size={13} aria-hidden="true" />} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
       </KpiBand>
     </>
   ) : undefined

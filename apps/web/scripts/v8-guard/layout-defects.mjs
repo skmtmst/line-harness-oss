@@ -21,12 +21,14 @@ import scanPreviewLayout from './create-preview-layout-browser.mjs'
 import scanAffixedInputs from './affixed-input-layout-browser.mjs'
 import scanShiftEntrySpacing from './shift-entry-layout-browser.mjs'
 import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
+import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
+import { inspectCsvPublicationLayout } from './csv-publication-layout.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
 export const keyOf = f => JSON.stringify([f.kind, f.target, f.other || '', f.text])
-const KINDS = ['form-shift-entry-spacing', 'form-affixed-height', 'form-keyword-input', 'form-action-value', 'form-preview-surface', 'form-create-title', 'form-save-icon', 'form-help', 'form-copy', 'form-shrink', 'form-color', 'form-footer-action', 'form-optional', 'form-row-end', 'control-overlap', 'control-blocked', 'liffshadow', 'liffradio', 'canvasbottom', 'kpiblank', 'kpialign', 'kpimenu', 'cardspill', 'cardbottom', 'segempty', 'segselected', 'segstyle', 'choice-radio', 'choice-color', 'pageredge', 'rowmenu', 'bandtouch', 'customer-edit', 'insertoutside', 'insertlegacy', 'internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname', 'requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu']
+const KINDS = ['choice-check', 'choice-check-color', 'csv-publication-layout', 'preview-card-width', 'layout-tile-rows', 'layout-tile-radio', 'layout-tile-check', 'layout-tile-title', 'form-shift-entry-spacing', 'form-affixed-height', 'form-keyword-input', 'form-action-value', 'form-preview-surface', 'form-create-title', 'form-save-icon', 'form-help', 'form-copy', 'form-shrink', 'form-color', 'form-footer-action', 'form-optional', 'form-row-end', 'control-overlap', 'control-blocked', 'liffshadow', 'liffradio', 'canvasbottom', 'kpiblank', 'kpialign', 'kpimenu', 'cardspill', 'cardbottom', 'segempty', 'segselected', 'segstyle', 'choice-radio', 'choice-color', 'pageredge', 'rowmenu', 'bandtouch', 'customer-edit', 'insertoutside', 'insertlegacy', 'internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname', 'requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu']
 export function validateAllowances(allowances) {
   if (!Array.isArray(allowances)) throw new Error('許可リストは配列です')
   const keys = new Set()
@@ -103,10 +105,12 @@ export function identifyStableTargets(findings) {
 }
 export async function measurePage(page) {
   const formColumns = formColumnFindings(await page.evaluate(collectFormLayouts))
+  const reservationReading = assessReservationReading(await page.evaluate(collectReservationReading))
   const panels = await page.evaluate(scanPanelBlank)
   // 下の空白は panel-blank に一本化。blankfix の途中・横・数の帯は残す。
   const gaps = await page.evaluate(scanBlankGap, { skipPanelBottom: true, exactSelectors: true, selectorDepth: 32, selectorLimit: 4096 })
-  const extra = []
+  const publicationCsv = await page.evaluate(inspectCsvPublicationLayout)
+  const extra = publicationCsv.failures.map(text => ({kind: 'csv-publication-layout', target: publicationCsv.csv ? '[data-design-node="T9gblG"]' : '[data-design-node="SyQA1"]', text, measure: {count: 1}}))
   for (const f of gaps.findings) {
     if (f.excluded || f.where === 'page-bottom' || f.excess < 96) continue
     extra.push({kind: 'blank-' + (f.kind === 'horizontal' ? 'horizontal' : 'vertical'), target: (f.container?.sel || f.edge?.sel || '').replace(/__[\w-]+/g,''), text: [f.where,f.prev?.text,f.next?.text].filter(Boolean).join(' → '), measure:{excess:f.excess}})
@@ -121,7 +125,7 @@ export async function measurePage(page) {
   const consistencyFindings = consistency.findings.map(f => ({ ...f, kind: consistencyKinds[f.kind] }))
   const previewLayout = await page.evaluate(scanPreviewLayout)
   const findings = [...await page.evaluate(scanShiftEntrySpacing), ...await page.evaluate(scanAffixedInputs), ...previewLayout.findings, ...consistencyFindings, ...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules), ...formColumns]
-  return await page.evaluate(identifyStableTargets, findings)
+  return await page.evaluate(identifyStableTargets, [...findings, ...reservationReading])
 }
 async function measureRoute(browser, baseUrl, route, width) {
   let page

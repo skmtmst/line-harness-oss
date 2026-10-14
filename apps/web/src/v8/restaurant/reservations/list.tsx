@@ -50,7 +50,7 @@ export const LEDGER_STATUS_OPTIONS = [
   { value: 'cancelled,no_show', label: '取消・無断のみ' },
 ]
 
-export default function ListView({ view, rows, total, tables, page, period, status, busy, canWrite, canImport, onPeriod, onStatus, onPage, onImport, onCreate, onOpen, onCancel, onRestore,day,storeId,storeName,detail,onView }: {
+export default function ListView({ view, rows, total, tables, page, period, status, busy, canWrite, canImport, onPeriod, onStatus, onPage, onImport, onCreate, onOpen, onEdit, onCancel, onRestore,day,storeId,storeName,detail,onView }: {
   onView:(view:LedgerView)=>void
   detail?:ReactNode
   storeName?:string
@@ -73,6 +73,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   onImport: () => void
   onCreate: () => void
   onOpen: (id: string) => void
+  onEdit: (id: string) => void
   onCancel: (id: string) => void
   onRestore: (id: string) => void
 }) {
@@ -80,7 +81,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   const {selectedAccountId}=useAccount()
   const [axis,setAxis]=useState<ReservationAxis>(view==='month'?'month':'list'),[floor,setFloor]=useState<RestaurantFloor>()
   useEffect(()=>{let current=true;setFloor(undefined);if(selectedAccountId&&storeId)void reservationBoardApi.floors(selectedAccountId,storeId).then(r=>{if(current)setFloor(r.data[0])}).catch(()=>{});return()=>{current=false}},[selectedAccountId,storeId])
-  const range=view==='week'?weekRange(day):view==='month'?monthRange(day):{from:period==='past'?'1970-01-01T00:00:00Z':period==='future'?dayRange(new Date()).from:'1970-01-01T00:00:00Z',to:period==='past'?dayRange(new Date()).from:'2100-01-01T00:00:00Z'}
+  const range=view==='week'?weekRange(day):view==='month'?monthRange(day):{from:period==='past'?'1970-01-01T00:00:00Z':period==='upcoming'?dayRange(new Date()).from:'1970-01-01T00:00:00Z',to:period==='past'?dayRange(new Date()).from:'2100-01-01T00:00:00Z'}
   const printEntries=selectedAccountId?()=>allBoardPages('seats',selectedAccountId,range.from,range.to,storeId).then(es=>es.filter(e=>status==='all'||status.split(',').includes(e.status))):undefined
   const live = rows.filter((item) => !INACTIVE_STATUSES.includes(item.status) && !isHold(item))
   const guests = live.reduce((sum, item) => sum + item.guest_count, 0)
@@ -100,7 +101,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         <KpiCard title="媒体予約" value={mediaCount} unit="件" detail="受信した予約" icon={undefined} presentation="band" />
         <KpiCard title="未配席" value={unseated} unit="件" detail="卓の割当が必要" valueTone={unseated > 0 ? 'warning' : 'default'} icon={undefined} presentation="band" />
       </StatRow>
-      <ReservationBoard printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='future'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns entries={rows.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',onSelect:()=>onRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,onSelect:()=>onCancel(e.id)}])]} />} canWrite={canWrite} busy={busy}
+      <ReservationBoard printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='upcoming'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns monthNamePresentation="readable" entries={rows.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} edit={{label:'変更',disabled:busy,onClick:()=>onEdit(e.id)}} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',onSelect:()=>onRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,onSelect:()=>onCancel(e.id)}])]} />} canWrite={canWrite} busy={busy}
         toolbar={      <>
         {view === 'list' ? (
           <>

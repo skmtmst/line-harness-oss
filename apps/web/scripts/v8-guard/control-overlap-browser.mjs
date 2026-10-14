@@ -1,7 +1,10 @@
 /** 表の押せる物の実寸と中心の当たり先を調べる。文字だけの重なり検査とは独立。 */
 export default function scanControlOverlap() {
   const findings = []
-  const root = document.querySelector('main') || document.body
+  const modal = [...document.querySelectorAll('[role="dialog"][aria-modal="true"],[role="alertdialog"][aria-modal="true"]')]
+    .filter(el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0
+      && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[hidden],[inert]')).at(-1)
+  const root = modal || document.querySelector('main') || document.body
   const controls = [...root.querySelectorAll('button,a[href],input:not([type="hidden"]),select,[role="button"]')]
     .filter(el => !el.matches(':disabled,[aria-disabled="true"]') && el.closest('tr,[data-shared-part="list-row"],[role="row"],[data-list-row],[data-table-layout="columns"],[data-ctx-row]'))
     .map(el => ({ el, rect: el.getBoundingClientRect() }))
@@ -36,7 +39,8 @@ export default function scanControlOverlap() {
     const hit = document.elementFromPoint(x, y)
     if (!hit || el.contains(hit)) continue
     // 開いたメニューや確認窓の下の一覧は、意図的に操作できなくなっている。
-    if (hit.closest('[role="dialog"],[role="alertdialog"],[role="menu"]')) continue
+    const overlay = hit.closest('[role="dialog"],[role="alertdialog"],[role="menu"]')
+    if (overlay && !overlay.contains(el)) continue
     if (hit.closest('label')?.control === el) continue
     findings.push({ kind: 'control-blocked', target: selector(el), other: selector(hit), text: `${name(el)} / ${name(hit)}`.slice(0, 120), measure: { count: 1 } })
   }

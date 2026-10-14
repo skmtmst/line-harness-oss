@@ -88,8 +88,7 @@
 /* 窓の中身：行は 余白8/0・間12・下に線。もっとは 12・上6。変わるところは 薄い地・余白14・間6。 */
 .dialogBody { display: flex; flex-direction: column; align-self: stretch; gap: var(--tpl-eds-dialog-gap); width: 100%; }
 .dialogList { display: flex; flex-direction: column; align-self: stretch; width: 100%; }
-.dialogRow,
-.blockedRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-dialog-row-pad); box-shadow: var(--shadow-row-line); }
+.dialogRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-dialog-row-pad); box-shadow: var(--shadow-row-line); }
 .dialogName { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-name-lh); text-overflow: ellipsis; white-space: nowrap; }
 .dialogState { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); white-space: nowrap; }
 .dialogMore { margin: 0; padding: var(--tpl-eds-dialog-more-pad); color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }

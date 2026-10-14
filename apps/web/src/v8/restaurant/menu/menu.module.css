@@ -13,12 +13,6 @@
 .colOps { width: var(--tpl-rs-menu-col-ops); }
 .rowActions { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
 
-/* 窓：価格と提供時間を横に並べる */
-.pair {
-  display: flex;
-  gap: var(--tpl-rs-pair-gap);
-}
-
 .stopName {
   margin: 0;
   color: var(--color-ink);

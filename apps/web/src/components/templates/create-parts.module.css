@@ -187,6 +187,7 @@
   font-weight: var(--tpl-section-title-weight);
 }
 
+.summaryDescriptionList { padding-inline-start: var(--text-caption); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); list-style-type: '・'; }
 /* 予約などの完了を示す印。指定しない設定内容の箱は変えない。 */
 .summaryCompletion { display: flex; align-items: center; gap: var(--polish-space-field); }
 .completionIcon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }

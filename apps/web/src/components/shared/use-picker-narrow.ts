@@ -15,4 +15,3 @@ export default function usePickerNarrow(threshold: number) {
   })
   return [ref, narrow] as const
 }
-

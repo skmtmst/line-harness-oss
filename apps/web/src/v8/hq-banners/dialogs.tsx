@@ -80,7 +80,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
           <>
             <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
             {/* W7Z57: 名前が空のまま作らせない。 */}
-            <Button variant="primary" onClick={submit} disabled={busy || Boolean(projectNameRequirement.check(name))} title={projectNameRequirement.check(name) ?? undefined} busy={busy} busyLabel="保存しています…">
+            <Button widthReserve="idle" variant="primary" onClick={submit} disabled={busy || Boolean(projectNameRequirement.check(name))} title={projectNameRequirement.check(name) ?? undefined} busy={busy} busyLabel="保存しています…">
               {project ? '変更を保存' : <><Plus aria-hidden="true" className={styles.icon} />作って開く</>}
             </Button>
         </>
@@ -98,10 +98,6 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               className={styles.full}
             /></SaveErrorField></Field></div>
           <div className={styles.field}>
-            <div className={styles.labelRow}>
-
-
-            </div>
             <Field label="説明" htmlFor={`${uid}-description`}><SaveErrorField names={["description"]}><TextArea
               id={`${uid}-description`}
               rows={2}

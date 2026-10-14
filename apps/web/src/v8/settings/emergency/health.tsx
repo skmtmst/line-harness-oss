@@ -597,9 +597,9 @@ export function HealthPanelV8({
         </GridTable>
       </section>
       <KpiBand presentation="band">
-        <KpiCard presentation="band" icon={null} title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />
-        <KpiCard presentation="band" icon={null} title="いちばん長かった停止" value={null} valueText={stats?.longest ?? '—'} unit="" detail={statsNote} />
-        <KpiCard presentation="band" icon={null} title="いまの版" value={null} valueText={stats?.version ?? '—'} unit="" detail={stats ? '反映済み' : statsNote} />
+        <KpiCard presentation="band" title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />
+        <KpiCard presentation="band" title="いちばん長かった停止" value={null} valueText={stats?.longest ?? '—'} unit="" detail={statsNote} />
+        <KpiCard presentation="band" title="いまの版" value={null} valueText={stats?.version ?? '—'} unit="" detail={stats ? '反映済み' : statsNote} />
       </KpiBand>
     </>
   )

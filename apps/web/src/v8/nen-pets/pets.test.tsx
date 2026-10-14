@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenPetListData, NenPetRow } from '@/lib/nen-pets-api'
 import type { NenFeedingData } from '@/lib/nen-ranks-api'
@@ -89,6 +89,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     window.history.replaceState(null, "", "/")
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'
+    LIST.products = []
     fetchApi.mockReset()
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/nen/pets?')) return { success: true, data: LIST }
@@ -105,6 +106,25 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     act(() => { root.unmount() })
     host.remove()
     delete document.documentElement.dataset.theme
+  })
+
+  it('主食の絞り込みで実際の商品を選び、一覧を同じ条件で取り直す', async () => {
+    LIST.products = [{ id: 'st-1', name: 'いつものごはん' }]
+    await render('pets')
+    expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-circle-plus')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-circle-minus')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-undo-2')).toHaveLength(1)
+    await click(byLabel('主食で絞り込む'))
+    await click(screen.getByRole('radio', { name: 'いつものごはん' }))
+    expect(listCalls().some(([path]) => String(path).includes('product=st-1'))).toBe(false)
+    await click(byText('選ぶ'))
+    expect(listCalls().some(([path]) => String(path).includes('product=st-1'))).toBe(true)
+    await click(byLabel('主食で絞り込む'))
+    await click(screen.getByRole('radio', { name: 'すべて' }))
+    expect(String(listCalls().at(-1)?.[0])).toContain('product=st-1')
+    await click(byText('選ぶ'))
+    expect(String(listCalls().at(-1)?.[0])).not.toContain('product=st-1')
+    LIST.products = []
   })
 
   it('一覧は1回だけ取り、数の帯・今日の目安・体重の古い札を出す（取り直しの輪にならない）', async () => {

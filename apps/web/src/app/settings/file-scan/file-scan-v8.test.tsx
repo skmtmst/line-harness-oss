@@ -90,6 +90,17 @@ describe('PfA4o 状態の札', () => {
     expect(screen.getByRole('button', { name: /戻した/ })).toBeTruthy()
     expect(screen.getByText('invoice.pdf')).toBeTruthy()
 
+    const safetyText = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。')
+    const safety = safetyText.closest('[data-design-part="notice"]')
+    expect(safety).not.toBeNull()
+    expect(safety?.querySelector('svg.lucide-shield-check')).not.toBeNull()
+    expect(safetyText.closest('[data-page-explanation-body]')).toBeNull()
+    const settings = screen.getByRole('button', { name: /設定を編集/ })
+    expect(settings.querySelector('svg.lucide-sliders-horizontal')).not.toBeNull()
+    fireEvent.click(settings)
+    expect(screen.getByRole('textbox', { name: /提供元/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '設定を閉じる' }))
+
     fireEvent.click(screen.getByRole('button', { name: /戻した/ }))
     await waitFor(() => {
       expect(mocks.list).toHaveBeenCalledWith('acc-1', expect.objectContaining({ status: 'released' }))

@@ -94,6 +94,16 @@ describe('止めた経路のQR（M）', () => {
     expect(html).not.toContain('この経路は停止しています')
   })
 
+  it('停止専用の案内では使えない形式・保存・印刷を置かず、別の経路へ案内する', () => {
+    const html = markup({ resource: { url: 'https://example.test/r/stopped', title: '停止した経路', stopped: true, stoppedPresentation: 'notice' } })
+    expect(html).toContain('role="alert"')
+    expect(html).toContain('別の有効な経路')
+    expect(html).not.toContain('画像の大きさ')
+    expect(html).not.toContain('画像をダウンロード')
+    expect(html).not.toContain('PDFで印刷')
+    expect(html).not.toContain('alt="停止した経路"')
+  })
+
   it('見つからない経路は選び直しを出す', () => {
     const html = markup({ initialRouteId: 'er-missing', routes: [activeRoute] as never })
     expect(html).toContain('見つかりません')

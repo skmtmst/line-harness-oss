@@ -38,10 +38,15 @@ describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe('—')
     expect(document.querySelector('[data-design-node="xRvDB"]')?.textContent).toBe(text)
   })
-  it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '3.2 GB', '800 KB', '—'])('数字の書式「%s」を保つ', (text) => {
+  it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '3.2 GB', '800 KB', '—', '9.8 → 9.2 kg', '3→4通目', '0→0件'])('数字の書式「%s」を保つ', (text) => {
     expect(isKpiNumberText(text)).toBe(true)
     render(<KpiCard title="数字" value={null} valueText={text} unit="" detail={null} />)
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe(text)
+  })
+  it.each(['停止中', 'v2.6.4', '3→', '→4', '3→4→5', '3件の失敗'])('数ではない「%s」を大きな数にしない', (text) => {
+    expect(isKpiNumberText(text)).toBe(false)
+    render(<KpiCard title="状態" value={null} valueText={text} unit="" detail={null} />)
+    expect(document.querySelector('[data-kpi-number]')?.textContent).toBe('—')
   })
   it('+Nの幅を先に確保し、全件が入れば+Nを出さない', () => {
     expect(fittingTagCount([80, 80, 80], 300, 8, () => 40)).toBe(3)

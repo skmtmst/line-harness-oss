@@ -30,7 +30,7 @@ export default function scanPreviewLayout() {
     const selected=inputs.filter(input=>input.checked && !input.disabled);
     const clipped=tiles.filter(tile=>{const title=tile.querySelector('strong'); return title && title.scrollWidth>title.clientWidth+1;});
     groups.push({preview:group.dataset.preview,tiles:tiles.map(rect),rows:rows.size,visibleRadios:indicators.length,selected:selected.length,checks:checks.length,clippedTitles:clipped.length});
-    if(rows.size!==1)add('layout-tile-rows',group,{excess:rows.size-1});
+    if(rows.size!==1)add('layout-tile-rows',group,{excess:Math.abs(rows.size-1)});
     if(indicators.length)add('layout-tile-radio',group,{count:indicators.length});
     if(checks.length!==selected.length)add('layout-tile-check',group,{count:Math.abs(selected.length-checks.length)});
     if(clipped.length)add('layout-tile-title',group,{count:clipped.length});

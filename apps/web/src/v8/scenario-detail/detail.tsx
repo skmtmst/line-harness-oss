@@ -7,7 +7,7 @@ import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompare, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { CircleAlert, RefreshCw, Trash2 } from 'lucide-react';
@@ -2475,10 +2475,10 @@ export default function ScenarioDetailV8({
 
           {/* 数の帯：購読中・読み終えた・始まる見込み・離脱が多い所。 */}
           <KpiBand data-design="KPIs">
-            <KpiCard icon={null} title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
-            <KpiCard icon={null} title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
-            <KpiCard icon={null} title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
-            <KpiCard icon={null} title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
+            <KpiCard title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
+            <KpiCard title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
+            <KpiCard title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
+            <KpiCard title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
           </KpiBand>
 
           {/* 最後の1通の後（行）。変える入口はこの行の右。 */}
@@ -2802,7 +2802,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary" icon={conflict ? <GitCompare aria-hidden /> : <Check aria-hidden />}
+                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)
