@@ -314,6 +314,15 @@ it('WEB-087：手動保存中は追加編集を止める', async () => {
   await act(async () => release()); draftStore.wait = null
 })
 describe('監査 WEB079/080/082', () => {
+  it('基準日の種類を印で区別し、イベントへ切り替えても予約の設定を保存しない', async () => {
+    await render('basics')
+    const event = host.querySelector<HTMLInputElement>('input[value="event"]')!
+    expect(event.closest('[data-choice-card]')?.querySelector('.lucide-ticket')).toBeTruthy()
+    expect(host.querySelector<HTMLInputElement>('input[value="booking"]')?.closest('[data-choice-card]')?.querySelector('.lucide-calendar-days')).toBeTruthy()
+    await act(async () => event.click())
+    expect(event.checked).toBe(true)
+    expect(draftStore.saved).toHaveLength(0)
+  })
   it('遅いフォルダ取得は、その間に入力した名前を消さない', async () => {
     const { api } = await import('@/lib/api')
     let complete!: (v: Awaited<ReturnType<typeof api.folders.list>>) => void

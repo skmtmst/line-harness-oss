@@ -111,6 +111,7 @@ import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
 import RichMenuSchedules from '@/v8/rich-menu-edit/schedules'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import HqMenuReferences from './hq-references'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
@@ -2767,7 +2768,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       </>
     )
   }
-
   /* ======== 右の列 ======== */
   /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
   function renderLinePreview() {
@@ -2788,7 +2788,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       />
     )
   }
-
   function renderRail(inDialog = false) {
     return (
       <>
@@ -2829,7 +2828,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           />
         ) : null}
 
-        {step === 'buttons' && (!host || selectedArea) ? (
+        {step === 'buttons' ? host ? <HqMenuReferences areas={pages.flatMap(page => page.areas)} references={host.references} /> : (
           <CreateSummaryCard
             title="押された回数（今月）"
             rows={
@@ -2838,7 +2837,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     {
                       key: selectedArea.id,
                       label: `${String.fromCharCode(65 + activePage.areas.findIndex((a) => a.id === selectedArea.id))} ${areaDisplayName(selectedArea, activePage.areas.findIndex((a) => a.id === selectedArea.id))}`,
-                      value: host ? '—（配る前）' : '—（公開前）',
+                      value: '—（公開前）',
                     },
                   ]
                 : []
