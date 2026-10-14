@@ -138,6 +138,26 @@ describe('広告とのつなぎ（FDBsG）', () => {
 })
 
 describe('広告への送信履歴（p0kA3）', () => {
+  it('媒体の絞り込みを選び、同じAPIページからその媒体だけ表示して戻せる', async () => {
+    await render(<AdHistoryV8 />, '定期便の申し込み')
+    const choose = async (label: string) => {
+      await act(async () => { (host.querySelector('button[aria-label="媒体"]') as HTMLElement).click() })
+      let option: HTMLElement | undefined
+      for (let i = 0; i < 40 && !option; i++) {
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+        option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes(label))
+      }
+      expect(option).toBeDefined()
+      await act(async () => { option!.querySelector('button')!.click() })
+    }
+    await choose('Google広告')
+    expect(host.querySelector('tbody')?.textContent).toContain('初回購入')
+    expect(host.querySelector('tbody')?.textContent).not.toContain('定期便の申し込み')
+    await choose('すべての媒体')
+    expect(host.querySelector('tbody')?.textContent).toContain('定期便の申し込み')
+    expect(calls).toHaveLength(0)
+  })
+
   it('行に成果・媒体・状態を出し、断られた理由を下の注に出す', async () => {
     await render(<AdHistoryV8 />, '定期便の申し込み')
     expect(host.querySelector('[data-design-node="p0kA3"]')).not.toBeNull()
