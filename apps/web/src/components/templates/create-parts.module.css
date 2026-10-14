@@ -176,3 +176,5 @@
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
+
+.summaryDescriptionList { padding-inline-start: var(--text-caption); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); list-style-type: '・'; }

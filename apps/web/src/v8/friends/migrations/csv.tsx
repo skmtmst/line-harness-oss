@@ -124,8 +124,10 @@ export default function CsvMigrationsV8() {
           <CardHeader title="CSVを取り込む" titleId="csv-import-title" headingLevel={3} size="content" />
           <FileDropzone
             className={styles.drop}
-            title="ここにCSVを置く"
-            hint="このシステムから書き出したUTF-8のCSV・5MBまで"
+            variant="upload"
+            disabled={m.manageLocked || m.busy}
+            title="CSVを追加"
+            hint={<>ドラッグ＆ドロップ<br />またはクリックしてファイルをアップロード<br />（1ファイル5メガバイト以内・UTF-8 の CSV）</>}
             accept=".csv,text/csv"
             onFiles={(files) => void m.onPickFile(files[0] ?? null)}
           />
