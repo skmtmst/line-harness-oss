@@ -135,7 +135,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />
       </Card>
-      {item.review_comment ? <Notice tone="warn">{item.review_comment}</Notice> : null}
+      {item.review_comment ? <Notice tone="warn" appearance="soft" icon={null}>{item.review_comment}</Notice> : null}
     </Card>
   )
 }
