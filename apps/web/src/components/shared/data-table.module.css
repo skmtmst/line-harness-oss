@@ -327,7 +327,7 @@
 :root .frame[data-table-density] :is(thead, tbody) { display: block; }
 :root .frame[data-table-density] tr {
   display: grid;
-  grid-template-columns: var(--table-columns);
+  grid-template-columns: var(--table-content-columns, var(--table-columns));
   align-items: center;
   column-gap: var(--table-grid-gap,var(--tpl-sb-ec-gap));
   height: auto;

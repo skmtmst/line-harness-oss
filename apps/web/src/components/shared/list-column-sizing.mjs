@@ -51,7 +51,7 @@ export function fitListColumns(frame) {
     const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, a, input, [data-design-node="xRvDB"], [data-list-date-time]'))
     return Math.ceil(controlsOnly ? Math.max(frame.listColumnCeilings[index], required) : unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
-  if (frame.hasAttribute('data-grid-table')) {
+  if (frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')) {
     const columns = widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ')
     frame.style.setProperty('--table-content-columns', columns)
   }

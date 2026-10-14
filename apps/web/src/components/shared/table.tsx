@@ -3,6 +3,7 @@
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import Avatar from './avatar'
 import React from 'react'
+import { recordTableColumns } from './record-table-columns'
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
 import { useListColumnSizing } from './use-list-column-sizing'
@@ -18,7 +19,6 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
-
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
@@ -154,6 +154,7 @@ export function DataTable({
   useListRowDensity(actionWidthRef)
   useListColumnSizing(actionWidthRef, columnSizing !== undefined)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
+  columns ??= tableDensity && !grid && !columnLayout ? recordTableColumns(children) : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
     <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
@@ -181,7 +182,6 @@ export function DataTable({
     </div>
   )
 }
-
 export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
