@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
@@ -60,6 +62,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
   const [editing, setEditing] = useState<BroadcastMessageAsset | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
+  const nameId = useId()
   const [imageUrl, setImageUrl] = useState('')
   /** 今選んだ画像の実ファイル情報（ファイル名・大きさを行に出す用）。 */
   const [imageFile, setImageFile] = useState<{ name: string; size: number } | null>(null)
@@ -202,7 +205,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
     <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
     {showForm && <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
       <div className="mb-5 flex items-center justify-between"><h3 className="font-bold">{editing ? '編集' : `新しい${meta.singular}`}</h3><button onClick={reset} className="text-sm text-ink-faint">閉じる</button></div>
-      <div className="space-y-4"><label className="block text-sm font-medium text-ink-secondary">名前<SaveErrorField names={["name"]}><input value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 w-full rounded-card border px-3 py-2.5 font-normal" placeholder={`${meta.singular}の管理名`} /></SaveErrorField></label>
+      <div className="space-y-4"><Field label="名前" htmlFor={nameId} required><SaveErrorField names={["name"]}><TextField id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder={`${meta.singular}の管理名`} /></SaveErrorField></Field>
       {kind === 'rich_message' && <>
         {/*
           画像の送信は1回のAPI呼び出しで、途中の割合を測れない。

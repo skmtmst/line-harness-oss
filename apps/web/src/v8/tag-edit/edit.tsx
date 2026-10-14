@@ -21,6 +21,7 @@ import { TagEditForm } from './edit-form'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
@@ -221,7 +222,7 @@ export default function TagEditV8() {
     }
   }
 
-  if (loading) return <SaveErrorScope errors={saveErrors}><p className={styles.loading} role="status">読み込み中…</p></SaveErrorScope>
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="読み込み中…" /></SaveErrorScope>
   if (!tagId) {
     return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="編集するタグが指定されていません" description="一覧から編集するタグを選び直してください。" backHref="/tags" backLabel="タグ一覧へ戻る" /></SaveErrorScope>
   }
