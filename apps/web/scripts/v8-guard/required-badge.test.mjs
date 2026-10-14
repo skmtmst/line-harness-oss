@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import { assessAgainstBase } from './layout-defects.mjs'
 
@@ -15,7 +15,7 @@ test('既存の伸びた必須札も検出し、基準版へ同じ崩れを置�
 
 test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯を3幅で検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/form-controls.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1440, 1152, 1920]) {
@@ -25,19 +25,19 @@ test('必須札は文字幅の面だけを通し、入力の幅へ伸びた帯�
         <div class="field"><span class="required" data-required-badge>必須</span><input aria-label="探す欄"></div>
         <div hidden><span class="required" data-required-badge>必須</span></div></main>`)
       const findings = await page.evaluate(scanFormRules)
-      assert.equal(findings.length, 1)
-      assert.equal(findings[0].kind, 'form-required-badge')
-      assert.ok(findings[0].measure.excess > 100, '伸びた面の実寸を確認する')
+      assert.deepEqual(findings, [], '共通の札は文字幅に収まる')
+      await page.addStyleTag({ content: '.field > [data-required-badge]{align-self:stretch}' })
+      const stretched = (await page.evaluate(scanFormRules)).filter(f => f.kind === 'form-required-badge')
+      assert.equal(stretched.length, 1)
+      assert.ok(stretched[0].measure.excess > 100, '伸びた面の実寸を確認する')
       await page.addStyleTag({ content: '.field > [data-required-badge]{align-self:flex-start}' })
       assert.deepEqual(await page.evaluate(scanFormRules), [])
-      await page.addStyleTag({ content: '.field > [data-required-badge]{align-self:stretch}' })
-      assert.equal((await page.evaluate(scanFormRules)).filter(f => f.kind === 'form-required-badge').length, 1)
     }
   } finally { await browser.close() }
 })
 
 test('本文の外へ開いた窓の札を検出し、本文内の窓は二重に数えない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>[data-field]{display:flex;flex-direction:column;width:300px}[data-required-badge]{display:inline-flex;padding:2px 6px}</style>

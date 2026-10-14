@@ -9,6 +9,19 @@ vi.mock('@/components/shared/select', () => ({ default: ({ value, options, onCha
 import QuestionEditor from './question-editor'
 afterEach(cleanup)
 const question = { tapMode: 'single' as const, title: '質問', text: '選ぶ', choices: ['A','B'].map(key => ({ key, label: key, behavior: 'scenario' as const, scenario: { op: 'start' as const, scenarioId: 's', restart: 'from_start' as const } })) }
+it('一つだけ編集する選択肢には、全選択肢を比べる列を重ねない', async () => {
+  for (const fn of [scope.tags, scope.fields, scope.scenarios]) fn.mockResolvedValue({ success: true, data: [] })
+  const view = render(<QuestionEditor value={question} onChange={() => {}} choiceColumns />)
+  await act(async () => {})
+  const comparison = view.container.querySelector('.xl\\:grid-cols-2')!
+  expect(comparison).not.toBeNull()
+  expect(view.container.querySelectorAll('input[type="radio"]').length).toBe(4)
+  view.rerender(<QuestionEditor value={question} onChange={() => {}} choiceColumns choiceOnly={1} />)
+  await act(async () => {})
+  expect(view.container.querySelector('.xl\\:grid-cols-2')).toBeNull()
+  expect(view.container.querySelectorAll('input[type="radio"]').length).toBe(2)
+  expect(view.container.querySelectorAll('details').length).toBe(1)
+})
 it('WEB265: 選択肢ごとの再開ラジオを独立したグループにする', async () => {
   for (const fn of [scope.tags, scope.fields, scope.scenarios]) fn.mockResolvedValue({ success: true, data: [] })
   const view = render(<QuestionEditor value={question} onChange={() => {}} choiceColumns />)

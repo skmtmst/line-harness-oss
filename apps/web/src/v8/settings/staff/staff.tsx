@@ -4,7 +4,6 @@ import MfaPolicy from './mfa-policy'
 import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
 import TotpQr from '@/components/shared/totp-qr'
 
-import { useOverlayFocus } from '@/components/shared/overlay-utils';
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -36,6 +35,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import styles from './staff.module.css'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context';
@@ -1090,7 +1090,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         </div>
         <div className={styles.cardTools}>
           <div className={styles.toolSelect}><SaveErrorField names={["roleFilter","role_filter"]}><Select aria-label="役割で絞り込む" size="full" value={roleFilter} onChange={(value) => setRoleFilter(value as AccessRoleBundle | 'all')} options={[{ value: 'all', label: 'すべての役割' }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ value: role, label: summaryReady ? `${V8_ROLE_LABEL[role]} ${tabUsers.filter((user) => user.roleBundle === role).length}` : V8_ROLE_LABEL[role] }))]} /></SaveErrorField></div>
-          <div className={styles.toolSelect}><SaveErrorField names={["sort"]}><Select aria-label="並び順" size="full" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></SaveErrorField></div>
+          <SaveErrorField names={["sort"]}><ListToolbarSort value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></SaveErrorField>
         </div>
       </div>
       <GridTable className={styles.table} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>

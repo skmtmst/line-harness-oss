@@ -1,7 +1,6 @@
 'use client'
 
 import Toggle from '@/components/shared/toggle'
-import { FolderDotName } from '@/components/shared/folder-dot';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Bookmark, CalendarDays, CircleHelp, Columns2, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
@@ -151,12 +150,6 @@ function downloadCsv(text: string, name: string) {
   URL.revokeObjectURL(url)
 }
 
-/** 件数の文（「7件中 1〜7件」）。 */
-function rangeText(total: number, page: number, size: number): string {
-  if (total === 0) return '0件'
-  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)} 件`
-}
-
 /** 状態の札（点＋文字）。tone は 動いている＝ok・予約中＝info・止めている／送っていない＝off。 */
 function Pill({ tone, children }: { tone: 'ok' | 'info' | 'off' | 'danger'; children: ReactNode }) {
   return (
@@ -175,17 +168,11 @@ function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] 
 }
 
 /** 表の下の件数とページ送り。2ページ以上は共通のページ送り（件数の文つき）、1ページでも件数は出す。 */
-function Pager({ total, page, size, onPage }: { total: number; page: number; size: number; onPage: (page: number) => void }) {
+export function Pager({ total, page, size, onPage }: { total: number; page: number; size: number; onPage: (page: number) => void }) {
   const pageCount = Math.max(1, Math.ceil(total / size))
   return (
     <div className={styles.pagerRow}>
-      {pageCount > 1 ? (
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPage} summary={rangeText(total, page, size)} />
-      ) : (
-        <div className={styles.pager}>
-          <span className={styles.pagerCount}>{rangeText(total, page, size)}</span>
-        </div>
-      )}
+      <Pagination page={page} pageCount={pageCount} onPageChange={onPage} range={{ total, first: total === 0 ? 0 : (page - 1) * size + 1, last: Math.min(total, page * size) }} />
     </div>
   )
 }
@@ -243,7 +230,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
       <KpiBand data-design="KPIs">
         <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settingsUnknown ? null : autoSettings.length} unit="件" detail={settingsUnknown ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
         <KpiCard presentation="band" title="今月送った" icon={<CircleHelp size={13} aria-hidden="true" />} help={`今月（日本時間の月初から）送った通数です。先月 ${num(kpis?.sentLastMonth)}通。配信からの注文 ${num(kpis?.orders)}件・${kpis?.orderAmount == null ? '金額未取得' : polishFormatYen(kpis.orderAmount)}（送信後7日以内）。届かなかった ${num(kpis?.undelivered)}通・友だち解除 ${num(kpis?.unfollowed)}・ブロック ${num(kpis?.blocked)}。`} value={kpis?.sentThisMonth ?? null} unit={kpis?.sentThisMonth == null ? '' : '通'} detail={sentDiff == null ? kpiMissing : `先月より ${sentDiff >= 0 ? '+' : ''}${formatNumber(sentDiff)}`} />
-        <KpiCard presentation="band" title={tab === 'history' ? '取得不可' : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={tab === 'history' ? null : kpis?.openRate ?? null} unit={tab === 'history' || kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
+        <KpiCard presentation="band" title={tab === 'history' ? '取得不可' : '開封率'} helpLabel={tab === 'history' ? undefined : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={tab === 'history' ? null : kpis?.openRate ?? null} unit={tab === 'history' || kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
         <KpiCard presentation="band" title="コラム" icon={<Undo2 size={13} aria-hidden="true" />} help="外部サイトの記事へつなぐコラムの本数です。" value={columnsUnknown ? null : columnTotal} unit="本" detail={columnsUnknown ? kpiMissing : `公開中 ${publishedCount}・下書き ${columns.length - publishedCount}`} />
       </KpiBand>
     </>
@@ -421,13 +408,13 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const audience = formatCampaignAudience(setting)
                 return (
                   <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns" detailKey="campaign" onOpen={() => props.onPreviewCampaign(props.previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}>
-                    <Td className={styles.colName}><FolderDotName>
+                    <Td className={styles.colName}>
                       {canEdit ? (
                         <RowNameLink href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.title} ><TruncatedText value={String(setting.label ?? '')} /></RowNameLink>
                       ) : (
                         <button type="button" className={styles.name} title={setting.label}  onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
-                    </FolderDotName></Td>
+                    </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={timing}>{timing}</span></Td>
                     <Td className={styles.colTarget}><span className={styles.cell} title={audience}>{audience}</span></Td>
                     <Td className={styles.colSent}><span className={styles.num}>{sent == null ? emptyValue('unknown') : formatNumber(sent)}</span></Td>
@@ -729,12 +716,12 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const draft = column.publishedAt == null
                 return (
                   <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} detailKey="column" onOpen={() => props.onSelectColumn(props.selectedColumnId === column.id ? null : column.id)}>
-                    <Td className={styles.colName}><FolderDotName>
+                    <Td className={styles.colName}>
                       <span className={styles.nameStack}>
                         <RowNameLink onOpen={() => props.onSelectColumn(column.id)} href={itemHref('column', column.id, { tab: 'columns' })} className={styles.name} title={column.title}>{column.title}</RowNameLink>
 
                       </span>
-                    </FolderDotName></Td>
+                    </Td>
                     <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '分類なし'}</span></Td>
                     <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : emptyValue('unknown')}</span></Td>
                     <Td className={styles.colLine}>{columnBadge(column, metric?.sent ?? null)}</Td>
@@ -955,7 +942,7 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                           <span className={styles.sub} title={who}>{who}</span>
                         </span>
                       </Td>
-                      <Td className={styles.colName}><FolderDotName><span className={styles.cell} title={delivery.label}>{delivery.label}</span></FolderDotName></Td>
+                      <Td className={styles.colName}><span className={styles.cell} title={delivery.label}>{delivery.label}</span></Td>
                       <Td className={styles.colResult}>
                         <span className={styles.nameStack}>
                           <Pill tone={tone}>{statusLabel[delivery.status] ?? '状態を確認できません'}</Pill>

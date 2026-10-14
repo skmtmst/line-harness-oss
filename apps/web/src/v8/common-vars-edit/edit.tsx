@@ -12,7 +12,7 @@ import { notifySaved } from '@/components/shared/toast';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, Trash2, X } from 'lucide-react';
 import type { CommonVar, CommonVarChangeImpact, CommonVarDeleteImpact, CommonVarSchedule, Folder } from '@line-crm/shared';
 import Link from '@/components/shared/list-navigation'
 
@@ -30,6 +30,7 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
@@ -50,8 +51,6 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { StickyBarAction } from '@/components/shared/sticky-bar'
-import { Trash2 } from 'lucide-react'
 
 /*
  * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
@@ -1101,7 +1100,7 @@ function EditCommonVarV8Inner() {
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <StickyBarAction label="共通情報を削除する" icon={Trash2} onClick={() => openDelete()} />
+        <StickyBarAction icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
       status={blocked.length > 0 ? `${blocked[0]}。直すまで保存できません。` : undefined}
       footerActions={(

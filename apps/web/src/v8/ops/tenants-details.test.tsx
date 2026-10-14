@@ -19,7 +19,7 @@ it('利用と請求・両日付・最終ログインを全文確認し、作成�
   render(<OpsTenants />)
   const name = await screen.findByRole('link', { name: tenant.name, exact: true })
   expect(new URL(name.getAttribute('href')!, 'https://fixture.invalid').searchParams.get('id')).toBe('t1')
-  const row = name.closest('[role="row"]')!
+  const row = name.closest('tr, [role="row"]')!
   const titles = [...row.querySelectorAll<HTMLElement>('[title]')].map(node => node.title)
   expect(titles.some(title => title.includes('利用停止') && title.includes('請求'))).toBe(true)
   expect(titles).toContain(`トライアル期限 ${formatDateTime(tenant.trial_ends_at)}・次回請求 ${formatDateTime(tenant.current_period_ends_at)}`)

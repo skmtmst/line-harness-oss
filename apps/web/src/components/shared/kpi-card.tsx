@@ -62,6 +62,8 @@ export type KpiCardProps = {
    * 渡したときは value と unit を使わない（★V6 37-6 の数値カード帯）。
    */
   valueText?: string
+  /** 数字の範囲を数と単位で読む。片方を取得できないときは範囲全体が不明。 */
+  valueRange?: { from: number | null | undefined; to: number | null | undefined }
   /** 「18 / 20人」のように、整形した値にも単位を添える。 */
   valueTextWithUnit?: boolean
   /**
@@ -157,6 +159,7 @@ export default function KpiCard({
   className,
   valueTone = 'default',
   valueText,
+  valueRange,
   valueTextWithUnit = false,
   ...cardProps
 }: KpiCardProps) {
@@ -167,16 +170,19 @@ export default function KpiCard({
     補足は見出しの「？」（HelpTip）へ。開閉・Esc・外側・1つだけの
     扱いは HelpTip が持つので、カード側は中身を渡すだけにする。
   */
-  const textIsNumber = valueText === undefined || isKpiNumberText(valueText)
+  const rangeText = valueRange === undefined ? undefined
+    : isCountableValue(valueRange.from) && isCountableValue(valueRange.to)
+      ? `${formatNumber(valueRange.from)} → ${formatNumber(valueRange.to)}` : '—'
+  const textIsNumber = valueRange !== undefined || valueText === undefined || isKpiNumberText(valueText)
   const statusText = textIsNumber ? undefined : valueText
-  const numberText = textIsNumber ? valueText : undefined
+  const numberText = rangeText ?? (textIsNumber ? valueText : undefined)
   const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
   const tip = help ?? description ?? menuDescription
   const hasTip = tip !== undefined && tip !== null
 
   const numberAndUnit = <>
     <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-    {(numberText !== undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
+    {(numberText !== undefined && valueRange === undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
   </>
 
   return (
@@ -200,7 +206,7 @@ export default function KpiCard({
           title={title || undefined}
         >
           {icon === null ? null : (
-            <span className={styles.icon} aria-hidden="true">
+            <span data-kpi-icon className={styles.icon} aria-hidden="true">
               {icon ?? <ChartNoAxesColumn size={14} />}
             </span>
           )}

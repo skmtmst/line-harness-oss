@@ -329,7 +329,7 @@ export function MemberChangeConfirmV8({ member, value, accountNames, busy, error
       open
       title={`${member.name} さんの権限を変えますか？`}
       designNode="M4jS9"
-      designWidth={MEMBER_WIDTH}
+      designWidth={720}
       designTop={CONFIRM_TOP}
       busy={busy}
       error={error || undefined}

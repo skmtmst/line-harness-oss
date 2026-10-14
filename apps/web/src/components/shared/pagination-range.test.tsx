@@ -5,6 +5,30 @@ import Pagination from './pagination'
 
 afterEach(cleanup)
 
+const reason = (button: HTMLElement) => {
+  const id = button.getAttribute('aria-describedby')
+  return id ? document.getElementById(id)?.textContent : null
+}
+
+it('ページ境界と一時停止の理由を示し、移動できる操作から理由を外す', () => {
+  const change = vi.fn()
+  const { rerender } = render(<Pagination page={1} pageCount={2} onPageChange={change} />)
+  expect(reason(screen.getByLabelText('前のページ'))).toBe('最初のページです。')
+  expect(screen.getByRole('button', { name: '前のページ', description: '最初のページです。' })).toBeTruthy()
+  expect(document.getElementById(screen.getByLabelText('前のページ').getAttribute('aria-describedby')!)?.hidden).toBe(true)
+  expect(screen.getByLabelText('前のページ').getAttribute('title')).toBe('最初のページです。')
+  expect(reason(screen.getByLabelText('次のページ'))).toBeNull()
+  rerender(<Pagination page={2} pageCount={2} onPageChange={change} />)
+  expect(reason(screen.getByLabelText('前のページ'))).toBeNull()
+  expect(reason(screen.getByLabelText('次のページ'))).toBe('最後のページです。')
+  rerender(<Pagination page={1} pageCount={2} disabled onPageChange={change} />)
+  for (const button of screen.getAllByRole('button')) {
+    expect(reason(button)).toBe('現在、ページを移動できません。')
+    fireEvent.click(button)
+  }
+  expect(change).not.toHaveBeenCalled()
+})
+
 it.each([
   [1, 1, { total: 7, first: 1, last: 7 }, '7件中 1〜7件'],
   [2, 3, { total: 48, first: 21, last: 40 }, '48件中 21〜40件'],

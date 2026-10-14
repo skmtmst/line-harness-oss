@@ -159,6 +159,7 @@ export function BannerImageDetailV8({
                 <Button
                   variant="primary"
                   disabled={busy || selected.length === 0}
+                  title={selected.length === 0 ? '配るアカウントを選んでください。' : undefined}
                   onClick={() => void onDeliver(selected).then((ok) => { if (ok) setSelected([]) })}
                   busy={busy}
                   busyLabel="配っています…"

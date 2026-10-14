@@ -10,9 +10,9 @@
  * 権限の言い分けはここでだけ変える。
  */
 import { useStaffRole } from '@/lib/staff-role'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import type { LineAccount } from '@line-crm/shared'
-import { api, ApiError, type FriendMigrationJob } from '@/lib/api'
+import { api, ApiError, downloadApiFile, type FriendMigrationJob } from '@/lib/api'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { parseFriendCsv, type FriendImportRow } from './friend-csv'
 
@@ -50,12 +50,14 @@ export function useFriendMigrations() {
   const [columns, setColumns] = useState<Array<'basic' | 'tags_fields' | 'support'>>(['basic'])
   // Shift_JIS書き出しはAPI未対応(#496-5)。対応までUTF-8固定で、選択肢は出さない。
   const encoding = 'utf-8' as const
-  const [exportResult, setExportResult] = useState<{ rowCount: number | null; downloadUrl: string } | null>(null)
+  const [exportResult, setExportResult] = useState<{ id: string; rowCount: number | null; downloadUrl: string } | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<FriendImportRow[]>([])
   const [importId, setImportId] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
   const [busy, setBusy] = useState(false)
+  const downloading = useRef(false)
+  const [downloadId, setDownloadId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -101,6 +103,22 @@ export function useFriendMigrations() {
       await load()
     } catch (error) { setMessage(operationFailureMessage(error, '書き出し')) }
     finally { setBusy(false) }
+  }
+
+  const downloadExport = async (id: string) => {
+    if (manageLocked || busy || downloading.current) return
+    downloading.current = true
+    setDownloadId(id)
+    setBusy(true); setMessage(null)
+    try {
+      await downloadApiFile(`/api/friends/exports/${encodeURIComponent(id)}/download`, '友だち.csv')
+    } catch (error) {
+      setMessage(operationFailureMessage(error, 'CSVの保存'))
+    } finally {
+      downloading.current = false
+      setDownloadId(null)
+      setBusy(false)
+    }
   }
 
   const onPickFile = async (selected: File | null) => {
@@ -184,6 +202,8 @@ export function useFriendMigrations() {
     load,
     toggleColumn,
     createExport,
+    downloadExport,
+    downloadId,
     onPickFile,
     previewImport,
     executeImport,

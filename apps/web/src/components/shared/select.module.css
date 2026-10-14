@@ -206,3 +206,5 @@
 /* List controls reserve the whole selected label, icon and existing inset. */
 html:root .content { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); flex: none; }
 html:root .content .trigger { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); max-width: none; }
+
+:root .root[data-select-icon-only] { width: var(--select-menu-field-h); min-width: var(--select-menu-field-h); flex: none; }

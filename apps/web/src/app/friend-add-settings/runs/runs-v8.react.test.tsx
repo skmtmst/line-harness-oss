@@ -163,3 +163,11 @@ test('実行結果は取得した総数・実際の表示範囲を共通件数�
   expect(calls.some(url => url.searchParams.get('cursor') === 'page-2')).toBe(true)
   expect(host.querySelector('button[aria-label="次のページ"]')?.hasAttribute('disabled')).toBe(true)
 })
+
+test('四つの集計に項目別の印を表示する', async () => {
+  await act(async () => root.render(<FriendAddRunsPage />))
+  await eventually(() => expect(host.querySelectorAll('[data-kpi-label]')).toHaveLength(4))
+  const icons = Array.from(host.querySelectorAll('[data-kpi-label]')).map(label => label.querySelector('[data-kpi-icon] svg'))
+  expect(icons.every(Boolean)).toBe(true)
+  expect(new Set(icons.map(icon => icon?.getAttribute('class'))).size).toBe(4)
+})

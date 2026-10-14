@@ -793,14 +793,6 @@
 .rowMenu {
   display: inline-flex;
 }
-:global(:root) .rowMenuButton {
-  width: var(--tpl-an-icon-btn);
-  height: var(--tpl-an-icon-btn);
-  flex: 0 0 var(--tpl-an-icon-btn);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-an-ring);
-}
 .reportNote {
   margin: 0;
   color: var(--color-ink-secondary);

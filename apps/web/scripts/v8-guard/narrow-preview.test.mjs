@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { PARITY_INIT } from '../../../../scripts/visual-qa/v8-parity.mjs'
 import { stubApi } from './speed-budget.mjs'
 import { mockFetch } from './mock-local.mjs'
@@ -23,7 +23,7 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${server.address().port}`
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const cases = ['K7HWG', 'u5YC6', 'U8Xm3X', 'JeINq', 'V6xAo'].map(board => ({ board, url: map.boards[board].url }))
     cases.find(item => item.board === 'U8Xm3X').url += '?id=rule-shop'

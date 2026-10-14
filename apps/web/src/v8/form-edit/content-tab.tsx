@@ -8,7 +8,6 @@ import { Field } from '@/components/shared/form-controls'
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
-import Link from '@/components/shared/list-navigation'
 import {
   AlignLeft,
   CalendarCheck,

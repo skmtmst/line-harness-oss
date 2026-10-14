@@ -120,7 +120,7 @@ export default function Confirm({
         </p>
       )}
       <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
-        <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sub" />
+        <Icon name="info" tone="booking-info" className="h-4 w-4 shrink-0" />
         <p>
           {autoConfirm
             ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'

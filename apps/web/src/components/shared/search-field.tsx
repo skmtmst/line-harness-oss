@@ -18,13 +18,15 @@ export interface SearchFieldProps
   loading?: boolean
   onChange: (value: string) => void
   onClear?: () => void
+  /** 入力直後にCSVなどへ同じ条件を渡す画面だけ、待たずに値を通知する。 */
+  updateMode?: 'debounced' | 'immediate'
   /** @deprecated ⌘K は探す窓専用。古い呼び出しでも印や合図を出さない。 */
   shortcut?: string
 }
 
 /** Pencil V5 `phlR1` を正本にした検索欄。 */
 const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
-  { className, disabled, hidden, loading = false, onChange, onClear, shortcut: _shortcut, value, onKeyDown, ...props },
+  { className, disabled, hidden, loading = false, onChange, onClear, updateMode = 'debounced', shortcut: _shortcut, value, onKeyDown, ...props },
   ref,
 ) {
   const [draft, setDraft] = useState(String(value ?? ''))
@@ -33,7 +35,11 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const composing = useRef(false)
   const cancel = () => { if (timer.current) clearTimeout(timer.current); timer.current = null }
-  const schedule = (next: string) => { cancel(); timer.current = setTimeout(() => { timer.current = null; callback.current(next) }, 300) }
+  const schedule = (next: string) => {
+    cancel()
+    if (updateMode === 'immediate') callback.current(next)
+    else timer.current = setTimeout(() => { timer.current = null; callback.current(next) }, 300)
+  }
   useEffect(() => { cancel(); setDraft(String(value ?? '')) }, [value])
   useEffect(() => cancel, [])
   const hasValue = draft.length > 0

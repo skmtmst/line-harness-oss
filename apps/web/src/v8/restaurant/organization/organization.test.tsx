@@ -120,3 +120,13 @@ it('未発行の取り込みアドレスは未設定で表示し、発行の操�
   await waitFor(() => expect(heading.closest('section')!.textContent).toContain('未設定'))
   expect(within(heading.closest('section')!).getByRole('button', { name: 'アドレスを発行' })).toBeTruthy()
 })
+
+it('担当の役割は日本語で示し、保存用の役割IDは保つ', async () => {
+  render(<OrganizationV8 />)
+  const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
+  expect(within(row).getByText('スタッフ')).toBeTruthy()
+  fireEvent.click(within(row).getByRole('button', { name: '変更' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('button', { name: '役割' }).textContent).toContain('スタッフ')
+  expect(dialog.querySelector<HTMLInputElement>('input[name="role"]')?.value).toBe('staff')
+})

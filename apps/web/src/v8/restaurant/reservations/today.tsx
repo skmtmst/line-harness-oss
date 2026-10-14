@@ -125,7 +125,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         <IconButton aria-label="前の日" onClick={() => onDay(addDays(day, -1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
         <h2 className={styles.dateTitle}>{dayTitle(day)}</h2>
         <IconButton aria-label="次の日" onClick={() => onDay(addDays(day, 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
-        <Button presentation="restaurant" onClick={() => onDay(new Date())} disabled={isToday}>今日</Button>
+        <Button presentation="restaurant" onClick={() => onDay(new Date())} disabled={isToday} title={isToday ? '今日の予約を表示しています' : undefined}>今日</Button>
 
 
 

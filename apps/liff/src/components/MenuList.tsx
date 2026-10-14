@@ -103,14 +103,12 @@ export default function MenuList({
                   <span className="block truncate text-[15px] leading-[22px] font-bold text-ink" title={m.name}>
                     {m.name}
                   </span>
-                  {/* 説明が無いメニューも行を取っておく (板 IruGD の「シャンプーのみ」。カードの高さをそろえる)。 */}
-                  <span
+                  {m.description ? <span
                     className="mt-[3px] block truncate text-[11.5px] leading-[17px] text-liff-sub"
                     title={m.description ?? undefined}
-                    aria-hidden={m.description ? undefined : true}
                   >
-                    {m.description || '\u00a0'}
-                  </span>
+                    {m.description}
+                  </span> : null}
                   <span className="mt-[3px] block text-xs">
                     <span className="font-semibold text-ink">{m.duration_minutes}分</span>
                     <span className="ml-2 font-bold text-liff-primary">

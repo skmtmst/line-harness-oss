@@ -109,6 +109,7 @@ import MessageInsertRow, { MessageBody } from '@/components/shared/message-inser
 import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
+import KeywordInput from '@/components/shared/keyword-input'
 import { FieldError } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -1682,8 +1683,8 @@ function AutoReplyWizardV8Inner() {
                             </button>
                           </span>
                         ))}
-                        <span className={styles.kwSpacer} />
-                        <KeywordInput
+                        <SaveErrorField names={["value"]}><KeywordInput
+                          id="wiz-keywords" label="反応する言葉を足す" errorId="wiz-keywords-error"
                           error={fieldError('wiz-keywords')}
                           onAdd={(word) => {
                             const trimmed = word.trim()
@@ -1696,7 +1697,7 @@ function AutoReplyWizardV8Inner() {
                               ],
                             })
                           }}
-                        />
+                        /></SaveErrorField>
                       </div>
                       {fieldError('wiz-keywords') ? <FieldError id="wiz-keywords-error">{fieldError('wiz-keywords')}</FieldError> : null}
                     </div>
@@ -2512,35 +2513,6 @@ function SummaryRow({
         変える
       </Button>
     </div>
-  )
-}
-
-/** 反応する言葉の追加入力。Enter・カンマ・離れると確定する。 */
-function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?: string }) {
-  const [value, setValue] = useState('')
-  const commit = () => {
-    if (value.trim()) {
-      onAdd(value)
-      setValue('')
-    }
-  }
-  return (
-    <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["value"]}><input
-        id="wiz-keywords"
-        aria-invalid={!!error || undefined}
-        aria-describedby={error ? 'wiz-keywords-error' : undefined}
-        value={value}
-        placeholder="言葉を入れて Enter"
-        aria-label="反応する言葉を足す"
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault()
-            commit()
-          }
-        }}
-        onBlur={commit}
-      /></SaveErrorField></Field>
   )
 }
 
