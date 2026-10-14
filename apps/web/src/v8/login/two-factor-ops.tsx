@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
 import { LogIn } from 'lucide-react'
 import {
   adminSessionHandoffPath,
@@ -20,7 +19,7 @@ import { Field } from '@/components/shared/form-controls'
 import { Steps } from '@/components/templates/steps'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
-import { AuthPage, AuthActions } from '@/components/templates/auth-page'
+import { AuthPage, AuthActions, AuthHelp } from '@/components/templates/auth-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
@@ -126,7 +125,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
     <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} brandName={brandName} title={recovery ? "回復コードでログイン" : scope === 'admin' ? "二段階認証" : "6桁の確認"} steps={ready && challenge ? <Steps label="ログインの手順" steps={[{ label: method === 'password' ? 'メールログイン' : 'LINEログイン', state: 'done' }, { label: recovery ? '回復コード' : '二段階認証', state: 'current' }]} /> : undefined} boardId={recovery ? undefined : 'tOPeY'} titleId="ops-two-factor-title" help={recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : scope === 'ops' ? <> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</> : undefined}>
 
         {missingChallenge ? (
-          <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
+          <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
         <Field density="input" contentGap={12} optional={false} label={<span id="ops-two-factor-code-label">{recovery ? '回復コード（8文字）' : '認証コード（6桁）'}</span>}>
           <SaveErrorField names={["typedCode","code"]} key={`${recovery}-${attempt}`}><OtpInput
@@ -137,7 +136,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
             invalid={Boolean(error)} success={succeeded} busy={loading} disabled={missingChallenge || succeeded} autoFocus
           /></SaveErrorField>
         </Field>
-        {recovery ? <><p>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</p><p>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</p></> : scope === 'admin' ? <p className={styles.foot}>コードは約30秒ごとに更新されます</p> : null}
+        {recovery ? <><AuthHelp>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</AuthHelp><AuthHelp>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</AuthHelp></> : scope === 'admin' ? <p className={styles.foot}>コードは約30秒ごとに更新されます</p> : null}
         <Button
           variant="primary" fullWidth
           className={styles.submit}
@@ -150,9 +149,9 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
         </Button>
         <Card surface="muted" padding="compact" layout="vertical" gap="normal">
           <SectionHeader title={recovery ? '認証アプリが手元に在る時' : 'コードを入力できない場合'} />
-          <AuthActions><Button variant="text" disabled={loading || succeeded} onClick={() => { setRecovery(value => !value); setCode(''); setError('') }}>{recovery ? '6桁のコードで入る' : '回復コードを使う'}</Button>
-            <Link href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Link>
-            {scope === 'admin' && !recovery && challenge && method === 'line' ? <Link href="/login" onClick={clearTwoFactorChallenge}>別のLINEアカウントでログイン</Link> : null}
+          <AuthActions><Button variant="text" size="inline" disabled={loading || succeeded} onClick={() => { setRecovery(value => !value); setCode(''); setError('') }}>{recovery ? '6桁のコードで入る' : '回復コードを使う'}</Button>
+            <Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>
+            {scope === 'admin' && !recovery && challenge && method === 'line' ? <Button variant="text" size="inline" href="/login" onClick={clearTwoFactorChallenge}>別のLINEアカウントでログイン</Button> : null}
           </AuthActions>
         </Card>
 

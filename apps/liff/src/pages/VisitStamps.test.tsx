@@ -119,10 +119,15 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
   });
 
   it('紙のカード：写真を預けてから、返った URL と数で申請し、確認待ちを出す', async () => {
+    // カードのボタンが出ても、申請一覧の取得はまだ終わっていないことがある。
+    fx.paperRequests.mockImplementationOnce(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return { success: true, data: [] };
+    });
     render(<VisitStamps />);
     fireEvent.click(await screen.findByRole('button', { name: '紙のカードを移す' }));
     const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
-    fireEvent.change(screen.getByLabelText('紙のカードの写真'), { target: { files: [file] } });
+    fireEvent.change(await screen.findByLabelText('紙のカードの写真'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '1個ふやす' }));
     fireEvent.click(screen.getByRole('button', { name: '申請する' }));
     await waitFor(() => expect(fx.uploadPaperPhoto).toHaveBeenCalledWith('acc-1', 'c1', file));

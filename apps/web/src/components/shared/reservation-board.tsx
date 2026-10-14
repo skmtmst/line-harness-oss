@@ -108,6 +108,6 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  <div className={styles.screen}>{renderBody?renderBody(boardBody):boardBody}</div>
  {printing?createPortal(<div data-reservation-print data-theme="v8" className={styles.print}><h2>{title}（{axisName[axis]}）</h2><p>{printContext??[...new Set((printRows??entries).map(e=>e.scopeId))].join('・')}</p><p>{renderedDays[0]}〜{renderedDays.at(-1)}</p>{axis!=='list'?<ReservationBoard kind={kind} entries={printRows??entries} resources={resources} axis={axis} floor={floor} dates={renderedDays} onOpen={()=>{}} title={title}/>:null}{list(printRows??entries,true)}</div>,document.body):null}
  </>
- const props={className:styles.board,'data-kind':kind,'data-columns':columns,'aria-label':title,'data-reservation-board':true,'data-print-active':printing?'true':undefined,'data-axis':axis}
+ const props={className:styles.board,'data-kind':kind,'data-columns':columns,'aria-label':title,'data-reservation-board':true,'data-list-skeleton':axis==='list'||compact?true:undefined,'data-print-active':printing?'true':undefined,'data-axis':axis}
  return renderBody||compact?<section {...props}>{contents}</section>:<Card frame="inset" overflow="hidden" {...props}>{contents}</Card>
 }

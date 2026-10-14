@@ -383,6 +383,32 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect((await inherited.json() as typeof mine).upcoming[0]).toMatchObject({ cancel_deadline_minutes_before: 90, cancel_deadline_at: new Date(Date.parse(T1) - 90 * 60_000).toISOString() });
   });
 
+  test.each([null, '{}', '"scalar"', '{"name":null}', '{"name":""}'])('写しが無い・壊れた予約は現在の名前で履歴を読める（%s）', async (snapshot) => {
+    mockSlots([D11]);
+    const id = await adminCreate('menu-ok', T1, 'history-fallback');
+    sqlite.prepare('UPDATE bookings SET menu_snapshot_json = ? WHERE id = ?').run(snapshot, id);
+    const current = sqlite.prepare('SELECT name FROM menus WHERE id = ?').get('menu-ok') as { name: string };
+    const response = await selfApp.request('/api/liff/booking/me?liffId=liff-ny-1', { headers: { Authorization: 'Bearer test-id-token' } }, env, execCtx);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { upcoming: Array<{ id: string; menu_name: string; menu_snapshot_json?: string }> };
+    expect(body.upcoming[0]).toMatchObject({ id, menu_name: current.name });
+    expect(body.upcoming[0]).not.toHaveProperty('menu_snapshot_json');
+  });
+
+  test('予約後の改名は予定と過去の履歴の名前を変えない', async () => {
+    mockSlots([D11]);
+    const id = await adminCreate('menu-ok', T1, 'history-name');
+    const original = sqlite.prepare('SELECT name FROM menus WHERE id = ?').get('menu-ok') as { name: string };
+    sqlite.prepare('UPDATE menus SET name = ? WHERE id = ?').run('改名した受付メニュー', 'menu-ok');
+    for (const status of ['confirmed', 'cancelled']) {
+      sqlite.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, id);
+      const response = await selfApp.request('/api/liff/booking/me?liffId=liff-ny-1', { headers: { Authorization: 'Bearer test-id-token' } }, env, execCtx);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { upcoming: Array<{ id: string; menu_name: string }>; past: Array<{ id: string; menu_name: string }> };
+      expect((status === 'confirmed' ? body.upcoming : body.past)[0]).toMatchObject({ id, menu_name: original.name });
+    }
+  });
+
   test('予約履歴の版とメニュー・担当を使って日時変更と取消ができる', async () => {
     mockSlots([D11, D12]);
     const id = await adminCreate('menu-ok', T1, 'history-actions');
