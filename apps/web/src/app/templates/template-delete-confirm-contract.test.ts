@@ -1,7 +1,12 @@
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
+import { DELETE_UNUSED_DESCRIPTION } from '@/v8/templates/words'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { templateDeleteDescription } from '@/v8/template-detail/model'
 
@@ -30,14 +35,7 @@ function fnBody(src: string, decl: string): string {
   throw new Error(`${decl} の本体が閉じていません`)
 }
 
-/** `<ConfirmDialog` から閉じまでを切り出す。 */
-function dialog(src: string, end: string): string {
-  const from = src.indexOf('<ConfirmDialog')
-  if (from < 0) throw new Error('<ConfirmDialog が見つかりません')
-  const to = src.indexOf(end, from)
-  if (to < 0) throw new Error(`${end} が見つかりません`)
-  return src.slice(from, to + end.length)
-}
+afterEach(cleanup)
 
 describe('テンプレート一覧の削除確認', () => {
   it('ブラウザのconfirmを使わず、共通の確認窓へ移す', () => {
@@ -69,14 +67,31 @@ describe('テンプレート一覧の削除確認', () => {
   })
 
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
-    const jsx = dialog(PAGE, '/>')
+    const remove = vi.fn(), cancel = vi.fn()
+    const { rerender } = render(React.createElement(TemplateDeleteDialog, {
+      open: true, title: '「秋のご案内」を削除しますか？', description: DELETE_UNUSED_DESCRIPTION,
+      busy: true, onConfirm: remove, onCancel: cancel,
+    }))
+    const jsx = PAGE.slice(PAGE.indexOf('<TemplateDeleteDialog'), PAGE.indexOf('/>', PAGE.indexOf('<TemplateDeleteDialog')) + 2)
+    // 画面側の対象・実行中・失敗・取消の接続を保つ。見た目は以下の実DOMで確かめる。
     expect(jsx, '対象の名前を読ませていない').toContain('pendingDelete?.item.name')
-    expect(jsx, '何が起きるかを本文で読ませていない').toContain('DELETE_UNUSED_DESCRIPTION')
-    expect(jsx, '取り消せない操作の色になっていない').toContain('destructive')
-    expect(readFileSync(join(HERE, '../../components/shared/confirm-dialog.tsx'), 'utf8')).toContain("deleteName !== undefined || isDeleteConfirmation(confirmLabel) ? '削除する'")
     expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
     expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')
     expect(jsx, '処理中に閉じられてしまう').toContain('if (!deleting)')
+    expect(screen.getByRole('alertdialog').textContent).toContain('秋のご案内')
+    expect(screen.getByRole('alertdialog').textContent).toContain('すでに送ったメッセージは残ります')
+    expect(screen.getByRole('alert').textContent).toContain('削除は元に戻せません')
+    for (const button of screen.getAllByRole('button')) expect((button as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(cancel).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+    rerender(React.createElement(TemplateDeleteDialog, {
+      open: true, title: '「秋のご案内」を削除しますか？', description: DELETE_UNUSED_DESCRIPTION,
+      error: '削除できませんでした', onConfirm: remove, onCancel: cancel,
+    }))
+    expect(screen.getAllByRole('alert').some(el => el.textContent?.includes('削除できませんでした'))).toBe(true)
+    expect((screen.getByRole('button', { name: '削除する' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByRole('button', { name: '削除する' }).getAttribute('data-dialog-action')).toBe('danger')
   })
 
   it('削除を押しただけでは消えず、窓を開くだけにする', () => {

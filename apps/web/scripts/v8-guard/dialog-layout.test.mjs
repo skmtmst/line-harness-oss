@@ -15,7 +15,7 @@ const search = readFileSync(new URL('../../src/components/shared/search-field.mo
 
 for (const width of [1152, 1440, 1920]) {
   test(`picker actions stay visible with long content at ${width}`, async () => {
-    const browser = await chromium.launch()
+    const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width, height: 700 }, reducedMotion: 'reduce' })
       await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${search}\n${shell.replace(/\.(panel|overlay|header|footer|heading)(?=[^\w-]|$)/g, '.source$1')}</style></head><body>
