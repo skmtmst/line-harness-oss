@@ -168,7 +168,7 @@
   display: flex; align-items: center; width: 100%; min-height: 0; gap: 0;
   color: var(--color-ink-faint); font-size: 12px; font-weight: 400; line-height: 18px;
 }
-:root .detailText { min-width: 0; flex: 1; }
+:root .detailText { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root .link { min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
 :root .card[data-kpi-presentation='band'] {
   border-radius: 0; outline-color: transparent; box-shadow: none;

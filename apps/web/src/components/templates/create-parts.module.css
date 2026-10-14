@@ -192,3 +192,8 @@
 .summaryCompletion { display: flex; align-items: center; gap: var(--polish-space-field); }
 .completionIcon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
 .completionIcon > svg { width: var(--polish-space-section); height: var(--polish-space-section); }
+.completionHeading { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-card); min-width: 0; }
+.completionMark { display: inline-flex; align-items: center; justify-content: center; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
+.completionMark > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+.completionTitle { margin: 0; text-align: center; font-size: var(--tpl-rm-done-title-size); line-height: var(--tpl-rm-done-title-lh); font-weight: var(--polish-weight-title); color: var(--color-ink); }
+.completionDescription { align-self: stretch; margin: 0; font-size: var(--polish-text-body); line-height: var(--tpl-rm-done-note-lh); color: var(--color-ink-secondary); }

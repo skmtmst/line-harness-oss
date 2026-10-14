@@ -722,7 +722,7 @@ const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
 }
 function RoleChip({ role }: { role: RoleKey }) {
-  return <StatusBadge tone="neutral" dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
+  return <StatusBadge tone={role === 'administrator' ? 'success' : role === 'operations' ? 'info' : role === 'reception' ? 'warning' : 'neutral'} dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
 }
 
 const STAFF_TAB_KEYS = [
@@ -1093,7 +1093,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           <SaveErrorField names={["sort"]}><ListToolbarSort value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></SaveErrorField>
         </div>
       </div>
-      <GridTable className={styles.table} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
+      <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
         <GridHeadRow>
           <GridCell className={styles.colPerson} role="columnheader">人</GridCell>
           <GridCell className={styles.colScope} role="columnheader" title="担当のLINEアカウント">担当のLINEアカウント</GridCell>

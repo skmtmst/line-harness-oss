@@ -133,7 +133,14 @@ export default function scanOwnerRules() {
     if (r.width < 300 || r.height < 28) continue
     const content = descendants(row).filter(d => d.matches('button,input,a,svg') || d.childElementCount===0 && d.textContent.trim())
     if (!content.length) continue
-    const right = Math.max(...content.map(d=>d.getBoundingClientRect().right))
+    const right = Math.max(...content.map(d => {
+      // A bare cell includes its padding; measure the visible text, not the cell box.
+      if (d.childElementCount === 0 && d.textContent.trim() && !d.matches('button,input,a,svg,[role="button"]')) {
+        const range = document.createRange(); range.selectNodeContents(d)
+        return range.getBoundingClientRect().right
+      }
+      return d.getBoundingClientRect().right
+    }))
     const gap = r.right-right
     if (gap < 12) add('edge',row,{deficit:Math.ceil(12-gap)})
   }

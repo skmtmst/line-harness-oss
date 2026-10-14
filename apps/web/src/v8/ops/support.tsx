@@ -561,7 +561,7 @@ export default function OpsSupportV8() {
               <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>
               <span className={styles.spacer} />
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>
+              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…"><Send aria-hidden="true" />送信する</Button>
             </div>
           )}
         >

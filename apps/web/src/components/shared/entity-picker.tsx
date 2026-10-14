@@ -16,6 +16,7 @@ import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
 import Dialog from './dialog'
 import TagPill from './tag-pill'
+import useNarrow from './use-picker-narrow'
 
 /*
  * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（B-155・163・164・165・175）。
@@ -67,26 +68,13 @@ function matches(item: EntityPickerItem, query: string) {
   return !q || item.name.toLocaleLowerCase().includes(q) || Boolean(item.keywords?.toLocaleLowerCase().includes(q)) || Boolean(item.content?.toLocaleLowerCase().includes(q))
 }
 
-/** 窓の幅が狭いときはフォルダの列を選ぶ欄に畳む（白い板 1100px 未満で畳む決まりに合わせる）。 */
-function useNarrow(threshold: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [narrow, setNarrow] = useState(false)
-  useEffect(() => {
-    const node = ref.current
-    if (!node || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < threshold))
-    observer.observe(node)
-    return () => observer.disconnect()
-  })
-  return [ref, narrow] as const
-}
-
 function CreateLink({ href, label }: { href?: string; label?: string }) {
   if (!href || !label) return null
   return <Link className={styles.createLink} href={href} target="_blank" rel="noopener">{`作る画面へ：${label}`}<ArrowUpRight size={13} aria-hidden="true" /></Link>
 }
 
 type SingleProps = {
+  scrollBody?: boolean
   title: string
   /** 窓の頭の説明。省くと題だけ。 */
   description?: string
@@ -119,7 +107,6 @@ type SingleProps = {
   onCancel: () => void
 }
 
-/** B-165：受信箱とすべての選ぶ窓が共有する640pxの器。 */
 export type EntityPickerWindowProps = {
   title: string
   description?: string
@@ -130,25 +117,31 @@ export type EntityPickerWindowProps = {
   initialFocusId?: string
   /** データ取得を呼ぶ側で管理するときの中身。窓の形は共通のまま。 */
   children: ReactNode
+  scrollBody?: boolean
   footer: ReactNode
   band?: ReactNode
 }
-export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
-  if ('children' in props) return <Dialog open dirty={false} title={props.title} description={props.description}
+
+export function EntityPickerWindow(props: EntityPickerWindowProps) {
+  return <Dialog open dirty={false} title={props.title} description={props.description}
     designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
+    contentLayout={props.scrollBody ? 'form' : undefined} designContentPadding={props.scrollBody ? '0' : undefined}
     busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel}
     footer={<>
-      {props.children}
+      {props.scrollBody ? null : props.children}
       {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
       {props.band}
       <div className={styles.tpFoot}>{props.footer}</div>
-    </>} />
-  return <SingleEntityPickerDialog {...props} />
+    </>}>{props.scrollBody ? props.children : null}</Dialog>
+}
+
+export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
+  return 'children' in props ? <EntityPickerWindow {...props} /> : <SingleEntityPickerDialog {...props} />
 }
 
 /** 行を選ぶ間は仮の選択。確定したときだけ呼ぶ側の値を変える。 */
 function SingleEntityPickerDialog({
-  title, description, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
+  title, description, scrollBody = false, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
   state, listFooter, preview, error, busy = false, confirmDisabled = false, readOnly = false, createHref, createLabel,
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel,
 }: SingleProps) {
@@ -173,7 +166,7 @@ function SingleEntityPickerDialog({
   if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
-  return <EntityPickerDialog title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
+  return <EntityPickerDialog scrollBody={scrollBody} title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?
@@ -182,11 +175,11 @@ function SingleEntityPickerDialog({
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>}
+      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>}
     </div>
     </>}
   >
-    <div ref={panelRef} className={shell.body}>
+    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : ''}`}>
       {hasFolders && !narrow ? <div className={shell.folders}>
         <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
@@ -445,7 +438,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   const empty = !name
   const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
   const isInvalid = invalid || Boolean(field?.invalid)
-  return <div className={styles.field} data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
+  return <div className={styles.field} data-entity-picker-field data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
       disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
       aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}

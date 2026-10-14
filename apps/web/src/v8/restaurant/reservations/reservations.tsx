@@ -9,7 +9,7 @@
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Lock, Plus } from 'lucide-react'
+import { Lock, Phone } from 'lucide-react'
 import {RowActions} from '@/components/shared/row-actions'
 import SeatWaitlistDialog from './waitlist'
 import SegmentedControl from '@/components/shared/segmented'
@@ -79,7 +79,7 @@ function HeadControls({ storePicker, view, day, storeId, busy, canWrite, onView,
         <span className={styles.headButtons}>
           <RowActions subjectName="予約台帳" menuItems={[{id:"waitlist",label:"キャンセル待ちを見る",disabled:busy||!storeId,onSelect:()=>setWaitOpen(true)}]}/>
           <Button presentation="restaurant" disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
-          <Button presentation="restaurant" variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
+          <Button presentation="restaurant" variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Phone size={16} aria-hidden="true" />電話の予約を入れる</Button>
         </span>
       ) : null}
       {waitOpen&&selectedAccountId&&canWrite?<SeatWaitlistDialog accountId={selectedAccountId} storeId={storeId} onClose={()=>setWaitOpen(false)}/>:null}
@@ -233,7 +233,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
+        <ListView onEdit={setOpenId} onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}

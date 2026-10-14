@@ -86,21 +86,10 @@
   line-height: var(--tpl-bks-switch-lh);
 }
 
-/* 時刻の欄（共通の TimeField を幅84・高さ36・時計と×なしで使う）。 */
+/* 時刻の欄は親で幅を持ち、見た目は共通部品へ任せる。 */
 .time {
   flex: 0 0 var(--tpl-bks-time-w);
   width: var(--tpl-bks-time-w);
-}
-
-.time > button[aria-haspopup] {
-  height: var(--tpl-bks-input-h);
-  padding: var(--tpl-bks-time-pad);
-  border: 0;
-  border-radius: var(--tpl-bks-time-radius);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  font-size: var(--text-label);
-  line-height: var(--tpl-bks-switch-lh);
 }
 
 /* 閲覧のみ：時刻を文字で見せる（選ぶ部品と同じ幅・高さ）。 */
@@ -112,9 +101,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.time > button[aria-haspopup] > svg,
-.time > button[aria-label='時刻を消す'] { display: none; }
-
 /* 休憩の1行：曜日のまとまり72・時刻〜時刻・ごみ箱。 */
 .breakRow {
   display: flex;
@@ -125,25 +111,7 @@
 .daysPick {
   position: relative;
   flex-shrink: 0;
-  width: var(--tpl-bks-break-label-w);
-}
-
-.daysButton {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 0;
-  height: var(--tpl-bks-input-h);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  font: inherit;
-  font-size: var(--text-label);
-  line-height: var(--tpl-bks-switch-lh);
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
+  min-width: var(--tpl-bks-break-label-w);
 }
 
 /* 閲覧のみ：曜日は押せない文字で見せる。 */
@@ -153,8 +121,6 @@
   height: var(--tpl-bks-input-h);
   font-size: var(--text-label);
 }
-
-.daysButton:hover { color: var(--color-action); text-decoration: underline; }
 
 .daysPanel {
   position: absolute;
@@ -170,26 +136,6 @@
   box-shadow: var(--shadow-controls-pop);
 }
 
-.iconButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: var(--tpl-bks-icon-btn);
-  height: var(--tpl-bks-icon-btn);
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-
-.iconButton:hover { background: var(--color-canvas-sunken); color: var(--color-danger); }
-.icon { width: var(--tpl-bks-icon); height: var(--tpl-bks-icon); }
 .btnIcon { width: var(--tpl-bks-btn-icon); height: var(--tpl-bks-btn-icon); flex-shrink: 0; }
 .addRow { display: flex; }
 
@@ -226,30 +172,6 @@
 
 .exEdit { display: flex; align-items: center; gap: var(--tpl-bks-row-gap); padding-bottom: var(--tpl-bks-row-gap); }
 
-/* 状態の札（点つき）。休み＝灰、シフト・つながっている＝緑、休憩＝青。 */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: var(--tpl-bks-pill-gap);
-  min-height: 0;
-  padding: var(--tpl-bks-pill-pad);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-v8-pill-off);
-  color: var(--color-ink-secondary);
-  font: inherit;
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-bks-pill-lh);
-  white-space: nowrap;
-}
-
-button.pill { cursor: pointer; }
-.pill[data-tone='on'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='break'] { background: var(--color-info-bg); color: var(--color-action); }
-.pillDot { width: var(--tpl-bks-pill-dot); height: var(--tpl-bks-pill-dot); border-radius: var(--radius-pill); background: currentColor; }
-
 .dayAdd {
   display: flex;
   flex-wrap: wrap;
@@ -263,22 +185,6 @@ button.pill { cursor: pointer; }
 
 /* 日付の欄（共通の DateField を高さ36で使う）。 */
 .dateBox { display: block; width: 100%; }
-.dateBox button[aria-haspopup] {
-  height: var(--tpl-bks-input-h);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-}
-
-.genRow {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--tpl-bks-row-gap);
-}
-
-.genRow > .dateBox,
-.genRow > div { flex: 1 1 0; min-width: 0; }
 
 .calRow {
   display: flex;

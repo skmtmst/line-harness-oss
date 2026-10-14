@@ -195,7 +195,7 @@
 .chart[data-chart-distribution='diverging'] .bars { position: relative; padding: 0; }
 .chart[data-chart-distribution='diverging'] .bar { position: absolute; }
 .chart[data-chart-distribution='diverging'] .addedBar { bottom: var(--chart-zero); }
-.chart[data-chart-distribution='diverging'] .removedBar { top: calc(100% - var(--chart-zero)); border-radius: 0 0 var(--radius-mini) var(--radius-mini); }
+.chart[data-chart-distribution='diverging'] .removedBar { top: calc(100% - var(--chart-zero)); border-radius: var(--radius-mini); border-start-start-radius: 0; border-start-end-radius: 0; }
 .chart[data-chart-distribution='diverging'] .axisLabel { position: absolute; top: 100%; width: 100%; }
 .chart[data-chart-distribution='diverging'] [data-chart-baseline] { border-color: var(--color-ink-faint); }
 .events { position: absolute; top: calc(0px - var(--tpl-an-mark) - var(--tpl-an-mark-gap)); display: flex; justify-content: center; gap: var(--tpl-an-mark-gap); }

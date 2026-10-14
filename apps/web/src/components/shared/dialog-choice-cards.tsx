@@ -1,0 +1,38 @@
+'use client'
+
+import { useId, type ReactNode } from 'react'
+import Card from './card'
+import styles from './dialog-choice-cards.module.css'
+
+export interface DialogChoice {
+  key: string
+  title: string
+  icon: ReactNode
+  description: string
+  notes: string[]
+  href: string
+}
+
+/** 作る種類を選んで、その作成画面へ進む窓のカード。 */
+export default function DialogChoiceCards({ choices, onChoose }: {
+  choices: DialogChoice[]
+  onChoose: (href: string) => void
+}) {
+  const id = useId()
+  return <div className={styles.grid} data-dialog-choice-cards>
+    {choices.map(choice => <Card key={choice.key} layout="vertical" padding="compact" gap="tight" className={styles.card}>
+      <a href={choice.href} className={styles.link} aria-describedby={`${id}-${choice.key}`} onClick={event => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        event.preventDefault()
+        onChoose(choice.href)
+      }}>
+        <span className={styles.icon} aria-hidden="true">{choice.icon}</span>
+        <span className={styles.title} title={choice.title}>{choice.title}</span>
+      </a>
+      <div id={`${id}-${choice.key}`} className={styles.body}>
+        <p className={styles.description} role="note">{choice.description}</p>
+        <div className={styles.notes}>{choice.notes.map(note => <small key={note}>{note}</small>)}</div>
+      </div>
+    </Card>)}
+  </div>
+}

@@ -15,6 +15,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField,SaveErrorScope } from '@/components/shared/save-form-errors'
 import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
 import { DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
@@ -285,7 +286,7 @@ export default function WebhooksApiTokensV8() {
                   return (
                     <Tr data-row-id={token.id} key={token.id} data-ctx-row={token.id}>
                       <Td grow title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
-                      <Td title={scopeText}>{scopeText}</Td>
+                      <Td title={scopeText}><TruncatedText value={scopeText} /></Td>
                       <Td>{tokenDate(token.createdAt)}</Td>
                       <Td>{tokenUsedAt(token.lastUsedAt)}</Td>
                       <Td>

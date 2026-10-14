@@ -177,7 +177,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('NEN活用スタートセミナー')
     await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('オンデマンド・いつでも視聴・公開中（版 3）')
-    const tabs = host.querySelector('[data-wc-tabs="true"]')
+    const tabs = host.querySelector('[role="tablist"]')
     expect(tabs?.textContent).toContain('参加者 124')
     expect(tabs?.querySelector('[aria-current="page"]')?.textContent).toBe('参加者 124')
     expect(host.textContent).toContain('視聴完了 71')
@@ -196,8 +196,13 @@ describe('V8 ウェビナーの編集', () => {
     const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
     expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
-    expect(stats?.textContent).toContain('フォーム送信?9人')
-    expect(stats?.textContent).not.toContain('フォーム送信?9件')
+    const metric = [...(stats?.querySelectorAll('[data-kpi-presentation]') ?? [])].find(item => item.querySelector('[data-kpi-label]')?.textContent === 'フォーム送信')
+    expect(metric?.querySelector('[data-kpi-number]')?.textContent).toBe('9')
+    expect(metric?.textContent).toContain('9人')
+    expect(metric?.textContent).not.toContain('9件')
+    const help = metric?.querySelector('[data-kpi-label] button') as HTMLButtonElement
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {

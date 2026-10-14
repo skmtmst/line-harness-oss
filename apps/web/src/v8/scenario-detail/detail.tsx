@@ -2802,7 +2802,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary"
+                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : undefined}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)
@@ -2814,7 +2814,6 @@ export default function ScenarioDetailV8({
                   busy={saving}
 
                 >
-                  {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}
                 </Button>
               ) : null}

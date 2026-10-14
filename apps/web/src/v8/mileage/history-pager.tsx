@@ -1,4 +1,5 @@
 import Pagination from '@/components/shared/pagination'
+import { ListPagePagination } from '@/components/templates'
 import { formatNumber } from '@/lib/format'
 import styles from './mileage.module.css'
 
@@ -6,16 +7,16 @@ export default function HistoryPager({ spentOnly, total, page, pageSize, items, 
   spentOnly: boolean; total: number | null; page: number; pageSize: number; items: { length: number }
   pageCount: number; loading: boolean; setPage: (value: number) => void
 }) {
+  const first = (page - 1) * pageSize + 1
+  const receivedLast = first + items.length - 1
+  const last = total == null ? receivedLast : Math.min(spentOnly ? page * pageSize : receivedLast, total)
   return (
     <>
-      <div className={styles.pagerRow}>
-        <span className={styles.pagerCount}>
-          {spentOnly
-            ? `${formatNumber(total ?? 0)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)} 件のうち、使った・取り消し ${formatNumber(items.length)} 件`
-            : `${formatNumber(total ?? 0)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)} 件`}
-        </span>
-        {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} /> : null}
-      </div>
+      <ListPagePagination>
+        <Pagination page={page} pageCount={Math.max(1, pageCount)} onPageChange={setPage} disabled={loading} range={!spentOnly || total !== null ? { total, first, last } : undefined}
+          summary={spentOnly && total === null ? `—件のうち、使った・取り消し ${formatNumber(items.length)} 件` : undefined} />
+      </ListPagePagination>
+      {spentOnly && total !== null ? <span className={styles.pagerCount}>{`このページのうち、使った・取り消し ${formatNumber(items.length)} 件`}</span> : null}
     </>
   )
 }

@@ -100,6 +100,16 @@ async function click(element: Element | undefined) {
 }
 
 describe('V8 投稿（審査）', () => {
+  it('掲載のURLでは掲載タブと本文をそろえ、審査のカードを出さない', async () => {
+    window.history.replaceState(null, '', '/nen-members?tab=publications')
+    await render()
+    const publications = [...host.querySelectorAll('[role="tab"]')].find(tab => tab.textContent === '公式サイト掲載')
+    expect(publications?.getAttribute('aria-selected')).toBe('true')
+    expect(host.textContent).toContain('公式サイト掲載中の写真はありません')
+    expect(host.querySelector('[data-design-node="photo-cards-v8"]')).toBeNull()
+    expect(buttons('写真を見送る')).toHaveLength(0)
+    expect(window.location.search).toBe('?tab=publications')
+  })
   it('次のページを含む全件選択でも審査対象の写真と版を保持する', async () => {
     const rows = Array.from({ length: 201 }, (_, index) => photo(`page-${index}`, `写真${index}`, 'pending'))
     const originalFetch = globalThis.fetch

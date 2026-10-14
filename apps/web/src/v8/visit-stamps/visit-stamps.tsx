@@ -660,11 +660,11 @@ function VisitStampsScreen() {
                 : paper === null ? <ListState kind="loading" />
                   : paper.length === 0 ? <p className={styles.empty}>まだ申請はありません。お客さまが LINE の来店スタンプから［紙のカードを移す］を押すと、ここに出ます。</p>
                     : (
-                      <DataTable className={styles.table} data-design="visit-stamp-paper">
+                      <DataTable className={styles.table} data-design="visit-stamp-paper" columnSizing="controls">
                         <thead>
                           <TableHeadRow className={styles.headRow}>
                             <Th className={styles.colPhoto}>写真</Th>
-                            <Th>お客さま</Th>
+                            <Th grow>お客さま</Th>
                             <Th className={styles.colStamps}>押印数</Th>
                             <Th className={styles.colDate}>申請日</Th>
                             <Th className={styles.colState}>状態・操作</Th>
@@ -681,7 +681,7 @@ function VisitStampsScreen() {
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
                                   </button>
                                 </Td>
-                                <Td>
+                                <Td grow>
                                   <span className={styles.texts}>
                                     <span className={styles.name} ><TruncatedText value={String(names.name ?? '')} /></span>
                                     {names.line ? <span className={styles.sub}>{`LINE：${names.line}`}</span> : null}

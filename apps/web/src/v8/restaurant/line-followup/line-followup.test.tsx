@@ -35,7 +35,7 @@ describe('配信のときの言い方', () => {
 
 it('本物の種類で数え、直した題と本文を下書きとして保存する（送らない）', async () => {
   render(<LineFollowupV8 />)
-  expect(await screen.findByText('予約24時間前のご案内')).toBeTruthy()
+  expect(await screen.findByRole('button', { name: '予約24時間前のご案内' })).toBeTruthy()
   expect(screen.getByText('ご来店のお礼')).toBeTruthy()
   expect(screen.getAllByText('確認用')).toHaveLength(2)
   expect(screen.getAllByText('未作成')).toHaveLength(2)
@@ -49,6 +49,25 @@ it('本物の種類で数え、直した題と本文を下書きとして保存�
 it('閲覧のみには「下書きを保存する」を置かない', async () => {
   fixture.role = 'staff'
   render(<LineFollowupV8 />)
-  expect(await screen.findByText('予約24時間前のご案内')).toBeTruthy()
+  expect(await screen.findByRole('button', { name: '予約24時間前のご案内' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
+})
+
+it('お知らせを切り替えても未保存の入力を保ち、選んだお知らせだけを保存する', async () => {
+  const { container } = render(<LineFollowupV8 />)
+  await screen.findByRole('button', { name: '予約24時間前のご案内' })
+  expect(screen.getByRole('button', { name: '予約24時間前のご案内' }).getAttribute('aria-pressed')).toBe('true')
+  fireEvent.change(screen.getByRole('textbox', { name: '本文' }), { target: { value: '編集中の本文' } })
+  fireEvent.click(screen.getByRole('button', { name: 'ご来店のお礼' }))
+  expect(screen.getByRole('button', { name: 'ご来店のお礼' }).getAttribute('aria-pressed')).toBe('true')
+  expect(screen.getByRole('button', { name: '予約24時間前のご案内' }).getAttribute('aria-pressed')).toBe('false')
+  expect((screen.getByRole('textbox', { name: '本文' }) as HTMLTextAreaElement).value).toBe('f2の本文')
+  fireEvent.click(screen.getByRole('button', { name: '予約24時間前のご案内' }))
+  expect((screen.getByRole('textbox', { name: '本文' }) as HTMLTextAreaElement).value).toBe('編集中の本文')
+  fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方' }))
+  expect(screen.getByRole('button', { name: 'LINEでの見え方' }).getAttribute('aria-expanded')).toBe('true')
+  expect(container.querySelectorAll('[data-line-preview-part="device-frame"]')).toHaveLength(1)
+  expect(container.querySelector('[data-line-preview-part="talk"]')?.textContent).toContain('編集中の本文')
+  fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+  await waitFor(() => expect(fixture.updateLineFlow).toHaveBeenCalledWith('account-1', 'f1', { title: 'f1の題', body: '編集中の本文' }))
 })

@@ -127,7 +127,7 @@ export default function UpdateHistoryV8() {
       <KpiBand aria-label="更新の集計">
         <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : '更新の記録なし'} />
         <KpiCard title="この30日の更新" icon={<RefreshCw size={14} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
-        <KpiCard title="失敗した更新" icon={<CircleX size={14} />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
+        <KpiCard title="失敗した更新" icon={<CircleX size={16} aria-hidden="true" />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
       </KpiBand>
 
       {state === 'error' ? (
@@ -167,7 +167,7 @@ export default function UpdateHistoryV8() {
 
       <div className={styles.foot}>
         <p className={styles.footText}>自前でデプロイしている環境では、手動アップデートガイドの手順で更新します。</p>
-        <Button external href={MANUAL_UPDATE_GUIDE_URL}><BookOpen size={14} aria-hidden="true" />手動アップデートガイドを開く</Button>
+        <Button external href={MANUAL_UPDATE_GUIDE_URL}><BookOpen size={16} aria-hidden="true" />手動アップデートガイドを開く</Button>
       </div>
     </div>
   )

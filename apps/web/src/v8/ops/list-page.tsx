@@ -11,7 +11,7 @@ export function OpsListPage({ stats, ...props }: ListPageProps) {
   const environment = opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)
   return <ListPage {...props} stats={<>
     <PageContent><Notice tone="warn" icon={<ShieldCheck aria-hidden="true" />} action={environment === 'staging' ? <span>検証環境</span> : undefined}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
-    {stats}
+    {stats ? <PageContent layout="stats">{stats}</PageContent> : null}
   </>} />
 }
 

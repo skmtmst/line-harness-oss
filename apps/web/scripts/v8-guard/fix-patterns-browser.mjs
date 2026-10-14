@@ -121,6 +121,12 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (el.closest('[data-kpi-number]')) continue
       const css = getComputedStyle(el)
       if (!el.textContent.trim() || css.display === 'contents') continue
+      if (el.matches('[data-kpi-detail] [role="note"]')) {
+        const oneLine = css.whiteSpace === 'nowrap' && css.overflowX === 'hidden' && css.textOverflow === 'ellipsis'
+          && el.getBoundingClientRect().height <= parseFloat(css.lineHeight) + 1
+        if (!oneLine) add('F1', el, 'KPI note must stay on one line with ellipsis')
+        if (oneLine && el.title.trim() === el.textContent.trim()) continue
+      }
       const rects = textRects(el)
       if (!rects.length) continue
       const paintedWidth = Math.max(...rects.map(r=>r.right)) - Math.min(...rects.map(r=>r.left))
@@ -194,6 +200,15 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
             && Math.min(text.bottom, rect.bottom) - Math.max(text.top, rect.top) > 1
         }))) add('F6', el, 'toolbar trailing text overlaps another control')
       }
+    }
+    for (const row of all('[class*="recentRow"]')) {
+      const action = [...row.querySelectorAll('button')].find(el => visible(el) && el.textContent.trim() === '複製する')
+      const metadata = action?.previousElementSibling
+      if (!action || !visible(metadata)) continue
+      const button = action.getBoundingClientRect()
+      const touches = textRects(metadata).some(text => Math.min(text.bottom, button.bottom) > Math.max(text.top, button.top)
+        && text.right >= button.left && text.left < button.right)
+      if (touches) add('F6', metadata, 'recent broadcast metadata touches or overlaps the duplicate action')
     }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const cell of all('[data-list-action-cell]')) {

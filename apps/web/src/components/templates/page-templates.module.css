@@ -256,6 +256,8 @@
   width: var(--tpl-preview-content-width); flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field);
 }
+/* 設定カードは欄の幅を使う。端末の見本は自身の幅を保つ。 */
+:global(:root) .previewContent > :global([data-card-variant='aside']) { width: 100%; align-self: stretch; }
 :global(:root) [data-page-template='create'][data-has-footer] .createContent > *,
 :global(:root) [data-page-template='create'][data-has-footer] .preview > * { flex-shrink: 0; }
 
@@ -343,6 +345,8 @@
 .detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-floor-aside-w); }
+/* 枠を持つ詳細カードの高さは内容で決め、図面の高さへ引き伸ばさない。 */
+.detailColumns[data-detail-columns='restaurant-tables'] .detailColumnAside { min-height: 0; }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnMain { gap: var(--tpl-rs-body-gap); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnAside { padding-left: 0; border-left: 0; }
 .detailColumns[data-presentation='notification'] { grid-template-columns: minmax(0, 1fr) var(--tpl-hb2-op-side-w); gap: var(--tpl-hb2-op-gap); margin-right: 0; }
@@ -488,6 +492,7 @@
 :global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 
 :global(:root) .pageContent { display: flex; flex-direction: column; gap: var(--polish-space-card); padding: var(--polish-space-card) var(--polish-space-section) 0; min-width: 0; }
+:global(:root) .pageContent[data-content-layout='stats'] { padding-block: 0; }
 :global(:root) .pageContent[data-content-layout='columns'] { flex-direction: row; align-items: flex-start; }
 :global(:root) .createColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-preview-width); min-height: 0; align-items: stretch; }
 :global(:root) .createColumns > aside { contain: size; min-height: 0; overflow-y: auto; }

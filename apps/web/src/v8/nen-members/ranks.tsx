@@ -13,7 +13,7 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field';
-import { FieldError } from '@/components/shared/form-controls';
+import { Field, FieldError } from '@/components/shared/form-controls';
 import { useFieldValidation } from '@/lib/use-field-validation';
 import { describeApiFailure } from '@/components/shared/api-error-message';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -454,7 +454,7 @@ export default function RankSettingsV8({
         tone="destructive"
         title={`ランク「${removeName}」を消しますか？`}
         busy={busy}
-        confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
+        actionWidthReserve="idle" confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
         cancelLabel="キャンセル"
         onConfirm={moving > 0 && !replacement ? undefined : () => removeRank()}
         onCancel={() => setRemoveTarget(null)}
@@ -467,8 +467,7 @@ export default function RankSettingsV8({
               : 'このランクに会員はいません。消すと、ランクの一覧から外れます。'}
           </p>
           {moving > 0 ? (<>
-            <div className={styles.removeField}>
-              <span className={styles.removeLabel} id="nen-rank-move-label">移す先のランク（必須）</span>
+            <Field label="移す先のランク" requirement={{ required: true }}>
               <SaveErrorField names={["replacement"]}><EntitySelect
                 aria-label="移す先のランク（必須）"
                 size="full"
@@ -479,7 +478,7 @@ export default function RankSettingsV8({
                   ...removeCandidates.map((row) => ({ ...entityOptionMetadata(row), value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
                 ]}
               /></SaveErrorField>
-            </div>
+            </Field>
             <p className={styles.removeNote}>
               移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
             </p>

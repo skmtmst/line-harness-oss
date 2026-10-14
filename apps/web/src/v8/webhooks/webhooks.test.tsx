@@ -6,6 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -100,6 +101,39 @@ async function render(node: React.ReactNode) {
 const buttons = () => [...document.querySelectorAll('button, a')] as HTMLElement[]
 
 describe('外部連携 V8', () => {
+  it('やり取りの記録は1ページでも件数とページ送りを同じ帯に出す', async () => {
+    await render(<WebhooksInteractionsV8 />)
+    const pager = within(host).getByRole('navigation', { name: 'やり取りの記録のページ送り' })
+    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('1件中 1〜1件')
+    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(host).getByRole('button', { name: '表示件数' }).closest('[data-template-region="toolbar"]')).not.toBeNull()
+  })
+
+  it('やり取りの総数と実範囲を分け、頁と表示件数をAPIへ渡す', async () => {
+    const base = globalThis.fetch
+    const queries: URLSearchParams[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await base(input, init)
+      if (!String(input).includes('/interactions')) return response
+      const params = new URL(String(input)).searchParams
+      queries.push(params)
+      const body = await response.json()
+      const page = Math.max(2, Number(params.get('page') || 2))
+      body.data = { ...body.data, total: 214, page, limit: Number(params.get('limit') || 20), items: [body.data.items[0], { ...body.data.items[0], id: 'wi-2' }] }
+      return json(body)
+    })
+    await render(<WebhooksInteractionsV8 />)
+    const pager = within(host).getByRole('navigation', { name: 'やり取りの記録のページ送り' })
+    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('214件中 21〜22件')
+    await act(async () => fireEvent.click(within(pager).getByRole('button', { name: '次のページ' })))
+    expect(queries.some(params => params.get('page') === '3')).toBe(true)
+    await act(async () => fireEvent.click(within(host).getByRole('button', { name: '表示件数' })))
+    const option = within(document.body).getByRole('option', { name: '50件表示' })
+    await act(async () => fireEvent.click(within(option).getByRole('button')))
+    await vi.waitFor(() => expect(queries.map(params => ({ limit: params.get('limit'), page: params.get('page') }))).toContainEqual({ limit: '50', page: '1' }))
+  })
+
   it('受け取り口を作る：窓（H031gC）が開き、名前が空なら作らずに理由を出す', async () => {
     await render(<WebhooksIncomingV8 />)
     const open = buttons().find((element) => element.textContent?.includes('受け取り口を作る'))!

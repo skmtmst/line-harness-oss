@@ -14,11 +14,11 @@ import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
 import { normalizeActionLabel } from './action-words'
 
-function hasDetail(node: ReactNode): boolean {
-  return React.Children.toArray(node).some(child => {
-    if (typeof child === 'string' || typeof child === 'number') return String(child).trim().length > 0
-    return React.isValidElement<{ children?: ReactNode }>(child) && hasDetail(child.props.children)
-  })
+function detailText(node: ReactNode): string {
+  return React.Children.toArray(node).map(child => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child)
+    return React.isValidElement<{ children?: ReactNode }>(child) ? detailText(child.props.children) : ''
+  }).join('')
 }
 
 /** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
@@ -72,7 +72,7 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
-  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
+  /** 旧指定との互換用。補足は共通の1行省略で表示する。 */
   detailLayout?: 'qualifier'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
@@ -260,8 +260,8 @@ export default function KpiCard({
       </div>
 
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
-      <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
-        <span role="note" className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
+      <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || action) || undefined} className={styles.detail}>
+        <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}

@@ -188,7 +188,7 @@ export default function AdConnectionsV8() {
     table = <ListState kind="empty" title="成果地点がまだありません" description="成果地点を作ると、ここで広告に返す名前を決められます。" />
   } else {
     table = (
-      <DataTable aria-label="成果地点と、広告に返す名前の対応" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+      <DataTable aria-label="成果地点と、広告に返す名前の対応" columnLayout={INFLOW_TABLE_LAYOUT} columnSizing="controls"><thead>
         <TableHeadRow data-table-layout="columns">
           <Th grow>成果地点</Th>
           <Th className={styles.colName}>Google広告に返す名前</Th>
