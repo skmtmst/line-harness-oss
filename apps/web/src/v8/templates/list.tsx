@@ -42,6 +42,7 @@ import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/
 import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TemplateDeleteDialog from './delete-dialog'
 import Dialog from '@/components/shared/dialog'
 import DialogChoiceCards from '@/components/shared/dialog-choice-cards'
 import { exampleHref, loadTemplateExamples, type TemplateExample } from './examples';
@@ -1301,21 +1302,15 @@ export default function TemplatesListV8() {
         削除の確認窓（`V6JFnd`：使っていないテンプレート）。
         危ないボタンは左端、キャンセルは真ん中（V8 の窓の決まり）。
       */}
-      <ConfirmDialog
+      <TemplateDeleteDialog
         open={pendingDelete !== null}
         title={`「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
-        deleteName={pendingDelete?.item.name ?? ''}
         description={DELETE_UNUSED_DESCRIPTION}
-        destructive busy={deleting} error={deleteError}
-        designNode="V6JFnd"
-        contentLayout="form"
+        busy={deleting} error={deleteError}
         confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
         onConfirm={() => confirmDelete()}
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
-      >
-        <Notice tone="danger" message="削除は元に戻せません。" />
-        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >アカウントが切り替わりました。削除するテンプレートを選び直してください。</Notice> : null}
-      </ConfirmDialog>
+      />
 
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
       <ConfirmDialog

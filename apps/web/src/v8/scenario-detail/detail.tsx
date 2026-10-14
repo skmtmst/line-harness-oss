@@ -2475,10 +2475,10 @@ export default function ScenarioDetailV8({
 
           {/* 数の帯：購読中・読み終えた・始まる見込み・離脱が多い所。 */}
           <KpiBand data-design="KPIs">
-            <KpiCard icon={null} title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
-            <KpiCard icon={null} title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
-            <KpiCard icon={null} title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
-            <KpiCard icon={null} title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
+            <KpiCard title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
+            <KpiCard title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
+            <KpiCard title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
+            <KpiCard title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
           </KpiBand>
 
           {/* 最後の1通の後（行）。変える入口はこの行の右。 */}
@@ -2779,7 +2779,7 @@ export default function ScenarioDetailV8({
         <StickyBar
           destructive={
             canEdit ? (
-              <StickyBarAction
+              <StickyBarAction destructive
                 icon={Trash2}
                 label="このシナリオを削除する"
                 onClick={() => {
@@ -2802,7 +2802,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary"
+                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : undefined}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)
@@ -2814,7 +2814,6 @@ export default function ScenarioDetailV8({
                   busy={saving}
 
                 >
-                  {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}
                 </Button>
               ) : null}

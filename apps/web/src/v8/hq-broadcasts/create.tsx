@@ -52,7 +52,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
-import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, runPeople, sendTotals, splitPreflightRows, toApiContent } from './model'
 import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
@@ -63,7 +63,7 @@ import type { TemplateEditHost } from '@/v8/template-edit/host'
 import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
-import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
+import MessageComposer from '@/components/shared/message-composer'
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Field } from '@/components/shared/form-controls'
@@ -117,11 +117,6 @@ function errorText(caught: unknown, fallback: string): string {
   }
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
-}
-
-/** 送った人数（外したアカウントを除く）。 */
-function runPeople(run: HqBroadcastRun): number {
-  return run.targets.reduce((sum, t) => sum + (t.excluded ? 0 : t.totalCount || 0), 0)
 }
 
 /** 配信の中身の種類（「テキスト＋カルーセル」）。 */
@@ -851,7 +846,7 @@ export default function HqBroadcastCreate() {
 
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
-      <MessageComposerPage active={step === 'message'}><CreatePage boardId="BBRDb" dirty={false}
+      <CreatePage boardId="BBRDb" dirty={false}
         footerActions={(
           <>
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
@@ -1185,7 +1180,7 @@ export default function HqBroadcastCreate() {
               </div>
             ) : null}
         {inlineEditor}
-    </CreatePage></MessageComposerPage>
+    </CreatePage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

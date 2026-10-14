@@ -327,7 +327,7 @@
 :root .frame[data-table-density] :is(thead, tbody) { display: block; }
 :root .frame[data-table-density] tr {
   display: grid;
-  grid-template-columns: var(--table-columns);
+  grid-template-columns: var(--table-content-columns, var(--table-columns));
   align-items: center;
   column-gap: var(--table-grid-gap,var(--tpl-sb-ec-gap));
   height: auto;
@@ -599,16 +599,16 @@ html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:no
 }
 
 /* Content-sized list columns keep their existing padding and truncation budget. */
-html:root .frame[data-column-sizing='content'] .table.table tr > :is(th, td)[data-content-name-column] {
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr > :is(th, td)[data-content-name-column] {
   width: auto; min-width: 0;
 }
-html:root .frame[data-column-sizing='content'] .table.table tr > :is(th, td)[data-content-support-column] {
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr > :is(th, td)[data-content-support-column] {
   width: var(--list-content-column-width);
 }
-html:root .frame[data-column-sizing='content'] .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-name-column] {
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-name-column] {
   flex: 1 1 0;
 }
-html:root .frame[data-column-sizing='content'] .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-support-column] {
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-support-column] {
   flex: 0 0 var(--list-content-column-width); min-width: 0;
 }
 

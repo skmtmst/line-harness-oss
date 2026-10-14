@@ -27,9 +27,10 @@ describe('図柄なしの形', () => {
     expect(screen.getByText('はい')).toBeTruthy()
   })
 
-  it('KpiCard は省略時に棒グラフ・null で図柄なし', () => {
+  it('KpiCard は省略時に数のマスの標準Inbox・null で図柄なし', () => {
     const { container, unmount } = render(<KpiCard title="対応が必要" value="3" unit="件" />)
     expect(container.querySelector('[class*="icon"]')).not.toBeNull()
+    expect(container.querySelector('[data-kpi-icon] .lucide-inbox')).not.toBeNull()
     unmount()
     const none = render(<KpiCard title="対応が必要" value="3" unit="件" icon={null} />)
     expect(none.container.querySelector('p [class*="icon"]')).toBeNull()

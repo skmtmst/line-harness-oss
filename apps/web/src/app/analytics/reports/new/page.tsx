@@ -1,5 +1,4 @@
 'use client'
-
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import EntitySelect from '@/components/shared/entity-select'

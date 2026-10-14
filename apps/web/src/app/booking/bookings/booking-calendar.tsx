@@ -651,7 +651,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           unit="枠" unitSpacing="tight" icon={<CalendarPlus size={14} />} presentation="band"
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
           valueText={mode === 'week' ? (listMissing ? '—' : weekRateValue) : undefined}
-          help={mode === 'day' ? availabilityNote : weekRateDetail}
+          help={mode === 'day' ? availabilityNote : weekRateDetail} helpDisplay={mode === 'day' ? 'question' : 'label'}
           detail={listMissing ? listMissingDetail : availability.status === 'ready' ? (mode === 'day' ? (isToday ? '今日の残り' : '選んだ日の残り') : weekRateDetail) : availabilityNote}
         />
         <KpiCard

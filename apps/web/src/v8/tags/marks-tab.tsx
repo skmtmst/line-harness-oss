@@ -61,7 +61,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 const PAGE_SIZES = STANDARD_PAGE_SIZES
 
-export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
+export default function MarksTab({ accountId, canEdit, host, explanation = false }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow>; explanation?: boolean }) {
   const router = useRouter()
   const [items, setItems] = useState<MarkRow[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -496,19 +496,19 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         ))}
       </KpiBand>}
 
-      <div className={styles.infoRow}>
+      {!explanation ? <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
           <Info className={styles.readonlyIcon} aria-hidden="true" />
           対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。
         </p>
-      </div>
+      </div> : null}
 
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じ対応マークを通常の一覧へ戻します。初期値や自動変更は再開せず、友だちの付け替えはそのまま残ります。"
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
-        skeleton
+        skeleton explanation={explanation ? '対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。' : undefined}
         toolbar={<>
           <ListToolbarSearchSlot>
             <SearchField

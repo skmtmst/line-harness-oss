@@ -289,7 +289,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー" icon={<Copy size={14} aria-hidden="true" />} />
+                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} icon={<Copy size={16} aria-hidden />} aria-label="紹介リンクをコピー"  />
                 </div>
               )
             })}
@@ -483,7 +483,7 @@ export default function AffiliateDrawer({
           {readonly ? <Button type="button" onClick={onClose}>閉じる</Button> : (
             <>
               <Button type="button" onClick={() => { setTab('payment'); setEditing((current) => !current) }}>
-                <Pencil size={14} aria-hidden="true" />{editing ? '編集をやめる' : '編集する'}
+                <Pencil size={16} aria-hidden />{editing ? '編集をやめる' : '編集する'}
               </Button>
               <Button
                 type="button"

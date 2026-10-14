@@ -6,10 +6,11 @@ import KpiCard from '@/components/shared/kpi-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
-import { Check, Undo2 } from 'lucide-react'
+import { Check, Inbox, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import ListState from '@/components/shared/list-state'
 import { TextArea } from '@/components/shared/text-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -134,7 +135,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />
       </Card>
-      {item.review_comment ? <Notice tone="warn">{item.review_comment}</Notice> : null}
+      {item.review_comment ? <Notice tone="warn" appearance="soft" icon={null}>{item.review_comment}</Notice> : null}
     </Card>
   )
 }
@@ -153,12 +154,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
       open={item !== null}
       title="差し戻しますか？"
       designNode="n4j0Rm"
+      contentLayout="form"
       onCancel={onCancel}
       footer={(
-        <div className={styles.dialogActions}>
+        <DialogActions>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}><Undo2 size={15} aria-hidden="true" />差し戻す</Button>
-        </div>
+        </DialogActions>
       )}
     >
       {item ? (
@@ -211,10 +213,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
-        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} presentation="band" value={null} unit="" />
+        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" presentation="band" value={null} unit="" />
+        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" presentation="band" value={null} unit="" />
+        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" presentation="band" value={null} unit="" />
       </StatRow>
       {rows.length === 0 ? (
         <ListState kind="empty" title="承認待ちはありません" />
