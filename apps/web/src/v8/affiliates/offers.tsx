@@ -12,7 +12,7 @@ import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { folderDotFor, managedFolderNavRows, useManagedFolders } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -52,16 +52,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
-/*
- * ★V8 成果とアフィリエイト「案件」（板 `h7dmB`）。
- *
- * app/affiliates/v8-offers-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
- * 組み直した。データの口は今と同じ（案件・アカウント・タグ・シナリオの名前・承認の全件）。
- * 行の「…」は 編集・決まり・公開を止める（公開する）・複製。複製は下書きで作る。
- *
- * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
- * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
- */
+/* ★V8 案件（h7dmB）。所属は共通フォルダ、成果の動きの絞り込みは別に保つ。 */
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
@@ -90,6 +81,8 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 export default function OffersTab() {
   const saveErrors = useSaveFormErrors()
   const { readonly, narrow, setCount, accountId } = useAffiliateShell()
+  const folderState = useManagedFolders('affiliate_offer', accountId)
+  const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
   const [offers, setOffers] = useState<AffiliateOffer[]>([])
@@ -234,7 +227,7 @@ export default function OffersTab() {
     ? Math.round(approvedThisMonth.reduce((sum, item) => sum + (item.rewardAmount ?? 0), 0) / approvedThisMonth.length)
     : null
 
-  const foldered = useMemo(() => offers.filter(FOLDERS.find((f) => f.key === folder)?.match ?? (() => true)), [offers, folder])
+  const foldered = useMemo(() => offers.filter(FOLDERS.find((f) => f.key === folder)?.match ?? (() => true)).filter(offer => folderId === 'all' || (folderId === 'unfiled' ? !offer.folderId : offer.folderId === folderId)), [offers, folder, folderId])
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return foldered
@@ -264,6 +257,7 @@ export default function OffersTab() {
     setQuery('')
     setFilters([])
     setFolder('all')
+    setFolderId('all')
     setSaved('')
     setPage(1)
   }
@@ -416,19 +410,22 @@ export default function OffersTab() {
     </CreateButton>
   )
 
-  /* 左の列は共通の ManagedFolderPanel。案件をフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
   const folderPanel = (
     <ManagedFolderPanel
-      kind={null}
-      folders={[]}
-      onChanged={() => undefined}
+      kind="affiliate_offer"
+      accountId={accountId}
+      folders={folderState.folders}
+      onChanged={folderState.reload}
       canManage={!readonly}
       createAction={createButton(true)}
       reserveCreateSpace={false}
       itemLabel="案件"
-      activeId="all"
-      onSelect={() => undefined}
+      activeId={folderId}
+      onSelect={(id) => resetPage(() => setFolderId(id))}
       allCount={ready ? offers.length : null}
+      unfiledCount={ready ? offers.filter(offer => !offer.folderId).length : null}
+      countOf={folder => ready ? offers.filter(offer => offer.folderId === folder.id).length : null}
+      error={folderState.error}
     />
   )
 
@@ -506,7 +503,7 @@ export default function OffersTab() {
               <Tr key={offer.id} data-table-layout="columns" data-row-id={offer.id}>
                 <Td grow>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                    <FolderDotName folder={null} dot={!narrow}>
+                    <FolderDotName folder={folderDotFor(folderState.folders, offer.folderId)}>
                       {readonly ? (
                         <span><TruncatedText value={String(offer.name ?? '')} /></span>
                       ) : (
@@ -592,7 +589,7 @@ export default function OffersTab() {
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
-      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('affiliate_offer', folderState.folders), activeId: folderId, onSelect: id => resetPage(() => setFolderId(id)), createAction: readonly ? undefined : createButton(false) }}
       folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}

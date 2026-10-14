@@ -5,10 +5,13 @@
  * - 210：複製は決まりも写す（読めなければ複製しない）
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ capStatus: vi.fn(), create: vi.fn(), approvalsFull: false }))
+const net = vi.hoisted(() => ({ capStatus: vi.fn(), create: vi.fn(), folders: vi.fn(async (_kind?: string, _accountId?: string) => ({ success: true, data: [
+  { id: 'folder-a', kind: 'affiliate_offer', name: '紹介', color: '#16a34a', parentId: null, displayOrder: 0 },
+  { id: 'folder-b', kind: 'affiliate_offer', name: '資料', color: '#2563eb', parentId: null, displayOrder: 1 },
+], unfiledCount: 0 })), approvalsFull: false }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -19,8 +22,9 @@ vi.mock('@/lib/api', async (importOriginal) => {
         ...actual.api.affiliateOffers,
         capStatus: (...args: unknown[]) => net.capStatus(...args),
         create: (...args: unknown[]) => net.create(...args),
-        list: async () => ({ success: true, data: [{ id: 'of-1', name: '紹介A', description: null, rewardAmount: 1000, rewardMiles: 0, lineAccountId: null, tagId: null, scenarioId: null, isActive: true, createdAt: '2026-10-01T00:00:00Z' }] }),
+        list: async () => ({ success: true, data: [{ id: 'of-1', name: '紹介A', folderId: 'folder-a', description: null, rewardAmount: 1000, rewardMiles: 0, lineAccountId: null, tagId: null, scenarioId: null, isActive: true, createdAt: '2026-10-01T00:00:00Z' }] }),
       },
+      folders: { ...actual.api.folders, list: (kind?: string, accountId?: string) => net.folders(kind, accountId) },
       affiliates: { ...actual.api.affiliates, allReport: async () => ({ success: true, data: [] }) },
       conversionApprovals: {
         ...actual.api.conversionApprovals,
@@ -108,11 +112,18 @@ test('209：承認を読み切れなかったときは、平均報酬を言い�
   await waitFor(() => expect(screen.getByText('件数が多く、全部は数えられませんでした')).toBeTruthy())
 })
 
-test('B-136：成果のときの動き（タグ・シナリオ・マイル）は上の絞り込み。選ぶ物のないフォルダ列を出さず、絞り込みを保つ（W2）', async () => {
+test('案件の所属フォルダで絞り、成果のときの動きの絞り込みも保つ', async () => {
   net.capStatus.mockResolvedValue({ success: true, data: { version: null } })
   render(<OffersTab />)
   await screen.findByRole('button', { name: '紹介Aの操作' })
-  expect(document.querySelector('[data-template-region="folders"]')).toBeNull()
-  expect(document.body.textContent).not.toContain('フォルダを追加')
+  const folders = await screen.findByRole('navigation', { name: 'フォルダ' })
+  expect(net.folders).toHaveBeenCalledWith('affiliate_offer', undefined)
+  expect(screen.getByRole('button', { name: 'フォルダを追加' })).toBeTruthy()
+  expect(document.querySelector('tr [aria-label="フォルダ：紹介"]')).not.toBeNull()
+  expect(screen.getAllByLabelText('成果のときの動き').length).toBeGreaterThan(0)
+  fireEvent.click(within(folders).getByTitle('資料'))
+  await waitFor(() => expect(screen.queryByRole('button', { name: '紹介Aの操作' })).toBeNull())
+  fireEvent.click(within(folders).getByTitle('紹介'))
+  expect(await screen.findByRole('button', { name: '紹介Aの操作' })).toBeTruthy()
   expect(screen.getAllByLabelText('成果のときの動き').length).toBeGreaterThan(0)
 })

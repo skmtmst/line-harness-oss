@@ -7,7 +7,7 @@ import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -128,6 +128,25 @@ afterEach(() => {
 })
 
 describe('V8 コンバージョンの一覧', () => {
+  it('並びの3択を受け口へ渡し、名前の検索で表示を絞る', async () => {
+    const base = globalThis.fetch
+    const sorts: Array<string | null> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/conversions/definitions') sorts.push(url.searchParams.get('sort'))
+      return base(input, init)
+    })
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '並び' }))
+    expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['件数が多い順', '金額が多い順', '名前順'])
+    fireEvent.click(within(screen.getByRole('option', { name: '名前順' })).getByRole('button'))
+    await flush()
+    await waitFor(() => expect(sorts).toContain('name_asc'))
+    fireEvent.change(screen.getByLabelText('成果地点の名前で探す'), { target: { value: '資料' } })
+    await waitFor(() => expect(screen.queryByText('商品を買った')).toBeNull())
+    expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+  })
+
   it('行の詳細を右パネルとURLへ残し、再表示・閉じるを同期する', async () => {
     await mount()
     fireEvent.click(screen.getByText('商品を買った'))
