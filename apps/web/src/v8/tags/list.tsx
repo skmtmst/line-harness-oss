@@ -13,7 +13,7 @@
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Upload } from 'lucide-react'
+import { Plus, Search, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -101,7 +101,7 @@ export default function TagsList({
       <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
     ) : null
   ) : tab === 'searches' && canEdit ? (
-    <Button href="/friends" variant="primary"><Plus size={15} aria-hidden="true" />友だち一覧で条件を作る</Button>
+    <Button href="/friends" variant="primary"><Search size={16} aria-hidden="true" />友だち一覧で条件を作る</Button>
   ) : null
 
   return (
@@ -110,6 +110,8 @@ export default function TagsList({
         headingSize="regular"
         title="タグ"
         help="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
+        explanation={tab === 'searches' && !currentTabBlocked ? '友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。' : undefined}
+        explanationKey={tab === 'searches' ? 'tags:searches' : undefined}
         actions={actions}
       />
 

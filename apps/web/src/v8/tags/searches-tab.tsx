@@ -4,7 +4,7 @@ import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react';
+import { ArrowRight, Bookmark, CircleDashed, Filter, MousePointerClick, Send } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -403,7 +403,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td className={styles.searchColOpen}>
                   {search.lineAccountId ? (
                     <Button href={`/friends?savedSearch=${search.id}`} aria-label={`「${search.name}」で友だち一覧を開く`}>
-                      <Users size={15} aria-hidden="true" />友だち一覧へ
+                      <ArrowRight size={16} aria-hidden="true" />友だち一覧へ
                     </Button>
                   ) : null}
                 </Td>
@@ -447,13 +447,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
           />
         ))}
       </KpiBand>
-
-      <div className={styles.infoRow}>
-        <p className={styles.readonlyBand}>
-          <Lightbulb className={styles.readonlyIcon} aria-hidden="true" />
-          友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。
-        </p>
-      </div>
 
       <ListPageBody
         skeleton
