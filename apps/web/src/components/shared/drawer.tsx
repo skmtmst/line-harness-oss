@@ -20,6 +20,8 @@ export type DrawerProps = {
   description?: ReactNode
   contentSpacing?: 'sections'
   dirty?: boolean
+  /** 未保存の確認を保ち、題の印だけ省く場合は false。 */
+  showDirtyIndicator?: boolean
   busy?: boolean
   error?: string
   onClose: () => void
@@ -58,6 +60,7 @@ export default function Drawer({
   description,
   contentSpacing,
   dirty,
+  showDirtyIndicator = true,
   busy = false,
   error,
   onClose,
@@ -90,7 +93,7 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty ? ' *' : ''}</h2>{titleAccessory}</div>
+      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )

@@ -188,7 +188,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" heightMode="viewport" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
+    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" heightMode="viewport" title="電話予約を入れる" dirty={dirty} showDirtyIndicator={false} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
         <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField></Field>
         {friends.length > 0 ? (
