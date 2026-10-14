@@ -13,7 +13,7 @@ export default function CommentViewerStats({ analytics, state, onRetry }: {
   onRetry: () => void
 }) {
   const summary = state === 'ready' ? analytics?.summary ?? null : null
-  const missing = state === 'error' ? '集計を取得できませんでした' : '集計を読み込んでいます'
+  const missing = state === 'error' ? '集計を読み込めませんでした' : '集計を読み込んでいます'
   const metrics = [
     { title: '申込', icon: History, value: summary?.reservations ?? null, detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : missing, help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
     { title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : missing, help: '動画の9割以上を見た人です。' },

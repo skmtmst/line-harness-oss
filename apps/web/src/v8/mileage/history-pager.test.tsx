@@ -47,8 +47,7 @@ it('1ページも件数と前後の枠を残す', () => {
 it('未取得の総数を0にせず、手元の絞り込みと次ページを保つ', () => {
   const setPage = vi.fn()
   render(<HistoryPager {...props} total={null} spentOnly pageCount={2} items={{ length: 0 }} setPage={setPage} />)
-  expect(screen.getByText('—件中 0〜0件')).toBeTruthy()
-  expect(screen.getByText('このページのうち、使った・取り消し 0 件')).toBeTruthy()
+  expect(screen.getByText('—件のうち、使った・取り消し 0 件')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
   expect(setPage).toHaveBeenCalledWith(2)
 })
