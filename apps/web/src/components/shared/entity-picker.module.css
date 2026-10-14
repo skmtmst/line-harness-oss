@@ -47,6 +47,7 @@
   box-shadow: var(--tpl-inbox-line-top);
 }
 :root .tpBody { flex: none; }
+:root .tpBody .tpList > * { flex-shrink: 0; }
 .tpSide {
   display: grid;
   grid-template-rows: 1fr auto;

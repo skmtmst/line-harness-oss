@@ -11,23 +11,30 @@ const globals = await compileUiStyles(cssPath)
 const dialog = readFileSync(new URL('../../src/components/shared/dialog.module.css', import.meta.url), 'utf8')
 const picker = readFileSync(new URL('../../src/components/shared/entity-picker.module.css', import.meta.url), 'utf8')
 const shell = readFileSync(new URL('../../src/components/shared/source-picker-dialog.module.css', import.meta.url), 'utf8')
+const search = readFileSync(new URL('../../src/components/shared/search-field.module.css', import.meta.url), 'utf8')
 
 for (const width of [1152, 1440, 1920]) {
   test(`picker actions stay visible with long content at ${width}`, async () => {
     const browser = await chromium.launch()
     try {
       const page = await browser.newPage({ viewport: { width, height: 700 }, reducedMotion: 'reduce' })
-      await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${shell.replace(/\.(panel|overlay|header|footer|heading)(?=[^\w-]|$)/g, '.source$1')}</style></head><body>
+      await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${search}\n${shell.replace(/\.(panel|overlay|header|footer|heading)(?=[^\w-]|$)/g, '.source$1')}</style></head><body>
         <div class="overlay"><div class="panel standardPanel" data-m1-scope data-design-width data-design-content-padding style="--dialog-design-width:640px;--dialog-design-content-padding:0">
           <div class="headerRow"><h2>テンプレートを選ぶ</h2></div>
-          <div class="content" data-content-layout="form"><div class="body tpBody"><section class="tpList"><div style="height:1600px;flex-shrink:0">候補と見え方</div></section></div></div>
+          <div class="content" data-content-layout="form"><div class="body tpBody"><section class="tpList"><div class="search"><input class="input" type="search" aria-label="名前で探す" /></div><div style="height:1600px;flex-shrink:0">候補と見え方</div></section></div></div>
           <div class="footer"><div class="tpFoot"><button>キャンセル</button><button>このテンプレートを使う</button></div></div>
         </div></div></body></html>`)
-      const options = { fixedActions: ['キャンセル', 'このテンプレートを使う'] }
+      const options = { fixedActions: ['キャンセル', 'このテンプレートを使う'], pickerControls: true }
       const normal = await page.evaluate(scanDialogAudit, options)
       assert.equal(normal.findings.length, 0)
       assert.equal(await page.locator('.tpBody').evaluate(el => el.getBoundingClientRect().height), 340)
       assert.equal(normal.inventory.filter(row => row.kind === 'fixed-action').length, 2)
+      await page.locator('.search').evaluate(el => { el.style.flexShrink = '1' })
+      await page.waitForFunction(() => document.querySelector('.search').getBoundingClientRect().height < 35)
+      assert.equal(await page.locator('.search').evaluate(el => getComputedStyle(el).flexShrink), '1')
+      assert.equal((await page.evaluate(scanDialogAudit, options)).findings.filter(row => row.kind === 'dialog-search-height').length, 1)
+      await page.locator('.search').evaluate(el => { el.style.flexShrink = '' })
+      await page.waitForFunction(() => document.querySelector('.search').getBoundingClientRect().height === 36)
       await page.locator('.tpList').evaluate(el => { el.scrollTop = el.scrollHeight })
       assert.equal((await page.evaluate(scanDialogAudit, options)).findings.length, 0)
       await page.locator('.footer').evaluate(el => {

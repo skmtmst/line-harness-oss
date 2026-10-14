@@ -1,9 +1,18 @@
-export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, fixedActions = [], compactBody = false, choices = false, plainUsage = false } = {}) {
+export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const rect = panel.getBoundingClientRect()
   const inventory = [{ kind: 'panel', width: rect.width, height: rect.height }]
   const findings = []
+  if (pickerControls) {
+    const search = panel.querySelector('input[type="search"]')?.parentElement
+    if (!search) findings.push({ pattern: 'F4', kind: 'dialog-search-missing' })
+    else {
+      const height = search.getBoundingClientRect().height
+      inventory.push({ kind: 'picker-search', height })
+      if (Math.abs(height - 36) > 1) findings.push({ pattern: 'F6', kind: 'dialog-search-height', height, expected: 36 })
+    }
+  }
   for (const name of fixedActions) {
     const button = [...panel.querySelectorAll('button')].find(el => el.innerText.trim() === name)
     if (!button) { findings.push({ pattern: 'F4', kind: 'dialog-fixed-action-missing', name }); continue }
