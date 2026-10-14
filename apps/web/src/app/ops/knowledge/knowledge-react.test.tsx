@@ -99,6 +99,8 @@ describe('V8 knowledge UI', () => {
     expect(host.textContent).not.toContain('公開範囲')
     expect(host.querySelector('button[aria-label="記事の種類"]')).not.toBeNull()
     expect(host.querySelectorAll('thead th')).toHaveLength(7)
+    const usage = Array.from(host.querySelectorAll('[data-kpi-label]')).find(label => label.textContent?.includes('使われた回数'))
+    expect(usage?.querySelector('[data-kpi-icon] .lucide-thumbs-up')).toBeTruthy()
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
     // 板 `eSXxA`「記事を承認する前に」：2つ確かめてから保存して承認する。

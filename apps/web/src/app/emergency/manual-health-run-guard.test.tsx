@@ -112,6 +112,15 @@ afterEach(() => {
 })
 
 describe('手動ヘルス確認の二重実行防止(N-458)', () => {
+  it('下の3つの数は値が未取得でも標準の印と題を持つ', async () => {
+    const view = render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    await flush()
+    const labels = Array.from(view.container.querySelectorAll('[data-kpi-label]'))
+    expect(labels.map(label => label.textContent)).toEqual(['止めた回数', 'いちばん長かった停止', 'いまの版'])
+    expect(labels.every(label => label.querySelector('[data-kpi-icon] .lucide-inbox'))).toBe(true)
+    expect(deferredList.run).toHaveLength(0)
+  })
+
   it('同一レンダーでの連打・ダブルクリックは1リクエストだけ送り、処理中は無効化する', async () => {
     render(<EmergencyPageInner />)
     deferredList.read[0]?.resolve(snapshot('初回の確認'))
