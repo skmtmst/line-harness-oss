@@ -69,6 +69,17 @@ const flush = async () => { for (let i = 0; i < 6; i += 1) await act(async () =>
 const buttonByText = (text: string) =>
   Array.from(document.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim() === text) as HTMLButtonElement | undefined
 const dialogTitles = () => Array.from(document.querySelectorAll('[role="dialog"] h2')).map((h) => h.textContent)
+const openScopePicker = async () => {
+  await act(async () => { (buttonByText('担当するアカウント：変える') ?? buttonByText('担当するアカウント：選ぶ'))!.click() })
+  await flush()
+  return Array.from(document.querySelectorAll('[role="dialog"]')).at(-1)!
+}
+const confirmScopePicker = async () => {
+  const dialog = Array.from(document.querySelectorAll('[role="dialog"]')).at(-1)!
+  const button = Array.from(dialog.querySelectorAll('button')).find((item) => /^この .+にする$/.test(item.textContent ?? ''))!
+  await act(async () => { button.click() })
+  await flush()
+}
 
 beforeEach(async () => {
   me.mockResolvedValue({ success: true, data: { id: 'owner', name: 'Kenta', role: 'owner', accountScope: 'all' } })
@@ -101,8 +112,16 @@ describe('V8 統括のメンバーの窓', () => {
     expect(dialogTitles()).toContain('権限者を招待')
     const radios = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]'))
     expect(radios.find((r) => r.value === 'accounts')?.checked).toBe(true)
-    const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')).map((l) => l.getAttribute('aria-label')).filter((label) => !label?.endsWith('をまとめて選ぶ'))
+    expect(document.querySelector('[role="dialog"] input[type="checkbox"]')).toBeNull()
+    const picker = await openScopePicker()
+    const checks = Array.from(picker.querySelectorAll('input[type="checkbox"]')).map((l) => l.getAttribute('aria-label')).filter((label) => !label?.endsWith('をまとめて選ぶ'))
     expect(checks).toEqual(['然 -NEN- 本店', '然 -NEN- 渋谷店'])
+    await act(async () => { (picker.querySelector('input[aria-label="然 -NEN- 渋谷店"]') as HTMLInputElement).click() })
+    await act(async () => { Array.from(picker.querySelectorAll('button')).find((item) => item.textContent === 'キャンセル')!.click() })
+    await flush()
+    const scope = document.querySelector('[role="group"][aria-label="担当するアカウント"]')!
+    expect(scope.textContent).toContain('然 -NEN- 本店')
+    expect(scope.textContent).not.toContain('然 -NEN- 渋谷店')
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
   })
 
@@ -112,8 +131,10 @@ describe('V8 統括のメンバーの窓', () => {
     const dialog = document.querySelector('[role="dialog"]')!
     const email = dialog.querySelector('input[type="email"]') as HTMLInputElement
     await act(async () => { fireEvent.change(email, { target: { value: 'staff@example.com' } }) })
-    const first = dialog.querySelector('[aria-label="担当するアカウント"] input[aria-label="然 -NEN- 本店"]') as HTMLInputElement
+    const picker = await openScopePicker()
+    const first = picker.querySelector('input[aria-label="然 -NEN- 本店"]') as HTMLInputElement
     await act(async () => { first.click() })
+    await confirmScopePicker()
     await act(async () => { buttonByText('招待メールを送る')!.click() })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(create).not.toHaveBeenCalled()
@@ -166,8 +187,10 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     const accountsOnly = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'accounts')!
     await act(async () => { accountsOnly.click() })
-    const firstAccount = document.querySelector<HTMLElement>('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')!
+    const picker = await openScopePicker()
+    const firstAccount = picker.querySelector<HTMLElement>('input[aria-label="然 -NEN- 渋谷店"]')!
     await act(async () => { firstAccount.click() })
+    await confirmScopePicker()
     await act(async () => { buttonByText('変更を保存')!.click() })
     await flush()
     const confirm = buttonByText('変える')

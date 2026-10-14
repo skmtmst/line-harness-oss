@@ -188,7 +188,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
+    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" heightMode="viewport" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
         <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField></Field>
         {friends.length > 0 ? (
@@ -267,9 +267,9 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
                 : time ? '人数が入る空いた卓がありません' : '時刻を選ぶと自動で割り当てます'}
             </span>
           </div>
-          {candidates.length > 1 && !changingTable ? <Button variant="text" onClick={() => setChangingTable(true)}>変える</Button> : null}
+          {!changingTable ? <Button variant="text" disabled={!candidates.length} title={!candidates.length ? '空いている時刻を選ぶと卓を変えられます' : undefined} onClick={() => setChangingTable(true)}>変える</Button> : null}
         </div>
-        {changingTable && candidates.length > 1 ? (
+        {changingTable && candidates.length > 0 ? (
           <SaveErrorField names={["id","chosenTable?.id","tableId","chosen_table?.id","table_id"]}><EntitySelect
             aria-label="卓を選ぶ"
             size="full"

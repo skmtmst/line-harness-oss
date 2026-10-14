@@ -100,11 +100,15 @@ describe('電話予約（E-2）', () => {
   it('電話番号で友だちを探し、押すと名前が入り、時刻を選んで source=phone で保存する（LINE で確認を送る）', async () => {
     const onSaved = vi.fn()
     render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={onSaved} />)
+    const changeTable = screen.getByRole('button', { name: '変える' }) as HTMLButtonElement
+    expect(changeTable.disabled).toBe(true)
+    expect(changeTable.title).toBe('空いている時刻を選ぶと卓を変えられます')
     fireEvent.change(screen.getByRole('textbox', { name: '電話番号' }), { target: { value: '090-1234-5678' } })
     fireEvent.click(await screen.findByRole('button', { name: /鈴木 美咲/ }))
     expect((screen.getByRole('textbox', { name: 'お名前' }) as HTMLInputElement).value).toBe('鈴木 美咲')
     fireEvent.click(screen.getByText(/明日/))
     fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
+    expect((screen.getByRole('button', { name: '変える' }) as HTMLButtonElement).disabled).toBe(false)
     expect(screen.getByRole('checkbox', { name: 'LINE で確認を送る' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ lineFailed: false }))
