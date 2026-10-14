@@ -2,23 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import postcss from 'postcss'
-import tailwind from '@tailwindcss/postcss'
+import { compileUiStyles } from './compile-ui-styles.mjs'
 import { chromium } from '@playwright/test'
 import { scanDialogAudit } from './dialog-layout-browser.mjs'
 
 const path = fileURLToPath(new URL('../../src/app/globals.css', import.meta.url))
-const globals = (await postcss([tailwind()]).process(readFileSync(path, 'utf8'), { from: path })).css
+const globals = await compileUiStyles(path)
 const dialog = readFileSync(new URL('../../src/components/shared/dialog.module.css', import.meta.url), 'utf8')
-const regressed = postcss.parse(dialog)
-const componentLayer = regressed.nodes.find(node => node.type === 'atrule' && node.name === 'layer' && node.params === 'components')
-for (const rule of [...regressed.nodes]) {
-  if (rule.type === 'rule' && rule.selector.includes('.calloutDanger .description')) {
-    rule.remove()
-    componentLayer.append(rule)
-  }
-}
-
 for (const width of [1152, 1440, 1920]) {
   test(`dialog description bands keep their tone at ${width}`, async () => {
     const browser = await chromium.launch()
@@ -39,10 +29,25 @@ for (const width of [1152, 1440, 1920]) {
           assert.equal(normal.findings.length, 0, `${band}: intended tone and text size`)
           assert.equal(normal.inventory.filter(row => row.kind === 'description-band').length, 1)
           const style = page.locator('style').nth(order[0] === dialog ? 0 : 1)
-          await style.evaluate((el, css) => { el.textContent = css }, regressed.toString())
+          await style.evaluate(el => {
+            const sheet = el.sheet
+            const rules = [...sheet.cssRules]
+            const index = rules.findIndex(rule => rule.selectorText?.includes('.calloutDanger .description'))
+            if (index < 0) throw new Error('警告の説明の規則がない')
+            const layer = rules.find(rule => rule.name === 'components')
+            layer.insertRule(rules[index].cssText, layer.cssRules.length)
+            sheet.deleteRule(index)
+          })
           const layered = await page.evaluate(scanDialogAudit)
           assert.equal(layered.findings.filter(row => row.kind === 'dialog-description-band').length, 1, 'layered rules must reproduce the gray body text')
-          await style.evaluate((el, css) => { el.textContent = css }, dialog)
+          await style.evaluate(el => {
+            const sheet = el.sheet
+            const layer = [...sheet.cssRules].find(rule => rule.name === 'components')
+            const index = [...layer.cssRules].findIndex(rule => rule.selectorText?.includes('.calloutDanger .description'))
+            if (index < 0) throw new Error('故障の規則がない')
+            sheet.insertRule(layer.cssRules[index].cssText, sheet.cssRules.length)
+            layer.deleteRule(index)
+          })
           await page.locator('#description').evaluate(el => { el.style.color = 'var(--color-ink-secondary)' })
           const gray = await page.evaluate(scanDialogAudit)
           assert.equal(gray.findings.filter(row => row.kind === 'dialog-description-band').length, 1)

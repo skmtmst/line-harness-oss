@@ -2,13 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import postcss from 'postcss'
-import tailwind from '@tailwindcss/postcss'
+import { compileUiStyles } from './compile-ui-styles.mjs'
 import { chromium } from '@playwright/test'
 import { scanDialogAudit } from './dialog-layout-browser.mjs'
 
 const path = fileURLToPath(new URL('../../src/app/globals.css', import.meta.url))
-const globals = (await postcss([tailwind()]).process(readFileSync(path, 'utf8'), { from: path })).css
+const globals = await compileUiStyles(path)
 const choices = readFileSync(new URL('../../src/components/shared/dialog-choice-cards.module.css', import.meta.url), 'utf8')
 
 for (const width of [1152, 1440, 1920]) {

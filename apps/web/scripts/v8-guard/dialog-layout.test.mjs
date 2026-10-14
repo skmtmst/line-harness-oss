@@ -4,11 +4,10 @@ import { chromium } from '@playwright/test'
 import { scanDialogAudit } from './dialog-layout-browser.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import postcss from 'postcss'
-import tailwind from '@tailwindcss/postcss'
+import { compileUiStyles } from './compile-ui-styles.mjs'
 
 const cssPath = fileURLToPath(new URL('../../src/app/globals.css', import.meta.url))
-const globals = (await postcss([tailwind()]).process(readFileSync(cssPath, 'utf8'), { from: cssPath })).css
+const globals = await compileUiStyles(cssPath)
 const dialog = readFileSync(new URL('../../src/components/shared/dialog.module.css', import.meta.url), 'utf8')
 const picker = readFileSync(new URL('../../src/components/shared/entity-picker.module.css', import.meta.url), 'utf8')
 const shell = readFileSync(new URL('../../src/components/shared/source-picker-dialog.module.css', import.meta.url), 'utf8')
@@ -18,7 +17,7 @@ for (const width of [1152, 1440, 1920]) {
     const browser = await chromium.launch()
     try {
       const page = await browser.newPage({ viewport: { width, height: 700 }, reducedMotion: 'reduce' })
-      await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${shell}</style></head><body>
+      await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${shell.replace(/\.(panel|overlay|header|footer|heading)(?=[^\w-]|$)/g, '.source$1')}</style></head><body>
         <div class="overlay"><div class="panel standardPanel" data-m1-scope data-design-width data-design-content-padding style="--dialog-design-width:640px;--dialog-design-content-padding:0">
           <div class="headerRow"><h2>テンプレートを選ぶ</h2></div>
           <div class="content" data-content-layout="form"><div class="body tpBody"><section class="tpList"><div style="height:1600px;flex-shrink:0">候補と見え方</div></section></div></div>
@@ -27,6 +26,7 @@ for (const width of [1152, 1440, 1920]) {
       const options = { fixedActions: ['キャンセル', 'このテンプレートを使う'] }
       const normal = await page.evaluate(scanDialogAudit, options)
       assert.equal(normal.findings.length, 0)
+      assert.equal(await page.locator('.tpBody').evaluate(el => el.getBoundingClientRect().height), 340)
       assert.equal(normal.inventory.filter(row => row.kind === 'fixed-action').length, 2)
       await page.locator('.tpList').evaluate(el => { el.scrollTop = el.scrollHeight })
       assert.equal((await page.evaluate(scanDialogAudit, options)).findings.length, 0)
