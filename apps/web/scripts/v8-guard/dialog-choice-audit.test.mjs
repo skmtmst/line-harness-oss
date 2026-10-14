@@ -15,7 +15,7 @@ for (const width of [1152, 1440, 1920]) {
   test(`choice links and plain usage keep their roles at ${width}`, async () => {
     const browser = await chromium.launch()
     try {
-      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
       await page.setContent(`<html data-theme="v8"><head><style>${globals}</style><style>${choices}</style></head><body>
         <div role="dialog" data-m1-scope>
           <div class="grid" data-dialog-choice-cards><section class="card"><a class="link" href="/templates/edit"><span class="title">メッセージ</span></a></section></div>
@@ -27,6 +27,15 @@ for (const width of [1152, 1440, 1920]) {
       await page.locator('.link').focus()
       assert.equal((await scan()).findings.length, 0)
       await page.locator('.link').evaluate(el => { el.style.background = 'var(--color-canvas-sunken)' })
+      await page.waitForFunction(() => {
+        const link = document.querySelector('.link')
+        const probe = document.createElement('span')
+        probe.style.background = 'var(--color-canvas-sunken)'
+        document.body.append(probe)
+        const expected = getComputedStyle(probe).backgroundColor
+        probe.remove()
+        return expected !== 'rgba(0, 0, 0, 0)' && getComputedStyle(link).backgroundColor === expected
+      })
       assert.equal((await scan()).findings.filter(f => f.kind === 'dialog-choice-label-background').length, 1)
       await page.locator('.link').evaluate(el => { el.style.background = '' })
       await page.locator('.link').evaluate(el => { el.style.backgroundImage = 'linear-gradient(var(--color-canvas-sunken), var(--color-canvas-sunken))' })
