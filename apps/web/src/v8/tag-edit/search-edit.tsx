@@ -898,7 +898,7 @@ export default function SavedSearchEditV8() {
         previewTitle="検索結果と使っている所"
         preview={side}
         destructive={(
-          <StickyBarAction label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />
+          <StickyBarAction destructive label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />
         )}
         status={dirty ? '変更内容を確かめて保存してください' : undefined}
         footerActions={(

@@ -1100,7 +1100,7 @@ function EditCommonVarV8Inner() {
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <StickyBarAction icon={Trash2} label="削除する" onClick={() => openDelete()} />
+        <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
       status={blocked.length > 0 ? `${blocked[0]}。直すまで保存できません。` : undefined}
       footerActions={(
