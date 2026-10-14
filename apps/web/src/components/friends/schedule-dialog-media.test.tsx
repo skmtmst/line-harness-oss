@@ -4,9 +4,10 @@ import { afterEach, expect, test, vi } from 'vitest'
 import ScheduleDialog from './schedule-dialog'
 
 const apiMock = vi.hoisted(() => ({ schedule: vi.fn(), list: vi.fn() }))
+const media = vi.hoisted(() => ({ item: { id: 'image-1', filename: '案内.png', kind: 'image', mimeType: 'image/png', sizeBytes: 1000, url: 'https://media.example/guide.png' } }))
 vi.mock('@/lib/api', () => ({ api: { chats: { schedule: apiMock.schedule }, templates: { list: apiMock.list } } }))
-vi.mock('@/components/shared/media-picker-dialog', () => ({ default: ({ onSelect }: { onSelect: (item: unknown) => void }) => <button onClick={() => onSelect({ id: 'image-1', filename: '案内.png', kind: 'image', mimeType: 'image/png', sizeBytes: 1000, url: 'https://media.example/guide.png' })}>案内を選ぶ</button> }))
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+vi.mock('@/components/shared/media-picker-dialog', () => ({ default: ({ onSelect }: { onSelect: (item: unknown) => void }) => <button onClick={() => onSelect(media.item)}>案内を選ぶ</button> }))
+afterEach(() => { cleanup(); vi.resetAllMocks(); Object.assign(media.item, { kind: 'image', mimeType: 'image/png', sizeBytes: 1000, url: 'https://media.example/guide.png' }) })
 
 function setup() {
   apiMock.list.mockResolvedValue({ success: true, data: [] })
@@ -20,6 +21,19 @@ async function chooseImage() {
   await screen.findByAltText('案内.png')
 }
 const reserve = () => screen.getByRole('button', { name: /に予約$/ })
+
+test.each([{ kind: 'video' }, { mimeType: 'image/webp' }, { sizeBytes: 1024 * 1024 + 1 }, { url: '' }])('予約できないメディアは入口を保って理由を示し、修正後に選べる: %j', async invalid => {
+  setup()
+  Object.assign(media.item, invalid)
+  fireEvent.click(screen.getByRole('button', { name: '画像', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '案内を選ぶ' }))
+  expect(await screen.findByText(/の画像を選んでください。/)).toBeTruthy()
+  expect(apiMock.schedule).not.toHaveBeenCalled()
+  expect(screen.queryByAltText('案内.png')).toBeNull()
+  Object.assign(media.item, { kind: 'image', mimeType: 'image/png', sizeBytes: 1024 * 1024, url: 'https://media.example/guide.png' })
+  fireEvent.click(screen.getByRole('button', { name: '案内を選ぶ' }))
+  expect(await screen.findByAltText('案内.png')).toBeTruthy()
+})
 
 test('本文なしでも画像を日時・冪等キーと予約でき、主操作には時計の印を渡す', async () => {
   apiMock.schedule.mockResolvedValue({ success: true })

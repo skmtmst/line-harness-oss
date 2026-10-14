@@ -17,7 +17,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import { TextArea } from '@/components/shared/text-field'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
+import MediaSlot, { mediaLimitLabel } from '@/components/shared/media-slot'
 import styles from './schedule-dialog.module.css'
 
 /* 日本時間の時計。サーバも端末も日本時間のつもりで扱う。 */
@@ -169,8 +169,8 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
               onConfirm={(id) => { const picked = templates.find((template) => template.id === id); if (picked) setContent(picked.messageContent); setTemplateMenuOpen(false) }} /> : null}
           </div>
           {image ? <MediaSlot title="予約する画像" size="compact" value={image.url} previewAlt={image.filename} disabled={busy} onMediaPick={() => setImagePickerOpen(true)} onRemove={() => setImage(null)} /> : null}
-          {imagePickerOpen ? <MediaPickerDialog open accountId={accountId} kind="image" title="予約する画像を選ぶ" description="JPEG・PNG、1MBまで。画像のあとに文が届きます。" onClose={() => setImagePickerOpen(false)} onSelect={(item) => {
-            if (item.kind !== 'image' || !['image/jpeg', 'image/png'].includes(item.mimeType) || item.sizeBytes > 1024 * 1024 || !item.url) { setError('JPEG・PNG、1MB以下の画像を選んでください。'); return }
+          {imagePickerOpen ? <MediaPickerDialog open accountId={accountId} kind="image" title="予約する画像を選ぶ" description={`${mediaLimitLabel('image/jpeg,image/png', 1024 * 1024)}。画像のあとに文が届きます。`} onClose={() => setImagePickerOpen(false)} onSelect={(item) => {
+            if (item.kind !== 'image' || !['image/jpeg', 'image/png'].includes(item.mimeType) || item.sizeBytes > 1024 * 1024 || !item.url) { setError(`${mediaLimitLabel('image/jpeg,image/png', 1024 * 1024)}の画像を選んでください。`); return }
             setImage(item); setImagePickerOpen(false); setError('')
           }} /> : null}
         </div>
