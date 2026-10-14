@@ -280,7 +280,7 @@ export function TagEditForm({
 
           <section aria-label="タグ連動" ref={actionsRef}>
             <Card variant="form" gap="normal">
-            <CardHeader size="stacked" title={<>タグ連動（このタグが付いたときの動き）<HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip></>}
+            <CardHeader size="stacked" title={<>{!host && 'タグ連動（このタグが付いたときの動き）'}<HelpTip label="タグ連動の説明" trigger={host ? 'タグ連動（このタグが付いたときの動き）' : undefined}>オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip></>}
               meta="上から順に動きます。並べ替えは上下の印で"
               action={<><span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>{readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}</>} />
             {actionsOpen ? <Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (

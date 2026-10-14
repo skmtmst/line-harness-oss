@@ -18,6 +18,19 @@ const definition: TagDefinition = {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括の V8 タグ編集と保存先', () => {
+  it('タグ連動の題から説明を読んで閉じても、保存する連動設定を変えない', async () => {
+    const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
+    render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '手動用', linkedEnabled: false } }} editing={false} saving={false} onCancel={() => {}} onSave={save} />)
+    const title = screen.getByRole('button', { name: 'タグ連動の説明' })
+    fireEvent.click(title)
+    expect(document.getElementById(title.getAttribute('aria-describedby')!)?.textContent).toContain('オフのままでも、タグの手動付与')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(title.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    await waitFor(() => expect(save).toHaveBeenCalledOnce())
+    expect(save.mock.calls[0][0].tag.linkedEnabled).toBe(false)
+    expect(save.mock.calls[0][1]).toBe(true)
+  })
   it('下書きを保存する入口があっても、続けて作る操作を同じ保存先へ渡す', async () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
     const draft = vi.fn<(definition: TagDefinition) => Promise<void>>().mockResolvedValue(undefined)
