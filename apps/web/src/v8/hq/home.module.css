@@ -62,7 +62,7 @@
 .card {
   display: grid;
   grid-template-rows: subgrid;
-  grid-row: span 4;
+  grid-row: span 5;
   row-gap: var(--tpl-hq-form-gap);
   min-width: 0;
   padding: var(--tpl-hq-home-account-pad);
@@ -125,10 +125,8 @@
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  display: block;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-hq-small-lh);

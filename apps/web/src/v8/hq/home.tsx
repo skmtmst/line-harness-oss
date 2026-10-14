@@ -36,18 +36,14 @@ import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 import StatusPill from '@/components/shared/status-pill'
+import TagPill from '@/components/shared/tag-pill'
+import TagOverflow from '@/components/shared/tag-overflow'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
-/*
- * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`。カードの「設定」で開く窓が `HMpVx`）。
- *
- * v7 の画面（app/hq/page.tsx と account-browser-v8.tsx）と読み書きの口・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
- * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
- */
+/* ★V8 統括のアカウント（JKjsE）。読み書き・権限は既存の口を保つ。 */
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -489,7 +485,7 @@ export default function HqHomeV8() {
             onChange={setView}
             options={[{ value: 'cards', label: 'カード' }, { value: 'table', label: '表' }]}
           /></SaveErrorField>
-          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} size="content" onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
           <SaveErrorField names={["size"]}><Select
             aria-label="アカウントの表示件数"
             value={String(size)}
@@ -535,10 +531,14 @@ export default function HqHomeV8() {
                       <FolderDotName folder={folderDotOf(account)}>{name}</FolderDotName>
                     </p>
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
-                    <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
+                    <TruncatedText className={styles.meta} value={metaOf(account)} />
                   </div>
                   <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </div>
+                <TagOverflow label={`${name}の分類`}>
+                  {folderDotOf(account) ? <TagPill name={folderDotOf(account)!.name} color={folderDotOf(account)!.color} aria-label={`フォルダ：${folderDotOf(account)!.name}`} /> : null}
+                  {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
+                </TagOverflow>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>

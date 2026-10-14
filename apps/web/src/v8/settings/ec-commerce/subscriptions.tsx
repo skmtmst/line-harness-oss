@@ -2,7 +2,7 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleDot, Star, Repeat2, Play, Pause, CreditCard } from 'lucide-react'
+import { CircleDot, Star, Repeat, Play, Pause, CreditCard } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
@@ -10,7 +10,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -114,7 +114,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
   const summary = data?.summary
   return <>
     <KpiBand presentation="band">
-      <KpiCard title="続いている定期便" icon={<Repeat2 size={13} />} value={summary?.active} unit="件" detail={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`} />
+      <KpiCard title="続いている定期便" icon={<Repeat size={13} />} value={summary?.active} unit="件" detail={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`} />
       <KpiCard title="今月 はじまった" icon={<Play size={13} />} value={summary?.startedThisMonth} unit="件" detail="初回の発送済み —" help="初回の発送数はまだ数えていません。開始日はECの定期便から集計しています。" />
       <KpiCard title="今月 止まった" icon={<Pause size={13} />} value={summary?.cancelledThisMonth} unit="件" detail="休止 —・解約 —" help="休止と解約は現在の契約数です。今月の内訳は未取得です。" />
       <KpiCard title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
@@ -134,7 +134,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
         <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
       </Tr>)}</tbody>
     </DataTable>}
-    <NoteBar icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</NoteBar>
+    <Notice tone="info" presentation="account-note" icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</Notice>
     {canEdit ? <Button href="/broadcasts/new" variant="text">対象を選んで送る</Button> : null}
     <div className={shared.pager}>
       <p className={shared.minorText}>{search.trim() ? `このページの ${formatNumber(shown.length)} 件を表示（検索はページの中だけに効きます）` : <ListRange label={filter === 'all' ? '定期便' : '表示条件に合う定期便'} total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={(page - 1) * pageSize + shown.length} />}{data && data.skipped.malformedSnapshots > 0 ? `／形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)} 件は数えていません` : ''}</p>
