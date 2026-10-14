@@ -316,13 +316,13 @@ export default function HistoryTab() {
   ) : table
 
 
-  const footer = ready && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
+  const footer = !loading && !error && result !== null && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
     <HistoryPager {...{ spentOnly, total, page, pageSize, items, pageCount, loading, setPage }} />
   ) : undefined
 
   return (
     <MileageFrame
-      help="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
+      explanation="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す

@@ -1,5 +1,5 @@
 'use client'
-import { BadgeCheck, CircleHelp, Clock, MessageSquareText } from 'lucide-react'
+import { BadgeCheck, CircleHelp, Clock, ThumbsUp } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
@@ -105,7 +105,7 @@ export default function OpsKnowledgeV8() {
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="承認済み" value={count((row) => knowledgeState(row).label === '承認済み')} unit="件" detail="AI の返信に使う" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="承認待ち" value={count((row) => row.reviewState === 'pending')} unit="件" detail="根拠が揃った下書き" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<CircleHelp size={13} aria-hidden="true" />} title="要確認" value={count((row) => row.reviewState === 'needs_review')} unit="件" detail="運営の回答がない" help={pageHelp} loading={!loaded} />
-          <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : emptyValue('unknown')} help="このページの記事の累計です。" loading={!loaded} />
+          <KpiCard presentation="cell" icon={<ThumbsUp size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : emptyValue('unknown')} help="このページの記事の累計です。" loading={!loaded} />
         </KpiBand>}
         toolbar={<OpsListToolbar
           search={{ value: q, onChange: (value) => { setQ(value); setOffset(0) }, placeholder: 'タイトル・質問・キーワードで探す' }}

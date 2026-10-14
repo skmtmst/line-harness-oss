@@ -120,6 +120,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
 
       // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
+      'components/shared/list-pagination.tsx',
       'components/shared/media-picker-dialog.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
@@ -185,9 +186,7 @@ describe('共通部品の影響範囲', () => {
       'v8/hq-broadcasts/list.tsx',
       // ★V8 成果とアフィリエイト（nJlxX・h7dmB・OylSV・aINnz）。src/v8 に一から書いた。
       'v8/affiliates/affiliators.tsx',
-      'v8/affiliates/offers.tsx',
-      'v8/affiliates/approvals.tsx',
-      'v8/affiliates/payment.tsx',
+      'v8/affiliates/report.tsx',
       // ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4）。新しい置き場（src/v8）に一から書いた。表の下にページ送りを置く。
       'v8/nen-campaigns/list.tsx',
       // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。

@@ -921,7 +921,7 @@ export default function SavedSearchEditV8() {
               {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
               <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
             </span>
-            <SegmentedControl aria-label="共有" value={isShared ? 'all' : 'self'} options={[{ value: 'all', label: '全員' }, { value: 'self', label: '自分だけ' }]} onChange={(value) => setIsShared(value === 'all')} />
+            <SegmentedControl fit="content" aria-label="共有" value={isShared ? 'all' : 'self'} options={[{ value: 'all', label: '全員' }, { value: 'self', label: '自分だけ' }]} onChange={(value) => setIsShared(value === 'all')} />
           </div>
         </Card>
 

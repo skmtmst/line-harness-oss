@@ -17,6 +17,7 @@ import type { DetailChrome, EditContext, PaneSaveProps } from './types'
 import styles from './comments.module.css'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CommentViewerStats from './comment-stats'
 
 
 /*
@@ -185,6 +186,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="Omqd4">
       <DetailHead {...chrome} current="comments" />
+      <CommentViewerStats analytics={ctx.analytics} state={ctx.analyticsState} onRetry={ctx.retryAnalytics} />
       <PageContent layout="columns" data-design-node="Omqd4">
         <div className={styles.previewToggle}>
           <Disclosure title="視聴画面での見え方" size="compact">{previewContent}</Disclosure>

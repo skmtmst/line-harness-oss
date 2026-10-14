@@ -1,7 +1,7 @@
 'use client'
 
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
+import { GitBranch, OctagonPause, ShieldCheck, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from '@/lib/api'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
@@ -532,10 +532,10 @@ const EmergencyControlV8 = (
           valueText={previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
           valueTone={isStopped ? 'danger' : 'default'}
           detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
-        <KpiCard title="止めた回数" icon={<PauseCircle size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
+        <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
         <KpiCard title="いちばん長かった停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
           detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
-        <KpiCard title="いまの版" icon={<Tag size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
           detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
       </KpiBand>
 

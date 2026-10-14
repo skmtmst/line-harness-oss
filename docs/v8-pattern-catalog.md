@@ -25,6 +25,8 @@
 ## 列車31b：既存の型の小さい口（2026-10-13）
 
 - 作成の2列：`templates/create-page.tsx` の `CreateColumns`。見え方は入力の高さに収め、長い見本はその欄で送る。380幅と1100未満の畳み方は型が持つ。保存・プレビューの内容は画面が渡す。
+- 手順ごとの補足列：`templates/create-step-columns.tsx` の `CreateStepColumns`。白い板1100未満では右欄を同じ内容の確認窓へ畳む。入力値・補足の役目名は画面から渡す。
+- 作成の完了見出し：`templates/create-parts.tsx` の `CreateCompletionHeading`。丸い成功印・中央の題・結果本文を表示する。状態の札と区別し、数と次の操作は画面から渡す。
 - 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。
 - 履歴の表：既存の `shared/table.tsx` の `DataTable.grid`。列・端の余白と本文／見出しの文字の大きさを共通の口へ渡す。画面で表の子を上書きしない。
 
@@ -242,6 +244,7 @@
 ## table 表
 
 - **役目**：表を見出し40・左右24・線は黒7%で並べる
+- 列配分：`DataTable.columnSizing="controls"` は状態札と操作の列だけ必要な自然幅を確保し、`Th/Td.grow` の名前列へ残りを配る。固定の名前・日時等の予算は保持。空の伸縮スペースは幅に含めず、前後の間は含める。`content` と未指定の表は従来どおり。
 - **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
   - 行高の対応（§6.5-3・2026-10-12 B-254）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧は、**セル内の描画文字が1行なら52、2行・3行なら60**。判定は共通表の `useListRowDensity`、値は `--tpl-list-row-h`／`--tpl-list-row-multi-h`。文字のない高さ40の見本画像は複数行相当。WQmepの受信表は絵で確認した既存の専用口60を保持。1行の `ListSkeleton` は52、一般の表・`TableSkeleton` は56。行高の正本は見た目の決まり §6.5-3。
   - 読む変数：`--color-table-head`・`--color-hairline`
@@ -287,9 +290,10 @@
 ## pagination ページ送り
 
 - **役目**：ページを送り、10・20・50件を切り替える
-- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
+- **持ち主（コード）**：`apps/web/src/components/shared/pagination.tsx`・`apps/web/src/components/shared/list-pagination.tsx`・`apps/web/src/components/shared/pagination.module.css`・`apps/web/src/components/shared/page-size-select.tsx`・`apps/web/src/components/shared/page-size-options.ts`（旧 ui は再公開）・`apps/web/src/components/ui/list-range.tsx`（部品 `Pagination`・`ListPagination`・`PageSizeSelect`・`pageSizeOptions`・`pageSizeLabel`・`ListPagePagination`）
 - **持ち主（Pen）**：`jX2Uw`「ページ送り」
   - 注：PageSizeSelect は shared が持つ（B-172）。
+  - 手元に全件がある一覧は `ListPagination` へ total/page/pageSize/unit を渡す。範囲とページ数を部品が決め、1ページ・0件でも枠を残す。カーソル式や総数未取得は既存の `Pagination`／`CursorPagination` を使う。
 - **見つけ方（コード）**：
   - own-size：`\b(const|let)\s+\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\w*\s*=` — 件数の定数を画面ごとに持つ
   - own-range-text：`summary`／`pagerSummary` で件数文を組む — `Pagination.range` へ総数・先頭・末尾・単位だけを渡す（L組差し戻しB）。
@@ -544,7 +548,7 @@
 <a id="sticky-bar"></a>
 ## sticky-bar 作る・編集の下の帯
 
-- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。
+- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。
 
 - **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
 - **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）
@@ -1082,3 +1086,9 @@
 
 - 役目：顔と名前を横並び1行で読む。持ち主は shared/table.tsx の PersonCell、顔は shared/avatar.tsx。名前と既存の行き先を name、表示名を avatarName へ渡す。幅が狭い時は名前だけ省略し全文を title で読む。フォルダ付きの NameCell とは役目を分ける。
 - 件数は shared/pagination.tsx の range（total/first/last）へ。手書きの件数文を足さない。
+
+### 日別グラフの基準線と出来事
+
+- 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
+- `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
+- 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。

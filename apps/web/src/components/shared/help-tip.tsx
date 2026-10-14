@@ -20,6 +20,7 @@ export default function HelpTip({
   label,
   className,
   icon,
+  trigger,
   hover = false,
   children,
 }: {
@@ -27,6 +28,8 @@ export default function HelpTip({
   label: string
   className?: string
   icon?: ReactNode
+  /** 印を増やさず、題そのものから説明を開く場合。 */
+  trigger?: ReactNode
   hover?: boolean
   /**
    * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
@@ -94,12 +97,13 @@ export default function HelpTip({
         aria-expanded={open}
         onClick={toggle}
         className={styles.button}
+        data-help-trigger={trigger ? 'text' : undefined}
       >
         {/*
           ★V7 `LYs5d`「？ 補足の印」：18px の正円の中に「?」。
           角丸の正方形・楕円・枠なしは使わない（2026-09-28 オーナー指示）。
         */}
-        <span aria-hidden="true">{icon ? <span className={styles.sourceMark}>{icon}</span> : <span className={styles.mark}>?</span>}</span>
+        {trigger ?? <span aria-hidden="true">{icon ? <span className={styles.sourceMark}>{icon}</span> : <span className={styles.mark}>?</span>}</span>}
       </button>
       {open ? (
         <span role="note" id={tipId} className={styles.tip}>

@@ -50,5 +50,6 @@
   "/webinars/edit?id=webinar-1&pane=cta",
   "/webinars/edit?id=webinar-1&pane=review",
   "/webinars/edit?id=webinar-1&pane=video",
-  "/webinars/edit?id=webinar-scheduled&pane=video"
+  "/webinars/edit?id=webinar-scheduled&pane=video",
+  "/nen-members?tab=publications"
 ]

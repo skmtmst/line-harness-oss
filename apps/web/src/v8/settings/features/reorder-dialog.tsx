@@ -4,9 +4,7 @@ import { useMemo, useState } from 'react'
 import { Check, RotateCcw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import { Field } from '@/components/shared/form-controls'
 import ReorderList from '@/components/shared/reorder-list'
-import Select from '@/components/shared/select'
 import type { FeatureGroup, MenuItemOrder } from '@/lib/feature-settings'
 import { applyItemOrder } from './feature-settings-view'
 import styles from './screen.module.css'
@@ -44,8 +42,7 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
     >
       <p className={styles.orderDescription}>つまみで動かすか、矢印で1つずつ動かします。区分（メイン・配信…）の中で並べ替えます。</p>
       {group ? <>
-        <Field label="区分"><Select aria-label="並びを変える区分を選ぶ" value={groupId} onChange={setGroupId} options={groups.map((item) => ({ value: item.id, label: item.label }))} /></Field>
-        <ReorderList items={group.items} visibleRows={5} onChange={(ids) => setDraft((current) => ({ ...current, [group.id]: ids }))} />
+        <ReorderList group={{ label: "区分", ariaLabel: "並びを変える区分を選ぶ", value: groupId, onChange: setGroupId, options: groups.map((item) => ({ value: item.id, label: item.label })) }} items={group.items} visibleRows={5} onChange={(ids) => setDraft((current) => ({ ...current, [group.id]: ids }))} />
       </> : null}
     </Dialog>
   )
