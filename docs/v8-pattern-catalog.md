@@ -25,6 +25,8 @@
 ## 列車31b：既存の型の小さい口（2026-10-13）
 
 - 作成の2列：`templates/create-page.tsx` の `CreateColumns`。見え方は入力の高さに収め、長い見本はその欄で送る。380幅と1100未満の畳み方は型が持つ。保存・プレビューの内容は画面が渡す。
+- 手順ごとの補足列：`templates/create-step-columns.tsx` の `CreateStepColumns`。白い板1100未満では右欄を同じ内容の確認窓へ畳む。入力値・補足の役目名は画面から渡す。
+- 作成の完了見出し：`templates/create-parts.tsx` の `CreateCompletionHeading`。丸い成功印・中央の題・結果本文を表示する。状態の札と区別し、数と次の操作は画面から渡す。
 - 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。
 - 履歴の表：既存の `shared/table.tsx` の `DataTable.grid`。列・端の余白と本文／見出しの文字の大きさを共通の口へ渡す。画面で表の子を上書きしない。
 
@@ -545,7 +547,7 @@
 <a id="sticky-bar"></a>
 ## sticky-bar 作る・編集の下の帯
 
-- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。
+- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。
 
 - **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
 - **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）

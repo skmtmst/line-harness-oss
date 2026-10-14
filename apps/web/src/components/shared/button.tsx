@@ -48,6 +48,8 @@ type CommonProps = {
   className?: string
   /** Authored action words only; entity names and arbitrary values remain unchanged. */
   actionWording?: boolean
+  /** 保存・公開・比較など、明示した役目の印。省略時は従来の描画を保つ。 */
+  icon?: ReactNode
   children: ReactNode
 }
 
@@ -137,11 +139,11 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
-        {props.actionWording ? normalizeActionNode(children) : children}
+        {icon}{props.actionWording ? normalizeActionNode(children) : children}
         {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
@@ -153,6 +155,7 @@ export default function Button(props: ButtonProps) {
 function NativeButton(props: NativeButtonProps & { classes: string }) {
   const {
     children: rawChildren,
+    icon,
     actionWording: _actionWording,
     classes,
     className: _className,
@@ -215,6 +218,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
     measuredLabelRef.current = measurementKey
+    el.style.width = ''
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (widthReserve === 'idle') {
@@ -279,6 +283,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
       {shownDone ? <Check size={15} aria-hidden="true" /> : null}
+      {!busyNow && !shownDone ? icon : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>
     {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}

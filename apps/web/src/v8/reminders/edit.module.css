@@ -110,7 +110,7 @@
 .countItem { display: flex; flex: none; flex-direction: column; gap: var(--tpl-compact-gap); white-space: nowrap; }
 .countLabel { color: var(--color-ink-secondary); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
 .countValue { color: var(--color-ink); font-size: var(--tpl-rm-count-size); font-weight: 700; line-height: var(--tpl-rm-count-lh); font-variant-numeric: tabular-nums; }
-.countNote { min-width: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
+.countNote { margin: 0; min-width: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
 .stopList { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
 .stopRow {
   display: flex;
