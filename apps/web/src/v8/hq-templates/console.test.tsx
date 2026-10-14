@@ -266,7 +266,7 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
     calls.update.mockImplementation(async (_id: string, input: { name: string; definition: unknown }) => ({ template: { ...formRow, revision: 4, name: input.name }, definition: input.definition }))
   })
 
-  it('名前を押すと店と同じ3つのタブの編集画面。右は「配った先」、［保存する］で統括のひな形を直してアカウントへ配るへ進む', async () => {
+  it('名前を押すと店と同じ3つのタブの編集画面。右は「配った先」、［保存して配る］で統括のひな形を直してアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="form" />)
     fireEvent.click((await screen.findByRole('link', { name: '来店アンケート' })).closest('tr')!)
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
@@ -276,13 +276,16 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
     expect(screen.queryByText('回答用URL')).toBeNull()
     expect(screen.queryByRole('button', { name: /この版を公開/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /公開前に試す/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    fireEvent.click(screen.getByRole('tab', { name: '答え終わったあと' }))
+    fireEvent.change(screen.getByLabelText('お礼の文'), { target: { value: '回答を受け付けました' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存して配る' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     const [id, input] = calls.update.mock.calls[0]
     expect(id).toBe('f-t-1')
     expect(input).toMatchObject({ type: 'form', name: '来店アンケート', expectedRevision: 3 })
     /* 画面に出ない設定（答えたあとのシナリオ）は落とさない。 */
     expect(input.definition.form).toMatchObject({ on_submit_scenario_id: 'scn-keep', fields: [{ name: 'purpose' }] })
+    expect(input.definition.form.layout.options.thanksText).toBe('回答を受け付けました')
     expect(await screen.findByRole('checkbox', { name: /然 -NEN- 本店/ })).toBeTruthy()
   })
 

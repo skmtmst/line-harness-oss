@@ -496,7 +496,7 @@ export default function AssignMatrixV8() {
                       {`升を押したとき（${staffLabel(selectedStaff)} × ${selectedMenu.name}）`}
                     </h3>
                   <div className={styles.overrideFields}>
-                    <Field label="このスタッフの所要時間" note={`メニューは ${selectedMenu.duration_minutes} 分`}><SaveErrorField names={["override_duration_minutes","selectedRow.override_duration_minutes","selected_row.override_duration_minutes"]}><NumberInput unit="分"
+                    <Field fill label="このスタッフの所要時間" note={`メニューは ${selectedMenu.duration_minutes} 分`}><SaveErrorField names={["override_duration_minutes","selectedRow.override_duration_minutes","selected_row.override_duration_minutes"]}><NumberInput unit="分"
                           type="number"
                           min={1}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -511,7 +511,7 @@ export default function AssignMatrixV8() {
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の所要時間`}
                         /></SaveErrorField>
                         </Field>
-                    <Field label="このスタッフの料金" note={`メニューは ${menuPriceLabel(selectedMenu)}`}><SaveErrorField names={["override_price","selectedRow.override_price","selected_row.override_price"]}><NumberInput unit="円"
+                    <Field fill label="このスタッフの料金" note={`メニューは ${menuPriceLabel(selectedMenu)}`}><SaveErrorField names={["override_price","selectedRow.override_price","selected_row.override_price"]}><NumberInput unit="円"
                           type="number"
                           min={0}
                           disabled={!canEditMenus || !selectedRow.is_offered}

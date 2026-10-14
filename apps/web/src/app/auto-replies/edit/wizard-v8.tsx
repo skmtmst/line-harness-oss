@@ -1540,8 +1540,8 @@ function AutoReplyWizardV8Inner() {
                 busy={saving}
                 busyLabel="進んでいます…"
               >
-                次へ：{STEP_LABELS_V8[STEP_ORDER[STEP_ORDER.indexOf(step) + 1]]}
                 <ChevronRight size={14} aria-hidden="true" />
+                次へ：{STEP_LABELS_V8[STEP_ORDER[STEP_ORDER.indexOf(step) + 1]]}
               </Button>
             ) : (
               <Button
