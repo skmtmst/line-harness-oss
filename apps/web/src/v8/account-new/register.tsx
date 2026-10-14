@@ -27,7 +27,6 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
@@ -634,12 +633,8 @@ export default function AccountRegisterV8() {
                 <ol className={styles.checkList} aria-label="接続確認項目">
                   {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
                 </ol>
-                <Card layout="horizontal" surface="inset" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><SettingCheckbox checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} /></SaveErrorField>
-                  <span className={styles.importText}>
-                    <strong>既存の友だちの取り込み</strong>
-                    <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>
-                  </span>
+                <Card surface="inset" contentPadding="var(--polish-space-card)">
+                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="登録のあと、いまの友だちを musubo に取り込みます（数分かかります）">既存の友だちの取り込み</Checkbox></SaveErrorField>
                 </Card>
               </div>
 

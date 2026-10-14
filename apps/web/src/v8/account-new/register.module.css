@@ -81,9 +81,6 @@
 }
 .checkRow[data-state='failed'] { height: auto; min-height: var(--tpl-htn-check-row-h); padding-block: var(--polish-space-row); }
 .checkRow[data-state='failed'] .checkDetail { color: var(--color-danger); white-space: normal; overflow: visible; overflow-wrap: anywhere; }
-.importText { display: flex; flex-direction: column; gap: var(--tpl-htn-import-gap); min-width: 0; }
-.importText strong { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.importText span { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 
 /* ⑤ 完了 */
 .doneLine {

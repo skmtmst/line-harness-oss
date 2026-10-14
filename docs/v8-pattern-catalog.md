@@ -382,6 +382,8 @@
 <a id="picker-field"></a>
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
 
+- 電話予約で検索した友だちの行は `shared/friend-match-row.tsx` の `FriendMatchRow`。選択の薄い帯、名前/補足、選ぶ/選び直すを1行で持ち、行の内側へ別の選択枠を重ねない。
+
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
 - 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
 - **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
