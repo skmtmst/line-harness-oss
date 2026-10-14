@@ -1,6 +1,5 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import styles from './steps.module.css'
@@ -15,7 +14,7 @@ type DotState = 'done' | 'current' | 'todo' | 'attention'
  * - 置き場所：作る画面の題と説明のすぐ下・左寄せ・1行（型の PageHeading の `steps` に渡す）。横いっぱいに広げない
  * - 段：丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・段の間に線24
  * - 済みの段（と直すところがある段）は押して戻れる。まだの段・今の段は押せない
- * - 入らない幅では、今の段だけ名を出し、ほかは丸だけにして1行を守る（名は読み上げと title に残す）
+ * - 入らない幅では各名を1行で省略し、全文は読み上げと title に残す
  *
  * 渡し方は共通の型（label・steps・currentKey）。手順の見た目はこのV8部品だけを使う。
  */
@@ -42,40 +41,9 @@ export function Steps({
     return state === 'current' ? 'todo' : state
   }
 
-  /* 入らない幅の判定：名を全部出した幅を覚えておき、それより狭いあいだは今の段だけ名を出す。 */
-  const navRef = useRef<HTMLElement>(null)
-  const listRef = useRef<HTMLOListElement>(null)
-  const fullWidth = useRef(0)
-  const [compact, setCompact] = useState(false)
-  const labelsKey = items.map((step) => step.label).join('\u0000')
-  useLayoutEffect(() => {
-    fullWidth.current = 0
-    setCompact(false)
-  }, [labelsKey])
-  useLayoutEffect(() => {
-    const nav = navRef.current
-    const list = listRef.current
-    if (!nav || !list) return
-    const check = () => {
-      const available = nav.clientWidth
-      if (available <= 0) return
-      if (!compact) {
-        fullWidth.current = list.scrollWidth
-        if (list.scrollWidth > available + 0.5) setCompact(true)
-      } else if (fullWidth.current > 0 && fullWidth.current <= available) {
-        setCompact(false)
-      }
-    }
-    check()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(check)
-    observer.observe(nav)
-    return () => observer.disconnect()
-  }, [compact, labelsKey])
-
   return (
-    <nav ref={navRef} aria-label={label} data-part="steps" data-connector-size={connectorSize} data-compact={compact || undefined} className={styles.root}>
-      <ol ref={listRef} className={styles.list} data-design="Steps">
+    <nav aria-label={label} data-part="steps" data-connector-size={connectorSize} className={styles.root}>
+      <ol className={styles.list} data-design="Steps">
         {items.map((step, index) => {
           const state = stateOf(index)
           const isCurrent = state === 'current'

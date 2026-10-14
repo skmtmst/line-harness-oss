@@ -5,6 +5,7 @@ import { connectGuardBrowser } from './browser-session.mjs'
 import scanCreateConsistency from './create-consistency-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import './status-steps-layout.test.mjs'
 
 import { assessAgainstBase, measurePage, record, validateAllowances } from './layout-defects.mjs'
 const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8');
