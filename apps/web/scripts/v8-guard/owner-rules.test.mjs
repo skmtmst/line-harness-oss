@@ -10,6 +10,22 @@ import { assess, record, measurePage } from './layout-defects.mjs'
 import './list-row-height.test.mjs'
 
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
+
+test('header edge measures the text inside padded cells and still detects text or controls too near the edge', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const edge = async () => (await page.evaluate(scan)).filter(f => f.kind === 'edge')
+    for (const label of ['状態・操作', '<button>操作</button>']) {
+      await page.setContent(shell(`<table style="width:600px"><thead><tr><th style="height:40px;padding:0 24px;text-align:right">${label}</th></tr></thead></table>`))
+      assert.deepEqual(await edge(), [], 'the cell box reaches the edge but its text/control has 24px of inset')
+      await page.locator('th').evaluate(el => el.style.paddingInlineEnd = '4px')
+      assert.ok((await edge()).some(f => f.measure.deficit >= 8), 'real 4px inset remains a failure')
+      await page.locator('th').evaluate(el => el.style.paddingInlineEnd = '24px')
+      assert.deepEqual(await edge(), [])
+    }
+  } finally { await browser.close() }
+})
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
 const table = body => `<div role="table" data-shared-part="list-table" style="width:600px">${body}</div>`
 test('同じ面の編集本文は描いた文字の余白を測り、余白0・別枠の端接触は止める', async () => {
