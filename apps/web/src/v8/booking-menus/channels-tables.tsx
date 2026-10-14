@@ -45,7 +45,7 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
     <Card variant="records" aria-labelledby="channels-calendar-heading">
       <CardHeader size="content" titleId="channels-calendar-heading" title="スタッフの Google カレンダー" />
       <p data-card-footer className={ch.cardDesc}>カレンダーの予定は「埋まっている時間」として扱います。LINE で入った予約は、そのスタッフのカレンダーに書き込みます。</p>
-      <DataTable aria-label="スタッフの Google カレンダー" columnSizing="controls" columnLayout={TABLE_LAYOUT}>
+      <DataTable aria-label="スタッフの Google カレンダー" columnSizing="content" columnLayout={TABLE_LAYOUT}>
         <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>スタッフ</Th><Th collapseAt="narrow" truncate>カレンダー</Th><Th truncate>状態</Th><Th align="right" truncate>外の予定（今週）</Th><Th collapseAt="narrow" truncate>最後に読んだ</Th><Th>操作</Th></TableHeadRow></thead>
         <tbody>{data.staff.map(person => <Tr key={person.staffId} data-table-layout="columns">
           <Td grow title={`カレンダー：${calendars[person.staffId] || emptyValue('unknown')}・最後に読んだ：${formatReadAt(person.lastReadAt)}`}><span className={ch.nameCell}><OneLine text={person.displayName} tone="name" />{roles[person.staffId] ? <OneLine text={roles[person.staffId]} tone="sub" /> : null}</span></Td>
@@ -60,7 +60,7 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
     <Card variant="records" aria-labelledby="channels-route-heading">
       <CardHeader size="content" titleId="channels-route-heading" title="予約経路" />
       <p data-card-footer className={ch.cardDesc}>どこから入った予約も「予約管理」に集めます。入り口ごとの受け取り方と、今日の件数です。</p>
-      <DataTable aria-label="予約経路" columnSizing="controls" columnLayout={TABLE_LAYOUT}>
+      <DataTable aria-label="予約経路" columnSizing="content" columnLayout={TABLE_LAYOUT}>
         <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th>操作</Th></TableHeadRow></thead>
         <tbody>{data.channels.map(channel => {
           const label = CHANNEL_LABEL[channel.key] ?? { name: channel.key, sub: '', how: '' }
