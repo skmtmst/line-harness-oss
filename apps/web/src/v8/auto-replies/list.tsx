@@ -1695,7 +1695,7 @@ export default function AutoRepliesListV8() {
           {/* 案内の帯は表の上の主列に置く（板 uE9gf）。左のフォルダの列を押し下げないよう toolbar 枠の先頭に置き、一行を取る。 */}
 
           {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
-          <ListToolbar
+          <ListToolbar preserveFilterChips
             search={{
               placeholder: 'ルール名・言葉で探す',
               width: 160,
