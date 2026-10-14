@@ -13,9 +13,10 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Select from '@/components/shared/select'
 import OtpInput from '@/components/shared/otp-input'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import { EmergencyControlFeedback } from './control-feedback-v8'
@@ -746,7 +747,7 @@ const EmergencyControlV8 = (
         open={confirmMode !== null}
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
-        tone={confirmMode === 'stop' ? 'destructive' : 'default'}
+        tone="default"
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
           ? '止める前に、何と何人に関わるかを実測で確かめました。'
@@ -838,14 +839,13 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><SaveErrorField names={["confirmWord","confirm_word"]}><input
+          <DialogFormRow><Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><SaveErrorField names={["confirmWord","confirm_word"]}><TextField
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
-              className={styles.dialogInput}
-            /></SaveErrorField></Field>
+            /></SaveErrorField></Field></DialogFormRow>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
             <div className={styles.dialogField}>
               <span className={styles.dialogLabel} id="emergency-stepup-label">
