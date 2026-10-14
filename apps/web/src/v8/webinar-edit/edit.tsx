@@ -184,7 +184,7 @@ function EditInner() {
     setVisited((prev) => (prev.has(next) ? prev : new Set(prev).add(next)))
     setPane(next)
     try {
-      window.history?.pushState?.(null, '', `?id=${encodeURIComponent(id ?? '')}&pane=${next}`)
+      window.history?.[(DETAIL_KEYS as readonly string[]).includes(next) ? 'replaceState' : 'pushState']?.(null, '', `?id=${encodeURIComponent(id ?? '')}&pane=${next}`)
     } catch {
       /* 履歴を持たない環境（試験用の簡易DOM）では画面内の状態だけで動く。 */
     }

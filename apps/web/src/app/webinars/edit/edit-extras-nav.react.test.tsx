@@ -129,7 +129,7 @@ describe('R94 編集画面の常設導線', () => {
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const nav = host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"]')
+    const nav = host.querySelector('[role="tablist"][aria-label="設定・参加者・分析・コメント演出"]')
     expect(nav, '常設導線の nav が見つかりません').toBeTruthy()
     expect(nav!.textContent).toContain('参加者')
     expect(nav!.textContent).toContain('分析')
@@ -140,12 +140,14 @@ describe('R94 編集画面の常設導線', () => {
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const nav = host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"]')!
+    const nav = host.querySelector('[role="tablist"][aria-label="設定・参加者・分析・コメント演出"]')!
     const button = [...nav.querySelectorAll('button')].find((el) => el.textContent === '分析')
     expect(button, '分析の行き先が見つかりません').toBeTruthy()
+    const historyLength = window.history.length
     await act(async () => { button!.click() })
     await flush()
-    expect(host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"] [aria-current="page"]')?.textContent).toBe('分析')
+    expect(host.querySelector('[role="tablist"][aria-label="設定・参加者・分析・コメント演出"] [aria-current="page"]')?.textContent).toBe('分析')
+    expect(window.history.length).toBe(historyLength)
   })
 })
 
@@ -166,7 +168,7 @@ describe('現役の設定から参加者へ移る口', () => {
     const participants = [...menu.querySelectorAll('[role="menuitem"]')].find(item => item.textContent === '参加者を見る') as HTMLButtonElement
     await act(async () => participants.click())
     await flush()
-    expect(host.querySelector('[data-wc-tabs] [aria-current="page"]')?.textContent).toContain('参加者')
+    expect(host.querySelector('[role="tablist"] [aria-current="page"]')?.textContent).toContain('参加者')
     expect(window.location.search).toContain('pane=participants')
   })
 })
