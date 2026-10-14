@@ -16,7 +16,7 @@ import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import SelectionDialog from './selection-dialog'
 import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
-import Dialog from './dialog'
+import EntityPickerWindow, { type EntityPickerWindowProps } from './entity-picker-window'
 import TagPill from './tag-pill'
 
 /*
@@ -89,6 +89,7 @@ function CreateLink({ href, label }: { href?: string; label?: string }) {
 }
 
 type SingleProps = {
+  scrollBody?: boolean
   title: string
   /** 窓の頭の説明。省くと題だけ。 */
   description?: string
@@ -121,36 +122,14 @@ type SingleProps = {
   onCancel: () => void
 }
 
-/** B-165：受信箱とすべての選ぶ窓が共有する640pxの器。 */
-export type EntityPickerWindowProps = {
-  title: string
-  description?: string
-  onCancel: () => void
-  busy?: boolean
-  error?: string
-  designNode?: string
-  initialFocusId?: string
-  /** データ取得を呼ぶ側で管理するときの中身。窓の形は共通のまま。 */
-  children: ReactNode
-  footer: ReactNode
-  band?: ReactNode
-}
+export type { EntityPickerWindowProps } from './entity-picker-window'
 export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
-  if ('children' in props) return <Dialog open dirty={false} title={props.title} description={props.description}
-    designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
-    busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel}
-    footer={<>
-      {props.children}
-      {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
-      {props.band}
-      <div className={styles.tpFoot}>{props.footer}</div>
-    </>} />
-  return <SingleEntityPickerDialog {...props} />
+  return 'children' in props ? <EntityPickerWindow {...props} /> : <SingleEntityPickerDialog {...props} />
 }
 
 /** 行を選ぶ間は仮の選択。確定したときだけ呼ぶ側の値を変える。 */
 function SingleEntityPickerDialog({
-  title, description, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
+  title, description, scrollBody = false, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
   state, listFooter, preview, error, busy = false, confirmDisabled = false, readOnly = false, createHref, createLabel,
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel,
 }: SingleProps) {
@@ -175,7 +154,7 @@ function SingleEntityPickerDialog({
   if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
-  return <EntityPickerDialog title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
+  return <EntityPickerDialog scrollBody={scrollBody} title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?
@@ -188,7 +167,7 @@ function SingleEntityPickerDialog({
     </div>
     </>}
   >
-    <div ref={panelRef} className={shell.body}>
+    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : ''}`}>
       {hasFolders && !narrow ? <div className={shell.folders}>
         <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
