@@ -108,6 +108,25 @@ export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = fals
         findings.push({ pattern: 'F6', kind: 'dialog-description-band', band: descriptionBand, ...actual, expectedColor })
       }
     }
+    const header = [...panel.children].find(el => el.querySelector('h2'))
+    const band = panel.querySelector('[data-qa-dialog-callout]')
+    if (header && band) {
+      const h = header.getBoundingClientRect(), b = band.getBoundingClientRect(), css = getComputedStyle(header)
+      const left = h.left + parseFloat(css.paddingLeft), right = h.right - parseFloat(css.paddingRight)
+      const gap = b.top - h.bottom
+      inventory.push({ kind: 'description-band-layout', width: b.width, available: right - left, gap })
+      if (Math.abs(b.left - left) > 1 || Math.abs(b.right - right) > 1) findings.push({ pattern: 'F6', kind: 'dialog-description-band-width', width: b.width, available: right - left })
+      if (gap < 11) findings.push({ pattern: 'F6', kind: 'dialog-description-band-gap', gap, minimum: 12 })
+    }
+  }
+  for (const group of panel.querySelectorAll('[data-choice-columns]')) {
+    const g = group.getBoundingClientRect(), columns = Number(group.dataset.choiceColumns)
+    const cards = [...group.querySelectorAll('[data-choice-card]')].map(el => el.getBoundingClientRect())
+    const firstRow = cards.filter(card => Math.abs(card.top - cards[0]?.top) < 1)
+    const excess = Math.max(0, ...cards.map(card => Math.max(g.left - card.left, card.right - g.right)))
+    inventory.push({ kind: 'choice-card-grid', columns: firstRow.length, expected: Math.min(columns, cards.length), excess })
+    if (excess > 1) findings.push({ pattern: 'F10', kind: 'dialog-choice-card-overflow', excess })
+    if (firstRow.length !== Math.min(columns, cards.length)) findings.push({ pattern: 'F10', kind: 'dialog-choice-card-columns', actual: firstRow.length, expected: Math.min(columns, cards.length) })
   }
   if (requiredAction && ![...panel.querySelectorAll('button,[role="menuitem"]')].some(el => el.innerText?.trim() === requiredAction)) {
     findings.push({ pattern: 'F8', kind: 'dialog-action-label', expected: requiredAction })

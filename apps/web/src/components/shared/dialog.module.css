@@ -379,6 +379,14 @@
   font-size: 11px;
   line-height: 17px;
 }
+:root .panel[data-description-band='danger'] > .headerRow { padding-bottom: 0; }
+:root .descriptionBand {
+  flex: none;
+  padding: 0 var(--polish-space-section);
+  margin: var(--polish-space-field) 0 var(--polish-space-card);
+}
+:root .descriptionBand > .callout { width: 100%; }
+:root .panel[data-design-layout='stacked'] > .descriptionBand { padding: 0; margin: 0; }
 :root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }

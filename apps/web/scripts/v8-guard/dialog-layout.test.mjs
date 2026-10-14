@@ -147,3 +147,36 @@ for (const width of [1152, 1440, 1920]) {
     }
   })
 }
+
+for (const width of [1152, 1440, 1920]) {
+  test(`dialog description occupies the full body below its heading at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
+      await page.setContent(`<style>${globals}</style><style>${dialog}</style><div class="panel" data-design-width style="--dialog-design-width:480px" data-m1-scope data-description-band="danger" aria-describedby="band-text">
+        <div class="headerRow"><div class="headerContent"><h2 class="title">接続を解除しますか？</h2></div><button>×</button></div>
+        <div class="descriptionBand"><div class="callout calloutDanger" data-qa-dialog-callout><p class="description" id="band-text">書き出しが止まります。シートの中身は消えません。この操作は取り消せません。</p></div></div></div>`)
+      const normal = await page.evaluate(scanDialogAudit, { expectedWidth: 480 })
+      assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+      assert.equal(await page.locator('#band-text').evaluate(el => el.getBoundingClientRect().height), 17)
+      await page.locator('[data-qa-dialog-callout]').evaluate(el => document.querySelector('.headerContent').append(el))
+      const broken = await page.evaluate(scanDialogAudit)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-description-band-width').length, 1)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-description-band-gap').length, 1)
+    } finally { await browser.close() }
+  })
+
+  test(`dialog choice cards use three equal columns within the body at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      const radio = readFileSync(new URL('../../src/components/shared/radio-card.module.css', import.meta.url), 'utf8')
+      await page.setContent(`<style>${globals}</style><style>${radio}</style><div data-m1-scope style="width:480px;padding:24px"><fieldset class="group"><legend>座れる卓</legend><div class="items" data-choice-columns="3" style="--choice-columns:3">${Array.from({length:5}, (_, index) => `<label class="card" data-choice-card><span class="title">T${index+1}</span><p class="note">2名席</p></label>`).join('')}</div></fieldset></div>`)
+      const normal = await page.evaluate(scanDialogAudit)
+      assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+      await page.locator('[data-choice-columns]').evaluate(el => { el.style.gridTemplateColumns = 'repeat(3, 160px)' })
+      const broken = await page.evaluate(scanDialogAudit)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-choice-card-overflow').length, 1)
+    } finally { await browser.close() }
+  })
+}

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
@@ -53,6 +54,20 @@ describe('ダイアログの桃箱', () => {
     )
     expect(html).not.toContain('data-qa-dialog-callout')
     expect(html).not.toContain('data-description-band=')
+  })
+
+  it('注意帯は閉じるボタンの列から独立し、説明の読み上げを保つ', () => {
+    const html = renderToStaticMarkup(<Dialog open modal={false} title="接続を解除しますか？"
+      description="シートの中身は残ります。" descriptionBand="danger" onCancel={vi.fn()} />)
+    const container = document.createElement('div')
+    container.innerHTML = html
+    const panel = container.querySelector('[role="dialog"]')!
+    const header = [...panel.children].find(el => el.querySelector('h2'))!
+    const band = panel.querySelector('[data-qa-dialog-callout]')!
+    expect(header.contains(band)).toBe(false)
+    expect(header.querySelector('button[aria-label="閉じる"]')).not.toBeNull()
+    expect(band.querySelector('p')?.id).toBe(panel.getAttribute('aria-describedby'))
+    expect(band.textContent).toBe('シートの中身は残ります。')
   })
 
   it('ConfirmDialog の dangerBand が桃箱へ素通しされる', () => {

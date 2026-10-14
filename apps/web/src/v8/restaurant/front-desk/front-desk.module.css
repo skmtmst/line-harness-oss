@@ -223,12 +223,6 @@
   min-width: 0;
 }
 
-.tableCards {
-  display: grid;
-  grid-template-columns: repeat(3, var(--tpl-e3-walkin-card-w));
-  gap: var(--tpl-e1-gap-s);
-}
-
 .full {
   display: flex;
   flex-direction: column;
