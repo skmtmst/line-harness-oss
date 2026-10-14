@@ -25,7 +25,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
     baseLink={referralUrl(route.refCode)} routes={[]}
     resource={{
       url: referralUrl(route.refCode), title: `${route.name} の QR コード`,
-      stopped: route.isActive === false,
+      stopped: route.isActive === false, stoppedPresentation: 'notice',
       description: 'チラシ・店頭POPに印刷して使えます。読み取るとこの経路の画面が開きます。',
       downloadPdf: route.id ? paper => route.couponEnabled ? api.entryRoutes.qrPdf(route.id!, paper) : api.entryRoutes.qrPdf(route.id!) : undefined,
       downloadImage: route.id && route.couponEnabled ? (format, size) => api.entryRoutes.qrImage(route.id!, format as 'png' | 'svg', size as 'small' | 'medium' | 'large') : undefined,

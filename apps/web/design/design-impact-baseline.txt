@@ -85,6 +85,7 @@ shared-button-importer components/chats/inbox-filter-panel.tsx
 shared-button-importer components/chats/saved-view-dialog.tsx
 shared-button-importer components/chats/template-folder-select.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
+shared-button-importer components/dashboard/qr-stopped-notice.tsx
 shared-button-importer components/events/event-questions-editor.tsx
 shared-button-importer components/feature-disabled-gate.tsx
 shared-button-importer components/forms/choice-table.tsx
