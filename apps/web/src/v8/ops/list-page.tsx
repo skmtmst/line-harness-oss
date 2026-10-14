@@ -25,7 +25,7 @@ export function OpsListToolbar({ search, filters, trailing }: Pick<ComponentProp
 }
 
 function filterItems(children: ReactNode, prefix = ''): ReactNode[] {
-  return Children.toArray(children).flatMap((node, index) => {
+  return Children.toArray(children).flatMap<ReactNode>((node, index) => {
     if (!isValidElement<{ children?: ReactNode }>(node)) return [node]
     const key = `${prefix}${node.key ?? index}`
     if (node.type !== Fragment) return [cloneElement(node, { key })]
