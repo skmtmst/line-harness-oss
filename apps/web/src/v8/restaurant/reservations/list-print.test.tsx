@@ -32,7 +32,7 @@ it.each([
   render(<ListView view="list" rows={[]} total={0} tables={[]} page={1} period={period} status="confirmed"
     busy={false} canWrite={false} canImport={false} day={new Date()} storeId="store" storeName="試験店"
     onView={vi.fn()} onPeriod={vi.fn()} onStatus={vi.fn()} onPage={vi.fn()} onImport={vi.fn()}
-    onCreate={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
+    onCreate={vi.fn()} onEdit={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
   expect(await fixture.board!.loadPrintEntries()).toEqual([{ status: 'confirmed' }])
   expect(fixture.allPages).toHaveBeenCalledWith('seats', 'account', from, to, 'store')
   expect(fixture.board!.printContext).toContain(label)
