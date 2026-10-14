@@ -277,6 +277,15 @@ jobs:
             node scripts/visual-qa/v8-pattern-audit.mjs \
               --code . --out "$RUNNER_TEMP/pattern-ownership"
           fi
+      - name: Guard newly added source visual contracts (B-273)
+        env:
+          SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --test scripts/verify-no-source-visual-contracts.test.mjs
+          base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
+          node scripts/verify-no-source-visual-contracts.mjs --base "$base"
+          node --test apps/web/scripts/v8-guard/code-size.test.mjs
+          node apps/web/scripts/v8-guard/code-size.mjs --base "$base"
       - name: Build shared packages
         run: >-
           pnpm
@@ -711,6 +720,9 @@ jobs:
         run: |
           node --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
           node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
+      - name: Rich-menu label font sizes at three widths (m22a)
+        if: steps.scope.outputs.run == 'true'
+        run: pnpm --filter web exec vitest run --config scripts/v8-guard/rich-menu-browser-vitest.config.ts
       - name: Upload V8 screen guard results
         if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

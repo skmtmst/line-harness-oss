@@ -29,10 +29,10 @@ afterEach(() => {
   cleanup()
 })
 
-describe.each(['text', 'primary', 'secondary'] as const)('CopyTextButton (%s)', (variant) => {
+describe.each(['text', 'primary', 'secondary', 'inline'] as const)('CopyTextButton (%s)', (variant) => {
   it('押すと全文をクリップボードへ書き、「コピーしました」へ変わる', async () => {
     const writeText = stubClipboard(async () => undefined)
-    render(<CopyTextButton variant={variant} value="{{var.open_hours}}" aria-label="営業時間の差し込みキーをコピー" />)
+    render(<CopyTextButton variant={variant === 'inline' ? 'text' : variant} size={variant === 'inline' ? 'inline' : undefined} value="{{var.open_hours}}" aria-label="営業時間の差し込みキーをコピー" />)
 
     const button = screen.getByRole('button', { name: '営業時間の差し込みキーをコピー' })
     await act(async () => { fireEvent.click(button) })
@@ -46,7 +46,7 @@ describe.each(['text', 'primary', 'secondary'] as const)('CopyTextButton (%s)', 
     vi.useFakeTimers()
     try {
       stubClipboard(async () => undefined)
-      render(<CopyTextButton variant={variant} value="abc" aria-label="値をコピー" />)
+      render(<CopyTextButton variant={variant === 'inline' ? 'text' : variant} size={variant === 'inline' ? 'inline' : undefined} value="abc" aria-label="値をコピー" />)
 
       const button = screen.getByRole('button', { name: '値をコピー' })
       await act(async () => { fireEvent.click(button) })
@@ -61,7 +61,7 @@ describe.each(['text', 'primary', 'secondary'] as const)('CopyTextButton (%s)', 
 
   it('コピーできない環境では全文を選べる欄と一言を出す', async () => {
     stubClipboard(async () => { throw new Error('denied') })
-    render(<CopyTextButton variant={variant} value="{{var.very_long_key_name}}" aria-label="キーをコピー" />)
+    render(<CopyTextButton variant={variant === 'inline' ? 'text' : variant} size={variant === 'inline' ? 'inline' : undefined} value="{{var.very_long_key_name}}" aria-label="キーをコピー" />)
 
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'キーをコピー' })) })
 

@@ -372,7 +372,7 @@ export async function getBookingAdminDetail(
     createdByStaffId: row.created_by_staff_id,
     calendarSync,
     notificationPolicy,
-    menuName: row.menu_name,
+    menuName: menuSnapshot?.name || row.menu_name,
     staffName: row.staff_name,
     customer: {
       friendId: row.friend_id,

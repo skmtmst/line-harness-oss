@@ -26,6 +26,7 @@ export default function CopyTextButton({
   'aria-label': ariaLabel,
   disabled = false,
   variant = 'text',
+  size,
 }: {
   /** クリップボードへ書き込む全文。表示用文字列ではなく取り出したい値。 */
   value?: string
@@ -36,6 +37,8 @@ export default function CopyTextButton({
   disabled?: boolean
   /** コードの下など、本文の操作は共通Buttonの形を使う。行内は文字操作のまま。 */
   variant?: 'text' | 'primary' | 'secondary'
+  /** 本文の操作は共通Buttonの小さいリンクの形でそろえる。 */
+  size?: 'inline'
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
   'aria-label': string
 }) {
@@ -101,10 +104,13 @@ export default function CopyTextButton({
     )
   }
 
-  if (variant !== 'text') {
+  if (variant !== 'text' || size === 'inline') {
     return (
       <Button
         variant={variant}
+        size={size}
+        className={size === 'inline' ? styles.button : undefined}
+        textTone={size === 'inline' && state === 'copied' ? 'accent' : undefined}
         role={role}
         disabled={disabled}
         onClick={(event) => { event.stopPropagation(); void copy() }}
