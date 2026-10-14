@@ -45,7 +45,7 @@
 }
 
 .colWhat {
-  width: var(--tpl-op-audit-what-w);
+  width: calc(var(--tpl-op-audit-what-w) + var(--polish-space-section) + var(--polish-space-section) + var(--polish-space-section));
 }
 
 .colTenant {
