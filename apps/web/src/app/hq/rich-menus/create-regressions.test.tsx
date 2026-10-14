@@ -42,8 +42,7 @@ const saved = (): HqRichMenuSeed => vi.mocked(host.onSave).mock.calls.at(-1)![0]
 const save = async () => { click('下書きを保存'); await waitFor(() => expect(host.onSave).toHaveBeenCalled()) }
 const selectArea = (letter: string) => fireEvent.focus(screen.getByRole('button', { name: new RegExp(`^面 ${letter}、`) }))
 const pickIntent = (name: string) => {
-  fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-  fireEvent.click(within(screen.getByRole('option', { name, exact: true })).getByRole('button'))
+  fireEvent.click(within(screen.getByRole('group', { name: '押したときの動き' })).getByRole('radio', { name, exact: true }))
 }
 
 describe('統括リッチメニューのオーナー指摘の回帰', () => {
