@@ -18,6 +18,16 @@ const definition: TagDefinition = {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括の V8 タグ編集と保存先', () => {
+  it('下書きを保存する入口があっても、続けて作る操作を同じ保存先へ渡す', async () => {
+    const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
+    const draft = vi.fn<(definition: TagDefinition) => Promise<void>>().mockResolvedValue(undefined)
+    render(<HqTagEditorV8 definition={definition} editing={false} saving={false} onCancel={() => {}} onSave={save} onSaveDraft={draft} />)
+    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    await waitFor(() => expect(save).toHaveBeenCalledOnce())
+    expect(save.mock.calls[0][1]).toBe(true)
+    expect(draft).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+  })
   it('店のAPIや遡及処理を呼ばず、名前・フォルダ・マイルを統括の保存へ渡す', async () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
     render(<HqTagEditorV8 definition={definition} editing saving={false} onCancel={() => {}} onSave={save} />)

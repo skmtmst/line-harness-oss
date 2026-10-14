@@ -5,7 +5,7 @@ export const formNameRequirement = requiredText('フォーム名を入力して�
 
 import Card from '@/components/shared/card'
 import { useRef, useState } from 'react'
-import { Sparkles, Link2 } from 'lucide-react'
+import { Sparkles, Link2, Store, Palette } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT, CUSTOMER_DESIGNS, DEFAULT_CUSTOMER_LOOK, resolveCustomerFormTheme, type CustomerLook,
   formThemeContrastError,
@@ -180,8 +180,8 @@ export function AppearanceTab(props: Props) {
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <RadioCardGroup legend="見た目の使い方" className={styles.designModes}>
-            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} title={props.portable?'配った先の店のデザインに合わせる':'店の設定に合わせる'} note={props.portable?'配った先で、その店の設定を使います':`今：${accountLabel}`} />
-            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
+            <RadioCard name="form-design-mode" value="account" icon={<Store aria-hidden="true" />} checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} title={props.portable?'配った先の店のデザインに合わせる':'店の設定に合わせる'} note={props.portable?'配った先で、その店の設定を使います':`今：${accountLabel}`} />
+            <RadioCard name="form-design-mode" value="fixed" icon={<Palette aria-hidden="true" />} checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
           </RadioCardGroup>
           {!props.portable ? <Link href="/settings/customer-look">店のデザインを変える ↗</Link> : mode === 'fixed' ? <p className={styles.cardNote}>このフォームは色を固定して配ります。配った先の店の設定より優先します。</p> : null}
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
