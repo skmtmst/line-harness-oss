@@ -941,7 +941,7 @@ export default function MenuFormV8() {
         previewLabel="お客さまの予約画面を見る"
         previewTitle="お客さまの予約画面"
         preview={previewContent}
-        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="お客さまの予約画面を見る">{previewContent}</PreviewLauncher>}
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
         help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} >
 
@@ -990,8 +990,7 @@ export default function MenuFormV8() {
                   options={categoryOptions}
                 /></SaveErrorField>
                 {categoryPicking && (
-                  <SaveErrorField names={["categoryNew","category_new"]}><input
-                    className={styles.input}
+                  <SaveErrorField names={["categoryNew","category_new"]}><TextField
                     type="text"
                     value={categoryNew}
                     onChange={(e) => setCategoryNew(e.target.value)}
@@ -1001,8 +1000,7 @@ export default function MenuFormV8() {
                 )}
               </Field>
             </SettingsFormRow>
-            <Field label="説明（お客さまに見えます）"><SaveErrorField names={["description"]}><input
-                className={styles.input}
+            <Field label="説明（お客さまに見えます）"><SaveErrorField names={["description"]}><TextField
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -1173,17 +1171,15 @@ export default function MenuFormV8() {
             <Card variant="form" padding="compact" gap="normal">
               <CardHeader size="stacked" headingLevel={3} title="受け方" />
               <div className={styles.fieldStack}>
-                <Field label="同時に受けられる件数"><span className={styles.unitField}>
+                <Field label="同時に受けられる件数">
                     <SaveErrorField names={["concurrentCapacity","concurrent_capacity"]}><NumberInput unit="件"
                       type="number"
                       min={1}
                       value={concurrentCapacity}
                       onChange={(e) => setConcurrentCapacity(e.target.value)}
                       aria-label="同時に受けられる件数"
-                    /></SaveErrorField>
-
-                  </span></Field>
-                <Field label="後の空き時間（片付け・移動）"><span className={styles.unitField}>
+                    /></SaveErrorField></Field>
+                <Field label="後の空き時間（片付け・移動）">
                     <SaveErrorField names={["bufferAfterMinutes","buffer_after_minutes"]}><NumberInput unit="分"
                       type="number"
                       min={0}
@@ -1200,8 +1196,6 @@ export default function MenuFormV8() {
                       aria-label="後の空き時間（分）"
                       aria-invalid={fieldErrors.buffer !== undefined}
                     /></SaveErrorField>
-
-                  </span>
 {fieldErrors.buffer !== undefined ? (
                     <span className={styles.fieldError} role="alert">{fieldErrors.buffer}</span>
                   ) : null}</Field>
@@ -1245,8 +1239,7 @@ export default function MenuFormV8() {
                 <span className={styles.toggleLineLabel}>予約するときに質問を出す</span>
               </div>
               {askQuestion && (
-                <Field label="質問文"><SaveErrorField names={["intakeQuestion","intake_question"]}><input
-                    className={styles.input}
+                <Field label="質問文"><SaveErrorField names={["intakeQuestion","intake_question"]}><TextField
                     type="text"
                     value={intakeQuestion}
                     onChange={(e) => setIntakeQuestion(e.target.value)}
