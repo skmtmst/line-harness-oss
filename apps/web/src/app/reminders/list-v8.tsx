@@ -1197,10 +1197,10 @@ export default function RemindersListV8() {
         )}
       </ConfirmDialog>
 
-      {/* 削除の窓（★V8 `VsSyu`）：幅600・上から260。危ない操作は左端、取消と「代わりに一時停止」は真ん中。 */}
+      {/* 削除の窓（★V8 `VsSyu`）。 */}
       <SheetDialog
         open={deleteTarget !== null}
-        designNode="VsSyu"
+        designNode="VsSyu" designWidth={480} designTop={260}
         title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
         band="削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。"
@@ -1213,7 +1213,7 @@ export default function RemindersListV8() {
           setDeleteError('')
         }}
         destructive={(
-          <Button variant="danger" onClick={() => void runDelete()} disabled={deleting || !deleteStillListed} busy={deleting} busyLabel="削除しています…">
+          <Button variant="danger" widthReserve="idle" onClick={() => void runDelete()} disabled={deleting || !deleteStillListed} busy={deleting} busyLabel="削除しています…">
             削除する
           </Button>
         )}

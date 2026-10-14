@@ -1,9 +1,13 @@
-export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false } = {}) {
+export function scanDialogAudit({ expectedWidth, expectedTop, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const rect = panel.getBoundingClientRect()
   const inventory = [{ kind: 'panel', width: rect.width, height: rect.height }]
   const findings = []
+  if (Number.isFinite(expectedTop)) {
+    inventory.push({ kind: 'dialog-top', actual: rect.top, expected: expectedTop })
+    if (Math.abs(rect.top - expectedTop) > 1) findings.push({ pattern: 'F6', kind: 'dialog-top', actual: rect.top, expected: expectedTop })
+  }
   if (pickerControls) {
     const search = panel.querySelector('input[type="search"]')?.parentElement
     if (!search) findings.push({ pattern: 'F4', kind: 'dialog-search-missing' })
