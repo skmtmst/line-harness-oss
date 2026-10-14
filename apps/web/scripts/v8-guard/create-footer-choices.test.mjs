@@ -1,8 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { build } from 'esbuild'
+import { createRequire } from 'node:module'
 import { connectGuardBrowser } from './browser-session.mjs'
+
+const require = createRequire(import.meta.url)
+const fromVitest = createRequire(require.resolve('vitest/package.json'))
+const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
 
 const webRoot = new URL('../..', import.meta.url).pathname
 const sheets = new Set()
@@ -39,6 +43,7 @@ const compiled = await build({
       sheets.add(css)
       return { contents: `export default ${JSON.stringify(names)}`, loader: 'js' }
     })
+    b.onLoad({ filter: /\.css$/ }, args => { sheets.add(readFileSync(args.path, 'utf8')); return { contents: '', loader: 'js' } })
   } }],
 })
 const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace(/@theme\s*\{/g, ':root {')

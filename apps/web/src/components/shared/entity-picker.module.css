@@ -158,7 +158,7 @@
 .fieldName { max-width: 100%; flex-shrink: 1; }
 /* eovoGの絞り込み：項目名と値を1行の本文として見せる。 */
 .field[data-value-prefix] .fieldName { font-size: var(--polish-text-body); font-weight: 400; line-height: var(--tpl-inbox-row-preview-lh); }
-.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-caption); color: var(--color-accent-deep); }
+.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-body); font-weight: 600; color: var(--color-accent-deep); }
 .fieldClear { position: relative; border: 0; background: none; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; }
 .fieldClear:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); }
 .fieldChips { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--tpl-picker-tiny-gap); padding-block: var(--tpl-picker-tiny-gap); pointer-events: none; }
