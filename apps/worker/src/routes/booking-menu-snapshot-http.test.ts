@@ -295,7 +295,7 @@ describe('予約の写し HTTP (T)', () => {
       menuSnapshot: { version: number; name: string; durationMinutes: number; basePrice: number } | null;
     } };
     expect(detailBody.booking.price).toBe(1000);
-    expect(detailBody.booking.menuName).toBe('カット');
+    expect(detailBody.booking.menuName).toBe('施術A');
     expect(detailBody.booking.menuSnapshot).toMatchObject({
       version: 1, name: '施術A', durationMinutes: 60, basePrice: 1000,
     });

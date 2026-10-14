@@ -20,6 +20,25 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
+it.each([
+  [4, 12, 'タグ 4 件', '分析 12 件'],
+  [0, 0, 'タグ 0 件', '分析 0 件'],
+  [null, null, 'タグ 未取得', '分析 未取得'],
+])('つなぎ先の補足でECの影響と全体の分析を区別し、再試行の場所を確認できる（%s/%s）', async (tags, analytics, tagLabel, analysisLabel) => {
+  const initial = await fx.read()
+  fx.read.mockResolvedValue({ ...initial, data: { ...initial.data, impact: { friendFields: tags, analytics } } })
+  render(<EcConnector accountId="account-a" />)
+  const destination = await screen.findByRole('link', { name: '→ NEN配信', exact: true })
+  const explanation = destination.closest('p')?.title
+  expect(explanation).toContain(tagLabel)
+  expect(explanation).toContain(analysisLabel)
+  expect(explanation).toContain('ECの出来事がきっかけ')
+  expect(explanation).toContain('アカウント全体')
+  expect(explanation).toContain('「取り込みの記録」タブで一件ずつ「もう一度やる」')
+  expect(destination.getAttribute('href')).toBe('/nen-campaigns')
+  expect(fx.save).not.toHaveBeenCalled()
+})
+
 it('入力不備は欄の赤枠と理由で知らせ、最初の欄へ移動する', async () => {
   render(<EcConnector accountId="account-a" />)
   const domain = await screen.findByLabelText('ショップのアドレス')

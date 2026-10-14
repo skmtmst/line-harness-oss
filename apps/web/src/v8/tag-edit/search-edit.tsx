@@ -1,4 +1,5 @@
 'use client'
+import ListState from '@/components/shared/list-state'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
@@ -793,7 +794,7 @@ export default function SavedSearchEditV8() {
   }
 
   if (loading) {
-    return <SaveErrorScope errors={saveErrors}><p className={styles.loading} role="status">読み込み中…</p></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="読み込み中…" /></SaveErrorScope>
   }
   if (!id) {
     return (

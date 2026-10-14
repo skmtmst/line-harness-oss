@@ -4,6 +4,9 @@
  */
 import { test, expect } from '@playwright/test'
 import scanLayoutDefects from '../../apps/web/scripts/v8-guard/layout-defects-browser.mjs'
+import { routeLocalApi } from './local-api.mjs'
+
+test.beforeEach(routeLocalApi)
 
 const base = process.env.VISUAL_QA_BASE ?? 'http://127.0.0.1:3101'
 if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(base).hostname)) throw new Error('処理中ボタンの試験はローカル画面専用です')
@@ -81,7 +84,8 @@ for (const width of [1152, 1440, 1920]) {
     })
     test('閲覧のみの人には変更操作を出さず、3幅で崩れない', async ({ page }, info) => {
       await page.route('**/api/staff/me', async (route) => {
-        const response = await route.fetch()
+        const url = new URL(route.request().url())
+        const response = await route.fetch({ url: `${fixtureApi}${url.pathname}${url.search}` })
         const json = await response.json()
         await route.fulfill({ json: { ...json, data: { ...json.data, role: 'viewer', readOnly: true } } })
       })

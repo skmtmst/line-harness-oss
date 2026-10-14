@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api, describeSaveFailure, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -35,6 +35,7 @@ function sumRefCounts(counts: TagDeleteImpactReferences, keys: Array<keyof TagDe
 
 export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
   const [confirmation, setConfirmation] = useState(initialConfirmation)
+  const confirmationId = useId()
   /*
    * 参照件数は `load()` で取った実値を出す。取れていないときは `—`。
    * 0件と書くと「消しても大丈夫」と読み違える。**取れていないあいだは
@@ -86,7 +87,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
         </dl>
       </div>
       <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
-      <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><SaveErrorField names={["confirmation"]}><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></SaveErrorField></label>
+      <div className="mt-5"><Field label={`確認のため「${tag.name}」と入力してください`} htmlFor={confirmationId} required><SaveErrorField names={["confirmation"]}><TextInput id={confirmationId} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} /></SaveErrorField></Field></div>
     </Dialog>
   )
 }

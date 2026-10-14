@@ -104,6 +104,23 @@ afterEach(() => {
 })
 
 describe('V8 流入リンクを作る', () => {
+  it('新しいフォルダは選ぶ窓で名前を決め、リンクを発行する時だけ同じ口へ保存する', async () => {
+    query.value = 'name=店頭POP&ref=shop-pop'
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: /新しいフォルダを作る/ }))
+    await flush()
+    fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '店頭' } })
+    fireEvent.click(screen.getByRole('button', { name: /作って選ぶ/ }))
+    await flush()
+    expect(posted).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
+    await flush()
+    expect(posted).toHaveLength(1)
+    expect(posted[0]).toMatchObject({ genre: '店頭', name: '店頭POP', lineAccountId: 'account-a' })
+  })
+
   it('題の説明を開閉しても、入力を保ち発行しない', async () => {
     await mount()
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '説明を読んでいる途中の入口' } })
