@@ -60,6 +60,7 @@ export function scanDialogAudit({ expectedWidth, expectedTop, fullForm = false, 
     const fixed = panel.querySelector('[data-fixed-display-name]')
     const selected = panel.querySelector('[data-presentation="columns"] [aria-label="選択した列"]')
     if (!fixed || !selected || !selected.contains(fixed)) findings.push({ pattern: 'F4', kind: 'display-fixed-name-missing' })
+    if (fixed && ![...fixed.querySelectorAll('svg.lucide-lock[role="img"][aria-label="いつも表示する列"]')].some(el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0)) findings.push({ pattern: 'F9', kind: 'display-fixed-lock-missing' })
     if (selected) {
       const css = getComputedStyle(selected)
       const framed = css.boxShadow !== 'none' || (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) || parseFloat(css.borderTopWidth) > 0

@@ -953,7 +953,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   ) : null
 
   const stopCard = stopTarget ? (
-    <Dialog open contentLayout="form" title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
+    <Dialog open contentLayout="form" description={stopImpactLoading
+          ? '利用先と影響を読み込んでいます。'
+          : stopImpact
+            ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
+            : '利用先と影響を読み込めませんでした。'} title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
           variant="primary"
@@ -966,13 +970,6 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         </Button>
       </DialogActions>}>
 
-      <p className={styles.stopDescription}>
-        {stopImpactLoading
-          ? '利用先と影響を読み込んでいます。'
-          : stopImpact
-            ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
-            : '利用先と影響を読み込めませんでした。'}
-      </p>
       <p>止めると、使っている配信・流入リンク・アフィリエイトでも、この成果地点では数えなくなります。</p>
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard

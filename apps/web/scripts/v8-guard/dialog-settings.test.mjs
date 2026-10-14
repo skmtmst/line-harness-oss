@@ -14,12 +14,15 @@ for (const width of [1152, 1440, 1920]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       await page.setContent(`<html data-theme="v8"><style>${globals}\n${columns}</style><div role="dialog" data-m1-scope>
         <div class="body" data-presentation="columns">
-          <section aria-label="選択した列" style="outline:1px solid var(--color-hairline)"><div data-fixed-display-name>友だち（名前）</div></section>
+          <section aria-label="選択した列" style="outline:1px solid var(--color-hairline)"><div data-fixed-display-name><svg class="lucide-lock" role="img" aria-label="いつも表示する列" width="16" height="16"><path d="M4 8h8v6H4z" /></svg>友だち（名前）</div></section>
           <div class="options" role="group" aria-label="基本の追加できる列"><label>電話</label><label>住所</label></div>
         </div><span data-score-delta="positive" style="color:var(--color-accent-deep)">+3</span><span data-score-delta="negative" style="color:var(--color-warning)">−5</span>
       </div></html>`)
       const scan = () => page.evaluate(scanDialogAudit, { columnSettings: true, scoreHistory: true })
       assert.equal((await scan()).findings.length, 0)
+      await page.getByRole('img', { name: 'いつも表示する列' }).evaluate(el => el.setAttribute('aria-label', '別の印'))
+      assert.equal((await scan()).findings.filter(row => row.kind === 'display-fixed-lock-missing').length, 1)
+      await page.locator('svg').evaluate(el => el.setAttribute('aria-label', 'いつも表示する列'))
       await page.locator('[data-fixed-display-name]').evaluate(el => el.removeAttribute('data-fixed-display-name'))
       assert.equal((await scan()).findings.filter(row => row.kind === 'display-fixed-name-missing').length, 1)
       await page.getByText('友だち（名前）').evaluate(el => el.setAttribute('data-fixed-display-name', ''))

@@ -31,6 +31,7 @@ test('開いている間に消された欄は、上限にも保存内容にも�
 test('列の固定名は選択数に含めず、上限の理由を選べない欄と保存操作から読める',()=>{
  const save=vi.fn();render(<DisplayItemsDialog presentation="columns" items={items} selected={['a','b']} maxSelected={2} onCancel={()=>{}} onConfirm={save}/>);
  expect(screen.getByText('友だち（名前）')).toBeTruthy();
+ expect(screen.getByRole('img',{name:'いつも表示する列'})).toBeTruthy();
  const candidate=screen.getByRole('checkbox',{name:'ペット'});
  const reason=document.getElementById(candidate.getAttribute('aria-describedby')!);
  expect(reason?.textContent).toContain('別の項目を外してから');
