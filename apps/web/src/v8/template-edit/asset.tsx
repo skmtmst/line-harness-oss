@@ -10,7 +10,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { GripVertical, Plus, Send, X } from 'lucide-react'
+import { GripVertical, Plus, Send, Trash2, X } from 'lucide-react'
 import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
@@ -614,17 +614,17 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
-                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><SettingCheckbox checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
-                    <button
+                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
+                    <Button
                       type="button"
-                      className={`${styles.insertChip} ${styles.questionRemove}`}
+                      variant="text" size="compact" icon={<Trash2 aria-hidden="true" />}
                       disabled={questions.length <= 1}
                       title={questions.length <= 1 ? '質問は1つ必要です' : `問 ${index + 1} を消す`}
                       aria-label={`問 ${index + 1} を消す`}
                       onClick={() => setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))}
                     >
                       消す
-                    </button>
+                    </Button>
                   </div>
                   <SettingsFormRow layout="columns">
                     <div className={styles.field}><Field label="質問文" htmlFor={`te-q-${question.key}`} requirement={fields.requirement(`q-${question.key}`)}><SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>

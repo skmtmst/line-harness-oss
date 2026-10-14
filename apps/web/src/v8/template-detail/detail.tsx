@@ -11,7 +11,7 @@ import { validateFlexContent } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageTitle } from '@/components/shell/page-chrome';
-import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { CreatePage } from '@/components/templates/create-page';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
@@ -647,20 +647,13 @@ export function ChangeBox({ title, before, after }: { title: string; before: str
   )
 }
 
-/**
- * 型の「作る」の頭（戻る・名前・説明）と左右の列。詳細には保存が無いので下の帯を置かない
- * （型の CreatePage は帯が必須で、帯があると本文が画面の高さで切られるため、枠と頭だけ型から使う）。
- */
+/** 本文と、同じ内容を窓でも読める右欄を型へ渡す。 */
 export function DetailFrame({ title, identity, description, preview, children }: {
   title: string; identity: ReactNode; description: string; preview: ReactNode; children: ReactNode
 }) {
   return (
-    <PageFrame kind="create">
-      <PageHeading title={title} identity={identity} help={description} />
-      <div className={styles.split}>
-        <div className={styles.content}>{children}</div>
-        <aside className={styles.aside}>{preview}</aside>
-      </div>
-    </PageFrame>
+    <CreatePage title={title} identity={identity} help={description} preview={preview} previewLabel="テンプレートの情報と届き方を見る" previewTitle="テンプレートの情報と届き方" footerActions={null}>
+      {children}
+    </CreatePage>
   )
 }
