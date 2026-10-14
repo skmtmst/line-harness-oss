@@ -145,7 +145,7 @@ describe('V8 テンプレートの通し', () => {
     await openPicker()
     await screen.findByText('どの種類を作りますか')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /^メッセージ / }))
+      fireEvent.click(screen.getByRole('link', { name: 'メッセージ', exact: true }))
     })
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/templates/edit'))
   })

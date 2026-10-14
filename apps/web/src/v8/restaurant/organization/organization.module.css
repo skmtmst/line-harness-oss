@@ -249,13 +249,7 @@
   box-shadow: var(--tpl-sb-line-top);
 }
 
-.stopActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--tpl-rt-chip-row-gap);
-  padding-top: var(--tpl-rt-dialog-gap);
-  box-shadow: var(--tpl-sb-line-top);
-}
+
 
 /* 狭い白い板では階層を開閉する段へ移し、表の名前と操作の幅を保つ。 */
 @container v8-page (width < 1100px) {

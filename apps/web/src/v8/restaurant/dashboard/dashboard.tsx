@@ -1,8 +1,9 @@
 'use client'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
-import { Armchair, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
+import { Armchair, CalendarCheck, Check, Phone, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import EntitySelect from '@/components/shared/entity-select'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -73,6 +74,7 @@ function TodayStore() {
   const d = useStoreToday(selectedAccountId)
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [walkInOpen, setWalkInOpen] = useState(false)
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [busyId, setBusyId] = useState('')
   const now = Date.now()
   const tables = useMemo(() => (d.snapshot?.tables ?? []).filter((t) => t.store_id === d.store?.id), [d.snapshot, d.store])
@@ -134,7 +136,7 @@ function TodayStore() {
 
   const actions = d.store ? (
     <><EntitySelect compact aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
-      <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button></>:null}
+      <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Phone size={16} aria-hidden="true" />電話予約</Button></>:null}
     </>
   ) : null
 
@@ -208,8 +210,9 @@ function TodayStore() {
             </Notice>
           </div>
         ) : null}
-        <DashboardRow
-          variant="restaurant" asideSize="restaurant"
+        <DashboardRow variant="restaurant">
+          <DetailColumns presentation="card" asideLabel="今日の回転・媒体・口コミを見る"
+          expanded={asideExpanded} onExpandedChange={setAsideExpanded}
           aside={<SidePanel rotation={d.rotation} media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
@@ -220,6 +223,7 @@ function TodayStore() {
             onVisited={(id) => void markVisited(id)}
             onUndo={(id) => void undoVisited(id)}
           />
+          </DetailColumns>
         </DashboardRow>
       </>
     )

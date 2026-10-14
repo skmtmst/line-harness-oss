@@ -10,6 +10,7 @@ import Notice from '@/components/shared/notice'
 import { SaveErrorField,SaveErrorScope } from '@/components/shared/save-form-errors'
 import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
 import { DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import TextLink from '@/components/shared/text-link'
@@ -188,7 +189,7 @@ export default function WebhooksSheetsV8() {
             ) : null}
             {groups.length > 0 ? (
               <>
-                <DataTable aria-label="同期の記録" density="records" columnSizing="content">
+                <DataTable aria-label="同期の記録" columnSizing="content">
                   <thead>
                     <TableHeadRow>
                   <Th>日時</Th>
@@ -202,7 +203,7 @@ export default function WebhooksSheetsV8() {
                   <Tr key={group.key}>
                     <Td>{shortDateTime(group.startedAt)}</Td>
                     <Td>{RUN_KIND_LABEL[group.kind] ?? group.kind}</Td>
-                    <Td grow title={group.parts.join('・')}>{group.parts.join('・') || emptyValue('unknown')}</Td>
+                    <Td grow title={group.parts.join('・')}><TruncatedText value={group.parts.join('・') || emptyValue('unknown')} /></Td>
                     <Td>
                       <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'running' ? 'neutral' : 'danger'}>{RUN_STATUS_LABEL[group.status] ?? group.status}</StatusBadge>
                     </Td>

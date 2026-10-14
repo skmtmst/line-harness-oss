@@ -63,7 +63,7 @@ import type { TemplateEditHost } from '@/v8/template-edit/host'
 import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
-import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
+import MessageComposer from '@/components/shared/message-composer'
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Field } from '@/components/shared/form-controls'
@@ -846,7 +846,7 @@ export default function HqBroadcastCreate() {
 
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
-      <MessageComposerPage active={step === 'message'}><CreatePage boardId="BBRDb" dirty={false}
+      <CreatePage boardId="BBRDb" dirty={false}
         footerActions={(
           <>
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
@@ -1180,7 +1180,7 @@ export default function HqBroadcastCreate() {
               </div>
             ) : null}
         {inlineEditor}
-    </CreatePage></MessageComposerPage>
+    </CreatePage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

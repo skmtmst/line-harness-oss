@@ -47,6 +47,7 @@ describe('V8 ランクの幅と行の操作', () => {
  fireEvent.click(screen.getByRole('button', { name:'ランク「ゴールド」のその他操作' }))
  fireEvent.click(screen.getByRole('menuitem', { name:'ランクを削除する' }))
  expect(screen.getByRole('alertdialog').textContent).toContain('ゴールド')
+ expect(screen.getByRole('alertdialog').querySelector('[data-required-badge]')?.textContent).toBe('必須')
  expect(screen.getByLabelText('ランク名 1')).toHaveProperty('value','ゴールド')
  expect(m.deleteRank).not.toHaveBeenCalled()
  fireEvent.click(screen.getByRole('button', { name:'削除する' }))

@@ -2,10 +2,20 @@
 import React, { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
+import { EntityPickerDialog, EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
 // @vitest-environment happy-dom
 
 afterEach(cleanup)
+
+it('単一候補の確定を止める理由を示し、選ぶだけでは反映しない', () => {
+  const confirm = vi.fn()
+  render(<EntityPickerDialog title="テンプレートを選ぶ" items={[{ id: 'a', name: '返信' }]} onCancel={() => {}} onConfirm={confirm} />)
+  expect(screen.getByRole('button', { name: '選ぶ' }).title).toContain('候補を選んで')
+  fireEvent.click(screen.getByRole('radio', { name: '返信' }))
+  expect(confirm).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+  expect(confirm).toHaveBeenCalledWith('a')
+})
 
 const folders = [{ id: 'f1', name: 'アンケート', color: '#3b82f6' }, { id: 'f2', name: '予約の前', color: '#22c55e' }]
 const items: EntityPickerItem[] = [

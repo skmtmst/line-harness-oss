@@ -132,11 +132,12 @@ async function selectPhoto(index: number) {
 
 /** B-245: read the actual explanation opened from the shared help button. */
 async function averageTimeValue(): Promise<string | undefined> {
-  const button = host.querySelector<HTMLButtonElement>('button[aria-label="審査待ちの説明"]')
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="投稿の説明"]')
   if (!button) return undefined
   if (button.getAttribute('aria-expanded') !== 'true') await act(async () => { button.click() })
   const tip = document.getElementById(button.getAttribute('aria-describedby') ?? '')
-  return tip?.textContent?.split('投稿から審査までの日数：')[1]?.trim()
+  const pending = tip?.querySelector('strong')?.nextElementSibling
+  return pending?.textContent?.split('投稿から審査までの日数：')[1]?.trim()
 }
 
 describe('「投稿から審査までの日数」の読みやすい単位（Issue #666）', () => {

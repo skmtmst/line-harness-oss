@@ -6,9 +6,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import { EntityMultiSelect } from '@/components/shared/entity-picker'
-import { toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
-import SearchField from '@/components/shared/search-field'
+import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
 import Dialog from '@/components/shared/dialog'
 import { Field as FormField, FieldError } from '@/components/shared/form-controls'
 import { focusFieldById } from '@/lib/use-form-errors'
@@ -118,8 +116,6 @@ export default function MemberDialogV8({
   const uid = useId()
   const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
   const [localError, setLocalError] = useState('')
-  const [scopeQuery, setScopeQuery] = useState('')
-  const accountFolders = useHqAccountFolders(open)
   /* 板 `ukPgd`：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string; assigned?: string }>({})
 
@@ -187,7 +183,7 @@ export default function MemberDialogV8({
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={submit} disabled={busy || Boolean(fieldErrors.name || fieldErrors.email)} busy={busy} busyLabel="処理中…">
             {member ? null : <Send aria-hidden="true" className={styles.icon} />}
-            {member ? '変更を保存' : '招待メールを送る'}
+            {member ? '変更を保存する' : '招待メールを送る'}
           </Button>
         </div>
       }
@@ -236,14 +232,11 @@ export default function MemberDialogV8({
             <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio></SaveErrorField>
           </div>
           {value.accountScope === 'accounts' ? (
-            <div id={`${uid}-scope`} className={styles.checks} role="group" aria-label="担当するアカウント" aria-describedby={fieldErrors.scope ? `${uid}-scope-error` : undefined}>
-              {scopeAccounts.length === 0 ? <p className={styles.note}>アカウントがまだありません。</p> : (
-                /* 選ぶ窓（dJZ7Q）のまとめて選ぶ中身を、この窓の中に埋め込む。 */
-                <EntityMultiSelect embedded items={toHqAccountItems(scopeAccounts, accountFolders)} folders={toPickerFolders(accountFolders.folders)} foldersFailed={accountFolders.failed}
-                  selected={value.scopedLineAccountIds} onChange={(ids) => set('scopedLineAccountIds', ids)} query={scopeQuery} busy={busy} listLabel="担当するアカウント"
-                  searchSlot={<SearchField aria-label="担当するアカウントを探す" placeholder="名前で探す" value={scopeQuery} onChange={setScopeQuery} onClear={() => setScopeQuery('')} />} />
-              )}
-            </div>
+            <SaveErrorField names={["scopedLineAccountIds", "value.scopedLineAccountIds"]}>
+              <HqAccountPickerField label="担当アカウント" accounts={scopeAccounts} value={value.scopedLineAccountIds}
+                id={`${uid}-scope`} onChange={(ids) => set('scopedLineAccountIds', ids)} disabled={busy}
+                invalid={Boolean(fieldErrors.scope)} describedBy={fieldErrors.scope ? `${uid}-scope-error` : undefined} />
+            </SaveErrorField>
           ) : (
             <p className={styles.note}>統括のすべてのアカウントを見て操作できます。</p>
           )}

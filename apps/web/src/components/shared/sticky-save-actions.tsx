@@ -20,13 +20,13 @@ function withoutDecorations(node: ReactNode): ReactNode {
   return cloneElement(node, {}, withoutDecorations(node.props.children))
 }
 
-/** The idle primary save/create/publish action has one mark across forms. */
+/** Reserve the save mark by default; an explicit role mark takes precedence. */
 export function normalizeStickySaveActions(node: ReactNode): ReactNode {
   if (Array.isArray(node)) return Children.map(node, normalizeStickySaveActions)
-  if (!isValidElement<ActionChildren & { variant?: string; href?: unknown }>(node)) return node
+  if (!isValidElement<ActionChildren & { variant?: string; href?: unknown; icon?: ReactNode }>(node)) return node
   if (node.type === Button && node.props.variant === 'primary' && node.props.href === undefined
     && /(保存|登録|作る|つくって|動かす|変更|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children))) {
-    return cloneElement(node, {}, <><Save size={16} aria-hidden="true" data-sticky-save-icon />{withoutDecorations(node.props.children)}</>)
+    return cloneElement(node, {}, <>{node.props.icon === undefined ? <Save size={16} aria-hidden="true" data-sticky-save-icon /> : null}{withoutDecorations(node.props.children)}</>)
   }
   if (node.props.children === undefined) return node
   const children = normalizeStickySaveActions(node.props.children)

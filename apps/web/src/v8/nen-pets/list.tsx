@@ -20,7 +20,6 @@ import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, type PetsQuery }
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
@@ -99,14 +98,14 @@ export default function PetsListV8({
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
         /></SaveErrorField>
-        <SaveErrorField names={["product","query.product"]}><EntitySelect
+        <SaveErrorField names={["product","query.product"]}><Select
           aria-label="主食で絞り込む"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}
           options={[
             { value: '', label: '主食：すべて' },
-            ...(data?.products ?? []).map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: `主食：${p.name}` })),
+            ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
         /></SaveErrorField>

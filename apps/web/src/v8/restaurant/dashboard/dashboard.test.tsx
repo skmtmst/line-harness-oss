@@ -101,3 +101,20 @@ it.each(['today','tasks','media-links','channels'])('B-241 dashboard %s read fai
  fireEvent.click(container.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('お店の情報を読み込めませんでした')).toBeNull())
 })
+
+ it('補助欄を同じ内容のまま開閉でき、電話予約の入口を保つ', async () => {
+  render(<RestaurantDashboardV8 />)
+  await screen.findByText('鈴木 美咲')
+  const toggle = screen.getByRole('button', { name: '今日の回転・媒体・口コミを見る' })
+  const aside = document.getElementById(toggle.getAttribute('aria-controls')!)!
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(aside.textContent).toContain('今日の回転')
+  expect(aside.textContent).toContain('Google の口コミ')
+  fireEvent.click(toggle)
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(aside.getAttribute('data-expanded')).toBe('true')
+  fireEvent.click(toggle)
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(aside.hasAttribute('data-expanded')).toBe(false)
+  expect(screen.getByRole('button', { name: '電話予約' }).querySelector('svg')?.classList.contains('lucide-phone')).toBe(true)
+ })

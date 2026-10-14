@@ -234,7 +234,7 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
     await openEditor()
     await screen.findByText('席A')
-    fireEvent.click(screen.getByRole('button', { name: '席A' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '席A' }))
     fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
     const saveButton = screen.getByRole('button', { name: '設備の割当を保存する' })
     // 同じ描画中に2イベントを届け、disabledへの再描画ではなくuseRefの
@@ -287,7 +287,7 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     await openEditor()
     expect(await screen.findByText('設備の割当は閲覧のみです。変更は管理者へ依頼してください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '設備の割当を保存する' })).toBeNull()
-    expect((screen.getByRole('button', { name: '個室A' }) as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByRole('checkbox', { name: '個室A' }) as HTMLInputElement).disabled).toBe(true)
   })
 
   test.each(['', '0', '-1', '1.5', '1001'])('必要数%sは送信せず、入力を残す', async (value) => {
@@ -348,7 +348,7 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     await openEditor(target)
     const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
     expect((quantity as HTMLInputElement).disabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: '個室A（停止中）' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '個室A（停止中）' }))
     expect(screen.queryByRole('spinbutton', { name: '個室Aの必要数' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
     await waitFor(() => expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', { expectedVersion: 1, resources: [] }))

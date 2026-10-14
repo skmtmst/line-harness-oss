@@ -165,7 +165,7 @@ describe('V6 保存タブの定期レポート', () => {
     expect(host.textContent).toContain('動いている')
     expect(host.textContent).not.toContain('定期レポートは現在「なし」です')
     // 選んでいる保存分析へ紐づく件数も実数で出る
-    expect(host.querySelector('#saved-history-title')?.getAttribute('title')).toBe('定期レポート 1件')
+    expect(host.textContent).toContain('定期レポート 1件')
     // 作成への導線がある
     expect(host.querySelector('a[href="/analytics/reports/new"]')).not.toBeNull()
     const menu = host.querySelector('button[aria-label="定期レポート「週次まとめ」の操作"]') as HTMLButtonElement

@@ -8,6 +8,7 @@ import { api, describeSaveFailure } from '@/lib/api'
 import type { AutoReplyConflict, AutoReplyDraftInput } from '@line-crm/shared'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { requiredText } from '@/lib/form-requirement'
 import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
 import { Field } from '@/components/shared/form-controls'
@@ -30,9 +31,8 @@ function validateKeywords(keywords: string[]): string | null {
   return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください'
 }
 
-function validateReply(reply: string): string | null {
-  return reply.trim() ? null : '返す内容を入力してください'
-}
+const replyRequirement = requiredText('返す内容を入力してください')
+const validateReply = replyRequirement.check
 
 function overlapNames(conflicts: AutoReplyConflict[]): string {
   const names = conflicts.map((conflict) => conflict.name).filter(Boolean)
@@ -285,7 +285,7 @@ export default function QuickCreateV8({
           </div>
           {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
-        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply"><SaveErrorField names={["reply"]}><textarea
+        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply" requirement={replyRequirement}><SaveErrorField names={["reply"]}><textarea
             id="quick-create-reply"
             value={reply}
             onChange={(event) => {

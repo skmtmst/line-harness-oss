@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Unlink } from 'lucide-react'
+import { Pencil, Unlink } from 'lucide-react'
 import { formatDateTime, formatDate as polishFormatDate } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -80,7 +80,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
       <PageContent><DetailColumns asideLabel="使っている値" expanded={valuesExpanded} onExpandedChange={setValuesExpanded} aside={
         <div className={styles.rail}>
           {canManage ? (
-            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile">使う値を直す</Button>
+            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile"><Pencil aria-hidden="true" />使う値を編集する</Button>
           ) : null}
           <section className={styles.valuesCard} aria-labelledby="mp-values">
             <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>

@@ -54,7 +54,7 @@ import { CreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
-import StatusBadge from '@/components/shared/status-badge'
+import { CreateCompletionHeading } from '@/components/templates/create-parts'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -1042,8 +1042,8 @@ export function TargetStageV8({
           >
             <RefreshCw size={15} aria-hidden="true" />数え直す
           </Button>
-          <span className={styles.countNote}>数秒〜1分（1,000人ごとに約10秒）</span>
         </div>
+        <p className={styles.countNote}>数秒〜1分（1,000人ごとに約10秒）</p>
         {recountError ? <p className={styles.fieldNote}>対象者を数え直せませんでした。保存済みの人数を表示しています。</p> : null}
         {validationFailed ? <p className={styles.fieldNote}>公開前チェックを実行できませんでした。人数は未取得のままです。</p> : null}
         <p className={styles.cardNote}>基準日が登録・変更されたときに、対象かどうかを自動で見直します。</p>
@@ -1839,10 +1839,9 @@ export function DoneStageV8({
       <PageHeading {...heading} />
       <div className={styles.doneBody}>
         <Card variant="form" className={styles.doneCard}>
-          <StatusBadge tone="success" dot={false}><Check size={16} aria-hidden="true" />有効</StatusBadge>
-          <CardHeader size="stacked" title={`「${settings.name}」を有効にしました`} meta={
-            <>これから{settings.triggerType === 'friend_field' ? '基準日が入った人' : '予約が入った人'}にも、自動で予定が作られます。止めたいときは、詳細の「一時停止する」から止められます。</>
-          } />
+          <CreateCompletionHeading icon={<Check />} title={`「${settings.name}」を有効にしました`}>
+            これから{settings.triggerType === 'friend_field' ? '基準日が入った人' : '予約が入った人'}にも、自動で予定が作られます。止めたいときは、詳細の「一時停止する」から止められます。
+          </CreateCompletionHeading>
           <dl className={styles.doneFacts}>
             <div className={styles.doneFact}>
               <dt>最初に送る</dt>

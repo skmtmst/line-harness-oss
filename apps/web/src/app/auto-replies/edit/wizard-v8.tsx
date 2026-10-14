@@ -14,8 +14,8 @@ import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowLeft,
+  ArrowRight,
   Check,
-  ChevronRight,
   CircleAlert,
   Play,
   Power,
@@ -27,7 +27,7 @@ import {
   CircleCheck,
   ArrowUp,
   ArrowUpToLine,
-  TextQuote,
+  TextSearch,
   MessagesSquare,
   Users,
   ListFilter,
@@ -1540,8 +1540,7 @@ function AutoReplyWizardV8Inner() {
                 busy={saving}
                 busyLabel="進んでいます…"
               >
-                <ChevronRight size={14} aria-hidden="true" />
-                次へ：{STEP_LABELS_V8[STEP_ORDER[STEP_ORDER.indexOf(step) + 1]]}
+                <ArrowRight size={16} aria-hidden="true" />次へ：{STEP_LABELS_V8[STEP_ORDER[STEP_ORDER.indexOf(step) + 1]]}
               </Button>
             ) : (
               <Button
@@ -1647,7 +1646,7 @@ function AutoReplyWizardV8Inner() {
                     checked={!form.respondToAll}
                     onChange={() => patch({ respondToAll: false })}
                     title="言葉で反応する"
-                    icon={<TextQuote size={16} />}
+                    icon={<TextSearch size={16} />}
                     note="決めた言葉が入っていたら返す"
                   />
                   <RadioCard

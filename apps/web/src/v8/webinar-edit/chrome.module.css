@@ -17,34 +17,3 @@
 .tabsRow {
   padding: 0 var(--tpl-head-pad-side);
 }
-.tabs {
-  display: flex;
-  gap: var(--tpl-wc-tab-gap);
-  border-bottom: 1px solid var(--color-hairline);
-}
-.tab {
-  min-height: 0;
-  margin-bottom: -1px;
-  padding: 0 0 var(--tpl-wc-tab-pad-bottom);
-  border: 0;
-  border-bottom: var(--tpl-wc-tab-line) solid transparent;
-  background: none;
-  color: var(--color-ink-secondary);
-  font: inherit;
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-wc-tab-lh);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.tab:hover { color: var(--color-ink); }
-.tab[data-selected] {
-  border-bottom-color: var(--color-ink);
-  color: var(--color-ink);
-  font-weight: 600;
-  cursor: default;
-}
-.tab:focus-visible {
-  outline: var(--tpl-wc-tab-line) solid var(--color-status-info);
-  outline-offset: var(--tpl-wc-tab-line);
-}

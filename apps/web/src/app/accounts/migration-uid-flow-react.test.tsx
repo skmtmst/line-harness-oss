@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
+import UidMigrationV8 from '@/v8/friends/migrations/uid'
 
 /**
  * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
@@ -204,6 +205,32 @@ function openDialog(): HTMLElement {
 }
 
 const writes = () => net.calls.filter((call) => call.method !== 'GET')
+
+describe('完了した移行履歴の表示と操作', () => {
+  it('完了履歴に選択面を付けず、現在の履歴と切り戻しの確認を残す', async () => {
+    net.runs = [runFixture({ status: 'completed', rollbackable: true })]
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    const history = host.querySelector('[aria-labelledby="uid-history"]')!
+    const current = history.querySelector('button[aria-current="true"]')!
+    expect(current).not.toBeNull()
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBeNull()
+    expect(host.textContent).toContain('照合の結果')
+    fireEvent.click(buttonByText('切り戻す', history))
+    await flush()
+    expect(openDialog().textContent).toContain('切り戻す')
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('判断中の履歴には選択面を保つ', async () => {
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    const current = host.querySelector('[aria-labelledby="uid-history"] button[aria-current="true"]')!
+    expect(current).not.toBeNull()
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBe('true')
+    expect(writes()).toHaveLength(0)
+  })
+})
 
 describe('UID移行の詳細確認（FRIEND-14）', () => {
   it('「開く」は読み取り専用で、更新APIを呼ばない', async () => {

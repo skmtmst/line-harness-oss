@@ -38,7 +38,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -1442,8 +1442,7 @@ export default function FormsListV8() {
         busy={deleting || deleteImpactLoading}
         onCancel={closeDelete}
         footer={(
-          <div className={styles.dialogActions}>
-            <span className={styles.dialogActionsSide}>
+          <DialogActions leadingAction={
               <Button
                 type="button"
                 variant="danger"
@@ -1453,7 +1452,7 @@ export default function FormsListV8() {
               >
                 削除する
               </Button>
-            </span>
+          }>
             <Button type="button" variant="secondary" disabled={deleting || deleteImpactLoading} onClick={closeDelete}>
               キャンセル
             </Button>
@@ -1468,8 +1467,7 @@ export default function FormsListV8() {
               <Archive size={15} aria-hidden="true" />
               アーカイブする
             </Button>
-            <span className={styles.dialogActionsSide} aria-hidden="true" />
-          </div>
+          </DialogActions>
         )}
       >
         {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}

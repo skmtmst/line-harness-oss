@@ -86,7 +86,7 @@ describe('DEEP-16: 担当設定だけが失敗したあとの再実行', () => {
     m.getMatrix.mockRejectedValueOnce(new Error('network'))
     render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
@@ -129,8 +129,8 @@ describe('DEEP-16: 担当設定だけが失敗したあとの再実行', () => {
     })
     render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByRole('button', { name: '担当1' }))
-    fireEvent.click(screen.getByRole('button', { name: '担当2' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当1' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当2' }))
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
@@ -154,15 +154,15 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
   it('切替後に前アカウントの担当へ割当を送らない', async () => {
     const v = render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
 
     m.account = 'B'
     await act(async () => { v.rerender(<Page />) })
     await flush()
 
     // 前アカウントの担当は候補にも選択にも残らない。
-    expect(screen.queryByRole('button', { name: '担当A' })).toBeNull()
-    expect(screen.getByRole('button', { name: '担当B' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByRole('checkbox', { name: '担当A' })).toBeNull()
+    expect((screen.getByRole('checkbox', { name: '担当B' }) as HTMLInputElement).checked).toBe(false)
 
     // 未選択のまま押しても作らない（0人のメニューを出さない）。
     await act(async () => {
@@ -172,7 +172,7 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
     expect(m.create).not.toHaveBeenCalled()
 
     // 切替先の担当を選んでから作る。割当は B の担当にだけ行く。
-    fireEvent.click(screen.getByRole('button', { name: '担当B' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当B' }))
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
@@ -217,7 +217,7 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
     m.create.mockRejectedValueOnce(new Error('network'))
     render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
@@ -241,7 +241,7 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
   it('アカウントを切り替えるとキーは替わる', async () => {
     const v = render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当A' }))
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
@@ -251,7 +251,7 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
     m.account = 'B'
     await act(async () => { v.rerender(<Page />) })
     await flush()
-    fireEvent.click(screen.getByRole('button', { name: '担当B' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '担当B' }))
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
@@ -282,7 +282,7 @@ describe('R536: 担当候補の取得失敗は画面内で取り直せる', () =
     })
 
     // 取り直せたので候補が出る。入力は保たれている。
-    expect(screen.getByRole('button', { name: '担当A' })).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: '担当A' })).toBeTruthy()
     expect(
       (screen.getByPlaceholderText('例：トリミング（小型犬）') as HTMLInputElement).value,
     ).toBe('検証メニュー')

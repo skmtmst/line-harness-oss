@@ -195,6 +195,15 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
         }))) add('F6', el, 'toolbar trailing text overlaps another control')
       }
     }
+    for (const row of all('[class*="recentRow"]')) {
+      const action = [...row.querySelectorAll('button')].find(el => visible(el) && el.textContent.trim() === '複製する')
+      const metadata = action?.previousElementSibling
+      if (!action || !visible(metadata)) continue
+      const button = action.getBoundingClientRect()
+      const touches = textRects(metadata).some(text => Math.min(text.bottom, button.bottom) > Math.max(text.top, button.top)
+        && text.right >= button.left && text.left < button.right)
+      if (touches) add('F6', metadata, 'recent broadcast metadata touches or overlaps the duplicate action')
+    }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const cell of all('[data-list-action-cell]')) {
       const tools = [...cell.querySelectorAll('button,a[role="button"]')].filter(visible)
