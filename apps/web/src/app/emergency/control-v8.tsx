@@ -12,7 +12,7 @@ import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
@@ -394,7 +394,7 @@ const EmergencyControlV8 = (
 
   /** 確認の窓の足（右寄せの2ボタン）。2段に書くと直書き扱いが増えるので1つにまとめる。 */
   const ConfirmActions = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+    <DialogActions>{children}</DialogActions>
   )
 
   const runStop = async (code: string) => {
@@ -747,7 +747,7 @@ const EmergencyControlV8 = (
         open={confirmMode !== null}
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
-        tone="default" contentLayout="form"
+        tone="default" contentLayout="form" confirmation
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
           ? '止める前に、何と何人に関わるかを実測で確かめました。'
@@ -762,7 +762,7 @@ const EmergencyControlV8 = (
               type="button"
               variant="danger"
               onClick={() => void runStop(stepUpMethod === 'password' ? stopPassword : stopCode)}
-              disabled={!canRunStop}
+              disabled={!canRunStop} title={mutationLocked || running ? '処理中です。' : !canRunStop ? '止める理由、確認の言葉、本人確認を入力してください。' : undefined}
             >
               緊急停止する
             </Button>
@@ -776,7 +776,7 @@ const EmergencyControlV8 = (
               type="button"
               variant="danger"
               onClick={proceedToStepUp}
-              disabled={mutationLocked || confirmWord !== '復旧'}
+              disabled={mutationLocked || confirmWord !== '復旧'} title={mutationLocked ? '処理中です。' : confirmWord !== '復旧' ? '確認の言葉に「復旧」と入力してください。' : undefined}
             >
               復旧を実行する
             </Button>
@@ -807,11 +807,7 @@ const EmergencyControlV8 = (
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
                 /></SaveErrorField></Field></div>
-              <div className={styles.detailBlock}>
-                <div className={styles.detailHead}>
-                  <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
-                  <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
-                </div>
+              <DialogFormRow><Field label="補足" htmlFor="emergency-detail-v8" optional note={`あと${1000 - reasonDetail.length}文字`}>
                 <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
                   id="emergency-detail-v8"
                   value={reasonDetail}
@@ -822,7 +818,7 @@ const EmergencyControlV8 = (
                   placeholder="発生していることを短く入力"
                   className={styles.detailTextarea}
                 /></SaveErrorField>
-              </div>
+              </Field></DialogFormRow>
               <p className={styles.dialogHint}>停止前にすでに LINE へ渡したものは取り消せません。</p>
             </>
           ) : (
