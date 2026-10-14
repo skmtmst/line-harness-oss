@@ -1,6 +1,6 @@
 'use client'
 import FolderSelect from '@/components/shared/folder-select'
-import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
+import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageCircle, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
 import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
@@ -11,8 +11,8 @@ import { RowNameLink } from '@/components/shared/table';
 
 
 
-
 import SharedStatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state';
 import { useFeatureAccess } from '@/lib/use-feature-access';
@@ -993,7 +993,7 @@ export default function AutoRepliesListV8() {
     {
       key: 'monthly',
       title: '今月の応答',
-      icon: MessageSquare,
+      icon: MessageCircle,
       value: ready ? (monthlyHits === null ? null : monthlyHits) : null,
       unit: '回',
       detail: ready
@@ -1224,7 +1224,7 @@ export default function AutoRepliesListV8() {
                             setPage(1)
                           }}
                         >
-                          <span>{`重なり ${conflicts}`}</span>
+                          <StatusBadge tone="warning">{`重なり ${conflicts}`}</StatusBadge>
                         </button>
                       )}
                     {!r.isActive && r.stopReason && (
