@@ -134,12 +134,13 @@ const values = {
 } as unknown as TagEditorValues
 
 describe('/tags/edit の主な状態', () => {
-  it('読み込み中は読み込み中と出す', () => {
+  it('読み込み中は読み込み中と出す', async () => {
     apiCalls.definition.mockReturnValue(new Promise(() => {}))
     apiCalls.dependencies.mockReturnValue(new Promise(() => {}))
     apiCalls.listGroups.mockReturnValue(new Promise(() => {}))
     render(<Page />)
-    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    const loading = await screen.findByLabelText('読み込み中…')
+    expect(loading.getAttribute('aria-busy')).toBe('true')
   })
 
   it('id が無いときは一覧へ戻す案内を出す', async () => {

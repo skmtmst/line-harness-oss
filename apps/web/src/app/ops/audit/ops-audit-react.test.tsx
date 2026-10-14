@@ -61,6 +61,13 @@ async function flush() {
 }
 
 describe('日付範囲の折返し（R158）', () => {
+  it('理由の全文にIPと公開範囲を添え、脚注で全件数と表示範囲を確認できる', async () => {
+    await act(async () => { root.render(<OpsAuditPage />) })
+    await flush()
+    const titles = [...host.querySelectorAll<HTMLElement>('[title]')].map(node => node.title)
+    expect(titles).toContain('テスト・IP 203.0.113.1・運営のみ')
+    expect(titles).toContain('120件中 1〜50件を表示')
+  })
   it('開始・終了の欄はV8の折返す道具の段で幅を守る', async () => {
     await act(async () => { root.render(<OpsAuditPage />) })
     await flush()

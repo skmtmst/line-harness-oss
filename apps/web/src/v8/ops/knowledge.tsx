@@ -124,7 +124,7 @@ export default function OpsKnowledgeV8() {
             <SaveErrorField names={["kind"]}><Select aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} /></SaveErrorField>
           </div>
           <div className={styles.select}>
-            <SaveErrorField names={["state"]}><Select aria-label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} /></SaveErrorField>
+            <SaveErrorField names={["state"]}><Select aria-label="状態" label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: 'すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} /></SaveErrorField>
           </div>
           <div className={styles.select}>
             <SaveErrorField names={["articleKind","article_kind"]}><Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} /></SaveErrorField>
