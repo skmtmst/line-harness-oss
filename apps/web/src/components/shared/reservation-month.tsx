@@ -8,10 +8,11 @@ import { ListFolderContext } from './list-folder-context'
 import styles from './reservation-board.module.css'
 
 /** 月の予約名も、共通の一行表示と全文の吹き出しで読む。 */
-export default function ReservationMonth({ month, entries, onOpen }: {
+export default function ReservationMonth({ month, entries, onOpen, readableNames = false }: {
   month: string
   entries: ReservationBoardEntry[]
   onOpen: (id: string) => void
+  readableNames?: boolean
 }) {
   const first = new Date(month + '-01T00:00:00Z')
   const count = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
@@ -23,6 +24,7 @@ export default function ReservationMonth({ month, entries, onOpen }: {
         new Date(Date.parse(entry.startsAt) + 9 * 3600000).toISOString().slice(0, 10) === date,
       ).map(entry => {
         const label = `${formatDate(entry.startsAt, { style: 'time' })} ${entry.customerName}`
+        if (!readableNames) return <Button presentation="restaurant" key={entry.id} onClick={() => onOpen(entry.id)}>{label}</Button>
         return <Button presentation="restaurant" fullWidth key={entry.id} aria-label={label} title={label} onClick={() => onOpen(entry.id)}>
           <FolderDotName>{label}</FolderDotName>
         </Button>

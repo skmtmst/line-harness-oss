@@ -14,7 +14,7 @@ it('JSTの翌日に置き、長い名前を全文確認して同じ予約を開�
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(300)
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
   const open = vi.fn()
-  render(<ReservationMonth month="2028-02" entries={[entry]} onOpen={open} />)
+  render(<ReservationMonth month="2028-02" entries={[entry]} onOpen={open} readableNames />)
   const label = `00:30 ${entry.customerName}`
   const button = screen.getByRole('button', { name: label })
   expect(button.parentElement?.querySelector('strong')?.textContent).toBe('29日')
@@ -26,6 +26,17 @@ it('JSTの翌日に置き、長い名前を全文確認して同じ予約を開�
   expect(open).toHaveBeenCalledWith(entry.id)
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(screen.queryByRole('tooltip')).toBeNull()
+})
+
+it('指定しない月は以前の名前操作の形と行き先を保つ', () => {
+  const open = vi.fn()
+  render(<ReservationMonth month="2028-02" entries={[entry]} onOpen={open} />)
+  const button = screen.getByRole('button', { name: `00:30 ${entry.customerName}` })
+  expect(button.querySelector('[data-list-name]')).toBeNull()
+  expect(button.hasAttribute('data-full-width')).toBe(false)
+  expect(button.hasAttribute('title')).toBe(false)
+  fireEvent.click(button)
+  expect(open).toHaveBeenCalledWith(entry.id)
 })
 
 it('対象外の月の予約は描かず、閏年でない2月は28日まで', () => {
