@@ -528,7 +528,7 @@ function FriendAddList() {
     { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} />, onSelect: () => router.push(runsHref(rule.id)) },
     ...locked({ id: 'test', label: 'テストを送る', icon: <Send size={15} />, onSelect: () => router.push(testHref(rule.id)) }),
     ...(rule.isFallback
-      ? locked({ id: 'stop-fallback', label: '止める', icon: <Pause size={15} />, onSelect: () => setFallbackStop(true) })
+      ? locked({ id: 'stop-fallback', label: '止められない理由を見る', icon: <Pause size={15} />, onSelect: () => setFallbackStop(true) })
       : [
           ...(rule.status === 'published'
             ? locked({

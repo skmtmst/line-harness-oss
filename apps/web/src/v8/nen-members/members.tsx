@@ -101,6 +101,7 @@ export default function MembersV8({
       skeleton
       boardId={BOARD_NODE[tab]}
       title="会員"
+      explanation="会員はネットショップで登録した人です。LINE と結びつくと、ランクやペットに合わせた配信ができます。ランクは通年の購入額で決まり、翌年の12月末まで維持されます。"
       help="ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。"
       actions={accountId ? <CsvExportButton accountId={accountId} /> : null}
       tabs={tabs}

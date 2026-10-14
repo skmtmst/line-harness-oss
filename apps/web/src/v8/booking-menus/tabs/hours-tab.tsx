@@ -664,7 +664,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       </div>
       <div className={styles.checkAction}>
         {/* 絵 yRPxl：虫めがね付きの白いボタン */}
-        <Button variant="secondary" onClick={() => void run()} disabled={!canRun} busy={checking}><Search size={15} aria-hidden="true" />確かめる</Button>
+        <Button variant="secondary" onClick={() => void run()} disabled={!canRun} title={!menuId ? '確かめるメニューを選んでください' : !date ? '確かめる日付を入力してください' : !time ? '開始時刻を入力してください' : undefined} busy={checking}><Search size={15} aria-hidden="true" />確かめる</Button>
         {result ? (
           <div className={`${styles.checkResult} ${result.bookable ? styles.checkOk : styles.checkNg}`} role="status">
             {result.bookable ? (

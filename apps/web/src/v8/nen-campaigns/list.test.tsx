@@ -177,7 +177,7 @@ describe('V8 NEN配信の一覧', () => {
     expect(rowNames()).toEqual(['注文ありがとうございます', '口コミのお願い', 'お誕生日クーポン', '困っていませんか'])
     expect(host.textContent).toContain('自動配信 4')
     expect(host.textContent).toContain('停止中 1')
-    expect(host.textContent).toContain('4 件中 1〜4 件')
+    expect(host.textContent).toContain('4件中 1〜4件')
   })
 
   it('札「止めている」で止めている配信だけになり、もう一度押すと戻る', async () => {
@@ -213,8 +213,10 @@ describe('V8 NEN配信の一覧', () => {
     expect(items).not.toContain('止める')
     expect(items).not.toContain('テスト送信')
     expect(items).not.toContain('編集する')
-    // 押せない（disabled）ボタンを置いて見せることもしない。
-    expect([...host.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
+    // 閲覧のみには押せない更新を置かない。ページ送りの境界は残す。
+    expect(host.querySelector('[data-pagination] button[aria-label="前のページ"]')).toHaveProperty('disabled', true)
+    expect(host.querySelector('[data-pagination] button[aria-label="次のページ"]')).toHaveProperty('disabled', true)
+    expect([...host.querySelectorAll('button[disabled]')].filter(b => !b.closest('[data-pagination]'))).toEqual([])
     await render(baseProps({ tab: 'columns' }))
     expect(host.textContent).not.toContain('コラムを書く')
     // クーポンの決めごとは値だけ見せる（入力欄・保存を置かない）。
@@ -222,7 +224,7 @@ describe('V8 NEN配信の一覧', () => {
     expect(document.body.textContent).toContain('お誕生日月限定クーポン')
     expect(button('設定を保存する')).toBeUndefined()
     expect(document.querySelector('[role="switch"]')).toBeNull()
-    expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
+    expect([...document.querySelectorAll('button[disabled]')].filter(b => !b.closest('[data-pagination]'))).toEqual([])
   })
 
   it('コラムのタブは公開日を「9/26」、予約中の下書きを「10/10 予定」と出す', async () => {

@@ -4,7 +4,6 @@ import MfaPolicy from './mfa-policy'
 import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
 import TotpQr from '@/components/shared/totp-qr'
 
-import { useOverlayFocus } from '@/components/shared/overlay-utils';
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';

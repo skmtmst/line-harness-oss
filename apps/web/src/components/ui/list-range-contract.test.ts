@@ -1,3 +1,7 @@
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import Pagination from '../shared/pagination'
+import { Pager as NenPager } from '../../v8/nen-campaigns/list'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
@@ -79,7 +83,7 @@ describe('ListRange 統一（監査6 #667）', () => {
       } else if (path === '../../v8/automations/runs.tsx') {
         expect(source).toContain('data.pagination.offset + 1')
         expect(source).toContain('data.pagination.offset + data.items.length')
-        expect(source).toContain('formatNumber(total)')
+        expect(renderToStaticMarkup(React.createElement(Pagination, { page: 6, pageCount: 7, onPageChange: () => {}, range: { total: 325, first: 251, last: 300 } }))).toContain('325件中 251〜300件')
         expect(source).toContain('<Pagination')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
@@ -91,7 +95,8 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('range={{ total: visibleTotal')
         expect(source).toContain('const pager = hasListData ?')
       } else if (path === '../../v8/nen-campaigns/list.tsx') {
-        expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
+        expect(renderToStaticMarkup(React.createElement(NenPager, { total: 25, page: 2, size: 20, onPage: () => {} }))).toContain('25件中 21〜25件')
+        expect(renderToStaticMarkup(React.createElement(NenPager, { total: 0, page: 1, size: 20, onPage: () => {} }))).toContain('0件')
         expect(source).toContain('<Pagination')
       } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },

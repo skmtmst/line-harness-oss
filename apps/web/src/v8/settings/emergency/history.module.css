@@ -44,10 +44,5 @@
   line-height: var(--tpl-rest3-em-th-lh);
 }
 
-@container (max-width: 760px) {
-
-  .table { --sett-history-columns: var(--tpl-rest3-uh-cols-narrow); }
-}
-
-.table { --sett-history-columns: var(--tpl-rest3-uh-cols); }
-@container (max-width: 760px) { .table { --sett-history-columns: var(--tpl-rest3-uh-cols-narrow); } }
+ .table { --sett-history-columns: minmax(0, 130px) minmax(0, 1fr) minmax(0, 100px) 100px minmax(110px, max-content); }
+@container (max-width: 760px) { .table { --sett-history-columns: minmax(0, 80px) minmax(0, 1fr) 64px 72px minmax(110px, max-content); } }

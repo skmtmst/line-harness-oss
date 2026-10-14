@@ -282,3 +282,11 @@ export function isMileageFriendsV6Overview(value: unknown): value is MileageFrie
 export function ruleEventLabel(eventType: string, labels: Record<string, string>): string {
   return labels[eventType] ?? 'その他の行動'
 }
+
+export function mileageAssignee(item: MileageDetailHistoryItem): string {
+  if (item.mode === 'manual') {
+    return item.restricted ? '権限の外側の記録' : item.executedByStaffName ?? '実行者は未取得'
+  }
+  if (item.entryType === 'spend') return '本人'
+  return '自動'
+}

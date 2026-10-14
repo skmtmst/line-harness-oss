@@ -21,6 +21,7 @@ export interface QrRoute {
 
 export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: () => void }) {
   return <DashboardQrDialog open onClose={onClose} accountName={route.name}
+    disabledReason={route.isActive === false ? 'この経路は停止中です。再開するまでQRコードは使えません。' : undefined}
     baseLink={referralUrl(route.refCode)} routes={[]}
     resource={{
       url: referralUrl(route.refCode), title: `${route.name} の QR コード`,

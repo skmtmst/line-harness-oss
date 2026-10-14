@@ -14,17 +14,7 @@ import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
-/** 札の文字は設計どおり (★V8 y1bs9A：申し込み済み・キャンセル待ち…)。意味は今の状態名のまま変えない。 */
-const statusMeta: Record<string, { text: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
-  confirmed: { text: '申し込み済み', tone: 'confirmed' },
-  waitlisted: { text: 'キャンセル待ち', tone: 'pending' },
-  requested: { text: '承認待ち', tone: 'pending' },
-  rejected: { text: '見送り', tone: 'neutral' },
-  cancelled: { text: 'キャンセル', tone: 'neutral' },
-  expired: { text: '期限切れ', tone: 'neutral' },
-  attended: { text: '参加済', tone: 'neutral' },
-  no_show: { text: '不参加', tone: 'neutral' },
-};
+import { statusMeta, canLeaveWaitlist } from './event-bookings-policy.js';
 
 function canCancel(b: EventBookingMine): boolean {
   if (b.status !== 'requested' && b.status !== 'confirmed') return false;
@@ -198,7 +188,8 @@ export default function EventBookings() {
     setBusy(true);
     setActionError(null);
     try {
-      await api.cancelMyEventBooking(b.id);
+      if (canLeaveWaitlist(b)) await api.cancelMyEventWaitlist(b.id);
+      else await api.cancelMyEventBooking(b.id);
       await refresh();
     } catch (err) {
       logFailure('cancel-event-booking', err);
@@ -208,7 +199,7 @@ export default function EventBookings() {
           case 'cancel_deadline_passed': return 'キャンセル期限を過ぎています。';
           case 'cancel_not_allowed': return 'このイベントは LIFF からのキャンセルに対応していません。LINE で運営にご連絡ください。';
           case 'invalid_state': return 'この予約は既にキャンセル済 / 確定外のためキャンセルできません。';
-          default: return 'キャンセルできませんでした。時間をおいて、もう一度お試しください。';
+          default: return canLeaveWaitlist(b) ? 'キャンセル待ちをやめられませんでした。時間をおいて、もう一度お試しください。' : 'キャンセルできませんでした。時間をおいて、もう一度お試しください。';
         }
       })();
       setActionError(msg);
@@ -264,7 +255,7 @@ export default function EventBookings() {
             ) : (
               <ul className="space-y-3.5">
                 {items.map((b) => {
-                  const meta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  const meta = canLeaveWaitlist(b) ? { text: 'キャンセル待ち', tone: 'pending' as const } : statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
                   return (
                     <li key={b.id}>
                       <Card className="p-3.5">
@@ -293,12 +284,12 @@ export default function EventBookings() {
                               </div>
                             )}
                             <div className="mt-[3px] flex">
-                              <Badge tone={meta.tone}>{meta.text}</Badge>
+                              <Badge tone={meta.tone}>{canLeaveWaitlist(b) && b.queue_position != null ? `キャンセル待ち ${b.queue_position}番目` : meta.text}</Badge>
                             </div>
                             {/* 板 y1bs9A：変える・キャンセルは文の列の下に小さく並べる。 */}
                             {canCancel(b) && (
-                              <div className="flex items-center gap-2 pt-1.5">
-                                <Button variant="secondary" className="w-auto"
+                              <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                                <Button variant="inline-action"
                                   type="button"
                                   onClick={() => {
                                     void openChange(b);
@@ -307,7 +298,7 @@ export default function EventBookings() {
                                 >
                                   時間を変える
                                 </Button>
-                                <Button variant="secondary" className="w-auto"
+                                <Button variant="inline-danger"
                                   type="button"
                                   onClick={() => {
                                     setActionError(null);
@@ -316,6 +307,13 @@ export default function EventBookings() {
                                   disabled={busy}
                                 >
                                   キャンセルする
+                                </Button>
+                              </div>
+                            )}
+                            {canLeaveWaitlist(b) && (
+                              <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                                <Button variant="inline-danger" disabled={busy} onClick={() => { setActionError(null); setPendingCancel(b); }}>
+                                  キャンセル待ちをやめる
                                 </Button>
                               </div>
                             )}
@@ -344,11 +342,11 @@ export default function EventBookings() {
         designNode="nUYyb"
         title={
           pendingCancel
-            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}をキャンセルしますか`
+            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}${canLeaveWaitlist(pendingCancel) ? 'のキャンセル待ちをやめますか' : 'をキャンセルしますか'}`
             : ''
         }
-        description="キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。"
-        confirmLabel="キャンセルする"
+        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : 'キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。'}
+        confirmLabel={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめる' : 'キャンセルする'}
         cancelLabel="閉じる"
         destructive
         busy={busy}

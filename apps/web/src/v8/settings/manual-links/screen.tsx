@@ -7,10 +7,14 @@
  * 今までの V8（app/settings/manual-links/manual-links-v8.tsx）と同じ。処理は同じ場所の
  * use-manual-links.ts（写し）に置く。見た目だけを型（SettingsPage）と部品で組み直した。
  */
-import { RefreshCw, ShieldCheck } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
+import StatusBadge from '@/components/shared/status-badge'
+import { RowActions } from '@/components/shared/row-actions'
+import { formatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
@@ -54,7 +58,13 @@ export default function ManualLinksScreen() {
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。">
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。"
+      saveStatus={editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
+      saveActions={editingKey ? <>
+        <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
+        <Button variant="primary" actionWording disabled={saving} onClick={() => void saveEdit()} busy={saving} busyLabel="保存しています…">決める</Button>
+      </> : undefined}>
+
       {children}
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </SbSettingsScreen>
@@ -87,23 +97,17 @@ export default function ManualLinksScreen() {
     <>
 
 
-      <div className={styles.toolbar}>
-        <SearchField
-          aria-label="画面ID・画面名で探す"
-          placeholder="画面ID・画面名で探す"
-          value={query}
-          onChange={setQuery}
-          className={styles.search}
-        />
-        <FilterChip selectedIcon={false} selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
-        <FilterChip selectedIcon={false} selected={filter === 'broken'} onChange={(selected) => setFilter(selected ? 'broken' : 'all')}>{`開けない ${brokenCount}`}</FilterChip>
-        <span className={styles.spacer} />
-        <span className={styles.schedule}>{SCHEDULE}</span>
-        <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">
-          <RefreshCw className={styles.btnIcon} aria-hidden="true" />
-          いま全部を確かめる
-        </Button>
-      </div>
+      <ListToolbar
+        search={{ value: query, onChange: setQuery, placeholder: '画面ID・画面名で探す' }}
+        filters={<>
+          <FilterChip selectedIcon={false} selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
+          <FilterChip selectedIcon={false} selected={filter === 'broken'} onChange={(selected) => setFilter(selected ? 'broken' : 'all')}>{`開けない ${brokenCount}`}</FilterChip>
+        </>}
+        trailing={<>
+          <span className={styles.schedule}>{SCHEDULE}</span>
+          <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…"><RefreshCw aria-hidden="true" />いま全部を確かめる</Button>
+        </>}
+      />
 
       {actionError && <Notice tone="danger" className={styles.dangerNoticePlacement} >{actionError}</Notice>}
 
@@ -133,6 +137,7 @@ export default function ManualLinksScreen() {
             {shown.map((row) => {
               const key = row.taskId ?? row.screenId
               const editing = editingKey === key
+              const checked = row.checkedAt ? formatDate(row.checkedAt, { style: 'list', fallback: checkedLabel(row.checkedAt) }) : emptyValue('unknown')
               return (
                 <GridRow key={key} data-broken={row.status !== 'ok' || undefined}>
                   <GridCell role="cell" className={styles.cell}>{row.screenId}</GridCell>
@@ -145,24 +150,15 @@ export default function ManualLinksScreen() {
                         onChange={(event) => setEditingUrl(event.target.value)}
                       /></SaveErrorField>
                     ) : (
-                      <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>{urlLabel(row.url)}</span>
+                      <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>{row.url ? urlLabel(row.url) : emptyValue('unconfigured')}</span>
                     )}
                   </GridCell>
-                  <GridCell role="cell" className={styles.cell} title={checkedLabel(row.checkedAt)}>{checkedLabel(row.checkedAt)}</GridCell>
+                  <GridCell role="cell" className={styles.cell} title={checkedLabel(row.checkedAt)}><span data-list-date-time>{checked}</span></GridCell>
                   <GridCell role="cell" className={styles.cell} title={LINK_STATUS_LABEL[row.status]}>
-                    <span className={styles.status} data-status={row.status}>{LINK_STATUS_LABEL[row.status]}</span>
+                    <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : LINK_STATUS_LABEL[row.status]}</StatusBadge>
                   </GridCell>
                   <GridCell role="cell" className={styles.actions}>
-                    {editing ? (
-                      <>
-                        <Button variant="text" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
-                        <Button variant="primary" disabled={saving} onClick={() => void saveEdit()}>決める</Button>
-                      </>
-                    ) : (
-                      <Button variant="text" onClick={() => startEdit(key)} aria-label={`${row.name}の行き先を${row.url ? '直す' : '決める'}`}>
-                        {row.url ? '直す' : '決める'}
-                      </Button>
-                    )}
+                    {editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', onSelect: () => startEdit(key) }]} />}
                   </GridCell>
                 </GridRow>
               )

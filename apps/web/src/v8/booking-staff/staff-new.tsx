@@ -1,30 +1,27 @@
 'use client'
-import Toggle from '@/components/shared/toggle'
-import { canEditFeature } from '@/lib/staff-capability'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Check, ChevronDown, Smartphone } from 'lucide-react'
+import { Smartphone } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
+import Card, { CardHeader } from '@/components/shared/card'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Select from '@/components/shared/select'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
-import layout from './layout.module.css'
-import styles from './staff-new.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
+import { CreatePage } from '@/components/templates/create-page'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { TextField, TextArea } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -283,17 +280,10 @@ export default function StaffNewV8() {
     : null
 
   if (!canManageStaff) {
-    return (
-      <SaveErrorScope errors={saveErrors}><div ref={formRef} className={layout.shell} data-design-node="CcA4k">
-        <div className={styles.denied}>
-          <ListState
-            kind="error"
-            title="予約設定の変更権限がありません"
-            description={permissionDeniedMessage('store')}
-          />
-        </div>
-      </div></SaveErrorScope>
-    )
+    return <CreatePage title="予約スタッフを登録" boardId="CcA4k" readOnly dirty={false}
+      footerActions={<Button href="/booking/menus?tab=staff">キャンセル</Button>}>
+      <ListState kind="error" title="予約設定の変更権限がありません" description={permissionDeniedMessage('store')} />
+    </CreatePage>
   }
 
   /* 右のスマホ：登録中のスタッフも見本に混ぜて、出方を確かめられるようにする。 */
@@ -320,174 +310,114 @@ export default function StaffNewV8() {
   const memberLabel = (m: StaffMember) => `${m.name}${m.email ? `（${m.email}）` : ''}`
 
   return (
-    <SaveErrorScope errors={saveErrors}><div ref={formRef} className={layout.shell} data-design-node="CcA4k">
-      <PageHeading title={<>予約スタッフを登録</>}
-        help={<>お客さまが予約するときに指名できる担当者を登録します。</>} />
-
-      <div className={layout.body} data-design="Body">
-        <div className={layout.main}>
-          <fieldset disabled={saving} className="contents">
-          {/* ① お客さまに見える情報 */}
+    <SaveErrorScope errors={saveErrors}>
+      <div ref={formRef}>
+        <CreatePage title="予約スタッフを登録" boardId="CcA4k" dirty={false} busy={saving}
+          help="お客さまが予約するときに指名できる担当者を登録します。"
+          contentDisabled={saving} contentLabel="登録するスタッフ"
+          previewLabel="予約画面での見え方を見る" previewTitle="予約画面での見え方"
+          preview={<>
+            {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+            <CardHeader size="stacked" title="予約画面での見え方" />
+            {staffPreviewError ? <ListState kind="error" title="担当の見本を読み込めませんでした" onRetry={() => setStaffPreviewRetry(value => value + 1)} /> : null}
+            <PhoneStaffStep menu={previewMenu} staff={previewStaff} designationFree={designationFree}
+              status={menusLoading || staffPreviewLoading ? 'loading' : menusError || staffPreviewError ? 'error' : 'ready'} />
+            {previewUrl ? null : <Notice tone="info">このアカウントには予約画面のURLがまだありません</Notice>}
+          </>}
+          footerActions={<>
+            <Button href="/booking/menus?tab=staff">キャンセル</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="登録しています…">
+              {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
+            </Button>
+          </>}
+        >
           <Card variant="form" gap="normal" aria-labelledby="bs-card-info">
-            <div className={layout.cardHead}><h2 id="bs-card-info" className={layout.cardTitle}>お客さまに見える情報</h2></div>
-            <div className={styles.grid}>
-              <div className={layout.field}><Field label="スタッフ名（管理画面での呼び名）" htmlFor="bs-name"><SaveErrorField names={["name"]}><input
-                  id="bs-name"
-                  type="text"
-                  value={name}
+            <CardHeader size="stacked" title="お客さまに見える情報" titleId="bs-card-info" />
+            <SettingsFormRow layout="columns">
+              <Field label="スタッフ名（管理画面での呼び名）" htmlFor="bs-name" required error={fieldErrors.name}
+                count={{ value: name.length, max: BOOKING_STAFF_LIMITS.name }}>
+                <SaveErrorField names={["name"]}><TextField id="bs-name" value={name}
                   onChange={(e) => {
                     setName(e.target.value)
                     if (fieldErrors.name !== undefined) setFieldErrors({ name: nameFieldError(e.target.value) ?? undefined })
                   }}
                   onBlur={() => setFieldErrors({ name: nameFieldError(name) ?? undefined })}
-                  maxLength={BOOKING_STAFF_LIMITS.name}
-                  placeholder="田中 美咲"
-                  className={layout.input}
-                  aria-invalid={fieldErrors.name !== undefined}
-                /></SaveErrorField>
-{fieldErrors.name !== undefined ? <span className={layout.fieldError} role="alert">{fieldErrors.name}</span> : null}</Field></div>
-              <div className={layout.field}><Field label="お客さま向けの表示名（空欄なら上の名前）" htmlFor="bs-display"><SaveErrorField names={["displayName","display_name"]}><input id="bs-display" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.displayName} placeholder="みさき" className={layout.input} /></SaveErrorField></Field></div>
-              <div className={layout.field}><Field label="肩書き" htmlFor="bs-role"><SaveErrorField names={["role"]}><input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} /></SaveErrorField></Field></div>
-              <div className={layout.field}>
-                <SaveErrorField names={["imageUrl"]}><ImageUploader
-                  mode="url" onMediaPick={() => setMediaOpen(true)}
-                  size="compact"
-                  label="顔写真（正方形・1MB まで）"
-                  title="顔写真を追加"
-                  maxMB={1}
-                  value={imageUrl ? { mode: 'url', url: imageUrl } : null}
-                  onChange={(next) => setImageUrl(next?.mode === 'url' ? next.url.slice(0, BOOKING_STAFF_LIMITS.profileImageUrl) : '')}
-                /></SaveErrorField>
-              </div>
-            </div>
-            <div className={layout.field}><Field label="紹介文" htmlFor="bs-bio">{/* 絵は1行の高さ。改行も書けるよう textarea のまま、下の角で広げられる。 */}
-<SaveErrorField names={["bio"]}><textarea id="bs-bio" rows={1} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="トリミング歴10年。小型犬が得意です。" className={`${layout.input} ${styles.bio}`} /></SaveErrorField></Field></div>
+                  maxLength={BOOKING_STAFF_LIMITS.name} placeholder="例：田中 美咲" />
+                </SaveErrorField>
+              </Field>
+              <Field label="お客さま向けの表示名（空欄なら上の名前）" htmlFor="bs-display" optional
+                count={{ value: displayName.length, max: BOOKING_STAFF_LIMITS.displayName }}>
+                <SaveErrorField names={["displayName", "display_name"]}><TextField id="bs-display" value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.displayName} placeholder="例：みさき" />
+                </SaveErrorField>
+              </Field>
+              <Field label="肩書き" htmlFor="bs-role" optional count={{ value: role.length, max: BOOKING_STAFF_LIMITS.role }}>
+                <SaveErrorField names={["role"]}><TextField id="bs-role" value={role} onChange={(e) => setRole(e.target.value)}
+                  maxLength={BOOKING_STAFF_LIMITS.role} placeholder="例：トリミング担当" /></SaveErrorField>
+              </Field>
+              <SaveErrorField names={["imageUrl"]}><ImageUploader mode="url" onMediaPick={() => setMediaOpen(true)} size="compact"
+                label="顔写真（正方形・1MB まで）" title="顔写真を追加" maxMB={1}
+                value={imageUrl ? { mode: 'url', url: imageUrl } : null}
+                onChange={(next) => setImageUrl(next?.mode === 'url' ? next.url.slice(0, BOOKING_STAFF_LIMITS.profileImageUrl) : '')} />
+              </SaveErrorField>
+            </SettingsFormRow>
+            <Field label="紹介文" htmlFor="bs-bio" optional count={{ value: bio.length, max: BOOKING_STAFF_LIMITS.bio }}>
+              <SaveErrorField names={["bio"]}><TextArea id="bs-bio" rows={1} size="single-row" value={bio}
+                onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="例：トリミング歴10年。小型犬が得意です。" /></SaveErrorField>
+            </Field>
           </Card>
 
-          {/* ② 予約を受けられるメニュー */}
           <Card variant="form" gap="normal" aria-labelledby="bs-card-menus">
-            <div className={layout.cardHead}><h2 id="bs-card-menus" className={layout.cardTitle}>予約を受けられるメニュー</h2></div>
-            <p className={layout.cardNote}>チェックしたメニューだけ、このスタッフを指名できます。1つも選ばないと予約画面に出ません。</p>
-            {menusLoading ? (
-              <span className={styles.checkRow} aria-busy="true">
-                <span className="sr-only">メニューを読み込んでいます</span>
-                <DelayedSkeleton loading skeleton={<span className={styles.checkRow} aria-hidden="true"><Skeleton width={120} height={20} /><Skeleton width={96} height={20} /><Skeleton width={136} height={20} /></span>} />
-              </span>
-            ) : menusError !== null ? (
-              <ListState
-                kind="error"
-                title="メニューを読み込めませんでした"
-                description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
-                error={menusError}
-                onRetry={() => setMenusReloadKey((value) => value + 1)}
-              />
-            ) : menus.length === 0 ? (
-              <p className={layout.cardNote}>まだメニューがありません。先に予約設定の「メニュー」から登録してください。</p>
-            ) : (
-              <EntitySelect aria-label="予約を受けられるメニュー" noun="予約メニュー" values={[...offered]} onChange={(ids) => setOffered(new Set(ids))} invalid={!!fieldErrors.menus && offered.size === 0} options={menus.map((m) => ({ value: m.id, label: m.name, description: `${m.duration_minutes}分・${priceLabel(m)}` }))} />
-            )}
+            <CardHeader size="stacked" title="予約を受けられるメニュー" titleId="bs-card-menus" />
+            <Notice tone="info">選んだメニューだけ、このスタッフを指名できます。1つも選ばないと予約画面に出ません。</Notice>
+            {menusLoading ? <span aria-busy="true"><span className="sr-only">メニューを読み込んでいます</span>
+              <DelayedSkeleton loading skeleton={<Skeleton width="100%" height={36} />} /></span>
+            : menusError !== null ? <ListState kind="error" title="メニューを読み込めませんでした"
+              description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+              error={menusError} onRetry={() => setMenusReloadKey(value => value + 1)} />
+            : menus.length === 0 ? <Notice tone="info">まだメニューがありません。先に予約設定の「メニュー」から登録してください。</Notice>
+            : <Field label="予約を受けられるメニュー" required error={fieldErrors.menus && offered.size === 0 ? fieldErrors.menus : undefined}>
+                <EntitySelect aria-label="予約を受けられるメニュー" noun="予約メニュー" size="full" values={[...offered]}
+                  onChange={(ids) => setOffered(new Set(ids))} invalid={!!fieldErrors.menus && offered.size === 0}
+                  options={menus.map(m => ({ value: m.id, label: m.name, description: `${m.duration_minutes}分・${priceLabel(m)}` }))} />
+              </Field>}
           </Card>
 
-          {fieldErrors.menus && offered.size === 0 ? <p className={layout.fieldError} role="alert">{fieldErrors.menus}</p> : null}
-
-          {/* ③ 受付と表示 */}
           <Card variant="form" gap="normal" aria-labelledby="bs-card-accept">
-            <div className={layout.cardHead}><h2 id="bs-card-accept" className={layout.cardTitle}>受付と表示</h2></div>
-            <div className={styles.switchRow} title="個別に変えるときは、登録後に「勤務とシフト」で調整できます。">
-              <SettingCheckbox label="店舗の営業時間に合わせる" checked locked />
-              <span className={styles.switchLabel}>店舗の営業時間に合わせる</span>
-            </div>
-            <div className={styles.switchRow}>
-              <SaveErrorField names={["isDesignationOptional","is_designation_optional"]}><SettingCheckbox label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} /></SaveErrorField>
-              <span className={styles.switchLabel}>「指名なし」の枠にも含める（お客さまが担当者を選ばなかったときの割り当て先になる）</span>
-            </div>
-            <div className={styles.switchRow}>
-              <SaveErrorField names={["isActive","is_active"]}><SettingCheckbox label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} /></SaveErrorField>
-              <span className={styles.switchLabel}>登録したらすぐ予約を受ける（オフにすると予約画面に出ません）</span>
-            </div>
-            <div className={styles.colorRow}>
-              <span className={styles.colorLabel}>予約枠の色</span>
-              {/* 色を持つ列がまだ無いため、選べるように見せず現在値だけを示す。 */}
-              <span className={styles.colorChip} title="現在はグリーンで固定です">
-                <span className={styles.swatch} aria-hidden="true" />
-                <span className={styles.colorDivider} aria-hidden="true" />
-                <ChevronDown className={styles.colorOpen} aria-hidden="true" />
-              </span>
-              <span className={styles.colorNote}>カレンダーでの見分けに使います</span>
-            </div>
+            <CardHeader size="stacked" title="受付と表示" titleId="bs-card-accept" />
+            <Notice tone="info">最初は店舗の営業時間に合わせます。個別に変えるときは、登録後に「勤務とシフト」で調整できます。</Notice>
+            <SaveErrorField names={["isDesignationOptional", "is_designation_optional"]}>
+              <Checkbox checked={isDesignationOptional} onCheckedChange={setIsDesignationOptional} aria-label="「指名なし」の枠にも含める"
+                description="お客さまが担当者を選ばなかったときの割り当て先になります。">「指名なし」の枠にも含める</Checkbox>
+            </SaveErrorField>
+            <SaveErrorField names={["isActive", "is_active"]}>
+              <Checkbox checked={isActive} onCheckedChange={setIsActive} aria-label="登録したらすぐ予約を受ける"
+                description="オフにすると予約画面に出ません。">登録したらすぐ予約を受ける</Checkbox>
+            </SaveErrorField>
+            <Notice tone="info">予約枠の色は現在グリーンで固定です。カレンダーでの見分けに使います。</Notice>
           </Card>
 
-          {/* ④ ログインユーザーとのひも付け */}
           <Card variant="form" gap="normal" aria-labelledby="bs-card-member">
-            <div className={layout.cardHead}><h2 id="bs-card-member" className={layout.cardTitle}>ログインユーザーとのひも付け</h2></div>
-            <p className={layout.cardNote}>ひも付けると、その人が左メニュー「自分の勤務」で、このスタッフのシフト・休憩・Google カレンダーを決められます。</p>
-            {membersLoading ? (
-              <span className={styles.full} aria-busy="true">
-                <span className="sr-only">ログインユーザーを読み込んでいます</span>
-                <DelayedSkeleton loading skeleton={<Skeleton width="100%" height={36} />} />
-              </span>
-            ) : membersError !== null ? (
-              <ListState
-                kind="error"
-                title="ログインユーザーを読み込めませんでした"
-                description={isForbiddenOrRateLimited(membersError) ? undefined : '通信の不具合などでログインユーザー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
-                error={membersError}
-                onRetry={() => setMembersReloadKey((value) => value + 1)}
-              />
-            ) : (
-              <div className={layout.field}>
-                <span className={layout.smallLabel} id="bs-member-label">ログインユーザー</span>
-                <span className={styles.selectBox}>
-                  <SaveErrorField names={["staffMemberId","staff_member_id"]}><EntitySelect
-                    aria-label="ログインユーザーとの紐づけ"
-                    id="bs-member"
-                    size="full"
-                    value={staffMemberId}
-                    onChange={setStaffMemberId}
-                    options={[{ value: '', label: '紐づけない' }, ...members.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: memberLabel(m) }))]}
-                  /></SaveErrorField>
-                </span>
-              </div>
-            )}
+            <CardHeader size="stacked" title="ログインユーザーとのひも付け" titleId="bs-card-member" />
+            <Notice tone="info">ひも付けると、その人が左メニュー「自分の勤務」で、このスタッフのシフト・休憩・Google カレンダーを決められます。</Notice>
+            {membersLoading ? <span aria-busy="true"><span className="sr-only">ログインユーザーを読み込んでいます</span>
+              <DelayedSkeleton loading skeleton={<Skeleton width="100%" height={36} />} /></span>
+            : membersError !== null ? <ListState kind="error" title="ログインユーザーを読み込めませんでした"
+              description={isForbiddenOrRateLimited(membersError) ? undefined : '通信の不具合などでログインユーザー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+              error={membersError} onRetry={() => setMembersReloadKey(value => value + 1)} />
+            : <Field label="ログインユーザー" optional>
+                <SaveErrorField names={["staffMemberId", "staff_member_id"]}><EntitySelect aria-label="ログインユーザーとの紐づけ" id="bs-member" size="full"
+                  value={staffMemberId} onChange={setStaffMemberId} options={[{ value: '', label: '紐づけない' }, ...members.map(m => ({ ...entityOptionMetadata(m), value: m.id, label: memberLabel(m) }))]} />
+                </SaveErrorField>
+              </Field>}
           </Card>
 
-          {createdStaffId ? <p className={layout.warnBand} role="status">スタッフは登録済みです。担当メニューの設定が残っています。</p> : null}
-          {saveError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{saveError}</Notice> : null}
-          <div className={layout.actions} data-design="Actions">
-            <Button href="/booking/menus?tab=staff">キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="登録しています…">
-              <Check className={styles.btnIcon} aria-hidden="true" />
-              {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
-            </Button>
-          </div>
-          </fieldset>
-        </div>
-
-        <aside className={layout.side} aria-label="お客さまの予約画面の見え方" data-design="Side">
-          {previewUrl ? (
-            <div className={layout.sideActions}>
-              <Button href={previewUrl} className={styles.sideButton}>
-                <Smartphone className={styles.btnIcon} aria-hidden="true" />
-                お客さまに見える画面を確かめる
-              </Button>
-            </div>
-          ) : null}
-          <p className={layout.sideTitle}>予約画面での見え方</p>
-          {staffPreviewError ? <ListState kind="error" title="担当の見本を読み込めませんでした" onRetry={()=>setStaffPreviewRetry(value=>value+1)}/> : null}
-          <div className={layout.phoneSlot}>
-            <PhoneStaffStep
-              menu={previewMenu}
-              staff={previewStaff}
-              designationFree={designationFree}
-              status={menusLoading || staffPreviewLoading ? 'loading' : menusError || staffPreviewError ? 'error' : 'ready'}
-            />
-          </div>
-          {previewUrl ? null : <p className={layout.cardNote}>このアカウントには予約画面のURLがまだありません</p>}
-        </aside>
+          {createdStaffId ? <Notice tone="warn" role="status">スタッフは登録済みです。担当メニューの設定が残っています。</Notice> : null}
+          {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
+        </CreatePage>
+        <MediaPickerDialog open={mediaOpen} accountId={selectedAccountId} kind="image" onClose={() => setMediaOpen(false)} onSelect={(item) => { setImageUrl(item.url); setMediaOpen(false) }} />
+        <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
       </div>
-
-      <MediaPickerDialog open={mediaOpen} accountId={selectedAccountId} kind="image" onClose={() => setMediaOpen(false)} onSelect={(item) => { setImageUrl(item.url); setMediaOpen(false) }} />
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div></SaveErrorScope>
+    </SaveErrorScope>
   )
 }

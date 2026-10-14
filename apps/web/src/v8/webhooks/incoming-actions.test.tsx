@@ -46,3 +46,25 @@ it('閲覧だけの人には変更・保存を出さない', () => {
   expect(screen.getByText('前のタグ')).toBeTruthy(); expect(screen.queryByRole('button', { name: '行うことを足す' })).toBeNull()
   expect(screen.queryByRole('button', { name: '行うことを保存する' })).toBeNull(); expect(mocks.resources).not.toHaveBeenCalled()
 })
+it('未変更の保存には理由があり、変更後は理由を外して保存できる', async () => {
+  mocks.resources.mockResolvedValue({ success: true, data: resources })
+  render(<IncomingActions detail={detail} accountId="owner-account" readOnly={false} onSaved={saved} onGuardReady={() => {}} />)
+  const button = screen.getByRole('button', { name: '行うことを保存する' }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  expect(button.title).toBe('行うことを変更すると保存できます')
+  expect(mocks.save).not.toHaveBeenCalled()
+  await addTag()
+  expect(button.disabled).toBe(false)
+  expect(button.title).toBe('')
+})
+
+it('既存のオートメーション参照を日本語で示し、別の行を追加しても保存する参照は変えない', async () => {
+  mocks.resources.mockResolvedValue({ success: true, data: resources }); mocks.save.mockResolvedValue({ success: true })
+  const legacy = { ...detail, actions: [{ refKind: 'automation', refId: 'automation-existing', refVersionId: null, displayName: '申込後の案内' }] } as IncomingWebhookDetail
+  render(<IncomingActions detail={legacy} accountId="owner-account" readOnly={false} onSaved={saved} onGuardReady={() => {}} />)
+  expect(screen.getByText('オートメーションを動かす')).toBeTruthy()
+  await addTag()
+  fireEvent.click(screen.getByRole('button', { name: '行うことを保存する' }))
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(1))
+  expect(mocks.save.mock.calls[0][2].actions[0]).toEqual({ refKind: 'automation', refId: 'automation-existing', refVersionId: null })
+})

@@ -169,3 +169,13 @@ describe('R530 実行結果の出し分け契約', () => {
     expect(PAGE).toContain('再実行・一時停止はオーナーと管理者だけができます')
   })
 })
+
+ it('四つの集計に項目別の印を表示する', async () => {
+  staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
+  await renderPage()
+  const labels = Array.from(container.querySelectorAll('[data-kpi-label]'))
+  expect(labels).toHaveLength(4)
+  const icons = labels.map(label => label.querySelector('[data-kpi-icon] svg'))
+  expect(icons.every(Boolean)).toBe(true)
+  expect(new Set(icons.map(icon => icon?.getAttribute('class'))).size).toBe(4)
+ })

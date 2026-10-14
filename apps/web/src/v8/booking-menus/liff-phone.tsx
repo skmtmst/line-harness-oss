@@ -102,11 +102,13 @@ export function LiffPhoneMenuStep({
   menus,
   draft,
   status = 'ready',
+  categoryTone,
 }: {
   menus: BookingMenu[]
   /** 作りかけ・直しかけのメニュー。先頭に選ばれた状態で出す（QqER7 の写し）。 */
   draft?: Pick<BookingMenu, 'id' | 'name' | 'category_label' | 'description' | 'duration_minutes' | 'base_price' | 'price_mode' | 'sort_order' | 'is_active' | 'auto_tag_id'> | null
   status?: 'loading' | 'ready' | 'error'
+  categoryTone?: 'customer'
 }) {
   const shown = menus.filter((m) => m.is_active).sort((a, b) => a.sort_order - b.sort_order)
   const list = draft ? [draft, ...shown.filter((m) => m.id !== draft.id)] : shown
@@ -125,7 +127,7 @@ export function LiffPhoneMenuStep({
           <>
             {categories.length > 0 && (
               <div className={styles.phoneCats}>
-                <span className={`${styles.phoneCat} ${styles.phoneCatNow}`}>すべて</span>
+                <span className={`${styles.phoneCat} ${styles.phoneCatNow}`} data-category-tone={categoryTone}>すべて</span>
                 {categories.slice(0, 3).map((c) => <span key={c} className={styles.phoneCat}>{c}</span>)}
               </div>
             )}

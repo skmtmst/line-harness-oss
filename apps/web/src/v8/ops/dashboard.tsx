@@ -137,7 +137,7 @@ export default function OpsDashboardV8() {
             <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
           </KpiBand>
 
-          <DashboardColumns layout="cards">{[
+          <DashboardColumns layout="cards" cardHeight="natural">{[
             <Card key="alerts" aria-label="要対応" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="要対応" />
               {data ? (
@@ -168,7 +168,7 @@ export default function OpsDashboardV8() {
             </Card>
           ]}</DashboardColumns>
 
-          <DashboardColumns layout="cards">{[
+          <DashboardColumns layout="cards" cardHeight="natural">{[
             <Card key="usage" aria-label="上限に近い契約先" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="上限に近い契約先" />
               {!data ? (
@@ -209,7 +209,7 @@ export default function OpsDashboardV8() {
             </Card>
           ]}</DashboardColumns>
 
-          <DashboardColumns layout="cards">{[
+          <DashboardColumns layout="cards" cardHeight="natural">{[
             <Card key="plans" aria-label="プラン別の契約" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
               <SectionHeader title="プラン別の契約" />
               {data ? <p className={parts.line} title={data.planShare.rows.map(row => `${row.label} ${row.percent}%`).join('・')}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
