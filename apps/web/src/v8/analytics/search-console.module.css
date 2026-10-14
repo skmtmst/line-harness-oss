@@ -6,5 +6,4 @@
 .devices { grid-column: 1 / -1; }
 .compareRow { display: flex; align-items: center; gap: var(--polish-space-field); min-width: 0; }
 .compareRow > strong { min-width: 0; overflow-wrap: anywhere; }
-.scAxis { display: flex; justify-content: space-between; gap: var(--polish-space-row); }
 @container v8-page (max-width: 1099px) { .rankings { grid-template-columns: minmax(0, 1fr); } }

@@ -6,6 +6,7 @@ import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { DashboardColumns } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
@@ -197,8 +198,8 @@ function CompareInner() {
               <h3 id="compare-values" className={styles.cardTitle}>結び付けた人に使う値</h3>
 
               {panelOpen ? (
-                <div className={styles.pair}>
-                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由</>} htmlFor="compare-reason" required><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の画面</p>
+                <DashboardColumns layout="cards" cardHeight="natural">{[
+                  <div key="decision" ref={panelRef} className={styles.panel} role="group" aria-label="この2件の判定"><Field label={<>判定の理由</>} htmlFor="compare-reason" required>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
                         <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
@@ -236,8 +237,8 @@ function CompareInner() {
 <div className={styles.panelActions}>
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
                       <Button type="button" variant="primary" onClick={submit} disabled={!ready} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : !reason.trim() ? '判定の理由を入れてください' : !linkedReady ? '使う値と3つの確認を選んでください' : undefined} busy={review.deciding} busyLabel="処理中…">判定する</Button>
-                    </div></Field></div>
-                  <div className={styles.historyCard}>
+                    </div></Field></div>,
+                  <div key="history" className={styles.historyCard}>
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>
                       {detail.history.map((item) => (
@@ -251,8 +252,8 @@ function CompareInner() {
                         <span>{`候補に上がった（${decisive?.label ?? '根拠を確認'}）`}</span>
                       </li>
                     </ul>
-                  </div>
-                </div>
+                  </div>,
+                ]}</DashboardColumns>
               ) : null}
 
               <DataTable className={styles.table}>

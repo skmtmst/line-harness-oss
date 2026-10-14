@@ -16,6 +16,13 @@
   font-size: var(--text-micro);
 }
 
+.dateGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  flex-shrink: 0;
+}
+
 .date {
   width: var(--tpl-op-audit-date-w);
 }
@@ -39,12 +46,6 @@
 
 .colWhat {
   width: var(--tpl-op-audit-what-w);
-}
-
-/* 操作の名前は長いと2行に折る（絵の「代理ログイン（書き込み）」）。 */
-.colWhat.colWhat {
-  padding-right: var(--tpl-op-audit-what-pad);
-  white-space: normal;
 }
 
 .colTenant {

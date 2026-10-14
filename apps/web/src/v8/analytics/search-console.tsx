@@ -13,7 +13,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type SearchConsoleMetric, type SearchConsoleMetricRow, type SearchConsolePerformance, type SearchConsoleSetup } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { StatePill, shortDay } from './common'
+import { StatePill } from './common'
 import styles from './search-console.module.css'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -47,7 +47,7 @@ function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetr
     {rows.length === 0 ? <p>データがありません</p> : <GridTable label={title} framed={false} design={{
       columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-sc-col-64)',
       gap: 'var(--polish-space-row)', rowPadding: '0', headPadding: '0',
-      rowHeight: 'var(--polish-table-row)', headHeight: 'var(--tpl-thead-h)',
+      rowHeight: 'var(--tpl-list-row-h)', headHeight: 'var(--tpl-thead-h)',
       fontSize: 'var(--text-caption)', headFontSize: 'var(--text-micro)',
     }}>
       <GridHeadRow>
@@ -130,7 +130,6 @@ export default function SearchConsoleV8() {
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
   const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
   const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
-  const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
 
   return <ListPage
     boardId="h1G4d"
@@ -166,8 +165,7 @@ export default function SearchConsoleV8() {
           <Card variant="form" aria-labelledby="sc-trend-title">
             <CardHeader size="stacked" titleId="sc-trend-title" title="検索クリックの推移（日別クリック数）" />
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
-              <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
-              <div className={styles.scAxis}><span>{shortDay(data.daily[0].key)}</span><span>{middle ? shortDay(middle.key) : ''}</span><span>{`${shortDay(data.daily[data.daily.length - 1].key)}（反映待ち）`}</span></div>
+              <ValueBarChart label="日別クリック数の推移" unit="クリック" presentation="summary" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
             </>}
           </Card>
           <div className={styles.rankings}>
