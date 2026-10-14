@@ -1,4 +1,4 @@
-export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false } = {}) {
+export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const rect = panel.getBoundingClientRect()
@@ -50,6 +50,36 @@ export function scanDialogAudit({ expectedWidth, fullForm = false, requiredActio
         inventory.push({ kind: 'usage-external-action', icons })
         if (icons !== 1) findings.push({ pattern: 'F9', kind: 'dialog-usage-external-icons', count: icons })
       }
+    }
+  }
+  if (columnSettings) {
+    const fixed = panel.querySelector('[data-fixed-display-name]')
+    const selected = panel.querySelector('[data-presentation="columns"] [aria-label="選択した列"]')
+    if (!fixed || !selected || !selected.contains(fixed)) findings.push({ pattern: 'F4', kind: 'display-fixed-name-missing' })
+    if (selected) {
+      const css = getComputedStyle(selected)
+      const framed = css.boxShadow !== 'none' || (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) || parseFloat(css.borderTopWidth) > 0
+      inventory.push({ kind: 'selected-columns', framed })
+      if (!framed) findings.push({ pattern: 'F6', kind: 'display-selected-frame-missing' })
+    }
+    for (const group of panel.querySelectorAll('[role="group"][aria-label$="の追加できる列"]')) {
+      const columns = getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean)
+      if (columns.length !== 2) findings.push({ pattern: 'F10', kind: 'display-available-columns', actual: columns.length, expected: 2 })
+    }
+  }
+  if (scoreHistory) {
+    for (const delta of panel.querySelectorAll('[data-score-delta]')) {
+      const sign = delta.getAttribute('data-score-delta')
+      const token = sign === 'positive' ? '--color-accent-deep' : sign === 'negative' ? '--color-warning' : null
+      if (!token) continue
+      const probe = document.createElement('span')
+      probe.style.color = `var(${token})`
+      panel.append(probe)
+      const expected = getComputedStyle(probe).color
+      probe.remove()
+      const actual = getComputedStyle(delta).color
+      inventory.push({ kind: 'score-history-delta', sign, actual, expected })
+      if (actual !== expected) findings.push({ pattern: 'F6', kind: 'score-history-tone', sign, actual, expected })
     }
   }
   const descriptionBand = panel.getAttribute('data-description-band')

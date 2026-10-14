@@ -370,6 +370,7 @@ shared-button-importer v8/settings/accounts/accounts.tsx
 shared-button-importer v8/settings/staff/mfa-policy.tsx
 shared-button-importer v8/settings/staff/self-mfa.tsx
 shared-button-importer v8/settings/staff/staff.tsx
+shared-button-importer v8/settings/features/reorder-dialog.tsx
 shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx

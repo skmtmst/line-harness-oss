@@ -21,8 +21,8 @@ export default function ReorderList({ items, onChange, visibleRows }: {
         <li key={item.id} className={styles.row} {...reorder.rowProps(item.id)}>
           <span className={styles.handle}><ReorderHandle label={item.label} {...reorder.handleProps(item.id)} {...reorder.handle(item.id)} /></span>
           <span className={styles.label} title={item.label}>{item.label}</span>
-          <IconButton variant="plain" aria-label={`${item.label}を上へ`} disabled={!reorder.canMoveBy(item.id, -1)} onClick={() => reorder.moveBy(item.id, -1)}><ArrowUp size={16} aria-hidden="true" /></IconButton>
-          <IconButton variant="plain" aria-label={`${item.label}を下へ`} disabled={!reorder.canMoveBy(item.id, 1)} onClick={() => reorder.moveBy(item.id, 1)}><ArrowDown size={16} aria-hidden="true" /></IconButton>
+          <IconButton variant="plain" aria-label={`${item.label}を上へ`} title={!reorder.canMoveBy(item.id, -1) ? '先頭の項目は上へ動かせません。' : undefined} disabled={!reorder.canMoveBy(item.id, -1)} onClick={() => reorder.moveBy(item.id, -1)}><ArrowUp size={16} aria-hidden="true" /></IconButton>
+          <IconButton variant="plain" aria-label={`${item.label}を下へ`} title={!reorder.canMoveBy(item.id, 1) ? '最後の項目は下へ動かせません。' : undefined} disabled={!reorder.canMoveBy(item.id, 1)} onClick={() => reorder.moveBy(item.id, 1)}><ArrowDown size={16} aria-hidden="true" /></IconButton>
         </li>
       ))}
     </ul>
