@@ -213,5 +213,5 @@ function KnowledgeSurface({ fullPage, editing, busy, onCancel, actions, title, d
 }
 
 function KnowledgeBody({ fullPage, preview, children }: { fullPage: boolean; preview: ReactNode; children: ReactNode }) {
-  return fullPage ? <CreateStepColumns preview={preview} previewTitle="解決の根拠と操作">{children}</CreateStepColumns> : <div className={parts.stack}>{children}{preview}</div>
+  return fullPage ? <CreateStepColumns standalone preview={preview} previewTitle="解決の根拠と操作">{children}</CreateStepColumns> : <div className={parts.stack}>{children}{preview}</div>
 }
