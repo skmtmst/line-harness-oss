@@ -162,6 +162,8 @@ describe('スコアの絵合わせ（板 `IRPw8`）', () => {
     expect(rows).toContain('低い')
     expect(rows).not.toContain('点が高い')
     expect(rows).not.toContain('中くらい')
+    expect(container.querySelector('tbody [data-tone="success"]')?.textContent).toBe('高い')
+    expect(container.querySelector('tbody [data-tone="warning"]')?.textContent).toBe('低い')
   })
 
   it('変化のひく符号は − で、最後の反応は日付と1行にする', async () => {
@@ -171,10 +173,14 @@ describe('スコアの絵合わせ（板 `IRPw8`）', () => {
     expect(body).toContain('9/30 商品を買った')
   })
 
-  it('脚注は空けて補足まで書く', async () => {
+  it('画面の説明から補足を開閉できる', async () => {
     await waitForRows()
-    const body = container.textContent ?? ''
-    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
-    expect(container.textContent ?? '').toContain('＋ できごとを足す（30日間反応がない、も選べる）')
+    const explanation = container.querySelector('[data-screen-explanation]') as HTMLElement
+    const toggle = container.querySelector('[data-screen-explanation-toggle]') as HTMLButtonElement
+    expect(explanation.textContent).toContain('＋ できごとを足す（30日間反応がない、も選べる）')
+    await act(async () => { toggle.click() })
+    expect(explanation.hidden).toBe(true)
+    await act(async () => { toggle.click() })
+    expect(explanation.hidden).toBe(false)
   })
 })
