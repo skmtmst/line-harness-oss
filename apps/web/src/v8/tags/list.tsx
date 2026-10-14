@@ -31,6 +31,7 @@ import FieldsTab from './fields-tab'
 import styles from './list.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -104,14 +105,13 @@ export default function TagsList({
     <Button href="/friends" variant="primary"><Search size={16} aria-hidden="true" />友だち一覧で条件を作る</Button>
   ) : null
 
-  return (
+  const page = (
     <PageFrame heightMode="content" skeleton kind="list" boardId={boardId}>
       <PageHeading
         headingSize="regular"
         title="タグ"
         help="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
-        explanation={tab === 'searches' && !currentTabBlocked ? '友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。' : undefined}
-        explanationKey={tab === 'searches' ? 'tags:searches' : undefined}
+        explanationToggle={tab === 'searches' && !currentTabBlocked ? <PageExplanationToggle /> : undefined}
         actions={actions}
       />
 
@@ -147,10 +147,11 @@ export default function TagsList({
       ) : tab === 'marks' ? (
         <MarksTab accountId={accountId} canEdit={canEdit} />
       ) : tab === 'searches' ? (
-        <SearchesTab accountId={accountId} canEdit={canEdit} />
+        <SearchesTab accountId={accountId} canEdit={canEdit} explanation />
       ) : (
         <FieldsTab accountId={accountId} canEdit={canEdit} narrow={narrow} />
       )}
     </PageFrame>
   )
+  return tab === 'searches' && !currentTabBlocked ? <PageExplanationProvider pageKey="tags:searches">{page}</PageExplanationProvider> : page
 }

@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
+  useStaffIdentity: () => null,
   canManageRole: (value: string | null | undefined) => value === 'owner' || value === 'admin',
 }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
