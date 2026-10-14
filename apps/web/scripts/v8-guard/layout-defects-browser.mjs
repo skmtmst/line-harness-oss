@@ -113,7 +113,12 @@ export default function scanLayoutDefects() {
   }
   const box = el => {
     const c = css(el)
-    return (c.borderTopWidth !== '0px' && c.borderTopStyle !== 'none') || c.boxShadow !== 'none' ||
+    // A horizontal 1px row divider is not the boundary of a card.
+    const shadowBox = c.boxShadow !== 'none' && c.boxShadow.replace(/(?:rgba?|hsla?|color)\([^)]*\)/g, '').split(',').some(shadow => {
+      const [x, y, blur = 0, spread = 0] = shadow.match(/-?\d+(?:\.\d+)?px/g)?.map(parseFloat) ?? []
+      return x !== 0 || Math.abs(y) !== 1 || blur !== 0 || spread !== 0
+    })
+    return (c.borderTopWidth !== '0px' && c.borderTopStyle !== 'none') || shadowBox ||
       (c.backgroundColor !== 'rgba(0, 0, 0, 0)' && c.backgroundColor !== 'rgb(255, 255, 255)') || c.outlineStyle !== 'none'
   }
   for (const parent of [root, ...root.querySelectorAll('*')]) {

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
 import scanColumns from './table-column-alignment-browser.mjs'
+import scanLayout from './layout-defects-browser.mjs'
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8')
 const css = path => read(path).replace(/:global\(([^)]+)\)/g, '$1')
@@ -61,6 +62,22 @@ test('staff roles stay before login dates at all widths; the former narrow reord
         await page.addStyleTag({ content: '.colLast{order:1}.colRole{order:2}' })
         assert.equal(await ordered(), false, 'the former ordering must be detected')
       }
+    }
+  } finally { await browser.close() }
+})
+
+test('a 1px row divider keeps its text spacing; genuine adjacent card shadows and borders still fail', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    for (const shadow of ['inset 0 -1px 0 rgba(0,0,0,.1)', '0 1px 0 rgba(0,0,0,.1)']) {
+      await page.setContent(`<style>ul{display:flex;flex-direction:column;width:320px;margin:0;padding:0;list-style:none}li{box-sizing:border-box;height:56px;padding:12px;box-shadow:${shadow}}</style><main><ul><li>役割の説明の一行目</li><li>役割の説明の二行目</li></ul></main>`)
+      const touching = async () => (await page.evaluate(scanLayout)).filter(finding => finding.kind === 'touch').length
+      assert.equal(await touching(), 0, 'row dividers do not turn the list into cards')
+      await page.addStyleTag({ content: 'li{box-shadow:0 2px 4px rgba(0,0,0,.2)}' })
+      assert.equal(await touching(), 1, 'real touching card shadows are still detected')
+      await page.addStyleTag({ content: 'li{box-shadow:none;border:1px solid #ccc}' })
+      assert.equal(await touching(), 1, 'real touching card borders are still detected')
     }
   } finally { await browser.close() }
 })
