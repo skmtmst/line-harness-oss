@@ -35,6 +35,7 @@ import createStyles from '@/v8/tags/create.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation'
 
 type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: boolean }
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
@@ -219,7 +220,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     const definition = current && 'mark' in current.definition ? current.definition : input?.type === 'mark' ? input.definition : { schemaVersion: 1 as const, mark: { name: '', color: '#EF4B55', displayOrder: entries.length } }
     return <SaveErrorScope errors={saveErrors}> <HqMarkEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} definition={definition} busy={busy} locked={uncertain} notices={notices} footer={footer} onCancel={() => setEditor(null)} onSave={(definition) => void save({ type: 'mark', name: definition.mark.name, description: current?.template.description ?? '', folderId: current?.template.folder_id ?? null, definition }, saveIntent.current)} /></SaveErrorScope>
   }
-  return <SaveErrorScope errors={saveErrors}> <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} help={description}
+  const page = <SaveErrorScope errors={saveErrors}> <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} help={description} explanationToggle={type === 'mark' ? <PageExplanationToggle /> : undefined}
     actions={type === 'mark' && canEdit ? <Button variant="primary" disabled={busy || status !== 'ready'} onClick={hostBase.onCreate}><Plus size={15} aria-hidden="true" />マークを作る</Button> : undefined}
     tabs={<AttributeTabs tab={tab} onSelect={onTab} />} overlays={<>
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
@@ -231,8 +232,9 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
       <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" deleteName={deletingFolder?.name ?? ''} description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
     </>}>
     {notices}
-    {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} />}
+    {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} explanation />}
   </ListPage></SaveErrorScope>
+  return type === 'mark' ? <PageExplanationProvider pageKey="hq:marks">{page}</PageExplanationProvider> : page
 }
 
 function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onSave }: { definition: HqMarkDefinition; busy: boolean; locked: boolean; notices: React.ReactNode; footer: (submit: () => void, cancel: () => void) => React.ReactNode; onCancel: () => void; onSave: (definition: HqMarkDefinition) => void }) {
