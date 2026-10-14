@@ -4,7 +4,7 @@ import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, PauseCircle } from 'lucide-react'
+import { Check, Copy, PauseCircle, Pencil } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -289,7 +289,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー"  />
+                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} icon={<Copy size={16} aria-hidden />} aria-label="紹介リンクをコピー"  />
                 </div>
               )
             })}
@@ -465,7 +465,7 @@ export default function AffiliateDrawer({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" layout="inset" busy={paymentOpen} onClose={onClose}
+      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" heightMode="viewport" layout="inset" busy={paymentOpen} onClose={onClose}
         heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
           const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
@@ -483,7 +483,7 @@ export default function AffiliateDrawer({
           {readonly ? <Button type="button" onClick={onClose}>閉じる</Button> : (
             <>
               <Button type="button" onClick={() => { setTab('payment'); setEditing((current) => !current) }}>
-                {editing ? '編集をやめる' : '編集する'}
+                <Pencil size={16} aria-hidden />{editing ? '編集をやめる' : '編集する'}
               </Button>
               <Button
                 type="button"

@@ -99,6 +99,7 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     expect(document.querySelector('[data-design-node="JOi8G"]')).toBeNull()
     const use = screen.getByRole('button', { name: 'この画像を使う' }) as HTMLButtonElement
     expect(use.disabled).toBe(true)
+    expect(use.getAttribute('aria-description')).toBe('使う画像を選んでください。')
 
     fireEvent.click(screen.getByRole('option', { name: /haru/ }))
     // 選んだ順が分かる
@@ -110,6 +111,7 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     expect((screen.getByRole('radio', { name: '土台にする' }) as HTMLInputElement).checked).toBe(false)
     expect(screen.getByRole('radio', { name: '素材を一部使う' })).toBeTruthy()
 
+    expect(screen.getByRole('button', { name: 'この 1 枚を使う' }).hasAttribute('aria-description')).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: 'この 1 枚を使う' }))
     expect(picked).toHaveLength(1)
     expect(picked[0].references).toEqual([{ imageId: 'img-1', mode: 'inspire' }])

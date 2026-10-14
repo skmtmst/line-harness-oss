@@ -43,6 +43,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('BERxg 座席・卓管理', () => {
+  it('最小・最大人数は必須として読み上げ、空欄なら卓を作らない', async () => {
+    render(<TablesPage />)
+    await screen.findByText('卓の詳細')
+    fireEvent.click(screen.getByRole('button', { name: /卓を追加する/ }))
+    for (const label of ['最小人数', '最大人数']) {
+      expect(screen.getByLabelText(label).getAttribute('aria-required')).toBe('true')
+    }
+    fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
+    fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '窓側' } })
+    fireEvent.change(screen.getByLabelText('最小人数'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    expect(await screen.findByText('最小人数は1以上の整数にしてください。')).toBeTruthy()
+    expect(fixture.createTable).not.toHaveBeenCalled()
+  })
+
   it('数4・フロアマップ・卓の詳細・自動配席ルールが出て、結合グループに札が付く', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
@@ -55,10 +70,28 @@ describe('BERxg 座席・卓管理', () => {
     expect(screen.getByText('T3 · 窓側4人卓')).not.toBeNull()
   })
 
+  it('卓の行にはメニュー1個だけを出し、停止の確認を開くまで更新しない', async () => {
+    render(<TablesPage />)
+    const name = await screen.findByText('T3 · 窓側4人卓')
+    const row = name.closest('li')!
+    expect(within(row).getAllByRole('button')).toHaveLength(1)
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    expect(screen.getByRole('menuitem', { name: '変更' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '停止' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: '再開' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
   it('止めるときは先の予約を出し、入る卓へ移し、入らない予約は未配席にしてから止める', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
-    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓を停止' }))
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     const dialog = document.querySelector('[data-design-node="eY9F3"]') as HTMLElement
     expect(dialog.textContent).toContain('これから先の予約が 2 件')
     fireEvent.click(within(dialog).getByRole('button', { name: '予約を移して止める' }))
@@ -129,7 +162,8 @@ describe('BERxg 座席・卓管理', () => {
     fixture.updateReservation.mockRejectedValueOnce(new Error('予約を移せませんでした。'))
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
-    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓を停止' }))
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '予約を移して止める' }))
     await screen.findByText('予約の移動・卓の停止に失敗しました。')
     expect(fixture.updateTable).not.toHaveBeenCalled()
@@ -142,7 +176,7 @@ describe('BERxg 座席・卓管理', () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     expect(screen.queryByRole('button', { name: /卓を追加する/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /を停止$/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /のその他操作$/ })).toBeNull()
   })
 
   it('移す先は人数が入り重ならない卓のうち、余る席がいちばん少ない卓', () => {

@@ -71,6 +71,9 @@ interface ConfirmDialogProps {
   onConfirm?: () => void
   /** 実行ボタンを押せない形で出す（WEB228：確かめのチェックが入るまで）。 */
   confirmDisabled?: boolean
+  confirmDisabledReason?: string
+  actionWidthReserve?: 'states' | 'idle'
+  confirmPlacement?: 'start'
   onCancel: () => void
 }
 
@@ -107,6 +110,9 @@ export default function ConfirmDialog({
   primaryAction = 'confirm',
   onConfirm,
   confirmDisabled = false,
+  confirmDisabledReason,
+  actionWidthReserve,
+  confirmPlacement,
   onCancel,
 }: ConfirmDialogProps) {
   const [executing, setExecuting] = useState(false)
@@ -155,6 +161,9 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy || executing}
       confirmDisabled={confirmDisabled}
+      confirmDisabledReason={confirmDisabledReason}
+      actionWidthReserve={actionWidthReserve}
+      confirmPlacement={confirmPlacement}
       error={error || executionError}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}

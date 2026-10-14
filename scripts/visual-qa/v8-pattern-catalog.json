@@ -904,13 +904,15 @@
             "apps/web/src/components/shared/overlay-utils.ts",
             "apps/web/src/components/shared/action-words.ts",
             "apps/web/src/components/shared/dialog-choice-cards.tsx",
-            "apps/web/src/components/shared/dialog-choice-cards.module.css"
+            "apps/web/src/components/shared/dialog-choice-cards.module.css",
+            "apps/web/src/components/shared/dialog-usage-table.tsx"
           ],
           "components": [
             "Dialog",
             "ConfirmDialog",
             "DialogSteps",
-            "DialogChoiceCards"
+            "DialogChoiceCards",
+            "DialogUsageTable"
           ],
           "vars": [
             "--radius-panel",
@@ -986,12 +988,14 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/entity-picker.tsx",
+            "apps/web/src/components/shared/entity-picker-window.tsx",
             "apps/web/src/components/shared/entity-picker.module.css",
             "apps/web/src/components/shared/entity-picker-sources.tsx",
             "apps/web/src/components/shared/hq-account-picker.tsx"
           ],
           "components": [
             "EntityPickerDialog",
+            "EntityPickerWindow",
             "EntityMultiPickerDialog",
             "HqAccountPickerDialog"
           ],

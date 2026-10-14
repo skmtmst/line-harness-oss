@@ -2,7 +2,7 @@
 import { localJst, toJstIso } from './video-time'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-
+import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 
 import { requiredText } from '@/lib/form-requirement'
@@ -472,7 +472,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
       </span>
       <span className={styles.colCount}><span className={styles.cell}>{session ? `${formatNumber(session.reservedCount)} 人` : emptyValue('unknown')}</span></span>
       <span className={styles.colState}>
-        <span className={form.pill} data-tone={session?.state === 'full' ? 'warn' : session?.state === 'open' ? 'info' : undefined}><span className={form.pillDot} aria-hidden="true" />{sessionText(session, failed)}</span>
+        <StatusBadge tone={session?.state === 'full' ? 'warning' : session?.state === 'open' ? 'info' : 'neutral'}>{sessionText(session, failed)}</StatusBadge>
       </span>
       {menu(() => { setInput(session?.capacity == null ? '' : String(session.capacity)); setError(''); setCapError(''); onEdit(true) })}
       {editing ? <Button size="compact" disabled={saving} onClick={() => { onEdit(false); setError(''); setCapError('') }}>やめる</Button> : null}

@@ -13,7 +13,8 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
+import CheckCard from '@/components/shared/check-card'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -451,7 +452,6 @@ export default function MenuFormV8() {
   usePageCrumbs([
     { label: '予約', href: '/booking/bookings' },
     { label: '予約設定', href: '/booking/menus' },
-    { label: editTarget ? 'メニューを直す' : 'メニューを作る' },
   ])
 
   function toggleAssigned(id: string) {
@@ -890,10 +890,6 @@ export default function MenuFormV8() {
         ? '変更を保存する'
         : '保存して公開'
 
-  const checkMark = (
-    <svg width="10" height="8" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 4l2.5 2.5L9 1" /></svg>
-  )
-
   const previewContent = <>
           <div className={shell.sideActions}>
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
@@ -941,7 +937,7 @@ export default function MenuFormV8() {
         previewLabel="お客さまの予約画面を見る"
         previewTitle="お客さまの予約画面"
         preview={previewContent}
-        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="お客さまの予約画面を見る">{previewContent}</PreviewLauncher>}
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
         help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} >
 
@@ -990,8 +986,7 @@ export default function MenuFormV8() {
                   options={categoryOptions}
                 /></SaveErrorField>
                 {categoryPicking && (
-                  <SaveErrorField names={["categoryNew","category_new"]}><input
-                    className={styles.input}
+                  <SaveErrorField names={["categoryNew","category_new"]}><TextField
                     type="text"
                     value={categoryNew}
                     onChange={(e) => setCategoryNew(e.target.value)}
@@ -1001,8 +996,7 @@ export default function MenuFormV8() {
                 )}
               </Field>
             </SettingsFormRow>
-            <Field label="説明（お客さまに見えます）"><SaveErrorField names={["description"]}><input
-                className={styles.input}
+            <Field label="説明（お客さまに見えます）"><SaveErrorField names={["description"]}><TextField
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -1029,7 +1023,7 @@ export default function MenuFormV8() {
 
               </Field>
               <Field label="金額" help="空なら、お客さまにはお問い合わせと出します">
-                <SaveErrorField names={["basePrice","base_price"]}><AffixedTextField startAdornment="¥"
+                <SaveErrorField names={["basePrice","base_price"]}><AffixedTextField layout="field" startAdornment="¥"
                   type="number"
                   min={0}
                   value={basePrice}
@@ -1039,7 +1033,7 @@ export default function MenuFormV8() {
                 /></SaveErrorField>
               </Field>
               <Field label="予約したときのマイル" optional={false} help="お店全体の設定で決まります" note={<TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink>}>
-              <SaveErrorField names={["bookingMileage","booking_mileage"]}><AffixedTextField
+              <SaveErrorField names={["bookingMileage","booking_mileage"]}><AffixedTextField layout="field"
                   readOnly endAdornment="マイル"
                   value={
                     mileageStatus === 'loading' ? '…'
@@ -1083,26 +1077,19 @@ export default function MenuFormV8() {
               </p>
             ) : (
               <>
-                <div className={styles.staffRow} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
+                <SettingsFormRow layout="columns" columns={3} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
                     // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
                     const label = `${person.display_name || person.name}${person.role && person.role !== 'トリマー' ? `（${person.role}）` : ''}`
                     return (
-                      <button
-                        key={person.id}
-                        type="button"
-                        aria-pressed={on}
-                        title={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined}
-                        className={`${styles.staffChip} ${on ? styles.staffChipOn : ''}`}
-                        onClick={() => toggleAssigned(person.id)}
-                      >
-                        <span className={styles.chipBox} aria-hidden="true">{checkMark}</span>
-                        {label}
-                      </button>
+                      <CheckCard key={person.id} size="row" checked={on}
+                        invalid={!!fieldErrors.staff && assigned.size === 0}
+                        title={<span title={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined}>{label}</span>}
+                        onChange={() => toggleAssigned(person.id)} />
                     )
                   })}
-                </div>
+                </SettingsFormRow>
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
@@ -1120,29 +1107,17 @@ export default function MenuFormV8() {
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
             {ownRules ? (
-              <>
-                <div className={styles.ruleRow}>
-                  <span className={styles.ruleLabel}>先の予約が取れる範囲</span>
-                  <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                    <SaveErrorField names={["windowDays","window_days"]}><NumberInput type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
-                    <span className={styles.unitSuffix}>日先まで</span>
-                  </span>
-                </div>
-                <div className={styles.ruleRow}>
-                  <span className={styles.ruleLabel}>受付の締め切り</span>
-                  <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                    <SaveErrorField names={["cutoffHours","cutoff_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" /></SaveErrorField>
-
-                  </span>
-                </div>
-                <div className={styles.ruleRow}>
-                  <span className={styles.ruleLabel}>キャンセルの期限</span>
-                  <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                    <SaveErrorField names={["cancelDeadlineHours","cancel_deadline_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" /></SaveErrorField>
-
-                  </span>
-                </div>
-              </>
+              <SettingsFormRow layout="columns" columns={3}>
+                <Field label="先の予約が取れる範囲">
+                  <SaveErrorField names={["windowDays","window_days"]}><NumberInput unit="日先まで" type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
+                </Field>
+                <Field label="受付の締め切り">
+                  <SaveErrorField names={["cutoffHours","cutoff_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" /></SaveErrorField>
+                </Field>
+                <Field label="キャンセルの期限">
+                  <SaveErrorField names={["cancelDeadlineHours","cancel_deadline_hours"]}><NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" /></SaveErrorField>
+                </Field>
+              </SettingsFormRow>
             ) : (
               <>
                 <div className={styles.ruleRow}>
@@ -1162,9 +1137,9 @@ export default function MenuFormV8() {
               </>
             )}
             <div className={styles.changeRow}>
-              <button type="button" className={styles.changeLink} onClick={() => setOwnRules((v) => !v)}>
-                {ownRules ? 'お店のきまりに戻す' : <><Pencil size={15} aria-hidden="true" />このメニューだけ変える</>}
-              </button>
+              <Button variant="text" textTone="ink" onClick={() => setOwnRules((v) => !v)}>
+                {ownRules ? 'お店のきまりに戻す' : <><Pencil aria-hidden="true" />このメニューだけ変える</>}
+              </Button>
             </div>
           </Card>
 
@@ -1173,17 +1148,15 @@ export default function MenuFormV8() {
             <Card variant="form" padding="compact" gap="normal">
               <CardHeader size="stacked" headingLevel={3} title="受け方" />
               <div className={styles.fieldStack}>
-                <Field label="同時に受けられる件数"><span className={styles.unitField}>
+                <Field label="同時に受けられる件数">
                     <SaveErrorField names={["concurrentCapacity","concurrent_capacity"]}><NumberInput unit="件"
                       type="number"
                       min={1}
                       value={concurrentCapacity}
                       onChange={(e) => setConcurrentCapacity(e.target.value)}
                       aria-label="同時に受けられる件数"
-                    /></SaveErrorField>
-
-                  </span></Field>
-                <Field label="後の空き時間（片付け・移動）"><span className={styles.unitField}>
+                    /></SaveErrorField></Field>
+                <Field label="後の空き時間（片付け・移動）">
                     <SaveErrorField names={["bufferAfterMinutes","buffer_after_minutes"]}><NumberInput unit="分"
                       type="number"
                       min={0}
@@ -1200,8 +1173,6 @@ export default function MenuFormV8() {
                       aria-label="後の空き時間（分）"
                       aria-invalid={fieldErrors.buffer !== undefined}
                     /></SaveErrorField>
-
-                  </span>
 {fieldErrors.buffer !== undefined ? (
                     <span className={styles.fieldError} role="alert">{fieldErrors.buffer}</span>
                   ) : null}</Field>
@@ -1245,8 +1216,7 @@ export default function MenuFormV8() {
                 <span className={styles.toggleLineLabel}>予約するときに質問を出す</span>
               </div>
               {askQuestion && (
-                <Field label="質問文"><SaveErrorField names={["intakeQuestion","intake_question"]}><input
-                    className={styles.input}
+                <Field label="質問文"><SaveErrorField names={["intakeQuestion","intake_question"]}><TextField
                     type="text"
                     value={intakeQuestion}
                     onChange={(e) => setIntakeQuestion(e.target.value)}
@@ -1272,17 +1242,11 @@ export default function MenuFormV8() {
                   {resourceChoices.map((item) => {
                     const on = resourceIds.has(item.id)
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        aria-pressed={on}
+                      <Checkbox key={item.id} checked={on}
                         disabled={Boolean(editTarget && (!canManageResources || resourceSaving || saving || !item.isActive && !on))}
-                        className={`${styles.check} ${on ? styles.checkOn : ''}`}
-                        onClick={() => toggleResource(item.id)}
-                      >
-                        <span className={styles.checkBox} aria-hidden="true">{checkMark}</span>
+                        onCheckedChange={() => toggleResource(item.id)}>
                         {item.name}{!item.isActive ? '（停止中）' : ''}
-                      </button>
+                      </Checkbox>
                     )
                   })}
                 </div>
@@ -1304,22 +1268,11 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            <div className={styles.payHead}>
-              <h2 className={shell.sectionTitle}>お支払い</h2>
-              <StatusBadge tone="warning" size="compact">お店で払うのみ</StatusBadge>
-            </div>
+            <CardHeader size="stacked" title="お支払い" action={<StatusBadge tone="warning" size="compact">お店で払うのみ</StatusBadge>} />
             <p className={shell.sectionDesc}>決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</p>
-            <div className={styles.payRow} role="radiogroup" aria-label="お支払い方法">
-              <span className={`${styles.payOption} ${styles.payOptionOn}`} role="radio" aria-checked="true">
-                <span className={styles.payDot} aria-hidden="true" />お店で払う
-              </span>
-              <span className={styles.payOption} role="radio" aria-checked="false" aria-disabled="true" title="決済サービスをつなぐと選べます">
-                <span className={styles.payDot} aria-hidden="true" />オンラインで先払い
-              </span>
-              <span className={styles.payOption} role="radio" aria-checked="false" aria-disabled="true" title="決済サービスをつなぐと選べます">
-                <span className={styles.payDot} aria-hidden="true" />どちらでも
-              </span>
-            </div>
+            <Field label="お支払い方法" optional={false} help="オンラインで先払い・どちらでもは、決済サービスをつなぐまで選べません。">
+              <TextField readOnly value="お店で払う" />
+            </Field>
           </Card>
 
           {saveError && (

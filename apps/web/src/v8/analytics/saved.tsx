@@ -286,7 +286,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>
               {visibleItems.length === 0 ? <Tr><Td colSpan={5}>条件に合う保存済み分析はありません。<Button onClick={() => setQuery('')}>キャンセル</Button></Td></Tr> : visibleItems.map(item => <Tr key={item.id} data-table-layout="columns" selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)}>
-                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} aria-pressed={selectedId === item.id} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
+                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} selected={selectedId === item.id} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
                 <Td><TruncatedText value={kindLabel(item.kind)} /></Td><Td><TruncatedText value={item.createdByName} /></Td><Td><TruncatedText value={shortDateTime(item.updatedAt)} /></Td>
                 <Td title={item.latestSnapshot ? `${formatAnalyticsDate(item.latestSnapshot.periodFrom)}〜${formatAnalyticsDate(item.latestSnapshot.periodTo)}・${SAVED_STATE_LABELS[item.latestSnapshot.state]}` : undefined}>{latestPill(item)}</Td>
               </Tr>)}

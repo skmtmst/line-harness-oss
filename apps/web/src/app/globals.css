@@ -2903,13 +2903,13 @@ select:not([multiple]):not(.appearance-none) {
 }
 
 /* キーボードの輪は、画面から渡されたクラスにも共通で効く。 */
-html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible {
+html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible:not(:where([data-dialog-choice-cards] a)) {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
 /* 数値として登録し、地の濃さを120msで連続して変える（文字には重ねない）。 */
 @property --polish-overlay-strength { syntax: '<number>'; inherits: false; initial-value: 0; }
-html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
+html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):not(:where([data-dialog-choice-cards] a)) {
   --polish-overlay-strength: var(--polish-overlay-idle);
   background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
   transition-property: background-color, color, border-color, outline-color, box-shadow, transform, filter, opacity, --polish-overlay-strength;

@@ -44,7 +44,8 @@ export default function FileDropzone({
   /** 見本・検証用にドラッグ状態を固定する。指定時はドラッグ操作で見た目が変わらない。 */
   icon?: ReactNode
   invalid?: boolean
-  variant?: 'default' | 'video' | 'composer'
+  /** upload は欄全体がファイル選択の入口（内側のボタンを出さない）。 */
+  variant?: 'default' | 'video' | 'composer' | 'upload'
   previewState?: 'active' | 'reject'
   /** 見出し（「ここに画像を落とす」など）。 */
   title: string
@@ -73,6 +74,7 @@ export default function FileDropzone({
   const dragCount = useRef(0)
   const [drag, setDrag] = useState<'idle' | 'active' | 'reject'>('idle')
   const interactive = !disabled && !busy
+  const wholeZonePicker = variant === 'composer' || variant === 'upload'
 
   const openPicker = () => {
     if (interactive) inputRef.current?.click()
@@ -113,7 +115,8 @@ export default function FileDropzone({
 
   return (
     <div
-      role={variant === 'composer' ? 'button' : 'group'}
+      role={variant === 'upload' ? disabled ? 'group' : 'button' : variant === 'composer' ? 'button' : 'group'}
+      aria-disabled={variant === 'upload' && !interactive || undefined}
       aria-label={ariaLabel ?? title}
       aria-busy={busy || undefined}
       aria-invalid={invalid || undefined}
@@ -124,8 +127,8 @@ export default function FileDropzone({
       data-busy={busy || undefined}
       data-disabled={disabled || undefined}
       className={[styles.zone, className].filter(Boolean).join(' ')}
-      tabIndex={variant === 'composer' && interactive ? 0 : undefined}
-      onKeyDown={(event) => { if (variant === 'composer' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker() } }}
+      tabIndex={wholeZonePicker && interactive ? 0 : undefined}
+      onKeyDown={(event) => { if (wholeZonePicker && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker() } }}
       onClick={(event) => {
         // input 自身の click はここへ泡立ってくる。拾うと input.click() が再帰する。
         if ((event.target as HTMLElement | null)?.closest('input[type="file"]')) return
@@ -156,7 +159,7 @@ export default function FileDropzone({
             {shown === 'active' ? '離すと追加します' : title}
           </p>
           {shown === 'active' || variant === 'video' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
-          {shown === 'active' || variant === 'composer' ? null : (
+          {shown === 'active' || wholeZonePicker ? null : (
             <Button
               type="button"
               disabled={!interactive}

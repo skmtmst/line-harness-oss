@@ -2,7 +2,7 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, FileText, PenLine, Plus, Users } from 'lucide-react';
+import { ClipboardList, List, Pencil, Plus, Users } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
@@ -23,7 +23,7 @@ import styles from './list.module.css';
 import type { AttributeListHost } from './attribute-host';
 import { LoadStatus, UNFILED } from './fields-list-model'
 
-export function useFieldsTab({ accountId, canEdit, narrow = false, host }: { accountId: string | null; canEdit: boolean; narrow?: boolean; host?: AttributeListHost<FriendField> }) {
+export function useFieldsTab({ accountId, canEdit, narrow = false, host, explanation = false }: { accountId: string | null; canEdit: boolean; narrow?: boolean; host?: AttributeListHost<FriendField>; explanation?: boolean }) {
   const router = useRouter()
   const [items, setItems] = useState<FriendField[]>([])
   const [summary, setSummary] = useState<FriendFieldListSummary | null>(null)
@@ -284,11 +284,11 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host }: { acc
         : null
   const detailOf = (whenAvailable: string): string => kpiReason ?? whenAvailable
   const kpis = [
-    { title: '項目', icon: ClipboardList, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使っている ${summary.inUse} 件` : '使っている数は未集計') },
+    { title: '項目', icon: List, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使っている ${summary.inUse} 件` : '使っている数は未集計') },
     { title: '入力済みの友だち', icon: Users, value: summary?.registeredFriends ?? null, unit: '人', detail: detailOf('1つ以上入っている') },
     // 口そのものが無いときは、読込・失敗とは別の言葉にする（v7 と同じ）。
-    { title: '回答フォームで集める', icon: FileText, value: summary?.formLinks ?? null, unit: '件', detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答で自動で入る') },
-    { title: '今月の変更', icon: PenLine, value: summary?.updatedThisMonth ?? null, unit: '件', detail: detailOf('追加・名前の変更') },
+    { title: '回答フォームで集める', icon: ClipboardList, value: summary?.formLinks ?? null, unit: '件', detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答で自動で入る') },
+    { title: '今月の変更', icon: Pencil, value: summary?.updatedThisMonth ?? null, unit: '件', detail: detailOf('追加・名前の変更') },
   ]
 
   const folderRows: FolderPanelRow[] = [
@@ -320,7 +320,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host }: { acc
   )
 
 
-  return { accountId, canEdit, narrow, host, items, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
+  return { accountId, canEdit, narrow, host, explanation, items, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
 }
 
 import FieldsView from './fields-view'

@@ -170,4 +170,22 @@ describe('メニュー作成（V8）の欄を離れたときの確かめ', () =>
     expect(await screen.findByText('後の空き時間は0〜1440分の整数で入力してください')).toBeTruthy()
     expect(fixture.createMenu).not.toHaveBeenCalled()
   })
+
+  test('共通入力でも説明・質問・0分を編集でき、予約画面の入口に内容の名前が出る', async () => {
+    await renderForm()
+    const description = screen.getByLabelText('説明（お客さまに見えます）') as HTMLInputElement
+    fireEvent.change(description, { target: { value: '紹介文のテスト' } })
+    expect(description.value).toBe('紹介文のテスト')
+    fireEvent.click(screen.getByRole('checkbox', { name: '予約するときに質問を出す', exact: true }))
+    const question = screen.getByLabelText('質問文') as HTMLInputElement
+    fireEvent.change(question, { target: { value: '気になることを教えてください' } })
+    expect(question.value).toBe('気になることを教えてください')
+    const buffer = screen.getByLabelText('後の空き時間（分）') as HTMLInputElement
+    fireEvent.change(buffer, { target: { value: '0' } })
+    fireEvent.blur(buffer)
+    expect(buffer.value).toBe('0')
+    expect(screen.queryByText('後の空き時間は0〜1440分の整数で入力してください')).toBeNull()
+    expect(screen.getByRole('button', { name: 'お客さまの予約画面を見る', exact: true })).toBeTruthy()
+    expect(fixture.createMenu).not.toHaveBeenCalled()
+  })
 })

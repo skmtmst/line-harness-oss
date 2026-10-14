@@ -144,3 +144,15 @@ describe('R391 権限不足でも一覧へ戻れる', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
+
+it('プロフィールの編集入口は鉛筆印を持ち、候補の窓を開く', async () => {
+  calls.get.mockResolvedValue(personFixture(1, true))
+  await renderView(vi.fn(), MergedPersonV8)
+  await flush()
+  const edit = buttonByText('使う値を編集する')
+  expect(edit.querySelector('svg.lucide-pencil')).not.toBeNull()
+  fireEvent.click(edit)
+  await flush()
+  expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('統合プロフィールを編集')
+  expect(calls.unlink).not.toHaveBeenCalled()
+})

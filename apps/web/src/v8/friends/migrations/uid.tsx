@@ -327,7 +327,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 {m.runs.map((run) => {
                   const badge = historyBadge(run)
                   return (
-                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined} data-row-id={run.id}>
+                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={reviewing && active?.id === run.id || undefined} data-row-id={run.id}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
                         <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
