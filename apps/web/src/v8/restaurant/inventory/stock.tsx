@@ -15,7 +15,7 @@ import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
-import DateField from '@/components/shared/date-field'
+import StockListHeading from './stock-list-heading'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -415,11 +415,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>OTA・LINE・当日の合計が総数を超えると保存できません。予約媒体へは書き戻しません（検証中）</p>
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
-            <div className={styles.sectionHeadRow}>
-              <CardHeader size="stacked" titleId="rs-stock-title" title={`時間帯ごとの在庫（${dayLabel(date)}）`} meta="予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます" />
-              <span className={styles.datePicker}><SaveErrorField names={["date"]}><DateField displayFormat="short" aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></SaveErrorField></span>
+            <StockListHeading date={date} busy={busy} onChange={changeDate}>
               {canEdit && slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', onSelect: generateSlots }]} /> : null}
-            </div>
+            </StockListHeading>
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
