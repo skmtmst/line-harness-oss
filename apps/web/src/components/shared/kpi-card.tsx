@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChartNoAxesColumn, MoreHorizontal } from 'lucide-react'
+import { ArrowRight, Inbox, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
@@ -37,7 +37,7 @@ function staticMenuDescription(menu: ReactNode): string | undefined {
 
 export type KpiCardProps = {
   title: string
-  /** 図柄。省略時は棒グラフ。`null` で図柄なし（X4STXS の絵どおり）。 */
+  /** 図柄。省略時は数のマスの標準Inbox。`null` は印のない絵だけで使う。 */
   icon?: ReactNode
   /** V8: 数の右に出す増減の札。 */
   delta?: ReactNode
@@ -89,6 +89,8 @@ export type KpiCardProps = {
    * `description` と両方渡したときは `help` を使う。
    */
   help?: ReactNode
+  /** 題から説明を開くのが既定。「？」が描かれている題だけquestionを指定。 */
+  helpDisplay?: 'label' | 'question'
   /** 「？」の見出し。省略時は title。読み上げ名は「{見出し}の説明」。 */
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
@@ -145,6 +147,7 @@ export default function KpiCard({
   description,
   descriptionLabel,
   help,
+  helpDisplay = 'label',
   helpLabel,
   helpHref,
   helpHrefLabel,
@@ -179,6 +182,8 @@ export default function KpiCard({
   const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
   const tip = help ?? description ?? menuDescription
   const hasTip = tip !== undefined && tip !== null
+  const explanation = <>{tip}{helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}</>
+  const explanationLabel = descriptionLabel ?? `${helpLabel ?? title}の説明`
 
   const numberAndUnit = <>
     <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
@@ -207,16 +212,19 @@ export default function KpiCard({
         >
           {icon === null ? null : (
             <span data-kpi-icon className={styles.icon} aria-hidden="true">
-              {icon ?? <ChartNoAxesColumn size={14} />}
+              {icon ?? <Inbox size={14} />}
             </span>
           )}
-          <span className={styles.labelText}>
+          {hasTip && helpDisplay === 'label' ? (
+            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{title}</span>}>
+              {explanation}
+            </HelpTip>
+          ) : <span className={styles.labelText}>
             {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
-          </span>
-          {hasTip ? (
-            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`} className={styles.tip}>
-              {tip}
-              {helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}
+          </span>}
+          {hasTip && helpDisplay === 'question' ? (
+            <HelpTip label={explanationLabel} className={styles.tip}>
+              {explanation}
             </HelpTip>
           ) : null}
         </p>

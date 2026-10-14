@@ -18,12 +18,10 @@ afterEach(() => {
 })
 
 /**
- * 数の帯の題の「？」（I1E7Bt の絵：マスごとに ?）。
- * KpiSpec.help を渡すと KpiCard の help へ届き「？」が出る。
- * 渡さなければ出ない（今までどおり）。
+ * 説明を渡した題から読める。印を出すときは明示指定する。
  */
 describe('一覧KPIの「？」', () => {
-  it('help を渡すと「？」が出る', async () => {
+  it('help を渡すと、？を増やさず題から説明が読める', async () => {
     render(
       <ListKpis
         build={() => [
@@ -36,6 +34,7 @@ describe('一覧KPIの「？」', () => {
     )
     expect(await screen.findByText('有効な友だち')).toBeTruthy()
     expect(screen.getByRole('button', { name: '有効な友だちの説明' })).toBeTruthy()
+    expect(screen.getByText('有効な友だち').closest('[data-kpi-label]')?.textContent).toBe('有効な友だち')
   })
 
   it('help を渡さなければ「？」は出ない', async () => {
