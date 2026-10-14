@@ -32,6 +32,8 @@ export type DialogProps = {
   widthPreset?: 'picker'
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
+  /** 指定した上位置を含めて窓を画面内に収め、本文だけをスクロールする。 */
+  fitViewport?: boolean
   /**
    * ★V8：絵の窓の頭（題と×の行）の余白。CSS の padding と同じ書き方（例 `'20px 20px 0'`）。
    * 小窓だけの絵（MyJP7・F1LK4e・CVz5d など）は頭が今の共通の値（上20・左右24・下8）より
@@ -134,6 +136,7 @@ export default function Dialog({
   designLayout,
   confirmFirst,
   designTop,
+  fitViewport,
   designHeaderPadding,
   designHeaderHeight,
   designContentPadding,
@@ -361,7 +364,7 @@ export default function Dialog({
   const discardDialog = discard.confirming ? <Dialog open={discard.confirming} title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) discard.requestClose()
     }}>
       {panel}

@@ -15,7 +15,7 @@ const search = readFileSync(new URL('../../src/components/shared/search-field.mo
 
 for (const width of [1152, 1440, 1920]) {
   test(`picker actions stay visible with long content at ${width}`, async () => {
-    const browser = await chromium.launch()
+    const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width, height: 700 }, reducedMotion: 'reduce' })
       await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${search}\n${shell.replace(/\.(panel|overlay|header|footer|heading)(?=[^\w-]|$)/g, '.source$1')}</style></head><body>
@@ -48,6 +48,49 @@ for (const width of [1152, 1440, 1920]) {
       assert.equal((await page.evaluate(scanDialogAudit, options)).findings.filter(row => row.kind === 'dialog-fixed-action-hidden').length, 2)
       await page.locator('button').first().evaluate(el => { el.remove() })
       assert.equal((await page.evaluate(scanDialogAudit, options)).findings.filter(row => row.kind === 'dialog-fixed-action-missing').length, 1)
+    } finally { await browser.close() }
+  })
+}
+
+for (const width of [1152, 1440, 1920]) {
+  test(`positioned dialog keeps its header and actions inside the viewport at ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
+      await page.setContent(`<style>${globals}\n${dialog}</style><div class="overlay" data-design-top data-viewport-fit style="--dialog-design-top:147px"><div class="panel" data-m1-scope data-design-width style="--dialog-design-width:560px">
+        <div class="headerRow"><h2 class="title">臨時休業・貸切を足す</h2><button class="close">閉じる</button></div>
+        <div class="content"><div style="height:1600px">長い本文</div><label><input type="checkbox">Googleへ登録する</label></div>
+        <div class="footer"><div class="actions"><button>キャンセル</button><button>この日を閉じる</button></div></div>
+      </div></div>`)
+      const options = { viewportFit: true, fixedActions: ['閉じる', 'キャンセル', 'この日を閉じる'] }
+      for (const height of [900, 640, 360]) {
+        await page.setViewportSize({ width, height })
+        await page.waitForFunction(() => {
+          const rect = document.querySelector('.panel').getBoundingClientRect()
+          return Math.abs(rect.top - 147) < 1 && rect.bottom <= innerHeight - 15
+        })
+        const normal = await page.evaluate(scanDialogAudit, options)
+        assert.equal(normal.findings.length, 0, JSON.stringify(normal))
+        assert.equal(await page.locator('.panel').evaluate(el => el.getBoundingClientRect().top), 147)
+        await page.locator('.content').evaluate(el => { el.scrollTop = el.scrollHeight })
+        await page.getByRole('checkbox').check()
+        await page.getByRole('button', { name: 'この日を閉じる' }).click()
+        assert.equal((await page.evaluate(scanDialogAudit, options)).findings.length, 0)
+      }
+      await page.setViewportSize({ width, height: 360 })
+      await page.locator('.overlay').evaluate(el => el.style.setProperty('--dialog-design-top', '380px'))
+      await page.waitForFunction(() => Math.abs(document.querySelector('.panel').getBoundingClientRect().top - (innerHeight / 2 - 16)) < 1)
+      assert.equal((await page.evaluate(scanDialogAudit, options)).findings.length, 0)
+      const normalHeight = await page.locator('.panel').evaluate(el => el.getBoundingClientRect().height)
+      await page.locator('.panel').evaluate(el => { el.style.maxHeight = 'calc(100dvh - 32px)' })
+      await page.waitForFunction(() => document.querySelector('.panel').getBoundingClientRect().bottom > innerHeight)
+      const broken = await page.evaluate(scanDialogAudit, options)
+      assert.equal(broken.findings.filter(row => row.kind === 'dialog-viewport-bounds').length, 1)
+      assert.ok(broken.findings.some(row => row.kind === 'dialog-fixed-action-hidden'))
+      await page.locator('.panel').evaluate(el => { el.style.maxHeight = '' })
+      await page.waitForFunction(height => Math.abs(document.querySelector('.panel').getBoundingClientRect().height - height) < 1, normalHeight)
+      const restored = await page.evaluate(scanDialogAudit, options)
+      assert.equal(restored.findings.length, 0, JSON.stringify(restored))
     } finally { await browser.close() }
   })
 }

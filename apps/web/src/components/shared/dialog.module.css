@@ -329,6 +329,13 @@
    層（@layer components）の中に置くと、この層の外の「幅 560」に負けて効かない。必ずこの後ろに置く。 */
 :root .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
 :root .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
+:root .overlay[data-viewport-fit][data-design-top] {
+  --dialog-top-inset: clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16)));
+  padding-top: var(--dialog-top-inset);
+}
+:root .overlay[data-viewport-fit][data-design-top] > .panel {
+  max-height: calc(100dvh - var(--dialog-top-inset) - var(--space-16));
+}
 :root .headerRow { width: 100%; padding: 20px 24px 8px; gap: 12px; }
 /* 絵の頭の余白・高さを画面が渡したとき（designHeaderPadding・designHeaderHeight）。上の共通の値の後ろに置く。 */
 :root .panel[data-design-header-padding] > .headerRow { padding: var(--dialog-design-header-padding); }
