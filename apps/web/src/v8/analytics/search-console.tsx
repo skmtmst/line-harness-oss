@@ -2,7 +2,7 @@
 import { ValueBarChart } from '@/components/shared/charts'
 import { useEffect, useState } from 'react'
 import { Download, Eye, ListOrdered, MousePointerClick, Percent, SlidersHorizontal } from 'lucide-react'
-import { ListPage } from '@/components/templates'
+import { DashboardColumns, ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -13,7 +13,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type SearchConsoleMetric, type SearchConsoleMetricRow, type SearchConsolePerformance, type SearchConsoleSetup } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { StatePill, shortDay } from './common'
+import { StatePill } from './common'
 import styles from './search-console.module.css'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -45,7 +45,7 @@ function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetr
   return <Card variant="form" aria-label={title}>
     <CardHeader size="stacked" title={title} />
     {rows.length === 0 ? <p>データがありません</p> : <GridTable label={title} framed={false} design={{
-      columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-sc-col-64)',
+      columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-col-58)',
       gap: 'var(--polish-space-row)', rowPadding: '0', headPadding: '0',
       rowHeight: 'var(--polish-table-row)', headHeight: 'var(--tpl-thead-h)',
       fontSize: 'var(--text-caption)', headFontSize: 'var(--text-micro)',
@@ -130,7 +130,6 @@ export default function SearchConsoleV8() {
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
   const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
   const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
-  const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
 
   return <ListPage
     boardId="h1G4d"
@@ -167,21 +166,20 @@ export default function SearchConsoleV8() {
             <CardHeader size="stacked" titleId="sc-trend-title" title="検索クリックの推移（日別クリック数）" />
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
               <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
-              <div className={styles.scAxis}><span>{shortDay(data.daily[0].key)}</span><span>{middle ? shortDay(middle.key) : ''}</span><span>{`${shortDay(data.daily[data.daily.length - 1].key)}（反映待ち）`}</span></div>
             </>}
           </Card>
-          <div className={styles.rankings}>
-            <Ranking title="検索キーワード 上位10件" rows={data.queries} kind="query" />
-            <Ranking title="検索流入ページ 上位10件" rows={data.pages} kind="page" />
-            <Card className={styles.devices} variant="form" aria-labelledby="sc-devices-title">
+          <DashboardColumns layout="cards">{[
+            <Ranking key="queries" title="検索キーワード 上位10件" rows={data.queries} kind="query" />,
+            <Ranking key="pages" title="検索流入ページ 上位10件" rows={data.pages} kind="page" />,
+            <Card key="devices" variant="form" aria-labelledby="sc-devices-title">
               <CardHeader size="stacked" titleId="sc-devices-title" title="デバイス別" />
               {data.devices.map((device) => {
                 const ratio = data.summary.clicks ? device.clicks / data.summary.clicks * 100 : 0
                 const label = DEVICE_LABELS[device.key] ?? device.key
                 return <div key={device.key} className={styles.compareRow} title={`${label}：${ratio.toFixed(1)}%`}><span >{label}</span><span className={styles.spacer} /><strong data-weight="bold">{formatNumber(device.clicks)}</strong></div>
               })}
-            </Card>
-          </div>
+            </Card>,
+          ]}</DashboardColumns>
           <Notice tone="info" title={`集計期間 ${data.startDate}〜${data.endDate} ／ 読み取り専用で取得・最終更新 ${formatDateTime(data.fetchedAt)}`}>見かたの注意：Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません。掲載順位は平均値です。「検索から友だち追加」はサイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません。</Notice>
         </div>
       </>}

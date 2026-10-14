@@ -11,6 +11,7 @@ import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
+import { ListFolderContext } from '@/components/shared/list-folder-context'
 import Toggle from '@/components/shared/toggle'
 import { CircleDot, Download, Inbox, Plus, Star } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
@@ -42,7 +43,6 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { readSaveFieldErrors } from '@/lib/api-field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
 /*
  * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
  *
@@ -1322,7 +1322,7 @@ function LineNotificationsPage() {
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
-    <Card padding="rows" overflow="hidden" data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
+    <ListFolderContext.Provider value={false}><Card padding="rows" overflow="hidden" data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
       {loadState === 'loading' ? (
         <div aria-busy="true" aria-label="顧客へのお知らせを読み込んでいます">
           <DelayedSkeleton
@@ -1374,7 +1374,7 @@ function LineNotificationsPage() {
             })}
           </tbody>
         </DataTable>}
-    </Card>
+    </Card></ListFolderContext.Provider>
     </> : null}
   </SbSettingsScreen></SaveErrorScope>
 }

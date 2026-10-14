@@ -3,13 +3,6 @@
  * ここは本文（きっかけの札の段・4列のカード・注記）だけ。値は globals.css の `--tpl-wb-tm-*`。
  */
 
-/* 本文：上16・左右24・下24、段の間14（絵の「本文」）。 */
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wb-tm-body-gap);
-  padding: var(--tpl-wb-tm-body-pad);
-}
 
 /* きっかけの札の段（1行・右端に再読み込み）。 */
 .tools {
@@ -34,27 +27,7 @@
   flex: 1;
 }
 
-/* カード：4列・横12・縦14。高さは絵の162を最低にそろえ、ボタンは下にそろえる。 */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-wb-tm-grid-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wb-tm-card-gap);
-  min-width: 0;
-  min-height: var(--tpl-wb-tm-card-h);
-  padding: var(--tpl-wb-tm-card-pad);
-  border-radius: var(--tpl-wb-tm-card-radius);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-  background: var(--color-canvas);
-}
+/* カードの中身。面と格子は共通の型が持つ。 */
 .cardTitle {
   margin: 0;
   overflow: hidden;
@@ -89,13 +62,6 @@
   min-width: 0;
   margin: 0;
   color: var(--color-ink-secondary);
-}
-.cardSpacer {
-  flex: 1;
-}
-.cardButton {
-  width: 100%;
-  justify-content: center;
 }
 
 /* 注記（薄い地・角丸8）。 */
