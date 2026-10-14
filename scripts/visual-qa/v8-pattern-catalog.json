@@ -474,8 +474,8 @@
             "apps/web/src/components/shared/folder-add-dialog.tsx",
             "apps/web/src/components/shared/folder-editor-dialog.tsx",
             "apps/web/src/components/shared/folder-dot.tsx",
-          "apps/web/src/components/shared/list-folder-context.tsx",
-          "apps/web/src/components/templates/list-page.tsx"
+            "apps/web/src/components/shared/list-folder-context.tsx",
+            "apps/web/src/components/templates/list-page.tsx"
           ],
           "components": [
             "ManagedFolderPanel",
@@ -3387,6 +3387,35 @@
       },
       "code": {
         "selectorHint": "authPage",
+        "overrideSelectors": [],
+        "signals": []
+      }
+    },
+    {
+      "id": "verification-list",
+      "name": "接続のチェックの行",
+      "role": "入力した接続情報の検査結果を印・題・説明・状態で見せる",
+      "rules": [
+        "B-172",
+        "B-178",
+        "B-260"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/verification-list.tsx",
+            "apps/web/src/components/shared/verification-list.module.css"
+          ],
+          "components": [
+            "VerificationList"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "v2KMjの接続確認の行を共通部品へ"
+      },
+      "code": {
+        "selectorHint": "verification-list",
         "overrideSelectors": [],
         "signals": []
       }

@@ -1093,3 +1093,10 @@
 - 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
 - `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
 - 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
+
+<a id="verification-list"></a>
+## verification-list 接続のチェックの行
+
+- 役目：入力した接続情報の検査結果。一般の表ではなく、検査の印・題・説明・状態を並べる。
+- 持ち主：`shared/verification-list.tsx` の `VerificationList`。箱は共通Card、状態はStatusBadge、行は文字と上下12の自然高。
+- 失敗の説明は全文を折り返して高さを増やす。その他は1行で省略し、titleで全文を残す。使用先：LINEアカウント登録の接続確認（v2KMj）。
