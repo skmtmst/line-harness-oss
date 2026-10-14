@@ -187,15 +187,6 @@ button
 /* 日付の欄（共通の DateField を高さ36で使う）。 */
 .dateBox { display: block; width: 100%; }
 
-.genRow {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--tpl-bks-row-gap);
-}
-
-.genRow > .dateBox,
-.genRow > div { flex: 1 1 0; min-width: 0; }
-
 .calRow {
   display: flex;
   align-items: flex-end;

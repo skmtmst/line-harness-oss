@@ -377,6 +377,7 @@ test('勤務の5段は共通の見出しを使い、保存の操作と入力の�
   expect(screen.getByRole('button', { name: '月〜金 13:00〜14:00 の休憩を削除' }).getAttribute('data-design-node')).toBe('H0V8EK')
   expect(within(document.querySelector('[aria-labelledby="bks-gen"]') as HTMLElement).getAllByText('必須')).toHaveLength(2)
   const weeks = screen.getByRole('spinbutton', { name: 'まとめて作る週の数' })
+  expect(weeks.closest('[data-form-row="columns"]')?.getAttribute('data-form-columns')).toBe('2')
   expect(weeks.getAttribute('min')).toBe('1')
   expect(weeks.getAttribute('max')).toBe('12')
   fireEvent.change(weeks, { target: { value: '7' } })

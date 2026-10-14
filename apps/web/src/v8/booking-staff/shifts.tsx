@@ -17,6 +17,7 @@ import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
 import Card, { CardHeader } from '@/components/shared/card'
 import { TextField } from '@/components/shared/text-field'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -1327,9 +1328,11 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
             {canEdit ? <Card variant="form" gap="normal" aria-labelledby="bks-gen">
               <CardHeader size="stacked" titleId="bks-gen" title="何週分かのシフトを作る" />
               <p className={layout.cardNote}>いつもの勤務時間から、日ごとのシフトをまとめて作ります。作ったあと1日ずつ直せます。</p>
-              <div className={styles.genRow}>
+              <SettingsFormRow layout="columns" columns={2}>
                 <Field required label="開始日"><span className={styles.dateBox}><SaveErrorField names={["genFrom","from_date","gen_from"]}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></SaveErrorField></span></Field>
                 <div className={layout.field}><Field required label="週の数（1〜12）" htmlFor="bks-weeks"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} /></SaveErrorField></Field></div>
+              </SettingsFormRow>
+              <div className={styles.calActions}>
                 {canEdit ? (
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">
                     <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る
