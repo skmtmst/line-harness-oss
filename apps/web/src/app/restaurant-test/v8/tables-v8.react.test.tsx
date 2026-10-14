@@ -81,30 +81,36 @@ describe('BERxg 座席・卓管理のV8', () => {
   it('卓の詳細から変更・停止・再開が今の口へ届く', async () => {
     render(<TablesV8 />)
     const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
-    fireEvent.click(within(detail).getAllByRole('button', { name: /を変更$/ })[0])
+    fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('2人卓'), { target: { value: '奥の2人卓' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ label: '奥の2人卓' })))
     await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull())
-    await waitFor(() => expect((within(detail).getAllByRole('button', { name: /を停止$/ })[0] as HTMLButtonElement).disabled).toBe(false))
-    fireEvent.click(within(detail).getAllByRole('button', { name: /を停止$/ })[0])
+    await waitFor(() => expect((within(detail).getAllByRole('button', { name: /のその他操作$/ })[0] as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '止める' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ isActive: false })))
-    fireEvent.click(within(detail).getByRole('button', { name: /を再開$/ }))
+    await waitFor(() => expect((within(detail).getByRole('button', { name: '個室B・個室のその他操作' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(within(detail).getByRole('button', { name: '個室B・個室のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '再開' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'pb', expect.objectContaining({ isActive: true })))
   })
 
   it('追加・変更の枠に板 gBrCz の印が付く', async () => {
     render(<TablesV8 />)
     const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
-    fireEvent.click(within(detail).getAllByRole('button', { name: /を変更$/ })[0])
+    fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     expect(document.querySelector('[data-design-node="gBrCz"]')).not.toBeNull()
   })
 
   it('止める確認に板 eY9F3 の印が付く', async () => {
     render(<TablesV8 />)
     const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
-    fireEvent.click(within(detail).getAllByRole('button', { name: /を停止$/ })[0])
+    fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
   })
 })
@@ -112,7 +118,8 @@ describe('BERxg 座席・卓管理のV8', () => {
 it('座標と結合グループを数値入力で保存する',async()=>{
  render(<TablesV8 />)
  const detail=(await screen.findByRole('heading',{name:'卓の詳細'})).closest('section')!
- fireEvent.click(within(detail).getAllByRole('button',{name:/を変更$/})[0])
+ fireEvent.click(within(detail).getAllByRole('button',{name:/のその他操作$/})[0])
+ fireEvent.click(screen.getByRole('menuitem',{name:'変更'}))
  fireEvent.click(screen.getByRole('button',{name:'配置・結合グループ'}))
  fireEvent.change(screen.getByRole('spinbutton',{name:'横の位置'}),{target:{value:'2'}})
  fireEvent.change(screen.getByRole('spinbutton',{name:'縦の位置'}),{target:{value:'1'}})

@@ -240,3 +240,61 @@ describe('V8 投稿（審査）', () => {
     expect(dialog()?.textContent).not.toContain('新しい版を作る')
   })
 })
+
+
+it('掲載順の端の操作は理由を示し、並びを変えても取消で保存しない', async () => {
+  const items = [
+    { id: 'publication-a', version: 3, pet_name: 'こむぎ', hide_owner_name: 1, placements: [], view_count_30_days: null },
+    { id: 'publication-b', version: 5, pet_name: 'そら', hide_owner_name: 1, placements: [], view_count_30_days: null },
+  ]
+  const originalFetch = globalThis.fetch
+  const writes: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://worker.test')
+    if (init?.method && init.method !== 'GET') writes.push(url.pathname)
+    if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 2 }, items, pendingWithdrawals: [], withdrawnItems: [] } })
+    if (url.pathname === '/api/nen-members/photos/publications/order') return json({ success: true, data: { items } })
+    return originalFetch(input, init)
+  })
+  await render()
+  await click(buttons('公式サイト掲載')[0])
+  await click(buttons('並び順を変える')[0])
+  const dialog = document.querySelector('[role="dialog"]')!
+  const orderButtons = () => [...dialog.querySelectorAll<HTMLButtonElement>('button')]
+  const up = orderButtons().find(button => button.getAttribute('aria-label') === 'こむぎを上へ')!
+  const down = orderButtons().find(button => button.getAttribute('aria-label') === 'そらを下へ')!
+  expect(up.disabled).toBe(true)
+  expect(up.title).toBe('これより上には移動できません')
+  expect(down.disabled).toBe(true)
+  expect(down.title).toBe('これより下には移動できません')
+  await click(orderButtons().find(button => button.getAttribute('aria-label') === 'こむぎを下へ'))
+  expect(dialog.querySelector('li')?.textContent).toContain('そら')
+  await click(orderButtons().find(button => button.textContent === 'キャンセル'))
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  expect(writes).toEqual([])
+})
+
+
+it('掲載先の保存失敗は編集中の窓だけで伝え、選択を保持する', async () => {
+  const item = { id: 'publication-a', version: 3, pet_name: 'こむぎ', hide_owner_name: 1, placements: [], view_count_30_days: null }
+  const originalFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://worker.test')
+    if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 1 }, items: [item], pendingWithdrawals: [], withdrawnItems: [] } })
+    if (url.pathname.endsWith('/placements') && init?.method === 'PUT') return new Response(JSON.stringify({ success: false, error: { code: 'CONFLICT', message: '先に変更されました' } }), { status: 409, headers: { 'Content-Type': 'application/json' } })
+    return originalFetch(input, init)
+  })
+  await render()
+  await click(buttons('公式サイト掲載')[0])
+  await click(buttons('その他操作')[0])
+  await click(buttons('使う場所')[0])
+  const dialog = document.querySelector('[role="dialog"]')!
+  const firstChoice = dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+  await click(firstChoice)
+  expect(firstChoice.checked).toBe(true)
+  await click([...dialog.querySelectorAll('button')].find(button => button.textContent === '保存する'))
+  const alerts = [...document.querySelectorAll('[role="alert"]')].filter(element => element.textContent?.includes('使う場所を保存できませんでした'))
+  expect(alerts).toHaveLength(1)
+  expect(dialog.contains(alerts[0])).toBe(true)
+  expect(firstChoice.checked).toBe(true)
+})

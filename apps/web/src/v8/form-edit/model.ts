@@ -311,3 +311,7 @@ export function readPage(value: string | null, count: number): number {
 export function firstInputBlockId(blocks: FormBlock[]): string | null {
   return blocks.find((b) => b.kind === 'input')?.id ?? null
 }
+
+export function blockTitleKind(block: FormBlock): string {
+  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
+}

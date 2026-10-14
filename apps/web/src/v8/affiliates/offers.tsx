@@ -17,7 +17,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import ListPagination from '@/components/shared/list-pagination'
 import Select from '@/components/shared/select'
 import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -580,9 +580,9 @@ export default function OffersTab() {
     </>
   )
 
-  const pager = ready && shown.length > 0 ? (
+  const pager = ready ? (
     <ListPagePagination>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} range={{ total: shown.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + paged.length }} />
+      <ListPagination total={shown.length} page={currentPage} pageSize={pageSize} unit="件" onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined
 

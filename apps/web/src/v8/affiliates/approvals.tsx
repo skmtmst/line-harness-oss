@@ -16,7 +16,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
+import ListPagination from '@/components/shared/list-pagination'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
@@ -574,9 +574,9 @@ export default function ApprovalsTab() {
     </>
   )
 
-  const pager = ready && shownItems.length > 0 ? (
+  const pager = ready ? (
     <ListPagePagination>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={(value) => { setPage(value); clearSelections() }} range={{ total: shownItems.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + pagedItems.length }} />
+      <ListPagination total={shownItems.length} page={currentPage} pageSize={pageSize} unit="件" onPageChange={(value) => { setPage(value); clearSelections() }} />
     </ListPagePagination>
   ) : undefined
 

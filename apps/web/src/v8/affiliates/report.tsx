@@ -33,6 +33,7 @@ import {
   type ReportPeriod,
 } from './display'
 import AffiliateDrawer from './drawer'
+import { rewardText, type Agg } from './report-values'
 import { AffiliateArchiveDialog } from './dialogs'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, PerPageSelect, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
@@ -44,17 +45,6 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ViewKey = 'affiliate' | 'offer'
-
-interface Agg {
-  id: string
-  name: string
-  sub: string | null
-  conversions: number
-  revenue: number
-  reward: number
-  missingReward: boolean
-  prevReward: number | null
-}
 
 const SAVED_VIEWS = [
   { value: '', label: 'よく使う絞り込み' },
@@ -202,16 +192,6 @@ export default function ReportTab() {
       : [['案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])])
   }
 
-  const rewardText = (row: Agg): string => {
-    if (row.conversions === 0 || row.missingReward) return '—'
-    if (row.reward === 0) return '計測のみ'
-    const base = formatYen(row.reward)
-    if (false || row.prevReward == null) return base
-    if (row.prevReward === 0) return `${base}（初めて）`
-    const diff = row.reward - row.prevReward
-    if (diff === 0) return `${base}（±¥0）`
-    return `${base}（${diff > 0 ? '+' : '−'}¥${formatNumber(Math.abs(diff))}）`
-  }
 
   const affiliate = affiliates.find(a => a.id === drawerId)
   const agg = affiliateRows.find(row => row.id === drawerId)

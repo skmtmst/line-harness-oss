@@ -2,7 +2,7 @@
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Download, Eye, PencilLine, Play, CircleCheck, Clock, LogOut } from 'lucide-react';
+import { Download, Eye, PencilLine } from 'lucide-react';
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared';
 import { api, ApiError, type ScenarioRuns } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
@@ -19,8 +19,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
+import ScenarioResultSummary from './result-summary'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
@@ -33,14 +32,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import Notice from '@/components/shared/notice'
 import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
-/*
- * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
- *
- * 型（DetailPage）に、戻る・題・説明・右上の操作（シナリオの編集へ・CSVで書き出す）と、
- * 中身（数の帯・通ごとの反応・参加中の友だちの表）を渡す。
- * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
- * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
- */
+/** 購読ごとの状態と未取得の反応を分け、再送や予定の操作は元の記録へ結び付ける。 */
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -398,33 +390,7 @@ export default function ScenarioResultsV8() {
     )
   }
 
-  /*
-   * 数の帯：始まった（参加した人）・読み終えた（全部届いた人）・途中（いま途中・止まっている人）・
-   * 離れた（終わらずに抜けた人＝参加 − 読み終えた − 途中）。
-   */
-  const enrolled = stats?.enrolledTotal ?? null
-  const completedCount = runs?.summary.completed ?? stats?.completed ?? null
-  const inProgress = runs
-    ? runs.summary.active + runs.summary.delivering + runs.summary.paused
-    : stats ? stats.activeNow + stats.paused : null
-  const leftCount = enrolled !== null && completedCount !== null && inProgress !== null
-    ? Math.max(0, enrolled - completedCount - inProgress)
-    : null
-  /* 届いた人数が次の通で最も減った通（「ここで離れた」）。離れた人がいるときだけ示す。 */
   const reachedOf = (step: ScenarioStep) => runsByOrder.get(step.stepOrder)?.delivered ?? statsByOrder.get(step.stepOrder)?.reachedCount ?? null
-  let dropStep: { order: number; count: number; base: number } | null = null
-  if (leftCount) {
-    sortedSteps.forEach((step, index) => {
-      const next = sortedSteps[index + 1]
-      if (!next) return
-      const here = reachedOf(step)
-      const there = reachedOf(next)
-      if (here === null || there === null) return
-      const count = Math.min(leftCount, here - there)
-      if (count > 0 && (!dropStep || count > dropStep.count)) dropStep = { order: step.stepOrder, count, base: here }
-    })
-  }
-  const drop = dropStep as { order: number; count: number; base: number } | null
   /* 送れずに止まった人（実行記録の失敗数）。取れないときは数を断定しない。 */
   const failedTotal = (runs?.steps ?? []).reduce(
     (acc, step) => acc + (step.failed.state === 'available' ? (step.failed.value ?? 0) : 0),
@@ -455,33 +421,14 @@ export default function ScenarioResultsV8() {
       {!loading && scenario && stats ? (
         <>
           <div className={styles.kpiBox}>
-          <KpiBand data-design="KPIs">
-            <KpiCard icon={<Play size={14} aria-hidden="true" />} title="始まった" value={enrolled} unit="人" detail="購読を始めた人" />
-            <KpiCard
-              presentation="cell"
-              icon={<CircleCheck size={14} aria-hidden="true" />}
-              title="読み終えた"
-              value={completedCount}
-              unit="人"
-              detail={enrolled && completedCount !== null ? percentLabel(completedCount, enrolled) : emptyValue('unknown')}
-            />
-            <KpiCard icon={<Clock size={14} aria-hidden="true" />} title="途中" value={inProgress} unit="人" detail="いま途中にいる人" />
-            <KpiCard
-              presentation="cell"
-              icon={<LogOut size={14} aria-hidden="true" />}
-              title="離れた"
-              value={leftCount}
-              unit="人"
-              detail={drop ? `${drop.order} 通目で多い` : '終わらずに抜けた人'}
-            />
-          </KpiBand>
+          <ScenarioResultSummary stats={stats} summary={runs?.summary} />
           </div>
 
           <section className={styles.section} aria-labelledby="scenario-results-steps">
             <div className={styles.sectionHead}>
               <h2 id="scenario-results-steps" className={styles.sectionTitle}>通ごとの反応</h2>
               {deliveringCount > 0 ? (
-                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)} 人）</span>
+                <span className={styles.sectionNote} role="status">いま送っています（送信中の購読 {formatNumber(deliveringCount)} 件）</span>
               ) : null}
             </div>
             <NoteBar tone="info">
@@ -508,9 +455,7 @@ export default function ScenarioResultsV8() {
                         <span className={styles.stepMeta}>
                           {`届いた率 ${reached === null ? emptyValue('unknown') : percentLabel(reached, stats.enrolledTotal)}・開いた ${opened}・押した ${clicked}`}
                         </span>
-                        {drop && drop.order === step.stepOrder ? (
-                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)} 人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
-                        ) : null}
+
                       </div>
                       <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder} 通目の届いた率`} />
                     </GridCell></GridRow>
@@ -529,7 +474,7 @@ export default function ScenarioResultsV8() {
               <h2 id="scenario-results-friends" className={styles.sectionTitle}>参加中の友だち</h2>
               {failedTotal > 0 ? (
                 <button type="button" className={styles.sectionLink} onClick={() => setSubscriptionStatus('paused')}>
-                  {`送れずに止まった人が ${formatNumber(failedTotal)} 人・止まっている人だけを見る`}
+                  {`送れなかった記録 ${formatNumber(failedTotal)} 件・止まっている購読だけを見る`}
                 </button>
               ) : null}
             </div>
@@ -554,7 +499,7 @@ export default function ScenarioResultsV8() {
                 /></SaveErrorField>
               </span>
               {runs ? (
-                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 人`}</span>
+                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 件（購読）`}</span>
               ) : null}
               <span className={styles.toolsSpacer} />
               <Button

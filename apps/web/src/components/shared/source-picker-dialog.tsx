@@ -39,7 +39,7 @@ export default function SourcePickerDialog({ items, preview, ...rest }: {
   onConfirm: (id: string) => void
   onCancel: () => void
 }) {
-  return <EntityPickerDialog {...rest} preview={preview} items={items.map((item) => ({ ...item, meta: item.updatedLabel }))} />
+  return <EntityPickerDialog {...rest} scrollBody preview={preview} items={items.map((item) => ({ ...item, meta: item.updatedLabel }))} />
 }
 
 function folderName(id: string | null | undefined, folders: SourcePickerFolder[]) {

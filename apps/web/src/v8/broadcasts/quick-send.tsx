@@ -17,6 +17,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -290,7 +291,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -298,13 +299,12 @@ export default function QuickSendV8({
           maxLength={TEXT_LIMIT}
           disabled={busy || pending}
           onValueChange={(next) => setText(next)}
-        /></SaveErrorField>
-<div className={styles.metaRow}>
-          <span className={styles.meta}>差し込む：</span>
-          <button type="button" className={styles.insert} disabled={busy || pending} onClick={insertName}>名前</button>
-          <span className={styles.spacer} aria-hidden="true" />
-          <span className={styles.meta}>{`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}</span>
-        </div>
+        />
+          <MessageInsertRow count={`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}>
+            <MessageInsertButton kind="name" label="名前" disabled={busy || pending} onClick={insertName} />
+          </MessageInsertRow>
+        </MessageBody></SaveErrorField></Field>
+
 <p className={styles.label} id="quick-send-v8-target">送る相手</p>
 <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
@@ -352,7 +352,7 @@ export default function QuickSendV8({
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>
           ) : null}
-        </div></Field></div>
+        </div></div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </></SaveErrorScope>

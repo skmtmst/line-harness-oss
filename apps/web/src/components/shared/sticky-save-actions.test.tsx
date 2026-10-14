@@ -8,6 +8,27 @@ import StickyBar from './sticky-bar'
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
+it('明示した役目の印は通常/分割の帯とリンクで保ち、待機/完了では状態印へ替わる', () => {
+  vi.useFakeTimers()
+  const actions = (busy = false, done = false) => <Button variant="primary" icon={<Upload aria-hidden="true" />} busy={busy} done={done}>保存して配る</Button>
+  const { rerender } = render(<StickyBar actions={actions()} />)
+  const button = screen.getByRole('button')
+  expect(button.querySelectorAll('svg')).toHaveLength(1)
+  expect(button.querySelector('svg.lucide-upload')).not.toBeNull()
+  rerender(<StickyBar split={{ trailingWidth: '380px' }} actions={actions()} />)
+  expect(screen.getByRole('button').querySelector('svg.lucide-upload')).not.toBeNull()
+  rerender(<StickyBar actions={actions(true)} />)
+  expect(screen.getByRole('button').querySelectorAll('svg')).toHaveLength(1)
+  expect(screen.getByRole('button').querySelector('svg.lucide-loader-circle')).not.toBeNull()
+  rerender(<StickyBar actions={actions(false, true)} />)
+  expect(screen.getByRole('button').querySelectorAll('svg')).toHaveLength(1)
+  expect(screen.getByRole('button').querySelector('svg.lucide-check')).not.toBeNull()
+  act(() => { vi.advanceTimersByTime(1300) })
+  expect(screen.getByRole('button').querySelector('svg.lucide-upload')).not.toBeNull()
+  rerender(<Button href="/templates" icon={<ArrowRight aria-hidden="true" />}>配る内容を見る</Button>)
+  expect(screen.getByRole('link').querySelector('svg.lucide-arrow-right')).not.toBeNull()
+})
+
 it.each(['保存する', '登録して紹介リンクを発行する', 'つくって動かす', '有効にする', 'タグを作る'])('主操作「%s」は共通の保存印と元の文字を持つ', label => {
   render(<StickyBar actions={<><div><Button variant="primary"><span><Check size={15} aria-hidden="true" /><strong>{label}</strong></span></Button></div></>} />)
   const button = screen.getByRole('button', { name: label })
