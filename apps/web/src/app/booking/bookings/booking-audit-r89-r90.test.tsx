@@ -116,6 +116,22 @@ function monthBounds(): { from: string; to: string } {
 }
 
 describe('監査 R90: 今月は今月の予約に絞る', () => {
+  it('今月の数の帯には項目の印があり、今日の表示は保つ', async () => {
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    for (const [title, icon] of [['今月の予約', 'calendar'], ['確定', 'calendar-plus'], ['変更依頼', 'circle-alert'], ['キャンセル', 'calendar-x']]) {
+      const label = await screen.findByText(title, { selector: '[data-kpi-label] > span' })
+      expect(label.closest('[data-kpi-label]')?.querySelectorAll(`[data-kpi-icon] svg.lucide-${icon}`)).toHaveLength(1)
+    }
+    fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: /^今日/ }))
+    expect(document.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
+  })
+  it('今月の題から一覧とCSVの説明を開ける', async () => {
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '予約管理の説明' }))
+    expect(await screen.findByText('予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。')).toBeTruthy()
+  })
   it('今月タブで一覧の取得に今月の初め〜来月の初めが入る', async () => {
     render(<BookingsPage />)
     fireEvent.click(screen.getByRole('button', { name: /^今月/ }))

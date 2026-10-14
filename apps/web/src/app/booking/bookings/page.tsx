@@ -14,7 +14,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Phone, X } from 'lucide-react'
+import { Calendar, CalendarPlus, CalendarX, CircleAlert, Phone, X } from 'lucide-react'
 import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -896,7 +896,7 @@ export default function BookingsPage() {
       {canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new"><Phone size={16} aria-hidden="true" />電話の予約を入れる</Button> : null}
     </>
   )
-  const pageHead = <PageHeading title="予約管理" actions={headingActions} />
+  const pageHead = <PageHeading title="予約管理" help={view === 'month' ? '予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。' : undefined} actions={headingActions} />
 
   const dialogs = (
     <>
@@ -984,22 +984,22 @@ export default function BookingsPage() {
 
           {/* 未取得の数と、取得済みの0件を区別する。 */}
           <KpiBand data-design="KPIs">
-            <KpiCard icon={null} presentation="band"
+            <KpiCard icon={view === 'month' ? <Calendar size={16} aria-hidden="true" /> : null} presentation="band"
               title="今月の予約"
               value={summaryReady ? kpi.total : null}
               unit="件"
               detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
             />
-            <KpiCard icon={null} presentation="band" title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
+            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
             {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
                 承認待ちを出す。要対応であることは変わらない。 */}
-            <KpiCard icon={null} presentation="band"
+            <KpiCard icon={view === 'month' ? <CircleAlert size={16} aria-hidden="true" /> : null} presentation="band"
               title="変更依頼"
               value={summaryReady ? summary.requested : null}
               unit="件"
               detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
             />
-            <KpiCard icon={null} presentation="band"
+            <KpiCard icon={view === 'month' ? <CalendarX size={16} aria-hidden="true" /> : null} presentation="band"
               title="キャンセル"
               value={summaryReady ? kpi.cancelled : null}
               unit="件"
