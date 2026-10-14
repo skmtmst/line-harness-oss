@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
@@ -44,6 +45,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
@@ -383,6 +385,7 @@ function InflowCreate() {
       hidePreviewWhenNarrow
       boardId="KMaMk"
       title="流入リンクを作る"
+      help="友だち追加の入口を作り、どこから来たかと、追加後に行うことを決めます。"
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}
@@ -405,7 +408,7 @@ function InflowCreate() {
 
       <Card variant="form" gap="normal" aria-labelledby="ir-new-where">
         <CardHeader size="stacked" titleId="ir-new-where" title={<>どこに置くリンクですか</>} meta={<>名前は一覧で見分けるため。お客さまには見えません</>} />
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="name-folder">
           <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
@@ -423,29 +426,23 @@ function InflowCreate() {
 <FieldError id="ir-name-error">{fieldErrors['ir-name']}</FieldError></Field></div>
           <div className={styles.field}>
             <Field label="フォルダ">
-            <SaveErrorField names={["genre"]}><Select
+            <SaveErrorField names={["genre"]}><FolderSelect
               id="ir-genre"
               value={genre}
-              onChange={(next) => setGenre(next)}
+              onChange={setGenre}
               aria-label="フォルダ"
               size="full"
-              options={[
-                { value: '', label: '（選ばない）' },
-                ...genres.map((item) => ({ value: item.name, label: item.name })),
-                { value: '__new', label: '新しいフォルダ…' },
-              ]}
+              colors={false}
+              unfiled={{ value: '', label: '（選ばない）' }}
+              folders={[...genres.map((item) => ({ value: item.name, label: item.name })), ...(genre === '__new' && newGenre ? [{ value: '__new', label: newGenre }] : [])]}
+              onCreate={async (name) => {
+                // フォルダの保存は、これまでと同じリンクの発行時だけ。
+                setNewGenre(name)
+                return { value: name, label: name }
+              }}
             /></SaveErrorField></Field>
           </div>
-        </div>
-        {genre === '__new' ? (
-          <SaveErrorField names={["newGenre","new_genre"]}><TextField
-            type="text"
-            value={newGenre}
-            onChange={(event) => setNewGenre(event.target.value)}
-            placeholder="新しいフォルダの名前"
-            aria-label="新しいフォルダの名前"
-          /></SaveErrorField>
-        ) : null}
+        </SettingsFormRow>
         <Field label={<><span className={styles.labelRow}>
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
 

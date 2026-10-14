@@ -36,10 +36,11 @@ describe('行操作を見える位置へ（#975 U042）', () => {
   })
 
   it('権限者の変更・再送は各行にあり、操作権限がある人だけに出す', () => {
-    expect(MEMBERS).toContain('role="table"')
-    expect(MEMBERS).toContain('onClick={() => openChange(member)}')
-    expect(MEMBERS).toContain('canManage && canResendInvite(member)')
-    expect(MEMBERS).toContain('onClick={() => void resend(member)}')
-    expect(MEMBERS).toContain('aria-label={`${member.name}さんの権限を変更`}')
+    expect(MEMBERS).toContain('<GridTable label="権限者の一覧"')
+    expect(MEMBERS).toContain('onClick: () => openChange(member)')
+    expect(MEMBERS).toContain('canManage ? <RowActions')
+    expect(MEMBERS).toContain('menuItems={canResendInvite(member)')
+    expect(MEMBERS).toContain('onSelect: () => { void resend(member) }')
+    expect(MEMBERS).toContain("subjectName={member.name} edit={{ label: '権限を変更する'")
   })
 })

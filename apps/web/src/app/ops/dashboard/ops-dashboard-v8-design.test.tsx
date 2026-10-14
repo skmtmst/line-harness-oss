@@ -98,10 +98,17 @@ describe('CyW0E ダッシュボードの絵合わせ', () => {
     expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).not.toContain('のようす')
     // 数の帯の順と内訳
-    const order = ['契約中の月額合計', '今月の売上（入金済み）', 'トライアル中', '今月の AI 利用']
+    const order = ['契約中の月額合計', '今月の売上', 'トライアル中', '今月の AI 利用']
     const positions = order.map((t) => body.indexOf(t))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+    const revenueHelp = host.querySelector<HTMLButtonElement>('button[aria-label="今月の売上の説明"]')!
+    expect(revenueHelp).toBeTruthy()
+    await act(async () => { revenueHelp.click() })
+    expect(document.body.textContent).toContain('今月の売上（入金済み）')
+    expect(document.body.textContent).toContain('前月比')
+    expect(document.body.textContent).toContain('返金')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(body).toContain('契約中 3・決済失敗 1（トライアルは入れない）')
     expect(body).toContain('決済失敗 1 社')
     expect(body).toContain('期限 3日以内 1')

@@ -29,27 +29,6 @@
 .failText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
 .failTitle { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-run-fail-title-lh); }
 .failNote { margin: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); text-overflow: ellipsis; white-space: nowrap; }
-
-/* 実行の記録：枠1本・角12。上に道具の段（余白12/20・間8）。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-ar-run-tools-pad);
-}
-.searchBox { width: var(--tpl-ar-run-search-w); }
-.searchBox :global(*) { max-width: 100%; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); }
 /* 札：選んだものは墨の地に白い字、ほかは白地に細い枠（絵の札 高さ36・横10・12px）。 */
 .chip {
@@ -70,50 +49,6 @@
   cursor: pointer;
 }
 .chip[aria-pressed='true'] { outline-color: var(--color-ink); background: var(--color-ink); color: var(--color-canvas); }
-.toolsSpacer { flex: 1 1 0; }
-.periodBox { width: var(--tpl-ar-run-period-w); }
-.periodBox :global(*) { max-width: 100%; }
-.periodBox :global(button) { width: 100%; }
-.sizeBox { width: var(--tpl-ar-run-size-w); }
-.sizeBox :global(*) { max-width: 100%; }
-.sizeBox :global(button) { width: 100%; }
-
-/* 表：見出し 35（余白10/20）・行 49.5（余白11/20）・欄の間16。 */
-.table { border: 0; border-radius: var(--tpl-ar-run-table-radius); }
-:global(:root) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-wb-col-gap);
-  height: var(--tpl-ar-run-head-h);
-  padding: var(--tpl-ar-run-head-pad);
-  background: var(--color-table-head);
-  box-shadow: var(--tpl-ar-run-head-lines);
-}
-:global(:root) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-wb-col-gap);
-  height: var(--tpl-ar-run-row-h);
-  padding: var(--tpl-ar-run-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-}
-:global(:root) .table .headRow[data-table-layout='columns'] > th,
-:global(:root) .table .row[data-table-layout='columns'] > td {
-  display: flex;
-  align-items: center;
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global(:root) .table .headRow[data-table-layout='columns'] > th {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-:global(:root) .table .headRow[data-table-layout='columns'] > th.colDone,
-:global(:root) .table .row[data-table-layout='columns'] > td.colDone {
-  flex: 1 1 0;
-  min-width: 0;
-}
 .colWhen { width: var(--tpl-ar-run-col-when); flex-shrink: 0; }
 .colFriend { width: var(--tpl-ar-run-col-friend); flex-shrink: 0; gap: var(--tpl-body-gap); min-width: 0; }
 .colInput { width: var(--tpl-ar-run-col-input); flex-shrink: 0; min-width: 0; }
@@ -122,31 +57,6 @@
 .colTime { width: var(--tpl-ar-run-col-time); flex-shrink: 0; }
 .colMenu { width: var(--tpl-ar-run-col-menu); flex-shrink: 0; }
 .when { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
-.face {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-ar-run-face);
-  height: var(--tpl-ar-run-face);
-  border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 700;
-}
-.friendName {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .input,
 .done,
 .time {
@@ -164,36 +74,6 @@
 :global(:root) .menuBox :global(button) { width: var(--tpl-ar-run-col-menu); min-width: 0; height: var(--tpl-ar-run-col-menu); min-height: 0; }
 
 .pager { padding: var(--tpl-ar-run-pager-pad); }
-
-/* 下の2つの箱：間16・余白20・題15/700・行 34.5（線は下）。 */
-.bottom { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-ar-run-bottom-gap); }
-.box {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-side-card-gap);
-  min-width: 0;
-  min-height: var(--tpl-ar-run-box-h);
-  padding: var(--tpl-section-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.boxTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-run-box-title-lh); }
-.kv { display: flex; flex-direction: column; margin: 0; }
-.kvRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-body-gap);
-  min-height: var(--tpl-ar-run-kv-row-h);
-  padding: var(--tpl-side-row-pad) 0;
-  box-shadow: var(--shadow-row-line);
-}
-.kvRow > dt { flex: 1 1 auto; min-width: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
-.kvRow > dd { margin: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; }
-.kvRow > dd.kvWarn { color: var(--color-warning); }
-.boxFoot { display: flex; justify-content: flex-end; padding-top: var(--tpl-ar-run-foot-pad); }
 
 .hint { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .stopReason {

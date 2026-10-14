@@ -28,6 +28,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 let staffRole: 'admin' | 'staff' = 'admin'
+let readOnly = false
 
 const mediaItems = [
   {
@@ -112,13 +113,14 @@ function ensureStorage() {
 beforeEach(() => {
   ensureStorage()
   staffRole = 'admin'
+  readOnly = false
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.includes('/api/staff/me')) {
-      return response({ success: true, data: { id: 'staff-1', role: staffRole } })
+      return response({ success: true, data: { id: 'staff-1', role: staffRole, readOnly } })
     }
     if (url.includes('/api/media/quota')) {
       return response({
@@ -178,6 +180,32 @@ async function renderPage() {
 }
 
 describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
+  test('閲覧専用は登録を隠し、一覧・表示切替・権限の説明を保つ', async () => {
+    readOnly = true
+    await renderPage()
+    expect(host?.textContent).toContain('秋の新商品.jpg')
+    expect(host?.textContent).toContain('閲覧のみで見ています')
+    expect([...host!.querySelectorAll('button')].some(button => button.textContent?.includes('メディアを登録する'))).toBe(false)
+    expect(host!.querySelector('[aria-label="一覧で並べる"]')).not.toBeNull()
+    const pager = host!.querySelector('[data-list-pager]')!
+    expect(pager.textContent).not.toContain('管理者だけ')
+    expect(pager.querySelector('nav')).not.toBeNull()
+  })
+  test('共通の表示切替から一覧へ移り、戻してもメディアと登録操作を保つ', async () => {
+    await renderPage()
+    const list=host!.querySelector<HTMLButtonElement>('button[aria-label="一覧で並べる"]')!
+    const grid=host!.querySelector<HTMLButtonElement>('button[aria-label="格子で並べる"]')!
+    expect(grid.getAttribute('aria-pressed')).toBe('true')
+    await act(async()=>{list.click()})
+    expect(list.getAttribute('aria-pressed')).toBe('true')
+    expect(grid.getAttribute('aria-pressed')).toBe('false')
+    expect(host!.textContent).toContain('秋の新商品.jpg')
+    expect(host!.textContent).toContain('メディアを登録する')
+    await act(async()=>{grid.click()})
+    expect(grid.getAttribute('aria-pressed')).toBe('true')
+    expect(host!.textContent).toContain('メニュー表.pdf')
+  })
+
   test('v8 では新しい一覧（O7hUt7）が出て、v7 は出ない', async () => {
     document.documentElement.dataset.theme = 'v8'
     await renderPage()

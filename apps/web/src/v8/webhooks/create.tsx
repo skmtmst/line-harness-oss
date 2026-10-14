@@ -359,6 +359,8 @@ function WebhooksCreateV8Inner() {
       boardId="hsD8e"
       title="送り先を作る"
       help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
+      previewLabel="送るデータを見る"
+      previewTitle="送るデータの見本"
       preview={preview}
       status="下書き（まだ動いていません）"
       footerActions={(
@@ -404,7 +406,7 @@ function WebhooksCreateV8Inner() {
 
       <Card variant="form" aria-labelledby="wh-new-dest">
         <CardHeader size="stacked" titleId="wh-new-dest" title="どこへ送りますか" />
-        <Field label="名前" htmlFor="wh-new-name" requirement={nameRequirement} error={fieldErrors.name}>
+        <Field requirement={nameRequirement} label="名前" htmlFor="wh-new-name" error={fieldErrors.name}>
           <SaveErrorField names={["name"]}><TextField
             id="wh-new-name"
             value={name}
@@ -418,7 +420,7 @@ function WebhooksCreateV8Inner() {
             required
           /></SaveErrorField>
         </Field>
-        <Field label="送り先の URL" htmlFor="wh-new-url" requirement={urlRequirement} error={fieldErrors.url}>
+        <Field requirement={urlRequirement} label="送り先の URL" htmlFor="wh-new-url" error={fieldErrors.url}>
           <SaveErrorField names={["url"]}><TextField
             id="wh-new-url"
             type="url"

@@ -2527,7 +2527,10 @@ export function NewAutomationV8({
         )
         : 'きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。'}
       /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
-      previewToggle={conflictBand}
+      notice={conflictBand}
+      noticeSpacing="band"
+      previewLabel="設定内容を見る"
+      previewTitle="設定内容"
       preview={sideColumn}
       status={saveStatusText}
       footerActions={(
@@ -2585,7 +2588,7 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
-        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" requirement={b244Requirements.name} error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
+        <Field requirement={b244Requirements.name} label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
           <SaveErrorField names={["name"]}><TextField
             id="v8-rule-name"
             value={name}
@@ -2677,7 +2680,7 @@ export function NewAutomationV8({
                 />
               ) : null}
             </div>
-            {inputError?.target === 'v8-trigger-tag' || inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <p id="v8-trigger-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
+            {inputError?.target === 'v8-trigger-tag' || inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <FieldError id="v8-trigger-error">{inputError.message}</FieldError> : null}
             <p className={styles.cardDesc}>{triggerConfigSummary}。保存後も設定を確認できます。</p>
           </div>
         ) : null}
@@ -2690,7 +2693,7 @@ export function NewAutomationV8({
         {conditionUnreadable ? (
           <Notice tone="danger" heading={<> 保存されていた条件は読めませんでした </>} action={<> <div>
               <Button id="v8-repair-condition" aria-describedby={inputError?.target === 'v8-repair-condition' ? 'v8-repair-condition-error' : undefined} onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
-              {inputError?.target === 'v8-repair-condition' ? <p id="v8-repair-condition-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
+              {inputError?.target === 'v8-repair-condition' ? <FieldError id="v8-repair-condition-error">{inputError.message}</FieldError> : null}
             </div> </>} >以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
               以前の条件を外してもよければ、下のボタンから付け直せます。</Notice>
         ) : (
@@ -2713,7 +2716,7 @@ export function NewAutomationV8({
               </button>
             </div>
             <button type="button" className={styles.linkButton} onClick={() => setConditionOpen(true)}>
-              ＋「いずれか1つ以上を満たす」条件（or 条件）を足す
+              ＋「いずれか1つ以上を満たす」条件を足す
             </button>
           </>
         )}
@@ -2791,10 +2794,10 @@ export function NewAutomationV8({
                   value={row.message}
                   onChange={(event) => updateAction(row.key, { message: event.target.value })}
                 /></SaveErrorField>
-{inputError?.target === `v8-message-${row.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}</Field>
+{inputError?.target === `v8-message-${row.key}` ? <FieldError id="v8-action-error">{inputError.message}</FieldError> : null}</Field>
             )}
           </div>} />
-        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
+        {inputError?.target === 'v8-add-action' ? <FieldError id="v8-add-action-error">{inputError.message}</FieldError> : null}
       </Card>
 
       {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}

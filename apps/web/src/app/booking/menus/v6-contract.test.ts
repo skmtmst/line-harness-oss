@@ -137,25 +137,14 @@ describe('V8 予約設定', () => {
     expect(LIST).not.toContain('.at(-1)!')
   })
 
-  it('C9fv7A: 閲覧のみは帯を出し作成操作を隠す', () => {
-    // 閲覧のみの帯と押せない作るボタンはメニュータブの中にある。
-    expect(SETTINGS_V8).toContain('<ReadOnlyNotice')
-    expect(SETTINGS_MENUS_TAB).toContain('{canEdit ? (')
-    expect(SETTINGS_MENUS_TAB).not.toContain('<Button variant="primary" disabled')
-    expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {
     expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
     expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
   })
 
-  it('VFxWU: 1152の右欄は見え方ボタンと確かめるボタンの2つ', () => {
-    expect(SETTINGS_V8).toContain('LINEでの見え方を見る')
-    expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
-    expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
-    expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
     expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")

@@ -673,6 +673,11 @@
   font-size: var(--text-micro);
 }
 
+/* 編集の競合の帯（`UGrd2`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
+
+
+/* 右の列の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */
+
 /* 絵 A0pDt：題の下の説明・言葉の並びと足す欄・2つの欄を横に・種類の札と注意を1行に・曜日とまとめてを1行に。 */
 .cardDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .kwRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-body-gap); }

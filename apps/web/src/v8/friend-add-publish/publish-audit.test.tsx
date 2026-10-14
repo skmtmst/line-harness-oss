@@ -50,3 +50,12 @@ it('確認行のテストするは編集へ移らず、同じ条件で実際の�
  await act(async()=>screen.getByRole('button',{name:'テストする',exact:true}).click())
  expect(net.test).toHaveBeenCalledWith('a','r',{routeId:null,expectedAt:null,friendId:null})
 })
+it('固定の自己宛先は文字で表示し、選ぶ操作を置かず明示したときだけ判定する',async()=>{
+ net.query='id=r';net.test.mockResolvedValue({success:true,data:{matched:true}})
+ render(<Page/>);await act(async()=>{})
+ expect(screen.getByText('送り先：担当（自分）',{exact:true})).toBeTruthy()
+ expect(screen.queryByRole('button',{name:'テストの送り先',exact:true})).toBeNull()
+ expect(net.test).not.toHaveBeenCalled()
+ await act(async()=>screen.getByRole('button',{name:'テストする（送らずに判定）',exact:true}).click())
+ expect(net.test).toHaveBeenCalledWith('a','r',{routeId:null,expectedAt:null,friendId:null})
+})

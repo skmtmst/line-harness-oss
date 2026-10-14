@@ -8,6 +8,13 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ListPage } from '@/components/templates'
+import { ListPageCards } from '@/components/templates/list-page'
+import Card, { CardContent, CardHeader } from '@/components/shared/card'
+import IconButton from '@/components/shared/icon-button'
+import StatusBadge from '@/components/shared/status-badge'
+import { RowNameButton } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import ListToolbar, { ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import KpiBand from '@/components/shared/kpi-band'
 import { formatNumber } from '@/lib/format'
 import KpiCard from '@/components/shared/kpi-card'
@@ -17,10 +24,7 @@ import { notifyToast } from '@/components/shared/toast'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -43,7 +47,7 @@ import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd } from '@/components/shared/list-toolbar'
+import { ListToolbarRow, ListToolbarSort } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
@@ -135,23 +139,14 @@ function BannersInner() {
     </KpiBand>
   )
 
-  const head = (
-    <>
-      {kpis}
-      <NoteBar tone="info">
-        作った画像は統括の登録メディアに保存されます。アカウントへ配ると、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
-      </NoteBar>
-      <div className={styles.tabs}>
-        <Tabs
-          label="バナー生成の表示"
-          items={[
-            { label: 'プロジェクト一覧', current: tab === 'projects', onClick: () => changeTab('projects') },
-            { label: '画像ライブラリ', current: tab === 'library', onClick: () => changeTab('library') },
-          ]}
-        />
-      </div>
-    </>
-  )
+  const head: BannerHead = {
+    stats: kpis,
+    explanation: '作った画像は統括の登録メディアに保存されます。アカウントへ配ると、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。',
+    tabs: <Tabs label="バナー生成の表示" items={[
+      { label: 'プロジェクト一覧', current: tab === 'projects', onClick: () => changeTab('projects') },
+      { label: '画像ライブラリ', current: tab === 'library', onClick: () => changeTab('library') },
+    ]} />,
+  }
 
   return tab === 'projects'
     ? <ProjectsView head={head} canManage={canManage} usage={usage} archivedCount={stats?.projects.archived ?? null} onChanged={() => void loadSummary()} />
@@ -160,8 +155,10 @@ function BannersInner() {
 
 /* ───────── プロジェクト一覧（B9ZAr） ───────── */
 
+type BannerHead = { stats: React.ReactNode; tabs: React.ReactNode; explanation: string }
+
 function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
-  head: React.ReactNode
+  head: BannerHead
   canManage: boolean
   usage: BannerUsage | null
   archivedCount: number | null
@@ -279,7 +276,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   ]
 
   const createProject = canManage ? (
-    <Button variant="primary" onClick={() => { setFormError(''); setFormOpen(true) }} className={styles.full}>
+    <Button variant="primary" onClick={() => { setFormError(''); setFormOpen(true) }}>
       <Plus aria-hidden="true" className={styles.buttonIcon} />プロジェクトを作る
     </Button>
   ) : null
@@ -332,7 +329,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     // R605: 検索・絞り込みの結果が0件。条件を外す口を付ける（作る口は出さない）。
     <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
   ) : (
-    <div className={styles.projectGrid}>
+    <ListPageCards>
       {visible.map((project) => (
         <ProjectCard
           key={project.id}
@@ -344,7 +341,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
           onToggleFavorite={() => void toggleFavorite(project)}
         />
       ))}
-    </div>
+    </ListPageCards>
   )
 
   return (
@@ -355,28 +352,18 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => setView('all'), createAction: createProject }}
-    >
-      <div className={styles.body}>
-        {head}
+      stats={head.stats}
+      tabs={head.tabs}
+      explanation={head.explanation}
+      contentInset
+      toolbar={<>
         <BannerLimitNotice usage={usage} />
-        {viewFilter}
-        <ListToolbarRow>
-          <ListToolbarSearchSlot>
-            <SearchField
-              placeholder="プロジェクト名・説明で探す"
-              aria-label="プロジェクト名・説明で探す"
-              value={query}
-              onChange={setQuery}
-              onClear={() => setQuery('')}
-            />
-          </ListToolbarSearchSlot>
-          <ListToolbarEnd>
-            <SaveErrorField names={["sort"]}><ListToolbarSort aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>
-          </ListToolbarEnd>
-        </ListToolbarRow>
+        <ListToolbar search={{placeholder:'プロジェクト名・説明で探す',label:'プロジェクト名・説明で探す',value:query,onChange:setQuery}}
+          filters={viewFilter} trailing={<SaveErrorField names={["sort"]}><ListToolbarSort aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
-        {body}
-      </div>
+      </>}
+    >
+      {body}
       <CreateProjectDialogV8
         open={formOpen}
         busy={formBusy}
@@ -426,34 +413,21 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
     ? '— ・ いま作成中'
     : `${project.imageCount} 枚 ・ ${monthDay(project.updatedAt)} 更新`
   return (
-    <article className={styles.projectCard} aria-label={project.name}>
+    <Card padding="rows" layout="media" overflow="hidden" aria-label={project.name}>
       <button type="button" className={styles.mosaic} onClick={onOpen} aria-label={`${project.name} を開く`}>
         {[0, 1, 2].map((i) => <Thumb key={i} image={thumbnails[i] ?? null} />)}
       </button>
-      <div className={styles.cardBody}>
-        <div className={styles.cardTitleRow}>
-          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name} >{project.name}</button>
-          {canManage ? (
-            <button
-              type="button"
-              className={styles.star}
-              onClick={onToggleFavorite}
-              disabled={busy}
-              aria-pressed={project.isFavorite}
-              aria-label={project.isFavorite ? `${project.name} をお気に入りから外す` : `${project.name} をお気に入りにする`}
-            >
-              <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.starOff} />
-            </button>
-          ) : project.isFavorite ? <Star aria-label="お気に入り" className={`${styles.starStatic} ${styles.starOn}`} /> : null}
-        </div>
-        <p className={styles.cardDesc} title={project.description ?? undefined}>{project.description || '説明はまだありません'}</p>
-        <div className={styles.cardMeta}>
-          <span className={styles.metaText}>{meta}</span>
-          {running ? <span className={`${styles.pill} ${styles.pillInfo}`}><span className={styles.dot} aria-hidden="true" />生成中</span> : null}
-          {project.archivedAt ? <span className={`${styles.pill} ${styles.pillIdle}`}>アーカイブ</span> : null}
-        </div>
-      </div>
-    </article>
+      <CardContent><CardHeader size="content" headingLevel={3} title={<RowNameButton onClick={onOpen} title={project.name}>{project.name}</RowNameButton>}
+        meta={<><TruncatedText value={project.description || '説明はまだありません'} /><TruncatedText value={meta} />
+          {running ? <StatusBadge tone="info">生成中</StatusBadge> : null}
+          {project.archivedAt ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : null}</>}
+        action={canManage ? <IconButton variant="plain" size="small" onClick={onToggleFavorite} disabled={busy}
+          title={busy ? 'お気に入りを変更しています' : undefined} pressed={project.isFavorite}
+          aria-label={project.isFavorite ? `${project.name} をお気に入りから外す` : `${project.name} をお気に入りにする`}>
+          <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.starOff} />
+        </IconButton> : project.isFavorite ? <Star aria-label="お気に入り" className={`${styles.starStatic} ${styles.starOn}`} /> : null}
+      /></CardContent>
+    </Card>
   )
 }
 
@@ -473,7 +447,7 @@ function Thumb({ image }: { image: BannerImage | null }) {
 /* ───────── 画像ライブラリ（W5Wxr） ───────── */
 
 function LibraryView({ head, canManage, presets, accounts, onChanged }: {
-  head: React.ReactNode
+  head: BannerHead
   canManage: boolean
   presets: BannerPreset[]
   accounts: AccountWithStats[]
@@ -620,7 +594,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   ]
 
   const uploadImage = canManage ? (
-    <Button variant="primary" onClick={() => setUploadOpen(true)} className={styles.full}>
+    <Button variant="primary" onClick={() => setUploadOpen(true)}>
       <Upload aria-hidden="true" className={styles.buttonIcon} />画像を取り込む
     </Button>
   ) : null
@@ -677,7 +651,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       : <ListState permissionScope="hq" kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
   ) : (
     <>
-      <div className={styles.imageGrid}>
+      <ListPageCards columns={4}>
         {images.map((image) => {
           const preset = image.generation ? presets.find((p) => p.key === image.generation?.presetKey) : null
           return (
@@ -688,19 +662,18 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
               <div className={styles.tileMeta}>
                 <span className={styles.metaText}>{image.source === 'upload' ? '取り込み' : shortPresetLabel(preset, image)}</span>
                 <span className={styles.spacer} />
-                {image.deliveredAccountIds.length > 0 ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
+                {image.deliveredAccountIds.length > 0 ? <StatusBadge tone="success">配布済み</StatusBadge> : null}
                 {canManage ? (
-                  <button type="button" className={styles.star} onClick={() => void toggleFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
+                  <IconButton size="small" variant="plain" onClick={() => void toggleFavorite(image)} pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                     <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />
-                  </button>
+                  </IconButton>
                 ) : null}
               </div>
               <p className={styles.tileProject}>{projects[image.projectId]?.name ?? emptyValue('unknown')}</p>
             </article>
           )
         })}
-      </div>
-      {pager}
+      </ListPageCards>
     </>
   )
 
@@ -712,36 +685,22 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => selectView('all'), createAction: uploadImage }}
-    >
-      <div className={styles.body}>
-        {head}
-        <ViewChips chips={viewChips} active={view} onChange={(next) => selectView(next ?? 'all')} />
-        <ListToolbarRow>
-          <ListToolbarSearchSlot>
-            <SearchField
-              placeholder="テキスト・指示で探す"
-              aria-label="テキスト・指示で探す"
-              value={query}
-              onChange={(value) => { setQuery(value); resetPage() }}
-              onClear={() => { setQuery(''); resetPage() }}
-            />
-          </ListToolbarSearchSlot>
-          <span className={styles.toolLabel}>用途</span>
-          <div role="group" aria-label="用途で絞り込む" className={styles.chips}>
-            <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => { setShape(null); resetPage() }}>すべて</FilterChip>
-            {SHAPE_FILTERS.map((item) => (
-              <FilterChip key={item.key} selected={shape === item.key} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => { setShape(on ? item.key : null); resetPage() }}>
-                {item.label}
-              </FilterChip>
-            ))}
-          </div>
-          <span className={styles.spacer} />
-          {/* 並びは「作成が新しい順」だけ。選べないので箱の形で示すだけにする（押しても変わらない口を置かない）。 */}
-          <span className={styles.sortStatic}>並び：作成が新しい順</span>
-        </ListToolbarRow>
+      stats={head.stats}
+      tabs={head.tabs}
+      explanation={head.explanation}
+      contentInset
+      pagination={images.length > 0 && status === 'ready' ? pager : undefined}
+      toolbar={<>
+        <ListToolbar search={{placeholder:'テキスト・指示で探す',label:'テキスト・指示で探す',value:query,onChange:(value)=>{setQuery(value);resetPage()}}}
+          filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><ResponsiveFilterChips label="用途">
+            <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={()=>{setShape(null);resetPage()}}>すべて</FilterChip>
+            {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
+          </ResponsiveFilterChips></>}
+          trailing={<span>並び：作成が新しい順</span>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
-        {body}
-      </div>
+      </>}
+    >
+      {body}
 
       <UploadDialogV8
         open={uploadOpen}

@@ -9,7 +9,8 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import Button from '@/components/shared/button'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
-import StickyBar from '@/components/shared/sticky-bar'
+import { CreatePage } from '@/components/templates/create-page'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -30,7 +31,7 @@ import MenuVersionHistory from './menu-version-history'
 import { LiffPhoneMenuStep } from './liff-phone'
 import shell from './settings.module.css'
 import styles from './menu-form.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
+import { PageFrame, PageContent } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -844,33 +845,33 @@ export default function MenuFormV8() {
 
   if (!canEdit) {
     return (
-      <SaveErrorScope errors={saveErrors}><div ref={formRef} className={shell.shell} data-design-node="QqER7">
-        <div className="mx-auto max-w-2xl p-6">
+      <SaveErrorScope errors={saveErrors}><PageFrame kind="create" boardId="QqER7" elementRef={formRef}>
+        <PageContent>
           <ListState
             kind="error"
             title="予約メニューの変更権限がありません"
             description={permissionDeniedMessage('store')}
           />
-        </div>
-      </div></SaveErrorScope>
+        </PageContent>
+      </PageFrame></SaveErrorScope>
     )
   }
 
   if (editId && editStatus === 'loading') {
     return (
-      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="QqER7" aria-busy="true">
+      <SaveErrorScope errors={saveErrors}><PageFrame kind="create" boardId="QqER7">
         <span className="sr-only" role="status">メニューを読み込んでいます</span>
         <DelayedSkeleton loading skeleton={<MenuFormSkeleton />} />
-      </div></SaveErrorScope>
+      </PageFrame></SaveErrorScope>
     )
   }
   if (editId && editStatus === 'error') {
     return (
-      <SaveErrorScope errors={saveErrors}><div ref={formRef} className={shell.shell} data-design-node="QqER7">
-        <div className="p-10">
+      <SaveErrorScope errors={saveErrors}><PageFrame kind="create" boardId="QqER7" elementRef={formRef}>
+        <PageContent>
           <ListState kind="error" description={editError ?? '読み込めませんでした。'} onRetry={() => void loadAll()} />
-        </div>
-      </div></SaveErrorScope>
+        </PageContent>
+      </PageFrame></SaveErrorScope>
     )
   }
 
@@ -886,10 +887,54 @@ export default function MenuFormV8() {
     <svg width="10" height="8" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 4l2.5 2.5L9 1" /></svg>
   )
 
+  const previewContent = <>
+          <div className={shell.sideActions}>
+            {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+          </div>
+          <p className={shell.sideTitle}>お客さまの予約画面</p>
+          <>
+            <LiffPhoneMenuStep
+              menus={menus.filter((menu) => menu.id !== editTarget?.id)}
+              draft={draftMenu}
+              status={menusStatus}
+            />
+          </>
+          <p className={shell.sideLineLink}>
+            {previewUrl
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
+              : 'このアカウントには予約画面のURLがまだありません'}
+          </p>
+</>
+
   return (
-    <SaveErrorScope errors={saveErrors}><div ref={formRef} className={shell.shell} data-design-node="QqER7">
-      <PageHeading title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
-        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} />
+    <SaveErrorScope errors={saveErrors}><CreatePage elementRef={formRef} boardId={conflict ? 'v5L19Z' : 'QqER7'} dirty={false}
+        status={conflict ? 'ほかの人の変更を確かめてから保存してください' : undefined}
+        footerActions={(
+            <>
+              <Button onClick={() => guarded(() => router.push('/booking/menus'))}>キャンセル</Button>
+              {!editTarget && (
+                <Button
+                  disabled={saving !== null || resourceSaving}
+                  busy={saving === 'draft'}
+                  onClick={() => void save(false)}
+                >
+                  下書きを保存
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                disabled={saving !== null || resourceSaving}
+                busy={saving !== null}
+                onClick={() => void save(true, Boolean(conflict))}
+              >
+                <Upload size={15} aria-hidden="true" />{primaryLabel}
+              </Button>
+            </>
+          )}
+        preview={previewContent}
+        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+       title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
+        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} >
 
       {conflict && (
         <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
@@ -897,8 +942,6 @@ export default function MenuFormV8() {
         </div>
       )}
 
-      <div className={shell.body} data-design="Body">
-        <div className={shell.main}>
           {/* ① メニューの中身 */}
           <section className={shell.section}>
             <div className={shell.sectionHead}>
@@ -1295,56 +1338,7 @@ export default function MenuFormV8() {
               メニューは保存済みです。もう一度押しても新しいメニューは増えません。
             </p>
           )}
-        </div>
-
-        <aside className={shell.side} data-design="Side">
-          <div className={shell.sideActions}>
-            {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
-          </div>
-          <p className={shell.sideTitle}>お客さまの予約画面</p>
-          <div className={shell.sidePhone}>
-            <LiffPhoneMenuStep
-              menus={menus.filter((menu) => menu.id !== editTarget?.id)}
-              draft={draftMenu}
-              status={menusStatus}
-            />
-          </div>
-          <p className={shell.sideLineLink}>
-            {previewUrl
-              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
-              : 'このアカウントには予約画面のURLがまだありません'}
-          </p>
-        </aside>
-      </div>
-
-      {/* 下の帯（追従・常に画面の下）。キャンセル・下書き・保存は中央（絵 QqER7・v5L19Z）。 */}
-      <div className={shell.saveBarWrap} data-design="Savebar">
-        <StickyBar
-          status={conflict ? 'ほかの人の変更を確かめてから保存してください' : undefined}
-          actions={(
-            <>
-              <Button onClick={() => guarded(() => router.push('/booking/menus'))}>キャンセル</Button>
-              {!editTarget && (
-                <Button
-                  disabled={saving !== null || resourceSaving}
-                  busy={saving === 'draft'}
-                  onClick={() => void save(false)}
-                >
-                  下書きを保存
-                </Button>
-              )}
-              <Button
-                variant="primary"
-                disabled={saving !== null || resourceSaving}
-                busy={saving !== null}
-                onClick={() => void save(true, Boolean(conflict))}
-              >
-                <Upload size={15} aria-hidden="true" />{primaryLabel}
-              </Button>
-            </>
-          )}
-        />
-      </div>
+      </CreatePage>
 
       {comparing && (editTarget ?? createdMenuNeedingFollowUp) && (
         <MenuVersionHistory
@@ -1358,7 +1352,7 @@ export default function MenuFormV8() {
         />
       )}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={editTarget ? 'メニューの変更' : '入力したメニュー'} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div></SaveErrorScope>
+    </SaveErrorScope>
   )
 }
 

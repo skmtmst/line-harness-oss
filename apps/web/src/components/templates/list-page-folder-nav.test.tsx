@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
 import { ListPage, ListPageBody } from './index'
+import { FolderDotName } from '@/components/shared/folder-dot'
 
 afterEach(cleanup)
 
@@ -144,13 +145,32 @@ describe('左の列を持つ一覧は、畳んだときの行き先も持つ', (
 })
 
 
-it('W2: a one-choice rail is omitted and creation remains reachable in shared tools', () => {
+it('X1: a one-choice rail places creation before other heading actions', () => {
   const { container } = render(<ListPage title="決めごと" folders={<nav>すべて</nav>}
     folderNav={{rows:[{id:'all',label:'すべて'}],activeId:'all',onSelect:()=>{},createAction:<a href="/new">作る</a>}}
+    actions={<button>CSVで書き出す</button>}
     toolbar={<ListToolbar search={{placeholder:'名前で探す',value:'',onChange:()=>{}}} />}>本文</ListPage>)
   expect(container.querySelector('[data-template-region="folders"]')).toBeNull()
   expect(screen.queryByRole('button',{name:'フォルダ'})).toBeNull()
-  expect(container.querySelector('[data-toolbar-persistent] a')?.getAttribute('href')).toBe('/new')
+  const heading=container.querySelector('[data-template-region="heading"]')!
+  const create=screen.getByRole('link',{name:'作る'})
+  expect(heading.contains(create)).toBe(true)
+  expect(create.getAttribute('href')).toBe('/new')
+  expect(create.compareDocumentPosition(screen.getByRole('button',{name:'CSVで書き出す'})) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(container.querySelector('[data-template-region="toolbar"]')?.contains(create)).toBe(false)
+})
+
+it('X2: folderless names retain selection and links; changing capability restores unfiled dots', () => {
+  const select=vi.fn()
+  const body=<FolderDotName><a href="/detail">決めごと</a></FolderDotName>
+  const {container,rerender}=render(<ListPage title="一覧" folderNav={{rows:[rows[0]],activeId:'',onSelect:select}}>{body}</ListPage>)
+  expect(container.querySelector('[data-folder-dot]')).toBeNull()
+  expect(screen.getByRole('link',{name:'決めごと'}).getAttribute('href')).toBe('/detail')
+  rerender(<ListPage title="一覧" folderNav={{rows,activeId:'',onSelect:select}}>{body}</ListPage>)
+  expect(container.querySelector('[data-folder-dot="unfiled"]')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'フォルダ'}))
+  fireEvent.click(screen.getByRole('button',{name:'春の案内'}))
+  expect(select).toHaveBeenCalledWith('f1')
 })
 
 

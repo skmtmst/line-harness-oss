@@ -42,13 +42,13 @@ describe('統括 バナー生成', () => {
   })
 
 
-  it('V8（板 B9ZAr・W5Wxr）の帯の順: 数値カード帯 → 案内帯 → タブ行 → 一覧本体（操作と見るは左列）', () => {
-    const order = ['{kpis}', '<NoteBar', '<Tabs']
-    const positions = order.map((needle) => listPage.indexOf(needle))
-    expect(positions.every((p) => p >= 0)).toBe(true)
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+  it('数・タブ・説明は一覧の型へ渡し、フォルダなしの作成位置も型で決める', () => {
+    expect(listPage.match(/stats=\{head.stats\}/g)).toHaveLength(2)
+    expect(listPage.match(/tabs=\{head.tabs\}/g)).toHaveLength(2)
+    expect(listPage.match(/explanation=\{head.explanation\}/g)).toHaveLength(2)
+    expect(listPage).toContain('createAction: createProject')
+    expect(listPage).toContain('createAction: uploadImage')
   })
-
   it('生成パネルに品質やクレジットの選択を置かない（2026-09-12 決定）', () => {
     const withoutComments = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     expect(withoutComments).not.toMatch(/品質|クレジット|高精細|quality/)
