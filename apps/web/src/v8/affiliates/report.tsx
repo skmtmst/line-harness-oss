@@ -280,7 +280,6 @@ export default function ReportTab() {
     <AffiliateToolbar
       narrow={narrow}
       notices={<ToolbarNotices
-        info={`期間は${periodLabel}。数は「認めた成果」だけ。${hasMissingReward ? '未確定の報酬は金額を出さず、CSVも空欄にしています。' : ''}成果地点ごとのレポートは「分析 › レポート」で見られます。`}
         error={state === 'error' ? loadError : undefined}
       />}
       search={{ placeholder: view === 'affiliate' ? '名前で探す' : '案件名で探す', value: query, onChange: setQuery }}
@@ -354,6 +353,7 @@ export default function ReportTab() {
 
   return (
     <AffiliateFrame
+      explanation={`期間は${periodLabel}。数は「認めた成果」だけ。${hasMissingReward ? '未確定の報酬は金額を出さず、CSVも空欄にしています。' : ''}成果地点ごとのレポートは「分析 › レポート」で見られます。`}
       help={view === 'affiliate'
           ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
           : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}
