@@ -5,16 +5,22 @@ import { ArrowDown, ArrowUp } from 'lucide-react'
 import IconButton from './icon-button'
 import ReorderHandle, { useReorder } from './reorder-handle'
 import styles from './reorder-list.module.css'
+import { Field } from './form-controls'
+import Select from './select'
 
 /** 並び替え窓の行。ドラッグ・上下キー・矢印を同じ下書きの並びへ反映する。 */
-export default function ReorderList({ items, onChange, visibleRows }: {
+export default function ReorderList({ items, onChange, visibleRows, group }: {
   items: Array<{ id: string; label: string }>
   onChange: (ids: string[]) => void
   /** 長い区分は窓の中で送る。省略時は全行を表示。 */
   visibleRows?: number
+  /** 区分ごとの下書きを保ち、並べ替える対象だけを切り替える。 */
+  group?: { label: string; ariaLabel: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }
 }) {
   const reorder = useReorder({ items, idOf: (item) => item.id, onReorder: ({ ids }) => onChange(ids) })
   return (
+    <>
+    {group ? <Field label={group.label}><Select aria-label={group.ariaLabel} value={group.value} options={group.options} onChange={group.onChange} /></Field> : null}
     <ul className={styles.list} aria-label="並び替える項目" data-scroll={visibleRows ? '' : undefined}
       style={visibleRows ? { '--reorder-visible-rows': visibleRows } as CSSProperties : undefined}>
       {reorder.shown.map((item) => (
@@ -26,5 +32,6 @@ export default function ReorderList({ items, onChange, visibleRows }: {
         </li>
       ))}
     </ul>
+    </>
   )
 }

@@ -14,7 +14,7 @@ import Select from './select'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
-import EntityPickerWindow, { type EntityPickerWindowProps } from './entity-picker-window'
+import Dialog from './dialog'
 import TagPill from './tag-pill'
 import useNarrow from './use-picker-narrow'
 
@@ -107,7 +107,34 @@ type SingleProps = {
   onCancel: () => void
 }
 
-export type { EntityPickerWindowProps } from './entity-picker-window'
+export type EntityPickerWindowProps = {
+  title: string
+  description?: string
+  onCancel: () => void
+  busy?: boolean
+  error?: string
+  designNode?: string
+  initialFocusId?: string
+  /** データ取得を呼ぶ側で管理するときの中身。窓の形は共通のまま。 */
+  children: ReactNode
+  scrollBody?: boolean
+  footer: ReactNode
+  band?: ReactNode
+}
+
+export function EntityPickerWindow(props: EntityPickerWindowProps) {
+  return <Dialog open dirty={false} title={props.title} description={props.description}
+    designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
+    contentLayout={props.scrollBody ? 'form' : undefined} designContentPadding={props.scrollBody ? '0' : undefined}
+    busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel}
+    footer={<>
+      {props.scrollBody ? null : props.children}
+      {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
+      {props.band}
+      <div className={styles.tpFoot}>{props.footer}</div>
+    </>}>{props.scrollBody ? props.children : null}</Dialog>
+}
+
 export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
   return 'children' in props ? <EntityPickerWindow {...props} /> : <SingleEntityPickerDialog {...props} />
 }

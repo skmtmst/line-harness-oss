@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -22,7 +24,6 @@
 
 /* 面はカードが持ち、題のリンクだけを塗らない。 */
 html:root [data-dialog-choice-cards] a.link { background: transparent; }
-html:root [data-dialog-choice-cards] a.link:focus-visible { outline: none; }
 
 .link::after {
   position: absolute;
@@ -37,7 +38,7 @@ html:root [data-dialog-choice-cards] a.link:focus-visible { outline: none; }
 }
 
 .link:focus-visible {
-  outline: none;
+  outline-color: transparent;
 }
 
 .link:focus-visible::after {
@@ -95,4 +96,6 @@ html:root [data-dialog-choice-cards] a.link:focus-visible { outline: none; }
 
 @media (max-width: 640px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 }
