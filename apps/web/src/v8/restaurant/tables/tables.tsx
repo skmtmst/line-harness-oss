@@ -38,6 +38,7 @@ import RestaurantShell, { Panel, QuietError, StatRow, Status, type RestaurantV8C
 import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
+import TableRowActions from './table-row-actions'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -258,14 +259,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                   <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名`}</p>
                 </div>
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
-                {canEdit ? (
-                  <>
-                    <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を変更`} onClick={() => openEdit(item)}>変更</Button>
-                    {item.is_active
-                      ? <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を停止`} onClick={() => { setStopError(''); setMoveMode('move'); setStopId(item.id) }}>停止</Button>
-                      : <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を再開`} onClick={() => resume(item)}>再開</Button>}
-                  </>
-                ) : null}
+                <TableRowActions table={item} canEdit={canEdit} busy={busy} onEdit={openEdit} onResume={resume}
+                  onStop={(table) => { setStopError(''); setMoveMode('move'); setStopId(table.id) }} />
               </li>
             ))}
           </ul>
