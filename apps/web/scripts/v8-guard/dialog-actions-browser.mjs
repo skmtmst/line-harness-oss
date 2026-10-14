@@ -39,6 +39,7 @@ export function scanDialogActions({ align, leadingAction, descriptionGap = false
       const centerDifference = Math.abs((first.left + last.right - left - right) / 2)
       inventory.push({ kind: 'dialog-actions', left, right, centerDifference })
       if (align === 'center' && centerDifference > 1) findings.push({ pattern: 'F9', kind: 'dialog-actions-center', centerDifference })
+      if (align === 'start' && Math.abs(first.left - left) > 1) findings.push({ pattern: 'F9', kind: 'dialog-actions-start', difference: first.left - left })
       if (leadingAction) {
         const lead = buttons.find(el => el.innerText.trim() === leadingAction)
         if (!lead || Math.abs(lead.getBoundingClientRect().left - left) > 1 || Math.abs(last.right - right) > 1)

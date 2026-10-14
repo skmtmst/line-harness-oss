@@ -56,6 +56,30 @@ for (const width of [1152, 1440, 1920]) {
       assert.equal((await page.evaluate(scanDialogActions, deletion)).findings.filter(x => x.kind === 'dialog-delete-cancel-placement').length, 1)
       await page.locator('.panel').evaluate(el => { el.dataset.confirmPlacement = 'start' })
       assert.equal((await page.evaluate(scanDialogActions, deletion)).findings.length, 0)
+      await page.setContent(`<html data-theme="v8"><style>${globals}\n${dialog}</style><div class="overlay" data-design-top style="--dialog-design-top:280px"><div class="panel standardPanel confirmationPanel" role="dialog" data-m1-scope data-design-layout="stacked" data-footer-align="start" data-design-width style="--dialog-design-width:480px">
+        <div class="headerRow"><h2 class="title">リマインダを削除しますか？</h2><button class="close">閉じる</button></div>
+        <p class="description">登録者と通知の予定が消えます。</p>
+        <div class="content">削除は元に戻せません。</div>
+        <div class="footer"><div class="actions" data-dialog-actions><button>削除する</button><button>キャンセル</button><button>代わりに一時停止</button></div></div>
+      </div></div></html>`)
+      await page.waitForFunction(() => { const r = document.querySelector('.panel').getBoundingClientRect(); return r.width === 480 && r.top === 280 })
+      const compactDelete = { expectedWidth: 480, expectedTop: 280 }
+      const compactNormal = await page.evaluate(scanDialogAudit, compactDelete)
+      assert.equal(compactNormal.findings.length, 0, JSON.stringify(compactNormal))
+      assert.equal((await page.evaluate(scanDialogActions, { align: 'start' })).findings.length, 0)
+      await page.locator('.panel').evaluate(el => { el.style.setProperty('--dialog-design-width', '720px') })
+      await page.waitForFunction(() => document.querySelector('.panel').getBoundingClientRect().width === 720)
+      assert.equal((await page.evaluate(scanDialogAudit, compactDelete)).findings.filter(x => x.kind === 'dialog-width').length, 1)
+      await page.locator('.panel').evaluate(el => { el.style.setProperty('--dialog-design-width', '480px'); el.dataset.footerAlign = 'center' })
+      await page.waitForFunction(() => document.querySelector('.panel').getBoundingClientRect().width === 480)
+      assert.equal((await page.evaluate(scanDialogActions, { align: 'start' })).findings.filter(x => x.kind === 'dialog-actions-start').length, 1)
+      await page.locator('.panel').evaluate(el => { el.dataset.footerAlign = 'start' })
+      await page.locator('.overlay').evaluate(el => { el.style.setProperty('--dialog-design-top', '320px') })
+      await page.waitForFunction(() => document.querySelector('.panel').getBoundingClientRect().top === 320)
+      assert.equal((await page.evaluate(scanDialogAudit, compactDelete)).findings.filter(x => x.kind === 'dialog-top').length, 1)
+      await page.locator('.overlay').evaluate(el => { el.style.setProperty('--dialog-design-top', '280px') })
+      await page.waitForFunction(() => document.querySelector('.panel').getBoundingClientRect().top === 280)
+      assert.equal((await page.evaluate(scanDialogAudit, compactDelete)).findings.length, 0)
     } finally { await browser.close() }
   })
 }
