@@ -444,7 +444,7 @@ export default function PaymentTab() {
     </>
   )
 
-  const pager = ready && shown.length > 0 ? (
+  const pager = ready ? (
     <ListPagePagination>
       <ListPagination total={shown.length} page={currentPage} pageSize={pageSize} unit="人" onPageChange={setPage} />
     </ListPagePagination>

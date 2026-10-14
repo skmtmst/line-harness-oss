@@ -575,7 +575,7 @@ export default function ApprovalsTab() {
     </>
   )
 
-  const pager = ready && shownItems.length > 0 ? (
+  const pager = ready ? (
     <ListPagePagination>
       <ListPagination total={shownItems.length} page={currentPage} pageSize={pageSize} unit="件" onPageChange={(value) => { setPage(value); clearSelections() }} />
     </ListPagePagination>

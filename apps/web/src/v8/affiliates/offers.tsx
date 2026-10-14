@@ -581,7 +581,7 @@ export default function OffersTab() {
     </>
   )
 
-  const pager = ready && shown.length > 0 ? (
+  const pager = ready ? (
     <ListPagePagination>
       <ListPagination total={shown.length} page={currentPage} pageSize={pageSize} unit="件" onPageChange={setPage} />
     </ListPagePagination>
