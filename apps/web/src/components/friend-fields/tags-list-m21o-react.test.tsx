@@ -1,8 +1,6 @@
 // @vitest-environment happy-dom
 /* タグ一覧のフォルダ、絞り込み、件数、読み込み状態を現役V8で確かめる。 */
 import React, { act } from 'react'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { flushListUrlState } from '@/components/shared/list-url-state'
@@ -133,27 +131,48 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
   })
 
   describe('V8の列と選び口（幅の検査はブラウザで行う）', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/v8/tags/tags-tab.tsx'), 'utf8')
-    const css = readFileSync(resolve(process.cwd(), 'src/v8/tags/list.module.css'), 'utf8')
-
-    it('操作は共通の行メニュー1つにまとめ、列幅は板の値を使う', () => {
-      expect(source).toContain('<RowMenu')
-      expect(source).toContain('className={styles.colMenu}')
-      expect(css).toContain('.colMenu { width: var(--tpl-tag-col-menu)')
+    it('行の操作から、そのタグの編集へ進める', async () => {
+      render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+      const row = screen.getAllByRole('row').find(row => within(row).queryByText('EC顧客連携済み'))!
+      const actions = within(row).getAllByRole('button', { name: 'タグ「EC顧客連携済み」の操作' })
+      expect(actions).toHaveLength(1)
+      fireEvent.click(actions[0])
+      const link = await screen.findByRole('menuitem', { name: '編集する', exact: true })
+      const destination = new URL(link.getAttribute('href')!, 'https://fixture.invalid')
+      expect(destination.pathname).toBe('/tags/edit')
+      expect(destination.searchParams.get('id')).toBe('t1')
     })
 
-    it('短い列は板の幅でそろえ、表は固定配置で長い名前を省略する', () => {
-      for (const col of ['Count', 'Source', 'Link', 'Usage']) expect(source).toContain(`className={styles.col${col}}`)
-      expect(css).toContain('table-layout: fixed')
-      expect(source).toContain('<FolderDotName folder={group}>')
-      expect(source).toContain('title={sourceLabel(tag)}')
+    it('行には付け方と所属フォルダの全文を残す', () => {
+      render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+      const row = screen.getAllByRole('row').find(row => within(row).queryByText('EC顧客連携済み'))!
+      expect(within(row).getByTitle('EC 連携').textContent).toContain('EC 連携')
+      expect(within(row).getByTitle(`フォルダ：${LONG_FOLDER}`).getAttribute('title')).toBe(`フォルダ：${LONG_FOLDER}`)
+      expect(within(row).queryByRole('button', { name: 'EC顧客連携済み のフォルダ' })).toBeNull()
     })
 
-    it('「よく使う」は1つのボタンから4条件を重ねて選ぶ', () => {
-      expect(source).toContain('title="よく使う絞り込み"')
-      expect(source).toContain('<ActionMenu open={quickOpen}')
-      expect(source).toContain('current.filter((key) => key !== value) : [...current, value]')
+    it('「よく使う」を開くと4条件を選べる', async () => {
+      render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+      fireEvent.click(screen.getByRole('button', { name: 'よく使う絞り込み' }))
+      for (const name of ['未使用のタグ', '今月増えたタグ', '自動付与あり', '連動あり']) {
+        expect(await screen.findByRole('menuitem', { name, exact: true })).toBeTruthy()
+      }
     })
+  })
+
+  it('作る入口からタグの作成へ進める', () => {
+    render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+    const links = screen.getAllByRole('link', { name: 'タグを作る', exact: true })
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) expect(link.getAttribute('href')).toBe('/tags/new')
+  })
+
+  it('見出しの操作にはCSVで一括登録があり、タグの作成を重ねない', () => {
+    render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+    const actions = document.querySelector('[data-template-region="heading"]')!
+    expect(actions).toBeTruthy()
+    expect(within(actions as HTMLElement).getByRole('button', { name: 'CSVで一括登録する', exact: true })).toBeTruthy()
+    expect(within(actions as HTMLElement).queryByRole('link', { name: 'タグを作る', exact: true })).toBeNull()
   })
 
   it('畳まれたフォルダ選択から名前と色の編集を開き、同じAPIへ保存する', async () => {

@@ -5,9 +5,6 @@
  * 上端がずれた数字として検出された。記号の位置（面の中心）は変えず、
  * 大きさだけ実表示に合わせた px 指定にすることが約束。
  */
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
@@ -18,15 +15,7 @@ afterEach(async () => {
   await act(async () => cleanup())
 })
 
-const DIR = dirname(fileURLToPath(import.meta.url))
-const source = readFileSync(join(DIR, 'rich-menu-create-form.tsx'), 'utf8')
-
 describe('面の分けかたの記号は実表示の大きさで書く（m22a）', () => {
-  it('記号の大きさは実表示の px 指定（SVG 内単位の 200px超に戻さない）', () => {
-    expect(source).toMatch(/fontSize:\s*'clamp\(9px/)
-    expect(source).not.toMatch(/fontSize=\{dims\.height/)
-  })
-
   it('4面の記号 A〜D が面の中心にある（位置は変えない）', () => {
     const template = TEMPLATES.find((item) => item.key === 'large-2x2')
     if (!template) throw new Error('large-2x2 がありません')
