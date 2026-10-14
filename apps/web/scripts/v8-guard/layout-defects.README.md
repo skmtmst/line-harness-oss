@@ -35,4 +35,4 @@ node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/rec
 CI は `required-pr-gate.yml` の既存 `v8-screen-guard` 内で同じ条件で動き、失敗は必須チェックを止める。結果は既存の `v8-screen-guard` artifact に残る。blankfix を統合する時は同枝の別の `blank-gap.mjs` 実行ステップを重ねず、この実行1つにする（重複したCI設定は対照試験が止める）。`browser-env.mjs` の待ち時間指定とエラー通知は両方残す。
 
 
-PR番号はまだ採っていない。統合者は `docs/release-log/unreleased/pending-kenta-guards-1010.md` を採番後のファイル名へ変え、本文の `#未採番` も実際の番号へ変える。
+この道具の変更内容は `docs/release-log/0.25.0.md` に収録している。履歴を書くときは `docs/release-log/README.md` の決まりに従う。
