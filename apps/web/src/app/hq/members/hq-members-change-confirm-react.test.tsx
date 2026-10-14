@@ -148,7 +148,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
       role!.value = 'viewer'
       role!.dispatchEvent(new Event('change', { bubbles: true }))
     })
-    const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存')
+    const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存する')
     expect(save, '変更を保存ボタンがない').not.toBeUndefined()
     await act(async () => { (save as HTMLButtonElement).click() })
     await flush()
@@ -178,7 +178,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     const edit = document.body.querySelector('[data-design-node="BHEl9"]')
     expect(edit, '変更の窓に目印がない').not.toBeNull()
     expect(edit?.textContent ?? '').toContain('最初に表示するアカウント')
-    const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存')
+    const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存する')
     await act(async () => { (save as HTMLButtonElement).click() })
     await flush()
     // 確認を挟んでから送る。

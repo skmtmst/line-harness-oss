@@ -887,7 +887,7 @@ export default function AutoRepliesListV8() {
     })
     items.push({
       id: 'delete',
-      label: '削除',
+      label: '削除する',
       icon: <Trash2 size={14} aria-hidden="true" />,
       tone: 'danger',
       dividerBefore: true,
@@ -1580,7 +1580,7 @@ export default function AutoRepliesListV8() {
       */}
       <Dialog
         open={pendingDelete !== null}
-        title={`「${pendingDelete ? displayName(pendingDelete.item) : ''}」を削除する`}
+        title={`「${pendingDelete ? displayName(pendingDelete.item) : ''}」を削除しますか？`}
         description="新しく届くメッセージへの自動返信と、タグ付けなどの後の処理が止まります。これまでの実行結果は消えません。"
         busy={deleting}
         error={deleteError}

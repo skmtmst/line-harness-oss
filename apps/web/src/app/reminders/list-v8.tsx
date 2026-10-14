@@ -774,7 +774,7 @@ export default function RemindersListV8() {
       ...reorder.menuItems(row.id, () => setOpenMenuId(null)),
       {
         id: 'delete',
-        label: '削除',
+        label: '削除する',
         icon: <Trash2 size={15} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,

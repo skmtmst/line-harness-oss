@@ -1009,11 +1009,11 @@ export function ScoreAdjustDialog({
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更量</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</p>
+            <p className={styles.deltaValue}><span className={validAmount ? 'text-accent-deep' : undefined}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</span></p>
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更後</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
+            <p className={styles.deltaValue}><span className={validAmount ? 'text-accent-deep' : undefined}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</span></p>
           </div>
         </div>
 
