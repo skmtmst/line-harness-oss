@@ -7,34 +7,22 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { bookingChannelsApi, type BookingChannel, type BookingChannelStaff, type BookingChannelsData, type BookingConflict } from './lib/booking-channels'
+import { bookingChannelsApi, type BookingChannelStaff, type BookingChannelsData, type BookingConflict } from './lib/booking-channels'
 import type { BookingStaff } from '@/lib/api'
 import styles from './settings.module.css'
 import ch from './channels.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
 import type { ChannelsSummary } from './channels-summary'
+import ChannelsTables, { StaffStatusChip, formatReadAt } from './channels-tables'
 type LoadStatus = 'loading' | 'ready' | 'error'
-const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> = {
-  line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
-  manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
-  hot_pepper_beauty: { name: 'Hot Pepper Beauty', sub: 'SALON BOARD', how: 'Google カレンダー経由（SALON BOARD が書き出せる場合・確認中）' },
-  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む' },
-  epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む' },
-}
-function formatReadAt(value: string | null): string {
-  return polishFormatDate(value, { style: 'list' })
-}
-
 function formatConflictRange(conflict: BookingConflict): string {
   const day = polishFormatDate(conflict.startsAt, { style: 'day', fallback: '' })
   return day ? `${conflict.staffName}さんの ${day} ${formatConflictTime(conflict.startsAt)}` : ''
@@ -42,24 +30,6 @@ function formatConflictRange(conflict: BookingConflict): string {
 
 function formatConflictTime(value: string): string {
   return polishFormatDate(value, { style: 'time' })
-}
-
-function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {
-  if (status === 'connected') return <StatusBadge tone="success">つながっている</StatusBadge>
-  if (status === 'expired') return <StatusBadge tone="danger">期限切れ</StatusBadge>
-  return <StatusBadge tone="neutral">つないでいない</StatusBadge>
-}
-
-function ChannelStatusChip({ channel }: { channel: BookingChannel }) {
-  if (channel.status === 'active') return <StatusBadge tone="success">使っている</StatusBadge>
-  if (channel.status === 'confirm') return <StatusBadge tone="warning">確認中</StatusBadge>
-  // 口が返す `preparing`（まだ何も届いていない）。「準備中」とは書かない。
-  return <StatusBadge tone="neutral">まだ届いていない</StatusBadge>
-}
-
-/** 1行で収め、はみ出す分は「…」にして title で全文を見せる。 */
-function OneLine({ text, tone }: { text: string; tone?: 'name' | 'sub' }) {
-  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} ><TruncatedText value={String(text ?? '')} /></span>
 }
 
 /** つながっているカレンダーの中身（「予定を見る」）。つなぎ直す口もここに置く。 */
@@ -370,81 +340,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
         </NoteBar>
       ) : null}
 
-      <section className={ch.card} aria-labelledby="channels-calendar-heading">
-        <h2 id="channels-calendar-heading" className={ch.cardTitle}>スタッフの Google カレンダー</h2>
-        <p className={ch.cardDesc}>カレンダーの予定は「埋まっている時間」として扱います。LINE で入った予約は、そのスタッフのカレンダーに書き込みます。</p>
-        <div className={ch.table} role="table" aria-label="スタッフの Google カレンダー">
-          <div className={`${ch.row} ${ch.headRow} ${ch.staffCols}`} role="row">
-            <span className={ch.head} role="columnheader">スタッフ</span>
-            <span className={ch.head} role="columnheader">カレンダー</span>
-            <span className={ch.head} role="columnheader">状態</span>
-            <span className={`${ch.head} ${ch.right}`} role="columnheader">外の予定（今週）</span>
-            <span className={ch.head} role="columnheader">最後に読んだ</span>
-            <span className={ch.head} role="columnheader">操作</span>
-          </div>
-          {data.staff.map((person) => {
-            const role = roles[person.staffId]
-            const calendarId = calendars[person.staffId] ?? ''
-            return (
-              <div key={person.staffId} className={`${ch.row} ${ch.staffCols}`} role="row">
-                <span className={ch.nameCell} role="cell">
-                  <OneLine text={person.displayName} tone="name" />
-                  {role ? <OneLine text={role} tone="sub" /> : null}
-                </span>
-                <span className={ch.cell} role="cell"><OneLine text={calendarId || emptyValue('unknown')} /></span>
-                <span className={ch.cell} role="cell"><StaffStatusChip status={person.status} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`}</span>
-                <span className={ch.cell} role="cell">{formatReadAt(person.lastReadAt)}</span>
-                <span className={ch.cell} role="cell">
-                  {person.status === 'connected' ? (
-                    <Button onClick={() => setDetailTarget(person)}>予定を見る</Button>
-                  ) : canEdit ? (
-                    <Button onClick={() => setConnectTarget(person)}>
-                      {person.status === 'not_connected' ? 'つなぐ' : 'つなぎ直す'}
-                    </Button>
-                  ) : null}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className={ch.card} aria-labelledby="channels-route-heading">
-        <h2 id="channels-route-heading" className={ch.cardTitle}>予約経路</h2>
-        <p className={ch.cardDesc}>どこから入った予約も「予約管理」に集めます。入り口ごとの受け取り方と、今日の件数です。</p>
-        <div className={ch.table} role="table" aria-label="予約経路">
-          <div className={`${ch.row} ${ch.headRow} ${ch.routeCols}`} role="row">
-            <span className={ch.head} role="columnheader">予約経路</span>
-            <span className={ch.head} role="columnheader">受け取り方</span>
-            <span className={ch.head} role="columnheader">状態</span>
-            <span className={`${ch.head} ${ch.right}`} role="columnheader">今日</span>
-            <span className={ch.head} role="columnheader">最後に届いた</span>
-            <span className={ch.head} role="columnheader">操作</span>
-          </div>
-          {data.channels.map((channel) => {
-            const label = CHANNEL_LABEL[channel.key] ?? { name: channel.key, sub: '', how: '' }
-            return (
-              <div key={channel.key} className={`${ch.row} ${ch.routeCols}`} role="row">
-                <span className={ch.nameCell} role="cell">
-                  <OneLine text={label.name} tone="name" />
-                  {label.sub ? <OneLine text={label.sub} tone="sub" /> : null}
-                </span>
-                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || emptyValue('unknown')}</span>
-                <span className={ch.cell} role="cell"><ChannelStatusChip channel={channel} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`}</span>
-                <span className={ch.cell} role="cell">{emptyValue('unknown')}</span>
-                <span className={ch.cell} role="cell">
-                  {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (
-                    <Button href="/booking/bookings">予約管理へ</Button>
-                  ) : null}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-        <p className={ch.note}>Google カレンダーに書き出せない入り口は、予約通知メールを取り込みアドレスへ転送して読み取ります（見本のメールがそろった媒体から順に）。</p>
-      </section>
+      <ChannelsTables data={data} canEdit={canEdit} roles={roles} calendars={calendars} onDetail={setDetailTarget} onConnect={setConnectTarget} />
 
       <section className={ch.card} data-design-node="wJYQb" aria-labelledby="channels-assign-heading">
         <h2 id="channels-assign-heading" className={ch.cardTitle}>外から予約が入ったとき</h2>
