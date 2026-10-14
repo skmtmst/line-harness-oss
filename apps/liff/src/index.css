@@ -10,6 +10,7 @@
 @import "./components/ui/liff-skin.css";
 /* Workerの公開入口から共用するときもLIFFの共通部品のクラスを生成する。 */
 @source "./";
+@source "../../worker/src/client/webinar";
 
 body {
   margin: 0;

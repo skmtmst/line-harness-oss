@@ -89,7 +89,7 @@ export default function SeatPick({
       : day==='error' ? <p className="text-[13px] leading-5 text-liff-sub">空きを読み込めませんでした。<Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
       : day==='closed'||!day.length ? <p className="text-[13px] leading-5 text-liff-sub">この日は予約を受け付けていません。ほかの日を選んでください。</p>
       : <RestaurantTimeChoices value={startsAt} onChange={onTime} options={day.map(s => ({ value: s.startsAt, label: zonedParts(s.startsAt, timeZone).hm, accessibleLabel: `${zonedParts(s.startsAt, timeZone).hm} ${slotLabel(s)}`, available: s.available }))} />}
-    {Array.isArray(day)&&day.some(s=>!s.available) && <p className="flex items-center gap-3 rounded-(--liff-radius) bg-liff-note px-4 py-3 text-[13px] leading-5 text-liff-sub"><Icon name="info" className="h-4 w-4 shrink-0" />{day.filter(s=>!s.available).map(s=>zonedParts(s.startsAt,timeZone).hm).join('・')} は満席です</p>}
+    {Array.isArray(day)&&day.some(s=>!s.available) && <p className="flex items-center gap-3 rounded-(--liff-radius) bg-liff-note px-4 py-3 text-[13px] leading-5 text-liff-sub"><Icon name="info" tone="info" className="h-4 w-4 shrink-0" />{day.filter(s=>!s.available).map(s=>zonedParts(s.startsAt,timeZone).hm).join('・')} は満席です</p>}
     {note&&<p className="text-xs leading-[18px] text-liff-sub">{note}</p>}
     {error&&<FieldError>{error}</FieldError>}
   </div>;

@@ -72,22 +72,10 @@
 }
 
 /* 通ごとの反応：1通1行（番号・いつ・届いた数・率）と、その下の棒。 */
-.stepList {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  list-style: none;
-  border-radius: var(--tpl-sc2-radius);
-  box-shadow: var(--tpl-sc2-ring);
-}
 .stepRow {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-sc2-step-gap);
-  padding: var(--tpl-sc2-step-pad);
-  box-shadow: var(--tpl-sc2-line-b);
+  gap: var(--polish-space-row);
 }
 .stepTop {
   display: flex;

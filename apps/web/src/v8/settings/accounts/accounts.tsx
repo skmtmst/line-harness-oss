@@ -1,11 +1,10 @@
 'use client'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowUpDown, CircleDot, Plus, Star } from 'lucide-react'
+import { ArrowUpDown, CircleDot, Plus, Star, Cable, CircleCheck, TriangleAlert, Users } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -193,10 +192,10 @@ export default function AccountsV8() {
         ) : null}
 
         <KpiBand data-design="KPIs">
-          <KpiCard title="つないでいる" value={kpis?.connected} unit="アカウント" detail={null} />
-          <KpiCard title="有効" value={kpis?.active} unit="件" detail={null} />
-          <KpiCard title="接続に問題" value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
-          <KpiCard title="友だちの合計" value={kpis?.friends} unit="人" detail={null} />
+          <KpiCard title="つないでいる" icon={<Cable size={13} aria-hidden="true" />} value={kpis?.connected} unit="アカウント" detail={null} />
+          <KpiCard title="有効" icon={<CircleCheck size={13} aria-hidden="true" />} value={kpis?.active} unit="件" detail={null} />
+          <KpiCard title="接続に問題" icon={<TriangleAlert size={13} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
+          <KpiCard title="友だちの合計" icon={<Users size={13} aria-hidden="true" />} value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
 
         <div className={styles.toolbar}>
@@ -258,11 +257,10 @@ export default function AccountsV8() {
               const friends = archived || account.stats?.friendCount == null ? '—' : polishFormatNumber(account.stats.friendCount)
               return (
                 <Tr data-row-id={account.id} key={account.id} interactive>
-                  <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
-                    <span className={styles.name} title={account.name}>{account.name}</span>
-
-                  </div></FolderDotName></Td>
-                  <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
+                  <Td className={styles.colName}><span className={styles.name} title={account.name}>{account.name}</span></Td>
+                  <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
+                    <TruncatedText className={styles.sub} value={account.channelId ? `チャネル ${account.channelId}` : `チャネル ${emptyValue("unconfigured")}`} />
+                  </Td>
                   <Td className={styles.colHook}>
                     {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
                   </Td>

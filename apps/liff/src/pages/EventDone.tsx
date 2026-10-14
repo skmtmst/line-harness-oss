@@ -115,7 +115,7 @@ export default function EventDone() {
             body={body}
           >
             {eventName && (
-              <dl className="w-full divide-y divide-liff-divider rounded-(--liff-radius-lg) border border-liff-line px-3.5 py-1 text-left">
+              <dl data-liff-card className="w-full divide-y divide-liff-divider rounded-(--liff-radius-lg) border border-liff-line px-3.5 py-1 text-left">
                 {waitEntry?.queue_position != null && (
                   <div className="flex gap-2 py-2.5">
                     <dt className="w-18 shrink-0 text-xs text-liff-sub">順番</dt>

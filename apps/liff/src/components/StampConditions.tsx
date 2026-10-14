@@ -1,5 +1,4 @@
 import type { VisitStampSettings } from '@line-crm/shared';
-import Card from './ui/Card.js';
 
 const hm = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, '0')}:${(minute % 60).toString().padStart(2, '0')}`;
 const day = (value: string, timeZone: string) => new Date(/(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`).toLocaleString('ja-JP', { timeZone });
@@ -24,9 +23,9 @@ export default function StampConditions({ settings: s }: { settings: VisitStampS
   else rules.push(`1回の上限は${s.maxPerVisit}個（端数は切り捨て）`);
   if (s.stampInterval?.mode === 'same_day') rules.push('スタンプは1日1回まで');
   if (s.stampInterval?.mode === 'hours') rules.push(`次のスタンプまで${s.stampInterval.hours}時間空けてください`);
-  return <Card className="space-y-2 p-4">
-    <h2 className="text-sm font-bold text-ink">スタンプがたまる条件</h2>
-    <ul className="space-y-1 text-xs text-ink-secondary">{rules.map((rule, i) => <li key={i}>{rule}</li>)}</ul>
+  return <section className="space-y-2" aria-label="スタンプがたまる条件">
+    <h2 className="text-xs font-semibold text-ink">スタンプがたまる条件</h2>
+    <ul className="space-y-0.5 text-xs text-ink-secondary">{rules.map((rule, i) => <li key={i}>{rule}</li>)}</ul>
     <p className="text-xs text-ink-secondary">曜日・時間は{ s.timezone === 'Asia/Tokyo' ? '日本時間' : s.timezone }で判定します</p>
-  </Card>;
+  </section>;
 }

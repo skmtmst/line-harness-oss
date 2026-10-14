@@ -170,6 +170,11 @@ describe('送る・止める前に確かめる', () => {
     await settle()
     await act(async () => { (buttons('停止')[0] as HTMLButtonElement).click() })
     await settle()
+    const name = document.querySelector('input[placeholder="契約先A"]') as HTMLInputElement
+    expect(name.getAttribute('aria-required')).toBe('true')
+    const nameField = name.closest('[data-field]') ?? name.parentElement?.parentElement
+    expect(nameField?.textContent).toContain('必須')
+    expect(nameField?.textContent).not.toContain('任意')
     const confirm = buttons('停止する')[0] as HTMLButtonElement
     expect(confirm).toBeTruthy()
     await act(async () => { confirm.click() })

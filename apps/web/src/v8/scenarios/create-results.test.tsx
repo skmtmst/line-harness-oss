@@ -142,6 +142,20 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('作る①（dnzqC）', () => {
+  test('F7: 画面の説明が開け、名前の必須と欄の理由を読む', async () => {
+    render(<ScenarioCreateV8 />)
+    const name = screen.getByRole('textbox', { name: 'シナリオ名' })
+    expect(name.getAttribute('aria-required')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'シナリオを作るの説明' }))
+    expect(screen.getByText('名前とフォルダを決め、配信方式を選んでから1通目を設定します。作ったあとは配信方式を変えられません。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /この方式で保存する/ }))
+    await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
+    expect(name.getAttribute('aria-describedby')).toContain('scenario-name-error')
+    expect(document.getElementById('scenario-name-error')?.textContent).toBe('シナリオ名を入力してください')
+    expect(document.activeElement).toBe(name)
+    expect(create).not.toHaveBeenCalled()
+  })
+
   test('はじめは「時刻で指定」を選び、図を押しても方式を替えられ、札は個別に読ませない', async () => {
     render(<ScenarioCreateV8 />)
     const absolute = screen.getByRole('radio', { name: /時刻で指定/ }) as HTMLInputElement

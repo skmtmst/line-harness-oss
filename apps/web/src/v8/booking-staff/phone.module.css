@@ -121,6 +121,8 @@
   overflow: hidden;
 }
 
+.body[data-body-scroll] { flex: 0 0 auto; overflow: visible; }
+
 .title {
   margin: 0;
   color: var(--color-ink);

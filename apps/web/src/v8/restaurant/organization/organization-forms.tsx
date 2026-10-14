@@ -274,4 +274,3 @@ export function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: 
     </form>
   )
 }
-

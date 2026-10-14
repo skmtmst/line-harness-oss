@@ -1,6 +1,9 @@
 'use client'
+import { isConflict } from './cta-errors'
+export { isConflict } from './cta-errors'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -50,9 +53,6 @@ type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidd
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-export function isConflict(cause: unknown): boolean {
-  return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
-}
 
 export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const saveErrors = useSaveFormErrors()
@@ -376,7 +376,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <span className={form.labelSmall}>申込フォーム</span>
           {forms.state === 'ready' ? (
             <div className={styles.formSelect}>
-              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <SaveErrorField names={["registrationFormId"]}><EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} /></SaveErrorField>}
+              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <SaveErrorField names={["registrationFormId"]}><EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} disabledReason={conflict ? 'ほかの人が更新しました。最新の内容を読み込んでください。' : busy ? '処理中です。完了してから操作してください。' : undefined} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} /></SaveErrorField>}
             </div>
           ) : forms.state === 'loading' ? <p className={form.cardNote}>回答フォームを読み込んでいます。</p>
             : forms.state === 'forbidden' ? <p className={form.cardNote}>{permissionDeniedMessage('store')}</p>
