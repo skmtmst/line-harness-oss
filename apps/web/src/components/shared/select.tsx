@@ -12,7 +12,7 @@ import pillStyles from './status-pill.module.css'
 import { fitSelectContent } from './select-content-size.mjs'
 import IconButton from './icon-button'
 
-import type { SelectOption, SelectProps } from './select-types'
+import type { SelectCreateContext, SelectOption, SelectProps } from './select-types'
 export type { SelectOption, SelectCreateContext, SelectCreateAction, SelectProps } from './select-types'
 
 /*

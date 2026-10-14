@@ -1,6 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
@@ -13,20 +11,34 @@ import { describe, expect, test } from 'vitest'
 
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const store = { id: 'store-1', name: '試験店', code: 'S', area: '', capacity: 20, status: 'active', line_account_id: 'used', line_account_name: '使用中公式' } as RestaurantStore
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-const consoleSource = readFileSync(resolve(process.cwd(), 'src/v8/restaurant/organization/organization.tsx'), 'utf8')
-const copySource = readFileSync(resolve(process.cwd(), 'src/components/shared/copy-text-button.tsx'), 'utf8')
-const apiSource = readFileSync(resolve(process.cwd(), 'src/lib/restaurant-test-api.ts'), 'utf8')
+function captureRequests() {
+  const requests: Array<{ url: URL; init?: RequestInit }> = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ url: new URL(String(input)), init })
+    return new Response(JSON.stringify({ success: true, data: init?.method ? { id: 'issued-1' } : [] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }))
+  return requests
+}
 
 describe('飲食店向け予約メール取り込みアドレス画面', () => {
-  test('一覧・発行APIを店舗単位で呼び分ける', () => {
-    expect(apiSource).toContain('listIntakeAddresses:')
-    expect(apiSource).toContain('issueIntakeAddress:')
-    expect(apiSource).toContain('encodeURIComponent(storeId)')
+  test('一覧・発行APIを店舗単位で呼び分ける', async () => {
+    const requests = captureRequests()
+    await restaurantTestApi.listIntakeAddresses('account&1', 'store/1 ?')
+    await restaurantTestApi.issueIntakeAddress('account&1', 'store/1 ?')
+    expect(requests).toHaveLength(2)
+    expect(requests.map(row => row.url.pathname)).toEqual(['/api/restaurant-test/intake-addresses', '/api/restaurant-test/intake-addresses'])
+    expect(requests.map(row => row.url.searchParams.get('account_id'))).toEqual(['account&1', 'account&1'])
+    expect(requests[0].url.searchParams.get('storeId')).toBe('store/1 ?')
+    expect(requests[0].init?.method ?? 'GET').toBe('GET')
+    expect(requests[1].init?.method).toBe('POST')
+    expect(JSON.parse(String(requests[1].init?.body))).toEqual({ storeId: 'store/1 ?' })
   })
 
   test('未発行・コピー・再発行確認・ドメイン未設定を運用者へ表示する', async () => {
+    const logs = ['log', 'warn', 'error'].map(method => vi.spyOn(console, method as 'log' | 'warn' | 'error'))
     const address = { id: 'mail-1', address: 'intake@example.test', status: 'active', createdAt: '2026-10-01T00:00:00Z', revokedAt: null }
     const list = vi.spyOn(restaurantTestApi, 'listIntakeAddresses').mockResolvedValue({ data: [] } as never)
     const issue = vi.spyOn(restaurantTestApi, 'issueIntakeAddress').mockResolvedValue({ success: true } as never)
@@ -43,7 +55,7 @@ describe('飲食店向け予約メール取り込みアドレス画面', () => {
     await screen.findByText('コピーしました')
     issue.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'アドレスを発行' }))
-    const dialog = screen.getByRole('alertdialog')
+    const dialog = screen.getByRole('dialog', { name: '新しい取り込みアドレスを発行しますか？' })
     expect(dialog.textContent).toContain('90日後に失効')
     expect(issue).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '発行する' }))
@@ -53,17 +65,23 @@ describe('飲食店向け予約メール取り込みアドレス画面', () => {
     list.mockRejectedValue(new ApiError(503, 'unconfigured'))
     render(React.createElement(IntakeAddressPanel, { accountId: 'account-1', store, readOnly: false }))
     await screen.findByText('取り込み用ドメインが未設定です')
-    expect(consoleSource).not.toMatch(/console\.(?:log|warn|error)\([^\n]*address/)
-    expect(copySource).toContain('navigator.clipboard.writeText(text)')
+    expect(logs.flatMap(log => log.mock.calls).flat().join(' ')).not.toContain(address.address)
   })
 })
 
 describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', () => {
-  test('店舗作成・編集APIを配線し、削除APIは持たない', () => {
-    expect(apiSource).toContain('createStore:')
-    expect(apiSource).toContain('updateStore:')
-    expect(apiSource).toContain("method: 'PATCH'")
-    expect(apiSource).not.toMatch(/deleteStore\s*:/)
+  test('店舗作成・編集APIを配線し、削除APIは持たない', async () => {
+    const requests = captureRequests()
+    const body = { name: '試験店', code: 'S', area: '', capacity: 20, timezone: 'Asia/Tokyo', lineAccountId: 'free' }
+    await restaurantTestApi.createStore('account-1', body)
+    await restaurantTestApi.updateStore('account-1', 'store-1', { ...body, status: 'active' })
+    expect(requests).toHaveLength(2)
+    expect(requests.map(row => row.url.pathname)).toEqual(['/api/restaurant-test/stores', '/api/restaurant-test/stores/store-1'])
+    expect(requests.map(row => row.url.searchParams.get('account_id'))).toEqual(['account-1', 'account-1'])
+    expect(requests.map(row => row.init?.method)).toEqual(['POST', 'PATCH'])
+    expect(JSON.parse(String(requests[0].init?.body))).toEqual(body)
+    expect(JSON.parse(String(requests[1].init?.body))).toEqual({ ...body, status: 'active' })
+    expect('deleteStore' in restaurantTestApi).toBe(false)
   })
 
   test('LINE公式アカウントを必須選択にして使用中アカウントを選択不可にする', () => {
@@ -83,6 +101,6 @@ describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', 
     expect(screen.getByRole('button', { name: 'LINE公式アカウント' }).textContent).toContain('使用中公式')
     fireEvent.click(screen.getByRole('button', { name: '状態' }))
     expect(screen.getByRole('option', { name: 'アーカイブ' })).toBeTruthy()
-    expect(consoleSource).not.toMatch(/店舗を削除|deleteStore/)
+    expect(screen.queryByRole('button', { name: /店舗を削除/ })).toBeNull()
   })
 })

@@ -27,6 +27,7 @@ import {
   fetchApi,
   type EcActionExecution,
   type EcActionExecutionList,
+  type EcActionExecutionStatus,
   type EcCommerceOverview,
   type EcOrder,
 } from '@/lib/api'
