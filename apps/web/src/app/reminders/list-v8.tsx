@@ -774,7 +774,7 @@ export default function RemindersListV8() {
       ...reorder.menuItems(row.id, () => setOpenMenuId(null)),
       {
         id: 'delete',
-        label: '削除',
+        label: '削除する',
         icon: <Trash2 size={15} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
@@ -1178,7 +1178,7 @@ export default function RemindersListV8() {
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
-        designNode="RwVo5"
+        designNode="RwVo5" footerAlign="center" actionWidthReserve="idle"
         title={pauseTarget ? `「${pauseTarget.name}」を一時停止する` : ''}
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"

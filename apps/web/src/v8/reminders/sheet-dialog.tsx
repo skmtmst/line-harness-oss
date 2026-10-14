@@ -10,7 +10,7 @@
  */
 import { type ReactNode } from 'react'
 import { TriangleAlert } from 'lucide-react'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import styles from './sheet-dialog.module.css'
 
 export default function SheetDialog({
@@ -43,7 +43,7 @@ export default function SheetDialog({
 }) {
   return <Dialog open={open} title={title} description={description} onCancel={onClose} busy={busy} error={error} designNode={designNode}
     tone={destructive ? 'destructive' : 'default'} confirmation designLayout="stacked" designWidth={720}
-    footer={<>{destructive}{actions}</>} footerAlign="center">
+    footer={destructive ? <>{destructive}{actions}</> : <DialogActions>{actions}</DialogActions>} footerAlign="center">
     {band ? <div className={styles.band} data-tone={bandTone}><TriangleAlert size={16} aria-hidden="true" className={styles.bandIcon} /><div className={styles.bandText}>{band}</div></div> : null}
   </Dialog>
 }

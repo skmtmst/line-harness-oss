@@ -61,7 +61,7 @@ export type DialogProps = {
    */
   designTitleRow?: 'mark'
   /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
-  layout?: 'continuous' | 'account-inset'
+  layout?: 'continuous' | 'account-inset' | 'inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
@@ -83,6 +83,9 @@ export type DialogProps = {
   busy?: boolean
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
+  confirmDisabledReason?: string
+  actionWidthReserve?: 'states' | 'idle'
+  confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
   /** 実行中の文字。Buttonのbusyへ渡す。 */
@@ -156,6 +159,9 @@ export default function Dialog({
   busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
+  confirmDisabledReason,
+  actionWidthReserve,
+  confirmPlacement,
   onConfirm,
   onCancel,
   children,
@@ -272,6 +278,7 @@ export default function Dialog({
       data-size={size}
       data-design-layout={designLayout}
       data-confirm-first={confirmFirst || undefined}
+      data-confirm-placement={confirmPlacement}
       data-layout={layout}
       data-description-band={descriptionBand}
       data-footer-align={footerAlign}
@@ -321,12 +328,13 @@ export default function Dialog({
          * 実行ボタンの無い参照窓では「キャンセル」を出さない。閉じ方は右上の×
          * に一本化する（UI-25）。
          */
-        <div className={styles.actions}>
+        <div className={styles.actions} data-dialog-actions>
           {footerLead ? <span className={styles.footerLead}>{footerLead}</span> : null}
           <Button
             data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
             variant={primaryAction === 'cancel' ? 'primary' : undefined}
             className={styles.designButton}
+            widthReserve={actionWidthReserve}
             ref={primaryAction === 'cancel' ? cancelRef : undefined}
             onClick={discard.requestClose}
             disabled={busy}
@@ -338,8 +346,9 @@ export default function Dialog({
             data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
+            widthReserve={actionWidthReserve}
             onClick={runConfirm}
-            disabled={busy || confirmDisabled} busy={busy} busyLabel={busyLabel}>
+            disabled={busy || confirmDisabled} title={confirmDisabled ? confirmDisabledReason : undefined} busy={busy} busyLabel={busyLabel}>
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
             {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
           </Button>
@@ -377,6 +386,6 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children }: { children: ReactNode }) {
-  return <div className={styles.actions}>{children}</div>
+export function DialogActions({ children, leadingAction }: { children: ReactNode; leadingAction?: ReactNode }) {
+  return <div className={styles.actions} data-dialog-actions>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
 }

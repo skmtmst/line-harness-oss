@@ -1,9 +1,87 @@
-export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, compactBody = false } = {}) {
+export function scanDialogAudit({ expectedWidth, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const rect = panel.getBoundingClientRect()
   const inventory = [{ kind: 'panel', width: rect.width, height: rect.height }]
   const findings = []
+  if (pickerControls) {
+    const search = panel.querySelector('input[type="search"]')?.parentElement
+    if (!search) findings.push({ pattern: 'F4', kind: 'dialog-search-missing' })
+    else {
+      const height = search.getBoundingClientRect().height
+      inventory.push({ kind: 'picker-search', height })
+      if (Math.abs(height - 36) > 1) findings.push({ pattern: 'F6', kind: 'dialog-search-height', height, expected: 36 })
+    }
+  }
+  for (const name of fixedActions) {
+    const button = [...panel.querySelectorAll('button')].find(el => el.innerText.trim() === name)
+    if (!button) { findings.push({ pattern: 'F4', kind: 'dialog-fixed-action-missing', name }); continue }
+    const box = button.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+    const visible = box.width > 0 && box.height > 0 && box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth && (hit === button || button.contains(hit))
+    inventory.push({ kind: 'fixed-action', name, visible, rect: box.toJSON() })
+    if (!visible) findings.push({ pattern: 'F10', kind: 'dialog-fixed-action-hidden', name })
+  }
+  if (choices) {
+    const grid = panel.querySelector('[data-dialog-choice-cards]')
+    if (!grid) findings.push({ pattern: 'F4', kind: 'dialog-choice-grid-missing' })
+    else for (const link of grid.querySelectorAll('a[href]')) {
+      const color = getComputedStyle(link).backgroundColor
+      const image = getComputedStyle(link).backgroundImage
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 1
+      const context = canvas.getContext('2d')
+      context.fillStyle = color
+      context.fillRect(0, 0, 1, 1)
+      const alpha = context.getImageData(0, 0, 1, 1).data[3]
+      inventory.push({ kind: 'choice-link', text: link.textContent.trim(), color, image, alpha })
+      if (alpha > 0 || image !== 'none') findings.push({ pattern: 'F6', kind: 'dialog-choice-label-background', color, image })
+    }
+  }
+  if (plainUsage) {
+    const table = panel.querySelector('table[aria-label="使っている所"]')
+    if (!table) findings.push({ pattern: 'F4', kind: 'dialog-usage-table-missing' })
+    else {
+      const dots = table.querySelectorAll('[data-folder-dot]').length
+      inventory.push({ kind: 'usage-table', folderDots: dots })
+      if (dots) findings.push({ pattern: 'F9', kind: 'dialog-usage-folder-dots', count: dots })
+      for (const link of table.querySelectorAll('a[target="_blank"]')) {
+        const icons = link.querySelectorAll('svg').length
+        inventory.push({ kind: 'usage-external-action', icons })
+        if (icons !== 1) findings.push({ pattern: 'F9', kind: 'dialog-usage-external-icons', count: icons })
+      }
+    }
+  }
+  if (columnSettings) {
+    const fixed = panel.querySelector('[data-fixed-display-name]')
+    const selected = panel.querySelector('[data-presentation="columns"] [aria-label="選択した列"]')
+    if (!fixed || !selected || !selected.contains(fixed)) findings.push({ pattern: 'F4', kind: 'display-fixed-name-missing' })
+    if (selected) {
+      const css = getComputedStyle(selected)
+      const framed = css.boxShadow !== 'none' || (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) || parseFloat(css.borderTopWidth) > 0
+      inventory.push({ kind: 'selected-columns', framed })
+      if (!framed) findings.push({ pattern: 'F6', kind: 'display-selected-frame-missing' })
+    }
+    for (const group of panel.querySelectorAll('[role="group"][aria-label$="の追加できる列"]')) {
+      const columns = getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean)
+      if (columns.length !== 2) findings.push({ pattern: 'F10', kind: 'display-available-columns', actual: columns.length, expected: 2 })
+    }
+  }
+  if (scoreHistory) {
+    for (const delta of panel.querySelectorAll('[data-score-delta]')) {
+      const sign = delta.getAttribute('data-score-delta')
+      const token = sign === 'positive' ? '--color-accent-deep' : sign === 'negative' ? '--color-warning' : null
+      if (!token) continue
+      const probe = document.createElement('span')
+      probe.style.color = `var(${token})`
+      panel.append(probe)
+      const expected = getComputedStyle(probe).color
+      probe.remove()
+      const actual = getComputedStyle(delta).color
+      inventory.push({ kind: 'score-history-delta', sign, actual, expected })
+      if (actual !== expected) findings.push({ pattern: 'F6', kind: 'score-history-tone', sign, actual, expected })
+    }
+  }
   const descriptionBand = panel.getAttribute('data-description-band')
   if (descriptionBand === 'danger') {
     const description = (panel.getAttribute('aria-describedby') ?? '').split(/\s+/).map(id => document.getElementById(id)).find(el => el && panel.contains(el))

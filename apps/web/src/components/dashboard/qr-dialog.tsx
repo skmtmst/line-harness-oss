@@ -1,6 +1,6 @@
 'use client'
 import DownloadIcon from './qr-download-icon'
-
+import QrStoppedNotice from './qr-stopped-notice'
 import React, { useEffect, useState } from 'react'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
@@ -15,18 +15,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
-/**
- * 友だち追加のQRコード（設計 V2 1-1-1）。
- *
- * ダッシュボードの「QRを表示」から開く。設計どおり、印刷に使う大きさを
- * 選べるようにしてある。Worker の /api/qr は size と download を受けるので、
- * 保存もそのまま通る。
- *
- * PDF生成APIは無いため、ブラウザの印刷画面を開く。そこで「PDFに保存」を
- * 選べば、外部サービスへデータを送らずにPDF化できる。
- */
-
+/** QRの取得・画像保存はWorker、PDFはブラウザの印刷で行う。 */
 /*
  * 選べる大きさ（#689）。
  *
@@ -61,6 +50,7 @@ export type FixedQrResource = {
   url: string
   title: string
   stopped?: boolean
+  stoppedPresentation?: 'notice'
   description?: string
   downloadPdf?: (paper: 'A4' | 'A5') => Promise<Blob>
   downloadImage?: (format: string, size: string) => Promise<Blob>
@@ -376,7 +366,7 @@ export default function QrDialog({
           </button>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
+        {resource?.stopped && resource.stoppedPresentation === 'notice' ? <QrStoppedNotice onClose={onClose} /> : <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {routesError ? <ListState kind="error" title="経路を読み込めませんでした" onRetry={()=>{if(routesErrorProp)onRetryRoutes?.();else setReadRetry(value=>value+1)}}/> : null}
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex min-w-0 flex-col items-center">
@@ -587,7 +577,7 @@ export default function QrDialog({
             </>:null}
             {direct?.footer}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   )

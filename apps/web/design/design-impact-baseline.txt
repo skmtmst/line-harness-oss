@@ -85,6 +85,7 @@ shared-button-importer components/chats/inbox-filter-panel.tsx
 shared-button-importer components/chats/saved-view-dialog.tsx
 shared-button-importer components/chats/template-folder-select.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
+shared-button-importer components/dashboard/qr-stopped-notice.tsx
 shared-button-importer components/events/event-questions-editor.tsx
 shared-button-importer components/feature-disabled-gate.tsx
 shared-button-importer components/forms/choice-table.tsx
@@ -135,6 +136,7 @@ shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/folder-editor-dialog.tsx
 shared-button-importer components/shared/use-folder-move.tsx
 shared-button-importer components/templates/detail-columns.tsx
+shared-button-importer components/shared/dialog-usage-table.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
@@ -369,6 +371,7 @@ shared-button-importer v8/settings/accounts/accounts.tsx
 shared-button-importer v8/settings/staff/mfa-policy.tsx
 shared-button-importer v8/settings/staff/self-mfa.tsx
 shared-button-importer v8/settings/staff/staff.tsx
+shared-button-importer v8/settings/features/reorder-dialog.tsx
 shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx

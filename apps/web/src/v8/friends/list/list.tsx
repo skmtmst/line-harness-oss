@@ -726,7 +726,7 @@ export default function FriendsListV8() {
         <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
-        {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
+        {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         <ListToolbarEnd>
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort

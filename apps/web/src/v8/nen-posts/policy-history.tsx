@@ -4,7 +4,9 @@ import { api, type PhotoRewardPolicyVersion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import Drawer from '@/components/shared/drawer'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Card from '@/components/shared/card'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import VersionCompare from '@/components/shared/version-compare'
@@ -20,6 +22,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : emptyValue('none')}`
 
@@ -101,27 +104,24 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
     finally { setSaving(false) }
   }
   return <SaveErrorScope errors={saveErrors}><>
-    <Dialog open={open && !(createOpen && canEdit)} designNode="N1br7" designWidth={640} designTop={220} title="版の履歴（報酬の決まり）" description="保存するたびに版が1つ増えます。前の版は変わりません。「この版に戻す」は、その中身で新しい版を作ります。" busy={saving} onCancel={onClose} footer={<div className={styles.dialogFoot}><Button variant="secondary" disabled={saving} onClick={onClose}>閉じる</Button></div>}>
+    <Dialog open={open && !(createOpen && canEdit)} designNode="N1br7" designWidth={640} designTop={220} title="版の履歴（報酬の決まり）" description="保存するたびに版が1つ増えます。前の版は変わりません。「この版に戻す」は、その中身で新しい版を作ります。" busy={saving} onCancel={onClose} footer={<DialogActions><Button variant="secondary" disabled={saving} onClick={onClose}>閉じる</Button>{canEdit ? <Button variant="primary" disabled={saving} onClick={() => setCreateOpen(true)}>新しい版を作る</Button> : null}</DialogActions>}>
       <div className={styles.dialogStack}>
       {loading ? <ListState kind="loading" title="版を読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => void load()} /> : <>
         <div className={styles.historyTable}><DataTable><thead><TableHeadRow><Th>版</Th><Th>保存日時</Th><Th>保存した人</Th><Th>内容</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead><tbody>
           {versions.filter((version) => version.status !== 'reserved').map((version) => <Tr key={version.versionNumber}>
-            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td>{policyContent(version)}</Td>
+            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td><TruncatedText value={policyContent(version)} /></Td>
             <Td>{version.status === 'in_use' ? <StatusBadge tone="success">いま使っている版</StatusBadge> : <Button variant="secondary" onClick={() => setSelected(version)}>比べる</Button>}</Td>
           </Tr>)}
         </tbody></DataTable></div>
-        {selected && current ? <section className={styles.historyCompare}><h3 className={styles.fieldTitle}>{`いま使っている版とv${selected.versionNumber}を比べる`}</h3><VersionCompare before={`${policyContent(current)}\n${current.summary}`} after={`${policyContent(selected)}\n${selected.summary}`} />{canEdit ? <div className={styles.historyActions}><Button variant="secondary" onClick={() => setRevertOpen(true)}>この版に戻す</Button></div> : null}</section> : null}
+        {selected && current ? <section className={styles.historyCompare}><h3 className={styles.fieldTitle}>{`いま使っている版とv${selected.versionNumber}を比べる`}</h3><VersionCompare before={`${policyContent(current)}\n${current.summary}`} after={`${policyContent(selected)}\n${selected.summary}`} />{canEdit && selected.status === 'past' ? <div className={styles.historyActions}><Button variant="secondary" onClick={() => setRevertOpen(true)}>この版に戻す</Button></div> : null}</section> : null}
         <p className={styles.historyHint}>過去の版は変わりません。その中身で新しい版を作ります。採用済みの付与は、そのときの版のまま変わりません。</p>
-        <div className={styles.historyColumns}>
-          <section className={styles.historyCard}>
+          <Card padding="compact" layout="vertical" gap="tight">
             <h3 className={styles.railTitle}>予約中の版</h3>
             {reserved.length ? reserved.map((version) => <div key={version.versionNumber} className={styles.historyReserved}>
-              <p className={styles.historyReservedHead}><strong>{`v${version.versionNumber}`}</strong><StatusBadge tone="info">予約</StatusBadge><span className={styles.historyReservedWhen} title={version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : undefined}>{version.effectiveFrom ? `${shortWhen(version.effectiveFrom)} から` : emptyValue('unknown')}</span></p>
+              <p className={styles.historyReservedHead}><strong>{`v${version.versionNumber}`}</strong><StatusBadge tone="info">予約</StatusBadge><span className={styles.historyReservedWhen} title={version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : undefined}>{version.effectiveFrom ? `${shortWhen(version.effectiveFrom)} から` : emptyValue('unknown')}</span><RowMenu label={`予約中のv${version.versionNumber}の操作`} items={[{ id: 'compare', label: '比べる', onSelect: () => setSelected(version) }]} /></p>
               <p className={styles.historyReservedBody}>{policyContent(version)}</p>
             </div>) : <p className={styles.railNote}>予約中の版はありません</p>}
-          </section>
-          {canEdit ? <Button variant="primary" onClick={() => setCreateOpen(true)}>新しい版を作る</Button> : null}
-        </div>
+          </Card>
       </>}
       </div>
     </Dialog>
