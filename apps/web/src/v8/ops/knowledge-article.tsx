@@ -8,7 +8,7 @@ import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { KNOWLEDGE_KINDS, knowledgeTime, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -178,15 +178,15 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
         <Dialog
           open={approving}
           title="記事を承認する前に"
-          designNode="eSXxA"
+          designNode="eSXxA" designTop={240}
           busy={busy}
           error={error || undefined}
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
-            <div className={styles.dialogActions}>
+            <DialogActions>
               <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}>保存して承認</Button>
-            </div>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={busy ? '処理中です' : ticketBlocked ? '元の問い合わせを解決にしてください' : !canApprove ? '承認できる記事の内容を確かめてください' : !readChecked ? '本文と手順を確かめてください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check size={15} aria-hidden="true" />保存して承認</Button>
+            </DialogActions>
           )}
         >
           <div className={parts.dialogBody}>
@@ -196,7 +196,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             </Checkbox></SaveErrorField>
             {ticket ? <Checkbox checked={ticket.resolved} disabled onCheckedChange={() => {}}>元の問い合わせ {ticket.label} が「解決」になっている</Checkbox> : null}
             {ticketBlocked ? <Notice tone="danger">元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。</Notice> : null}
-            <Notice tone="info">承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</Notice>
+            <p className={parts.line}>承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</p>
           </div>
         </Dialog>
       )}

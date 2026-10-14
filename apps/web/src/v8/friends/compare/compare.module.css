@@ -64,14 +64,13 @@
 .attr { display: flex; align-items: center; gap: var(--tpl-fr-stack-gap); min-height: var(--tpl-fr-cmp-attr-h); }
 .attr dt { width: var(--tpl-fr-cmp-attr-label); flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .attr dd { margin: 0; }
-.attr dd.mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-family: var(--font-mono); font-size: var(--text-micro); }
+.attr dd.mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-family: var(--font-mono); font-size: var(--text-micro); }
 
 .pill { display: inline-flex; padding: var(--tpl-fr-status-pad); border-radius: var(--radius-pill); font-size: var(--text-micro); font-weight: 700; line-height: var(--tpl-fr-sub-lh); white-space: nowrap; }
 .pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
 .card { gap: var(--tpl-fr-cmp-card-gap); padding: var(--tpl-fr-panel-pad); }
-.pair > .card { min-height: var(--tpl-fr-cmp-card-min); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fr-sub-lh); }
 

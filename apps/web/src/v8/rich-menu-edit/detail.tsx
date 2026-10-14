@@ -14,6 +14,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
@@ -29,7 +30,6 @@ import { DetailColumns } from '@/components/templates/detail-columns'
 import { ListPageSection } from '@/components/templates/list-page'
 import Notice from '@/components/shared/notice'
 import { notifySaved } from '@/components/shared/toast'
-
 
 type Group = {
   id: string
@@ -327,7 +327,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="hKr8f">
-      <PageFrame kind="create">
+      <PageFrame kind="detail" heightMode="content">
         <PageHeading title={group.name} identity={backLink} help={head} />
         <ListPageSection><DetailColumns presentation="notification" asideLabel="いまの状態と操作" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
 
@@ -375,7 +375,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
             {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
             {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
-            {canInspectOperations ? <section className={styles.card} aria-label="公開の進み">
+            {canInspectOperations ? <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
               {progress && !progress.completed && !progress.failed && progress.message ? <p className={styles.cardNote}>{progress.message}</p> : null}
               {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <DetailLoading /> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
@@ -387,15 +387,15 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                   <span className={step.status === 'done' ? styles.stateOk : step.status === 'failed' ? styles.stateNg : styles.stateQuiet}>{progressStatusText(step.status)}</span>
                 </div>
               ))}
-            </section> : null}
+            </Card> : null}
 
-            {canInspectOperations ? <section className={styles.card} aria-label="公開の履歴とLINEとの照合">
+            {canInspectOperations ? <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="公開の履歴とLINEとの照合">
               <div className={styles.cardTitles}>
-                <h2 className={styles.cardTitle}><ShieldCheck className={styles.stepOk} size={15} aria-hidden="true" />公開の履歴とLINEとの照合</h2>
+                <h2 className={styles.cardTitle}>公開の履歴とLINEとの照合</h2>
                 <p className={styles.cardNote} title={publishedInfo}>管理画面の記録と、LINE上の状態がずれていないかを見ます</p>
               </div>
               {!runsError && draftDiffers === true ? <Notice tone="warn" message="編集中の下書きは公開中の版と違います。公開すると、この下書きで上書きされます。" /> : null}
-              <div className={styles.checkBox}>
+              <div className={styles.checkBox}>{!checkError && diffs?.length === 0 ? <ShieldCheck className={styles.stepOk} size={15} aria-hidden="true" /> : null}
                 <div className={styles.checkText}>
                   {checkError ? <span className={styles.errorText}>{checkError}</span>
                     : diffs === null ? <span>LINEと照らし合わせています…</span>
@@ -432,7 +432,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                   ))}
                 </div>
               )}
-            </section> : null}
+            </Card> : null}
           </div>
 </DetailColumns></ListPageSection>
       </PageFrame>
