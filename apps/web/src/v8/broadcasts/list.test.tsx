@@ -17,6 +17,8 @@ const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
+const narrow = vi.hoisted(() => ({ value: false }))
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -147,6 +149,21 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
 }
 
 describe('V8 一斉配信一覧（src/v8）の動き', () => {
+  it('狭い幅でも送信枠を保持し、下書きの絞り込みは使える', async () => {
+    narrow.value = true
+    try {
+      act(() => { root.render(<BroadcastListV8 />) })
+      await flush()
+      expect(host.querySelector('[data-kpi-label][title="今月の送信枠"]')).not.toBeNull()
+      expect(host.querySelector('[data-kpi-label][title="下書き"]')).toBeNull()
+      const draft = buttonByText('下書き 3')
+      expect(draft).toBeTruthy()
+      act(() => draft!.click())
+      await flush()
+      expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'draft' }))
+    } finally { narrow.value = false }
+  })
+
   it('行と数の帯・札の件数が出る', async () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()

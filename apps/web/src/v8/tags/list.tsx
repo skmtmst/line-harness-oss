@@ -111,7 +111,7 @@ export default function TagsList({
         headingSize="regular"
         title="タグ"
         help="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
-        explanationToggle={tab === 'searches' && !currentTabBlocked ? <PageExplanationToggle /> : undefined}
+        explanationToggle={(tab === 'searches' || tab === 'fields') && !currentTabBlocked ? <PageExplanationToggle /> : undefined}
         actions={actions}
       />
 
@@ -149,9 +149,9 @@ export default function TagsList({
       ) : tab === 'searches' ? (
         <SearchesTab accountId={accountId} canEdit={canEdit} explanation />
       ) : (
-        <FieldsTab accountId={accountId} canEdit={canEdit} narrow={narrow} />
+        <FieldsTab accountId={accountId} canEdit={canEdit} narrow={narrow} explanation />
       )}
     </PageFrame>
   )
-  return tab === 'searches' && !currentTabBlocked ? <PageExplanationProvider pageKey="tags:searches">{page}</PageExplanationProvider> : page
+  return (tab === 'searches' || tab === 'fields') && !currentTabBlocked ? <PageExplanationProvider pageKey={`tags:${tab}`}>{page}</PageExplanationProvider> : page
 }
