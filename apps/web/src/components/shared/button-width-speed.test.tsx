@@ -14,7 +14,7 @@ describe('保存中・完了のボタン幅', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
       return parseFloat(this.style.width) || (this.textContent?.includes('か所') ? 240 : 100)
     })
-    const action = (label: string, busy = false) => <Button busy={busy} done={false}>{label}</Button>
+    const action = (label: string, busy = false) => <Button widthReserve="dynamic" busy={busy} done={false}>{label}</Button>
     const { rerender } = render(action('保存する'))
     const button = screen.getByRole('button')
     expect(button.style.width).toBe('121px')

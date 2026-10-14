@@ -19,7 +19,7 @@ const compiled = await build({
     function Fixture(){
       const [long,setLong]=useState(false),[busy,setBusy]=useState(false),[done,setDone]=useState(false);
       return <><nav><button onClick={()=>setLong(v=>!v)}>文字を替える</button><button onClick={()=>setBusy(v=>!v)}>待機を替える</button><button onClick={()=>setDone(v=>!v)}>完了を替える</button></nav>
-        <StickyBar actions={<Button variant="primary" icon={<GitCompare aria-hidden="true"/>} busy={busy} done={done}><span data-label>{long?'12345か所に反映して保存':'保存する'}</span></Button>}/></>;
+        <StickyBar actions={<Button variant="primary" widthReserve="dynamic" icon={<GitCompare aria-hidden="true"/>} busy={busy} done={done}><span data-label>{long?'12345か所に反映して保存':'保存する'}</span></Button>}/></>;
     } createRoot(document.getElementById('root')).render(<Fixture/>);
   ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',

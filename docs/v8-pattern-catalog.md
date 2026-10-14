@@ -541,7 +541,7 @@
 <a id="sticky-bar"></a>
 ## sticky-bar 作る・編集の下の帯
 
-- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。
+- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。 件数で保存文が変わる操作は`Button.widthReserve="dynamic"`を指定し現在の全文で測り直す。既定の`states`/`idle`の幅は保つ（合格済みの窓と競合の帯を動かさない）。
 
 - **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
 - **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）

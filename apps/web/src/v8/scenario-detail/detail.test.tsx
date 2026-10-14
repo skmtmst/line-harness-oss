@@ -226,7 +226,7 @@ describe('V8 シナリオ配信の編集', () => {
     expect(within(alert).getByRole('button', { name: '最新を読み込んで続ける' })).toBeTruthy()
     await waitFor(() => expect(screen.getByRole('button', { name: '比べてから保存' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
-    expect(screen.getByRole('button', { name: '比べてから保存' }).querySelector('svg.lucide-git-compare-arrows')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '比べてから保存' }).querySelector('svg.lucide-git-compare')).not.toBeNull()
   })
 
   it('下の帯の「複製する」で複製の窓（Al4Ek）が開き、名前は「〇〇 のコピー」', async () => {

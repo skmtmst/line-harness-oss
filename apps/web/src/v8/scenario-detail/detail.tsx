@@ -7,7 +7,7 @@ import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompare, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { CircleAlert, RefreshCw, Trash2 } from 'lucide-react';
@@ -2802,7 +2802,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
+                  variant="primary" icon={conflict ? <GitCompare aria-hidden /> : <Check aria-hidden />}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)
