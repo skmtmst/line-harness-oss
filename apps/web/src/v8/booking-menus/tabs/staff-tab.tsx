@@ -4,7 +4,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
-import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table'
 import { ListChecks, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -192,9 +192,9 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         return (
           <div key={person.id} className={styles.staffRow}>
             <span className={styles.staffName}>
-              <Link href={`/booking/staff/shifts?staff_id=${person.id}`} className={styles.staffNameLink}>
+              <RowNameLink href={`/booking/staff/shifts?staff_id=${person.id}`} title={person.name}>
                 {person.name}
-              </Link>
+              </RowNameLink>
               {person.role ? <span className={styles.staffRole}>{person.role}</span> : null}
             </span>
             <span className={styles.staffColMenus}>

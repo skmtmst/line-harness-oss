@@ -54,7 +54,7 @@ tags: [memory, core]
 
 ## 進行中（2026-10-14）
 
-- oneF2x A2の続き：本線d12・列車38最新版包含。担当5板のVFxWU/VLEajをRowMenu box/rowへ接続、関連25/型/lint/本番build成功。3幅F5=15→0、VLEaj全F/崩れ0、開閉6/6。VFxWUは旧Save判定のF6各1をFへ継続。撮影404の2件は開発用条件を静的用の写しで外して再取得待ち、完成/正式追加0。次はクリーン版の1440左右から、docs/qa/one-f2x-a2-1015.md・外部F2x/a2-1015/row-menu。下の記録は前回。
+- oneF2x A2の続き：行メニュー13eで3幅F5=15→0/保護331取得・既存53板2731差の追加0を確認。全高の左右からVLEajの名前をRowNameLinkへ接続、関連22/型/lint/build成功、3幅全F/崩れ0・9名の黒/700/1行/行き先/全文title成功。名前保存後のクリーン撮影/保護へ。静的撮影は既存fast-captureをworkers=1・1板ずつ、通常の失敗は保存。完成/正式追加は未確認、共通/工程待ち4板を保持。docs/qa/one-f2x-a2-1015.md・外部F2x/a2-1015/name-ink。下は前回。
 
 - oneF2x NIGHT再開：列車38=25a4e6d458を9a91974fffへmerge、7競合は両側の機能・試験・記録保持。競合関連53/追加44成功・1失敗、型/lintエラー0。共有CreateStepColumnsのdesign-debt unresolved-classname 0→1はF持主へ依頼して停止。待機中ビルドを中断、新版のbuild/3幅/鍵は未実施、前回の36条件/機械0=5は新版に流用しない。新候補/正式合格/撮影/Pen/台帳0、コミットまで。詳細docs/qa/one-f2x-night-train38-1014.md・外部F2x/train38-night-1014。次はFの解消枝取り込みから夜12板36条件。
 

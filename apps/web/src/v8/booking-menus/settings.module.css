@@ -1084,21 +1084,6 @@
   min-width: 0;
 }
 
-.staffNameLink {
-  width: fit-content;
-  overflow: hidden;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.staffNameLink:hover {
-  text-decoration: underline;
-}
-
 .staffRole {
   color: var(--color-ink-faint);
   font-size: var(--tpl-bm-11);
