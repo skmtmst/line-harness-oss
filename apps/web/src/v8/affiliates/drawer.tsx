@@ -4,7 +4,7 @@ import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, PauseCircle } from 'lucide-react'
+import { Check, Copy, PauseCircle, Pencil } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -289,7 +289,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー"  />
+                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー" icon={<Copy size={14} aria-hidden="true" />} />
                 </div>
               )
             })}
@@ -483,7 +483,7 @@ export default function AffiliateDrawer({
           {readonly ? <Button type="button" onClick={onClose}>閉じる</Button> : (
             <>
               <Button type="button" onClick={() => { setTab('payment'); setEditing((current) => !current) }}>
-                {editing ? '編集をやめる' : '編集する'}
+                <Pencil size={14} aria-hidden="true" />{editing ? '編集をやめる' : '編集する'}
               </Button>
               <Button
                 type="button"

@@ -15,7 +15,7 @@ import { jstDate } from '@/lib/jst-datetime';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 
 import Link from '@/components/shared/list-navigation'
-import { Eye } from 'lucide-react';
+import { Check, Eye } from 'lucide-react';
 
 import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
@@ -538,7 +538,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
       footer={(
         <div className={styles.drawerFoot}>
           <Button type="button" disabled={saving} onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => { if (fields.submit()) onSave() }}>設定を保存する</Button>
+          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => { if (fields.submit()) onSave() }}><Check size={15} aria-hidden="true" />設定を保存する</Button>
         </div>
       )}
     >

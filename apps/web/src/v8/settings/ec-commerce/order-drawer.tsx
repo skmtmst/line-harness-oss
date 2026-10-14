@@ -198,7 +198,7 @@ export default function OrderDrawer({
     : true
 
   return (
-    <Drawer open={open} width="order" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
+    <Drawer open={open} width="order" heightMode="viewport" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
       description={order ? <>
         {friendId && order.customerName
           ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{`${order.customerName}さん`}</Link>
