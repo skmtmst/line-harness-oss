@@ -56,7 +56,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { describeFriendAddFailure } from './failure';
 import { addTimeWindow, friendAddFlowSteps, friendAddReaddLines, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow';
-import { resendSuppressionText } from './text';
+import { conditionSummary, localInputValue, resendSuppressionText } from './text';
 import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import TruncatedText from '@/components/shared/truncated-text'
@@ -153,29 +153,6 @@ function toEditorRule(rule: FriendAddRule): EditorRule {
     lastTestStatus: rule.lastTestStatus,
     version: rule.version,
   }
-}
-
-/** 日時の欄（datetime-local）の値。保存値の秒・時差は落として見せる。 */
-function localInputValue(value: string | null) {
-  if (!value) return ''
-  return value.slice(0, 16)
-}
-
-/** 友だち条件の1行の言い方（タグの有無だけ名前で言う。ほかは件数）。 */
-function conditionSummary(condition: SegmentCondition | null, tags: FriendAddRuleOptions['tags']) {
-  if (!condition || condition.rules.length + (condition.groups?.length ?? 0) === 0) return '友だち条件：なし（全員）'
-  const tagName = (value: unknown) => {
-    const id = typeof value === 'string' ? value : (value as { tagId?: string } | null)?.tagId
-    return tags.find((tag) => tag.id === id)?.name ?? null
-  }
-  const parts = condition.rules.map((rule) => {
-    const name = tagName(rule.value)
-    if (rule.type === 'tag_exists' && name) return `タグ「${name}」が付いている`
-    if (rule.type === 'tag_not_exists' && name) return `タグ「${name}」が付いていない`
-    return null
-  })
-  if (parts.length === 1 && parts[0] && !condition.groups?.length) return `友だち条件：${parts[0]}`
-  return `友だち条件：${condition.rules.length + (condition.groups?.length ?? 0)}つ`
 }
 
 function parseFriendConditionJson(value: string): SegmentCondition | null {
