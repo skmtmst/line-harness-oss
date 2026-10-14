@@ -73,7 +73,7 @@ function parseEntry(line) {
   return out
 }
 
-function parseFile(name) {
+function parseFile(name, summaryExcludedVersions) {
   // name にはサブディレクトリ（`unreleased/196-kenta-....md`）も来る。
   const raw = readFileSync(join(LOG_DIR, name), 'utf8')
   const { meta, body } = parseFrontMatter(raw)
@@ -96,8 +96,11 @@ function parseFile(name) {
     }
     entries.push({ kind, ...parseEntry(line) })
   }
+  const version = meta.version ?? name.replace(/\.md$/, '')
+  // 過去の未公開行を保管する版は、全文を残したまま要約の候補から外せる。
+  if (meta.summary === 'false') summaryExcludedVersions.add(version)
   return {
-    version: meta.version ?? name.replace(/\.md$/, ''),
+    version,
     released: meta.released ?? null,
     entries,
   }
@@ -117,7 +120,8 @@ function main() {
   }
 
   const files = readdirSync(LOG_DIR).filter((f) => f.endsWith('.md') && f !== 'README.md')
-  const releases = files.map(parseFile)
+  const summaryExcludedVersions = new Set()
+  const releases = files.map((name) => parseFile(name, summaryExcludedVersions))
 
   /*
    * 未リリースぶんは、PRごとの1ファイルからも拾う。
@@ -136,7 +140,7 @@ function main() {
       .filter((f) => f.endsWith('.md') && f !== 'README.md')
       .sort()
     for (const name of parts) {
-      const parsed = parseFile(join('unreleased', name))
+      const parsed = parseFile(join('unreleased', name), summaryExcludedVersions)
       if (unreleased) unreleased.entries.push(...parsed.entries)
       else releases.push({ version: 'unreleased', released: null, entries: parsed.entries })
     }
@@ -155,7 +159,7 @@ function main() {
 
   mkdirSync(OUT_DIR, { recursive: true })
   writeFileSync(OUT_FILE, JSON.stringify({ releases }, null, 2) + '\n')
-  writeFileSync(SUMMARY_FILE, JSON.stringify(summarize(releases)) + '\n')
+  writeFileSync(SUMMARY_FILE, JSON.stringify(summarize(releases, summaryExcludedVersions)) + '\n')
   const total = releases.reduce((n, r) => n + r.entries.length, 0)
   console.log(`[release-log] ${releases.length} 版 / ${total} 件を書き出しました`)
 }
@@ -167,15 +171,17 @@ function main() {
  * それだけで 160kB を超えた。画面が本文を出すのは「反映済みの新しい行」だけで、
  * ほかは版ごとの件数しか使わない。そこで件数（entryCount）を残し、本文は
  * 反映済みの新しい SUMMARY_KEEP 行だけにする。
+ * 保管用の版で `summary: false` を指定したものは候補から外す。未公開の行を
+ * 版へまとめても、要約に新しく載せず、全文と版ごとの件数は残すため。
  *
  * 「新しい行」の並べ方は画面（update-history.ts の collectRecentUpdates）と同じ
  * `at ?? released` の新しい順。画面は配備記録と混ぜて新しい10行を出すので、
  * 反映済みの新しい10行より多く残しておけば、表示される行は全文のときと変わらない。
  */
-export function summarize(releases) {
+export function summarize(releases, summaryExcludedVersions = new Set()) {
   const rows = []
   releases.forEach((release, r) => {
-    if (!release.released) return
+    if (!release.released || summaryExcludedVersions.has(release.version)) return
     release.entries.forEach((entry, e) => {
       rows.push({ r, e, key: Date.parse(entry.at ?? release.released ?? '') })
     })
