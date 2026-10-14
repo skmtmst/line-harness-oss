@@ -22,6 +22,8 @@ import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDate
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
+import StatusBadge from '@/components/shared/status-badge'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
@@ -109,10 +111,7 @@ export default function DuplicatesListV8() {
         )}
       />
       <div className={styles.body}>
-        <p className={styles.band}>
-          <Info size={16} aria-hidden="true" />
-          <span>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</span>
-        </p>
+        <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</Notice>
 
         <KpiBand gridClassName="grid grid-cols-4">
           {kpis.map((kpi) => (
@@ -229,12 +228,9 @@ export default function DuplicatesListV8() {
                     <Td className={styles.td}><span className={styles.cellText} title={evidence}>{evidence}</span></Td>
                     <Td className={styles.td}><span className={styles.cellText} title={accounts}>{accounts}</span></Td>
                     <Td className={styles.td}>
-                      <span
-                        className={statusTone(candidate.status) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : statusTone(candidate.status) === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_muted}`}
-                        title={`最終更新 ${slashDateTime(candidate.reviewedAt ?? candidate.detectedAt)}`}
-                      >
+                      <StatusBadge tone={statusTone(candidate.status) === 'ok' ? 'success' : statusTone(candidate.status) === 'warn' ? 'warning' : 'neutral'} title={`最終更新 ${slashDateTime(candidate.reviewedAt ?? candidate.detectedAt)}`}>
                         {STATUS_WORD[candidate.status] ?? candidate.status}
-                      </span>
+                      </StatusBadge>
                     </Td>
                     <Td className={styles.tdAction}>
                       <Button href={href} variant="secondary">比べて決める</Button>
