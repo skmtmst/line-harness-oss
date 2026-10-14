@@ -6,7 +6,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
-import { Check, Undo2 } from 'lucide-react'
+import { Check, Inbox, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -213,10 +213,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
-        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={<Inbox aria-hidden />} presentation="band" value={null} unit="" />
+        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" icon={<Inbox aria-hidden />} presentation="band" value={null} unit="" />
+        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" icon={<Inbox aria-hidden />} presentation="band" value={null} unit="" />
+        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={<Inbox aria-hidden />} presentation="band" value={null} unit="" />
       </StatRow>
       {rows.length === 0 ? (
         <ListState kind="empty" title="承認待ちはありません" />
