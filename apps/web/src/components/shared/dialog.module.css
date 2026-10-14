@@ -12,16 +12,14 @@
   padding: 16px;
 }
 
-/* ★V6 の短い確認窓は、一覧の内容を隠しすぎない固定位置に置く。 */
+/* 確認の窓は本文の有無によらず上寄せし、短い画面にも収める。 */
 .confirmationOverlay {
+  --dialog-confirm-top: clamp(var(--space-16), 260px, calc(50dvh - var(--space-16)));
   align-items: flex-start;
-  padding-top: 280px;
+  padding-top: var(--dialog-confirm-top);
 }
-
-@media (max-height: 640px) {
-  .confirmationOverlay {
-    padding-top: 80px;
-  }
+.confirmationOverlay:not([data-design-top]) > .panel {
+  max-height: calc(100dvh - var(--dialog-confirm-top) - var(--space-16));
 }
 
 .panel {
@@ -391,14 +389,14 @@
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
 :root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
-:root .footer { display: block; width: 100%; flex-shrink: 0; }
+:root .footer { --radius-control: var(--radius-primary-action); display: block; width: 100%; flex-shrink: 0; }
 :root .footer:empty { display: none; }
 :root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
 /* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
 :root .panel[data-footer-align='center'] .actions { justify-content: center; }
 :root .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
 :root .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
-:root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+:root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
 :root .designButton[data-dialog-action='primary'] { border: 0; }
 :root .buttonIcon svg { width: 15px; height: 15px; }
 :root .steps { width: 100%; flex-shrink: 0; padding: 10px 24px; border-block: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
