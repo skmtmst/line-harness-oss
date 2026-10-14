@@ -22,6 +22,7 @@ import scanAffixedInputs from './affixed-input-layout-browser.mjs'
 import scanShiftEntrySpacing from './shift-entry-layout-browser.mjs'
 import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
 import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
+import { inspectCsvPublicationLayout } from './csv-publication-layout.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
@@ -108,7 +109,8 @@ export async function measurePage(page) {
   const panels = await page.evaluate(scanPanelBlank)
   // 下の空白は panel-blank に一本化。blankfix の途中・横・数の帯は残す。
   const gaps = await page.evaluate(scanBlankGap, { skipPanelBottom: true, exactSelectors: true, selectorDepth: 32, selectorLimit: 4096 })
-  const extra = []
+  const publicationCsv = await page.evaluate(inspectCsvPublicationLayout)
+  const extra = publicationCsv.failures.map(text => ({kind: 'csv-publication-layout', target: publicationCsv.csv ? '[data-design-node="T9gblG"]' : '[data-design-node="SyQA1"]', text, measure: {count: 1}}))
   for (const f of gaps.findings) {
     if (f.excluded || f.where === 'page-bottom' || f.excess < 96) continue
     extra.push({kind: 'blank-' + (f.kind === 'horizontal' ? 'horizontal' : 'vertical'), target: (f.container?.sel || f.edge?.sel || '').replace(/__[\w-]+/g,''), text: [f.where,f.prev?.text,f.next?.text].filter(Boolean).join(' → '), measure:{excess:f.excess}})

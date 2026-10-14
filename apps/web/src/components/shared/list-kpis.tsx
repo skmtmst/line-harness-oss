@@ -23,10 +23,11 @@ export interface KpiSpec {
   unit: string
   detail: string
   /**
-   * 題の右の「？」に入れる文（I1E7Bt の絵どおり）。
-   * KpiCard の `help` へそのまま渡す。渡さなければ「？」は出ない。
+   * 題から開いて読む説明。KpiCardへそのまま渡す。
+   * 「？」が描かれている題だけhelpDisplayで指定する。
    */
   help?: ReactNode
+  helpDisplay?: 'label' | 'question'
 }
 
 export default function ListKpis({

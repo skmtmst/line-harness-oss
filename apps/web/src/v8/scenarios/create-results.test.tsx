@@ -297,6 +297,23 @@ describe('作る①：書きかけをシナリオの下書きの口へ残す（�
 })
 
 describe('配信結果（X4STXS）', () => {
+  test('再参加の古い完了と新しい途中を人数から引かず、購読件数と未取得を分ける', async () => {
+    const previous = { total: stats.enrolledTotal, summary: { ...runs.summary } }
+    stats.enrolledTotal = 1; runs.summary = { active: 1, paused: 0, completed: 2, delivering: 0 }
+    try {
+      search = 'id=sc-1'; render(<ScenarioResultsV8 />); await screen.findByText('高橋 直人')
+      const metric = (name: string) => screen.getByText(name, { selector: '[data-kpi-label] span' }).closest('[data-kpi-presentation]')!
+      expect(metric('始まった').querySelector('[data-kpi-number]')?.textContent).toBe('1')
+      expect(metric('読み終えた').querySelector('[data-kpi-number]')?.textContent).toBe('2')
+      expect(metric('読み終えた').textContent).toContain('件')
+      expect(metric('途中').textContent).toContain('購読')
+      expect(screen.getByText(/件（購読）$/)).toBeTruthy()
+      expect(metric('離れた').querySelector('[data-kpi-number]')?.textContent).toBe('—')
+      expect(metric('読み終えた').textContent).not.toContain('200.0%')
+      expect(screen.queryByText(/ここで .*離れた/)).toBeNull()
+    } finally { stats.enrolledTotal = previous.total; runs.summary = previous.summary }
+  })
+
   test('B-248: 送達不明は要確認と確認方法を出し、再開・再送・移動を出さない', async () => {
     const uncertain = sub('unknown', '確認対象', 'paused', 1, 'delivery_unconfirmed')
     runs.subscriptions.push(uncertain)

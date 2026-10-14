@@ -137,11 +137,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
     <>
       {!canEdit ? <ReadOnlyNotice /> : null}
       <StatRow>
-        <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・アーカイブ" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="単品" valueText={`${rows.filter((item) => item.kind !== 'course').length}`} detail="アラカルト" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="要承認" valueText={`${pendingApprovals.length}`} detail="価格・内容改定" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="アレルギー登録" valueText={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} detail="注意品目あり" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・アーカイブ" presentation="band" value={null} unit="" />
+        <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" presentation="band" value={null} unit="" />
+        <KpiCard title="単品" valueText={`${rows.filter((item) => item.kind !== 'course').length}`} detail="アラカルト" presentation="band" value={null} unit="" />
+        <KpiCard title="要承認" valueText={`${pendingApprovals.length}`} detail="価格・内容改定" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} presentation="band" value={null} unit="" />
+        <KpiCard title="アレルギー登録" valueText={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} detail="注意品目あり" presentation="band" value={null} unit="" />
       </StatRow>
       <Panel
         title="メニュー一覧"
