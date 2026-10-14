@@ -19,7 +19,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => true }))
 
 const WORKER_SRC = resolve(process.cwd(), '../worker/src') + '/'
-const requireFromWorker = createRequire(`${WORKER_SRC}index.ts`)
+const requireFromWorker = createRequire(resolve(process.cwd(), '../worker/package.json'))
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL!
 const webOrigin = 'http://localhost:3000'
 const ACCOUNT_A = 'account-a', ACCOUNT_B = 'account-b'
