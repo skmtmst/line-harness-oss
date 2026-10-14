@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 
 import ListDateTime from '@/components/shared/list-date-time'
 import { useDeferredDelete } from '@/lib/use-deferred-delete';
@@ -1261,15 +1262,12 @@ export default function RemindersListV8() {
         }}
       >
         <div className={styles.moveBody}>
-          <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
               onChange={(value) => setMoveDraft(value)}
-              options={[
-                { value: '', label: '未分類' },
-                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-              ]}
+              folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
             /></SaveErrorField></Field>
         </div>
       </ConfirmDialog>

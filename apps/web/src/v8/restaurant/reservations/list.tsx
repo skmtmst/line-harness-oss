@@ -45,7 +45,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 export const PAGE_SIZE = 20
 
 export const LEDGER_STATUS_OPTIONS = [
-  { value: 'all', label: '状態：すべての状態' },
+  { value: 'all', label: 'すべての状態' },
   { value: 'pending,confirmed,seated,visited', label: '有効のみ' },
   { value: 'cancelled,no_show', label: '取消・無断のみ' },
 ]
@@ -115,7 +115,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
             </div>
             <div className={styles.filterField} data-filter="status">
               <Field labelSize="compact" labelHidden label="状態">
-              <SaveErrorField names={["status"]}><Select aria-label="状態" size="full" value={status} onChange={onStatus} options={LEDGER_STATUS_OPTIONS} /></SaveErrorField>
+              <SaveErrorField names={["status"]}><Select aria-label="状態" label="状態" size="full" value={status} onChange={onStatus} options={LEDGER_STATUS_OPTIONS} /></SaveErrorField>
               </Field>
             </div>
           </>

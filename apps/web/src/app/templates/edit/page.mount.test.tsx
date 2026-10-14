@@ -438,6 +438,10 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
     // 取得後も、上のバーは A店 のまま。所属ちがいなので閉じ続ける。
     expect(nameValue()).toBe('B店のご案内')
     expect(screenText()).toContain(Testing.ACCOUNT_MISMATCH_MESSAGE)
+    const notice = [...container.querySelectorAll<HTMLElement>('[role="alert"][title]')].find(node => node.title.includes('いま選んでいるのは'))
+    expect(notice?.title).toContain('A店')
+    expect(notice?.title).toContain('B店')
+    expect(notice?.textContent).toContain('B店')
     expect(isDisabled(saveButton())).toBe(true)
     await act(async () => { click(saveButton()!) })
     await settle()

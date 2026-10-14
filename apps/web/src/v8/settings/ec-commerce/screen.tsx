@@ -47,15 +47,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
-/*
- * ★V8 EC連携（Pencil `GmVR5`。つなぎ先は `iLJmw`、定期便は `wqC8x`）。
- *
- * 取り込みの記録（出来事ごとの処理）の動きは今までの画面（app/ec-commerce/page.tsx の EventsPanel）と同じ：
- * アカウントと一体で持つ値（#685）・サーバ側の絞り込みとページ送り・検索の遅らせ・もう一度やる（409 の読み直し）・
- * 注文の状況のパネル。処理はここへ写した（src/v8 は @/app を読めない）。
- * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
+/** 出来事ごとの取り込みを表示し、再実行時も版と対象アカウントを保持する。 */
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 

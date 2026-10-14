@@ -66,14 +66,7 @@ import styles from './mileage.module.css'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-/*
- * ★V8 マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす `M8zhjL`）。
- *
- * app/mileage/friends/detail/v8-friend-detail.tsx から動きを写し、詳細の型（DetailPage）で組み直した。
- * 頭に名前と操作（トークを開く・減らす・増やす）、数の帯は4マス、明細の箱（探す・札・期間・件数・
- * 表「日時・内容・きっかけ・使い道・種類・担当・増減・…」・ページ送り）、下に「たまったきっかけ・
- * 交換した使い道」の2枚。確定待ちの確定・取消・通知の再送は行末の「…」から。
- */
+/** 明細の取得範囲を示し、残高と一部の履歴を同じ集計として扱わない。 */
 
 type MileageDetail = {
   summary: MileageSummary

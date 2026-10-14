@@ -4,7 +4,7 @@ import type { ApiResponse } from '@line-crm/shared'
 import { fetchApi, describeSaveFailure } from '@/lib/api'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import FormSection from '@/components/shared/form-section'
-import SectionHeader from '@/components/shared/section-header'
+import { AuthDetailRow, AuthHelp } from '@/components/templates/auth-page'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Dialog from '@/components/shared/dialog'
@@ -74,9 +74,9 @@ export default function SelfMfa({ loginPath = '/login' }: { loginPath?: '/login'
     <FormSection id="self-mfa-title" title="自分の二段階認証" description="このアカウントでログインする時の確かめ">
       {error ? <Notice tone="danger" message={error} /> : null}
       {self?.notice ? <Notice tone="warn" message={self.notice} /> : null}
-      <SectionHeader title="認証アプリ" note={self ? self.enabledAt ? `登録済み（${formatDate(self.enabledAt, { style: 'day' })}）` : '未登録' : '—'} actions={self?.canEdit ? <Button disabled={busy} onClick={reenroll}>{self.enabledAt ? '登録し直す' : '登録する'}</Button> : undefined} />
-      <SectionHeader title="回復コード" note={`残り ${self?.remaining ?? '—'} / 8 個`} actions={self?.canEdit && self.enabledAt ? <Button disabled={busy} onClick={regenerate}>回復コードを作り直す</Button> : undefined} />
-      <p>作り直すと、前のコードは全部使えなくなります。新しい8個は、作った時に1回だけ表示します。</p>
+      <AuthDetailRow label="認証アプリ" value={self ? self.enabledAt ? `登録済み（${formatDate(self.enabledAt, { style: 'day' })}）` : '未登録' : '—'} actions={self?.canEdit ? <Button disabled={busy} onClick={reenroll}>{self.enabledAt ? '登録し直す' : '登録する'}</Button> : undefined} />
+      <AuthDetailRow label="回復コード" value={`残り ${self?.remaining ?? '—'} / 8 個`} actions={self?.canEdit && self.enabledAt ? <Button disabled={busy} onClick={regenerate}>回復コードを作り直す</Button> : undefined} />
+      <AuthHelp>作り直すと、前のコードは全部使えなくなります。新しい8個は、作った時に1回だけ表示します。</AuthHelp>
     </FormSection>
     <Dialog open={codes.length > 0} title="回復コードを控えてください" description="認証アプリが使えない時に、1つにつき1回だけ使えます。" onCancel={() => { setCodes([]); if (relogin) void logoutAndGoToLogin(loginPath); else void load() }} cancelLabel="閉じる">
       <RecoveryCodePanel codes={codes} continueLabel="控えました" onContinue={() => { setCodes([]); if (relogin) void logoutAndGoToLogin(loginPath); else void load() }} />

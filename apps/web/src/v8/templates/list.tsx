@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import ListDateTime from '@/components/shared/list-date-time'
@@ -1447,16 +1448,13 @@ export default function TemplatesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
             disabled={moving}
-            options={[
-              { value: '', label: '未分類' },
-              ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-            ]}
+            folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
           /></SaveErrorField>
         </div>
       </ConfirmDialog>
@@ -1592,16 +1590,13 @@ export default function TemplatesListV8() {
               <>
                 <p className={styles.panelLabel}>移動先のフォルダ</p>
                 <div className={styles.moveBody}>
-                  <SaveErrorField names={["moveDraft","move_draft"]}><Select
+                  <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
                     aria-label="移動先のフォルダ"
                     size="full"
                     value={moveDraft}
                     onChange={(value) => setMoveDraft(value)}
                     disabled={moving}
-                    options={[
-                      { value: '', label: '未分類' },
-                      ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-                    ]}
+                    folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
                   /></SaveErrorField>
                   <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
                     移動する

@@ -35,14 +35,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import Notice from '@/components/shared/notice'
 import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
-/*
- * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
- *
- * 型（DetailPage）に、戻る・題・説明・右上の操作（シナリオの編集へ・CSVで書き出す）と、
- * 中身（数の帯・通ごとの反応・参加中の友だちの表）を渡す。
- * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
- * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
- */
+/** 購読ごとの状態と未取得の反応を分け、再送や予定の操作は元の記録へ結び付ける。 */
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
