@@ -3364,7 +3364,9 @@
             "apps/web/src/components/templates/auth-page.module.css"
           ],
           "components": [
-            "AuthPage"
+            "AuthPage",
+            "AuthHelp",
+            "AuthDetailRow"
           ],
           "vars": [
             "--tpl-ms-otp-card-w"
