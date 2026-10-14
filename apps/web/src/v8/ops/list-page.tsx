@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import { Children, Fragment, cloneElement, isValidElement, type ComponentProps, type ReactNode } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { ListPage, type ListPageProps } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
@@ -18,7 +18,15 @@ export function OpsListPage({ stats, ...props }: ListPageProps) {
 export function OpsListToolbar({ search, filters, trailing }: Pick<ComponentProps<typeof ListToolbar>, 'search' | 'filters' | 'trailing'>) {
   return <ListToolbarFrame><ListToolbarRow>
     {search ? <ListToolbarSearchSlot width={search.width}><SearchField value={search.value} onChange={search.onChange} onClear={() => search.onChange('')} placeholder={search.placeholder} aria-label={search.label ?? search.placeholder} maxLength={search.maxLength} loading={search.loading} /></ListToolbarSearchSlot> : null}
-    {filters}
+    {filterItems(filters)}
     {trailing ? <ListToolbarEnd>{trailing}</ListToolbarEnd> : null}
   </ListToolbarRow></ListToolbarFrame>
+}
+
+function filterItems(children: ReactNode, prefix = ''): ReactNode[] {
+  return Children.toArray(children).flatMap((node, index) => {
+    if (!isValidElement<{ children?: ReactNode }>(node)) return [node]
+    const key = `${prefix}${node.key ?? index}`
+    return node.type === Fragment ? filterItems(node.props.children, `${key}/`) : [cloneElement(node, { key })]
+  })
 }
