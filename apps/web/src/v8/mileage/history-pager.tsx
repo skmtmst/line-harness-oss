@@ -8,6 +8,6 @@ export default function HistoryPager({ spentOnly, total, page, pageSize, items, 
   return (
     <Pagination page={page} pageCount={Math.max(1, pageCount)} onPageChange={setPage} disabled={loading}
       range={!spentOnly ? { total, first: (page - 1) * pageSize + 1, last: total === null ? (page - 1) * pageSize + items.length : Math.min(page * pageSize, total) } : undefined}
-      summary={spentOnly ? `${paginationSummary(total, (page - 1) * pageSize + 1, total === null ? page * pageSize : Math.min(page * pageSize, total))}のうち、使った・取り消し ${formatNumber(items.length)} 件` : undefined} />
+      summary={spentOnly ? `${total === null ? '—件' : paginationSummary(total, (page - 1) * pageSize + 1, Math.min(page * pageSize, total))}のうち、使った・取り消し ${formatNumber(items.length)} 件` : undefined} />
   )
 }
