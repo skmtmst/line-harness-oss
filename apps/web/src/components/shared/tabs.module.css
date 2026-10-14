@@ -109,7 +109,7 @@
   height: var(--tpl-tabs-h);
   align-items: flex-end; /* 文字は下付き（文字の下10） */
   padding-bottom: var(--tpl-tabs-pad-bottom);
-  font-size: var(--text-body); /* B-180：13px */
+  font-size: var(--text-caption); /* ★V8のタブの文字：12px。高さと太さはB-180。 */
   line-height: var(--tpl-tabs-text-lh);
   transition:
     color var(--motion-fast) var(--motion-ease-out),
@@ -213,7 +213,7 @@
   padding: 0;
   align-items: center;
   line-height: 20px;
-  font-size: var(--text-body);
+  font-size: var(--text-caption);
   font-weight: var(--tpl-tabs-weight);
   border-bottom: 2px solid transparent;
   margin-bottom: 0;

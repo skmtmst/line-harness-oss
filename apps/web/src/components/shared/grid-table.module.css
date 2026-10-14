@@ -22,7 +22,7 @@
   min-width: 0;
   padding: var(--grid-table-row-padding);
   box-shadow: var(--shadow-row-line);
-  color: var(--grid-table-color, var(--color-ink-secondary));
+  color: var(--grid-table-color, var(--color-ink));
   line-height: var(--grid-table-line-height, inherit);
 }
 .row[data-head] {
