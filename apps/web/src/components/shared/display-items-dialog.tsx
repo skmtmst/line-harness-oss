@@ -26,7 +26,7 @@ export default function DisplayItemsDialog({title = '表示項目を編集', ite
   const available = items.filter(item => !keys.includes(item.key) && `${item.label} ${item.group}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
   const groups = useMemo(() => [...new Set(available.map(item => item.group))], [available])
   const full = maxSelected !== undefined && chosen.length >= maxSelected
-  return <Dialog open title={title} size="medium" onCancel={onCancel} onConfirm={() => onConfirm(chosen.map(item => item.key))} confirmLabel="保存する"
+  return <Dialog open title={title} size="medium" contentLayout="form" onCancel={onCancel} onConfirm={() => onConfirm(chosen.map(item => item.key))} confirmLabel="保存する"
     confirmDisabled={maxSelected !== undefined && chosen.length > maxSelected} confirmDisabledReason={full ? '選択数が上限を超えています。別の項目を外してから保存してください。' : undefined}>
     <div className={styles.body} data-presentation={presentation}>
       <p className={styles.note}>{maxSelected === undefined ? '選んだ項目は、つまみで並べ替えられます。' : `友だちの名前はいつも表示します。ほかは${maxSelected}列まで選べます。`}</p>

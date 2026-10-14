@@ -907,7 +907,9 @@
             "apps/web/src/components/shared/dialog-choice-cards.module.css",
             "apps/web/src/components/shared/dialog-usage-table.tsx",
         "apps/web/src/components/shared/dialog-form-row.tsx",
-        "apps/web/src/components/shared/dialog-content-row.module.css"
+        "apps/web/src/components/shared/dialog-content-row.module.css",
+        "apps/web/src/components/shared/dialog-recipient-list.tsx",
+        "apps/web/src/components/shared/dialog-recipient-list.module.css"
           ],
           "components": [
             "Dialog",
@@ -916,7 +918,8 @@
             "DialogChoiceCards",
             "DialogUsageTable",
         "DialogFormRow",
-        "DialogContentRow"
+        "DialogContentRow",
+        "DialogRecipientList"
           ],
           "vars": [
             "--radius-panel",

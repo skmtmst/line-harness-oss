@@ -1,4 +1,4 @@
-export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = false, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false } = {}) {
+export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = false, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false, recipientRows = false } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const rect = panel.getBoundingClientRect()
@@ -61,7 +61,31 @@ export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = fals
       }
     }
   }
+  if (recipientRows) {
+    const table = panel.querySelector('[data-dialog-recipients]')
+    if (!table) findings.push({ pattern: 'F4', kind: 'dialog-recipients-missing' })
+    for (const row of table?.querySelectorAll('tbody tr') ?? []) {
+      const height = row.getBoundingClientRect().height
+      inventory.push({ kind: 'dialog-recipient-row', height })
+      if (height > 40) findings.push({ pattern: 'F6', kind: 'dialog-recipient-row-height', height, maximum: 40 })
+      const channel = row.lastElementChild?.firstElementChild
+      if (channel) {
+        const gap = row.getBoundingClientRect().right - channel.getBoundingClientRect().right
+        inventory.push({ kind: 'dialog-recipient-edge', gap })
+        if (gap < 11.5) findings.push({ pattern: 'F6', kind: 'dialog-recipient-edge', gap, minimum: 12 })
+      }
+    }
+  }
   if (columnSettings) {
+    const body = panel.querySelector('[data-presentation="columns"]')
+    const content = body?.parentElement
+    if (body && content) {
+      const css = getComputedStyle(content)
+      const available = content.getBoundingClientRect().width - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight)
+      const width = body.getBoundingClientRect().width
+      inventory.push({ kind: 'display-body-width', width, available })
+      if (Math.abs(available - width) > 1) findings.push({ pattern: 'F6', kind: 'display-body-width', width, available })
+    }
     const fixed = panel.querySelector('[data-fixed-display-name]')
     const selected = panel.querySelector('[data-presentation="columns"] [aria-label="選択した列"]')
     if (!fixed || !selected || !selected.contains(fixed)) findings.push({ pattern: 'F4', kind: 'display-fixed-name-missing' })
