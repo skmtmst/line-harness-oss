@@ -147,12 +147,12 @@ export function DataTable({
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
   grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string; headTextSize?: string; bodyTextSize?: string }
-  /** 補助列の内容幅を読み、名前へ残りの幅を割り当てる。 */
-  columnSizing?: 'content'
+  /** 名前へ残りを配る。contentは補助列の内容幅、controlsは札・操作だけ最低必要幅を確保。 */
+  columnSizing?: 'content' | 'controls'
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   useListRowDensity(actionWidthRef)
-  useListColumnSizing(actionWidthRef, columnSizing === 'content')
+  useListColumnSizing(actionWidthRef, columnSizing !== undefined)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (

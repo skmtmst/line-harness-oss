@@ -18,6 +18,7 @@ export function fitListColumns(frame) {
   }
   const context = document.createElement('canvas').getContext('2d')
   if (!context) return
+  const controlsOnly = frame.dataset.columnSizing === 'controls'
   const number = value => parseFloat(value) || 0
   const intrinsic = node => {
     if (node.nodeType === 3) {
@@ -35,18 +36,20 @@ export function fitListColumns(frame) {
       return style.content === 'none' || style.content === 'normal' || style.display === 'none' ? 0 : number(style.width)
     }
     const sizes = [pseudo('::before'), ...[...node.childNodes].map(intrinsic), pseudo('::after')].filter(size => size > 0)
-    if (!sizes.length && !node.textContent.trim()) return node.getBoundingClientRect().width
+    if (!sizes.length && !node.textContent.trim()) return controlsOnly && number(css.flexGrow) > 0 ? 0 : node.getBoundingClientRect().width
     const inline = css.display === 'inline' || css.display === 'inline-flex' || (css.display === 'flex' && css.flexDirection === 'row')
-    const content = inline ? sizes.reduce((sum, size) => sum + size, 0) + number(css.columnGap) * Math.max(0, sizes.length - 1) : Math.max(0, ...sizes)
+    const gapItems = controlsOnly ? [...node.childNodes].filter(child => child.nodeType === 3 ? child.textContent.trim() : child.nodeType === 1 && getComputedStyle(child).display !== 'none').length + Number(pseudo('::before') > 0) + Number(pseudo('::after') > 0) : sizes.length
+    const content = inline ? sizes.reduce((sum, size) => sum + size, 0) + number(css.columnGap) * Math.max(0, gapItems - 1) : Math.max(0, ...sizes)
     return content + number(css.paddingLeft) + number(css.paddingRight) + number(css.borderLeftWidth) + number(css.borderRightWidth)
   }
   const widths = [...body.children].map((cell, index) => {
     if (index === nameIndex || !cell.getBoundingClientRect().width) return null
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
+    if (controlsOnly && !cells.some(cell => cell.querySelector('button, input, [role="button"], [data-design-node="xRvDB"]'))) return null
     // A genuinely long secondary value keeps its existing truncation budget.
     const required = Math.max(0, ...cells.map(intrinsic))
     const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, a, input, [data-design-node="xRvDB"], [data-list-date-time]'))
-    return Math.ceil(unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
+    return Math.ceil(controlsOnly ? Math.max(frame.listColumnCeilings[index], required) : unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
   if (frame.hasAttribute('data-grid-table')) {
     const columns = widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ')

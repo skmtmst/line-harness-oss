@@ -109,6 +109,7 @@ describe('広告とのつなぎ（FDBsG）', () => {
     expect(rows[0]).toContain('Purchase')
     expect(rows[0]).toContain('返している')
     expect(rows[1]).toContain('返していない')
+    expect(host.querySelector('table[aria-label="成果地点と、広告に返す名前の対応"]')?.parentElement?.getAttribute('data-column-sizing')).toBe('controls')
     // 数の帯は口の30日の集計。
     expect(host.textContent).toContain('15')
   })
