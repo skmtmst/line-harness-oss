@@ -18,6 +18,7 @@ import scanControlOverlap from './control-overlap-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import scanCreateConsistency from './create-consistency-browser.mjs'
 import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
+import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
@@ -100,6 +101,7 @@ export function identifyStableTargets(findings) {
 }
 export async function measurePage(page) {
   const formColumns = formColumnFindings(await page.evaluate(collectFormLayouts))
+  const reservationReading = assessReservationReading(await page.evaluate(collectReservationReading))
   const panels = await page.evaluate(scanPanelBlank)
   // 下の空白は panel-blank に一本化。blankfix の途中・横・数の帯は残す。
   const gaps = await page.evaluate(scanBlankGap, { skipPanelBottom: true, exactSelectors: true, selectorDepth: 32, selectorLimit: 4096 })
@@ -117,7 +119,7 @@ export async function measurePage(page) {
   const consistencyKinds = { Y1: 'form-action-value', Y2: 'form-preview-surface', Y3: 'form-create-title', Y4: 'form-save-icon' }
   const consistencyFindings = consistency.findings.map(f => ({ ...f, kind: consistencyKinds[f.kind] }))
   const findings = [...consistencyFindings, ...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules), ...formColumns]
-  return await page.evaluate(identifyStableTargets, findings)
+  return await page.evaluate(identifyStableTargets, [...findings, ...reservationReading])
 }
 async function measureRoute(browser, baseUrl, route, width) {
   let page

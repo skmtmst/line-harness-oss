@@ -22,11 +22,6 @@
   flex: 1 1 0;
 }
 
-.detailPanel {
-  flex: 0 0 var(--tpl-floor-aside-w);
-  width: var(--tpl-floor-aside-w);
-}
-
 .mapGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

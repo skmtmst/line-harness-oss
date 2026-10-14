@@ -177,7 +177,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('NEN活用スタートセミナー')
     await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('オンデマンド・いつでも視聴・公開中（版 3）')
-    const tabs = host.querySelector('[data-wc-tabs="true"]')
+    const tabs = host.querySelector('[role="tablist"]')
     expect(tabs?.textContent).toContain('参加者 124')
     expect(tabs?.querySelector('[aria-current="page"]')?.textContent).toBe('参加者 124')
     expect(host.textContent).toContain('視聴完了 71')

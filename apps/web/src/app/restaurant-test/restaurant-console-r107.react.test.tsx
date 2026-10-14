@@ -42,11 +42,14 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     render(<RestaurantScreen view="tables" />)
     const detail = await screen.findByRole('heading', { name: '卓の詳細' })
     const panel = detail.closest('section')!
-    fireEvent.click(within(panel).getByRole('button', { name: /変更$/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('窓際'), { target: { value: '奥席' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', expect.objectContaining({ label: '奥席' })))
-    fireEvent.click(within(panel).getByRole('button', { name: /停止$/ }))
+    await waitFor(() => expect((within(panel).getByRole('button', { name: /のその他操作$/ }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '止める' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', { isActive: false }))
   })
@@ -76,6 +79,9 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     if(view === 'organization') {
       fireEvent.click(await screen.findByRole('button',{name:'佐藤のその他操作'}))
       fireEvent.click(screen.getByRole('menuitem',{name:'再開'}))
+    } else if (view === 'tables') {
+      fireEvent.click(await screen.findByRole('button', { name: /のその他操作$/ }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '再開' }))
     } else fireEvent.click(await screen.findByRole('button', { name: /再開$/ }))
     await waitFor(() => expect(fixture[method]).toHaveBeenCalledWith('account-1', id, expect.objectContaining(expected)))
   })
