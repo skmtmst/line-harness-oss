@@ -533,7 +533,7 @@
   font-size: var(--text-label);
 }
 
-/* 1152（wbDHy）：右の補足を出さず、列は 人・担当・最後に入った・役割 の並び。 */
+/* 狭い幅は右の補足を畳み、列は広い幅と同じDOM順を保つ。 */
 @media (max-width: 1279.98px) {
   .aside {
     display: none;
@@ -545,9 +545,7 @@
   }
 
   .colScope { flex-basis: var(--tpl-sa-staff-scope-w-narrow); }
-  .colLast { flex-basis: var(--tpl-sa-staff-last-w-narrow); order: 1; }
-  .colRole { order: 2; }
-  .colMenu { order: 3; }
+  .colLast { flex-basis: var(--tpl-sa-staff-last-w-narrow); }
 }
 
 /* 窓の中（今の画面から写した）：高さの上限・見せる範囲の2列・通知の行・2段階の QR。 */
@@ -578,7 +576,7 @@
 }
 
 .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-scope-w) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w) var(--tpl-sa-staff-menu-w); }
-@media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-scope-w-narrow) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-menu-w); } }
+@media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-scope-w-narrow) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); } }
 @media (max-width: 1279px) {
   .readOnlyTable { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-scope-w-narrow) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); }
   .readOnlyTable .colRole { order: 1; }

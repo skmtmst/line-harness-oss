@@ -721,8 +721,8 @@ type RoleKey = 'owner' | AccessRoleBundle
 const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
 }
-function RoleChip({ role, colored = false }: { role: RoleKey; colored?: boolean }) {
-  return <StatusBadge tone={!colored ? 'neutral' : role === 'administrator' ? 'success' : role === 'operations' ? 'info' : role === 'reception' ? 'warning' : 'neutral'} dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
+function RoleChip({ role }: { role: RoleKey }) {
+  return <StatusBadge tone={role === 'administrator' ? 'success' : role === 'operations' ? 'info' : role === 'reception' ? 'warning' : 'neutral'} dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
 }
 
 const STAFF_TAB_KEYS = [
@@ -1111,7 +1111,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
               <GridRow key={user.id}>
                 <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? user.name : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>} />
                 <GridCell className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</GridCell>
-                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} colored={viewer} />}</GridCell>
+                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
