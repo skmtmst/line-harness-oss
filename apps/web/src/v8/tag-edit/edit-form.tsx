@@ -239,7 +239,7 @@ export function TagEditForm({
         previewLabel="使用状況を見る"
         previewTitle="使っている所"
         preview={host ? host.preview(values) : side}
-        destructive={host || readOnly ? undefined : <StickyBarAction label="タグを削除する" icon={Trash2} onClick={onDelete} />}
+        destructive={host || readOnly ? undefined : <StickyBarAction destructive label="タグを削除する" icon={Trash2} onClick={onDelete} />}
         footerActions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
