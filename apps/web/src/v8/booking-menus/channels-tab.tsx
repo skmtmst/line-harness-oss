@@ -248,6 +248,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   const [data, setData] = useState<BookingChannelsData | null>(null)
+  const loadedAccountId = useRef('')
   const [calendars, setCalendars] = useState<Record<string, string>>({})
   const [conflicts, setConflicts] = useState<BookingConflict[]>([])
   const [connectTarget, setConnectTarget] = useState<BookingChannelStaff | null>(null)
@@ -286,7 +287,6 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
       setSavingAssign(false)
     }
   }
-
   /* WEB058：アカウントを変えたら、前のアカウントの遅い応答（一覧・重なり・カレンダー）を捨てる。 */
   const loadGeneration = useRef(0)
   useEffect(() => {
@@ -310,6 +310,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
       if (!alive()) return
       if (!channelsRes.success) throw new Error(channelsRes.error)
       if (!conflictsRes.success) throw new Error(conflictsRes.error)
+      loadedAccountId.current = accountId
       setData(channelsRes.data)
       setConflicts(conflictsRes.data.conflicts)
       setStatus('ready')
@@ -345,7 +346,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
   }, [load])
 
   useEffect(() => {
-    onSummaryChange?.({ accountId, status, data, conflicts: conflicts.length })
+    onSummaryChange?.({ accountId: data ? loadedAccountId.current : accountId, status, data, conflicts: conflicts.length })
   }, [accountId, status, data, conflicts.length, onSummaryChange])
 
   const firstConflict = conflicts[0] ?? null
