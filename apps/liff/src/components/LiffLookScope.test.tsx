@@ -13,7 +13,7 @@ vi.mock('../lib/api.js', () => ({
 vi.mock('../lib/user-message.js', () => ({ logFailure: vi.fn() }));
 
 async function renderScope(
-  props: { className?: string; designNode?: string } = {},
+  props: { className?: string; designNode?: string; appearance?: 'stamp' } = {},
   settings: unknown = { liff_date_view: 'list', booking_window_days: 60 },
 ) {
   // 包みは読んだ見た目をモジュールに持つ。試験ごとに作り直す。
@@ -29,7 +29,7 @@ async function renderScope(
     customerLook.mockResolvedValue({success:true,data:{settings}} as never);
   }
   render(
-    <LiffLookScope className={props.className} designNode={props.designNode}>
+    <LiffLookScope className={props.className} designNode={props.designNode} appearance={props.appearance}>
       <p>中身</p>
     </LiffLookScope>,
   );
@@ -53,6 +53,22 @@ describe('LiffLookScope', () => {
       new Promise(() => {}),
     );
     expect(scope().getAttribute('data-liff-theme')).toBe('line');
+  });
+
+  it('スタンプの無指定の主色は既定の緑を使う', async () => {
+    const { scope, customerLook } = await renderScope({ appearance: 'stamp' });
+    await vi.waitFor(() => expect(customerLook).toHaveBeenCalled());
+    expect(scope().style.getPropertyValue('--color-liff-primary')).toBe('var(--color-accent-deep)');
+  });
+  it('スタンプでも店の指定色を残す', async () => {
+    const { scope } = await renderScope({ appearance: 'stamp' }, { liff_theme: 'line', shop_primary_color: '#123d2f' });
+    await vi.waitFor(() => expect(scope().style.getPropertyValue('--color-liff-primary')).toBe('#123d2f'));
+  });
+  it('スタンプでも選んだ型の主色を上書きしない', async () => {
+    const { scope } = await renderScope({ appearance: 'stamp' }, { liff_theme: 'natural' });
+    await vi.waitFor(() => expect(scope().getAttribute('data-liff-theme')).toBe('natural'));
+    expect(scope().style.getPropertyValue('--color-liff-primary')).not.toBe('var(--color-accent-deep)');
+    expect(scope().style.getPropertyValue('--liff-radius-stamp-control')).toBe('var(--liff-radius)');
   });
 
   it('店の型と色を包みに載せる', async () => {

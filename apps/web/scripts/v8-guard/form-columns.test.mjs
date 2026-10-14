@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
 
 const css = readFileSync(new URL('../../src/components/shared/settings-form-card.module.css', import.meta.url), 'utf8')
@@ -10,7 +10,7 @@ const pageHtml = (styles, content) => `<style>:root{--polish-space-field:12px;--
 const check = async page => formColumnFindings(await page.evaluate(collectFormLayouts))
 
 test('共通の2欄・4欄の2列・3欄の期間は広い時を保ち、1152では1列', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const content = `<div class="row">${field('名前')}${field('紹介コード')}</div>
@@ -31,7 +31,7 @@ test('共通の2欄・4欄の2列・3欄の期間は広い時を保ち、1152で
 })
 
 test('部品名の無い4欄の2列と、入れ子の数値欄も数える', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
     const number = '<div data-form-requirement="required"><label>件数</label><div data-form-requirement="optional"><span><input type="number"><span>件</span></span></div></div>'
@@ -44,7 +44,7 @@ test('部品名の無い4欄の2列と、入れ子の数値欄も数える', asy
 })
 
 test('1欄の内部の時・分・単位と、ラジオの選択肢は独立した2欄に数えない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
     await page.setContent(pageHtml('.pair{display:grid;grid-template-columns:1fr 1fr}', `<div data-form-requirement="required"><label>開始時刻</label><div class="pair"><div><input aria-label="時"></div><div><input aria-label="分"></div></div></div><div class="pair" role="radiogroup"><label><input type="radio">定額</label><label><input type="radio">割合</label></div>`))
@@ -54,7 +54,7 @@ test('1欄の内部の時・分・単位と、ラジオの選択肢は独立し�
 })
 
 test('all independent inputs remain in the inventory after the shared layout collapses', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>section{width:900px}.inputs{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}</style><main><section data-page-template="create"><div class="inputs">${['名前','件数','開始','終了'].map(label=>`<div data-form-requirement><label>${label}<input aria-label="${label}"></label></div>`).join('')}</div></section></main>`)
@@ -73,7 +73,7 @@ test('all independent inputs remain in the inventory after the shared layout col
 })
 
 test('compound input internals and separate content regions are distinct from independent fields', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent('<style>section{width:900px}div{display:flex;gap:12px}</style><main><section data-page-template="create"><div><div data-form-requirement><label>日時</label><div><input aria-label="日付"><input aria-label="時刻"></div></div><div data-form-requirement><label>金額</label><div><input aria-label="金額"><span>円</span></div></div></div></section></main>')

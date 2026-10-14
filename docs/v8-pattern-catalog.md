@@ -106,6 +106,7 @@
 ## card カード（中身のまとまりの箱）
 
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
+- 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
 
 - **役目**：中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる
 - **持ち主（コード）**：`apps/web/src/components/shared/card.tsx`・`apps/web/src/components/shared/card.module.css`（部品 `Card`・`CardHeader`）
@@ -332,6 +333,8 @@
 
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
+  - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：

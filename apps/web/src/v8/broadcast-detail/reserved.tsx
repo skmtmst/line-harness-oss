@@ -8,7 +8,7 @@
  * 右の欄（次にできること → メッセージのスマホ）。
  * 予約の読み込み・取消・複製・テスト送信の中身は入口（app/broadcasts/reserved/page.tsx）が持つ。
  */
-import { Copy, Eye, Send } from 'lucide-react'
+import { CalendarCheck, Copy, Eye, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { DetailPage } from '@/components/templates/detail-page'
@@ -127,7 +127,7 @@ export default function Reserved({
       titleAccessory={<StatusBadge tone="info">予約中</StatusBadge>}
       summary={summary} summaryLabel="次にできることとメッセージ"
       summaryPreview={{ label: '次の操作とメッセージを見る', title: '次にできることとメッセージ' }}>
-      <CreateSummaryCard title="一斉配信を予約しました" description="送る前にもう一度、対象の人数を数え直します" rows={rows}>
+      <CreateSummaryCard variant="completion" completionIcon={<CalendarCheck />} title="一斉配信を予約しました" description="送る前にもう一度、対象の人数を数え直します" rows={rows}>
         <Notice tone="info" message={notificationText || '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。'} />
         <div className={styles.doneButtons}><Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}><Eye aria-hidden="true" />予約の内容を見る</Button></div>
       </CreateSummaryCard>

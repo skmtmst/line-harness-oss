@@ -1,6 +1,9 @@
 'use client'
+import { isConflict } from './cta-errors'
+export { isConflict } from './cta-errors'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -50,9 +53,6 @@ type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidd
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-export function isConflict(cause: unknown): boolean {
-  return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
-}
 
 export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const saveErrors = useSaveFormErrors()

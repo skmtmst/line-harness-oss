@@ -9,17 +9,30 @@ import DateField, { formatLabel, parseDate } from './date-field'
 
 afterEach(() => cleanup())
 
-function Harness({ initial = '2026-09-23', min }: { initial?: string; min?: string }) {
+function Harness({ initial = '2026-09-23', min, displayFormat }: { initial?: string; min?: string; displayFormat?: 'full' | 'short' }) {
   const [value, setValue] = useState(initial)
   return (
     <>
-      <DateField value={value} onChange={setValue} min={min} aria-label="配信日" />
+      <DateField value={value} onChange={setValue} min={min} displayFormat={displayFormat} aria-label="配信日" />
       <output data-testid="value">{value}</output>
     </>
   )
 }
 
 describe('日付の選択（★V7）', () => {
+  it('短い表示でも年を含む全文と日付の選択を保持する', () => {
+    render(<Harness displayFormat="short" />)
+    const trigger = screen.getByRole('button', { name: '配信日' })
+    expect(trigger.textContent).toContain('9/23（水）')
+    expect(trigger.title).toBe('2026年9月23日（水）')
+    fireEvent.click(trigger)
+    fireEvent.keyDown(screen.getByRole('grid'), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    expect(screen.getByTestId('value').textContent).toBe('2026-09-24')
+    expect(trigger.textContent).toContain('9/24（木）')
+    expect(trigger.title).toBe('2026年9月24日（木）')
+  })
+
   it('表示は「2026年9月23日（水）」、値は YYYY-MM-DD', () => {
     render(<Harness />)
     expect(screen.getByRole('button', { name: '配信日' }).textContent).toContain('2026年9月23日（水）')

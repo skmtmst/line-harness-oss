@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 
 test('必須札は隠したラベルでも文字幅を保ち、伸びる故障を検出する', async () => {
   const css = readFileSync(new URL('../../src/components/shared/form-controls.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1440, 1152, 1920]) {

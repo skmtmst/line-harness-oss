@@ -1,4 +1,5 @@
 'use client'
+import DownloadIcon from './qr-download-icon'
 
 import React, { useEffect, useState } from 'react'
 import { QrCode } from 'lucide-react'
@@ -68,13 +69,6 @@ export type FixedQrResource = {
   sizes?: { value: string; label: string }[]
 }
 
-function DownloadIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 export default function QrDialog({
   open,
@@ -92,11 +86,13 @@ export default function QrDialog({
   onRetryRoutes,
   direct,
   resource,
+  disabledReason,
 }: {
   direct?:{title:string;description:string;content?:React.ReactNode;footer?:React.ReactNode;qrContent?:React.ReactNode;downloads?:boolean}
   open: boolean
   /** 流入・クーポン・来店スタンプも同じ窓で出す。取得と保存は元のAPI。 */
   resource?: FixedQrResource
+  disabledReason?: string
   onClose: () => void
   accountName: string
   /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
@@ -514,6 +510,7 @@ export default function QrDialog({
                   type="button"
                   onClick={copy}
                   disabled={blocked}
+                  title={blocked ? disabledReason : undefined}
                   className="shrink-0"
                 >
                   コピー
@@ -533,8 +530,8 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {resource?.downloadImage ? <Button variant="primary" disabled={blocked || pdfState === 'working'} busy={imageState === 'working'} onClick={() => void downloadImage()}><DownloadIcon />{format.toUpperCase()} を保存</Button> : blocked ? (
-                <Button variant="primary" disabled>
+              {resource?.downloadImage ? <Button variant="primary" disabled={blocked || pdfState === 'working'} title={blocked ? disabledReason : undefined} busy={imageState === 'working'} onClick={() => void downloadImage()}><DownloadIcon />{format.toUpperCase()} を保存</Button> : blocked ? (
+                <Button variant="primary" disabled title={disabledReason}>
                   <DownloadIcon />画像をダウンロード
                 </Button>
               ) : (
@@ -556,6 +553,7 @@ export default function QrDialog({
                   type="button"
                   onClick={() => void downloadPdf()}
                   disabled={blocked || pdfState === 'working' || imageState === 'working'}
+                  title={blocked ? disabledReason : undefined}
                 >
                   PDFで印刷
                 </Button>
@@ -565,6 +563,7 @@ export default function QrDialog({
                   type="button"
                   onClick={printQr}
                   disabled={blocked}
+                  title={blocked ? disabledReason : undefined}
                 >
                   PDFで印刷
                 </Button>

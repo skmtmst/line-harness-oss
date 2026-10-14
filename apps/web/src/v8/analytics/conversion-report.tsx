@@ -36,7 +36,7 @@ function rangeOf(days: number) {
 function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void }) {
   const router = useRouter()
   return <span className={styles.rowMenu}>
-    <SharedRowMenu className={styles.rowMenuButton} label={`成果地点「${point.conversionPointName}」の操作`} items={[
+    <SharedRowMenu appearance="box" label={`成果地点「${point.conversionPointName}」の操作`} items={[
       { id: 'open', label: '成果地点を開く', onSelect: () => router.push(`/conversions?pointId=${encodeURIComponent(point.conversionPointId)}`) },
       { id: 'daily', label: '日ごとの表を見る', onSelect: onShowDaily },
     ]} />

@@ -67,7 +67,7 @@ export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, bus
     {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
       <Content className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing} disabled={contentDisabled} aria-label={contentDisabled === undefined ? undefined : contentLabel ?? '入力内容'}>{children}</Content>
-      {preview ? <aside className={styles.preview} aria-label={previewLabel} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{aside}</div></aside> : null}
+      {preview ? <aside aria-label={previewLabel} className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{aside}</div></aside> : null}
     </div>
     {footerActions ? <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div> : null}
   </PageFrame>

@@ -27,18 +27,17 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
     }
     return bands.length
   }
-  const shortTextTargets = el => {
-    if (!el.matches('button') && [...el.children].some(child => child.matches('br'))) return []
+  const isTextColumn = el => {
     const css = getComputedStyle(el)
-    const column = css.display.includes('flex') && css.flexDirection === 'column'
-    const children = [...el.children].filter(child => visible(child) && child.textContent.trim() && !child.matches('svg'))
-    if (!children.length || [...el.childNodes].some(node => node.nodeType === 3 && node.textContent.trim())) return [el]
-    const nestedColumn = css.display.includes('flex') && children.some(child => {
-      const style = getComputedStyle(child)
-      return style.display.includes('flex') && style.flexDirection === 'column'
-    })
-    if (!column && !nestedColumn) return [el]
-    return children.flatMap(shortTextTargets)
+    return css.display.includes('flex') && css.flexDirection === 'column'
+  }
+  const shortControlParts = el => {
+    if (!el.matches('button') && [...el.children].some(child => child.matches('br'))) return []
+    const column = isTextColumn(el) || [...el.querySelectorAll('*')].some(isTextColumn)
+    if (!column) return [el]
+    if ([...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) return [el]
+    return [...el.children].filter(child => visible(child) && child.textContent.trim()
+      && !child.matches('svg')).flatMap(shortControlParts)
   }
   const canvas = document.createElement('canvas').getContext('2d')
   const roots = [...document.querySelectorAll('[data-page-template]')].filter(visible)
@@ -135,10 +134,10 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       const css = getComputedStyle(el); canvas.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
       if (canvas.measureText(el.placeholder).width > el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1) add('F1', el, 'search placeholder does not fit')
     }
-    for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button')) {
-      // A column of title/instructions is a composite control. Audit each
-      // short label; explicit line breaks in instructions are intentional.
-      const targets = el.matches('button') ? shortTextTargets(el) : [el]
+    for (const el of all('[data-list-date-time],[data-list-name],th,[data-design-node="xRvDB"],button,[data-page-title],[data-template-region="heading"] h1,[data-template-region="heading"] h2')) {
+      // A control can contain a column of name/type or upload instructions.
+      // Measure each label, including columns nested inside a horizontal row.
+      const targets = el.matches('button') ? shortControlParts(el) : [el]
       for (const target of targets) if (lines(target) > 1) add('F2', target, 'short text wraps')
     }
     for (const el of all('button,a[role="button"],[data-page-title]')) {

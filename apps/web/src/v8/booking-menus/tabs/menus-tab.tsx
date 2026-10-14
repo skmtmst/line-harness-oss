@@ -356,8 +356,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 </span>
                 <span className={styles.colMenu}>
                   <RowMenu
-                    appearance="plain"
-                    className={styles.rowMenuButton}
+                    appearance="box"
+                    size="row"
                     label={`「${menu.name}」のそのほかの操作`}
                     menuLabel={`「${menu.name}」の操作`}
                     open={openMenuId === menu.id}

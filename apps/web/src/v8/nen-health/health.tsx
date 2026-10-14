@@ -24,7 +24,7 @@ import { ApiError } from '@/lib/api';
 import { nenPetsApi, petAnimalTypeLabel, type NenHealthKpis, type NenHealthListData, type NenHealthRow, type NenHealthSort, type NenHealthSummaryData } from '@/lib/nen-pets-api';
 import HealthItemsV8 from './items'
 import SummaryDrawerV8, { SummarySheet } from './summary';
-import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts';
+import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, type HealthFilters, type HealthTabKey } from './parts';
 import styles from './health.module.css'
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
@@ -368,11 +368,7 @@ function HealthListV8({
             </tbody>
           </DataTable>
           <div className={styles.pagerRow}>
-            {data.total > data.pageSize ? (
-              <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} summary={rangeText(data.total, data.page, data.pageSize)} />
-            ) : (
-              <div className={styles.pager}><span className={styles.pagerCount}>{rangeText(data.total, data.page, data.pageSize)}</span></div>
-            )}
+            <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} range={{ total: data.total, first: (data.page - 1) * data.pageSize + 1, last: Math.min(data.total, data.page * data.pageSize) }} />
           </div>
           <p className={styles.hint}>行の「…」から 30日のまとめ・獣医師向け PDF・飼い主にトークで声をかける。</p>
         </>

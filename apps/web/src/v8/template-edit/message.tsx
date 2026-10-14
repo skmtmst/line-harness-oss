@@ -542,7 +542,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             <Card variant="form" gap="normal">
               <CardHeader size="stacked" title="名前とフォルダ" meta="一覧に出る名前です。友だちには見えません。" />
               <SettingsFormRow layout="name-folder">
-                <div className={`${styles.field} ${styles.grow}`}><Field requirement={fields.requirement('name')} label="テンプレート名" htmlFor="te-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
+                <div className={styles.field}><Field label="テンプレート名" htmlFor="te-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
                 <div className={styles.field}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect size="full"
                     id="te-folder"
