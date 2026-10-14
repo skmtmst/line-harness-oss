@@ -722,7 +722,7 @@ const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
 }
 function RoleChip({ role }: { role: RoleKey }) {
-  return <StatusBadge tone="neutral" dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
+  return <StatusBadge tone={role === 'administrator' ? 'success' : role === 'operations' ? 'info' : role === 'reception' ? 'warning' : 'neutral'} dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
 }
 
 const STAFF_TAB_KEYS = [
