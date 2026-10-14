@@ -416,7 +416,7 @@ export default function HqHomeV8() {
         <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
           <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
         </Button>
-        {canManage && (account.role == null || account.role === 'owner' || account.role === 'admin') ? (
+        {canManage ? (
           <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
             <Settings aria-hidden="true" className={styles.buttonIcon} />設定
           </Button>
