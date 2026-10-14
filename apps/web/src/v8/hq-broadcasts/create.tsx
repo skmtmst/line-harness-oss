@@ -54,7 +54,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
-import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, runPeople, sendTotals, splitPreflightRows, toApiContent } from './model'
 import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
@@ -119,11 +119,6 @@ function errorText(caught: unknown, fallback: string): string {
   }
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
-}
-
-/** 送った人数（外したアカウントを除く）。 */
-function runPeople(run: HqBroadcastRun): number {
-  return run.targets.reduce((sum, t) => sum + (t.excluded ? 0 : t.totalCount || 0), 0)
 }
 
 /** 配信の中身の種類（「テキスト＋カルーセル」）。 */

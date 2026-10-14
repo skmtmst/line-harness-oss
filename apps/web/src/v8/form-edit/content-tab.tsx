@@ -32,7 +32,7 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
+import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -308,10 +308,6 @@ function OpenBlock(props: RowProps) {
       ) : null}
     </div>
   )
-}
-
-function blockTitleKind(block: FormBlock): string {
-  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
 }
 
 function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
