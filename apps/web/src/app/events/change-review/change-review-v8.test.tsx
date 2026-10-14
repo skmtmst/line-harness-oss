@@ -161,6 +161,7 @@ describe('V8-B 変更の確認（hmr2P）', () => {
     expect(document.querySelector('[data-design-node="qUdNh"]'), '確認の窓の印がある').toBeTruthy()
     const confirmButton = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('人にお知らせする'))
     expect(confirmButton, '確認の窓に確定の押しがある').toBeTruthy()
+    expect(confirmButton!.querySelector('svg.lucide-send'), 'お知らせする操作に紙飛行機がある').toBeTruthy()
     await act(async () => { confirmButton!.click() })
     await flush()
     expect(applyEventChange, '変える口を叩く').toHaveBeenCalled()

@@ -1,6 +1,7 @@
 'use client'
 import { useId, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { Lock } from 'lucide-react'
 import Dialog from './dialog'
 import Checkbox from './checkbox'
 import SearchField from './search-field'
@@ -29,9 +30,9 @@ export default function DisplayItemsDialog({title = '表示項目を編集', ite
     confirmDisabled={maxSelected !== undefined && chosen.length > maxSelected} confirmDisabledReason={full ? '選択数が上限を超えています。別の項目を外してから保存してください。' : undefined}>
     <div className={styles.body} data-presentation={presentation}>
       <p className={styles.note}>{maxSelected === undefined ? '選んだ項目は、つまみで並べ替えられます。' : `友だちの名前はいつも表示します。ほかは${maxSelected}列まで選べます。`}</p>
-      <h3 className={styles.heading}>表示する項目（{chosen.length}{maxSelected === undefined ? '' : ` / ${maxSelected}`}）</h3>
+      <h3 className={styles.heading}>{presentation === 'columns' ? 'いま出している列' : '表示する項目'}（{chosen.length}{maxSelected === undefined ? '' : ` / ${maxSelected}`}）</h3>
       <ChosenFrame {...(presentation === 'columns' ? { padding: 'rows' as const, surface: 'bordered' as const } : {})} className={styles.chosen} aria-label="選択した列">
-        {presentation === 'columns' ? <div className={styles.fixedRow} data-fixed-display-name><span>友だち（名前）</span><span>いつも出ます</span></div> : null}
+        {presentation === 'columns' ? <div className={styles.fixedRow} data-fixed-display-name><span><Lock size={16} role="img" aria-label="いつも表示する列" />友だち（名前）</span><span>いつも出ます</span></div> : null}
         {chosen.map(item => <div key={item.key} className={styles.row} {...reorder.rowProps(item.key)}>
           <ReorderHandle label={item.label} {...reorder.handleProps(item.key)} onMove={direction => reorder.moveBy(item.key, direction)} />
           <Checkbox checked onCheckedChange={() => setKeys(current => current.filter(key => key !== item.key))}>{item.label}</Checkbox>
