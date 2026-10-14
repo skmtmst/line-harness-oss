@@ -399,7 +399,6 @@ export default function ApprovalsTab() {
 
   const notices = (
     <ToolbarNotices
-      info={`認めた成果は、保留期間${holdDays == null ? '' : `（${formatNumber(holdDays)}日）`}を過ぎると次の締めで報酬に入ります。締める前なら「認めない」に変えると、今回の支払いから外れます。`}
       error={actionError ?? undefined}
     />
   )
@@ -583,6 +582,7 @@ export default function ApprovalsTab() {
 
   return (
     <AffiliateFrame
+      explanation={`認めた成果は、保留期間${holdDays == null ? '' : `（${formatNumber(holdDays)}日）`}を過ぎると次の締めで報酬に入ります。締める前なら「認めない」に変えると、今回の支払いから外れます。`}
       help={readonly
           ? '行の「…」から 詳細と成果の付け方を見る。'
           : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
