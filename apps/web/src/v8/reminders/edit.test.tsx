@@ -183,6 +183,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
   it('保存が 409 のときは競合の帯（k32cn）を出し、比べる・読み込むを選べる', async () => {
     draftStore.conflict = true
     await render('basics')
+    expect(buttonByText('設定内容を見る')).toBeTruthy()
     const save = buttonByText('下書きを保存')
     expect(save).toBeTruthy()
     await act(async () => { save!.click() })

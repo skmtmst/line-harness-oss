@@ -1113,7 +1113,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         title={isSelf ? '自分の勤務' : '勤務とシフト'}
         help={isSelf ? 'あなたの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。ほかの人の勤務は管理者だけが開けます。' : '担当スタッフの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。'}
         preview={previewContent}
-        previewToggle={<PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+        previewToggle={<PreviewLauncher title="お客さまの予約画面" label={isSelf ? "LINEでの見え方を見る" : "お客さまの予約画面を見る"}>{previewContent}</PreviewLauncher>}
       >
           {isSelf ? (
             <p className={styles.linkBand} data-design="Info">{staffLabel(staff)}としてひも付いています。ひも付けを変えるときはオーナーか管理者に頼んでください。</p>

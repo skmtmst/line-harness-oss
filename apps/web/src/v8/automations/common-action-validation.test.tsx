@@ -52,3 +52,11 @@ it('閉じた行でも並べ替え・削除でき、保存する処理の順番�
   await waitFor(() => expect(create).toHaveBeenCalledTimes(2))
   expect(create.mock.calls[1][1].actions.map((step: { type: string }) => step.type)).toEqual(['wait'])
 })
+
+it('畳んだ版と使用先を同じ名前の窓から確認できる', async () => {
+  render(<CommonActionNew />)
+  fireEvent.click(screen.getByRole('button', { name: '版とつながる先を見る' }))
+  const dialog = await screen.findByRole('dialog', { name: '版とつながる先' })
+  expect(dialog.textContent).toContain('版 1 の下書き')
+  expect(dialog.textContent).toContain('つながる先')
+})

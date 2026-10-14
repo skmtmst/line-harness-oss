@@ -802,7 +802,7 @@ function BasicsStageV8({
 
   return (
     <CreatePage
-      {...frame}
+      {...frame} previewLabel="設定内容を見る" previewTitle="設定内容"
       preview={(
         <>
           <SummaryCardV8

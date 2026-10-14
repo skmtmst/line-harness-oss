@@ -118,6 +118,8 @@ describe('V8 統括のメンバーの窓', () => {
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(create).not.toHaveBeenCalled()
     expect(dialog.textContent).toContain('名前を入力してください')
+    expect(dialog.querySelector('input[id$="-name"]')?.closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
+    expect(email.closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
     const scope = dialog.querySelector('[aria-label="担当するアカウント"]')!
     expect(scope.getAttribute('aria-describedby')).toMatch(/-scope-error$/)
     expect(dialog.textContent).toContain('担当するアカウントを1つ以上選んでください')

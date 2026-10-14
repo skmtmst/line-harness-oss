@@ -18,6 +18,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
+import { inviteRequirements } from './member-requirements'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -139,10 +140,8 @@ export default function MemberDialogV8({
   const submit = () => {
     /* 欄の誤りは全部その欄の下に出し、上から1つ目へ移る（板 ukPgd・B-139）。 */
     const errors = {
-      name: member || value.name.trim() ? undefined : '名前を入力してください',
-      email: member ? undefined : !value.email.trim()
-        ? 'メールアドレスを入力してください'
-        : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim()) ? undefined : 'メールアドレスの形が正しくありません（@ のあとに .com などが要ります）',
+      name: member ? undefined : inviteRequirements.name.check(value.name) ?? undefined,
+      email: member ? undefined : inviteRequirements.email.check(value.email) ?? undefined,
       scope: value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0 ? '担当するアカウントを1つ以上選んでください' : undefined,
       assigned: !member && !value.assignedLineAccountId ? '最初に表示するアカウントを選んでください' : undefined,
     }
@@ -202,11 +201,11 @@ export default function MemberDialogV8({
       >
         {!member ? (
           <div className={styles.pair}>
-            <FormField label="名前" htmlFor={`${uid}-name`} error={fieldErrors.name}>
+            <FormField label="名前" requirement={inviteRequirements.name} htmlFor={`${uid}-name`} error={fieldErrors.name}>
               <SaveErrorField names={["name","value.name"]}><TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例：山田 太郎" /></SaveErrorField>
 
             </FormField>
-            <FormField label="メールアドレス" htmlFor={`${uid}-email`} error={fieldErrors.email}>
+            <FormField label="メールアドレス" requirement={inviteRequirements.email} htmlFor={`${uid}-email`} error={fieldErrors.email}>
 
               <SaveErrorField names={["email","value.email"]}><TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例：staff@example.com" /></SaveErrorField>
 
