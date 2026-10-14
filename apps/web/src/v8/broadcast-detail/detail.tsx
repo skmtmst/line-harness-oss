@@ -31,6 +31,8 @@ import {
 } from '@/lib/api'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { ListPageSection } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -59,19 +61,6 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-/*
- * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
- * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
- * ほかの人が更新した `Q28Gb`・予約の取り消しの窓 `BeNtj`。
- *
- * 白い板いっぱいに 板の頭（題＋札・1行の説明・進みの帯／右に操作）→（競合の帯）→ タブ →
- * 左の本文（余白 20・28、段の間 22）と右の欄（幅 380、配信した設定 → メッセージのスマホ）。
- * カードで囲まず、線で分ける（絵 `cgiGB` ほか）。
- *
- * 読み込み・承認・集計・競合の見張りは入口（app/broadcasts/detail/page.tsx）が持ち、
- * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
- * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
- */
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -175,6 +164,7 @@ export default function BroadcastDetail({
   const isSent = broadcast.status === 'sent'
   const isScheduled = broadcast.status === 'scheduled'
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -288,7 +278,6 @@ export default function BroadcastDetail({
         actions={<>{canEdit ? (
             <>
               <RowMenu
-                className={styles.iconButton}
                 label={`配信「${broadcast.title}」の操作`}
                 items={menuItems}
               />
@@ -346,25 +335,8 @@ export default function BroadcastDetail({
         />
       </div>
 
-      <div className={styles.split}>
-        <div className={styles.main}>
-          {tab === 'recipients' ? recipients : tab === 'activity' ? activity : (
-            <Overview
-              broadcast={broadcast}
-              insight={insight}
-              insightState={insightState}
-              approval={approval}
-              canEdit={canEdit}
-              messageText={messageText}
-              scheduledLabel={scheduledLabel}
-              resumeLabel={`${resumeStep.order} ${resumeStep.label}から続ける`}
-              onReload={onReload}
-              onChase={() => router.push(chaseHref(broadcast.id))}
-            />
-          )}
-        </div>
+      <ListPageSection><DetailColumns presentation="notification" asideLabel="配信した設定とメッセージ" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
 
-        <aside className={styles.side} aria-label="配信した設定とメッセージ">
           <h3 className={styles.secTitle}>配信した設定</h3>
           <dl className={styles.rows}>
             <Row label="対象" value={`${audienceLabel} ${formatNumber(total)} 人`} />
@@ -399,8 +371,25 @@ export default function BroadcastDetail({
               time={timeOf(isSent ? broadcast.sentAt : broadcast.scheduledAt)}
             />
           </div>
-        </aside>
-      </div>
+
+</>}>
+<div className={styles.main}>
+          {tab === 'recipients' ? recipients : tab === 'activity' ? activity : (
+            <Overview
+              broadcast={broadcast}
+              insight={insight}
+              insightState={insightState}
+              approval={approval}
+              canEdit={canEdit}
+              messageText={messageText}
+              scheduledLabel={scheduledLabel}
+              resumeLabel={`${resumeStep.order} ${resumeStep.label}から続ける`}
+              onReload={onReload}
+              onChase={() => router.push(chaseHref(broadcast.id))}
+            />
+          )}
+        </div>
+</DetailColumns></ListPageSection>
 
       <ConfirmDialog
         open={deleteOpen}

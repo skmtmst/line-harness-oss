@@ -279,7 +279,6 @@ a.railStep:hover .railLabel {
   flex-direction: column;
   gap: var(--tpl-bd-main-gap);
   min-width: 0;
-  padding: var(--tpl-bd-main-pad);
 }
 
 .side {
