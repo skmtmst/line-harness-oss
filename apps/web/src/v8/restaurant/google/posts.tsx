@@ -551,6 +551,34 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           /></SaveErrorField>
           {form.mediaFilename ? <span className={styles.imageName} title={form.mediaFilename}>{`${form.mediaFilename}・4:3`}</span> : null}
         </div>
+        <div className={styles.postDetails} data-post-details>
+          <SectionHeader size="small" title="投稿の詳細" />
+          <div className={styles.fieldPair}>
+            <Field density="compact" label="ボタン（任意）" grow>
+              <SaveErrorField names={["ctaType","form.ctaType","cta_type","type","form.cta_type"]}><Select
+                aria-label="ボタンの種類"
+                size="full"
+                value={form.kind === 'offer' ? '' : form.ctaType}
+                onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
+                options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
+                disabled={!editable || form.kind === 'offer'}
+              /></SaveErrorField>
+            </Field>
+            <Field density="input" label="リンク先" htmlFor="gb-post-cta-url" grow>
+              <SaveErrorField names={["ctaUrl","form.ctaUrl","cta_url","form.cta_url"]}><TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} /></SaveErrorField>
+            </Field>
+          </div>
+          <Field density="compact" label="公開方法">
+            <Select
+              aria-label="公開方法"
+              size="full"
+              value="now"
+              onChange={() => {}}
+              options={[{ value: 'now', label: '今すぐ' }, { value: 'scheduled', label: '日時を指定（Google側の対応を確かめてから使えます）', disabled: true }]}
+              disabled={!editable}
+            />
+          </Field>
+        </div>
         </div>
         {picker.open ? (
           <div className={styles.picker} role="group" aria-label="画像を選ぶ">
@@ -587,31 +615,6 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </Field>
           </div>
         ) : null}
-        <div className={styles.fieldPair}>
-          <Field density="compact" label="ボタン（任意）" grow>
-            <SaveErrorField names={["ctaType","form.ctaType","cta_type","type","form.cta_type"]}><Select
-              aria-label="ボタンの種類"
-              size="full"
-              value={form.kind === 'offer' ? '' : form.ctaType}
-              onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
-              options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
-              disabled={!editable || form.kind === 'offer'}
-            /></SaveErrorField>
-          </Field>
-          <Field density="input" label="リンク先" htmlFor="gb-post-cta-url" grow>
-            <SaveErrorField names={["ctaUrl","form.ctaUrl","cta_url","form.cta_url"]}><TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} /></SaveErrorField>
-          </Field>
-        </div>
-        <Field density="compact" label="公開方法">
-          <Select
-            aria-label="公開方法"
-            size="full"
-            value="now"
-            onChange={() => {}}
-            options={[{ value: 'now', label: '今すぐ' }, { value: 'scheduled', label: '日時を指定（Google側の対応を確かめてから使えます）', disabled: true }]}
-            disabled={!editable}
-          />
-        </Field>
         {igAvailable ? (
           <div className={styles.igBand} data-design-node="hsiwQ">
             <div className={styles.igToggleRow}>

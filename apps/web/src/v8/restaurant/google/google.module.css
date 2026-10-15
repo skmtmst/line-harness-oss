@@ -540,3 +540,9 @@
 /* 絵 T1j2Sw：本文は横いっぱい、画像はその下に左寄せで置く。 */
 .postCompose { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
 .postCompose > :first-child { justify-self: stretch; }
+/* 投稿の画像の右に「投稿の詳細」（ボタン・リンク先・公開方法）。広い幅だけ 2 列、狭い幅は縦に並べる。 */
+.postDetails { display: flex; flex-direction: column; gap: var(--tpl-rt-half-gap); min-width: 0; justify-self: stretch; }
+@media (min-width: 1280px) {
+  .postCompose { grid-template-columns: min(100%, var(--tpl-rt-post-image-w)) minmax(0, 1fr); column-gap: var(--tpl-rt-half-gap); }
+  .postCompose > :first-child { grid-column: 1 / -1; }
+}
