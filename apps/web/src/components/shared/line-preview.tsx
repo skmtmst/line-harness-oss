@@ -110,8 +110,10 @@ export default function LinePreview({
 }
 
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
-export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density }: {
+export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density, bare = false }: {
   accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
+  /** 写真など、それ自体が角丸の札になる中身。白い吹き出しとしっぽを付けず、そのまま置く（絵 pNiUk）。 */
+  bare?: boolean
 }) {
   if (direction === 'outgoing') return <div className={styles.outgoingRow}>
     {time ? <span className={styles.messageTime}>{time}</span> : null}
@@ -122,10 +124,10 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
     <div className={styles.senderBody}>
       <span className={styles.senderName}>{accountName}</span>
       <div className={styles.bubbleRow}>
-        <div className={styles.bubble}>
+        {bare ? children : <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
           <div className={styles.bubbleBody}><span className={styles.bubbleText}>{children}</span></div>
-        </div>
+        </div>}
         <span className={styles.messageTime}>{time}</span>
       </div>
     </div>
