@@ -19,6 +19,8 @@ describe('番号付き処理カード', () => {
     render(<Harness />)
     expect(screen.queryByRole('textbox')).toBeNull()
     expect((screen.getByRole('button', { name: '1つ目の処理を上へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: '1つ目の処理を上へ' }).getAttribute('title')).toBe('最初の処理です')
+    expect(screen.getByRole('button', { name: '2つ目の処理を下へ' }).getAttribute('title')).toBe('最後の処理です')
     fireEvent.click(screen.getByRole('button', { name: '1つ目の処理を下へ' }))
     expect(data().map(step => step.id)).toEqual(['branch', 'tag'])
     fireEvent.click(screen.getByRole('button', { name: '2つ目の処理を上へ' }))

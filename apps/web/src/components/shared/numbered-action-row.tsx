@@ -29,8 +29,8 @@ export default function NumberedActionRow({ number, title, summary, open, readOn
       {readOnly ? <div className={styles.content}>{content}</div> : <button type="button" className={styles.content} aria-expanded={open} onClick={onToggle}>{content}</button>}
       {readOnly ? null : <div className={styles.controls}>
         {reorderable ? <>
-          <IconButton size="compact" aria-label={`${number}つ目の処理を上へ`} disabled={!onMoveUp} onClick={onMoveUp}><ArrowUp size={16} aria-hidden="true" /></IconButton>
-          <IconButton size="compact" aria-label={`${number}つ目の処理を下へ`} disabled={!onMoveDown} onClick={onMoveDown}><ArrowDown size={16} aria-hidden="true" /></IconButton>
+          <IconButton size="compact" aria-label={`${number}つ目の処理を上へ`} title={!onMoveUp ? '最初の処理です' : undefined} disabled={!onMoveUp} onClick={onMoveUp}><ArrowUp size={16} aria-hidden="true" /></IconButton>
+          <IconButton size="compact" aria-label={`${number}つ目の処理を下へ`} title={!onMoveDown ? '最後の処理です' : undefined} disabled={!onMoveDown} onClick={onMoveDown}><ArrowDown size={16} aria-hidden="true" /></IconButton>
         </> : null}
         {onRemove ? <IconButton size="compact" aria-label={`${number}つ目の処理を削除する`} onClick={() => setRemoving(true)}><Trash2 size={16} aria-hidden="true" /></IconButton> : null}
       </div>}
