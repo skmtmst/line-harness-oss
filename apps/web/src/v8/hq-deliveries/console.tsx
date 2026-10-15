@@ -74,7 +74,8 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   const accountFolders = useDistributionFolders(view==='accounts' || view==='preflight' || view==='result')
   const dirty = view === 'edit' && JSON.stringify(selected) !== savedSnapshot.current
   const guard = useUnsavedGuard({ dirty, busy, onDiscard: () => setSelected(null) })
-  usePageTitle(`${titleOf(type)}を配る`)
+  /* 作る・直す画面のパンくずは画面の題の種類名（絵 T5ljMA「自動応答」）。一覧は今までどおり「〜を配る」。 */
+  usePageTitle(view === 'edit' ? titleOf(type) : `${titleOf(type)}を配る`)
 
   const load = useCallback(async () => {
     setLoading(true); setRowsReady(false); setError('')

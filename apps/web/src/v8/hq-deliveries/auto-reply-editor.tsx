@@ -7,7 +7,7 @@
  * 店ごとのテンプレート・タグを統括から名前で選ぶ口が無いので出さない（機能待ち）。
  */
 import { useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, PenLine, CircleSlash } from 'lucide-react'
+import { ArrowRight, PenLine, CircleSlash } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
@@ -28,7 +28,6 @@ const STEP_LABELS: Record<StepKey, string> = { basic: '基本設定', trigger: '
 const ORDER: StepKey[] = ['basic', 'trigger', 'reply', 'priority', 'confirm']
 /* ④は統括では選べないので、次へは③→⑤へ飛ぶ。 */
 const NEXT: Partial<Record<StepKey, StepKey>> = { basic: 'trigger', trigger: 'reply', reply: 'confirm' }
-const PREV: Partial<Record<StepKey, StepKey>> = { trigger: 'basic', reply: 'trigger', confirm: 'reply' }
 
 const DELAYS = [{ value: '0', label: 'すぐ返す' }, { value: '30', label: '30秒あける' }, { value: '60', label: '1分あける' }, { value: '300', label: '5分あける' }]
 const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': '然 -NEN-', '{{var.store_phone}}': '03-1234-5678', '{{var.reservation_url}}': 'https://nen.example/booking' }
@@ -57,7 +56,6 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
   const req = (label: string, required: boolean) => ({ label, requirement: canEdit ? { required } : undefined, optional: canEdit && !required })
   const inserts = [...new Set((text.match(/\{\{[^}]+\}\}/g) ?? []).map((token) => token === '{{name}}' ? '名前（無いときは「お客さま」）' : token === '{{account.name}}' ? '店名' : token === '{{var.store_phone}}' ? '店の電話番号' : token === '{{var.reservation_url}}' ? '予約ページ' : '友だち情報'))]
   const next = NEXT[step]
-  const prev = PREV[step]
 
   const preview = <>
     <CreateSummaryCard title="送るものの確認" rows={[
@@ -77,12 +75,13 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
     steps={<Steps label="自動応答のひな形を作る手順" steps={steps} currentKey={step} />}
     preview={preview}
     footerActions={<>
-      {prev ? <Button disabled={busy} onClick={() => setStep(prev)}><ArrowLeft size={15} aria-hidden="true" />戻る</Button> : <Button disabled={busy} onClick={onCancel}>キャンセル</Button>}
+      {/* ページ内に戻るは置かない（決まり）。前の段へは上の手順の段から戻る。 */}
+      <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
       {canEdit ? <Button disabled={busy || !name.trim()} title={!name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</Button> : null}
       {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}><ArrowRight size={15} aria-hidden="true" />{`次へ：${STEP_LABELS[next]}`}</Button> : null}
     </>}>
-    {step === 'basic' ? <Card layout="vertical" padding="roomy">
-      <CardHeader title="基本設定" />
+    {step === 'basic' ? <Card variant="form" gap="normal">
+      <CardHeader size="stacked" title="基本設定" />
       <div className={styles.grid}>
         <Field {...req('統括での名前', true)} htmlFor="hq-ar-name"><SaveErrorField names={['name']}>{canEdit ? <TextField id="hq-ar-name" value={name} onChange={(event) => onName(event.target.value)} placeholder="例：予約変更のご案内" /> : <span>{name}</span>}</SaveErrorField></Field>
         <Field {...req('店に届く名前', true)} htmlFor="hq-ar-store-name"><SaveErrorField names={['definition.settings.name']}>{canEdit ? <TextField id="hq-ar-store-name" value={storeName} onChange={(event) => onSetting('name', event.target.value)} /> : <span>{storeName}</span>}</SaveErrorField></Field>
@@ -90,8 +89,8 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       </div>
     </Card> : null}
 
-    {step === 'trigger' ? <Card layout="vertical" padding="roomy">
-      <CardHeader title="どんなときに動くか" />
+    {step === 'trigger' ? <Card variant="form" gap="normal">
+      <CardHeader size="stacked" title="どんなときに動くか" />
       <div className={styles.grid}>
         <Field {...req('キーワード', true)} htmlFor="hq-ar-keyword"><SaveErrorField names={['keyword', 'definition.settings.keyword']}>{canEdit ? <TextField id="hq-ar-keyword" value={keyword} onChange={(event) => onSetting('keyword', event.target.value)} placeholder="例：予約変更" /> : <span>{keyword}</span>}</SaveErrorField></Field>
         <Field {...req('一致方法', true)}>{canEdit ? <Select aria-label="一致方法" value={String(s.matchType ?? 'contains')} options={[{ value: 'contains', label: '含む' }, { value: 'exact', label: '完全一致' }]} onChange={(value) => onSetting('matchType', value)} /> : <span>{s.matchType === 'exact' ? '完全一致' : '含む'}</span>}</Field>
@@ -99,15 +98,15 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
     </Card> : null}
 
     {step === 'reply' ? <>
-      <Card layout="vertical" padding="roomy">
-        <CardHeader title="返すもの" />
+      <Card variant="form" gap="normal">
+        <CardHeader size="stacked" title="返すもの" />
         {canEdit ? <SegmentedControl aria-label="返すもの" size="compact" value={silent ? 'silent' : 'text'} onChange={(value) => onSetting('responseType', value)}
           options={[{ value: 'text', label: <span className={styles.choice}><PenLine size={14} aria-hidden="true" />この画面で書く</span> }, { value: 'silent', label: <span className={styles.choice}><CircleSlash size={14} aria-hidden="true" />返信しない（記録だけ）</span> }]} /> : null}
         {silent ? <p className={styles.note}>返信はしません。キーワードに当たったことだけを店の記録に残します。</p>
           : <SaveErrorField names={['responseContent', 'definition.settings.responseContent']}><HqMessageBody value={text} label="返信内容" onChange={(value) => onSetting('responseContent', value)} readOnly={!canEdit} disabled={busy} /></SaveErrorField>}
       </Card>
-      <Card layout="vertical" padding="roomy">
-        <CardHeader title="細かい決まり" />
+      <Card variant="form" gap="normal">
+        <CardHeader size="stacked" title="細かい決まり" />
         <div className={styles.rules}>
           <div className={styles.rule}><span>返すまで待つ時間</span><Select aria-label="返すまで待つ時間" disabled={!canEdit || busy} value={String(s.replyDelaySeconds ?? 0)} options={DELAYS} onChange={(value) => onSetting('replyDelaySeconds', Number(value) || null)} /></div>
           <div className={styles.rule}><span>同じ人へ続けて返さない</span><span className={styles.ruleEnd}>{s.cooldownMinutes ? <small>{`${s.cooldownMinutes}分あける`}</small> : null}<Toggle label="同じ人へ続けて返さない" disabled={!canEdit || busy} checked={Boolean(s.cooldownMinutes)} onChange={(on) => onSetting('cooldownMinutes', on ? 60 : null)} /></span></div>
@@ -117,8 +116,8 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       </Card>
     </> : null}
 
-    {step === 'confirm' ? <Card layout="vertical" padding="roomy">
-      <CardHeader title="確認" />
+    {step === 'confirm' ? <Card variant="form" gap="normal">
+      <CardHeader size="stacked" title="確認" />
       <dl className={styles.confirm}>
         <dt>統括での名前</dt><dd>{name || '—'}</dd>
         <dt>店に届く名前</dt><dd>{storeName || '—'}</dd>
