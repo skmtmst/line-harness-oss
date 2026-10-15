@@ -163,7 +163,11 @@ export interface HqRichMenuSeed {
   folderId: string | null
   size: 'large' | 'compact'
   /** 誰に出すか：すべての友だち（配った先の既定）／配った先で店が決める。 */
-  displayAudience: 'all' | 'store'
+  displayAudience: 'all' | 'store' | 'tag'
+  /** 「タグが付いた人」のタグ名。配った先の同じ名前の有効なタグで出す（displayAudience が tag のときだけ）。 */
+  displayTagName: string
+  /** トークを開いたとき、メニューを開いておくか。 */
+  defaultOpen: boolean
   displayOrder: number
   defaultPageId: string
   pages: Array<{ id: string; name: string; imageR2Key: string | null; areas: Area[] }>
@@ -174,6 +178,13 @@ export const HQ_RICH_MENU_INTENTS = ['url', 'text', 'form', 'template', 'switch'
 
 const HQ_ID = /^[A-Za-z0-9_-]{1,128}$/
 
+/** 統括のひな形の保存が持つ「誰に出すか」の広い形（タグ・開閉）。画面用の狭い型は Codex の持ち物なので、ここで読み替える。 */
+type WideMenu = { displayAudience?: 'all' | 'store' | 'tag'; displayTagName?: string; defaultOpen?: boolean }
+function audienceOf(menu: object): HqRichMenuSeed['displayAudience'] {
+  const value = (menu as WideMenu).displayAudience
+  return value === 'all' || value === 'tag' ? value : 'store'
+}
+
 export function hqRichMenuSeedFromDefinition(definition: RichMenuDefinition, folderId: string | null): HqRichMenuSeed {
   const menu = definition.richMenu
   return {
@@ -182,7 +193,9 @@ export function hqRichMenuSeedFromDefinition(definition: RichMenuDefinition, fol
     chatBarText: menu.chatBarText,
     folderId,
     size: menu.size,
-    displayAudience: menu.displayAudience === 'all' ? 'all' : 'store',
+    displayAudience: audienceOf(menu),
+    displayTagName: (menu as WideMenu).displayTagName ?? '',
+    defaultOpen: (menu as WideMenu).defaultOpen ?? true,
     displayOrder: menu.displayOrder ?? 0,
     defaultPageId: menu.defaultPageId,
     pages: menu.pages.map((page) => ({
@@ -257,9 +270,7 @@ export function hqRichMenuDefinitionFromSeed(seed: HqRichMenuSeed): RichMenuDefi
     }
   })
   const menuId = seed.id && HQ_ID.test(seed.id) ? seed.id : uniqueId('menu', used)
-  return {
-    schemaVersion: 1,
-    richMenu: {
+  const menu = {
       id: menuId,
       name: seed.name.trim(),
       chatBarText: seed.chatBarText.trim(),
@@ -267,7 +278,10 @@ export function hqRichMenuDefinitionFromSeed(seed: HqRichMenuSeed): RichMenuDefi
       defaultPageId: pageIds.get(seed.defaultPageId) ?? pages[0]?.id ?? '',
       displayOrder: Math.max(0, Math.round(seed.displayOrder)),
       displayAudience: seed.displayAudience,
+      ...(seed.displayAudience === 'tag' ? { displayTagName: seed.displayTagName.trim() } : {}),
+      defaultOpen: seed.defaultOpen,
       pages,
-    },
-  }
+    }
+  if (seed.displayAudience === 'tag' && !seed.displayTagName.trim()) fail('「タグが付いた人」に出すときは、タグの名前を入れてください。')
+  return { schemaVersion: 1, richMenu: menu as RichMenuDefinition['richMenu'] }
 }

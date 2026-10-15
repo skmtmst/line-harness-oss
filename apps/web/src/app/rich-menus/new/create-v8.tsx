@@ -490,7 +490,7 @@ function groupFromSeed(seed: HqRichMenuSeed): Group {
     targetingPriority: seed.displayOrder,
     targetingEnabled: seed.displayAudience === 'store',
     folderId: seed.folderId,
-    defaultOpen: true,
+    defaultOpen: seed.defaultOpen ?? true,
     version: 0,
     pages: seed.pages.map((page, index) => ({
       id: page.id, orderIndex: index, name: page.name, aliasId: '', lineRichmenuId: null,
@@ -568,7 +568,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [pendingTabCount, setPendingTabCount] = useState<number | null>(null)
 
   /* 手順③ */
-  const [audience, setAudience] = useState<'all' | 'targeted' | 'none'>('all')
+  const [audience, setAudience] = useState<'all' | 'targeted' | 'none' | 'tag'>('all')
+  /* 統括のひな形だけ：「タグが付いた人」のタグ名（配った先の同じ名前の有効なタグで出す）。 */
+  const [hqTagName, setHqTagName] = useState(host?.initial?.displayTagName ?? '')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
   const [targetingPriority, setTargetingPriority] = useState(0)
   const [priorityOpen, setPriorityOpen] = useState(false)
@@ -680,6 +682,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             : null,
         folderId: folderId || null,
         defaultOpen,
+        hqTag: audience === 'tag' ? hqTagName.trim() : null,
         pages: pages.map((p, i) => ({
           id: p.id,
           name: p.name,
@@ -687,7 +690,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           areas: p.areas.map(projectAreaForDraft),
         })),
       }),
-    [name, chatBarText, audience, targetingPriority, targetingCondition, folderId, defaultOpen, pages],
+    [name, chatBarText, audience, targetingPriority, targetingCondition, folderId, defaultOpen, hqTagName, pages],
   )
 
   const signatureNow = useCallback(
@@ -924,14 +927,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setChatBarText(g.chatBarText)
     setFolderId(g.folderId ?? '')
     setDefaultOpen(g.defaultOpen)
-    setAudience(g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? 'targeted' : 'none')
+    setAudience(g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? (host.initial?.displayAudience === 'tag' ? 'tag' : 'targeted') : 'none')
     setTargetingCondition(parseStoredCondition(g.targetingCondition))
     setTargetingPriority(g.targetingPriority)
     /*
      * 基準署名は draftSignature と同じ投影で組み立てる（audience の写像・
      * 条件の prune が違うと、保存直後なのに未保存と出る）。
      */
-    const hydratedAudience = g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? 'targeted' : 'none'
+    const hydratedAudience = g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? (host.initial?.displayAudience === 'tag' ? 'tag' : 'targeted') : 'none'
     const hydratedCondition = parseStoredCondition(g.targetingCondition)
     setBaselineSignature(
       JSON.stringify({
@@ -946,6 +949,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             : null,
         folderId: g.folderId,
         defaultOpen: g.defaultOpen,
+        hqTag: hydratedAudience === 'tag' ? (host?.initial?.displayTagName ?? '').trim() : null,
         pages: g.pages.map((p, i) => ({
           id: p.id,
           name: p.name,
@@ -1013,7 +1017,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       imageR2Key: imageKeys[index] ?? null,
       areas: createAreaDrafts(template).map((area, areaIndex) => ({ ...area, id: `p${index + 1}-a${areaIndex + 1}` })),
     }))
-    return { id: host.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null, size, displayAudience: audience === 'all' ? 'all' : 'store', displayOrder: targetingPriority, defaultPageId: shapePages[0].id, pages: shapePages }
+    return { id: host.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null, size, displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store', displayTagName: audience === 'tag' ? hqTagName.trim() : '', defaultOpen, displayOrder: targetingPriority, defaultPageId: shapePages[0].id, pages: shapePages }
   }
 
   /** 手順①の内容で下書きを作る。作れたら true。 */
@@ -1877,7 +1881,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       chatBarText: chatBarText.trim(),
       folderId: folderId || null,
       size: group?.size ?? size,
-      displayAudience: audience === 'all' ? 'all' : 'store',
+      displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store',
+      displayTagName: audience === 'tag' ? hqTagName.trim() : '',
+      defaultOpen,
       displayOrder: targetingPriority,
       defaultPageId: group?.defaultPageId ?? pages[0]?.id ?? '',
       pages: pages.map((page) => ({ id: page.id, name: page.name, imageR2Key: page.imageR2Key, areas: page.areas })),
@@ -2466,7 +2472,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * ======== 統括の手順③：配る先（絵 UgZPJ）========
    * 配るアカウント（統括が渡す1行の欄）→ 各アカウントで誰に出すか。
    * 統括のひな形が持てるのは「全員（配った先の既定）」か「決めない（各アカウントで決める）」の2つ。
-   * 絵の「タグが付いた人」と「トークを開いたとき」は、ひな形の口に値が無いので出さない（機能待ち）。
+   * 「タグが付いた人」（displayTagName）と「トークを開いたとき」（defaultOpen）は組1の口（保存・配布）で持つ。
    */
   function renderHqAudience() {
     if (!host) return null
@@ -2479,7 +2485,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             help="配った先のアカウントで、このメニューを誰に出すかの初めの形です。配ったあとに各アカウントで変えられます。"
             helpLabel="各アカウントで誰に出すかの説明"
           />
-          <SaveErrorField names={["audience","displayAudience"]}><RadioCardGroup legend="各アカウントで誰に出すか" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["audience","displayAudience"]}><RadioCardGroup legend="各アカウントで誰に出すか" className="grid grid-cols-3 gap-3">
             <RadioCard
               name="audience"
               value="all"
@@ -2491,21 +2497,52 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             />
             <RadioCard
               name="audience"
+              value="tag"
+              checked={audience === 'tag'}
+              onChange={() => setAudience('tag')}
+              title="タグが付いた人"
+              icon={<Tag aria-hidden="true" />}
+              note="同じ名前のタグの人に出す"
+            />
+            <RadioCard
+              name="audience"
               value="targeted"
-              checked={audience !== 'all'}
+              checked={audience !== 'all' && audience !== 'tag'}
               onChange={() => setAudience('targeted')}
               title="決めない"
               icon={<CircleDashed aria-hidden="true" />}
               note="誰に出すかは各アカウントで"
             />
           </RadioCardGroup></SaveErrorField>
+          {audience === 'tag' ? (
+            <Field label="タグの名前" htmlFor="rm-hq-tag" help="配った先のアカウントにある、同じ名前のタグが付いた人に出します。無いアカウントには配れません。">
+              <SaveErrorField names={["displayTagName","tag"]}><TextInput id="rm-hq-tag" value={hqTagName} onChange={(e) => setHqTagName(e.target.value)} placeholder="例：会員" maxLength={100} /></SaveErrorField>
+            </Field>
+          ) : null}
           <div className={styles.infoBand}>
             <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
             <span>
               {audience === 'all'
                 ? '「全員」にすると、配った先で既定のメニューとして届きます。LINE に出て、いまの既定のメニューと入れ替わるのは、各アカウントで公開したときです。'
-                : '配った先では下書きのまま届きます。誰に出すかは、各アカウントで決めます。'}
+                : audience === 'tag'
+                  ? '配った先では、同じ名前のタグが付いた人に出します。タグが無い・同じ名前が複数あるアカウントは、配る前の確認で止まります。'
+                  : '配った先では下書きのまま届きます。誰に出すかは、各アカウントで決めます。'}
             </span>
+          </div>
+        </Card>
+        <Card variant="form" gap="normal">
+          <SectionHeader title="トークを開いたとき" />
+          <div className={styles.segRow}>
+            <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
+            <SaveErrorField names={["defaultOpen"]}><SegmentedControl
+              aria-label="トークを開いたときのメニュー"
+              options={[
+                { value: 'open', label: '開いておく' },
+                { value: 'closed', label: '閉じておく' },
+              ]}
+              value={defaultOpen ? 'open' : 'closed'}
+              onChange={(v) => setDefaultOpen(v === 'open')}
+            /></SaveErrorField>
           </div>
         </Card>
       </>

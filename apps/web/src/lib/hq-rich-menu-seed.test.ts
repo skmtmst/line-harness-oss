@@ -9,7 +9,7 @@ const area = (id: string, intent: string, actionData: Record<string, unknown>, e
   label: null, tagIds: [], scoreChange: null, templateId: null, formId: null, trackedLinkId: null, ...extra,
 })
 const seed = (areas: HqRichMenuSeed['pages'][number]['areas']): HqRichMenuSeed => ({
-  name: '通常メニュー', chatBarText: 'メニュー', folderId: null, size: 'large', displayAudience: 'store', displayOrder: 2,
+  name: '通常メニュー', chatBarText: 'メニュー', folderId: null, size: 'large', displayAudience: 'store', displayTagName: '', defaultOpen: true, displayOrder: 2,
   defaultPageId: 'tmp-x', pages: [{ id: 'tmp-x', name: 'トップ', imageR2Key: 'hq-templates/t/a.png', areas }],
 })
 
@@ -35,6 +35,17 @@ describe('統括のリッチメニューの下書き → ひな形の定義', ()
     expect(() => hqRichMenuDefinitionFromSeed({ ...seed([]), pages: [{ id: 'p', name: 'トップ', imageR2Key: null, areas: [] }] })).toThrow('画像')
     expect(() => hqRichMenuDefinitionFromSeed(seed([area('a', 'url', { uri: 'https://x.example' }, { trackedLinkId: 'l' })]))).toThrow('計測リンク')
     expect(() => hqRichMenuDefinitionFromSeed(seed([area('a', 'url', { uri: 'https://x.example' }, { tagIds: ['t'] })]))).toThrow('タグ')
+  })
+
+  it('「タグが付いた人」と開閉は、タグ名つきで保存し、そのまま戻る', () => {
+    const def = hqRichMenuDefinitionFromSeed({ ...seed([area('a-1', 'url', { uri: 'https://example.com' })]), displayAudience: 'tag', displayTagName: ' 会員 ', defaultOpen: false })
+    expect(def.richMenu).toMatchObject({ displayAudience: 'tag', displayTagName: '会員', defaultOpen: false })
+    const back = hqRichMenuSeedFromDefinition(def, null)
+    expect(back).toMatchObject({ displayAudience: 'tag', displayTagName: '会員', defaultOpen: false })
+  })
+
+  it('タグ名が空のまま「タグが付いた人」では保存できない', () => {
+    expect(() => hqRichMenuDefinitionFromSeed({ ...seed([area('a-1', 'url', { uri: 'https://example.com' })]), displayAudience: 'tag', displayTagName: '  ' })).toThrow('タグの名前')
   })
 
   it('保存してある定義から下書きに戻すと、同じ定義に戻る', () => {
