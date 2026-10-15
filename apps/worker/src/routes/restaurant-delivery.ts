@@ -24,7 +24,6 @@ import { requireIrreversibleConfirmation, requireRole } from '../middleware/role
 import { auditLog } from '../lib/audit-log.js';
 import type { AuditAction } from '../lib/audit-log.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
-import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
@@ -47,13 +46,15 @@ import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js
 import type { StoreContext } from './restaurant-google.js';
 import {
   deliveryWebhookIpAllowlist,
-  deliveryWebhookSecret,
   isDeliveryWebhookIpAllowed,
   webhookSourceIp,
 } from '../services/delivery-webhook-ip.js';
 import {
+  deliveryWebhookSigningSecret,
+  verifyDeliveryWebhook,
+} from '../services/delivery-webhook-auth.js';
+import {
   MAX_WEBHOOK_BODY_BYTES,
-  WEBHOOK_SKEW_SECONDS,
   parseWebhookPayload,
   utf8Length,
   type WebhookOrder,
@@ -1723,7 +1724,8 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
   }
-  const secret = deliveryWebhookSecret(c.env, service);
+  // 署名の鍵はサービスごとに違う（Uber は公式仕様で client_secret。delivery-webhook-auth.ts）。
+  const secret = deliveryWebhookSigningSecret(c.env, service);
   if (!secret) {
     // 合言葉が未設定・短すぎる場合は検証できない。受け取らずに設定不足として返す。
     console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
@@ -1739,19 +1741,17 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
 
-  const timestamp = c.req.header('x-nen-timestamp') || '';
-  const timestampSeconds = Number(timestamp);
   const now = nowSec();
-  if (!Number.isInteger(timestampSeconds) || Math.abs(now - timestampSeconds) > WEBHOOK_SKEW_SECONDS) {
-    return c.json({ success: false, error: 'Expired request' }, 401);
-  }
-  const signature = (c.req.header('x-nen-signature') || '').replace(/^sha256=/i, '').toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(signature)) {
-    return c.json({ success: false, error: 'Invalid signature' }, 401);
-  }
-  const expected = await computeHmacSha256Hex(secret, `${timestamp}.${rawBody}`);
-  if (!safeEqualHex(signature, expected)) {
-    return c.json({ success: false, error: 'Invalid signature' }, 401);
+  // 確かめ方の違いは service 層に閉じてある。合わない通知はここで止めて本文を保存しない。
+  const verified = await verifyDeliveryWebhook({
+    service,
+    secret,
+    rawBody,
+    header: (name) => c.req.header(name),
+    nowSeconds: now,
+  });
+  if (!verified.ok) {
+    return c.json({ success: false, error: verified.error }, 401);
   }
 
   let parsedJson: unknown;
