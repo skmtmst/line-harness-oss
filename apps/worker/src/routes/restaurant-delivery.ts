@@ -36,7 +36,13 @@ import {
 } from '../services/uber-eats.js';
 import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
 import { verifySupportRelay } from '../services/support-relay.js';
-import { platformCooldownStore, probeUberSandboxToken, uberProbeSecret } from '../services/ubereats-token-probe.js';
+import {
+  UBER_PROBE_CHECK_BODY,
+  platformCooldownStore,
+  probeUberSandboxToken,
+  uberProbeReadiness,
+  uberProbeSecret,
+} from '../services/ubereats-token-probe.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
 import {
@@ -2156,20 +2162,27 @@ restaurantDelivery.get(
  * - 返すのは「取れたか」と `scope` と残り秒だけ。
  *   **トークンの値と Client Secret は返さない・記録しない。**
  * - 接続先が Sandbox でないときは送らない。冷却時間の中でも送らない。
+ * - 本文が `{"mode":"check"}` のときは下見。署名を確かめたあと、Uber へは送らずに
+ *   接続先と設定の有無だけを返す。トークンの口の回数も冷却時間も使わない。
  */
 restaurantDelivery.post('/internal/ubereats/sandbox-token-probe', async (c) => {
   if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
-  const secret = uberProbeSecret(c.env);
+  const gate = uberProbeSecret(c.env);
   // 合言葉が無いあいだは口を閉じたまま。誰でも叩ける状態にはしない。
-  if (!secret) return c.json({ success: false, code: 'probe_not_configured' }, 503);
+  // 返すのは「届いていない」か「短すぎる」かの理由だけ。長さも値も返さない。
+  if (!gate.ok) return c.json({ success: false, code: gate.code }, 503);
   const rawBody = await c.req.text();
   const verified = await verifySupportRelay(
-    secret,
+    gate.secret,
     c.req.header('x-nen-timestamp'),
     c.req.header('x-nen-signature'),
     rawBody,
   );
   if (!verified) return c.json({ success: false, code: 'probe_unauthorized' }, 401);
+  // 下見。Uber へは送らないので、トークンの口の回数も冷却時間も使わない。
+  if (rawBody === UBER_PROBE_CHECK_BODY) {
+    return c.json({ success: true, mode: 'check', ...uberProbeReadiness(c.env) });
+  }
   const outcome = await probeUberSandboxToken({
     env: c.env,
     store: platformCooldownStore(dbFor(c.env)),
