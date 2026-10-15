@@ -32,7 +32,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
   it('名前が空の作成は保存の理由を出し、入力すると解除する', async () => {
     render(<HqDeliveryConsole type="auto_reply" />)
     fireEvent.click(await screen.findByRole('button', { name: 'ひな形を作る', exact: true }))
-    const save = await screen.findByRole('button', { name: '下書きを保存する' }) as HTMLButtonElement
+    const save = await screen.findByRole('button', { name: '下書きとして保存' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.title).toBe('統括での名前を入力してください。')
     fireEvent.click(save)

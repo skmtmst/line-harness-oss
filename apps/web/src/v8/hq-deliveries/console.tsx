@@ -1,6 +1,7 @@
 'use client'
 
 import HqMessageBody from '@/components/shared/hq-message-inserts'
+import HqAutoReplyEditor from './auto-reply-editor'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -173,6 +174,13 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={14} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
     </ListPage></SaveErrorScope>
   }
+  /* 自動応答は店と同じ手順の段で作る（T5ljMA）。ほかの種類は今の1枚の画面。 */
+  if (view === 'edit' && selected && type === 'auto_reply') return <SaveErrorScope errors={saveErrors}><HqAutoReplyEditor
+    title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
+    canEdit={canEdit} busy={busy} name={selected.template.name} description={selected.template.description ?? ''} settings={settings}
+    onName={(value) => setSelected({ ...selected, template: { ...selected.template, name: value } })}
+    onDescription={(value) => setSelected({ ...selected, template: { ...selected.template, description: value } })}
+    onSetting={updateSetting} onCancel={back} onSave={() => void save()} /></SaveErrorScope>
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
     footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} title={!selected.template.name.trim() ? '統括での名前を入力してください。' : undefined} onClick={()=>void save()} busy={busy} busyLabel="保存中…">下書きを保存する</Button>}</>}>
       <div className={styles.fields}>
