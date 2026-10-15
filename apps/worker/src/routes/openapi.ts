@@ -21,6 +21,7 @@ import type { Env } from '../index.js';
 
 import { bookingEntitlementPaths } from './booking-entitlements-openapi.js';
 import { bookingAssignmentPaths } from './booking-assignment-openapi.js';
+import { bookingPaymentAdminPaths } from './booking-payment-admin-openapi.js';
 
 const openapi = new Hono<Env>();
 
@@ -413,6 +414,7 @@ const spec = {
   },
   paths: {
     ...bookingAssignmentPaths,
+    ...bookingPaymentAdminPaths,
     ...bookingEntitlementPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },

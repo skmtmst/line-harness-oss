@@ -170,7 +170,7 @@ interface StartBookingRow {
  * 支払いを始める中身。担当者用とお客さま用で共用する。
  * 同じ予約の送り直しは作り直さず、今の記録を返す。
  */
-async function startBookingPayment(
+export async function startBookingPayment(
   db: D1Database,
   env: Env['Bindings'],
   booking: StartBookingRow,

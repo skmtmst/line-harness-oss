@@ -145,6 +145,7 @@ import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.
 import booking from './routes/booking.js';
 import { bookingEntitlements } from './routes/booking-entitlements.js';
 import { bookingPayments } from './routes/booking-payments.js';
+import { bookingPaymentAdmin } from './routes/booking-payment-admin.js';
 import { bookingPlus } from './routes/booking-plus.js';
 import events from './routes/events.js';
 import { trafficPools } from './routes/traffic-pools.js';
@@ -645,6 +646,7 @@ app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
 app.route('/', bookingPayments);
+app.route('/', bookingPaymentAdmin);
 app.route('/', bookingEntitlements);
 app.route('/', bookingPlus);
 app.route('/', events);

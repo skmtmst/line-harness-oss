@@ -2066,6 +2066,23 @@ const updateRestaurantMenu = async (c: Context<Env>) => {
 restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"]}), updateRestaurantMenu);
 restaurantTest.patch('/api/restaurant-test/menus/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"]}), updateRestaurantMenu);
 
+// 支払いの保存先は追加番号の承認待ち。飲食の既存の統括/店/機能の境界を先に通す。
+for (const method of ['get','put'] as const) {
+  restaurantTest[method]('/api/restaurant-test/menus/:id/payment',requireRole('owner','admin','staff'),async c => {
+    c.header('Cache-Control','no-store');
+    if (method==='put' && (c.get('staff').readOnly || c.get('staff').role==='staff')) return c.json({success:false,error:'forbidden'},403);
+    if (!accountId(c)) return requiredAccount(c);
+    const organization=await organizationFor(c);
+    if (!organization) return c.json({success:false,error:'not_found'},404);
+    const menu=await dbFor(c.env).prepare(`SELECT m.id FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
+      WHERE m.id=? AND m.kind='course' AND s.organization_id=? AND s.line_account_id=?
+      AND (? IS NULL OR s.id=?)`)
+      .bind(c.req.param('id'),organization.id,accountId(c),organization.scopedStoreId,organization.scopedStoreId).first();
+    if (!menu) return c.json({success:false,error:'not_found'},404);
+    return c.json({success:false,error:'course_payment_storage_not_ready',code:'course_payment_storage_not_ready'},503);
+  });
+}
+
 /** 全枠を一括保存し、どれか一つの版が古ければ一件も変更しない。 */
 restaurantTest.put('/api/restaurant-test/inventory/allocation', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["string"],"slots":["array"],"otaCapacity":["number"],"lineCapacity":["number"],"walkInCapacity":["number"],"sameDayCapacity":["number"]}), async c => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);

@@ -1,0 +1,107 @@
+import { getBookingPaymentConfig } from '@line-crm/db';
+import { getAccountTimeZone } from './availability.js';
+import { assignmentWindows } from './booking-assignment.js';
+import { entitlementMonth } from './booking-entitlements.js';
+
+export interface PaymentRecordFilter {
+  q: string; status: string; method: string; period: string; limit: number; offset: number;
+}
+export interface AdminPaymentRecord {
+  id: string; bookingId: string | null; friendId: string | null; friendName: string | null;
+  bookingStartsAt: string | null; bookingLabel: string | null; bookingNote: string | null;
+  amount: number; status: 'paid' | 'pending' | 'refunded' | 'expired' | 'onsite';
+  method: string | null; createdAt: string; receiptUrl: string | null;
+}
+export function paymentRecordFilter(query: Record<string, string>): PaymentRecordFilter | null {
+  const integer = (value: string | undefined, fallback: number, max: number) => value === undefined ? fallback
+    : /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) <= max ? Number(value) : NaN;
+  const filter = { q: (query.q ?? '').trim(), status: query.status ?? '', method: query.method ?? '',
+    period: query.period || 'month', limit: integer(query.limit, 20, 100), offset: integer(query.offset, 0, 100000) };
+  return filter.q.length <= 200 && ['', 'paid', 'pending', 'refunded', 'expired', 'onsite'].includes(filter.status)
+    && ['', 'online', 'onsite'].includes(filter.method) && ['month', '7d', '30d', '90d'].includes(filter.period)
+    && filter.limit >= 1 && filter.offset >= 0 ? filter : null;
+}
+
+// 店払いは予約時に保存した選択だけを載せる。現在の店設定から過去の支払いを推測しない。
+// 決済失敗はDの表示型に無いのでこの一覧に含めない（pending/expiredへ偽装しない）。
+const recordsCte = `WITH records AS (
+ SELECT p.id,p.booking_id AS bookingId,b.friend_id AS friendId,f.display_name AS friendName,
+ b.starts_at AS bookingStartsAt,m.name AS bookingLabel,b.internal_note AS bookingNote,p.amount,
+ CASE WHEN p.status IN ('unpaid','pending') THEN 'pending' ELSE p.status END AS status,
+ 'online' AS method,p.created_at AS createdAt,NULL AS receiptUrl
+ FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
+ LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=p.line_account_id
+ LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=p.line_account_id
+ WHERE p.line_account_id=? AND p.status IN ('unpaid','pending','paid','refunded','expired')
+ UNION ALL
+ SELECT 'onsite:'||b.id,b.id,b.friend_id,f.display_name,b.starts_at,m.name,b.internal_note,b.price_at_booking,
+ 'onsite','onsite',b.requested_at,NULL
+ FROM booking_payment_choices ch JOIN bookings b ON b.id=ch.booking_id AND b.line_account_id=ch.line_account_id
+ LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
+ LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=b.line_account_id
+ WHERE ch.line_account_id=? AND ch.mode='onsite' AND b.status IN ('requested','confirmed','completed')
+ AND NOT EXISTS(SELECT 1 FROM booking_payments p WHERE p.booking_id=b.id AND p.line_account_id=b.line_account_id)
+)`;
+
+export async function paymentPeriod(db: D1Database, account: string, period: string, now = new Date()) {
+  const timezone = await getAccountTimeZone(db, account);
+  if (period === 'month') { const m = entitlementMonth(now.toISOString(), timezone); return { from: m.periodStart, to: m.periodEnd }; }
+  return { from: new Date(now.getTime() - Number(period.slice(0, -1)) * 86400000).toISOString(), to: now.toISOString() };
+}
+
+export async function paymentRecords(db: D1Database, account: string, filter: PaymentRecordFilter, now = new Date()) {
+  const period = await paymentPeriod(db, account, filter.period, now);
+  const where = ` WHERE julianday(createdAt)>=julianday(?) AND julianday(createdAt)<julianday(?)
+    AND (?='' OR status=?) AND (?='' OR method=?)
+    AND (?='' OR instr(lower(COALESCE(friendName,'')||' '||COALESCE(bookingLabel,'')||' '||COALESCE(bookingId,'')),lower(?))>0)`;
+  const bindings = [account, account, period.from, period.to, filter.status, filter.status, filter.method, filter.method, filter.q, filter.q];
+  const rows = await db.prepare(`${recordsCte} SELECT * FROM records${where} ORDER BY julianday(createdAt) DESC,id LIMIT ? OFFSET ?`)
+    .bind(...bindings, filter.limit, filter.offset).all<AdminPaymentRecord>();
+  const count = await db.prepare(`${recordsCte} SELECT COUNT(*) AS total FROM records${where}`).bind(...bindings).first<{total:number}>();
+  return { items: rows.results, total: count?.total ?? 0 };
+}
+
+/** 集計は検索・ページ・一覧の期間と独立した店の今月。入金総額と返金額は別々に数える。 */
+export async function paymentSummary(db: D1Database, account: string, now = new Date()) {
+  const { from, to } = await paymentPeriod(db, account, 'month', now);
+  const rows = await db.prepare(`SELECT p.amount,p.status,p.paid_at,p.updated_at,p.created_at,b.status AS booking_status
+    FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
+    WHERE p.line_account_id=? AND (
+      (julianday(p.paid_at)>=julianday(?) AND julianday(p.paid_at)<julianday(?)) OR
+      (julianday(p.updated_at)>=julianday(?) AND julianday(p.updated_at)<julianday(?)) OR
+      (julianday(p.created_at)>=julianday(?) AND julianday(p.created_at)<julianday(?)))`)
+    .bind(account, from, to, from, to, from, to).all<{
+      amount:number; status:string; paid_at:string|null; updated_at:string; created_at:string; booking_status:string|null;
+    }>();
+  const inMonth = (at: string | null) => at !== null && Date.parse(at) >= Date.parse(from) && Date.parse(at) < Date.parse(to);
+  const summary = { paidAmount:0, paidCount:0, refundedAmount:0, refundedCount:0, expiredCount:0, pendingCount:0,
+    holdMinutes:(await getBookingPaymentConfig(db, account)).holdMinutes };
+  for (const row of rows.results) {
+    if (['paid','refunded'].includes(row.status) && inMonth(row.paid_at)) { summary.paidAmount += row.amount; summary.paidCount++; }
+    // 既存の返金処理が更新した時刻。正確な返金履歴の保存は追加migrationの承認待ち。
+    if (row.status==='refunded' && inMonth(row.updated_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
+    if (row.status==='expired' && row.booking_status==='expired' && inMonth(row.updated_at)) summary.expiredCount++;
+    if (['unpaid','pending'].includes(row.status) && inMonth(row.created_at)) summary.pendingCount++;
+  }
+  return summary;
+}
+
+/** 表計算で実行される数式を防ぎ、改行・引用符・日本語を保つ。 */
+export function paymentCsv(items: AdminPaymentRecord[]) {
+  const cell = (v: unknown) => { const s=String(v ?? ''); return `"${(/^[\s\u0000-\u001f]*[=+@-]/u.test(s) ? "'"+s : s).replace(/"/g,'""')}"`; };
+  const rows: unknown[][] = [['記録ID','予約ID','お客さま','予約日時','メニュー','金額','状態','方法','作成日時']];
+  for (const p of items) rows.push([p.id,p.bookingId,p.friendName,p.bookingStartsAt,p.bookingLabel,p.amount,p.status,p.method,p.createdAt]);
+  return '\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n';
+}
+
+export async function staffTodayCounts(db: D1Database, account: string, now = new Date()) {
+  const timezone = await getAccountTimeZone(db, account);
+  const w=assignmentWindows(now.toISOString(),timezone,'day');
+  const rows=await db.prepare(`SELECT s.id AS staffId,COUNT(b.id) AS todayCount FROM staff s
+    LEFT JOIN bookings b ON b.staff_id=s.id AND b.line_account_id=s.line_account_id
+      AND b.status IN ('requested','confirmed','completed')
+      AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)
+    WHERE s.line_account_id=? AND s.deleted_at IS NULL GROUP BY s.id ORDER BY s.sort_order,s.id`)
+    .bind(w.dayFrom,w.dayTo,account).all<{staffId:string;todayCount:number}>();
+  return { items: rows.results, date: new Intl.DateTimeFormat('sv-SE',{timeZone:timezone}).format(now), timezone };
+}
