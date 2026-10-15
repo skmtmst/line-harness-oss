@@ -150,7 +150,7 @@ it('担当は本物のチェック、設備は札＋選ぶ窓で選び、選択�
   fireEvent.click(screen.getByRole('button', { name: '使う設備：選ぶ' }))
   const picker = await screen.findByRole('dialog')
   fireEvent.click(within(picker).getByRole('checkbox', { name: '台1' }))
-  fireEvent.click(within(picker).getByRole('button', { name: 'この 1件にする' }))
+  fireEvent.click(within(picker).getByRole('button', { name: '選ぶ（1件）' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(staff.checked).toBe(true)
   expect(screen.getByRole('button', { name: '台1を外す' })).toBeTruthy()

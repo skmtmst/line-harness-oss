@@ -20,10 +20,4 @@ describe('予約一覧の行の行き先（R11）', () => {
     expect(PAGE).toContain('openBookingDetail(b.id)')
     expect(PAGE).toContain('BookingDetailPanel')
   })
-
-  it('受信箱への行き先は操作列の「…」から行ける', () => {
-    expect(PAGE).toContain("label: '会話を開く'")
-    expect(PAGE).toContain('<RowMenu')
-    expect(PAGE).toContain('`/chats?friend=${b.friend_id}`')
-  })
 })

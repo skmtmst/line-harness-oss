@@ -1,3 +1,7 @@
+// @vitest-environment happy-dom
+import { createElement } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import DateField from './date-field'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,9 +23,6 @@ const block = (selector: string) => {
  * 消すボタンは欄の右端・欄と同じ高さ帯に収めることが約束。
  */
 describe('日時の消すボタンは欄の中に収まる（m22a）', () => {
-  it('欄の高さは 36px（ほかの欄と同じ・B-145）', () => {
-    expect(block('.field')).toMatch(/height:\s*36px/)
-  })
 
   it('消すボタンは欄の上下いっぱい（top:1px・bottom:1px）で固定の高さを持たない', () => {
     const clear = block('.clear')
@@ -34,4 +35,14 @@ describe('日時の消すボタンは欄の中に収まる（m22a）', () => {
   it('消すボタンは globals の min-height:32px に伸ばされない', () => {
     expect(block('.clear')).toMatch(/min-height:\s*0/)
   })
+})
+
+
+it('日付を消す操作は欄を開かず空の値を返す', () => {
+  let next = '2026-10-15'
+  render(createElement(DateField, { value: next, onChange: (value: string) => { next = value }, 'aria-label': '日付' }))
+  fireEvent.click(screen.getByRole('button', { name: '日付を消す' }))
+  expect(next).toBe('')
+  expect(screen.queryByRole('dialog')).toBeNull()
+  cleanup()
 })

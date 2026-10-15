@@ -234,10 +234,6 @@ describe('2画面が同じ部品で組まれている', () => {
     }
   })
 
-  it('撮影の押し口を、文言ではなく印で持つ', () => {
-    expect(ec).toContain('data-qa-open="ELayY"')
-  })
-
   it('それぞれの種類だけを読む', () => {
     expect(friend).toContain("useIdentityReview('friend_duplicate')")
     expect(ec).toContain("useIdentityReview('ec_member', { lineAccountId: selectedAccountId })")

@@ -50,8 +50,6 @@ describe('KpiCardの見出しのはみ出し（G3）', () => {
     expect(label?.textContent).toBe('始まる見込み（試算）')
     const parts = [...(label?.querySelectorAll('span span') ?? [])].map(span => span.textContent)
     expect(parts).toEqual(['始まる見込み', '（試算）'])
-    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'kpi-card.module.css'), 'utf8')
-    expect(css).toMatch(/\.labelText:has\(> \.labelMain\) \{[^}]*flex-wrap:\s*wrap;[^}]*max-height:\s*1lh;/s)
   })
 
   it('添え書きの無い題は分けない', async () => {

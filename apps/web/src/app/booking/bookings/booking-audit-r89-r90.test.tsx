@@ -11,6 +11,7 @@ import type { BookingRequest } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
   staffMe: vi.fn(),
+  push: vi.fn(),
   listRequests: vi.fn(),
   requestsSummary: vi.fn(),
   listMenus: vi.fn(),
@@ -24,7 +25,7 @@ const fixture = vi.hoisted(() => ({
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: fixture.push }),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -171,7 +172,7 @@ describe('監査 R90: 今月は今月の予約に絞る', () => {
     await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(expected)))
     fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
     await waitFor(() => expect(fixture.downloadLedgerCsv).toHaveBeenCalledWith('account-a', expect.objectContaining(expected)))
-    expect(screen.getByRole('status').textContent).toContain('表示月')
+    expect(screen.getByRole('status').textContent).toContain('月の予約を')
     expect(JSON.parse(sessionStorage.getItem('booking-ledger-state-v1')!).date).toBe(`${key(1)}-01`)
     fireEvent.click(screen.getByRole('button', { name: '前の月' }))
     await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(monthBounds())))
@@ -255,3 +256,15 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
      expect(fixture.availability).not.toHaveBeenCalled()
    })
  })
+
+
+it('予約の一覧は右端のメニューからその人の会話を開く', async () => {
+  render(<BookingsPage />)
+  fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: '一覧' }))
+  const menu = await screen.findByRole('button', { name: '予約「花子」の操作' })
+  expect(screen.queryByRole('menuitem', { name: '会話を開く' })).toBeNull()
+  fireEvent.click(menu)
+  fireEvent.click(await screen.findByRole('menuitem', { name: '会話を開く' }))
+  expect(fixture.push).toHaveBeenCalledWith(expect.stringContaining('/chats?friend=f1'))
+  expect(fixture.getBooking).not.toHaveBeenCalled()
+})

@@ -97,12 +97,6 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<RowMenu')
   })
 
-  it('/ec-commerce/identity-candidates：V8の比較表で操作の列を持つ', () => {
-    const body = code(read('v8', 'settings', 'ec-commerce', 'identity.tsx'))
-    expect(body).toContain('<Th>操作</Th>')
-    expect(body).toContain('<DataTable')
-  })
-
   it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
     const css = read('v8', 'friends', 'migrations', 'migrations.module.css')
     expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)

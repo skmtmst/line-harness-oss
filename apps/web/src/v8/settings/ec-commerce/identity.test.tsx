@@ -43,7 +43,9 @@ afterEach(() => { cleanup(); vi.resetAllMocks() })
 it('候補の行は「…」の中に「候補を見る」「決める」、候補なしの行は「友だちを探す」（行の右端は「…」1つ・B-253）', async () => {
   render(<EcIdentityCandidatesScreen />)
   const table = await screen.findByRole('table', { name: '会員のつき合わせの候補' })
+  expect(within(table).getByRole('columnheader', { name: '操作' })).toBeTruthy()
   const rows = within(table).getAllByRole('row')
+  expect(within(rows[1]).getByRole('button', { name: /の候補の操作/ }).getAttribute('data-qa-open')).toBe('ELayY')
   // 行の右端にボタンを並べない。
   expect(within(rows[1]).queryByRole('button', { name: '候補を見る' })).toBeNull()
   fireEvent.click(within(rows[1]).getByRole('button', { name: /の候補の操作/ }))

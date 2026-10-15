@@ -234,11 +234,11 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
     await openEditor()
     await screen.findByText('個室A')
-    // 絵 v5L19Z：設備は札＋［変える］。窓で足して「この 2件にする」で決める。
+    // 絵 v5L19Z：設備は札＋［変える］。窓で足して「選ぶ（2件）」で決める。
     fireEvent.click(screen.getByRole('button', { name: '使う設備：変える' }))
     const picker = await screen.findByRole('dialog')
     fireEvent.click(within(picker).getByRole('checkbox', { name: '席A' }))
-    fireEvent.click(within(picker).getByRole('button', { name: 'この 2件にする' }))
+    fireEvent.click(within(picker).getByRole('button', { name: '選ぶ（2件）' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
     const saveButton = screen.getByRole('button', { name: '設備の割当を保存する' })

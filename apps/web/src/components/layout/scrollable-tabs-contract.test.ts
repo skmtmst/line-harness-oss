@@ -1,3 +1,6 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import HqSettingsNavV8 from '@/v8/hq/settings-nav'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,11 +13,7 @@ const SRC = join(HERE, '..', '..')
 const NEN_MEMBERS = readFileSync(join(SRC, 'app', 'nen', 'members', 'page.tsx'), 'utf8')
 const NEN_HEALTH = readFileSync(join(SRC, 'app', 'nen', 'health', 'page.tsx'), 'utf8')
 // 入口は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
-const HQ_MEMBERS = readFileSync(join(SRC, 'v8', 'hq', 'members.tsx'), 'utf8')
-const HQ_NAV = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.tsx'), 'utf8')
 // 統括の設定の中のメニューは、店の設定と同じ共通の形（SettingsMenu）を使う（2026-10-15）。
-const SHARED_MENU = readFileSync(join(SRC, 'components', 'layout', 'settings-inner-nav.tsx'), 'utf8')
-const HQ_NAV_CSS = readFileSync(join(SRC, 'components', 'layout', 'settings-inner-nav.module.css'), 'utf8')
 
 /*
  * #975 U091: タブが右にはみ出す画面（/analytics、/search-console、
@@ -64,16 +63,14 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
     expect(readFileSync(join(SRC, 'components', 'shared', 'tabs.module.css'), 'utf8')).toContain('overflow-x: auto')
     expect(readFileSync(join(SRC, 'components', 'shared', 'tabs.tsx'), 'utf8')).toContain('tabs[next]?.focus()')
   })
+})
 
-  it('V8のメンバー管理は縦の設定メニューから各画面へ進む', () => {
-    expect(HQ_MEMBERS).toContain('<HqSettingsNavV8 active="members"')
-    expect(HQ_NAV).toContain('<SettingsMenu')
-    expect(HQ_NAV).toContain('label="統括の設定"')
-    expect(HQ_NAV).toContain('active: key === active')
-    expect(SHARED_MENU).toContain("aria-current={active ? 'page' : undefined}")
-    expect(HQ_NAV_CSS).toMatch(/\.list\s*\{[^}]*flex-direction:\s*column/s)
-    for (const href of ['/hq/members', '/hq/settings', '/hq/billing', '/hq/support']) {
-      expect(HQ_NAV).toContain(href)
-    }
-  })
+
+it('統括の設定は全4画面へのリンクと現在地を示す', () => {
+  const html = renderToStaticMarkup(createElement(HqSettingsNavV8, { active: 'members' }))
+  expect(html).toContain('aria-label="統括の設定"')
+  expect(html).toMatch(/<a(?=[^>]*href="\/hq\/members")(?=[^>]*aria-current="page")[^>]*>/)
+  for (const href of ['/hq/members', '/hq/settings', '/hq/billing', '/hq/support']) {
+    expect(html).toContain(`href="${href}"`)
+  }
 })

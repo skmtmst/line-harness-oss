@@ -63,11 +63,11 @@ describe('KpiCardの説明ポップオーバー', () => {
     expect(note.querySelector('strong')?.textContent).toBe('シナリオ')
   })
 
-  it('旧2行指定も同じ補足を保ち、行き先と再試行を実行できる', async () => {
+  it('括弧の前で補足を2行に分け、全文と行き先と再試行を保つ', async () => {
     const retry = vi.fn(), action = vi.fn()
     await render({ detail: '購読の数（再参加を含む）', detailLayout: 'qualifier', onRetry: retry, action: { label: '一覧を見る', onClick: action } })
     const note = host.querySelector('[data-kpi-detail] [role="note"]')!
-    expect(note.textContent).toBe('購読の数（再参加を含む）')
+    expect(note.textContent).toBe('購読の数\n（再参加を含む）')
     expect(note.getAttribute('title')).toBe('購読の数（再参加を含む）')
     const buttons = host.querySelectorAll<HTMLButtonElement>('[data-kpi-detail] button')
     await act(async () => {
