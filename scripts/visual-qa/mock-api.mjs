@@ -2793,11 +2793,13 @@ const VISUAL_COMPOSE_BUBBLES = [
   } } },
   { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
     columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      /* 絵の小さな写真の代わり（撮影は外へ取りに行かないので、その場の色の絵）。 */
+      thumbnailImageUrl: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="${['#c98a4b', '#8fae6b', '#d9a066'][index]}"/><rect y="120" width="300" height="80" fill="${['#a8663a', '#6f8f4f', '#b97f4a'][index]}"/></svg>`)}`,
       title, text: '秋のおすすめ商品をご案内します',
       actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
     }))),
   } },
-  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+  { id: 'visual-audio', type: 'audio', content: { fileName: 'autumn-greeting.m4a', state: {
     location: { title: '', address: '', latitude: '', longitude: '' },
     video: { originalContentUrl: '', previewImageUrl: '' },
     audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
