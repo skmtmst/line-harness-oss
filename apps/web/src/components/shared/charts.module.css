@@ -33,3 +33,11 @@ html:root .axis { left: 50%; right: auto; width: max-content; max-width: none; t
 html:root .axis[hidden] { display: none; }
 html:root .axis[data-axis-edge='first'] { left: 0; transform: none; }
 html:root .axis[data-axis-edge='last'] { left: auto; right: 0; transform: none; }
+
+/* 横棒（HorizontalBarChart・絵 v0SbYR）。 */
+.hbar { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.hbarRow { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--color-ink); font-size: 12px; }
+.hbarLabel { flex: 0 0 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbarTrack { display: flex; flex: 1 1 0; min-width: 0; height: 10px; border-radius: var(--radius-mini); background: var(--color-canvas-sunken); overflow: hidden; }
+.hbarTrack > span { height: 100%; border-radius: var(--radius-mini); background: var(--color-accent-deep); }
+.hbarValue { flex: 0 0 90px; font-weight: 600; white-space: nowrap; }
