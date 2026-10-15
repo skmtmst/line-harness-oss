@@ -141,6 +141,9 @@ import {
   getBookingAutoAssign,
   saveBookingAutoAssign,
   getBookingChannels,
+  EXTERNAL_BOOKING_CHANNELS,
+  getBookingChannelSetting,
+  saveBookingChannelSetting,
   listBookingConflicts,
   notifyBookingConflicts,
   bookingAutomaticNotificationAllowed,
@@ -2226,6 +2229,21 @@ booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SE
   if (!body || typeof body.autoAssign !== 'boolean') return inputError(c, { error: 'invalid_auto_assign' }, 400, ["autoAssign"]);
   await saveBookingAutoAssign(c.env.DB, accountId, body.autoAssign);
   return c.json({ success: true, data: { autoAssign: body.autoAssign } });
+});
+
+booking.put('/api/booking/admin/channels/:channel/settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ['account_id']);
+  const channel = EXTERNAL_BOOKING_CHANNELS.find((key) => key === c.req.param('channel'));
+  if (!channel) return c.json({ success: false, error: 'channel_not_found' }, 404);
+  const body = await c.req.json<{ enabled?: unknown; expectedVersion?: unknown }>().catch(() => null);
+  if (!body || typeof body.enabled !== 'boolean' || !Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+    return inputError(c, { success: false, error: '連携の状態と読み込んだ版を確認してください' }, 400, ['enabled', 'expectedVersion']);
+  }
+  if (!await saveBookingChannelSetting(c.env.DB, accountId, channel, body.enabled, Number(body.expectedVersion))) {
+    return c.json({ success: false, error: '設定が更新されました。読み直してください' }, 409);
+  }
+  return c.json({ success: true, data: await getBookingChannelSetting(c.env.DB, accountId, channel) });
 });
 
 booking.get('/api/booking/admin/conflicts', requireRole('owner', 'admin', 'staff'), requirePermission('/booking/bookings'), async (c) => {

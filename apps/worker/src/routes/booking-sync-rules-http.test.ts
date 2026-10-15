@@ -16,6 +16,21 @@ function request(path:string,body?:unknown,method=body?'PUT':'GET') {
 beforeEach(()=>{db=createTestD1();role='owner';access.allow=true;db.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('a','試験店','test','test','test'),('b','別店','other','other','other')");});
 afterEach(()=>db.raw.close());
 describe('予約同期ルールと知らせのHTTP API',()=>{
+ it('外部予約経路は実接続と区別して開始・停止し、古い版と別店の更新を拒む',async()=>{
+  const path='/api/booking/admin/channels/google_reserve/settings?account_id=a';
+  expect((await request(path,{enabled:true,expectedVersion:5})).status).toBe(409);
+  expect(await (await request(path,{enabled:true,expectedVersion:0})).json()).toMatchObject({data:{enabled:true,version:1,connectionStatus:'requested',operational:false}});
+  expect((await request(path,{enabled:false,expectedVersion:0})).status).toBe(409);
+  expect(await (await request('/api/booking/admin/channels?account_id=a')).json()).toMatchObject({data:{channels:expect.arrayContaining([{key:'google_reserve',status:'preparing',todayCount:null,enabled:true,version:1,connectionStatus:'requested',operational:false}])}});
+  expect(await (await request(path,{enabled:false,expectedVersion:1})).json()).toMatchObject({data:{enabled:false,version:2,connectionStatus:'disabled'}});
+  expect(await (await request('/api/booking/admin/channels?account_id=b')).json()).toMatchObject({data:{channels:expect.arrayContaining([expect.objectContaining({key:'google_reserve',enabled:false,version:0})])}});
+  role='staff';expect((await request(path,{enabled:true,expectedVersion:2})).status).toBe(403);
+  role='owner';access.allow=false;expect((await request(path,{enabled:true,expectedVersion:2})).status).toBe(403);
+ });
+ it('予約経路の不正な値と未対応の経路は保存しない',async()=>{
+  expect((await request('/api/booking/admin/channels/epark/settings?account_id=a',{enabled:'true',expectedVersion:0})).status).toBe(400);
+  expect((await request('/api/booking/admin/channels/line/settings?account_id=a',{enabled:true,expectedVersion:0})).status).toBe(404);
+ });
  const path='/api/booking/admin/sync-rules?account_id=a';
  it('固定項目・初期版を返し、保存と競合409を返す',async()=>{
   expect(await (await request(path)).json()).toMatchObject({success:true,data:{excludeCalendarBusy:true,writeLineBookingsToCalendar:true,version:0}});
