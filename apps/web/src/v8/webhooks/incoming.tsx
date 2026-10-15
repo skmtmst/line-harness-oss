@@ -759,7 +759,7 @@ export default function WebhooksIncomingV8() {
               <p className={styles.cardNote}>いま確認が必要な届物はありません。</p>
             ) : (
               <>
-                <DataTable aria-label="人が見つからなかった届物" columnSizing="content">
+                <DataTable aria-label="人が見つからなかった届物">
                   <thead>
                     <TableHeadRow>
                   <Th className={styles.miniWhen}>届いた日時</Th>
