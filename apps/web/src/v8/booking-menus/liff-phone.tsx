@@ -202,7 +202,6 @@ export function LiffPhoneStaffStep({
         <span className={`${styles.phoneCta} ${shown.length === 0 && !designationFree ? styles.phoneCtaOff : ''}`}>
           日時を選ぶ
         </span>
-        <span className={styles.phoneBack}>← メニューを選び直す</span>
       </div>
     </PhoneChrome>
   )
