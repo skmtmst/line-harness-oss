@@ -35,4 +35,10 @@
 .body[data-presentation='columns'] .option label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .optionMeta { margin-left: 8px; font-size: 12px; color: var(--color-ink-faint); }
 .chosenRows { padding-bottom: var(--space-16); }
+.body { align-self: stretch; width: 100%; }
+.group { display: flex; flex-direction: column; gap: var(--polish-space-row); min-width: 0; }
+.headRow { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); min-width: 0; }
+.subheading { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; }
+.manage { display: inline-flex; align-items: center; gap: var(--tpl-dic-gap-tight); color: var(--color-accent); font-size: var(--text-micro); font-weight: 600; white-space: nowrap; }
+.section { display: flex; flex-direction: column; gap: 0; }
 }

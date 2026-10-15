@@ -205,6 +205,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const alive = useRef(true)
   /** リッチメニューの作る④で選んだ配るアカウント。 */
   const [menuTargets, setMenuTargets] = useState<string[]>([])
+  /* ③④の右の列「出る人（合計）」。選んだアカウントの友だちの合計（読めないときは null）。 */
+  const [menuFriendTotal, setMenuFriendTotal] = useState<number | null>(0)
+  /* ④「配ったときの扱い」で選んだ初めの選択。配る前の確認（重複の一覧）を開いたときに、その扱いを選べる行へ入れる。 */
+  const preferredBulkMode = useRef<'' | DistributionMode>('')
 
   const reconcileSessionUploads = (keep: readonly string[]) => {
     const kept = new Set(keep)
@@ -333,7 +337,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
-    createAttempt.current = null; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
+    createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
     flushListUrlState()
     entryHandled.current = ''
     window.history.replaceState(window.history.state, '', returnHref)
@@ -546,7 +550,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     if (checked.stores.length !== ids.length || new Set(checked.stores.map((s) => s.accountId)).size !== ids.length || checked.stores.some((s) => !ids.includes(s.accountId))) throw new Error('配布先を確認できませんでした。もう一度アカウントを選択してください。')
     if (!alive.current) return
     if (stage === 'saved') { setSearch(''); setAccountFolder(ALL_ACCOUNTS) }
-    setPendingRun(null); setPreflight(checked); setChoices({}); setBulkMode(''); setSelected(ids); setNow(Date.now()); setStage('duplicates')
+    const preferred = preferredBulkMode.current
+    preferredBulkMode.current = ''
+    const preset: Record<string, DistributionMode> = {}
+    if (preferred) for (const store of checked.stores) for (const item of store.items) if (item.duplicate && item.allowedModes.includes(preferred)) preset[choiceKey(store.accountId, item.sourceId)] = preferred
+    setPendingRun(null); setPreflight(checked); setChoices(preset); setBulkMode(preferred); setSelected(ids); setNow(Date.now()); setStage('duplicates')
   })
   const applyBulk = (mode: '' | DistributionMode) => {
     setBulkMode(mode)
@@ -812,7 +820,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         }}
         onBack={toList}
         onEdit={() => { if (detail) open(detail.template.id, 'edit') }}
-        onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
+        onDistribute={() => { preferredBulkMode.current = ''; setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
         onDuplicate={() => void perform(async () => {
           const requestId = crypto.randomUUID()
           await hqTemplatesApi.duplicate(detail.template.id, `${detail.template.name}のコピー`, detail.template.revision, requestId)
@@ -962,25 +970,23 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       },
       imageUrl: (r2Key) => `${process.env.NEXT_PUBLIC_API_URL ?? ''}/images/${r2Key.split('/').map(encodeURIComponent).join('/')}`,
       distribute: (
-        <Card padding="spacious" layout="vertical">
+        <Card variant="form" gap="normal">
           <HqAccountPicker
             title="配るアカウント"
+            help="選んだアカウントへ、このリッチメニューを下書きとして届けます。LINE に出すのは各アカウントで公開したときです。"
             allowed={accounts}
             selected={menuTargets}
             onChange={setMenuTargets}
-            note="配った先で、既定のメニューにするかを決めます。"
+            onFriendTotal={setMenuFriendTotal}
             disabled={busy || !canEdit}
           />
         </Card>
       ),
-      distributeSummary: [
-        { key: 'accounts', label: '配るアカウント', value: menuTargets.length ? `${menuTargets.length} アカウント` : 'まだ選んでいません' },
-        { key: 'state', label: '届き方', value: '下書きとして届く' },
-      ],
       selectedCount: menuTargets.length,
+      friendTotal: menuFriendTotal,
       busy,
       notice: notices,
-      onSave: (seed, distribute) => {
+      onSave: (seed, distribute, duplicateMode) => {
         let next: RichMenuDefinition
         try {
           next = hqRichMenuDefinitionFromSeed(seed)
@@ -993,6 +999,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           return
         }
         setDefinition(next); setName(seed.name); setFolderId(seed.folderId)
+        preferredBulkMode.current = distribute ? duplicateMode ?? '' : ''
         void save(distribute, next, seed.name, description, false, { folderId: seed.folderId, preselect: distribute ? menuTargets : undefined })
       },
     }

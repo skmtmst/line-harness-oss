@@ -439,7 +439,9 @@ export default function BalancesTab() {
               setPendingOnly(value === 'pending')
             }}
           />
-          <HelpTip label="残高一覧の操作の説明">名前で探し、残高あり・確定待ちありで絞り込めます。行を押すと明細が開きます。</HelpTip><PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
+          <PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
+          {/* 絵 CJlf4：件数の右に表の読み方の「？」。 */}
+          <HelpTip label="表の読み方">いまの残高は使えるマイルです。「保留」は確定待ちの分です。消える予定は30日以内に期限を迎える分、最終行動は最後にマイルが動いた日です。</HelpTip>
         </>}
       />
     </ListToolbarFrame>
