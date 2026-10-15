@@ -93,7 +93,7 @@ export default function Drawer({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
-  const panelRef = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy, initialFocus === 'panel' ? () => panelRef.current : undefined)
+  const panelRef: React.RefObject<HTMLElement | null> = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy, initialFocus === 'panel' ? (): HTMLElement | null => panelRef.current : undefined)
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
 
