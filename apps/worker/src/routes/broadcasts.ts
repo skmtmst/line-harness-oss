@@ -1340,9 +1340,6 @@ broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messag
     if (body.draftStep !== undefined && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
       return inputError(c, { success: false, error: 'draftStep is invalid' }, 400, ["draftStep"]);
     }
-    if (body.scheduledAt != null && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
-      return inputError(c, { success: false, error: '予約には未来の日時を指定してください', code: 'SCHEDULE_MUST_BE_FUTURE' }, 400, ['scheduledAt']);
-    }
     const messageOptionsError = validateMessageOptions(body.messageOptions);
     if (messageOptionsError) return inputError(c, { success: false, error: messageOptionsError }, 400, ["messageOptions"]);
 
@@ -1462,6 +1459,10 @@ broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messag
         c.header('Idempotency-Replayed', 'true');
         return c.json({ success: true, data: serializeBroadcast(existing) }, 200);
       }
+    }
+
+    if (body.scheduledAt != null && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
+      return inputError(c, { success: false, error: '予約には未来の日時を指定してください', code: 'SCHEDULE_MUST_BE_FUTURE' }, 400, ['scheduledAt']);
     }
 
     let broadcast: DbBroadcast;
