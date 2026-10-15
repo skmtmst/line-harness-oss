@@ -27,3 +27,19 @@ test('開いている間に消された欄は、上限にも保存内容にも�
  expect((screen.getByRole('checkbox',{name:'アレルギー'}) as HTMLInputElement).disabled).toBe(false);
  fireEvent.click(screen.getByRole('button',{name:'保存する'}));expect(save).toHaveBeenCalledWith(['a']);
 })
+
+test('列の固定名は選択数に含めず、上限の理由を選べない欄と保存操作から読める',()=>{
+ const save=vi.fn();render(<DisplayItemsDialog presentation="columns" items={items} selected={['a','b']} maxSelected={2} onCancel={()=>{}} onConfirm={save}/>);
+ expect(screen.getByText('友だち（名前）')).toBeTruthy();
+ expect(screen.getByRole('img',{name:'いつも表示する列'})).toBeTruthy();
+ const candidate=screen.getByRole('checkbox',{name:'ペット'});
+ const reason=document.getElementById(candidate.getAttribute('aria-describedby')!);
+ expect(reason?.textContent).toContain('別の項目を外してから');
+ fireEvent.click(screen.getByRole('button',{name:'保存する'}));expect(save).toHaveBeenCalledWith(['a','b']);
+})
+
+test('幅が変わって上限より多くなった選択を消さず、保存できない理由を示す',()=>{
+ render(<DisplayItemsDialog items={items} selected={['a','b','field:c']} maxSelected={2} onCancel={()=>{}} onConfirm={()=>{}}/>);
+ expect(screen.getByRole('button',{name:'保存する'}).title).toContain('上限');
+ expect(screen.getByRole('checkbox',{name:'アレルギー'})).toBeTruthy();
+})

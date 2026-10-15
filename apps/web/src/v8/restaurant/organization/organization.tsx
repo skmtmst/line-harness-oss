@@ -2,7 +2,7 @@
 
 
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import { emptyValue } from '@/components/shared/empty-value'
 import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
@@ -276,17 +276,16 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             designHeaderHeight={50}
             busy={busy}
             onCancel={() => setStopId('')}
-            footer={<></>}
+            footer={<DialogActions>
+              <Button onClick={() => setStopId('')} disabled={busy}>キャンセル</Button>
+              <Button widthReserve="idle" variant="danger" busy={busy} busyLabel="処理中…" disabled={busy} onClick={() => { if (stopping) void mutate(() => updateMember(stopping.id, { status: 'suspended' }), '停止しました。').then(() => setStopId('')) }}>停止する</Button>
+            </DialogActions>}
           >
             {/* 絵（bMpC5）：だれを止めるか（役割・担当店舗）と、名簿の停止はログインを変えないこと（受け口も名簿だけを変える）。 */}
             {stopping ? (
               <div className={styles.stopBody}>
                 <p className={styles.stopWho}>{`${stopping.staff_name}（${roleLabel[stopping.role]}・${data.stores.find((s) => s.id === stopping.store_id)?.name || '全店舗'}）`}</p>
                 <p className={styles.stopNote}>名簿には残り、再開できます。ログインの権限は変わりません。</p>
-                <div className={styles.stopActions}>
-                  <Button onClick={() => setStopId('')} disabled={busy}>キャンセル</Button>
-                  <Button variant="danger" busy={busy} busyLabel="処理中…" disabled={busy} onClick={() => { if (stopping) void mutate(() => updateMember(stopping.id, { status: 'suspended' }), '停止しました。').then(() => setStopId('')) }}>停止する</Button>
-                </div>
               </div>
             ) : null}
           </Dialog>

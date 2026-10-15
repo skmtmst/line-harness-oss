@@ -222,7 +222,7 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     })
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByRole('heading', { name: '見本から作る' })).toBeNull()
-    expect(screen.getByRole('button', { name: /カルーセル/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'カルーセル', exact: true }).getAttribute('href')).toBe('/templates/carousel')
   })
 })
 

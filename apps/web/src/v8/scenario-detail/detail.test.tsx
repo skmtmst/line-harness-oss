@@ -219,12 +219,14 @@ describe('V8 シナリオ配信の編集', () => {
   it('保存が 409 なら競合の帯（kz2B6）を出し、保存ボタンは「比べてから保存」になる', async () => {
     updateScenario.mockRejectedValueOnce(new (ApiError as unknown as new (s: number, m?: string) => Error)(409, 'conflict'))
     await render()
+    expect(screen.getByRole('button', { name: '保存する' }).querySelector('svg.lucide-save')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('ほかの人が 14:10 にシナリオ「新規登録7日間フォロー」を保存しました')
     expect(within(alert).getByRole('button', { name: '最新を読み込んで続ける' })).toBeTruthy()
     await waitFor(() => expect(screen.getByRole('button', { name: '比べてから保存' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+    expect(screen.getByRole('button', { name: '比べてから保存' }).querySelector('svg.lucide-git-compare-arrows')).not.toBeNull()
   })
 
   it('下の帯の「複製する」で複製の窓（Al4Ek）が開き、名前は「〇〇 のコピー」', async () => {

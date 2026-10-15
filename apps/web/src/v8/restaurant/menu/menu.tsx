@@ -26,6 +26,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
@@ -137,11 +139,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
     <>
       {!canEdit ? <ReadOnlyNotice /> : null}
       <StatRow>
-        <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・アーカイブ" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="単品" valueText={`${rows.filter((item) => item.kind !== 'course').length}`} detail="アラカルト" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="要承認" valueText={`${pendingApprovals.length}`} detail="価格・内容改定" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="アレルギー登録" valueText={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} detail="注意品目あり" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・アーカイブ" presentation="band" value={null} unit="" />
+        <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" presentation="band" value={null} unit="" />
+        <KpiCard title="単品" valueText={`${rows.filter((item) => item.kind !== 'course').length}`} detail="アラカルト" presentation="band" value={null} unit="" />
+        <KpiCard title="要承認" valueText={`${pendingApprovals.length}`} detail="価格・内容改定" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} presentation="band" value={null} unit="" />
+        <KpiCard title="アレルギー登録" valueText={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} detail="注意品目あり" presentation="band" value={null} unit="" />
       </StatRow>
       <Panel
         title="メニュー一覧"
@@ -230,14 +232,14 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       >
         {!canEdit ? <ReadOnlyNotice /> : null}
         {editing ? <Notice tone="info">{`提供時間：${periodLabel(safeArray(editing.service_periods_json))} ／ 所要時間：${editing.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown')}`}</Notice> : null}
-        {canEdit ? <fieldset className={styles.fields} disabled={busy}>
+        {canEdit ? <DialogFormRow><fieldset className={styles.fields} disabled={busy}>
         <DialogField label="種類" kind="select">
           <SaveErrorField names={["kind","draft.kind"]}><Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></SaveErrorField>
         </DialogField>
         <DialogField label="メニュー名" htmlFor="rs-menu-name">
           <SaveErrorField names={["name","draft.name"]}><TextField id="rs-menu-name" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
         </DialogField>
-        <div className={styles.pair}>
+        <SettingsFormRow layout="columns">
           <DialogField label="価格（税込）" htmlFor="rs-menu-price">
             <SaveErrorField names={["price","draft.price"]}><NumberInput id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
           </DialogField>
@@ -250,7 +252,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]}
             /></SaveErrorField>
           </DialogField>
-        </div>
+        </SettingsFormRow>
         <DialogField label={editing ? '新しい価格の開始日時' : '価格の開始日時'} htmlFor="rs-menu-effective">
           <SaveErrorField names={["effectiveAt","draft.effectiveAt","effective_at","draft.effective_at"]}><DateTimeField id="rs-menu-effective" value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} /></SaveErrorField>
         </DialogField>
@@ -262,7 +264,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
             : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。あとから価格を変えるときは承認ワークフローへ申請されます。'}
         </DialogNote>
-        </fieldset> : <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? '変更予定の価格は承認後に反映します。開始日時が未設定のときは、承認後すぐに反映します。' : undefined} rows={[
+        </fieldset></DialogFormRow> : <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? '変更予定の価格は承認後に反映します。開始日時が未設定のときは、承認後すぐに反映します。' : undefined} rows={[
           { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
           { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
           { label: '価格（税込）', value: editing ? formatYen(editing.price) : draft.price.trim() ? formatYen(Number(draft.price)) : emptyValue('unconfigured') },

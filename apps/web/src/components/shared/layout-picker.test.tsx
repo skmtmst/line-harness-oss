@@ -22,7 +22,9 @@ it('形と面の文字を読み上げ、共通カードのラジオを1つだけ
   expect(radio.checked).toBe(true)
   expect(within(group).getAllByRole('radio').filter((input) => (input as HTMLInputElement).checked)).toHaveLength(1)
   expect(radio.closest('[data-choice-card]')).toBeTruthy()
-  expect(radio.closest('[data-choice-card]')?.getAttribute('data-content-placement')).toBe('below-indicator')
+  expect(radio.closest('[data-choice-card]')?.getAttribute('data-content-placement')).toBe('standard')
+  expect(radio.closest('[data-choice-card]')?.getAttribute('data-choice-indicator')).toBe('check')
+  expect(group.querySelectorAll('[data-choice-check]')).toHaveLength(1)
   expect(radio.parentElement?.textContent).toContain('上下2面')
   const areas = radio.parentElement!.querySelectorAll('span[style]') as NodeListOf<HTMLElement>
   expect(Array.from(areas).map((area) => [area.textContent, area.style.top, area.style.height])).toEqual([['A', '0%', '50%'], ['B', '50%', '50%']])
@@ -55,6 +57,18 @@ it('保存して形を固定したときはクリックとキーで変更しな�
   fireEvent.keyDown(radio, { key: 'ArrowRight' })
   expect(radio.disabled).toBe(true)
   expect(onChange).not.toHaveBeenCalled()
+})
+
+it('選択の印は選んだ面だけに移り、messageの丸の出し方は保つ', () => {
+  const { rerender } = render(<LayoutPicker options={options} value="1" onChange={vi.fn()} />)
+  expect(screen.getByRole('radio', { name: '1面（面 A）' }).parentElement?.querySelector('[data-choice-check]')).toBeTruthy()
+  rerender(<LayoutPicker options={options} value="2v" onChange={vi.fn()} />)
+  expect(screen.getByRole('radio', { name: '1面（面 A）' }).parentElement?.querySelector('[data-choice-check]')).toBeNull()
+  expect(screen.getByRole('radio', { name: '上下2面（面 A・B）' }).parentElement?.querySelector('[data-choice-check]')).toBeTruthy()
+  rerender(<LayoutPicker options={options} value="2v" onChange={vi.fn()} preview="message" />)
+  expect(document.querySelector('[data-choice-indicator="check"]')).toBeNull()
+  expect(document.querySelector('[data-choice-check]')).toBeNull()
+  expect(screen.getByRole('radio', { name: '上下2面（面 A・B）' }).parentElement?.getAttribute('data-content-placement')).toBe('below-indicator')
 })
 it('2つの選び方を同じ画面に置いてもラジオの組を混ぜない', () => {
   render(<><Picker /><Picker /></>)

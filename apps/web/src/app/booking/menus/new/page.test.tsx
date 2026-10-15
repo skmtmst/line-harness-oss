@@ -188,7 +188,7 @@ async function chooseTag(name: string) { await pickEntity('予約後に付ける
 function chosenTag() { return screen.getByRole('button', { name: '予約後に付けるタグ' }).closest('[data-entity-picker-field]')!.textContent }
 async function publish() {
   fireEvent.change(nameInput(), { target: { value: 'トリミング' } })
-  fireEvent.click(await screen.findByRole('button', { name: '担当A' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: '担当A' }))
   fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
 }
 describe('新規作成画面: 予約後に付けるタグ', () => {

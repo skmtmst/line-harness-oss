@@ -503,12 +503,12 @@ export default function MileageAdjustDialog({
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更量</p>
               <p className={styles.deltaValue}>
-                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}
+                <span className={valid ? 'text-accent-deep' : undefined}>{valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}</span>
               </p>
             </div>
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更後の残高</p>
-              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</p>
+              <p className={styles.deltaValue}><span className={valid ? 'text-accent-deep' : undefined}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</span></p>
             </div>
           </div>
 

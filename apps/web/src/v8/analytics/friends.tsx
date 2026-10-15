@@ -1,6 +1,6 @@
 'use client'
 
-import { BarChart, toBarChartItems } from '@/components/shared/bar-chart'
+import { BarChart, BarChartEventMark, BarChartLegend, toBarChartItems } from '@/components/shared/bar-chart'
 
 /*
  * ★V8 分析「友だちの増減」（Pencil `ws9wt`・1152 `eEhYU`・閲覧のみ `L4Uov`）。
@@ -44,7 +44,7 @@ type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
 
 function DailyBars({ days, campaigns, selected, onSelect }: { days: Day[]; campaigns: Campaign[]; selected: string; onSelect: (date: string) => void }) {
-  return <BarChart showLegend={false} items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
+  return <BarChart distribution="diverging" showLegend={false} items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
 }
 
 /** 経路の内訳は概要の後に読む（2つの重い集計を同時に走らせない）。 */
@@ -124,15 +124,16 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
           <CardHeader size="stacked" titleId="friends-daily-title"
             title={<>{`日ごとの増減（この${days}日）`}<HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip></>}
             action={<RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />} />
-          <div className={styles.legend}>
-            <span data-swatch="up">増えた</span><span data-swatch="down">減った</span><span data-swatch="broadcast">配信した日</span><span data-swatch="scenario">シナリオを始めた日</span>
-          </div>
+          <BarChartLegend layout="analytics" items={[
+            { label: '増えた', tone: 'added' }, { label: '減った', tone: 'removed' },
+            { label: '配信した日', tone: 'broadcast' }, { label: 'シナリオを始めた日', tone: 'scenario' },
+          ]} />
           {daysShown
             ? <DailyBars days={overview.days} campaigns={overview.campaigns} selected={selectedDate} onSelect={setSelectedDate} />
             : <div className={styles.emptyChart} role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' ? <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p> : null}</div>}
           {daysShown && (selectedDay || overview.campaigns.length > 0) ? <div className={styles.notes}>
             {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人・差し引き ${selectedDay.net} 人`}</p> : null}
-            {overview.campaigns.map((item) => <p key={item.id} className={styles.note}><i data-kind={item.kind} aria-hidden="true" />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}
+            {overview.campaigns.map((item) => <p key={item.id} className={styles.note}><BarChartEventMark tone={item.kind} />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}
           </div> : null}
         </Card>
       </DetailColumns>

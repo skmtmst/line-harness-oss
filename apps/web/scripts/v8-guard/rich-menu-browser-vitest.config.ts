@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     ...config.test,
     include: ['scripts/v8-guard/rich-menu-template-preview.test.tsx'],
+    maxWorkers: 1,
+    minWorkers: 1,
   },
 })

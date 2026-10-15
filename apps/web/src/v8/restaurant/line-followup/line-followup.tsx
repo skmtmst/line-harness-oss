@@ -1,31 +1,21 @@
 'use client'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Eye, Utensils } from 'lucide-react'
-import Button from '@/components/shared/button'
+import { Eye } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
-import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from '@/lib/restaurant-test-api'
+import { restaurantTestApi, type RestaurantLineFlow } from '@/lib/restaurant-test-api'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { Panel, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameButton } from '@/components/shared/table'
+import { FlowEditor, FlowPreview, type FlowDraft } from './flow-editor'
 
-/*
- * ★V8 LINE来店フォロー（Pencil `xLpnS`）。
- *
- * 確認用の注意の帯 → 数6（フロー・4種の有無・本送信）→ 流れのカード2列
- * （頭：NEN RESTAURANT・流れの名前・プレビューのみ／左：タイトル・本文・配信・下書き保存／
- * 右：LINEでの見え方）→ LINE ミニアプリ連携。
- * データの口は今の画面と同じ（snapshot の lineFlows＋updateLineFlow）。保存しても送らない。
- * 閲覧のみ（変える権限が無い人）には「下書きを保存する」を置かない。動きは BEHAVIOR.md。
- */
+/* ★V8 LINE来店フォロー。通知の一覧・選んだ通知の入力・畳めるプレビュー。 */
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
 const FLOW_KINDS: Record<string, { stat: string; note: string; title: string }> = {
@@ -43,74 +33,26 @@ export function timingLabel(flow: RestaurantLineFlow): string {
   return `配信：${amount}${flow.timing_minutes < 0 ? '前' : '後'}`
 }
 
-function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; store: RestaurantStore | null; ctx: RestaurantContext; readOnly: boolean }) {
-  const { busy, mutate } = ctx
-  const { selectedAccountId } = useAccount()
-  const [title, setTitle] = useState(flow.title)
-  const [body, setBody] = useState(flow.body)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
-  const kind = FLOW_KINDS[flow.flow_type]
-  const name = kind?.title ?? OTHER_TITLES[flow.flow_type] ?? flow.flow_type
-  const accountName = store?.line_account_name || store?.name || 'LINE公式アカウント'
-  return (
-    <section className={styles.flow} aria-label={name}>
-      <div className={styles.flowHead}>
-        <div className={styles.flowHeadText}>
-          <p className={styles.kicker}>NEN RESTAURANT</p>
-          <h2 className={styles.flowTitle}>{name}</h2>
-        </div>
-        <StatusBadge tone="warning">{flow.delivery_mode === 'disabled' ? '送信しない' : 'プレビューのみ'}</StatusBadge>
-      </div>
-      <div className={styles.flowBody}>
-        <div className={styles.form}>
-          <Field label="タイトル"><SaveErrorField names={["title"]}><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></SaveErrorField></Field>
-          <Field label="本文"><span className={styles.bodyBox} onClick={() => bodyRef.current?.focus()}>
-              <SaveErrorField names={["body"]}><textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} /></SaveErrorField>
-            </span></Field>
-          <div className={styles.flowFoot}>
-            <span className={styles.timing}>{timingLabel(flow)}</span>
-            <span className={styles.spacer} aria-hidden="true" />
-            {readOnly ? null : (
-              <Button
-                disabled={busy || !selectedAccountId}
-                onClick={() => {
-                  if (!selectedAccountId) return
-                  void mutate(
-                    () => restaurantTestApi.updateLineFlow(selectedAccountId, flow.id, { title, body }),
-                    '下書きを保存しました。送信はまだ行いません。',
-                  )
-                }}
-              >
-                下書きを保存する
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className={styles.preview} aria-label="LINEでの見え方">
-          <div className={styles.previewHead}>
-            <span className={styles.previewIcon} aria-hidden="true">{accountName.slice(0, 1)}</span>
-            <span className={styles.previewAccount}>{accountName}</span>
-          </div>
-          <div className={styles.rich}>
-            <div className={`${styles.photo} ${flow.flow_type === 'reservation_2h' ? styles.photoB : flow.flow_type === 'post_visit' ? styles.photoC : flow.flow_type === 'review_request' ? styles.photoD : styles.photoA}`}><Utensils aria-hidden className={styles.photoIcon} /></div>
-            <div className={styles.richText}>
-              <p className={styles.richTitle}>{title || 'タイトル'}</p>
-              <p className={styles.richBody}>{body || '本文'}</p>
-            </div>
-            <p className={styles.richAction}>予約内容を確認</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
-  const { data, store } = ctx
+  const { data, store, busy, mutate } = ctx
+  const { selectedAccountId } = useAccount()
+  const [selectedId, setSelectedId] = useState('')
+  const [previewExpanded, setPreviewExpanded] = useState(false)
+  const [drafts, setDrafts] = useState<Record<string, FlowDraft>>({})
+  const [draftAccount, setDraftAccount] = useState(selectedAccountId)
+  if (draftAccount !== selectedAccountId) {
+    setDraftAccount(selectedAccountId)
+    setDrafts({})
+    setSelectedId('')
+    setPreviewExpanded(false)
+  }
   const role = useStaffRole()
   const readOnly = !canManageRole(role)
   const flows = data.lineFlows.filter((flow) => !store || !flow.store_id || flow.store_id === store.id)
   const has = (type: string) => flows.some((flow) => flow.flow_type === type)
+  const selected = flows.find(flow => flow.id === selectedId) ?? flows[0]
+  const draft = selected ? drafts[selected.id] ?? { title: selected.title, body: selected.body } : null
+  const nameOf = (flow: RestaurantLineFlow) => FLOW_KINDS[flow.flow_type]?.title ?? OTHER_TITLES[flow.flow_type] ?? flow.flow_type
   return (
     <>
       <div className={styles.caution} role="note">
@@ -127,9 +69,20 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         ))}
         <KpiCard density="compact" title="本送信" valueText="停止中" detail="プレビューのみ" valueTone={true ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
       </StatRow>
-      <div className={styles.flowGrid}>
-        {flows.map((flow) => <FlowCard key={flow.id} flow={flow} store={store} ctx={ctx} readOnly={readOnly} />)}
-      </div>
+      <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
+        aside={selected && draft ? <FlowPreview flow={selected} draft={draft} accountName={store?.line_account_name || store?.name || 'LINE公式アカウント'} /> : null}>
+        <DataTable columnSizing="content">
+          <thead><TableHeadRow><Th grow>お知らせ</Th><Th>配信のタイミング</Th><Th>状態</Th></TableHeadRow></thead>
+          <tbody>{flows.map(flow => <Tr key={flow.id}>
+            <Td grow><RowNameButton selected={selected?.id === flow.id} onClick={() => setSelectedId(flow.id)}>{nameOf(flow)}</RowNameButton></Td>
+            <Td>{timingLabel(flow)}</Td>
+            <Td><StatusBadge tone="warning">{flow.delivery_mode === 'disabled' ? '送信しない' : 'プレビューのみ'}</StatusBadge></Td>
+          </Tr>)}</tbody>
+        </DataTable>
+        {selected && draft ? <FlowEditor key={selected.id} flow={selected} name={nameOf(selected)} draft={draft} readOnly={readOnly} busy={busy}
+          onChange={next => setDrafts(current => ({ ...current, [selected.id]: next }))}
+          onSave={() => { if (selectedAccountId) void mutate(() => restaurantTestApi.updateLineFlow(selectedAccountId, selected.id, draft), '下書きを保存しました。送信はまだ行いません。') }} /> : null}
+      </DetailColumns>
       <Panel title="LINE ミニアプリ連携" description="将来の切り離しを前提に、予約・会員証の境界を分離しています。" >
         <div className={styles.miniGrid}>
         <div className={styles.miniCard}>
@@ -151,7 +104,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
 export default function LineFollowupV8() {
   return (
     <RestaurantFrame
-      boardId="xLpnS"
+      boardId="n9vvGx"
       title="LINE来店フォロー"
       description="予約前・来店後・口コミ依頼・会員証をカード型で設計します。"
     >

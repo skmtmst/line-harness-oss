@@ -1100,7 +1100,7 @@ function EditCommonVarV8Inner() {
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <StickyBarAction icon={Trash2} label="削除する" onClick={() => openDelete()} />
+        <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
       status={blocked.length > 0 ? `${blocked[0]}。直すまで保存できません。` : undefined}
       footerActions={(
@@ -1115,20 +1115,18 @@ function EditCommonVarV8Inner() {
           ) : null}
           {canWrite && item ? (
             conflict ? (
-              <Button type="button" variant="primary" onClick={() => setCompareOpen(true)} disabled={saving}>
-                <GitCompare size={14} aria-hidden="true" />
+              <Button type="button" variant="primary" icon={<GitCompare size={16} aria-hidden="true" />} onClick={() => setCompareOpen(true)} disabled={saving}>
                 比べてから保存
               </Button>
             ) : (
               <Button
                 type="button"
-                variant="primary"
+                variant="primary" icon={<Check size={16} aria-hidden="true" />}
                 disabled={saving || blocked.length > 0}
                 onClick={() => void save()}
                 busy={saving}
                 busyLabel="保存中…"
               >
-                <Check size={14} aria-hidden="true" />
                 {impactState === 'ready' && impact && usageTotal !== null
                   ? `${formatNumber(usageTotal)}か所に反映して保存`
                   : '保存する'}
