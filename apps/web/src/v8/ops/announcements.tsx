@@ -1,7 +1,7 @@
 'use client'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
-import { Send } from 'lucide-react'
+import { Pencil, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
@@ -16,6 +16,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Radio from '@/components/shared/radio'
+import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -448,11 +449,16 @@ export default function OpsAnnouncementsV8() {
                   <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">
-                    {readOnly || a.status === 'sending'
+                    {/* 行の右端は「…」1つ（B-253）。閲覧のみは押せる操作が無いので出さない。送信中は中身の無い「…」（使える操作はありません）。 */}
+                    {readOnly
                       ? <span className={styles.faint}>{emptyValue('unknown')}</span>
-                      : a.status === 'draft' || a.status === 'scheduled'
-                        ? <Button onClick={() => edit(a)} disabled={busy} aria-label={`「${a.subject}」を編集する`}>編集する</Button>
-                        : <Button onClick={() => copyAsNew(a)} disabled={busy} aria-label={`「${a.subject}」を元に新しく作る`} title="送ったものは変えられないので、中身を写して新しいお知らせを作ります">編集する</Button>}
+                      : <RowMenu
+                          label={`「${a.subject}」の操作`}
+                          size="row"
+                          items={a.status === 'sending' ? [] : a.status === 'draft' || a.status === 'scheduled'
+                            ? [{ id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => edit(a) }]
+                            : [{ id: 'edit', label: '編集する', description: '送ったものは変えず、中身を写して新しく作ります', icon: <Pencil size={14} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => copyAsNew(a) }]}
+                        />}
                   </span>
                 </div>
               ))}
