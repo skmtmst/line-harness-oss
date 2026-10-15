@@ -8,9 +8,27 @@
 .row { display: flex; align-items: center; gap: var(--tpl-fdt-group-gap); min-width: 0; padding: var(--tpl-fdt-group-gap) 0; }
 .row > button:last-child { margin-left: auto; }
 .row label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.body[data-presentation='columns'] .chosen { flex-shrink: 0; }
-.body[data-presentation='columns'] .chosen .row { padding: var(--polish-space-row) var(--polish-space-field); border-top: 1px solid var(--color-hairline); }
-.fixedRow { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); padding: var(--polish-space-row) var(--polish-space-field); background: var(--color-table-head); color: var(--color-ink-secondary); font-size: var(--text-label); }
-.fixedRow > span:first-child { display: inline-flex; align-items: center; gap: var(--space-8); }
-.body[data-presentation='columns'] .options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--polish-space-field); }
+.body[data-presentation='columns'] { gap: 16px; width: 100%; align-self: stretch; }
+.body[data-presentation='columns'] .block { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.body[data-presentation='columns'] .block[data-gap='12'] { gap: 12px; }
+.body[data-presentation='columns'] .blockHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.body[data-presentation='columns'] .title { margin: 0; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--color-ink); }
+.body[data-presentation='columns'] .count { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap; }
+.body[data-presentation='columns'] .chosen { flex-shrink: 0; max-height: none; overflow: hidden; border-radius: 8px; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.body[data-presentation='columns'] .chosen .row { height: 40px; gap: 12px; padding: 0 16px; border-top: 1px solid var(--color-hairline); }
+.body[data-presentation='columns'] .chosen .row > button:last-child { margin-left: 0; }
+.fixedRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 40px; padding: 0 16px; background: var(--color-table-head); color: var(--color-ink-secondary); font-size: 13px; line-height: 20px; }
+.fixedRow > span:first-child { display: inline-flex; align-items: center; gap: 12px; }
+.fixedRow > span:last-child { font-size: 12px; line-height: 18px; color: var(--color-ink-faint); }
+.body[data-presentation='columns'] .available { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 12px; }
+.body[data-presentation='columns'] .group { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.body[data-presentation='columns'] .groupHead { margin: 0; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--color-ink-secondary); }
+.body[data-presentation='columns'] .groupHeadRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.body[data-presentation='columns'] .groupLink { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--color-accent-deep); white-space: nowrap; }
+.body[data-presentation='columns'] .empty { margin: 0; font-size: 12px; line-height: 18px; color: var(--color-ink-faint); }
+.body[data-presentation='columns'] .options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.body[data-presentation='columns'] .options[data-columns='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.body[data-presentation='columns'] .option { display: flex; align-items: center; height: 24px; min-width: 0; }
+.body[data-presentation='columns'] .option label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.optionMeta { margin-left: 8px; font-size: 12px; color: var(--color-ink-faint); }
 }

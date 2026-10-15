@@ -268,7 +268,7 @@
   cursor: pointer;
 }
 .row:hover { background: transparent; }
-.row.checked, .row.checked:hover { border-color: transparent; background: transparent; }
+.row.checked, .row.checked:hover { border-color: transparent; background: transparent; outline-color: transparent; }
 .row.disabled { background: transparent; }
 .row.invalid { border-color: transparent; }
 .row .topIcon { display: none; }

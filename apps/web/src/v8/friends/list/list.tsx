@@ -215,8 +215,8 @@ export default function FriendsListV8() {
   const narrow = useNarrowViewport()
   const maxColumns = narrow ? 4 : 7
   const columnItems = useMemo(() => [
-    ...COLUMNS.map(column => ({...column, group:'いつもの項目'})),
-    ...BASIC_FRIEND_FIELDS.map(field => ({key:`fixed:${field.key}`,label:field.label,group:'基本'})),
+    ...COLUMNS.map(column => ({...column, group:'今の列'})),
+    ...BASIC_FRIEND_FIELDS.map(field => ({key:`fixed:${field.key}`,label:field.label,group:'決まった欄（回答フォームの答えが入ります）'})),
     ...fieldDefinitions.filter(field => !field.fixedKey && field.status !== 'archived').map(field => ({key:`field:${field.id}`,label:field.name,group:`お店が作った情報欄 / ${fieldFolders.find(folder => folder.id === field.folderId)?.name ?? '未分類'}`})),
   ], [fieldDefinitions, fieldFolders])
   const displayColumns = [...visible].map(key => columnItems.find(column => column.key === key)).filter((column): column is typeof columnItems[number] => Boolean(column)).slice(0,maxColumns)
