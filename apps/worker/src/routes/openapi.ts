@@ -2189,7 +2189,7 @@ const spec = {
         tags: ['HQ Templates'],
         summary: '統括ひな形一覧を取得',
         description: 'statusはactive（既定）/archived/all。archive_countsは同じtype/kindに対するactive/archivedの件数で、選択中statusには依存しない。保管行もarchived_atとrevisionを返す。',
-        parameters: [{name:'status',in:'query',schema:{type:'string',enum:['active','archived','all'],default:'active'}},{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder'] } }],
+        parameters: [{name:'status',in:'query',schema:{type:'string',enum:['active','archived','all'],default:'active'}},{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder','booking_menu','mileage_reward'] } }],
         responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
       },
       post: {
@@ -2199,7 +2199,7 @@ const spec = {
         requestBody: {
           required: true,
           content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
-            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
+            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag','rich_menu','template','form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder','booking_menu','mileage_reward'] },
             name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
           } } } },
         },
