@@ -540,16 +540,17 @@ export async function updateWebinar(
   db: D1Database,
   id: string,
   patch: Partial<WebinarCreateInput>,
+  expectedVersion?: number,
 ): Promise<Webinar | null> {
   const existing = await getWebinarById(db, id);
   if (!existing) return null;
-  await db
+  const update = db
     .prepare(
       `UPDATE webinars SET account_id = ?, title = ?, slug = ?, status = ?,
          video_prefix = ?, duration_seconds = ?, schedule_json = ?, cta_json = ?,
          tag_on_attend = ?, tag_on_cta_click = ?, folder_id = ?,
          publication_starts_at = ?, publication_ends_at = ?, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?${expectedVersion === undefined ? '' : ' AND EXISTS (SELECT 1 FROM webinar_editor_settings s WHERE s.webinar_id = webinars.id AND s.version = ?)'}`,
     )
     .bind(
       patch.accountId !== undefined ? patch.accountId : existing.account_id,
@@ -566,9 +567,28 @@ export async function updateWebinar(
       patch.publicationStartsAt !== undefined
         ? patch.publicationStartsAt : existing.publication_starts_at,
       patch.publicationEndsAt !== undefined ? patch.publicationEndsAt : existing.publication_ends_at,
-      jstNow(), id,
-    )
-    .run();
+      jstNow(), id, ...(expectedVersion === undefined ? [] : [expectedVersion]),
+    );
+  if (expectedVersion === undefined) await update.run();
+  else {
+    const result = await db.batch([
+      db.prepare(`INSERT OR IGNORE INTO webinar_editor_settings (webinar_id,version,created_at,updated_at) VALUES (?,0,?,?)`).bind(id,jstNow(),jstNow()),
+      update,
+      db.prepare(`UPDATE webinar_editor_settings SET version = version + 1, updated_at = ? WHERE webinar_id = ? AND version = ? AND changes() = 1`).bind(jstNow(), id, expectedVersion),
+      db.prepare(`INSERT INTO webinar_versions (id,webinar_id,version,state,snapshot_json,created_at)
+        SELECT ?,webinar_id,version,'draft',json_object(
+          'deliveryKind',delivery_kind,'viewingCondition',json(viewing_condition_json),
+          'publicDescription',public_description,'registrationFormId',registration_form_id,
+          'notificationMessages',json(notification_messages_json),
+          'notificationTest',CASE WHEN notification_test_json IS NULL THEN NULL ELSE json(notification_test_json) END,
+          'actionTemplateBody',action_template_body,'missingResultPolicy',missing_result_policy,
+          'publicPageTest',CASE WHEN public_page_test_json IS NULL THEN NULL ELSE json(public_page_test_json) END),?
+        FROM webinar_editor_settings WHERE webinar_id=? AND version=? AND changes()=1`)
+        .bind(crypto.randomUUID(),jstNow(),id,expectedVersion+1),
+
+    ]);
+    if (Number(result[1].meta?.changes ?? 0) !== 1) return null;
+  }
   return getWebinarById(db, id);
 }
 
@@ -949,6 +969,13 @@ export async function recordWebinarViewSegment(
  * 重なる区間を束ね、重複時間を足さない合計秒数を返す（J #821）。
  * 同じ区間の再送は呼び出し前に冪等キーで1行になっている前提。
  */
+export async function getWebinarWatchedSeconds(db: D1Database, webinarId: string, friendId: string, sessionStartAt: number): Promise<number> {
+  const { results } = await db.prepare(`SELECT start_seconds, end_seconds FROM webinar_view_segments
+    WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ?`)
+    .bind(webinarId, friendId, sessionStartAt).all<{ start_seconds: number; end_seconds: number }>();
+  return mergeWebinarWatchedSeconds(results);
+}
+
 export function mergeWebinarWatchedSeconds(
   intervals: Array<{ start_seconds: number; end_seconds: number }>,
 ): number {

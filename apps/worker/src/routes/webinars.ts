@@ -1,3 +1,4 @@
+import { isWebinarMissedInWindow, getWebinarWatchedSeconds } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 // オートウェビナー (疑似ライブ) HTTP routes.
@@ -229,7 +230,8 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
           : null;
       const replayEligible =
         replayReg !== null && requestedStart !== null &&
-        now >= requestedStart + webinar.duration_seconds;
+        now >= requestedStart + webinar.duration_seconds
+        && await isWebinarMissedInWindow(c.env.DB, webinar.id, requestedStart, now);
       if (!replayEligible) return c.json({ error: 'not_found' }, 404);
     }
     // R96: オンデマンドは枠を持たない。入場そのものを開始として録画の
@@ -301,11 +303,12 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
 
     // 配信終了後でも、専用リンクを持つ予約済み本人には
     // その回を先頭から再生する。アセットトークンは開くたびに再発行するため、
-    // 入場リンク自体に期限を持たせない。
+    // 見逃し配信を許可した期間内だけ入場できる。
     if (
       admissionReg &&
       requestedSessionStartAt !== null &&
       now >= requestedSessionStartAt + webinar.duration_seconds
+      && await isWebinarMissedInWindow(c.env.DB, webinar.id, requestedSessionStartAt, now)
     ) {
       await upsertWebinarViewer(
         c.env.DB, webinar.id, auth.friendId, requestedSessionStartAt,
@@ -534,6 +537,11 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), as
     if (parseWebinarHeartbeatPlayerState(body.playerState) === null) {
       return inputError(c, { error: 'invalid_body' }, 422, ["playerState"]);
     }
+    const at = nowEpoch();
+    if (at >= sessionStartAt + loaded.webinar.duration_seconds) {
+      const registration = await getWebinarRegistration(c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt);
+      if (!registration || !await isWebinarMissedInWindow(c.env.DB, loaded.webinar.id, sessionStartAt, at)) return c.json({ error: 'not_found' }, 404);
+    } else if (publicationWindowBlockReason(loaded.webinar)) return c.json({ error: 'not_found' }, 404);
     const heartbeat = await recordWebinarHeartbeat(c.env.DB, {
       webinarId: loaded.webinar.id,
       friendId: auth.friendId,
@@ -553,7 +561,9 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), as
       positionSeconds,
       durationSeconds: loaded.webinar.duration_seconds,
     }));
-    if (positionSeconds >= Math.floor(loaded.webinar.duration_seconds * 0.9)) {
+    const watchedSeconds = heartbeat.status === 'recorded'
+      ? await getWebinarWatchedSeconds(c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt) : 0;
+    if (watchedSeconds >= Math.max(1, Math.ceil(loaded.webinar.duration_seconds * 0.9))) {
       c.executionCtx.waitUntil(enqueueWebinarCompletedNotification(
         c.env.DB,
         loaded.webinar.id,
@@ -2014,6 +2024,7 @@ webinarRoutes.put('/api/webinars/:id', requireDeliveryAccess('webinars'), inputJ
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<WebinarBody>();
+    if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 0) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: '確認した版が必要です' }, 400, ['expectedVersion']);
     // R95: 下書きから公開中への切替は通常更新では受けない。公開前検査と
     // 公開版の固定を通す公開専用口（POST /:id/publish）へ寄せる。
     // 公開中のまま他項目を直す保存は通す。
@@ -2044,7 +2055,8 @@ webinarRoutes.put('/api/webinars/:id', requireDeliveryAccess('webinars'), inputJ
       const dupe = await getWebinarBySlug(c.env.DB, body.slug);
       if (dupe) return c.json({ success: false, error: 'slug_taken' }, 409);
     }
-    const updated = await updateWebinar(c.env.DB, id, input as Parameters<typeof updateWebinar>[2]);
+    const updated = await updateWebinar(c.env.DB, id, input as Parameters<typeof updateWebinar>[2], body.expectedVersion);
+    if (!updated) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, updated!) });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id"}));
