@@ -1187,7 +1187,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             /></SaveErrorField>
           </span>
         <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/>
-          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
+          {/* フォルダの「まとめて選ぶ」の箱は置かない。表の見出しの箱（表示中のアカウントをすべて選ぶ）と同じ役で、ラベルの無い緑の四角に見えた（meBRB）。 */}
           {accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
         </DistributionToolbar>}
       actions={<>

@@ -48,6 +48,8 @@ describe('配布の V8（meBRB）', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '配る' }))
     await screen.findByRole('checkbox', { name: '銀座本店' })
     expect(document.querySelector('[data-design-node="meBRB"]')).toBeTruthy()
+    // 道具の段にフォルダの「まとめて選ぶ」の箱を置かない（表の見出しの箱と同じ役。ラベルの無い緑の四角に見えた）。
+    expect(screen.queryByRole('checkbox', { name: 'すべてをまとめて選ぶ' })).toBeNull()
     fireEvent.click(screen.getByRole('checkbox', { name: '銀座本店' }))
     fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
     await screen.findByRole('button', {name: 'この内容で1アカウントへ配る'})
