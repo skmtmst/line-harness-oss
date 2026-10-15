@@ -16,13 +16,17 @@ for (const width of [1152, 1440, 1920]) {
       await page.setContent(`<html data-theme="v8"><style>${globals}\n${css}</style><section data-m1-scope style="width:432px">
         <div class="row" data-dialog-content-row><label><input type="checkbox" checked>媒体の受付を閉じた</label></div>
         <div class="row" data-dialog-content-row data-tone="muted"><span>未設定のLINEアカウント：本店</span><button>移動先を選ぶ</button></div>
+        <div class="row" data-dialog-content-row data-size="account"><span>本店</span><button data-row-menu>移動先を選ぶ</button></div>
       </section></html>`)
-      const options = { expected: 2, muted: 1 }
+      const options = { expected: 3, muted: 1 }
       const normal = await page.evaluate(scanDialogContentRows, options)
       assert.equal(normal.findings.length, 0, JSON.stringify(normal))
       await page.getByRole('checkbox').uncheck()
       assert.equal((await page.evaluate(scanDialogContentRows, options)).findings.length, 0)
       const rows = page.locator('[data-dialog-content-row]')
+      await rows.last().evaluate(el => { el.style.paddingRight = '0px' })
+      assert.ok((await page.evaluate(scanDialogContentRows, options)).findings.some(f => f.kind === 'dialog-account-action-edge'))
+      await rows.last().evaluate(el => { el.style.paddingRight = '' })
       await rows.first().evaluate(el => el.style.backgroundColor = '#087a3e')
       assert.ok((await page.evaluate(scanDialogContentRows, options)).findings.some(f => f.kind === 'dialog-row-surface'))
       await rows.first().evaluate(el => el.style.backgroundColor = '')

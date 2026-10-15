@@ -86,6 +86,11 @@ export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = fals
       inventory.push({ kind: 'display-body-width', width, available })
       if (Math.abs(available - width) > 1) findings.push({ pattern: 'F6', kind: 'display-body-width', width, available })
     }
+    for (const row of panel.querySelectorAll('[data-presentation="columns"] [data-reorder-id]')) {
+      const height = row.getBoundingClientRect().height
+      inventory.push({ kind: 'display-selected-row-height', height })
+      if (Math.abs(height - 40) > 1) findings.push({ pattern: 'F6', kind: 'display-selected-row-height', height, expected: 40 })
+    }
     const fixed = panel.querySelector('[data-fixed-display-name]')
     const selected = panel.querySelector('[data-presentation="columns"] [aria-label="選択した列"]')
     if (!fixed || !selected || !selected.contains(fixed)) findings.push({ pattern: 'F4', kind: 'display-fixed-name-missing' })
@@ -98,7 +103,7 @@ export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = fals
     }
     for (const group of panel.querySelectorAll('[role="group"][aria-label$="の追加できる列"]')) {
       const columns = getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean)
-      if (columns.length !== 2) findings.push({ pattern: 'F10', kind: 'display-available-columns', actual: columns.length, expected: 2 })
+      if (columns.length !== 3) findings.push({ pattern: 'F10', kind: 'display-available-columns', actual: columns.length, expected: 3 })
     }
   }
   if (scoreHistory) {

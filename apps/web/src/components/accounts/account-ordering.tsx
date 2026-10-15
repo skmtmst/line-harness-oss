@@ -6,11 +6,10 @@ import { api } from '@/lib/api'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
-import { MoreAction } from '@/components/shared/row-actions'
+import { MoreAction, RowMenu } from '@/components/shared/row-actions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { DialogContentRow } from '@/components/shared/dialog-form-row'
 import ListState from '@/components/shared/list-state'
 import { Grid2X2, GripHorizontal, Save } from 'lucide-react'
@@ -237,6 +236,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
   /** カードの「…」ボタンと移動先メニュー。カード全体はdivなので操作はボタンに寄せる。 */
   const moveMenu = (account: AccountItem) => {
     const name = account.displayName || account.name
+    if (onClose) return <span className={compact.moveMenu}><RowMenu appearance="box" label={`${name}の移動先を選ぶ`} items={moveMenuItems(account)} open={moveMenuFor === account.id} onOpenChange={open => setMoveMenuFor(open ? account.id : null)} triggerProps={{ disabled: saving }} /></span>
     return (
       <span className="relative ml-auto flex shrink-0 items-center">
         <MoreAction
@@ -283,8 +283,8 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     const compactNode = (account: AccountItem, depth: number): ReactNode => {
       const parent = accounts.find((item) => item.id === account.parentLineAccountId)
       return <div key={account.id} className={depth > 0 ? compact.child : undefined}>
-        <Card surface="inset" contentPadding="var(--tpl-acct-hierarchy-row-pad)" className={compact.row}
-          data-account-id={account.id} draggable={!saving}
+        <DialogContentRow size="account" align="start" className={compact.row}
+          data-account-id={account.id} data-depth={depth} draggable={!saving}
           onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
           onDrop={(event) => dropOn(event, account.id)}>
@@ -292,17 +292,17 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
           <span className={compact.name} title={account.displayName || account.name}>{account.displayName || account.name}</span>
           <span className={compact.relationship}>{depth === 0 ? '最上位（親）' : `${parent?.displayName || parent?.name || '上位アカウント'}の${depth === 1 ? '子' : '孫'}`}</span>
           {moveMenu(account)}
-        </Card>
+        </DialogContentRow>
         {(childrenByParent.get(account.id) ?? []).map((child) => compactNode(child, depth + 1))}
       </div>
     }
     return <SaveErrorScope errors={saveErrors}><>
       <Dialog open title="LINEアカウント階層を編集" designNode="a7lUk" designWidth={600} designTop={140}
-        designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
-        footer={<div className={compact.footer}>
+        designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 12px" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
+        footer={<DialogActions>
           <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} title={changed.length === 0 ? '構成を変更すると保存できます。' : undefined} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
-        </div>}>
+        </DialogActions>}>
         <div className={compact.body}>
           <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>
           {error ? <Notice tone="danger" message={error} /> : null}
@@ -312,8 +312,8 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
               onDrop={(event) => dropOn(event, null)}>
               {hierarchyRoots.map((account) => compactNode(account, 0))}
             </div>
-            {unassigned.length > 0 ? <div className={compact.unassignedMenus}>{unassigned.map((account) => <DialogContentRow key={account.id} tone="muted">
-                <Grid2X2 size={12} aria-hidden="true" /><span className={compact.name} title={`未設定のLINEアカウント：${account.displayName || account.name}`}>{`未設定のLINEアカウント：${account.displayName || account.name}`}</span>{moveMenu(account)}
+            {unassigned.length > 0 ? <div className={compact.unassignedMenus}>{unassigned.map((account) => <DialogContentRow key={account.id} tone="muted" align="start">
+                <Grid2X2 size={12} aria-hidden="true" /><Button variant="text" size="inline" textTone="ink" aria-label={`${account.displayName || account.name}の移動先を選ぶ`} onClick={() => setMoveMenuFor(account.id)} disabled={saving}>{`未設定のLINEアカウント：${account.displayName || account.name}`}</Button><ActionMenu open={moveMenuFor === account.id} ariaLabel={`${account.displayName || account.name}の移動先`} onClose={() => setMoveMenuFor(null)} items={moveMenuItems(account)} />
               </DialogContentRow>)}</div> : null}
             {!hierarchyRoots.length && !unassigned.length ? <ListState kind="empty" title="LINEアカウントがありません" /> : null}
           </>}

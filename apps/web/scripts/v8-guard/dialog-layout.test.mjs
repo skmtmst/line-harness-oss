@@ -11,6 +11,7 @@ const globals = await compileUiStyles(cssPath)
 const dialog = readFileSync(new URL('../../src/components/shared/dialog.module.css', import.meta.url), 'utf8')
 const picker = readFileSync(new URL('../../src/components/shared/entity-picker.module.css', import.meta.url), 'utf8')
 const shell = readFileSync(new URL('../../src/components/shared/source-picker-dialog.module.css', import.meta.url), 'utf8')
+const displayItems = readFileSync(new URL('../../src/components/shared/display-items-dialog.module.css', import.meta.url), 'utf8')
 const search = readFileSync(new URL('../../src/components/shared/search-field.module.css', import.meta.url), 'utf8')
 
 for (const width of [1152, 1440, 1920]) {
@@ -186,11 +187,17 @@ for (const width of [1152, 1440, 1920]) {
     const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width, height: 900 } })
-      await page.setContent(`<style>${globals}</style><style>${dialog}</style><div class="panel" data-m1-scope style="width:560px"><div class="content" data-content-layout="form"><div data-presentation="columns"><div aria-label="選択した列" style="border:1px solid"><div data-fixed-display-name><svg class="lucide-lock" role="img" aria-label="いつも表示する列" width="16" height="16"></svg>友だち（名前）</div></div><input type="search" aria-label="表示項目を検索" style="width:100%"></div></div></div>`)
+      await page.setContent(`<style>${globals}</style><style>${dialog}\n${displayItems}</style><div class="panel" data-m1-scope style="width:560px"><div class="content" data-content-layout="form"><div class="body" data-presentation="columns"><div class="chosen" aria-label="選択した列" style="border:1px solid"><div data-fixed-display-name><svg class="lucide-lock" role="img" aria-label="いつも表示する列" width="16" height="16"></svg>友だち（名前）</div><div class="row" data-reorder-id="phone">電話</div></div><input type="search" aria-label="表示項目を検索" style="width:100%"><div class="options" role="group" aria-label="基本の追加できる列"><span>名前</span><span>電話</span><span>年齢</span><span>住所</span></div></div></div></div>`)
       assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.length, 0)
-      await page.locator('[data-content-layout]').evaluate(el => { el.removeAttribute('data-content-layout') })
+      await page.locator('[data-reorder-id]').evaluate(el => { el.style.height = '48px' })
+      assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.filter(row => row.kind === 'display-selected-row-height').length, 1)
+      await page.locator('[data-reorder-id]').evaluate(el => { el.style.height = '' })
+      await page.locator('[role="group"]').evaluate(el => { el.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))' })
+      assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.filter(row => row.kind === 'display-available-columns').length, 1)
+      await page.locator('[role="group"]').evaluate(el => { el.style.gridTemplateColumns = '' })
+      await page.locator('[data-presentation]').evaluate(el => { el.style.width = '60%' })
       assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.filter(row => row.kind === 'display-body-width').length, 1)
-      await page.locator('.content').evaluate(el => { el.setAttribute('data-content-layout', 'form') })
+      await page.locator('[data-presentation]').evaluate(el => { el.style.width = '' })
       assert.equal((await page.evaluate(scanDialogAudit, { columnSettings: true })).findings.length, 0)
     } finally { await browser.close() }
   })

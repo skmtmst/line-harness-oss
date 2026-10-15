@@ -14,6 +14,12 @@ export function scanDialogContentRows({ expected = 0, muted = 0 } = {}) {
     if (!hasOutline) findings.push({ pattern: 'F6', kind: 'dialog-row-outline-missing' })
     if (filled === transparent) findings.push({ pattern: 'F3', kind: 'dialog-row-surface' })
     if (rect.right > parent.right + 1 || rect.left < parent.left - 1) findings.push({ pattern: 'F10', kind: 'dialog-row-overflow' })
+    if (row.dataset.size === 'account') {
+      const action = row.querySelector('[data-row-menu]')
+      const gap = action ? rect.right - action.getBoundingClientRect().right : null
+      inventory.push({ kind: 'account-action-edge', gap })
+      if (gap === null || gap < 11.5) findings.push({ pattern: 'F6', kind: 'dialog-account-action-edge', gap, minimum: 12 })
+    }
     const label = row.querySelector('label')
     if (label && getComputedStyle(label).outlineStyle !== 'none') findings.push({ pattern: 'F6', kind: 'dialog-row-double-outline' })
   }

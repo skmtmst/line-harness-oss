@@ -18,3 +18,7 @@
 
 .row > :first-child { min-width: 0; }
 .row > svg { flex-shrink: 0; color: var(--color-ink-secondary); }
+
+.row[data-align='start'] { justify-content: flex-start; }
+
+.row[data-size='account'] { min-height: var(--tpl-htn-row-h); }
