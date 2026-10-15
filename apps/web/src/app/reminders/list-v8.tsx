@@ -1203,7 +1203,7 @@ export default function RemindersListV8() {
         designNode="VsSyu" designWidth={480}
         title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
-        band="削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。"
+        band={deleteTarget && statusKeyOf(deleteTarget) === 'active' ? '削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。' : '削除は元に戻せません。'}
         bandTone="danger"
         busy={deleting}
         error={deleteError || (deleteTarget && !deleteStillListed ? 'このリマインダが一覧から外れました。この窓を閉じて、いまの一覧から選び直してください。' : undefined)}
