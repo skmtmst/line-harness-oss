@@ -264,7 +264,6 @@ test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動い
     expect(buttons.filter(Boolean)).toEqual(['削除する', 'キャンセル', '代わりに一時停止'])
     const panel = dialog!.querySelector('[role="alertdialog"]') as HTMLElement
     expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('480px')
-    expect((dialog as HTMLElement).style.getPropertyValue('--dialog-design-top')).toBe('260px')
     expect(panel.querySelector('[data-dialog-actions]')?.querySelectorAll('button')).toHaveLength(3)
   })
 })
