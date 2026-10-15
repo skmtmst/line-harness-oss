@@ -13,8 +13,9 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
-import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -43,7 +44,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 import Notice from '@/components/shared/notice'
+import HelpTip from '@/components/shared/help-tip'
 import { isSaveConflict } from '@/components/shared/api-error-message'
 
 /**
@@ -481,16 +484,13 @@ export default function MenuFormV8() {
     })
   }
 
-  function toggleResource(id: string) {
+  /** 設備の欄（札＋変える）で選び直した結果。足した設備は必要数 1 から。 */
+  function pickResources(ids: string[]) {
     if (editTarget && (!canManageResources || resourceSaving || saving)) return
     setResourceMessage(null)
-    if (!resourceIds.has(id)) setResourceQuantities((current) => ({ ...current, [id]: '1' }))
-    setResourceIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    const added = ids.filter((id) => !resourceIds.has(id))
+    if (added.length) setResourceQuantities((current) => ({ ...current, ...Object.fromEntries(added.map((id) => [id, '1'])) }))
+    setResourceIds(new Set(ids))
   }
 
   function validate(): string | null {
@@ -939,13 +939,14 @@ export default function MenuFormV8() {
         preview={previewContent}
         previewToggle={<PreviewLauncher title="お客さまの予約画面" label="お客さまの予約画面を見る">{previewContent}</PreviewLauncher>}
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
-        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} >
+        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>}
+        /* 競合の帯は本文と右の欄をまたいで上に出す（絵 v5L19Z）。 */
+        notice={conflict ? (
+          <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
+            <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
+          </div>
+        ) : undefined} >
 
-      {conflict && (
-        <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
-          <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
-        </div>
-      )}
 
           {/* ① メニューの中身 */}
           <Card variant="form" gap="normal">
@@ -1143,8 +1144,8 @@ export default function MenuFormV8() {
             </div>
           </Card>
 
-          {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7 は灰の段に白い小段を積む。 */}
-          <Card variant="form" gap="normal" surface="muted">
+          {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7・v5L19Z は白い段に白い小段を積む。 */}
+          <Card variant="form" gap="normal">
             <Card variant="form" padding="compact" gap="normal">
               <CardHeader size="stacked" headingLevel={3} title="受け方" />
               <div className={styles.fieldStack}>
@@ -1180,9 +1181,8 @@ export default function MenuFormV8() {
             </Card>
 
             <Card variant="form" padding="compact" gap="normal">
-              <CardHeader size="stacked" headingLevel={3} title="予約を受けたときにすること" />
-              <p className="text-ink-faint text-sm">予約を受け付けたことを知らせる：日時・メニュー・場所を書いた案内をLINEへ送ります。</p>
-              <p className="text-ink-faint text-sm">前日・開始前に思い出してもらう：確定した予約は、前日と設定時間前のリマインダへ登録されます。</p>
+              {/* 説明は「？」の中へ（絵 v5L19Z は題の下に説明を置かない）。 */}
+              <CardHeader size="stacked" headingLevel={3} title={<span className={styles.titleWithMark}>予約を受けたときにすること<HelpTip label="予約を受けたときにすることの説明">予約を受け付けたことを知らせる：日時・メニュー・場所を書いた案内をLINEへ送ります。前日・開始前に思い出してもらう：確定した予約は、前日と設定時間前のリマインダへ登録されます。</HelpTip></span>} />
               {tagStatus === 'loading' ? (
                 <span className="inline-block w-full" aria-busy="true">
                   <span className="sr-only">タグを読み込んでいます</span>
@@ -1238,18 +1238,13 @@ export default function MenuFormV8() {
               ) : resourceChoices.length === 0 ? (
                 <p className="text-ink-faint text-sm">使える設備はまだありません。受付枠の設備から登録できます。</p>
               ) : (
-                <div className={styles.checkRow}>
-                  {resourceChoices.map((item) => {
-                    const on = resourceIds.has(item.id)
-                    return (
-                      <Checkbox key={item.id} checked={on}
-                        disabled={Boolean(editTarget && (!canManageResources || resourceSaving || saving || !item.isActive && !on))}
-                        onCheckedChange={() => toggleResource(item.id)}>
-                        {item.name}{!item.isActive ? '（停止中）' : ''}
-                      </Checkbox>
-                    )
-                  })}
-                </div>
+                /* 絵 v5L19Z：選んだ設備を札で並べ、［変える］で選ぶ窓を開く。 */
+                <EntityPickerField multiple label="使う設備" noun="設備" unit="件"
+                  items={resourceChoices.map((item) => ({ id: item.id, name: `${item.name}${!item.isActive ? '（停止中）' : ''}`, disabled: !item.isActive && !resourceIds.has(item.id) }))}
+                  value={[...resourceIds]} allowEmpty
+                  readOnly={Boolean(editTarget && !canManageResources)}
+                  disabled={Boolean(editTarget && (resourceSaving || saving))}
+                  onChange={pickResources} />
               )}
               {editTarget && resourceChoices.filter((item) => resourceIds.has(item.id)).map((item) => (
                 <Field key={item.id} label={`${item.name}の必要数`}>
@@ -1268,11 +1263,15 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            <CardHeader size="stacked" title="お支払い" action={<StatusBadge tone="warning" size="compact">お店で払うのみ</StatusBadge>} />
-            <p className={shell.sectionDesc}>決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</p>
-            <Field label="お支払い方法" optional={false} help="オンラインで先払い・どちらでもは、決済サービスをつなぐまで選べません。">
-              <TextField readOnly value="お店で払う" />
-            </Field>
+            {/* 絵 v5L19Z・QqER7：題の横に「準備中」、説明、3つの選ぶ箱（お店で払うだけ選べる）。 */}
+            <CardHeader size="stacked" title={<span className={styles.titleWithMark}>お支払い<StatusBadge tone="warning" size="compact">準備中</StatusBadge></span>} meta={<span id="menu-payment-note">決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>} />
+            <RadioCardGroup legend="お支払い方法" aria-describedby="menu-payment-note" className={styles.paymentChoices}>
+              {PAYMENT_CHOICES.map((choice) => (
+                <RadioCard key={choice.value} variant="form" name="menu-payment" value={choice.value} title={choice.label}
+                  checked={choice.value === 'store'} disabled={choice.value !== 'store'}
+                  onChange={() => {}} />
+              ))}
+            </RadioCardGroup>
           </Card>
 
           {saveError && (
@@ -1300,6 +1299,13 @@ export default function MenuFormV8() {
     </SaveErrorScope>
   )
 }
+
+/** お支払いの選び方。決済サービスをつなぐまでは「お店で払う」だけ。 */
+const PAYMENT_CHOICES = [
+  { value: 'store', label: 'お店で払う' },
+  { value: 'online', label: 'オンラインで先払い' },
+  { value: 'either', label: 'どちらでも' },
+] as const
 
 function bookingErrorText(error: unknown, action: '読み込み' | '保存'): string {
   if (error instanceof ApiError) {

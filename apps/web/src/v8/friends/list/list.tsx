@@ -1,7 +1,7 @@
 'use client'
 import PageSizeSelect from '@/components/shared/page-size-select'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarLeading, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -655,7 +655,6 @@ export default function FriendsListV8() {
   )
 
   const toolbar = (
-    <ListToolbarLeading leading={primaryFilter}>
     <ListToolbarFrame data-design="V8SearchPanel">
       <ListToolbarRow as="form"
         onSubmit={(event) => {
@@ -679,7 +678,9 @@ export default function FriendsListV8() {
             placeholder="名前・LINE名・タグ・メモで探す"
           />
         </ListToolbarSearchSlot>
-        {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
+        {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。
+            タグは検索のすぐ右（絵 nF4ts・y2n1z）。前の段（作る・フォルダの口）に置くと 1440 で消えていた。 */}
+        {primaryFilter}
 
         <ListToolbarOptional collapse="overflow" label="ほかの絞り込み・操作">
         <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
@@ -764,7 +765,6 @@ export default function FriendsListV8() {
         </p>
       ) : null}
     </ListToolbarFrame>
-    </ListToolbarLeading>
   )
 
   const colCount = 4 + displayColumns.length
@@ -817,6 +817,7 @@ export default function FriendsListV8() {
                     <button
                       type="button"
                       className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
+                      data-part="attention-star"
                       aria-pressed={attention}
                       aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
                       onClick={() => void toggleAttention(friend)}

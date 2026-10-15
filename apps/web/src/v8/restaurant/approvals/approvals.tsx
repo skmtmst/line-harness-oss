@@ -213,10 +213,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
-        <KpiCard title="承認待ち" value={pending.length} unit="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} presentation="band" />
-        <KpiCard title="Google投稿" value={rows.filter((a) => a.kind === 'gbp_post').length} unit="投稿下書き" presentation="band" />
-        <KpiCard title="LINE配信" value={rows.filter((a) => a.kind === 'line_message').length} unit="配信下書き" presentation="band" />
-        <KpiCard title="メニュー改定" value={rows.filter((a) => a.kind === 'menu_change').length} unit="価格・内容変更" presentation="band" />
+        <KpiCard title="承認待ち" value={pending.length} unit="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} detail={null} presentation="band" />
+        <KpiCard title="Google投稿" value={rows.filter((a) => a.kind === 'gbp_post').length} unit="投稿下書き" detail={null} presentation="band" />
+        <KpiCard title="LINE配信" value={rows.filter((a) => a.kind === 'line_message').length} unit="配信下書き" detail={null} presentation="band" />
+        <KpiCard title="メニュー改定" value={rows.filter((a) => a.kind === 'menu_change').length} unit="価格・内容変更" detail={null} presentation="band" />
       </StatRow>
       {rows.length === 0 ? (
         <ListState kind="empty" title="承認待ちはありません" />
