@@ -12,7 +12,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { formatListTimestamp } from '@/lib/format'
 import { ApiError, bookingApi, type BookingPaymentAdminConfig } from '@/lib/api'
-import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode, type StripeConnection } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, type BookingPaymentMode, type StripeConnection } from '@/lib/api-booking-payment-admin'
 import { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from '../booking-menus/tabs/shared'
 import settings from '../booking-menus/settings.module.css'
 import { NOT_READY, providerFor } from './labels'
@@ -156,14 +156,14 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
           <h2 id="payments-method-heading" className={settings.sectionTitle}>いつもの支払い方法</h2>
           <HelpTip label="いつもの支払い方法の説明">メニュー・コース・クラスで「このメニューだけ変える」を選んでいないときに使う方法です。</HelpTip>
         </div>
-        <RadioCardGroup legend="いつもの支払い方法" columns={3}>
-          {METHOD_CHOICES.map((choice) => (
-            <RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
-              icon={choice.icon}
-              checked={mode === choice.value} disabled={!canEdit} disabledReason={canEdit ? undefined : '閲覧のみのため変えられません'}
-              onChange={(value) => setMode(value as BookingPaymentMode)} />
-          ))}
-        </RadioCardGroup>
+        {canEdit ? (
+          <RadioCardGroup legend="いつもの支払い方法" columns={3}>
+            {METHOD_CHOICES.map((choice) => (
+              <RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
+                icon={choice.icon} checked={mode === choice.value} onChange={(value) => setMode(value as BookingPaymentMode)} />
+            ))}
+          </RadioCardGroup>
+        ) : <p className={styles.readValue}>{METHOD_CHOICES.find((choice) => choice.value === mode)?.title}</p>}
         <p className={styles.minor}>メニュー・コース・クラスごとに変えられます（メニューの「お支払い」）。</p>
       </section>
 
@@ -174,9 +174,9 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         </div>
         <div className={styles.holdRow}>
           <span className={styles.holdSelect}>
-            <Select aria-label="お支払いを待つ時間" value={String(hold)} disabled={!canEdit}
+            {canEdit ? <Select aria-label="お支払いを待つ時間" value={String(hold)}
               onChange={(value) => setHold(Number(value))}
-              options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} />
+              options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} /> : <span className={styles.readValue}>{`${hold} 分`}</span>}
           </span>
           <span className={styles.minor}>この時間を過ぎても払われないときは、仮の予約を取り消して枠を空けます。</span>
         </div>

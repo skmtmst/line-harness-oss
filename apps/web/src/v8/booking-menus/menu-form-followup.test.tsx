@@ -15,6 +15,7 @@ const net = vi.hoisted(() => ({
   createMenu: vi.fn(), updateMenu: vi.fn(), putStaffMenus: vi.fn(), saveMenuResources: vi.fn(),
   menus: [] as unknown[],
   matrix: [] as unknown[],
+  paymentMode: 'online' as string,
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: nav.push, replace: vi.fn() }),
@@ -44,6 +45,18 @@ vi.mock('@/lib/api', async (importOriginal) => {
       updateMenu: (...args: unknown[]) => net.updateMenu(...args),
       putStaffMenus: (...args: unknown[]) => net.putStaffMenus(...args),
       saveMenuResources: (...args: unknown[]) => net.saveMenuResources(...args),
+      getPaymentConfig: async () => ({ success: true, data: { mode: net.paymentMode, provider: net.paymentMode === 'onsite' ? 'onsite' : 'stripe', holdMinutes: 10, keyConfigured: true, testMode: true } }),
+    },
+  }
+})
+vi.mock('@/lib/api-booking-payment-admin', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-booking-payment-admin')>()
+  return {
+    ...actual,
+    bookingPaymentAdminApi: {
+      ...actual.bookingPaymentAdminApi,
+      connection: async () => ({ success: true, data: { connected: net.paymentMode !== 'onsite', testMode: true, accountIdTail: null, connectedAt: null, dashboardUrl: null } }),
+      menuOverrides: async () => ({ success: true, data: { menus: [] } }),
     },
   }
 })
@@ -139,6 +152,15 @@ it('担当の一覧に新しいメニューがまだなくても、割当を明�
 })
 
 
+it('決済をつないでいない店は、お支払いの段を押せない形にせず「お支払いをつなぐ」の1行だけ出す', async () => {
+  net.paymentMode = 'onsite'
+  render(<MenuFormV8 />)
+  await settle()
+  expect(await screen.findByRole('link', { name: /お支払いをつなぐ/ })).toBeTruthy()
+  expect(screen.queryByRole('radio', { name: /いつもの方法を使う/ })).toBeNull()
+  net.paymentMode = 'online'
+})
+
 it('担当は本物のチェック、設備は札＋選ぶ窓で選び、選択と解除を独立して保持する', async () => {
   render(<MenuFormV8 />)
   await settle()
@@ -179,10 +201,12 @@ it('メニュー固有ルールの操作と支払いは共通の部品で、選�
   fireEvent.click(screen.getByRole('button', { name: 'お店のきまりに戻す', exact: true }))
   expect(screen.queryByRole('spinbutton', { name: '受付の締め切り（時間前）' })).toBeNull()
   expect(screen.getByRole('heading', { name: /^お支払い/ }).closest('[data-design-node="t0jk8p"]')).toBeTruthy()
-  // 絵 v5L19Z：3つの箱を並べ、選べるのは「お店で払う」だけ（ほかは押せない形）。
-  const store = screen.getByRole('radio', { name: 'お店で払う' }) as HTMLInputElement
-  expect(store.checked).toBe(true)
-  expect(store.disabled).toBe(false)
-  expect((screen.getByRole('radio', { name: 'オンラインで先払い' }) as HTMLInputElement).disabled).toBe(true)
-  expect((screen.getByRole('radio', { name: 'どちらでも' }) as HTMLInputElement).disabled).toBe(true)
+  // 絵 mauOC・QqER7（B-305）：決済がつながっている店は「いつもの方法を使う／このメニューだけ変える」を選べる。
+  const usual = await screen.findByRole('radio', { name: /いつもの方法を使う/ }) as HTMLInputElement
+  expect(usual.checked).toBe(true)
+  expect(screen.queryByRole('radio', { name: 'お客さまが選ぶ' })).toBeNull()
+  fireEvent.click(screen.getByRole('radio', { name: /このメニューだけ変える/ }))
+  expect((screen.getByRole('radio', { name: 'お店で払う' }) as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByRole('radio', { name: 'オンラインで先払い' })).toBeTruthy()
+  expect(screen.getByRole('radio', { name: 'お客さまが選ぶ' })).toBeTruthy()
 })

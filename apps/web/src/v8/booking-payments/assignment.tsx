@@ -9,7 +9,7 @@ import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { Field } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
@@ -76,7 +76,7 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
     if (!target) return
     const mine = ++generation.current
     setStatus('loading')
-    const request = target.kind === 'staff' ? bookingAssignmentApi.get(target.accountId) : bookingAssignmentApi.getTables(target.accountId, target.storeId)
+    const request = Promise.resolve().then(() => target.kind === 'staff' ? bookingAssignmentApi.get(target.accountId) : bookingAssignmentApi.getTables(target.accountId, target.storeId))
     request.then((response) => {
       if (mine !== generation.current) return
       apply(response.data)
@@ -137,7 +137,7 @@ const METHODS: Array<{ value: BookingAssignmentMethod; title: string; icon: Reac
 /** 割り当て方の区画（題・準備中の帯・3 つの選び方・数える期間）。 */
 export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentState; kind: 'staff' | 'tables'; canEdit: boolean }) {
   const staff = kind === 'staff'
-  const locked = !canEdit || state.status !== 'ready'
+  const locked = state.status !== 'ready'
   const notes: Record<BookingAssignmentMethod, string> = staff
     ? { balanced: '担当の少ない人から入れます', priority: '決めた順番で埋めます', random: '空いている人から無作為に' }
     : { balanced: 'その日の予約の少ない卓から', priority: '決めた順番で埋めます', random: '空いている卓から無作為に' }
@@ -158,13 +158,15 @@ export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentS
             <h3 className={styles.subTitle}>同じ大きさの卓の中での選び方</h3>
           </>
         ) : null}
-        <RadioCardGroup legend={staff ? '指名なしの予約の割り当て方' : '同じ大きさの卓の中での選び方'} columns={3}>
-          {METHODS.map((choice) => (
-            <RadioCard key={choice.value} name={`assign-${kind}-method`} value={choice.value} title={choice.title} note={notes[choice.value]} icon={choice.icon}
-              checked={state.method === choice.value} disabled={locked} onChange={(value) => state.setMethod(value as BookingAssignmentMethod)} />
-          ))}
-        </RadioCardGroup>
-        {staff ? (
+        {canEdit ? (
+          <RadioCardGroup legend={staff ? '指名なしの予約の割り当て方' : '同じ大きさの卓の中での選び方'} columns={3}>
+            {METHODS.map((choice) => (
+              <RadioCard key={choice.value} name={`assign-${kind}-method`} value={choice.value} title={choice.title} note={notes[choice.value]} icon={choice.icon}
+                checked={state.method === choice.value} disabled={locked} onChange={(value) => state.setMethod(value as BookingAssignmentMethod)} />
+            ))}
+          </RadioCardGroup>
+        ) : <p className={styles.readValue}>{`${METHODS.find((choice) => choice.value === state.method)?.title}：${notes[state.method]}`}</p>}
+        {staff && canEdit ? (
           <div className={styles.periodRow}>
             <span className={styles.periodLabel}>数える期間</span>
             <span className={styles.periodSelect}>
