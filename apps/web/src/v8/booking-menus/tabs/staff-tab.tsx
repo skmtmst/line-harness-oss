@@ -194,7 +194,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               <Link href={`/booking/staff/shifts?staff_id=${person.id}`} className={styles.staffNameLink}>
                 {person.name}
               </Link>
-              {person.role ? <span className={styles.staffRole}>{person.role}</span> : null}
+              {person.role ? <span className={styles.staffRole} title={person.role}>{person.role}</span> : null}
             </span>
             <span className={styles.staffColMenus}>
               {offered > 0 ? (

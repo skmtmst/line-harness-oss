@@ -1104,7 +1104,7 @@
 
 .staffName {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 var(--tpl-bk2-staff-col-name);
   flex-direction: column;
   gap: var(--tpl-bm-2);
   min-width: 0;
@@ -1126,7 +1126,10 @@
 }
 
 .staffRole {
+  overflow: hidden;
   color: var(--color-ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--tpl-bm-11);
 }
 
@@ -1150,9 +1153,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--tpl-bm-4);
-  width: var(--tpl-bk2-staff-col-link);
-  flex-shrink: 0;
-  min-width: 0;
+  flex: 1 1 var(--tpl-bk2-staff-col-link);
+  min-width: var(--tpl-bk2-staff-col-link);
 }
 
 .staffColStatus {
@@ -1186,16 +1188,19 @@
   line-height: var(--tpl-bm-16);
 }
 
+/* 絵 VLEaj：数の「0」は黒、下の注意文だけオレンジ。 */
 .staffRow .cellWarn {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  color: var(--color-ink);
   line-height: var(--tpl-bm-17);
 }
 
 /* 絵 VLEaj：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
 .staffRow .cellWarn .staffCellSub {
   overflow: hidden;
+  color: var(--color-warning);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
