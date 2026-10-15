@@ -3601,6 +3601,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       return { accountId: account.id, accountName: account.name, receivedAt: '2026-08-21T09:10:00.000Z', targetVersion: { version, latestVersion: current, status: older ? 'older' : 'latest', label: `版${version}` } }
     }) }
   }
+  /* 配る前に「配布先が今受け取っている版」を読む（API 組1 の契約：GET /api/hq/templates/:id/distribution-targets）。同名の有無は返さない。 */
+  const distributionTargetsMatch = pathname.match(/^\/api\/hq\/templates\/([^/]+)\/distribution-targets$/)
+  if (distributionTargetsMatch && method === 'GET') {
+    const wanted = (query.get('accountIds') ?? '').split(',').filter(Boolean)
+    const latest = 2
+    const states = [{ version: null, status: 'undistributed', label: '未配布' }, { version: latest, status: 'latest', label: `版 ${latest}（最新）` }, { version: 1, status: 'older', label: '版 1' }]
+    return { success: true, data: {
+      templateId: decodeURIComponent(distributionTargetsMatch[1]), latestVersion: latest, requiresPreflight: true,
+      stores: HQ_TEMPLATE_ACCOUNTS_HTN.filter((a) => !wanted.length || wanted.includes(a.id)).map((a, i) => ({ accountId: a.id, accountName: a.name, targetVersion: { ...states[i % states.length], latestVersion: latest } })),
+    } }
+  }
   if (pathname === '/api/hq/templates/kind-counts' && method === 'GET') {
     const counts = { message: 0, carousel: 0, rich_message: 0, question: 0, coupon: 0, research: 0 }
     for (const row of HQ_TEMPLATES_HTN) if (row.template_type === 'template') counts[row.kind ?? 'message'] += 1

@@ -33,6 +33,7 @@ import TemplateAssetEditor from '@/v8/template-edit/asset'
 import TemplateRichEditor from '@/v8/template-edit/rich'
 import TemplateRichVideoEditor from '@/v8/template-edit/rich-video'
 import { hqMediaApi } from '@/lib/api-hq-media'
+import { fetchHqDistributionTargets } from '@/lib/api-hq-distribution-targets'
 import CarouselV8 from '@/v8/templates/carousel'
 import QuestionNewV8 from '@/v8/templates/question-new'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
@@ -170,6 +171,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   /* 詳細（pQ4fH）の版の履歴と配った先ごとの版（API-18）。null は読み込み中・読めなかった。 */
   const [versions, setVersions] = useState<HqTemplateVersionDisplay[] | null>(null)
   const [versionsFailed, setVersionsFailed] = useState(false)
+  /** 確認の前に読む「配布先が今受け取っている版」（組1：distribution-targets）。同名の有無・上書き可否は決めない。 */
+  const [targetVersions, setTargetVersions] = useState<Map<string, { version: number | null; status: string }> | null>(null)
   const [received, setReceived] = useState<HqTemplateReceivedVersion[] | null>(null)
   const [receivedFailed, setReceivedFailed] = useState(false)
   const versionsRequest = useRef(0)
@@ -233,6 +236,16 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   usePageCrumbs(stage === 'list' || stage === 'saved' || (stage === 'edit' && type === 'form')
     ? [{ label: 'ホーム', href: '/' }]
     : [{ label: PAGE_TITLES[type], href: LIST_HREFS[type], onSelect: () => toListRef.current() }])
+
+  const distributionTemplateId = stage === 'accounts' || stage === 'saved' ? detail?.template.id ?? '' : ''
+  useEffect(() => {
+    if (!distributionTemplateId) { setTargetVersions(null); return }
+    let live = true
+    void fetchHqDistributionTargets(distributionTemplateId).then((res) => {
+      if (live) setTargetVersions(new Map(res.data.stores.map((row) => [row.accountId, { version: row.targetVersion.version, status: row.targetVersion.status }])))
+    }, () => { if (live) setTargetVersions(null) })
+    return () => { live = false }
+  }, [distributionTemplateId])
 
   useEffect(() => {
     alive.current = true
@@ -1152,7 +1165,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }
   const storeVersion = (accountId: string) => {
     const store = storeOf(accountId)
-    if (!store) return '—'
+    if (!store) {
+      const target = targetVersions?.get(accountId)
+      if (!target) return '—'
+      return target.version == null ? 'まだない' : `版 ${target.version}${target.status === 'latest' ? '（最新）' : ''}`
+    }
     const main = store.items[0]
     /* 絵（meBRB）：ひな形と同じ版が配布先にあれば「版 2（最新）」。 */
     return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}${detail && main.expectedRevision === detail.template.revision ? '（最新）' : ''}` : '配布済み') : '未配布'
