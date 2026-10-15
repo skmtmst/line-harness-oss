@@ -1095,8 +1095,6 @@ export default function ScenariosListV8() {
 
   const wideToolbar = (
     <>
-      {/* 案内の帯は表の上の主列に置く（板 axFrW）。toolbar 枠の先頭で一行を取る。 */}
-      <div className={styles.noteRow}></div>
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',

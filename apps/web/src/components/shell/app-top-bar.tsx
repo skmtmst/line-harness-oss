@@ -85,6 +85,44 @@ export function parentCrumbForPath(pathname: string): { label: string; href: str
   return null
 }
 
+/** 左メニューの「設定」の組に入っている項目の道（`/settings` は設定の入口そのもの）。 */
+const SETTINGS_SECTION_PATHS: string[] = (MENU_SECTIONS.find((section) => section.id === 'settings')?.items ?? [])
+  .map((item) => item.href.split('?')[0])
+
+/** いまの道が属する左メニューの組（いちばん長く当たる項目の組）。 */
+function menuSectionIdForPath(pathname: string): string | null {
+  let best: { length: number; section: string } | null = null
+  for (const section of MENU_SECTIONS) {
+    for (const item of section.items) {
+      const path = item.href.split('?')[0]
+      if (path === '/') continue
+      if (pathname !== path && !pathname.startsWith(`${path}/`)) continue
+      if (!best || path.length > best.length) best = { length: path.length, section: section.id }
+    }
+  }
+  return best?.section ?? null
+}
+
+const SETTINGS_CRUMB = { label: '設定', href: '/settings' }
+
+/**
+ * ★V8 上の帯のパンくずの仕上げ（2026-10-15 判定役 VLEaj・P6EdLW・DrwMm・D0AOyx・I2V65v・u8xibp・u3iab3）。
+ * - 画面名と同じ名前の段は出さない（「予約設定 › 予約設定」にしない）。
+ * - 左メニューの「設定」の組の画面は、手前に「設定」の段を置く（ホーム › 設定 › LINE通知）。
+ *   左メニューの下の「設定」の入口が `/settings` なので、その段の行き先も `/settings`。
+ *   `/settings` を親に持つ画面の「機能設定」の段は「設定」にそろえて二重にしない。
+ * 設定の入口（`/settings`）そのものと統括の画面には足さない。
+ */
+export function finishPageCrumbs<T extends { label: string; href?: string }>(pathname: string, crumbs: T[] | null, title: string, hq = false): Array<T | typeof SETTINGS_CRUMB> | null {
+  let next: Array<T | typeof SETTINGS_CRUMB> | null = crumbs ? crumbs.filter((crumb) => crumb.label !== title) : null
+  const inSettings = !hq && pathname !== '/settings' && SETTINGS_SECTION_PATHS.length > 0 && menuSectionIdForPath(pathname) === 'settings'
+  if (inSettings) {
+    const rest = (next ?? []).filter((crumb) => crumb.label !== 'ホーム' && crumb.label !== SETTINGS_CRUMB.label && crumb.href?.split('?')[0] !== '/settings')
+    next = [SETTINGS_CRUMB, ...rest]
+  }
+  return next && next.length > 0 ? next : null
+}
+
 /**
  * 権限の呼び名。言葉の表（GLOSSARY.md）どおり **`owner` は「オーナー」**。
  *
@@ -165,7 +203,7 @@ export default function AppTopBar() {
    */
   const onlyHome = pageCrumbs === null || pageCrumbs.every((crumb) => crumb.label === 'ホーム')
   const parentCrumb = onlyHome ? parentCrumbForPath(pathname) : null
-  const crumbs = parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs
+  const crumbs = finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHq)
   const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
   const hqShell = isHqShellPath(pathname)
   const [hqName, setHqName] = useState<string | null>(null)

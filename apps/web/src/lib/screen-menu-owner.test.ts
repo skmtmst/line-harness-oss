@@ -45,6 +45,12 @@ describe('画面→メニュー所属の正本（#984 LAY-15）', () => {
     expect(menuOwnerForScreen('/accounts/new', '')).toEqual(['hq-stores'])
   })
 
+  it('メニューと別の URL の画面も、属する項目が選ばれ組が開く（Eo56k・YMVFD）', () => {
+    expect(menuOwnerForScreen('/affiliates', '?tab=report')).toEqual(['affiliates'])
+    expect(menuOwnerForScreen('/restaurant-test/close-tasks', '')).toEqual(['restaurant-dashboard'])
+    expect(menuOwnerForScreen('/booking/staff', '')).toEqual(['booking-menus'])
+  })
+
   it('サイドバーが正本を読んで選択へ反映する', () => {
     expect(SIDEBAR).toContain('menuOwnerForScreen')
     // 宣言がある画面では、パス一致ではなく所属先の項目を選ぶ。

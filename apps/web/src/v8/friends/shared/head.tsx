@@ -1,6 +1,7 @@
 'use client'
 
 import { PageHeading } from '@/components/templates/page-frame'
+import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation'
 
 /*
  * ★V8 友だちの段の頭。
@@ -53,6 +54,11 @@ export function FriendsSectionHead({
 }) {
   const noteText = note === undefined ? FRIENDS_TAB_NOTES[current] : note
   return (
-    <PageHeading title={title} help={<>{description}{noteText}</>} tabs={tabs ? <FriendsTabs current={current} line={false} action={action} /> : undefined} />
+    <PageExplanationProvider pageKey={`friends:${current}`}>
+      <PageHeading title={title} help={description} explanationToggle={noteText ? <PageExplanationToggle /> : undefined} tabs={<>
+        {tabs ? <FriendsTabs current={current} line={false} action={action} /> : null}
+        {noteText ? <PageExplanationBody keepMounted>{noteText}</PageExplanationBody> : null}
+      </>} />
+    </PageExplanationProvider>
   )
 }

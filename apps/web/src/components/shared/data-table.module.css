@@ -171,7 +171,7 @@
   padding: 9px 20px; border-bottom: 1px solid var(--color-divider);
 }
 :root .row[data-table-layout='columns'] .bodyCell {
-  display: block; padding: 0; border: 0; flex-shrink: 0; color: var(--color-ink-secondary);
+  display: block; padding: 0; border: 0; flex-shrink: 0; color: var(--color-ink);
 }
 
 :root .row { background: var(--color-canvas); }
@@ -424,10 +424,11 @@ html:root .frame[data-grid-table] .table.table > :is(thead, tbody) > tr > :is(th
   padding: 0;
   border: 0;
   box-shadow: none;
-  color: var(--color-ink-secondary);
+  color: var(--color-ink);
   font-size: inherit;
   line-height: inherit;
 }
+html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { color: var(--color-ink-secondary); }
 :root .frame[data-grid-table] .table th {
   overflow: hidden;
   text-overflow: ellipsis;

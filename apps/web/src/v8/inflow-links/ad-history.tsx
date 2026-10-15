@@ -12,7 +12,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 import EntitySelect from '@/components/shared/entity-select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -138,7 +138,7 @@ export default function AdHistoryV8() {
           <Th className={styles.colSource} collapseAt="narrow">流入元</Th>
           <Th className={styles.colStatus}>状態</Th>
           <Th className={styles.colNext} collapseAt="narrow">次の予定</Th>
-          <Th className={styles.colOps}>操作</Th>
+          <Th className={styles.colOps} showActionLabel>操作</Th>
         </TableHeadRow></thead><tbody>
         {visible.map((log) => {
           const state = adLogStatus(log.status)
@@ -177,25 +177,14 @@ export default function AdHistoryV8() {
         help={<>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</>}
         actions={<><Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button></>}>
       <div className={adsStyles.body}>
-        <div className={styles.tools}>
-          <span className={styles.searchBox}>
-            <SearchField
-              value={query}
-              onChange={(value) => { setQuery(value); setPage(1) }}
-              onClear={() => { setQuery(''); setPage(1) }}
-              placeholder="成果・クリックの種類で探す"
-              aria-label="成果・クリックの種類で探す"
-            />
-          </span>
-          <span className={styles.selectBox}>
+        <ListToolbar
+          search={{ value: query, onChange: (value) => { setQuery(value); setPage(1) }, placeholder: '成果・クリックの種類で探す' }}
+          filters={<>
             <SaveErrorField names={["status"]}><Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} /></SaveErrorField>
-          </span>
-          <span className={styles.selectBox}>
             <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" noun="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
-          </span>
-          <span className={styles.toolsSpacer} aria-hidden="true" />
-          <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
-        </div>
+            <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
+          </>}
+        />
         {retryError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{retryError}</Notice> : null}
         {body}
         {pageCount > 1 ? (

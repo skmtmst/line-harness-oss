@@ -57,7 +57,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
    */
   icon?: ReactNode
   /** アカウントの短い説明。既定の帯の色・寸法は変えない。 */
-  presentation?: 'account-note'
+  presentation?: 'account-note' | 'ops'
 }
 
 /**

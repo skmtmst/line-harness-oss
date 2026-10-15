@@ -62,7 +62,7 @@ function nameText(node: ReactNode): string {
  * フォルダを使う一覧は畳んだ幅でも丸を出す。機能の無い一覧は型が丸を外す。
  */
 export function FolderDotName({ folder, children, annotation, selection }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode; annotation?: ReactNode; selection?: ReactNode }) {
-  const hasFolders = useContext(ListFolderContext)
+  const hasFolders = useContext(ListFolderContext) ?? (folder !== undefined)
   const parts = Children.toArray(children)
   const selectionNodes = parts.filter(child => isValidElement(child) && child.type === Checkbox)
   const name = parts.filter(child => !isValidElement(child) || child.type !== Checkbox)

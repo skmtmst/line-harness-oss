@@ -37,6 +37,21 @@
   },
   "patterns": [
     {
+      "id": "people-day-grid",
+      "name": "人の当日予約盤",
+      "role": "時刻を縦、担当を横に並べ、実際の予約と空き枠を開く",
+      "rules": ["B-260", "B-262"],
+      "owner": {
+        "code": {
+          "files": ["apps/web/src/components/shared/reservation-board.tsx", "apps/web/src/components/shared/reservation-people-grid.tsx", "apps/web/src/components/shared/reservation-people-grid.module.css"],
+          "components": ["ReservationBoard", "ReservationPeopleGrid"],
+          "vars": ["--tpl-people-time-width", "--tpl-people-hour-height", "--tpl-people-block-height", "--tpl-people-block-gap"]
+        },
+        "pen": ["GcyTr", "O2Z8u"]
+      },
+      "code": { "selectorHint": "data-people-day-grid", "overrideSelectors": [], "signals": [] }
+    },
+    {
       "id": "card",
       "name": "カード（中身のまとまりの箱）",
       "role": "中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる",
