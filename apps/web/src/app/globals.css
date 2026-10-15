@@ -982,7 +982,7 @@
   --tpl-st2-od-z: 80; --tpl-st2-od-scrim: #1d1d1f59; --tpl-st2-od-w: 560px; --tpl-st2-od-pad: 24px; --tpl-st2-od-gap: 16px; --tpl-st2-od-shadow: -8px 0 24px #1d1d1f29; --tpl-st2-od-head-gap: 8px; --tpl-st2-od-head-text-gap: 4px; --tpl-st2-od-title: var(--polish-text-section); --tpl-st2-od-close: 36px; --tpl-st2-od-title-gap: 6px; --tpl-st2-od-fact-gap: 12px; --tpl-st2-od-fact-label-w: 90px; --tpl-st2-od-row-pad: 6px 0; --tpl-st2-od-time-gap: 10px; --tpl-st2-od-time-w: 80px; --tpl-st2-od-detail-gap: 4px; --tpl-st2-od-title-lh: 26px; --tpl-st2-od-text-lh: 17px; --tpl-st2-od-small-lh: 16px; --tpl-st2-od-section-lh: 19px;
   /* ecc：設定内の列幅。狭い板でも右端を越えない。 */
   --tpl-ecc-record-columns: minmax(0, 170fr) minmax(0, 150fr) minmax(0, 222fr) minmax(0, 170fr) minmax(82px, 90fr) 36px;
-  --tpl-ecc-sub-columns: minmax(0, 282fr) minmax(0, 100fr) minmax(0, 100fr) minmax(0, 90fr) minmax(100px, 110fr) 160px;
+  --tpl-ecc-sub-columns: minmax(0, 282fr) minmax(0, 100fr) minmax(0, 100fr) minmax(0, 90fr) minmax(100px, 110fr) 36px;
   --tpl-ecc-identity-columns: minmax(0, 196fr) minmax(0, 180fr) minmax(0, 200fr) minmax(70px, 90fr) 36px;
   --tpl-ecc-sub-search: 340px;
   --tpl-st2-id-band-lh: 18px; --tpl-st2-id-band-pad: 10px 12px; --tpl-st2-id-col-friend: 180px; --tpl-st2-id-col-evidence: 200px; --tpl-st2-id-col-confidence: 90px; --tpl-st2-id-col-ops: 190px; --tpl-st2-id-row-pad: 9px 14px; --tpl-st2-id-ops-gap: 6px;
