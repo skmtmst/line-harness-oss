@@ -1,5 +1,5 @@
 'use client'
-import { ArrowRight, Ban, CalendarClock, Copy, CreditCard, MessageCircle, PanelLeftOpen, Send, Timer, Undo2, UserRoundCog, Armchair, Check, CircleX, ListChecks } from 'lucide-react'
+import { ArrowRight, Ban, CalendarClock, Copy, CreditCard, MessageCircle, PanelLeftOpen, Send, Timer, Undo2, UserRoundCog, UserRoundX, Armchair, Check, CircleX, ListChecks } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Card from '@/components/shared/card'
@@ -59,6 +59,10 @@ type MenuHandlers = {
   pay: (row: StyleRow) => void
   copy: (row: StyleRow) => void
   roster: (row: StyleRow) => void
+  noShow: (row: StyleRow) => void
+  cancel: (row: StyleRow) => void
+  refund: (row: StyleRow) => void
+  cancelClass: (row: StyleRow) => void
 }
 
 /** 決済の口（Stripe・API 組3）ができるまで、押したときに出す案内。 */
@@ -72,23 +76,26 @@ export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: bool
   const detail: ActionMenuItem = { id: 'detail', label: '詳細を開く', icon: <PanelLeftOpen size={16} />, onSelect: () => h.open(row) }
   if (!canWrite) return [detail]
   const payLink: ActionMenuItem = { id: 'pay-link', label: '支払いのリンクを送る', icon: <CreditCard size={16} />, dividerBefore: true, onSelect: () => h.pay(row) }
-  const refund: ActionMenuItem = { id: 'refund', label: '返金する', icon: <Undo2 size={16} />, onSelect: () => h.pay(row) }
+  const refund: ActionMenuItem = { id: 'refund', label: '返金する', icon: <Undo2 size={16} />, onSelect: () => h.refund(row) }
   const line: ActionMenuItem = { id: 'line', label: 'LINE を送る', icon: <MessageCircle size={16} />, dividerBefore: true, onSelect: () => h.line(row) }
-  const cancel: ActionMenuItem = { id: 'cancel', label: '取り消す', icon: <CircleX size={16} />, tone: 'danger', dividerBefore: true, onSelect: () => h.open(row) }
+  // 無断・欠席の印は開始の時刻を過ぎた予約にだけ出す（B-338）。あとで戻せるので赤にしない。
+  const noShowItems: ActionMenuItem[] = row.past && row.live !== false ? [{ id: 'no-show', label: style === 'consult' ? '欠席にする（あとで戻せる）' : '無断にする（あとで戻せる）', icon: <UserRoundX size={16} />, group: 'destructive', onSelect: () => h.noShow(row) }] : []
+  const cancelItem: ActionMenuItem = { id: 'cancel', label: '取り消す', icon: <CircleX size={16} />, tone: 'danger', dividerBefore: true, onSelect: () => h.cancel(row) }
+  const cancel = row.live === false ? [] : [cancelItem]
   if (style === 'restaurant') return [
     detail,
     { id: 'seat', label: '卓を変える', icon: <Armchair size={16} />, onSelect: () => h.open(row) },
     { id: 'time', label: '時間を変える', icon: <Timer size={16} />, onSelect: () => h.open(row) },
     payLink, refund, line,
     { id: 'remind', label: '前日の確認をもう一度送る', icon: <Send size={16} />, onSelect: () => h.open(row) },
-    cancel,
+    ...noShowItems, ...cancel,
   ]
   if (style === 'salon') return [
     detail,
     { id: 'visit', label: '来店にする', icon: <Check size={16} />, onSelect: () => h.visit(row) },
     { id: 'time', label: '時間を変える', icon: <Timer size={16} />, onSelect: () => h.open(row) },
     { id: 'staff', label: '担当を移す', icon: <UserRoundCog size={16} />, onSelect: () => h.open(row) },
-    payLink, { ...line, dividerBefore: false }, cancel,
+    payLink, { ...line, dividerBefore: false }, ...noShowItems, ...cancel,
   ]
   if (style === 'consult') return [
     detail,
@@ -96,12 +103,12 @@ export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: bool
     { id: 'staff', label: '担当を変える', icon: <UserRoundCog size={16} />, onSelect: () => h.open(row) },
     payLink, refund, line,
     { id: 'copy', label: '予約 URL をコピー', icon: <Copy size={16} />, onSelect: () => h.copy(row) },
-    cancel,
+    ...noShowItems, ...cancel,
   ]
   return [
     { id: 'roster', label: '名簿を開く', icon: <ListChecks size={16} />, onSelect: () => h.roster(row) },
     { id: 'line', label: 'この回の人に LINE を送る', icon: <MessageCircle size={16} />, onSelect: () => h.line(row) },
     payLink,
-    { id: 'cancel', label: '休講にする', icon: <Ban size={16} />, tone: 'danger', dividerBefore: true, onSelect: () => h.open(row) },
+    { id: 'cancel', label: '休講にする', icon: <Ban size={16} />, tone: 'danger', dividerBefore: true, onSelect: () => h.cancelClass(row) },
   ]
 }

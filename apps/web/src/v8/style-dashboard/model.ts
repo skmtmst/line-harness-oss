@@ -42,7 +42,13 @@ export interface StyleRow {
   pay?: StyleBadge
   state?: StyleBadge
   /** 行の右の操作。visit＝来店（ボタン）・undo＝取り消す（文字）・meet＝Meet に入る・place＝場所を開く・done＝済み（文字）。 */
-  action?: 'visit' | 'undo' | 'meet' | 'place' | 'done' | null
+  action?: 'visit' | 'undo' | 'meet' | 'place' | 'done' | 'approve' | 'result' | null
+  /** 開始の時刻を過ぎたか。［無断にする］［欠席にする］はこの時だけ出す（B-338）。 */
+  past?: boolean
+  /** 取り消せる（取消・無断・期限切れでない）予約か。 */
+  live?: boolean
+  /** 口の予約（版・種類・料金。変える操作に渡す）。 */
+  booking?: { id: string; kind: string; version: number | null; updatedAt: string | null; price: number; partySize: number; startsAt: string; meetingUrl?: string | null }
   actionHref?: string
   /** 教室：予約／定員・待ち・空き。 */
   booked?: number
@@ -111,7 +117,9 @@ export interface StyleRoster {
   title: string
   pay: StyleBadge
   meta: string
-  members: { name: string; sub: string; pay: StyleBadge; attend: 'done' | 'button' | 'cancel'; bookingId?: string; eventId?: string }[]
+  members: { name: string; sub: string; pay: StyleBadge; attend: 'done' | 'absent' | 'button' | 'cancel'; bookingId?: string; eventId?: string }[]
+  /** 回が始まったか（［欠席］はこの後だけ）。 */
+  started?: boolean
   more: string
   payLinkCount: number
 }

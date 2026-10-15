@@ -80,13 +80,13 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, unit: `組・${num(s, 'guests') ?? '—'}人`, detail: () => `初めて ${num(s, 'firstTime') ?? '—'}・常連 ${num(s, 'regular') ?? '—'}`, link: { label: '一覧', href: '/restaurant-test/reservations' }, help: '取消・無断・押さえを除く予約です。来店日で数えます。' }, s),
     kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => `未配席 ${num(s, 'unseated') ?? '—'}・枠を閉じる ${num(s, 'mediaCloseTasks') ?? '—'}`, link: { label: '内訳', href: '/restaurant-test/reservations' }, help: '承認待ち・卓が決まっていない予約・他の予約サイトの枠を閉じる知らせの数です。' }, s),
     kpi({ id: 'free', key: 'freeTables', title: '空席（いま）', unit: '卓', detail: () => '動いている卓のうち', link: { label: '座席表', href: '/restaurant-test/tables' }, help: '動いている卓のうち、いま予約が重なっていない卓の数です。' }, s),
-    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間の予約で数えます', link: { label: '人・LINE', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
+    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間の予約で数えます', link: { label: '人を見る', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
     newKpi(s, '/restaurant-test/reservations', range),
   ]
   if (style === 'salon') return [
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, detail: (x) => { const e = metricValue(x.metrics.estimatedRevenue); return e.valueText ? `見込み ${e.valueText}` : '見込み —' }, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く予約です。来店日で数えます。' }, s),
-    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・印なし', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
-    kpi({ id: 'rebook', key: 'nextBookingRate', title: '次回予約率', detail: () => '過去30日', link: { label: '人・LINE', href: '/friends' }, help: '施術のあと24時間以内に次の予約を入れた人の割合です。' }, s),
+    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・来店の印がまだ', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
+    kpi({ id: 'rebook', key: 'nextBookingRate', title: '次回予約率', detail: () => '過去30日', link: { label: '人を見る', href: '/friends' }, help: '施術のあと24時間以内に次の予約を入れた人の割合です。' }, s),
     paymentKpi(range),
     newKpi(s, '/booking/bookings', range),
   ]
@@ -94,7 +94,7 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
     kpi({ id: 'meetings', key: 'bookings', title: `${r}の面談`, detail: (x) => `実施 ${num(x, 'visits') ?? '—'}`, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く面談です。面談日で数えます。' }, s),
     kpi({ id: 'results', key: 'resultPending', title: '結果待ち', detail: () => '結果を付ける面談', link: { label: '付ける', href: '/booking/bookings' }, help: '面談が終わって、結果（検討中・成約・見送り）をまだ付けていない数です。' }, s),
     kpi({ id: 'week', key: 'weekBookings', title: '今週の面談', detail: () => '月曜〜日曜・面談日', link: { label: '一覧', href: '/booking/bookings' }, help: '今週（月〜日）の面談です。面談日で数えます。' }, s),
-    kpi({ id: 'noshow', key: 'noShowRate', title: '無断欠席率', lower: true, detail: () => '期間の面談で数えます', link: { label: '人・LINE', href: '/friends' }, help: '無断欠席の割合です。' }, s),
+    kpi({ id: 'noshow', key: 'noShowRate', title: '無断欠席率', lower: true, detail: () => '期間の面談で数えます', link: { label: '人を見る', href: '/friends' }, help: '無断欠席の割合です。' }, s),
     newKpi(s, '/booking/bookings', range),
   ]
   return [
@@ -116,7 +116,7 @@ export const stateBadge = (b: StyleBooking, style: IndustryStyle = 'restaurant')
 const MEET: Record<string, StyleBadge> = { online: { label: 'オンライン', tone: 'info' }, in_person: { label: '対面', tone: 'neutral' }, customer_choice: { label: 'お客さまが選ぶ', tone: 'neutral' } }
 const SOURCE: Record<string, string> = { line: 'LINE', liff: 'LINE', phone: '電話', manual: '電話', walk_in: 'ウォークイン', web: 'Web', hotpepper: 'ホットペッパー', tabelog: '食べログ', restaurant_board: 'レストランボード' }
 
-function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule): StyleRow {
+function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule, now: Date): StyleRow {
   const b = e.booking
   const tz = sch.timeZone
   const columnNames = e.columnIds.map((id) => sch.columns.find((c) => c.id === id)?.name).filter(Boolean).join('・')
@@ -128,9 +128,11 @@ function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule):
   }
   const state = stateBadge(b, style)
   const live = !['cancelled', 'rejected', 'expired', 'no_show'].includes(b.status)
-  if (style === 'restaurant') return { ...base, reservationId: b.id, people: b.partySize, seat: columnNames || '—', course: e.title || '席のみ', courseNote: b.price ? `1人 ${yen(b.price)}` : '—', state, action: !live ? null : b.visited ? 'undo' : 'visit' }
-  if (style === 'consult') return { ...base, sub: e.title, meet: b.meetingMode ? MEET[b.meetingMode] : undefined, staff: columnNames || '—', state, action: b.visited ? 'done' : !live ? null : b.meetingUrl ? 'meet' : b.location ? 'place' : null, actionHref: b.meetingUrl ?? (b.location ? `https://maps.google.com/?q=${encodeURIComponent(b.location)}` : undefined) }
-  return { ...base, course: e.title, courseNote: b.price ? yen(b.price) : undefined, staff: columnNames || '—', state, action: b.visited ? 'done' : !live ? null : 'visit' }
+  const past = Date.parse(b.startsAt) <= now.getTime()
+  const extra = { past, live, booking: { id: b.id, kind: b.kind, version: b.version, updatedAt: b.updatedAt, price: b.price, partySize: b.partySize, startsAt: b.startsAt, meetingUrl: b.meetingUrl } }
+  if (style === 'restaurant') return { ...base, ...extra, reservationId: b.id, people: b.partySize, seat: columnNames || '—', course: e.title || '席のみ', courseNote: b.price ? `1人 ${yen(b.price)}` : '—', state, action: !live ? null : b.visited ? 'undo' : 'visit' }
+  if (style === 'consult') return { ...base, ...extra, sub: e.title, meet: b.meetingMode ? MEET[b.meetingMode] : undefined, staff: columnNames || '—', state: b.visited && !b.outcome ? { label: '結果待ち', tone: 'warning' } : state, action: b.visited ? (b.outcome ? 'done' : 'result') : !live ? null : b.meetingUrl ? 'meet' : b.location ? 'place' : null, actionHref: b.meetingUrl ?? (b.location ? `https://maps.google.com/?q=${encodeURIComponent(b.location)}` : undefined) }
+  return { ...base, ...extra, course: e.title, courseNote: b.price ? yen(b.price) : undefined, staff: columnNames || '—', state, action: b.visited ? 'done' : !live ? null : ['requested', 'pending'].includes(b.status) ? 'approve' : 'visit' }
 }
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
@@ -140,8 +142,10 @@ const TONES = ['green', 'purple', 'blue', 'amber'] as const
 function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoard {
   const tz = sch.timeZone
   const times = [...sch.entries.flatMap((e) => [hm(e.startsAt, tz), hm(e.endsAt, tz)]), ...sch.availability.slots.flatMap((s) => [hm(s.startsAt, tz), hm(s.endsAt, tz)])]
-  const from = times.length ? Math.floor(Math.min(...times.map(toMin)) / 60) * 60 : 600
-  const to = times.length ? Math.max(from + 120, Math.ceil(Math.max(...times.map(toMin)) / 60) * 60) : 1200
+  // 予約が 0 件でも営業の時間帯が分かるよう、空きだけの日は 10:00〜20:00 を下限にする（b22bbd）。
+  const hasEntries = sch.entries.length > 0
+  const from = times.length ? Math.min(hasEntries ? Infinity : 600, Math.floor(Math.min(...times.map(toMin)) / 60) * 60) : 600
+  const to = times.length ? Math.max(hasEntries ? 0 : 1200, from + 120, Math.ceil(Math.max(...times.map(toMin)) / 60) * 60) : 1200
   const today = parts(now.toISOString(), tz)
   const showsToday = sch.range === 'today' && sch.from.slice(0, 10) <= today.date && today.date < sch.to.slice(0, 10)
   const nowMin = toMin(today.time)
@@ -232,7 +236,7 @@ const LINKS: Record<IndustryStyle, string> = { restaurant: '/restaurant-test/res
 
 export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, selected: string, range: DashboardRange, now = new Date()): StyleToday {
   const sorted = sch.entries.slice().sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-  const rows = sorted.map((e) => rowOf(style, e, sch))
+  const rows = sorted.map((e) => rowOf(style, e, sch, now))
   const dayRows = rows.filter((_, i) => parts(sorted[i].startsAt, sch.timeZone).date === selected)
   return {
     style, asOf: s.asOf, hoursLabel: null,
@@ -265,7 +269,7 @@ const cell = (m?: StyleMetric | number | null) => {
   if (m === undefined || m === null) return { text: '—' }
   if (typeof m === 'number') return { text: m.toLocaleString('ja-JP') }
   const v = metricValue(m)
-  return v.value === null ? { text: '—', note: m.status === 'insufficient_sample' ? '出せない' : m.status === 'unconfigured' ? '未設定' : undefined } : { text: v.valueText ?? `${v.value}${v.unit === '%' ? '%' : ''}` }
+  return v.value === null ? { text: '—', note: !isRate(m) ? undefined : m.status === 'insufficient_sample' ? '出せない' : m.status === 'unconfigured' ? '未設定' : undefined } : { text: v.valueText ?? `${v.value}${v.unit === '%' ? '%' : ''}` }
 }
 
 export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics: Record<string, unknown> }, tab: string, names: Record<string, string>): StyleAnalytics {
@@ -288,7 +292,7 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
   let table: StyleAnalytics['table']
   if (style === 'consult') {
     const f = (a.funnel as Funnel[] | undefined) ?? []
-    table = { title: '流入と成果（友だち→予約→実施→成約）', help: '流入経路ごとの数です。', link: { label: '人・LINE', href: '/friends' }, columns: [{ label: '流入経路' }, { label: '友だち', align: 'right' }, { label: '予約', align: 'right' }, { label: '実施', align: 'right' }, { label: '成約', align: 'right' }], rows: f.map((r) => ({ id: r.route, name: r.route === 'unknown' ? '経路が分からない' : r.route, sub: '', cells: [cell(r.friends ?? null), cell(r.bookings), cell(r.performed), cell(r.won)] })) }
+    table = { title: '流入と成果（友だち→予約→実施→成約）', help: '流入経路ごとの数です。', link: { label: '人を見る', href: '/friends' }, columns: [{ label: '流入経路' }, { label: '友だち', align: 'right' }, { label: '予約', align: 'right' }, { label: '実施', align: 'right' }, { label: '成約', align: 'right' }], rows: f.map((r) => ({ id: r.route, name: r.route === 'unknown' ? '経路が分からない' : r.route, sub: '', cells: [cell(r.friends ?? null), cell(r.bookings), cell(r.performed), cell(r.won)] })) }
   } else if (style === 'salon' || style === 'lesson') {
     const st = (a.staff as Staff[] | undefined) ?? []
     table = { title: style === 'lesson' ? '講師' : 'スタッフ', help: 'スタッフごとの数です。率は標本が少ないときは出しません（0% とは違います）。', columns: [{ label: style === 'lesson' ? '講師' : 'スタッフ' }, { label: '予約', align: 'right' }, { label: '稼働率', align: 'right' }, { label: '指名率', align: 'right' }, { label: '次回予約率', align: 'right' }, { label: '再来率', align: 'right' }], rows: st.map((r) => ({ id: r.staffId, name: names[r.staffId] ?? r.staffId, sub: '', cells: [cell(r.bookings), cell(r.utilization), cell(r.designationRate), cell(r.nextBookingRate), cell(r.returnRate)] })) }

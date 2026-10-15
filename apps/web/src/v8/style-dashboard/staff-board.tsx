@@ -3,7 +3,6 @@ import { CalendarX2, CircleHelp, Plus, Star } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import SearchField from '@/components/shared/search-field'
-import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import type { StyleBoard, StyleBoardEntry } from './model'
 import styles from './style-dashboard.module.css'
@@ -19,12 +18,10 @@ const at = (hm: string, from: string): CSSProperties => ({ insetBlockStart: `cal
 const span = (start: string, end: string): CSSProperties => ({ blockSize: `calc(var(--tpl-sd-hour) * ${(toMin(end) - toMin(start)) / 60} - var(--tpl-sd-entry-gap))` })
 const col = (index: number, count: number): CSSProperties => ({ insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${count} * ${index})`, inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${count})` })
 
-export function StaffBoard({ board, search, onSearch, view, onView, canWrite, entryItems, onSlot }: {
+export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSlot }: {
   board: StyleBoard
   search: string
   onSearch: (value: string) => void
-  view: 'board' | 'list'
-  onView: (value: 'board' | 'list') => void
   canWrite: boolean
   /** 予約の箱を押すと開く操作（行の「…」と同じ並び）。 */
   entryItems: (entry: StyleBoardEntry) => ActionMenuItem[]
@@ -40,7 +37,6 @@ export function StaffBoard({ board, search, onSearch, view, onView, canWrite, en
   return (
     <section className={styles.board} aria-label="台帳の盤">
       <div className={styles.boardTools}>
-        <SegmentedControl aria-label="見え方" appearance="choices" value={view} onChange={onView} options={[{ value: 'board', label: '時間×スタッフ' }, { value: 'list', label: '一覧' }]} />
         {board.next ? <span className={styles.nextChip}><CircleHelp size={14} aria-hidden="true" />次の空き<strong>{board.next}</strong></span> : null}
         <span className={styles.grow} />
         <div className={styles.search}><SearchField value={search} onChange={onSearch} placeholder="名前・電話で探す" aria-label="名前・電話で探す" /></div>

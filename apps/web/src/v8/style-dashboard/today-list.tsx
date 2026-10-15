@@ -1,5 +1,6 @@
 'use client'
-import { Check, MapPin, Video } from 'lucide-react'
+import { Check, ClipboardCheck, MapPin, Video } from 'lucide-react'
+import type React from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -14,7 +15,7 @@ import styles from './style-dashboard.module.css'
  * 列は業種ごと。行の右に今すぐの操作（来店・Meet に入る・場所を開く）と「…」。
  */
 
-type Column = { key: string; label: string; width?: string }
+export type Column = { key: string; label: string; width?: string }
 
 const COLUMNS: Record<IndustryStyle, Column[]> = {
   restaurant: [
@@ -59,7 +60,7 @@ function fillTone(row: StyleRow): 'full' | 'ok' {
   return row.booked !== undefined && row.capacity !== undefined && row.booked >= row.capacity ? 'full' : 'ok'
 }
 
-export function TodayList({ style, rows, note, canWrite, busyId, selectedId, menuFor, onVisit, onUndo, onSelect }: {
+export function TodayList({ style, rows, note, canWrite, busyId, selectedId, menuFor, onVisit, onUndo, onSelect, onNoShow, onApprove, onResult, empty, columnsOverride }: {
   style: IndustryStyle
   rows: StyleRow[]
   note: string
@@ -70,8 +71,14 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
   onVisit: (row: StyleRow) => void
   onUndo: (row: StyleRow) => void
   onSelect?: (row: StyleRow) => void
+  onNoShow?: (row: StyleRow) => void
+  onApprove?: (row: StyleRow) => void
+  onResult?: (row: StyleRow) => void
+  /** 0 件のときの見せ方（mkyvE）。 */
+  empty?: React.ReactNode
+  columnsOverride?: Column[]
 }) {
-  const columns = COLUMNS[style]
+  const columns = columnsOverride ?? COLUMNS[style]
   const cell = (row: StyleRow, key: string) => {
     switch (key) {
       case 'time': return <span className={styles.cellText}>{row.time}</span>
@@ -94,13 +101,20 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
   const actionCell = (row: StyleRow) => {
     if (row.action === 'done') return <span className={styles.cellMuted}>済み</span>
     if (!canWrite) return null
-    if (row.action === 'visit') return <Button size="compact" disabled={busyId === row.id} onClick={() => onVisit(row)} aria-label={`${row.name}さんを来店にする`}><Check size={16} aria-hidden="true" />来店</Button>
+    if (row.action === 'visit') return (
+      <span className={styles.actionPair}>
+        <Button size="compact" disabled={busyId === row.id} onClick={() => onVisit(row)} aria-label={`${row.name}さんを来店にする`}>{row.past ? null : <Check size={16} aria-hidden="true" />}来店</Button>
+        {row.past && onNoShow ? <Button size="compact" disabled={busyId === row.id} onClick={() => onNoShow(row)} aria-label={`${row.name}さんを${style === 'consult' ? '欠席' : '無断'}にする`}>{style === 'consult' ? '欠席' : '無断'}</Button> : null}
+      </span>
+    )
+    if (row.action === 'approve') return <Button size="compact" disabled={busyId === row.id} onClick={() => onApprove?.(row)} aria-label={`${row.name}さんの予約を承認する`}><Check size={16} aria-hidden="true" />承認する</Button>
+    if (row.action === 'result') return <Button size="compact" disabled={busyId === row.id} onClick={() => onResult?.(row)} aria-label={`${row.name}さんの結果を付ける`}><ClipboardCheck size={16} aria-hidden="true" />結果を付ける</Button>
     if (row.action === 'undo') return <button type="button" className={styles.textAction} disabled={busyId === row.id} onClick={() => onUndo(row)} aria-label={`${row.name}さんの来店の印を取り消す`}>取り消す</button>
     if (row.action === 'meet') return <Button size="compact" href={row.actionHref} external={Boolean(row.actionHref)}><Video size={16} aria-hidden="true" />Meet に入る</Button>
     if (row.action === 'place') return <Button size="compact" href={row.actionHref} external={Boolean(row.actionHref)}><MapPin size={16} aria-hidden="true" />場所を開く</Button>
     return null
   }
-  if (rows.length === 0) return <ListState kind="empty" title="この日の予約はまだありません" />
+  if (rows.length === 0) return <>{empty ?? <ListState kind="empty" title="この日の予約はまだありません" />}</>
   return (
     <div className={styles.list} role="table" aria-label="一覧">
       <div className={styles.listHead} role="row">

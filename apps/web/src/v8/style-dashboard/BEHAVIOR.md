@@ -31,6 +31,14 @@
 - 教室：回を押すと右に名簿（出席・この回の人に LINE・支払いのリンク・休講にする）。
 - 異常の帯の［閉じた］は `completeChannelCloseTask`（飲食）。
 
+## 印・確かめの窓（B-338）
+- ［無断にする］（面談は［欠席にする］）は開始の時刻を過ぎた予約にだけ出す（行の主ボタン［来店｜無断］と「…」の両方）。あとで戻せる。飲食は `postSeatVisitMark(no_show)`、人の予約は `bookingApi.postVisitMark(no_show)`、Meet は `styleApi.saveMeetResult(attendance=no_show)`。
+- サロンの承認待ちは主ボタン［承認する］（`bookingApi.decideRequest(approve)`）。面談の実施済みで結果が無い物は［結果を付ける］（`saveBooking`・`saveMeetResult` の outcome）と「結果待ち」タブ（件数つき）。
+- 教室の名簿は［出席｜欠席］（欠席は回が始まった後だけ）、7 人を超えたら［ほか N人を表示する］。
+- 取り消す（h2lHCH）・返金（Y8MWGs、2 段）・休講（Md9O3）・休みの重なる予約（s8BwT8）は共通の確かめの窓（`components/shared/booking-confirm-dialogs.tsx`）。取り消しは理由を口へ。返金・休講・重なる予約への LINE は口が無いので、押すと共通の準備中の窓。
+- 試験モードの印は `TestModeNote`（`bookingApi.getPaymentConfig().testMode`）。支払いの札の言葉は `payment-status.ts` の 1 か所。
+- 閲覧のみは上に閲覧のみの帯、異常の帯は外の管理画面を開く物だけ残す。［表示を変える］に［型を変える］（`styleApi.save` の style）。
+
 ## 狭い板
 - 白い板が 1100 未満では右の列を畳み、［新着・お支払いを見る］で開く（2 列で下に出す）。分析の右の列は下に並べる。日付の段は折り返す。数の帯は数と比べの札を折り返す（`KpiBand layout="link-row"`）。
 

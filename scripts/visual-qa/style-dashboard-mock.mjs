@@ -344,19 +344,20 @@ const CARDS = {
   lesson: ['connection-alert', 'classes', 'members', 'trials', 'analytics'],
 }
 let styleVersion = 1
+let qaEmpty = false
 
 /** 業種ダッシュボードの口の見本。当たらなければ null。 */
 export function styleDashboardMock(method, pathname, query, body) {
   const root = '/api/dashboard/style'
   if (pathname === root) {
-    if (method === 'PUT') { if (body?.style) accountStyle = body.style; styleVersion += 1 }
+    if (method === 'PUT') { if (body?.style) accountStyle = body.style; qaEmpty = Boolean(body?.qaEmpty); styleVersion += 1 }
     const cards = (CARDS[accountStyle] ?? []).map((id) => ({ id, visible: true }))
     return { success: true, data: { style: accountStyle, styleSelected: accountStyle !== 'standard', version: styleVersion, answers: {}, settings: {}, cards, questions: [] } }
   }
   if (!pathname.startsWith(root + '/')) return null
   const style = query.get('style') || accountStyle
-  if (method === 'GET' && pathname === root + '/summary') return TODAY[style] ? { success: true, data: snapshotFor(style, query) } : null
-  if (method === 'GET' && pathname === root + '/schedule') return TODAY[style] ? { success: true, data: scheduleFor(style, query) } : null
+  if (method === 'GET' && pathname === root + '/summary') { if (!TODAY[style]) return null; const d = snapshotFor(style, query); return { success: true, data: qaEmpty ? { ...d, newBookings: [], metrics: Object.fromEntries(Object.entries(d.metrics).map(([k, m]) => [k, m.denominator !== undefined ? m : { ...m, value: 0 }])) } : d } }
+  if (method === 'GET' && pathname === root + '/schedule') { if (!TODAY[style]) return null; const d = scheduleFor(style, query); return { success: true, data: qaEmpty ? { ...d, entries: [], days: d.days.map((x) => ({ ...x, entryIds: [], bookings: 0, people: 0 })), closures: [] } : d } }
   if (method === 'GET' && pathname === root + '/analytics') return TODAY[style] ? { success: true, data: analyticsFor(style, query) } : null
   if (pathname === root + '/cards' && (method === 'PUT' || method === 'DELETE')) {
     styleVersion += 1

@@ -58,6 +58,8 @@
 .nameButton:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
 .textAction { all: unset; cursor: pointer; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; }
 .textAction:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
+.resultChoices { display: flex; gap: var(--polish-space-card); }
+.actionPair { display: inline-flex; gap: var(--polish-space-row); }
 .menuCell { display: flex; flex: 0 0 var(--tpl-sd-col-menu); justify-content: flex-end; inline-size: var(--tpl-sd-col-menu); }
 .listNote { margin: 0; padding-block-start: var(--polish-space-field); color: var(--color-ink-faint); font-size: var(--text-label); }
 .fill { display: flex; flex-direction: column; gap: var(--polish-space-row); }
@@ -193,7 +195,9 @@
 .rosterRow { display: flex; align-items: center; gap: var(--polish-space-field); min-block-size: var(--tpl-sd-row-h); border-block-end: 1px solid var(--color-hairline); }
 .rosterName { display: flex; flex-direction: column; min-inline-size: 0; }
 .rosterName strong { font-size: var(--text-body); white-space: nowrap; }
-.rosterAttend { display: flex; justify-content: flex-end; inline-size: var(--tpl-sd-col-state); }
+.rosterAttend { display: flex; justify-content: flex-end; min-inline-size: var(--tpl-sd-col-state); }
+.sideMoreButton { all: unset; display: inline-flex; align-items: center; gap: var(--polish-space-row); color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; cursor: pointer; }
+.sideMoreButton:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
 .attendDone { color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; white-space: nowrap; }
 
 /* 分析 */
@@ -220,6 +224,7 @@
 /* 表示を変える・休みを入れる */
 .drawerBody { display: flex; flex-direction: column; gap: var(--polish-space-section); }
 .drawerBase, .drawerLocked { display: flex; align-items: center; gap: var(--polish-space-field); padding: var(--polish-space-card); border-radius: var(--radius-card); background: var(--polish-table-head-bg); }
+.drawerPick { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }
 .drawerLocked { background: transparent; border: 1px solid var(--color-hairline); }
 .drawerBaseText { display: flex; flex-direction: column; min-inline-size: 0; font-size: var(--text-body); }
 .drawerSection { display: flex; flex-direction: column; gap: var(--polish-space-row); }

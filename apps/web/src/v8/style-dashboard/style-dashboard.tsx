@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarCheck, CalendarDays, CalendarX2, Check, CircleUserRound, Clock3, CreditCard, Download, ExternalLink, Link2, Mail, MessageCircle, Plus, RefreshCw, Repeat2, SlidersHorizontal, Sparkles, UserPlus, Users, Video, Armchair, BellRing, ClipboardList, UserRoundX } from 'lucide-react'
+import { Copy, CalendarCheck, CalendarDays, CalendarX2, Check, CircleUserRound, Clock3, CreditCard, Download, ExternalLink, Link2, Mail, MessageCircle, Plus, RefreshCw, Repeat2, SlidersHorizontal, Sparkles, UserPlus, Users, Video, Armchair, BellRing, ClipboardList, UserRoundX } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { DashboardPage } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
@@ -23,7 +23,12 @@ import { formatDate } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import type { DashboardRange, IndustryStyle, StyleAlertAction, StyleAnalytics, StyleClosureInput, StyleKpi, StyleLayout, StyleRoster, StyleRow, StyleToday } from './model'
 import { styleApi } from '@/lib/api-styles'
-import { eventsApi } from '@/lib/api'
+import { bookingApi, eventsApi } from '@/lib/api'
+import { CancelClassDialog, CancelReservationDialog, RefundDialog, type CancelReservationInput } from '@/components/shared/booking-confirm-dialogs'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import TestModeNote from '@/components/shared/test-mode-note'
+import Dialog from '@/components/shared/dialog'
+import Radio from '@/components/shared/radio'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import type { RestaurantClosureKind, StyleCard } from '@line-crm/shared'
 import { analyticsWindow, toAnalytics, toLayout, toToday } from './adapter'
@@ -227,28 +232,34 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     else if (style === 'lesson') setRosterId(row.id)
     else router.push(`/booking/bookings?id=${encodeURIComponent(row.id)}`)
   }
-  const markVisit = async (row: StyleRow) => {
-    if (style !== 'restaurant' || !row.reservationId) { openRow(row); return }
+  const version = (row: StyleRow) => row.booking?.version ?? store.today?.find((r) => r.id === row.reservationId)?.customer_version ?? 1
+  const run = async (row: StyleRow, fn: () => Promise<unknown>, ok: string, fail: string) => {
     setBusy(row.id)
-    try {
-      const version = store.today?.find((r) => r.id === row.reservationId)?.customer_version ?? 1
-      await restaurantTestApi.postSeatVisitMark(accountId, row.reservationId, { kind: 'visited', expectedVersion: version, requestId: crypto.randomUUID() })
-      notifyToast('来店にしました。')
-    } catch (caught) {
-      notifyToast(japaneseDetailOf(caught) || '来店にできませんでした。', { tone: 'error' })
-    } finally { await reload(); setBusy('') }
+    try { await fn(); notifyToast(ok) } catch (caught) { notifyToast(japaneseDetailOf(caught) || fail, { tone: 'error' }) } finally { await reload(); setBusy('') }
   }
-  const undoVisit = async (row: StyleRow) => {
+  const bookingId = (row: StyleRow) => row.booking?.id ?? row.reservationId ?? row.id
+  const markVisit = (row: StyleRow) => {
+    if (style === 'restaurant' && row.reservationId) return run(row, () => restaurantTestApi.postSeatVisitMark(accountId, row.reservationId!, { kind: 'visited', expectedVersion: version(row), requestId: crypto.randomUUID() }), '来店にしました。', '来店にできませんでした。')
+    if (row.booking?.kind === 'meet' && row.booking.updatedAt) return run(row, () => styleApi.saveMeetResult(accountId, row.booking!.id, { expectedUpdatedAt: row.booking!.updatedAt!, attendance: 'visited' }), '実施にしました。', '実施にできませんでした。')
+    if (row.booking) return run(row, () => bookingApi.postVisitMark(accountId, bookingId(row), { kind: 'visited' }), '来店にしました。', '来店にできませんでした。')
+    openRow(row)
+  }
+  /** 無断・欠席の印（開始の時刻を過ぎた予約だけ。あとで戻せる）。 */
+  const markNoShow = (row: StyleRow) => {
+    if (!row.past) return
+    if (style === 'restaurant' && row.reservationId) return run(row, () => restaurantTestApi.postSeatVisitMark(accountId, row.reservationId!, { kind: 'no_show', expectedVersion: version(row), requestId: crypto.randomUUID() }), '無断にしました。来店の印の取り消しで戻せます。', '無断にできませんでした。')
+    if (row.booking?.kind === 'meet' && row.booking.updatedAt) return run(row, () => styleApi.saveMeetResult(accountId, row.booking!.id, { expectedUpdatedAt: row.booking!.updatedAt!, attendance: 'no_show' }), '欠席にしました。', '欠席にできませんでした。')
+    return run(row, () => bookingApi.postVisitMark(accountId, bookingId(row), { kind: 'no_show' }), style === 'consult' ? '欠席にしました。' : '無断にしました。', '印を付けられませんでした。')
+  }
+  const approve = (row: StyleRow) => run(row, () => bookingApi.decideRequest(accountId, bookingId(row), 'approve'), '承認しました。お客さまに確定の LINE が届きます。', '承認できませんでした。')
+  const undoVisit = (row: StyleRow) => {
     if (style !== 'restaurant' || !row.reservationId) return
-    setBusy(row.id)
-    try {
-      const version = store.today?.find((r) => r.id === row.reservationId)?.customer_version ?? 1
-      await restaurantTestApi.deleteSeatVisitMark(accountId, row.reservationId, version, crypto.randomUUID())
-      notifyToast('来店の印を取り消しました。')
-    } catch (caught) {
-      notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' })
-    } finally { await reload(); setBusy('') }
+    return run(row, () => restaurantTestApi.deleteSeatVisitMark(accountId, row.reservationId!, version(row), crypto.randomUUID()), '来店の印を取り消しました。', '取り消せませんでした。')
   }
+  const [cancelRow, setCancelRow] = useState<StyleRow | null>(null)
+  const [refundRow, setRefundRow] = useState<StyleRow | null>(null)
+  const [resultRow, setResultRow] = useState<StyleRow | null>(null)
+  const [classRow, setClassRow] = useState<StyleRow | null>(null)
   const menuFor = (row: StyleRow) => rowMenuItems(style, row, canWrite, {
     open: openRow,
     visit: (r) => void markVisit(r),
@@ -256,7 +267,37 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     pay: openPayment,
     copy: (r) => { void navigator.clipboard?.writeText(`${window.location.origin}/booking/bookings?id=${encodeURIComponent(r.id)}`).then(() => notifyToast('予約 URL をコピーしました。')) },
     roster: (r) => setRosterId(r.id),
+    noShow: (r) => void markNoShow(r),
+    cancel: (r) => setCancelRow(r),
+    refund: (r) => setRefundRow(r),
+    cancelClass: (r) => { setRosterId(r.id); setClassRow(r) },
   })
+  /** 取り消す（h2lHCH）。理由は口の cancellationReason へ。返金は決済の口（組3）の一部返金・理由つきが要る。 */
+  const confirmCancel = async (row: StyleRow, input: CancelReservationInput) => {
+    setBusy('cancel')
+    try {
+      if (style === 'restaurant' && row.reservationId) await restaurantTestApi.updateReservation(accountId, row.reservationId, { status: 'cancelled', expectedVersion: version(row), cancellationReason: input.reason })
+      else {
+        if (row.booking?.version != null) await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason })
+        await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
+      }
+      setCancelRow(null)
+      notifyToast('予約を取り消しました。')
+      if (input.refund !== 'none' || input.notify) openPayment()
+    } catch (caught) { notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { setBusy(''); void reload() }
+  }
+  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（B-304 追記 4 ⑤）。 */
+  const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {
+    setBusy('result')
+    try {
+      if (row.booking?.kind === 'meet' && row.booking.updatedAt) await styleApi.saveMeetResult(accountId, row.booking.id, { expectedUpdatedAt: row.booking.updatedAt, outcome })
+      else await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking?.version ?? 1, outcome })
+      setResultRow(null)
+      notifyToast('結果を付けました。分析の成約率に入ります。')
+    } catch (caught) { notifyToast(japaneseDetailOf(caught) || '結果を付けられませんでした。', { tone: 'error' }) } finally { setBusy(''); void reload() }
+  }
+  const [testMode, setTestMode] = useState(false)
+  useEffect(() => { if (accountId) void bookingApi.getPaymentConfig(accountId).then((r) => setTestMode(Boolean(r.data?.testMode))).catch(() => setTestMode(false)) }, [accountId])
 
   const alertAction = async (action: StyleAlertAction) => {
     if (action.taskId && style === 'restaurant') {
@@ -269,21 +310,22 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     if (action.href) router.push(action.href)
   }
 
-  const attend = async (r: StyleRoster, name: string | null) => {
+  const attend = async (r: StyleRoster, name: string | null, status: 'attended' | 'no_show' = 'attended') => {
     const targets = r.members.filter((m) => m.attend === 'button' && (name === null || m.name === name) && m.bookingId && m.eventId)
     setBusy('attend')
     let failedCount = 0
     for (const m of targets) {
-      try { await eventsApi.updateBooking(accountId, m.eventId!, m.bookingId!, { status: 'attended' }) } catch { failedCount += 1 }
+      try { await eventsApi.updateBooking(accountId, m.eventId!, m.bookingId!, { status }) } catch { failedCount += 1 }
     }
     setBusy('')
-    notifyToast(failedCount ? `${failedCount}人を出席にできませんでした。` : '出席にしました。', failedCount ? { tone: 'error' } : undefined)
+    const word = status === 'attended' ? '出席' : '欠席'
+    notifyToast(failedCount ? `${failedCount}人を${word}にできませんでした。` : `${word}にしました。`, failedCount ? { tone: 'error' } : undefined)
     setRosterId(r.rowId)
     void load()
   }
 
   const KIND: Record<string, RestaurantClosureKind> = { 貸切: 'private_event', 臨時休業: 'temporary_closed' }
-  const saveClosure = async (input: StyleClosureInput) => {
+  const saveClosure = async (input: StyleClosureInput, overlap?: { mode: 'ask' | 'cancel'; message: string }) => {
     setBusy('closure')
     try {
       if (style === 'restaurant' && store.store) {
@@ -301,6 +343,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         notifyToast(failedNames.length ? `休みを入れました。${failedNames.join('・')}は入れられませんでした。` : '休みを入れました。予約は取り消していません。', failedNames.length ? { tone: 'error' } : undefined)
       }
       setClosureOpen(false)
+      // 重なる予約への LINE・取り消しの口はまだ無い（口が要る）。休みだけ入れて、連絡は準備中の窓で伝える。
+      if (overlap) preparing.open('重なる予約への連絡')
       void reload()
     } catch (caught) {
       notifyToast(japaneseDetailOf(caught) || '休みを入れられませんでした。', { tone: 'error' })
@@ -333,6 +377,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       <Button disabled disabledReason="書き出しの口をつなぐと使えます。"><Download size={16} aria-hidden="true" />CSV で書き出す</Button>
       <Button disabled disabledReason="定期の送信の口をつなぐと使えます。"><Mail size={16} aria-hidden="true" />毎朝メールで送る</Button>
+      {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
     </div>
   ) : (
     <div className={styles.filters}>
@@ -346,8 +391,10 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     </div>
   )
 
+  const resultRows = useMemo(() => (style === 'consult' ? (today?.rows ?? []).filter((r) => r.action === 'result') : []), [style, today?.rows])
   const tabItems = TAB_KEYS.map((key: DashboardTab) => ({
     label: cfg.tabs[key],
+    ...(style === 'consult' && key === 'bookings' && resultRows.length ? { count: resultRows.length, countTone: 'warning' as const } : {}),
     current: key === tab,
     onClick: () => setParam({ tab: key === 'main' ? null : TAB_PARAM[key] }),
   }))
@@ -355,13 +402,25 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <SegmentedControl aria-label="表示" appearance="track" size="small" fit="content" value={view} onChange={(v: DashboardView) => setParam({ view: v === cfg.defaultView ? null : v })} options={cfg.views} />
   ) : null
 
-  const side = (today?.side ?? []).map((card) => <SideCard key={card.id} card={card} canWrite={canWrite} onAction={(card) => (card.id === 'pay' ? openPayment() : router.push('/broadcasts'))} />)
+  const side = (today?.side ?? []).map((card) => <SideCard key={card.id} card={card} canWrite={canWrite} onAction={(card) => (card.id === 'pay' ? openPayment() : router.push('/broadcasts'))}>{card.id === 'pay' && testMode ? <TestModeNote /> : null}</SideCard>)
 
   let body: ReactNode
   if (!today) {
     body = failed ? <ListState kind="error" title="ダッシュボードを読み込めませんでした" onRetry={() => void reload()} /> : <ListState kind="loading" />
   } else if (tab === 'analytics') {
     body = <StyleAnalyticsView data={analytics} error={analyticsFailed} onTab={(t) => setParam({ sub: t })} onRetry={() => void loadAnalytics()} onRowOpen={() => router.push(cfg.links.bookings)} />
+  } else if (style === 'consult' && tab === 'bookings') {
+    // 結果待ち（OJ4Vu）：実施した面談のうち、結果をまだ付けていない物。押すと結果を付ける窓。
+    body = (
+      <div className={styles.columns}>
+        <div className={styles.mainColumn}>
+          <TodayList style={style} rows={resultRows} note={`${resultRows.length}件中 1〜${resultRows.length}件・結果を付けると、分析の成約率に入ります`} canWrite={canWrite} busyId={busy} menuFor={menuFor}
+            onVisit={(r) => void markVisit(r)} onUndo={() => {}} onResult={(r) => setResultRow(r)}
+            empty={<ListState kind="empty" title="結果待ちの面談はありません" description="実施した面談に結果を付けると、ここから消えます。" />} />
+        </div>
+        {side.length ? <aside className={styles.sideColumn} aria-label="今日の動き">{side}</aside> : null}
+      </div>
+    )
   } else if (tab !== 'main') {
     body = <ListState kind="empty" title={`${cfg.tabs[tab]}は今の画面で見られます`} action={<Button href={tab === 'bookings' ? cfg.links.bookings : cfg.links.people}>{`${cfg.tabs[tab]}を開く`}</Button>} />
   } else {
@@ -381,17 +440,19 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       main = floor ? <RestaurantFloorMap floor={floor} labels={tables.map((t) => ({ id: t.id, label: t.code, active: Boolean(t.is_active), capacity: t.max_capacity }))} onSelect={() => router.push('/restaurant-test/tables')} />
         : <ListState kind="empty" title="座席の図がまだありません" action={canWrite ? <Button href="/restaurant-test/tables">座席の図を作る</Button> : undefined} />
     } else if (view === 'board' && today.board) {
-      main = <StaffBoard board={today.board} search={search} onSearch={setSearch} view="board" onView={(v) => setParam({ view: v === cfg.defaultView ? null : v })} canWrite={canWrite} onSlot={() => addNew()}
-        entryItems={(e) => rowMenuItems(style, { id: e.id, time: e.start, name: e.name }, canWrite, { pay: openPayment, open: () => router.push(cfg.links.bookings), visit: () => router.push(cfg.links.bookings), line: () => router.push('/chats'), copy: () => undefined, roster: (r) => setRosterId(r.id) })} />
+      main = <StaffBoard board={today.board} search={search} onSearch={setSearch} canWrite={canWrite} onSlot={() => addNew()}
+        entryItems={(e) => menuFor(today.rows.find((r) => r.id === e.id) ?? { id: e.id, time: e.start, name: e.name })} />
     } else {
       main = (
         <>
           {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><SearchField value={search} onChange={setSearch} placeholder={cfg.search} aria-label={cfg.search} /></div></div> : null}
-          <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onUndo={(r) => void undoVisit(r)}
+          <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
+            empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
+              action={canWrite ? (style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" onClick={addNew}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>) : undefined} />}
             selectedId={style === 'lesson' ? (shownRoster ? shownRoster.rowId : null) : undefined} onSelect={style === 'lesson' ? (r) => setRosterId(r.id) : undefined} />
         </>
       )
-      if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onLine={() => router.push('/broadcasts')} onCancelClass={() => router.push('/events')} />
+      if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => router.push('/events')} />
     }
     body = (
       <div className={styles.columns} data-wide={!aside || undefined}>
@@ -408,12 +469,13 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <DashboardPage boardId={`style-${style}`} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
       <div className={styles.head}>{filters}</div>
       <div className={styles.inset}>
+        {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         <KpiBand layout="link-row" data-style-dashboard={style}>
           {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
         </KpiBand>
         {alert ? (
           <Notice tone="warn" role="status" heading={alert.title} className={styles.alert}
-            action={canWrite ? <div className={styles.alertActions}>{alert.actions.map((a) => (
+            action={alert.actions.some((a) => canWrite || a.icon === 'external') ? <div className={styles.alertActions}>{alert.actions.filter((a) => canWrite || a.icon === 'external').map((a) => (
               <Button key={a.id} size="compact" href={a.taskId ? undefined : a.href} external={a.icon === 'external'} busy={busy === a.id} onClick={a.taskId || !a.href ? () => void alertAction(a) : undefined}>{a.icon ? ALERT_ICON[a.icon] : null}{a.label}</Button>
             ))}</div> : undefined}>
             {alert.detail}
@@ -433,14 +495,60 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         </>
       ) : null}
       <ViewDrawer open={viewOpen} layout={layout} busy={busy === 'layout'} onClose={() => setViewOpen(false)}
+        onChangeStyle={(next) => { if (!layout) return; setBusy('layout'); void styleApi.save(accountId, { expectedVersion: layout.version, style: next }).then(() => { notifyToast('型を変えました。'); window.location.assign('/') }).catch((e) => notifyToast(japaneseDetailOf(e) || '型を変えられませんでした。', { tone: 'error' })).finally(() => setBusy('')) }}
         onReset={() => { if (!layout) return; setBusy('layout'); void styleApi.resetCards(accountId, layout.version).then((r) => { setCardDefaults(r.data.cards); setLayout(toLayout(style, r.data.cards, r.data.version, r.data.cards)); notifyToast('型に戻しました。') }).catch((e) => notifyToast(japaneseDetailOf(e) || '型に戻せませんでした。', { tone: 'error' })).finally(() => setBusy('')) }}
         onSave={(next) => { if (!layout) return; setBusy('layout'); void styleApi.saveCards(accountId, layout.version, next.map((c) => ({ id: c.id, visible: c.on }))).then((r) => { setLayout(toLayout(style, r.data.cards, r.data.version, cardDefaults)); setViewOpen(false); notifyToast('表示を保存しました。'); void load() }).catch((e) => notifyToast(japaneseDetailOf(e) || '表示を保存できませんでした。', { tone: 'error' })).finally(() => setBusy('')) }} />
       <ClosureDialog open={closureOpen} date={date} busy={busy === 'closure'} seatNoun={style === 'restaurant' ? '卓' : style === 'lesson' ? '講師' : '担当者'}
         targets={{ staff: style === 'restaurant' ? [] : (today?.staff ?? []), seats: style === 'restaurant' ? (today?.staff ?? []) : [] }}
         affectedNote={style === 'restaurant' ? 'その時間の予約は取り消しません。連絡は次の画面で選べます。' : 'その時間の予約は取り消しません。連絡は次の画面で選べます。'}
         onClose={() => setClosureOpen(false)}
-        onSave={(input) => void saveClosure(input)} />
+        onSave={(input, overlap) => void saveClosure(input, overlap)}
+        preview={async (input) => {
+          const inRange = (t: string) => input.allDay || ((input.from ?? '00:00') <= t && t < (input.to ?? '24:00'))
+          if (style === 'restaurant' && store.store) {
+            const res = await restaurantTestApi.previewClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
+            return res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${r.customerName}さま`, sub: `${r.guestCount}名`, pay: null }))
+          }
+          return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${r.name}さま`, sub: [r.people ? `${r.people}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
+        }}
+        overlapMessage={(input) => `〇〇さま　${input.date.slice(5).replace('-', '/')} はお店の都合でお休みをいただくことになりました。ご予約の日を変えるか、取り消すかを選んでください。`}
+        mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
       {preparing.dialog}
+      {cancelRow ? (
+        <CancelReservationDialog open title={`${cancelRow.name}さまの予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${cancelRow.people}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
+          facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `¥${(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1)).toLocaleString('ja-JP')}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
+          fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
+          messageFor={(i) => `${cancelRow.name}さま　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
+          onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
+      ) : null}
+      {refundRow ? (
+        <RefundDialog open subtitle={`${refundRow.name}さま・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${refundRow.people}名` : ''}`}
+          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `¥${(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1)).toLocaleString('ja-JP')}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
+          paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
+          onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
+      ) : null}
+      {classRow ? (
+        <CancelClassDialog open subtitle={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`}
+          facts={[{ label: '予約', value: roster && roster.rowId === classRow.id ? `${roster.members.filter((m) => m.attend !== 'cancel').length}人` : '名簿を開くと人数が出ます' }, { label: 'キャンセル待ち', value: classRow.waiting !== undefined ? `${classRow.waiting}人（待ちは終わりにします）` : '—' }]}
+          counts={{ members: roster && roster.rowId === classRow.id ? roster.members.filter((m) => m.attend !== 'cancel').length : 0, paid: 0, paidAmount: 0, tickets: 0, unpaid: 0 }} testMode={testMode}
+          messageFor={(i) => `〇〇さま　本日 ${classRow.time} の${classRow.name}は、${i.reason || '〇〇'}のため休講になりました。`}
+          onClose={() => setClassRow(null)} onConfirm={() => { setClassRow(null); preparing.open('休講') }} />
+      ) : null}
+      {resultRow ? <ResultDialog row={resultRow} busy={busy === 'result'} onClose={() => setResultRow(null)} onSave={(outcome) => void saveResult(resultRow, outcome)} /> : null}
     </DashboardPage>
+  )
+}
+
+const OUTCOMES = [{ value: 'considering', label: '検討中' }, { value: 'won', label: '成約' }, { value: 'lost', label: '見送り' }] as const
+
+/** 面談の［結果を付ける］の窓。結果は予約ごと。人の段階のタグも口が同じ時に直す。 */
+function ResultDialog({ row, busy, onClose, onSave }: { row: StyleRow; busy: boolean; onClose: () => void; onSave: (outcome: 'considering' | 'won' | 'lost') => void }) {
+  const [value, setValue] = useState<'considering' | 'won' | 'lost'>('considering')
+  return (
+    <Dialog open title="結果を付ける" description={`${row.name}さま・${row.time}${row.endTime ?? ''}・${row.sub ?? ''}`} designWidth={480} busy={busy} confirmLabel="結果を付ける" onCancel={onClose} onConfirm={() => onSave(value)}>
+      <div className={styles.resultChoices} role="radiogroup" aria-label="面談の結果">
+        {OUTCOMES.map((o) => <Radio key={o.value} name="outcome" checked={value === o.value} onChange={() => setValue(o.value)}>{o.label}</Radio>)}
+      </div>
+    </Dialog>
   )
 }

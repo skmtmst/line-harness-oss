@@ -956,7 +956,7 @@
   /* 業種ダッシュボード（XBkC2：NqAvL・mOAX5・R0FFqz・k2MBw・KcRVI・hqQLV・UTxFu・tMIuZ・UtmIg・R28Jqt・wFmQa・wXOm6）。 */
   --tpl-sd-side-w: 300px; --tpl-sd-roster-w: 380px; --tpl-sd-col-gap: 20px; --tpl-sd-side-gap: 10px; --tpl-sd-row-h: 56px; --tpl-sd-head-h: 36px;
   --tpl-sd-col-time: 40px; --tpl-sd-col-time-wide: 72px; --tpl-sd-col-people: 32px; --tpl-sd-col-seat: 44px; --tpl-sd-col-course: 108px; --tpl-sd-col-pay: 92px; --tpl-sd-col-pay-narrow: 92px;
-  --tpl-sd-col-state: 80px; --tpl-sd-col-state-narrow: 64px; --tpl-sd-col-action: 84px; --tpl-sd-col-action-wide: 120px; --tpl-sd-col-staff: 40px; --tpl-sd-col-meet: 98px; --tpl-sd-col-fill: 88px; --tpl-sd-col-menu: 28px;
+  --tpl-sd-col-state: 80px; --tpl-sd-col-state-narrow: 84px; --tpl-sd-col-action: 112px; --tpl-sd-col-action-wide: 120px; --tpl-sd-col-staff: 40px; --tpl-sd-col-meet: 98px; --tpl-sd-col-fill: 88px; --tpl-sd-col-menu: 28px;
   --tpl-sd-fill-w: 72px; --tpl-sd-fill-h: 4px; --tpl-sd-search-w: 220px; --tpl-sd-hour: 52px; --tpl-sd-week-hour: 48px; --tpl-sd-board-top: 8px; --tpl-sd-entry-gap: 4px; --tpl-sd-free-h: 22px;
   --tpl-sd-time-col: 56px; --tpl-sd-staff-h: 60px; --tpl-sd-tools-h: 60px; --tpl-sd-face: 32px; --tpl-sd-month-cell: 92px; --tpl-sd-chart-h: 160px; --tpl-sd-metric-gap: 6px; --tpl-sd-split-h: 8px; --tpl-sd-bar-h: 6px;
   --tpl-sd-dialog-w: 480px; --tpl-sd-now: #b3261e; --tpl-sd-past: rgb(29 29 31 / 0.024); --tpl-sd-line: rgb(29 29 31 / 0.07); --tpl-sd-line-soft: rgb(29 29 31 / 0.03);
