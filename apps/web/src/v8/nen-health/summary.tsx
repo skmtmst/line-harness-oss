@@ -70,7 +70,7 @@ export default function SummaryDrawerV8({
 
   return (
     <Drawer
-      width="editor"
+      width="editor" heightMode="viewport"
       open
       title="健康日記 30日のまとめ"
       description={status === 'ready' && summary ? petLine(summary) : 'まとめを作っています'}

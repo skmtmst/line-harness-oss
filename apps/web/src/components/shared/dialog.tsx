@@ -384,6 +384,6 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children, leadingAction }: { children: ReactNode; leadingAction?: ReactNode }) {
-  return <div className={styles.actions} data-dialog-actions>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
+export function DialogActions({ children, leadingAction, padding }: { children: ReactNode; leadingAction?: ReactNode; padding?: 'none' }) {
+  return <div className={styles.actions} data-dialog-actions data-padding={padding}>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
 }

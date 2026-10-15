@@ -392,6 +392,7 @@
 :root .footer { --radius-control: var(--radius-primary-action); display: block; width: 100%; flex-shrink: 0; }
 :root .footer:empty { display: none; }
 :root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
+html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 /* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
 :root .panel[data-footer-align='center'] .actions { justify-content: center; }
 :root .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
