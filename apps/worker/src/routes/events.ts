@@ -1,3 +1,4 @@
+import { eventModeRemaining } from '../services/event-mode-capacity.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';
@@ -3061,6 +3062,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     slot_id?: string;
     customer_note?: string | null;
     party_size?: unknown;
+    participation_mode?: unknown;
     answers?: unknown;
   };
   if (typeof body.slot_id !== 'string' || body.slot_id.length === 0) {
@@ -3076,6 +3078,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     return finalize(422, { error: 'invalid_party_size' });
   }
   const partySize = requestedPartySize as number;
+  const participationMode=body.participation_mode??'classroom';
+  if(participationMode!=='classroom'&&participationMode!=='online')return finalize(422,{error:'invalid_participation_mode'});
   const answerSnapshot = serializeAnswerSnapshot(body.answers);
   if (!answerSnapshot.ok) return finalize(422, { error: 'invalid_answers' });
   // 必須の質問に答えていない申込は受け付けない。定義に無いidへの回答は
@@ -3150,8 +3154,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
            (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
             party_size, answer_snapshot_json, first_participation,
             first_participation_attended_count, first_participation_checked_at,
-            event_version_id, event_snapshot_json, created_at, updated_at)
-         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?
+            event_version_id, event_snapshot_json, created_at, updated_at, participation_mode)
+         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE NOT EXISTS (
             SELECT 1 FROM event_bookings
              WHERE event_id = ? AND slot_id = ? AND identity_key = ?
@@ -3179,6 +3183,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         bookingSnapshotJson,
         firstParticipationCheckedAt,
         firstParticipationCheckedAt,
+        participationMode,
         event.id, slot.id, identityKey,
         event.max_bookings_per_friend, event.id, identityKey, event.max_bookings_per_friend,
       )
@@ -3235,6 +3240,9 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     }
   }
 
+  const modeRemaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
+  if(modeRemaining!==null&&partySize>modeRemaining){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
+
   // 同一人物 (cross-account) の active 予約数を identity_key ベースでカウント。
   // 重複制限ロジック:
   //   - max=null: 制限なし (admin UI の「制限なし」と整合)、チェックスキップ
@@ -3287,8 +3295,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
           requested_at, identity_key, party_size, answer_snapshot_json,
           first_participation, first_participation_attended_count,
           first_participation_checked_at, event_version_id, event_snapshot_json,
-          approval_expires_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          approval_expires_at, participation_mode)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE NOT EXISTS (
           SELECT 1 FROM event_waitlist
            WHERE event_id = ? AND slot_id = ? AND identity_key = ?
@@ -3306,13 +3314,15 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       body.customer_note ?? null, nowIso, identityKey, partySize,
       answerSnapshot.json, firstParticipationIsFirst, priorAttendedCount,
       firstParticipationCheckedAt,
-      event.current_published_version_id, bookingSnapshotJson, approvalExpiresAt,
+      event.current_published_version_id, bookingSnapshotJson, approvalExpiresAt, participationMode,
       event.id, slot.id, identityKey,
       event.max_bookings_per_friend, event.id, identityKey,
       event.id, identityKey, event.max_bookings_per_friend,
     )
     .run();
   if ((bookingInserted.meta?.changes ?? 0) === 0) {
+    const remaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
+    if(remaining!==null&&remaining<partySize){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
     // 同じ回の待ちが先に成立した場合は、その順番・人数・回答を維持する。
     // 別の回のwaitingは予約上限を消費せず、席を保留したoffered/acceptedだけ数える。
     const waiting = await c.env.DB

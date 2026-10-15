@@ -90,3 +90,4 @@ export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmen
 
 export * from './booking-entitlements.js';
 export * from './payment-status.js';
+export * from './style-api.js';

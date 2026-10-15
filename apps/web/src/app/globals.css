@@ -954,6 +954,15 @@
   --tpl-wc-ct-time-w: 56px; --tpl-wc-ct-toggle-gap: 10px; --tpl-wc-ct-band-pad: 12px 16px; --tpl-wc-ct-preview-gap: 8px; --tpl-wc-ct-card-gap: var(--polish-space-row); --tpl-wc-ct-button-pad: 7px 12px;
   --tpl-wc-rv-band-pad: 10px 12px; --tpl-wc-rv-summary-gap: 14px;
   --tpl-head-gap: var(--polish-space-row); --tpl-desc-size: var(--polish-text-body); --tpl-desc-lh: 19px;
+  /* 業種ダッシュボード（XBkC2：NqAvL・mOAX5・R0FFqz・k2MBw・KcRVI・hqQLV・UTxFu・tMIuZ・UtmIg・R28Jqt・wFmQa・wXOm6）。 */
+  --tpl-sd-side-w: 300px; --tpl-sd-roster-w: 380px; --tpl-sd-col-gap: 20px; --tpl-sd-side-gap: 10px; --tpl-sd-row-h: 56px; --tpl-sd-head-h: 36px;
+  --tpl-sd-col-time: 40px; --tpl-sd-col-time-wide: 72px; --tpl-sd-col-people: 32px; --tpl-sd-col-seat: 44px; --tpl-sd-col-course: 108px; --tpl-sd-col-pay: 92px; --tpl-sd-col-pay-narrow: 92px;
+  --tpl-sd-col-state: 80px; --tpl-sd-col-state-narrow: 84px; --tpl-sd-col-action: 112px; --tpl-sd-col-action-wide: 120px; --tpl-sd-col-staff: 40px; --tpl-sd-col-meet: 98px; --tpl-sd-col-fill: 88px; --tpl-sd-col-menu: 28px;
+  --tpl-sd-fill-w: 72px; --tpl-sd-fill-h: 4px; --tpl-sd-search-w: 220px; --tpl-sd-hour: 52px; --tpl-sd-week-hour: 48px; --tpl-sd-board-top: 8px; --tpl-sd-entry-gap: 4px; --tpl-sd-free-h: 22px;
+  --tpl-sd-time-col: 56px; --tpl-sd-staff-h: 60px; --tpl-sd-tools-h: 60px; --tpl-sd-face: 32px; --tpl-sd-month-cell: 92px; --tpl-sd-chart-h: 160px; --tpl-sd-metric-gap: 6px; --tpl-sd-split-h: 8px; --tpl-sd-bar-h: 6px;
+  --tpl-sd-dialog-w: 480px; --tpl-sd-now: #b3261e; --tpl-sd-past: rgb(29 29 31 / 0.024); --tpl-sd-line: rgb(29 29 31 / 0.07); --tpl-sd-line-soft: rgb(29 29 31 / 0.03);
+  --tpl-sd-booked: rgb(37 99 235 / 0.08); --tpl-sd-active: rgb(22 163 74 / 0.12); --tpl-sd-done: #f2f4f7; --tpl-sd-pending: rgb(249 115 22 / 0.1); --tpl-sd-free: rgb(22 163 74 / 0.08);
+  --tpl-sd-amber: #94600a; --tpl-sd-date-w: 176px; --tpl-sd-date-short-w: 152px; --tpl-sd-entry-pad: 6px 10px 6px 12px; --tpl-sd-name-min: 120px; --tpl-sd-accent-w: 3px; --tpl-sd-ring: 2px; --tpl-sd-week-today: #e8f5ec;
   /* リマインダの作る②〜⑤・詳細（YChR6・r1l0bT・T0nis・hjNpJ・k32cn・rbAig・loVfW・RwVo5）。 */
   --tpl-rm-back-size: 13px; --tpl-rm-label-size: var(--polish-text-support); --tpl-rm-label-lh: 19px; --tpl-rm-note-size: var(--polish-text-note); --tpl-rm-note-lh: 17px; --tpl-rm-small-size: var(--polish-text-support); --tpl-rm-small-lh: 16px; --tpl-rm-tiny-size: 10px; --tpl-rm-tiny-lh: 13px; --tpl-rm-body-size: var(--polish-text-body); --tpl-rm-title-lh: 22px; --tpl-rm-form-title-lh: 1.4; --tpl-rm-form-note-lh: 1.3; --tpl-rm-loose-lh: 1.5; --tpl-rm-rule-lh: 22px;
   --tpl-rm-row-gap-sm: 8px; --tpl-rm-row-gap: 10px; --tpl-rm-row-gap-lg: 12px; --tpl-rm-side-row-gap: var(--polish-space-row); --tpl-rm-choice-gap: 12px; --tpl-rm-field-grid: minmax(0, 1fr) 220px; --tpl-rm-tpl-card-h: 150px;

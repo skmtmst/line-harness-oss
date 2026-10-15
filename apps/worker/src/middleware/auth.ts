@@ -279,6 +279,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
   // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
   [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],

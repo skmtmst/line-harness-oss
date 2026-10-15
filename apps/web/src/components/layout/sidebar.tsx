@@ -29,6 +29,42 @@ import {
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
 
+function watchNavOverflow(nav: HTMLElement | null) {
+  if (!nav || typeof ResizeObserver === 'undefined') return
+  const update = () => {
+    const more = nav.scrollHeight - nav.clientHeight - nav.scrollTop > 1
+    const above = nav.scrollTop > 1
+    let cutTop = 0
+    let cutBottom = 0
+    if (more || above) {
+      const box = nav.getBoundingClientRect()
+      for (const row of Array.from(nav.querySelectorAll<HTMLElement>('a, button'))) {
+        const rect = row.getBoundingClientRect()
+        if (rect.height === 0) continue
+        if (more && rect.top < box.bottom && rect.bottom > box.bottom) cutBottom = Math.max(cutBottom, box.bottom - rect.top)
+        if (above && rect.top < box.top && rect.bottom > box.top) cutTop = Math.max(cutTop, rect.bottom - box.top)
+      }
+    }
+    nav.style.setProperty('--nav-cut-top', `${Math.ceil(cutTop)}px`)
+    nav.style.setProperty('--nav-cut-bottom', `${Math.ceil(cutBottom)}px`)
+    if (more || above) nav.setAttribute('data-clipped', '')
+    else nav.removeAttribute('data-clipped')
+  }
+  update()
+  nav.addEventListener('scroll', update, { passive: true })
+  const observer = new ResizeObserver(update)
+  observer.observe(nav)
+  for (const child of Array.from(nav.children)) observer.observe(child)
+  // 区分が後から足される・開閉されるときも測り直す。
+  const mutations = new MutationObserver(update)
+  mutations.observe(nav, { childList: true, subtree: true })
+  return () => {
+    nav.removeEventListener('scroll', update)
+    observer.disconnect()
+    mutations.disconnect()
+  }
+}
+
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
