@@ -1,7 +1,7 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
 import { ArrowLeft, Check } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
@@ -46,13 +46,32 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [closing, setClosing] = useState(false)
+  const [loadedTicket, setLoadedTicket] = useState<typeof ticket>(null)
+  const [ticketError, setTicketError] = useState('')
+  const [ticketAttempt, setTicketAttempt] = useState(0)
+  useEffect(() => {
+    if (!approving || ticket) return
+    let current = true
+    setLoadedTicket(null); setTicketError('')
+    void opsCall(api.ops.support.ticket(initial.sourceRequestId)).then(result => {
+      if (!current) return
+      if (!result.success || result.data.ticket.id !== initial.sourceRequestId) {
+        setTicketError('元の問い合わせの状態を確認できませんでした。もう一度読み込んでください。')
+        return
+      }
+      const source = result.data.ticket
+      setLoadedTicket({ label: source.ticketLabel, resolved: source.stage === 'resolved' || source.stage === 'closed', stageLabel: source.stageLabel })
+    })
+    return () => { current = false }
+  }, [approving, initial.sourceRequestId, ticket, ticketAttempt])
+  const sourceTicket = ticket ?? loadedTicket
 
   const editing = initial.reviewState === 'approved' && initial.sourceCurrent
   const eligible = article.sourceCurrent && (article.articleKind === 'verified'
     ? article.reviewState === 'pending' && article.evidence.length >= 2
     : (article.reviewState === 'pending' || article.reviewState === 'needs_review'))
   const canApprove = eligible && Boolean(form.question.trim()) && Boolean(form.answer.trim())
-  const ticketBlocked = Boolean(ticket && !ticket.resolved)
+  const ticketBlocked = !sourceTicket?.resolved
 
   const input = () => ({ ...form, keywords: keywords.split(/[、,\n]/).map((v) => v.trim()).filter(Boolean) })
   const change = <K extends keyof OpsKnowledgeInput>(key: K, value: OpsKnowledgeInput[K]) => {
@@ -178,14 +197,14 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
         <Dialog
           open={approving}
           title="記事を承認する前に"
-          designNode="eSXxA"
+          designNode="eSXxA" designTop={240}
           busy={busy}
           error={error || undefined}
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
             <DialogActions>
               <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? '元の問い合わせを解決にしてから承認してください' : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check aria-hidden="true" />保存して承認</Button>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check aria-hidden="true" />保存して承認</Button>
             </DialogActions>
           )}
         >
@@ -194,9 +213,10 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             <SaveErrorField names={["readChecked","read_checked"]}><Checkbox checked={readChecked} disabled={busy || !eligible} onCheckedChange={setReadChecked}>
               本文と手順を読み、いまの作りと合っていることを確かめました
             </Checkbox></SaveErrorField>
-            {ticket ? <Checkbox checked={ticket.resolved} disabled onCheckedChange={() => {}}>元の問い合わせ {ticket.label} が「解決」になっている</Checkbox> : null}
-            {ticketBlocked ? <Notice tone="danger">元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。</Notice> : null}
-            <p className={parts.dialogNote}>承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</p>
+            {sourceTicket ? <Checkbox checked={sourceTicket.resolved} disabled title="元の問い合わせの状態は問い合わせ側で変更します。" onCheckedChange={() => {}}>元の問い合わせ {sourceTicket.label} が「解決」になっている</Checkbox> : null}
+            {sourceTicket && ticketBlocked ? <Notice tone="danger" appearance="soft" density="compact" icon={null}>{`元の問い合わせ ${sourceTicket.label} がまだ「${sourceTicket.stageLabel}」です。解決にしてから承認できます。`}</Notice> : null}
+            {!sourceTicket ? <Notice tone={ticketError ? 'danger' : 'info'} action={ticketError ? <Button onClick={() => setTicketAttempt(value => value + 1)}>もう一度読み込む</Button> : undefined}>{ticketError || '元の問い合わせの状態を確認しています。'}</Notice> : null}
+            <p className={styles.evidence}>承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</p>
           </div>
         </Dialog>
       )}
