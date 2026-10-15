@@ -21,6 +21,10 @@
   align-items: center;
 }
 
+.labeledRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); align-items: start; }
+.labeledRow > * { min-width: 0; }
+.labeledRow .body { display: block; }
+
 .stack {
   flex-direction: column;
 }
@@ -187,6 +191,7 @@
 }
 
 @container v8-page (width < 1100px) {
+  .labeledRow { grid-template-columns: minmax(0, 1fr); }
   .row { flex-direction: column; align-items: stretch; }
   .row .kind { flex: none; width: 100%; }
   .row .body { flex: none; }

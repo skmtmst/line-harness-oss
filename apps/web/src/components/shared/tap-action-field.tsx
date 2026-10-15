@@ -31,6 +31,7 @@ import { ENTITY_KINDS, EntityKindDialog, type EntityKind } from './entity-picker
 import Select from './select'
 import { TextField } from './text-field'
 import styles from './tap-action-field.module.css'
+import { Field } from './form-controls'
 
 export const TAP_ACTION_ICONS: Record<TapActionKind, LucideIcon> = {
   uri: ExternalLink,
@@ -90,6 +91,8 @@ export interface TapActionFieldProps {
   sources?: TapActionSources
   /** 'row'＝押したら・中身を横に並べる（ボタンの行）。'stack'＝縦に積む（狭い右の列）。 */
   layout?: 'row' | 'stack'
+  /** ボタンの文字などを種類・中身と同じ行へ置く。指定時だけ3列にする。 */
+  labelControl?: ReactNode
   /** 作成の面で種類を直接選ぶ。指定しない欄は既存のSelect。 */
   kindPresentation?: 'select' | 'grid'
   /** テキストを送るの文字数の上限（LINE の決まりは画面ごとに違う）。 */
@@ -118,7 +121,7 @@ export default function TapActionField({
   id, invalid, 'aria-describedby': saveDescription,
   name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
-  layout = 'row', kindPresentation = 'select', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
+  layout = 'row', labelControl, kindPresentation = 'select', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
 }: TapActionFieldProps) {
   const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
   const current = options.find((option) => option.value === value.kind)
@@ -218,9 +221,10 @@ export default function TapActionField({
   }
 
   return (
-    <div id={id} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined} className={styles.withExtras}><div className={`${styles.root} ${kindPresentation === 'grid' ? styles.grid : layout === 'stack' ? styles.stack : styles.row}`} data-tap-kind={value.kind}>
-      <div className={styles.kind}>{kindControl}</div>
-      <div className={styles.body}>{body}</div>
+    <div id={id} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined} className={styles.withExtras}><div className={`${styles.root} ${labelControl ? styles.labeledRow : kindPresentation === 'grid' ? styles.grid : layout === 'stack' ? styles.stack : styles.row}`} data-tap-kind={value.kind} data-tap-action-columns={labelControl ? '3' : undefined}>
+      {labelControl ?? null}
+      <div className={styles.kind}>{labelControl ? <Field label="押したら">{kindControl}</Field> : kindControl}</div>
+      <div className={styles.body}>{labelControl ? <Field label="中身">{body}</Field> : body}</div>
     </div>
     {allowExtras ? <TapExtrasField name={name} value={value.tapExtras} onChange={tapExtras => onChange({ tapExtras })} accountId={accountId} readOnly={readOnly} unavailable={extrasUnavailable} error={extrasError} /> : null}
     </div>
