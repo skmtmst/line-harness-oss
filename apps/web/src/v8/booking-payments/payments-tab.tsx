@@ -2,20 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, Check, CreditCard, ExternalLink, Link2, Split, Store } from 'lucide-react'
+import { AlertTriangle, CreditCard, ExternalLink, Plug, Split, Store } from 'lucide-react'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { notifySaved } from '@/components/shared/toast'
 import { formatListTimestamp } from '@/lib/format'
 import { ApiError, bookingApi, type BookingPaymentAdminConfig } from '@/lib/api'
 import { bookingPaymentAdminApi, type BookingPaymentMode, type StripeConnection } from '@/lib/api-booking-payment-admin'
 import { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from '../booking-menus/tabs/shared'
 import settings from '../booking-menus/settings.module.css'
-import { NOT_READY, providerFor } from './labels'
+import { providerFor } from './labels'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { TestModeBadge } from '@/components/shared/payment-badges'
 import PaymentRecords from './records'
 import PaymentEvents from './events'
 import styles from './payments.module.css'
@@ -32,8 +34,10 @@ const HOLD_CHOICES = [5, 10, 15, 30, 60]
 const METHOD_CHOICES: Array<{ value: BookingPaymentMode; title: string; note: string; icon: ReactNode }> = [
   { value: 'onsite', title: 'お店で払う', note: '来店したときに払う', icon: <Store size={16} aria-hidden="true" /> },
   { value: 'online', title: 'オンラインで先払い', note: '予約のときにカードで払う', icon: <CreditCard size={16} aria-hidden="true" /> },
-  { value: 'customer_choice', title: 'お客さまが選ぶ', note: '先払いか、お店で払うか', icon: <Split size={16} aria-hidden="true" /> },
 ]
+/* 「お客さまが選ぶ」は絵（T91bV・B-338）のいつもの方法には置かない。すでに選んでいる店だけ 3 つ目に出す。 */
+const CHOICE_CUSTOMER = { value: 'customer_choice' as BookingPaymentMode, title: 'お客さまが選ぶ', note: '先払いか、お店で払うか', icon: <Split size={16} aria-hidden="true" /> }
+const METHOD_NOTE = '店のいつもはお店で払う。コースなど先に払ってほしい物だけ、メニューの「お支払い」で先払いにします。'
 
 function normalMode(mode: BookingPaymentMode | undefined): BookingPaymentMode {
   return !mode || mode === 'none' ? 'onsite' : mode
@@ -58,6 +62,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const generation = useRef(0)
+  const preparing = usePreparingDialog()
 
   const load = useCallback(async () => {
     const mine = ++generation.current
@@ -96,7 +101,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       setSaveError(cause instanceof ApiError && cause.status === 403
         ? 'この設定を変える権限がありません。'
         : mode === 'customer_choice' && cause instanceof ApiError && cause.status === 400
-          ? `${NOT_READY}「お客さまが選ぶ」は、データの準備が済むと保存できます。`
+          ? '「お客さまが選ぶ」は、データの準備が済むと保存できます。'
           : '保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)
@@ -107,7 +112,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
     dirty,
     saving,
     subject: 'お支払いの設定への変更',
-    saveDisabled: !canEdit || view !== 'settings' || !link.connected,
+    saveDisabled: !canEdit || view !== 'settings',
     onSave: () => void save(),
     onReset: () => { if (config) { setMode(savedMode); setHold(config.holdMinutes); setSaveError(null) } },
   })
@@ -119,11 +124,11 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
     return <StateCard icon={<AccountIcon />} title="お支払いの設定を読み込めませんでした" description="通信状態を確認して、もう一度お試しください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
   }
 
-  if (!link.connected) return <ConnectCard canEdit={canEdit} />
-
   const testMode = link.testMode
+  const connected = link.connected
+  const choices = connected ? [...METHOD_CHOICES, ...(savedMode === 'customer_choice' ? [CHOICE_CUSTOMER] : [])] : METHOD_CHOICES.slice(0, 1)
   return (
-    <div className={settings.tabStack} data-design="Payments">
+    <div className={settings.tabStack} data-design={connected ? 'Payments' : 'PaymentsNotConnected'}>
       {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
       <section className={settings.section} aria-labelledby="payments-provider-heading">
         <div className={styles.headRow}>
@@ -135,20 +140,25 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
           <div className={styles.providerText}>
             <span className={styles.providerName}>
               Stripe
-              <StatusBadge tone="success" size="compact">つながっている</StatusBadge>
-              {testMode ? <StatusBadge tone="warning" size="compact">試験モード</StatusBadge> : null}
+              {connected ? <StatusBadge tone="success" size="compact">つながっている</StatusBadge> : null}
+              {connected && testMode ? <TestModeBadge /> : null}
             </span>
             <span className={styles.providerMeta}>
-              {link.accountIdTail ? `アカウント acct_••••${link.accountIdTail}` : 'アカウント：決済サービスの設定から読みます'}
-              {link.connectedAt ? `・${formatListTimestamp(link.connectedAt)} につないだ` : ''}
+              {connected
+                ? <>{link.accountIdTail ? `アカウント acct_••••${link.accountIdTail}` : 'アカウント：決済サービスの設定から読みます'}{link.connectedAt ? `・${formatListTimestamp(link.connectedAt)} につないだ` : ''}</>
+                : 'まだつないでいません。つなぐと、予約のときにカードで先に払ってもらえます'}
             </span>
           </div>
           <div className={styles.providerActions}>
-            <Button href={link.dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} aria-hidden="true" />Stripe の管理画面を開く</Button>
-            {canEdit ? <Button onClick={() => notifyToast(`${NOT_READY}つなぎ直す操作は、本部の承認のあとに使えます。`)}>つなぎ直す</Button> : null}
+            {connected ? <Button href={link.dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} aria-hidden="true" />Stripe の管理画面を開く</Button> : null}
+            {canEdit ? (connected
+              ? <Button onClick={() => preparing.open('Stripe のつなぎ直し')}>つなぎ直す</Button>
+              : <Button variant="primary" onClick={() => preparing.open('Stripe をつなぐ')}><Plug size={15} aria-hidden="true" />Stripe をつなぐ</Button>) : null}
           </div>
         </div>
-        {testMode ? <Notice tone="warn" icon={<AlertTriangle size={16} aria-hidden="true" />}>試験モードです。本当の請求は起きません。本番に切り替えるのは、本部の承認のあとです。</Notice> : null}
+        {connected
+          ? (testMode ? <Notice tone="warn" icon={<AlertTriangle size={16} aria-hidden="true" />}>試験モードです。本当の請求は起きません。本番に切り替えるのは、本部の承認のあとです。</Notice> : null)
+          : <Notice tone="warn" icon={<AlertTriangle size={16} aria-hidden="true" />}>つなぐまでは、お客さまはお店で払うだけです。つないだ後も最初は試験モードで、本番は本部の承認のあとです。</Notice>}
       </section>
 
       <section className={settings.section} aria-labelledby="payments-method-heading">
@@ -157,16 +167,17 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
           <HelpTip label="いつもの支払い方法の説明">メニュー・コース・クラスで「このメニューだけ変える」を選んでいないときに使う方法です。</HelpTip>
         </div>
         {canEdit ? (
-          <RadioCardGroup legend="いつもの支払い方法" columns={3}>
-            {METHOD_CHOICES.map((choice) => (
+          <RadioCardGroup legend="いつもの支払い方法" columns={choices.length > 2 ? 3 : choices.length === 2 ? 2 : undefined}>
+            {choices.map((choice) => (
               <RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
                 icon={choice.icon} checked={mode === choice.value} onChange={(value) => setMode(value as BookingPaymentMode)} />
             ))}
           </RadioCardGroup>
-        ) : <p className={styles.readValue}>{METHOD_CHOICES.find((choice) => choice.value === mode)?.title}</p>}
-        <p className={styles.minor}>メニュー・コース・クラスごとに変えられます（メニューの「お支払い」）。</p>
+        ) : <p className={styles.readValue}>{[...METHOD_CHOICES, CHOICE_CUSTOMER].find((choice) => choice.value === mode)?.title}</p>}
+        <p className={styles.minor}>{METHOD_NOTE}</p>
       </section>
 
+      {connected ? (
       <section className={settings.section} aria-labelledby="payments-hold-heading">
         <div className={styles.headRow}>
           <h2 id="payments-hold-heading" className={settings.sectionTitle}>お支払いを待つ時間</h2>
@@ -185,25 +196,8 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
           <span className={styles.minor}>キャンセルの期限までに取り消されたときは、自動で返金します。期限を過ぎた取り消しは返金しません。</span>
         </div>
       </section>
-    </div>
-  )
-}
-
-/** つなぐ前（UteeA の左）。つなぐ操作の口はまだ無い（B-314：押すと準備中の案内）。 */
-function ConnectCard({ canEdit }: { canEdit: boolean }) {
-  return (
-    <div className={styles.connectLayout} data-design="PaymentsConnect">
-      <section className={styles.connectCard} aria-labelledby="payments-connect-heading">
-        <span className={styles.providerMark} aria-hidden="true">S</span>
-        <h2 id="payments-connect-heading" className={styles.connectTitle}>Stripe をつなぐと、先払いを受け取れます</h2>
-        <ul className={styles.connectList}>
-          <li><Check size={14} aria-hidden="true" />カード・Apple Pay・Google Pay で払ってもらえます</li>
-          <li><Check size={14} aria-hidden="true" />返金は予約の画面から押すだけです</li>
-          <li><Check size={14} aria-hidden="true" />カード番号はお店にも musubo にも残りません</li>
-        </ul>
-        {canEdit ? <Button variant="primary" onClick={() => notifyToast(`${NOT_READY}Stripe をつなぐ画面は、もうすぐ使えるようになります。`)}><Link2 size={15} aria-hidden="true" />Stripe をつなぐ</Button> : null}
-        <p className={styles.minor}>最初は試験モードでつながります。本番は本部の承認のあとです。</p>
-      </section>
+      ) : null}
+      {preparing.dialog}
     </div>
   )
 }

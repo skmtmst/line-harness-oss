@@ -348,3 +348,20 @@
   font-size: var(--tpl-bm-13);
   font-weight: 700;
 }
+
+.eventKind {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  min-width: 0;
+}
+
+.eventKind > .cellStack {
+  flex: 1;
+}
+
+.eventFix {
+  display: flex;
+  flex: none;
+  gap: var(--tpl-bm-8);
+}

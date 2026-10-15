@@ -4,6 +4,10 @@ import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import Card from './ui/Card.js';
 import Badge from './ui/Badge.js';
 import Button from './ui/Button.js';
+import Icon from './ui/Icon.js';
+import PaymentBadge from './PaymentBadge.js';
+import type { BookingPayment } from '../lib/api.js';
+import { paymentStatusKey } from '@line-crm/shared';
 
 /**
  * 予約の履歴の札 (★V8・YvTJ3)。日付の四角＋メニュー名＋状態の札。
@@ -14,15 +18,23 @@ export default function HistoryCard({
   booking,
   onChange,
   onCancel,
+  onPay,
+  payment = null,
   disabled = false,
 }: {
   booking: BookingHistoryItem;
   onChange?: () => void;
   onCancel?: () => void;
+  /** 未払いのときの［お支払いへ進む］（B-338・nWby5）。 */
+  onPay?: () => void;
+  /** この予約のお支払い（先払いの予約だけ）。 */
+  payment?: BookingPayment | null;
   disabled?: boolean;
 }) {
+  const payKey = paymentStatusKey(payment?.status);
+  const unpaid = payKey === 'unpaid';
   const meta = STATUS_META[booking.status] ?? { label: booking.status, tone: 'neutral' as const };
-  const hasActions = Boolean(onChange || onCancel);
+  const hasActions = Boolean(onChange || onCancel || onPay);
   return (
     <li>
       <Card className="flex flex-col gap-2.5 p-3.5">
@@ -37,13 +49,25 @@ export default function HistoryCard({
             <div className="w-full truncate text-sm leading-normal font-bold text-ink" title={booking.menu_name}>
               {booking.menu_name}
             </div>
-            <Badge tone={meta.tone}>{meta.label}</Badge>
+            {payKey ? <PaymentBadge status={payment!.status} amount={payment?.amount ?? null} /> : <Badge tone={meta.tone}>{meta.label}</Badge>}
           </div>
         </div>
-        <BookingCancelDeadline deadline={booking.cancel_deadline_at} />
+        {unpaid && payment?.hold_until ? (
+          <div className="flex flex-col gap-1">
+            <p className="flex items-center gap-1.5 text-[12.5px] leading-[18px] font-bold text-liff-wait-ink">
+              <Icon name="clock" className="h-3.5 w-3.5 shrink-0" />
+              {`${utcToJstMd(payment.hold_until)} ${utcToJstHm(payment.hold_until)} までにお支払いください`}
+            </p>
+            <p className="text-[11.5px] leading-[17px] text-liff-sub">過ぎると予約は取り消され、枠はほかの方に回ります</p>
+          </div>
+        ) : <BookingCancelDeadline deadline={booking.cancel_deadline_at} />}
         {hasActions && (
           <div className="flex gap-2">
-            {onChange && (
+            {unpaid && onPay ? (
+              <Button variant="primary" className="flex-1" disabled={disabled} onClick={onPay}>
+                お支払いへ進む
+              </Button>
+            ) : onChange && (
               <Button variant="secondary" className="flex-1" disabled={disabled} onClick={onChange}>
                 日時を変える
               </Button>

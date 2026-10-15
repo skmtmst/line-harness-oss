@@ -13,7 +13,7 @@ import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSave
 import { formatYen } from '@/lib/format'
 import { ApiError, bookingApi } from '@/lib/api'
 import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api-booking-payment-admin'
-import { MODE_LABEL, NOT_READY, providerFor } from './labels'
+import { MODE_LABEL, providerFor } from './labels'
 import styles from './payments.module.css'
 
 /*
@@ -179,7 +179,7 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
   return (
     <>
       {conflictBand}
-      {state.status === 'not-ready' ? <Notice tone="info">{NOT_READY}このメニューだけ変える設定は、データの準備が済むと保存できます（今はいつもの方法で受けます）。</Notice> : null}
+      {state.status === 'not-ready' ? <Notice tone="info">このメニューだけ変える設定は、データの準備が済むと保存できます（今はいつもの方法で受けます）。</Notice> : null}
       <RadioCardGroup legend={`${name}のお支払い`} columns={2}>
         <RadioCard name={`${name}-payment-source`} value="default" title="いつもの方法を使う" note={`今は：${MODE_LABEL[state.defaultMode]}（予約設定 › お支払い）`}
           icon={<Settings size={16} aria-hidden="true" />} checked={!own} disabled={locked} onChange={() => state.setValue(null)} />

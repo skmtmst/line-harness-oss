@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ListOrdered, Lock, Scale, Shuffle, Wrench } from 'lucide-react'
+import { ListOrdered, Lock, Scale, Shuffle } from 'lucide-react'
 import type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentSettings } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
 import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
@@ -17,7 +17,6 @@ import { ApiError } from '@/lib/api'
 import { bookingAssignmentApi } from '@/lib/api-booking-assignment'
 import { isNotReadyError } from '@/lib/api-booking-payment-admin'
 import settings from '../booking-menus/settings.module.css'
-import { NOT_READY } from './labels'
 import styles from './assignment.module.css'
 
 /*
@@ -93,7 +92,7 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
     reload: async () => { const latest = await fetchSettings(); if (latest) { apply(latest); conflict.clear() } },
   })
 
-  const dirty = status === 'ready' && saved !== null && JSON.stringify({ method, period, resources }) !== JSON.stringify({ method: saved.method, period: saved.balancePeriod, resources: toMap(saved.resources) })
+  const dirty = (status === 'ready' || status === 'not-ready') && saved !== null && JSON.stringify({ method, period, resources }) !== JSON.stringify({ method: saved.method, period: saved.balancePeriod, resources: toMap(saved.resources) })
 
   const write = useCallback(async (order: string[], version: number) => {
     if (!target) return
@@ -138,15 +137,13 @@ const METHODS: Array<{ value: BookingAssignmentMethod; title: string; icon: Reac
 /** 割り当て方の区画（題・準備中の帯・3 つの選び方・数える期間）。 */
 export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentState; kind: 'staff' | 'tables'; canEdit: boolean }) {
   const staff = kind === 'staff'
-  const locked = state.status !== 'ready'
+  /* 表がまだ無い（not-ready）ときも選べる形で出し、保存を押すと共通の準備中の窓（B-321：手書きの帯は出さない）。 */
+  const locked = state.status === 'loading' || state.status === 'error'
   const notes: Record<BookingAssignmentMethod, string> = staff
     ? { balanced: '担当の少ない人から入れます', priority: '決めた順番で埋めます', random: '空いている人から無作為に' }
     : { balanced: 'その日の予約の少ない卓から', priority: '決めた順番で埋めます', random: '空いている卓から無作為に' }
   return (
     <>
-      {state.status === 'not-ready' ? (
-        <Notice tone="info" icon={<Wrench size={16} aria-hidden="true" />}>{`${NOT_READY}データの準備が済むまで、割り当て方は保存できません（今は一覧の上の${staff ? '人' : '卓'}から入ります）。`}</Notice>
-      ) : null}
       {state.error ? <Notice tone="danger" role="alert">{state.error}</Notice> : null}
       <section className={settings.section} aria-labelledby={`assign-${kind}-heading`}>
         <div className={styles.headRow}>

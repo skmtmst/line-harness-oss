@@ -79,7 +79,7 @@ export default function EntitlementsCard({ accountId, friendId, friendName, canE
   return (
     <Card variant="form" gap="normal">
       <CardHeader size="stacked" title="回数券・月謝" action={canEdit && state === 'ready' ? <Button onClick={() => setDialog({ action: 'give', id: items[0]?.id ?? NEW_TICKET })}><Plus size={15} aria-hidden="true" />手で入れる</Button> : undefined} />
-      {state === 'not-ready' ? <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>現在準備中です。回数券・月謝は、データの準備が済むと店が手で入れられます。</Notice>
+      {state === 'not-ready' ? <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>回数券・月謝は、データの準備が済むと店が手で入れられます。</Notice>
         : state === 'loading' ? <ListState kind="loading" title="回数券・月謝を読み込んでいます" />
           : state === 'error' ? <ListState kind="error" title="回数券・月謝を表示できませんでした" onRetry={() => void reload()} />
             : items.length === 0 ? <p className={styles.minor}>持っている回数券・月謝はありません。店頭で売ったときや紙の回数券を引き継ぐときは［手で入れる］から。</p>
@@ -183,7 +183,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
     } catch (cause) {
       setError(cause instanceof ApiError && cause.status === 409 ? 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。'
         : cause instanceof ApiError && cause.status === 403 ? '回数券を変える権限がありません。'
-          : isNotReadyError(cause) ? '現在準備中です。データの準備が済むと保存できます。'
+          : isNotReadyError(cause) ? 'データの準備が済むと保存できます。'
             : '保存できませんでした。もう一度お試しください。')
     } finally {
       setBusy(false)

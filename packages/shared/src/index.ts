@@ -88,3 +88,4 @@ export * from './restaurant-followup.js';
 export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings } from './booking-assignment.js';
 
 export * from './booking-entitlements.js';
+export * from './payment-status.js';

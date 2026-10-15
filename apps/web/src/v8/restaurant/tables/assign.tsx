@@ -9,6 +9,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { RowMenu } from '@/components/shared/row-actions'
 import { ActionCell, DataTable, RowNameButton, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Card from '@/components/shared/card'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { jstDate } from '@/lib/jst-datetime'
@@ -33,6 +34,7 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
   const rows: RestaurantTable[] = (store ? data.tables.filter((table) => table.store_id === store.id) : data.tables).filter((table) => table.is_active)
   const order = rows.map((table) => table.id)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const preparing = usePreparingDialog()
   const [target, setTarget] = useState<RestaurantTable | null>(null)
   const today = jstDate(new Date())
   const todayCount = (id: string) => data.reservations.filter((item) => item.table_id === id && jstDate(new Date(item.starts_at)) === today && !['cancelled', 'no_show', 'rejected'].includes(item.status)).length
@@ -64,9 +66,10 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
       {canEdit ? (
         <StickyBar actions={<>
           <Button onClick={assignment.reset} disabled={assignment.saving}>キャンセル</Button>
-          <Button variant="primary" busy={assignment.saving} onClick={() => { if (!assignment.dirty) { notifyToast('変更はありません。'); return } void assignment.save(order) }}><Check size={15} aria-hidden="true" />保存する</Button>
+          <Button variant="primary" busy={assignment.saving} onClick={() => { if (!assignment.dirty) { notifyToast('変更はありません。'); return } if (assignment.status === 'not-ready') { preparing.open('卓の割り当て方の保存'); return } void assignment.save(order) }}><Check size={15} aria-hidden="true" />保存する</Button>
         </>} />
       ) : null}
+      {preparing.dialog}
       <AssignmentRowDialog open={target !== null} name={target ? `卓 ${target.code}` : ''} unit="組" value={target ? assignment.resources[target.id] : undefined}
         onClose={() => setTarget(null)} onApply={(patch) => { if (target) assignment.setResource(target.id, patch) }} />
       <AssignmentConflict state={assignment} unit="組" order={order} subject="卓の割り当て方" names={Object.fromEntries(rows.map((table) => [table.id, `卓 ${table.code}`]))} />
