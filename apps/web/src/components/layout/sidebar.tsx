@@ -128,6 +128,21 @@ export function clearSidebarCountCache(): void {
 /** 統括の左メニューを出す住所。決め方は上の帯と同じものを使う（`@/lib/menu`）。 */
 export { isHqShellPath }
 
+/**
+ * 巻く領域（左メニューの項目の並び）の中で、項目が上下とも見える所まで巻く。
+ * scrollIntoView は外のページまで巻くので使わない。上下に 8px の余裕を残す。
+ */
+export function revealInScroller(scroller: HTMLElement, item: HTMLElement, margin = 8) {
+  const box = scroller.getBoundingClientRect()
+  const rect = item.getBoundingClientRect()
+  if (box.height === 0 || rect.height === 0) return
+  if (rect.top < box.top + margin) {
+    scroller.scrollTop -= box.top + margin - rect.top
+  } else if (rect.bottom > box.bottom - margin) {
+    scroller.scrollTop += rect.bottom - (box.bottom - margin)
+  }
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -537,27 +552,6 @@ export default function Sidebar({
   }, [selectedAccountId, photosBadgeVisible])
 
   useEffect(() => { setIsOpen(false) }, [pathname])
-  /* メニューが縦に送られるとき、いま開いている項目が下の設定・本人カードに隠れないよう、メニューの中だけを送る。 */
-  /* 広い幅の列とスマホの引き出しの両方に同じメニューがあるので、それぞれ送る。 */
-  const navs = useRef(new Set<HTMLElement>())
-  const navRef = (node: HTMLElement | null) => { if (node) navs.current.add(node) }
-  useEffect(() => {
-    const reveal = () => {
-      for (const nav of navs.current) {
-        if (!nav.isConnected) { navs.current.delete(nav); continue }
-        const current = nav.querySelector<HTMLElement>('[aria-current="page"]')
-        if (!current || nav.clientHeight === 0) continue
-        const top = current.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop
-        const bottom = top + current.getBoundingClientRect().height
-        if (top < nav.scrollTop) nav.scrollTop = top
-        else if (bottom > nav.scrollTop + nav.clientHeight) nav.scrollTop = bottom - nav.clientHeight
-      }
-    }
-    reveal()
-    // 項目・件数は後から読み込まれて高さが変わる。開いた直後の短い間だけ見直す（人がたたんだ・送った後は動かさない）。
-    const timers = [150, 500, 1200].map((ms) => window.setTimeout(reveal, ms))
-    return () => { for (const timer of timers) window.clearTimeout(timer) }
-  }, [pathname])
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -571,6 +565,7 @@ export default function Sidebar({
    */
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLElement>(null)
+  const desktopRef = useRef<HTMLElement>(null)
   const wasOpen = useRef(false)
   useEffect(() => {
     if (isOpen) {
@@ -681,6 +676,31 @@ export default function Sidebar({
     sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
   )
 
+  /*
+   * いまの画面の項目を、左メニューを開いたときに必ず全部見える位置へ巻く（2026-10-15 判定役）。
+   * 項目が多いと、下の方の項目（NEN配信など）が巻く領域の下端で半分切れ、
+   * 下に固定した「設定」の帯の陰に隠れて見えなかった。組を開く動き（--motion-base）が
+   * 終わってからもう一度測り、領域の中だけを巻く（ページ全体は巻かない）。
+   */
+  const activeItemKey = visibleSections
+    .flatMap((section) => section.items)
+    .find((item) => isActive(item))?.id ?? ''
+  // 機能の表示可否を読み終えて項目が増減したときも測り直す。
+  const visibleItemCount = visibleSections.reduce((sum, section) => sum + section.items.length, 0)
+  useEffect(() => {
+    if (!activeItemKey) return
+    const reveal = () => {
+      for (const root of [desktopRef.current, drawerRef.current]) {
+        const nav = root?.querySelector<HTMLElement>('[data-sidebar-scroll]')
+        const item = nav?.querySelector<HTMLElement>('[data-nav-active]')
+        if (nav && item) revealInScroller(nav, item)
+      }
+    }
+    const frame = requestAnimationFrame(reveal)
+    const timer = window.setTimeout(reveal, 320)
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer) }
+  }, [activeItemKey, isOpen, visibleItemCount])
+
   /**
    * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
    *
@@ -736,7 +756,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav ref={navRef} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -814,6 +834,7 @@ export default function Sidebar({
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
                   aria-current={active ? 'page' : undefined}
+                  data-nav-active={active ? '' : undefined}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
@@ -1011,7 +1032,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
+      <aside ref={desktopRef} className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
         {sidebarContent(false)}
       </aside>
     </>
