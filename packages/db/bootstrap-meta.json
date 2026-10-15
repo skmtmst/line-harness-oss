@@ -592,7 +592,8 @@
     "652_style_outcomes_and_member_tags.sql",
     "663_booking_payment_connections.sql",
     "664_booking_payment_events.sql",
-    "665_booking_course_event_payment_settings.sql"
+    "665_booking_course_event_payment_settings.sql",
+    "681_style_setup_selection_and_auto_insert.sql"
   ],
-  "migrationCount": 593
+  "migrationCount": 594
 }

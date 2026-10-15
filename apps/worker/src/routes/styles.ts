@@ -19,7 +19,8 @@ import {
   defaultCards,
   features,
   profile,
-  questionKeys,
+  profileAnswers,
+  questionsForStyle,
   readCards,
   readDefinition,
   saveProfile,
@@ -165,14 +166,15 @@ styles.get(base, async (c) => {
     success: true,
     data: {
       style,
-      styleSelected: !!p?.selected_at,
+      styleSelected: !!p?.selected_at && p.selection_mode === 'configured',
+      styleMode: p?.selection_mode ?? 'later',
       version: p?.version ?? 0,
-      answers: JSON.parse(p?.answers_json ?? '{}'),
+      answers: profileAnswers(p),
       settings: JSON.parse(p?.settings_json ?? '{}'),
       cards: p?.cards_json ? JSON.parse(p.cards_json) : defaultCards(style),
-      questions: questionKeys.map((key) => ({
+      questions: questionsForStyle(style).map((key) => ({
         key,
-        changeAt: features[key],
+        ...(features[key] ? { changeAt: features[key] } : {}),
         canChangeLater: true,
         recommended: key === 'payment' ? false : true,
         modes: ['configured', 'later', 'manual'],
@@ -848,7 +850,7 @@ styles.get('/api/hq/style-starter-sets', async (c) => {
     success: true,
     data: (
       await c.env.DB.prepare(
-        'SELECT * FROM style_starter_sets WHERE tenant_id=? AND archived_at IS NULL',
+        `SELECT s.*, (SELECT COUNT(*) FROM account_styles p JOIN line_accounts a ON a.id=p.line_account_id WHERE a.tenant_id=s.tenant_id AND a.archived_at IS NULL AND a.is_active=1 AND p.style=s.style AND p.selection_mode='configured' AND p.selected_at IS NOT NULL) accountCount FROM style_starter_sets s WHERE s.tenant_id=? AND s.archived_at IS NULL`,
       )
         .bind(tenant)
         .all<{
@@ -857,11 +859,20 @@ styles.get('/api/hq/style-starter-sets', async (c) => {
           name: string;
           version: number;
           definition_json: string;
+          auto_insert: number;
+          updated_at: string;
+          updated_by: string | null;
+          accountCount: number;
         }>()
-    ).results.map(({ definition_json, ...r }) => ({
-      ...r,
-      definition: JSON.parse(definition_json),
-    })),
+    ).results.map(
+      ({ definition_json, auto_insert, updated_at, updated_by, ...r }) => ({
+        ...r,
+        autoInsert: !!auto_insert,
+        updatedAt: updated_at,
+        updatedBy: updated_by,
+        definition: JSON.parse(definition_json),
+      }),
+    ),
   });
 });
 styles.put('/api/hq/style-starter-sets/:style', async (c) => {
@@ -870,22 +881,26 @@ styles.put('/api/hq/style-starter-sets/:style', async (c) => {
     b = await json(c);
   const definition = readDefinition(b.definition, style),
     current = await c.env.DB.prepare(
-      'SELECT id,version FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
+      'SELECT id,version,auto_insert FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
     )
       .bind(tenant, style)
-      .first<{ id: string; version: number }>();
+      .first<{ id: string; version: number; auto_insert: number }>();
+  if (b.autoInsert !== undefined && typeof b.autoInsert !== 'boolean')
+    throw new StyleError('invalid_auto_insert');
+  const autoInsert = b.autoInsert ?? !!(current?.auto_insert ?? 1);
   version(b.expectedVersion, current?.version ?? 0);
   const id = current?.id ?? crypto.randomUUID(),
     now = new Date().toISOString();
   if (current) {
     const r = await c.env.DB.prepare(
-      'UPDATE style_starter_sets SET name=?,definition_json=?,version=version+1,updated_at=?,updated_by=? WHERE id=? AND tenant_id=? AND version=?',
+      'UPDATE style_starter_sets SET name=?,definition_json=?,version=version+1,updated_at=?,updated_by=?,auto_insert=? WHERE id=? AND tenant_id=? AND version=?',
     )
       .bind(
         text(b.name, 100) ?? style,
         JSON.stringify(definition),
         now,
         c.get('staff').id,
+        Number(autoInsert),
         id,
         tenant,
         current.version,
@@ -894,7 +909,7 @@ styles.put('/api/hq/style-starter-sets/:style', async (c) => {
     if (!r.meta.changes) throw new StyleError('version_conflict', 409);
   } else
     await c.env.DB.prepare(
-      'INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)',
+      'INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,updated_at,updated_by,auto_insert) VALUES(?,?,?,?,?,?,?,?)',
     )
       .bind(
         id,
@@ -904,11 +919,12 @@ styles.put('/api/hq/style-starter-sets/:style', async (c) => {
         JSON.stringify(definition),
         now,
         c.get('staff').id,
+        Number(autoInsert),
       )
       .run();
   return c.json({
     success: true,
-    data: { id, version: (current?.version ?? 0) + 1 },
+    data: { id, version: (current?.version ?? 0) + 1, autoInsert },
   });
 });
 styles.get('/api/hq/style-attention', async (c) => {
@@ -919,9 +935,9 @@ styles.get('/api/hq/style-attention', async (c) => {
     const a = account.id,
       queries: Record<string, string> = {
         unhandledChats: `SELECT id,'/chats' href FROM chats WHERE line_account_id=? AND status IN('unread','in_progress','on_hold')`,
-        pendingBookings: `SELECT id,'/booking/bookings' href FROM bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT id,'/events' href FROM event_bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT r.id,'/restaurant-test' href FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE s.line_account_id=? AND r.status='pending' AND r.hold_expires_at IS NULL`,
-        unpaid: `SELECT id,'/booking/settings?tab=payment' href FROM booking_payments WHERE line_account_id=? AND status IN('unpaid','pending','failed')`,
-        connections: `SELECT id,'/line-accounts' href FROM line_account_connection_checks c WHERE line_account_id=? AND result IN('failed','mismatched','unconfigured') AND NOT EXISTS(SELECT 1 FROM line_account_connection_checks n WHERE n.line_account_id=c.line_account_id AND n.check_kind=c.check_kind AND n.checked_at>c.checked_at)`,
+        pendingBookings: `SELECT id,'/booking/bookings' href FROM bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT id,'/events/bookings' href FROM event_bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT r.id,'/restaurant-test/reservations' href FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE s.line_account_id=? AND r.status='pending' AND r.hold_expires_at IS NULL`,
+        unpaid: `SELECT id FROM booking_payments WHERE line_account_id=? AND status IN('unpaid','pending','failed')`,
+        connections: `SELECT id,'/accounts' href FROM line_account_connection_checks c WHERE line_account_id=? AND result IN('failed','mismatched','unconfigured') AND NOT EXISTS(SELECT 1 FROM line_account_connection_checks n WHERE n.line_account_id=c.line_account_id AND n.check_kind=c.check_kind AND n.checked_at>c.checked_at)`,
         stoppedDeliveries: `SELECT id,'/broadcasts' href FROM broadcasts WHERE line_account_id=? AND status IN('stopped','failed')`,
       };
     const counts: Record<string, number> = {},
@@ -945,6 +961,7 @@ styles.get('/api/hq/style-attention', async (c) => {
     }
     items.push({
       accountId: a,
+      style: (await profile(c.env.DB, a))?.style ?? 'standard',
       name:
         (
           await c.env.DB.prepare('SELECT name FROM line_accounts WHERE id=?')
@@ -1207,7 +1224,11 @@ styles.post(base + '/activate', async (c) => {
           throw new StyleError('forbidden', 403);
         const p = await profile(c.env.DB, a);
         const answer = JSON.parse(p?.answers_json ?? '{}').reminders;
-        if (answer?.mode !== 'configured' || answer.value === false)
+        if (
+          p?.selection_mode !== 'configured' ||
+          answer?.mode !== 'configured' ||
+          answer.value === false
+        )
           throw new StyleError('feature_unconfigured', 422);
         const activated = await publishAutomationDraft(c.env.DB, {
           id: item.id,
@@ -1220,7 +1241,11 @@ styles.post(base + '/activate', async (c) => {
       } else {
         const setup = await profile(c.env.DB, a);
         const answer = JSON.parse(setup?.answers_json ?? '{}').booking;
-        if (answer?.mode !== 'configured' || answer.value === false)
+        if (
+          setup?.selection_mode !== 'configured' ||
+          answer?.mode !== 'configured' ||
+          answer.value === false
+        )
           throw new StyleError('feature_unconfigured', 422);
         if (!hasStaffPermission(c, '/booking/menus'))
           throw new StyleError('forbidden', 403);

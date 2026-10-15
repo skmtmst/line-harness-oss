@@ -185,6 +185,14 @@
    */
   --color-line-talk: #8cabd9;
   /*
+   * 見本のリッチメニューの画像の色（B-311 初期セット・絵 wI4ZX）。業種ごとの見本の画像そのものの色で、
+   * 画面の部品の色ではない。地と字の組で 4.5:1 以上。
+   */
+  --sample-restaurant-bg: #f6efe4; --sample-restaurant-ink: #7a4b16;
+  --sample-salon-bg: #f3ecf3; --sample-salon-ink: #6b3a68;
+  --sample-consult-bg: #eaf1f8; --sample-consult-ink: #24527a;
+  --sample-lesson-bg: #eaf5ef; --sample-lesson-ink: #1f6b46;
+  /*
    * 回答の選択肢の緑。白地に文字として載るので AA の 4.5:1 が要る。
    * 以前の #00a947 は 3.1:1。色あいはそのままに濃くした（4.64:1）。
    */

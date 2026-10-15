@@ -203,6 +203,230 @@ describe('style setup', () => {
     ).toBe(count);
     expect((await write('', { expectedVersion: 3 })).status).toBe(409);
   });
+  test('restaurant exposes all eleven owner-approved questions and retains the new answers', async () => {
+    const answers = {
+      cancelDeadline: { mode: 'configured', value: 'day_before' },
+      seats: { mode: 'configured', value: 'sample' },
+      hours: { mode: 'configured', value: 'day' },
+      partySize: { mode: 'configured', value: '1-6' },
+      nomination: { mode: 'later' },
+      assignment: { mode: 'manual' },
+      classCapacity: { mode: 'configured', value: '8' },
+    };
+    expect(
+      (await write('', { expectedVersion: 1, style: 'restaurant', answers }))
+        .status,
+    ).toBe(200);
+    const state = (await value(await get())).data;
+    expect(state.answers).toMatchObject(answers);
+    expect(state.questions.map((q: any) => q.key)).toEqual([
+      'style',
+      'image',
+      'approval',
+      'payment',
+      'cancelDeadline',
+      'reminders',
+      'stamps',
+      'coupons',
+      'seats',
+      'hours',
+      'partySize',
+    ]);
+    expect(
+      state.questions.every(
+        (q: any) =>
+          q.canChangeLater &&
+          q.modes.includes('later') &&
+          q.modes.includes('manual'),
+      ),
+    ).toBe(true);
+    expect(
+      (
+        await write('', {
+          expectedVersion: 2,
+          answers: { unknown: { mode: 'later' } },
+        })
+      ).status,
+    ).toBe(400);
+    expect((await value(await get())).data.version).toBe(2);
+  });
+  test.each(['later', 'manual'])(
+    'style %s persists without creating samples or enabling booking',
+    async (mode) => {
+      const before = raw
+        .prepare('SELECT COUNT(*) n FROM style_starter_items')
+        .get();
+      expect(
+        (
+          await write('', {
+            expectedVersion: 1,
+            style: 'restaurant',
+            styleMode: mode,
+            answers: {
+              approval: { mode: 'configured', value: 'manual' },
+              booking: { mode: 'configured', value: true },
+            },
+          })
+        ).status,
+      ).toBe(200);
+      expect((await value(await get())).data).toMatchObject({
+        style: 'restaurant',
+        styleMode: mode,
+        styleSelected: false,
+        answers: { style: { mode } },
+      });
+      expect(
+        raw.prepare('SELECT COUNT(*) n FROM style_starter_items').get(),
+      ).toEqual(before);
+      expect(
+        raw.prepare('SELECT COUNT(*) n FROM booking_settings').get(),
+      ).toEqual({ n: 0 });
+      const warnings = (await value(await get('/warnings'))).data;
+      expect(warnings[mode === 'later' ? 'pending' : 'manual']).toContainEqual(
+        expect.objectContaining({ key: 'style' }),
+      );
+      expect(
+        (await write('', { expectedVersion: 2, styleMode: 'configured' }))
+          .status,
+      ).toBe(200);
+      expect((await value(await get())).data.styleSelected).toBe(true);
+      expect(
+        raw.prepare('SELECT COUNT(*) n FROM style_starter_items').get(),
+      ).not.toEqual(before);
+    },
+  );
+  test('deferring the style prevents activating existing booking samples', async () => {
+    await write('', {
+      expectedVersion: 1,
+      style: 'salon',
+      answers: { booking: { mode: 'configured', value: true } },
+    });
+    const menu = raw
+      .prepare(
+        "SELECT target_id id FROM style_starter_items WHERE kind='booking_menu'",
+      )
+      .get() as { id: string };
+    const revision = raw
+      .prepare('SELECT version FROM menus WHERE id=?')
+      .get(menu.id) as { version: number };
+    await write('', { expectedVersion: 2, styleMode: 'later' });
+    const result = await value(
+      await write(
+        '/activate',
+        {
+          confirmed: true,
+          items: [
+            {
+              id: menu.id,
+              kind: 'booking_menu',
+              expectedVersion: revision.version,
+            },
+          ],
+        },
+        'POST',
+      ),
+    );
+    expect(result.data).toMatchObject({
+      complete: false,
+      items: [{ success: false, code: 'feature_unconfigured' }],
+    });
+    expect(
+      raw.prepare('SELECT is_active FROM menus WHERE id=?').get(menu.id),
+    ).toEqual({ is_active: 0 });
+  });
+  test('style answer mode is accepted, conflicts and invalid modes do not mutate the profile', async () => {
+    expect(
+      (
+        await write('', {
+          expectedVersion: 1,
+          answers: { style: { mode: 'manual' } },
+        })
+      ).status,
+    ).toBe(200);
+    expect((await value(await get())).data.styleMode).toBe('manual');
+    expect(
+      (
+        await write('', {
+          expectedVersion: 2,
+          styleMode: 'configured',
+          answers: { style: { mode: 'later' } },
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await write('', { expectedVersion: 2, styleMode: 'invalid' })).status,
+    ).toBe(400);
+    expect((await value(await get())).data.version).toBe(2);
+  });
+  test('legacy selected profiles do not regain a pending style question', async () => {
+    raw.exec(
+      "UPDATE account_styles SET selection_mode='configured',selected_at='2026-10-15',answers_json='{}'",
+    );
+    expect((await value(await get())).data.answers.style).toEqual({
+      mode: 'configured',
+      value: 'standard',
+    });
+    expect(
+      (await value(await get('/warnings'))).data.pending.some(
+        (item: any) => item.key === 'style',
+      ),
+    ).toBe(false);
+    expect(
+      (
+        await write('', {
+          expectedVersion: 1,
+          answers: { style: { mode: 'configured', value: 'restaurant' } },
+        })
+      ).status,
+    ).toBe(200);
+    expect((await value(await get())).data.style).toBe('restaurant');
+    expect(
+      (
+        await write('', {
+          expectedVersion: 2,
+          style: 'salon',
+          answers: { style: { mode: 'configured', value: 'restaurant' } },
+        })
+      ).status,
+    ).toBe(400);
+    expect((await value(await get())).data.version).toBe(2);
+  });
+  test('missing settings pages omit links while real pages keep their tabs', async () => {
+    await write('', {
+      expectedVersion: 1,
+      style: 'restaurant',
+      answers: {
+        coupons: { mode: 'manual' },
+        payment: { mode: 'manual' },
+        tickets: { mode: 'manual' },
+        cancelDeadline: { mode: 'manual' },
+      },
+    });
+    const state = (await value(await get())).data;
+    expect(
+      state.questions.find((q: any) => q.key === 'payment'),
+    ).not.toHaveProperty('changeAt');
+    expect(
+      state.questions.find((q: any) => q.key === 'cancelDeadline').changeAt,
+    ).toBe('/booking/menus?tab=rules');
+    const warnings = (await value(await get('/warnings'))).data;
+    expect(
+      warnings.manual.find((q: any) => q.key === 'coupons'),
+    ).not.toHaveProperty('href');
+    expect(
+      warnings.manual.find((q: any) => q.key === 'payment'),
+    ).not.toHaveProperty('href');
+    raw.exec(
+      "INSERT INTO rich_menu_groups(id,account_id,name,chat_bar_text,size) VALUES('coupon-menu','a','メニュー','メニュー','large'); INSERT INTO rich_menu_pages(id,group_id,order_index,name,alias_id) VALUES('coupon-page','coupon-menu',0,'ページ','alias'); INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,label,intent,action_data) VALUES('coupon-area','coupon-page',0,0,100,100,'postback','クーポン','postback','{}')",
+    );
+    const couponWarnings = (await value(await get('/warnings'))).data.items;
+    expect(
+      couponWarnings.find((item: any) => item.feature === 'coupons'),
+    ).not.toHaveProperty('href');
+    expect(JSON.stringify({ state, warnings })).not.toMatch(
+      /\/booking\/settings|\/booking\/tickets|\/line-accounts|"href":"\/coupons"/,
+    );
+  });
   test('reuse is restricted to the same account and is not marked as a sample', async () => {
     raw.exec(
       "INSERT INTO templates(id,line_account_id,name,message_type,message_content) VALUES('own','a','既存','text','{}'),('foreign-template','b','他店','text','{}')",
@@ -292,6 +516,96 @@ describe('style setup', () => {
         },
       ],
     });
+  });
+  test('HQ list returns style account count, last edit and auto insertion preference', async () => {
+    const payload = {
+      expectedVersion: 0,
+      name: '初期セット',
+      autoInsert: false,
+      definition: {
+        items: [
+          { key: 'hello', kind: 'template', name: '案内', text: 'こんにちは' },
+        ],
+      },
+    };
+    expect(
+      (await request('PUT', '/api/hq/style-starter-sets/restaurant', payload))
+        .status,
+    ).toBe(200);
+    const before = raw
+      .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
+      .get();
+    await write('', { expectedVersion: 1, style: 'restaurant' });
+    expect(
+      raw
+        .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
+        .get(),
+    ).toEqual(before);
+    const readSet = (
+      await value(await request('GET', '/api/hq/style-starter-sets'))
+    ).data[0];
+    expect(readSet).toMatchObject({
+      style: 'restaurant',
+      accountCount: 1,
+      autoInsert: false,
+      updatedAt: '2026-10-15T03:00:00.000Z',
+      updatedBy: 'owner',
+      version: 1,
+    });
+    raw.exec(
+      "UPDATE line_accounts SET tenant_id='other' WHERE id='b'; INSERT INTO account_styles(line_account_id,style,updated_at,selected_at) VALUES('b','restaurant','now','now')",
+    );
+    expect(
+      (await value(await request('GET', '/api/hq/style-starter-sets'))).data[0]
+        .accountCount,
+    ).toBe(1);
+    expect(
+      (
+        await request('PUT', '/api/hq/style-starter-sets/restaurant', {
+          ...payload,
+          expectedVersion: 1,
+          autoInsert: 'false',
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request('PUT', '/api/hq/style-starter-sets/restaurant', {
+          ...payload,
+          expectedVersion: 1,
+          autoInsert: true,
+        })
+      ).status,
+    ).toBe(200);
+    await write('', { expectedVersion: 2 });
+    expect(
+      raw
+        .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
+        .get(),
+    ).not.toEqual(before);
+    // Omitted preferences are retained when editing the contents later.
+    const { autoInsert, ...withoutPreference } = payload;
+    expect(
+      (
+        await request('PUT', '/api/hq/style-starter-sets/restaurant', {
+          ...withoutPreference,
+          expectedVersion: 2,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await value(await request('GET', '/api/hq/style-starter-sets'))).data[0]
+        .autoInsert,
+    ).toBe(true);
+    actor.readOnly = true;
+    expect(
+      (
+        await request('PUT', '/api/hq/style-starter-sets/restaurant', {
+          ...payload,
+          expectedVersion: 3,
+        })
+      ).status,
+    ).toBe(403);
   });
   test('HQ starter overrides standard for this tenant only, with version checks', async () => {
     const payload = {
@@ -558,13 +872,22 @@ describe('classes, closure, and HQ attention', () => {
     raw.exec(
       "INSERT INTO chats(id,friend_id,line_account_id,status,created_at,updated_at) VALUES('c','f','a','unread','2026-10-15','2026-10-15'),('hidden','foreign','b','unread','2026-10-15','2026-10-15')",
     );
+    await write('', { expectedVersion: 1, style: 'salon' });
+    raw.exec(
+      "INSERT INTO line_account_connection_checks(id,line_account_id,check_kind,result,checked_at,checked_by,correlation_id,idempotency_key,account_revision) VALUES('check','a','webhook_test','failed','2026-10-15','owner','correlation','idempotency',1)",
+    );
     const response = await request('GET', '/api/hq/style-attention');
     expect(response.status).toBe(200);
     const data = await value(response);
     expect(data.data.items).toHaveLength(1);
     expect(data.data.items[0]).toMatchObject({
       accountId: 'a',
+      style: 'salon',
       counts: { unhandledChats: 1, pendingBookings: 1 },
+      details: {
+        connections: [{ id: 'check', href: '/accounts' }],
+        pendingBookings: [{ id: 'b', href: '/booking/bookings' }],
+      },
     });
   });
 });
@@ -781,7 +1104,12 @@ test('restaurant counts include guests, staff assignment and real closure-aware 
     `INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','店');INSERT INTO rt_stores(id,organization_id,line_account_id,name,code) VALUES('store','org','a','店','STORE');INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity) VALUES('table','store','T','T','table',1,4);INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,staff_id) VALUES('r','store','line','花子','Uf',2,'2026-10-15T01:00:00Z','2026-10-15T05:00:00Z','table','confirmed','s');`,
   );
   const data = await styleSnapshot(db, 'a', 'restaurant', {}, 's');
-  expect(data.items).toHaveLength(1);expect(data.items[0]).toMatchObject({meetingMode:null,outcome:null,attendance:null});
+  expect(data.items).toHaveLength(1);
+  expect(data.items[0]).toMatchObject({
+    meetingMode: null,
+    outcome: null,
+    attendance: null,
+  });
   expect(data.metrics.guests.value).toBe(2);
   expect(data.metrics.freeTables.value).toBe(0);
   expect(data.analytics.rotationSummary).toMatchObject({
@@ -866,6 +1194,23 @@ test('changing an answer back to later keeps an old booking sample stopped durin
   ).toEqual({ is_active: 0 });
 });
 
-test('deferring content does not add new templates or rich menus for the selected style',async()=>{
- const result=await value(await write('',{expectedVersion:1,style:'consult',answers:{content:{mode:'later'}}}));expect(result.data.inserted).not.toEqual(expect.arrayContaining([expect.objectContaining({kind:'template'})]));expect(result.data.inserted).not.toEqual(expect.arrayContaining([expect.objectContaining({kind:'rich_menu'})]));expect(raw.prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'").get()).toEqual({n:16});
+test('deferring content does not add new templates or rich menus for the selected style', async () => {
+  const result = await value(
+    await write('', {
+      expectedVersion: 1,
+      style: 'consult',
+      answers: { content: { mode: 'later' } },
+    }),
+  );
+  expect(result.data.inserted).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ kind: 'template' })]),
+  );
+  expect(result.data.inserted).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ kind: 'rich_menu' })]),
+  );
+  expect(
+    raw
+      .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
+      .get(),
+  ).toEqual({ n: 16 });
 });

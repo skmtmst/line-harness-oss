@@ -453,6 +453,26 @@ export default function Sidebar({
    * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
    * 即復帰させてから裏で取り直す。
    */
+  /* 統括の「対応が要るもの」の札（B-322）。全アカウントの件数の合計。読めないときは出さない。 */
+  const [hqAttentionCount, setHqAttentionCount] = useState(0)
+  useEffect(() => {
+    if (!isHq) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { hqStyleApi } = await import('@/lib/api-styles')
+        const res = await hqStyleApi.attention()
+        if (cancelled || !res.success) return
+        setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts as Record<string, number>).reduce<number>((a, b) => a + (b ?? 0), 0), 0))
+      } catch {
+        // 口がまだ無い・読めない：札を出さない
+      }
+    }
+    void load()
+    const id = setInterval(load, 5 * 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [isHq])
+
   const photosBadgeVisible = visibleSections.some(
     (section) => section.items.some((item) => item.badge === 'photos'),
   )
@@ -586,6 +606,7 @@ export default function Sidebar({
    * 取り残される。
    */
   const badgeCount = (item: MenuItem) => {
+    if (item.badge === 'hq-attention') return hqAttentionCount
     if (item.badge === 'unanswered') return unansweredCount
     if (item.badge === 'photos') return pendingPhotoCount
     if (item.badge === 'unmatched') return unmatchedCount

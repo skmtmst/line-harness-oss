@@ -24,7 +24,15 @@ export const checkStyle = (style: unknown): AccountStyle => {
   return style as AccountStyle;
 };
 export const questionKeys = [
+  'style',
   'image',
+  'cancelDeadline',
+  'seats',
+  'hours',
+  'partySize',
+  'nomination',
+  'assignment',
+  'classCapacity',
   'booking',
   'approval',
   'payment',
@@ -35,18 +43,76 @@ export const questionKeys = [
   'outcome',
   'content',
 ] as const;
-export const features: Record<string, string> = {
-  booking: '/booking/settings',
-  approval: '/booking/settings',
-  payment: '/booking/settings?tab=payment',
-  reminders: '/booking/settings',
+export const features: Record<string, string | null> = {
+  style: '/getting-started',
+  booking: '/booking/menus',
+  approval: '/booking/menus?tab=rules',
+  payment: null,
+  reminders: '/reminders',
   stamps: '/visit-stamps',
-  coupons: '/coupons',
-  tickets: '/booking/tickets',
+  coupons: null,
+  tickets: null,
   image: '/rich-menus',
-  outcome: '/booking/settings',
-  content: '/rich-menus',
+  outcome: '/booking/menus',
+  content: '/templates',
+  cancelDeadline: '/booking/menus?tab=rules',
+  seats: '/restaurant-test/tables',
+  hours: '/booking/menus?tab=hours',
+  partySize: '/booking/menus?tab=rules',
+  nomination: '/booking/menus?tab=staff',
+  assignment: '/booking/menus?tab=staff',
+  classCapacity: '/events',
 };
+export const featureLink = (key: string) =>
+  features[key] ? { href: features[key] } : {};
+export function questionsForStyle(style: AccountStyle): string[] {
+  const keys: Record<AccountStyle, string[]> = {
+    restaurant: [
+      'approval',
+      'payment',
+      'cancelDeadline',
+      'reminders',
+      'stamps',
+      'coupons',
+      'seats',
+      'hours',
+      'partySize',
+    ],
+    salon: [
+      'approval',
+      'payment',
+      'cancelDeadline',
+      'reminders',
+      'tickets',
+      'stamps',
+      'coupons',
+      'nomination',
+      'hours',
+    ],
+    consult: [
+      'approval',
+      'payment',
+      'cancelDeadline',
+      'reminders',
+      'outcome',
+      'assignment',
+      'hours',
+    ],
+    lesson: [
+      'approval',
+      'payment',
+      'cancelDeadline',
+      'reminders',
+      'tickets',
+      'coupons',
+      'classCapacity',
+      'hours',
+    ],
+    ec: ['coupons', 'content'],
+    standard: ['content'],
+  };
+  return ['style', 'image', ...keys[style]];
+}
 export function readAnswers(input: unknown): Record<string, SetupAnswer> {
   if (!input || typeof input !== 'object' || Array.isArray(input))
     throw new StyleError('invalid_answers');
@@ -210,7 +276,7 @@ export function readDefinition(
       typeof item.name !== 'string' ||
       !item.name.trim() ||
       item.name.length > 100 ||
-      (item.feature && !features[item.feature]) ||
+      (item.feature && !Object.hasOwn(features, item.feature)) ||
       (item.text !== undefined &&
         (typeof item.text !== 'string' || item.text.length > 2000)) ||
       (item.durationMinutes !== undefined &&
@@ -230,7 +296,7 @@ export function readDefinition(
           (b) =>
             typeof b.label !== 'string' ||
             b.label.length > 50 ||
-            (!features[b.feature] && b.feature !== 'contact'),
+            (!Object.hasOwn(features, b.feature) && b.feature !== 'contact'),
         ))
     )
       throw new StyleError('invalid_buttons');
@@ -246,9 +312,21 @@ export type StyleProfile = {
   cards_json: string | null;
   settings_json: string;
   selected_at: string | null;
+  selection_mode: SetupAnswer['mode'];
   version: number;
   updated_at: string;
 };
+export function profileAnswers(
+  p: StyleProfile | null,
+): Record<string, SetupAnswer> {
+  return {
+    ...JSON.parse(p?.answers_json ?? '{}'),
+    style: {
+      mode: p?.selection_mode ?? 'later',
+      ...(p?.selection_mode === 'configured' ? { value: p.style } : {}),
+    },
+  };
+}
 export async function profile(db: D1Database, account: string) {
   return db
     .prepare('SELECT * FROM account_styles WHERE line_account_id=?')
@@ -265,14 +343,25 @@ export async function starter(
       `SELECT * FROM style_starter_sets WHERE style=? AND archived_at IS NULL AND (tenant_id=? OR tenant_id IS NULL) ORDER BY tenant_id IS NULL LIMIT 1`,
     )
     .bind(style, tenant)
-    .first<{ id: string; version: number; definition_json: string }>();
+    .first<{
+      id: string;
+      version: number;
+      definition_json: string;
+      auto_insert: number;
+    }>();
   return saved
     ? {
         id: saved.id,
         version: saved.version,
+        autoInsert: !!saved.auto_insert,
         definition: readDefinition(JSON.parse(saved.definition_json), style),
       }
-    : { id: 'musubo:' + style, version: 1, definition: standardStarter(style) };
+    : {
+        id: 'musubo:' + style,
+        version: 1,
+        autoInsert: true,
+        definition: standardStarter(style),
+      };
 }
 function assertVersion(expected: unknown, actual: number) {
   if (!Number.isInteger(expected) || expected !== actual)
@@ -287,14 +376,43 @@ export async function saveProfile(
 ) {
   const current = await profile(db, account);
   assertVersion(input.expectedVersion, current?.version ?? 0);
-  const style =
-    input.style === undefined
-      ? (current?.style ?? 'standard')
-      : checkStyle(input.style);
+  const submittedAnswers =
+    input.answers === undefined ? {} : readAnswers(input.answers);
+  const chosenStyle =
+    submittedAnswers.style?.mode === 'configured'
+      ? submittedAnswers.style.value
+      : undefined;
+  if (chosenStyle !== undefined) {
+    checkStyle(chosenStyle);
+    if (input.style !== undefined && input.style !== chosenStyle)
+      throw new StyleError('invalid_style');
+  }
+  const style = checkStyle(
+    input.style ?? chosenStyle ?? current?.style ?? 'standard',
+  );
   const answers = {
     ...JSON.parse(current?.answers_json ?? '{}'),
-    ...(input.answers === undefined ? {} : readAnswers(input.answers)),
+    ...submittedAnswers,
   } as Record<string, SetupAnswer>;
+  const styleMode =
+    input.styleMode ??
+    submittedAnswers.style?.mode ??
+    (input.style !== undefined
+      ? 'configured'
+      : (current?.selection_mode ?? 'later'));
+  if (!['configured', 'later', 'manual'].includes(styleMode as string))
+    throw new StyleError('invalid_style_mode');
+  const selected = styleMode === 'configured';
+  if (
+    submittedAnswers.style &&
+    input.styleMode !== undefined &&
+    input.styleMode !== submittedAnswers.style.mode
+  )
+    throw new StyleError('invalid_style_mode');
+  answers.style = {
+    mode: styleMode as SetupAnswer['mode'],
+    ...(selected ? { value: style } : {}),
+  };
   const now = new Date().toISOString(),
     version = (current?.version ?? 0) + 1;
   const settings = { ...JSON.parse(current?.settings_json ?? '{}') };
@@ -338,7 +456,7 @@ export async function saveProfile(
   statements.push(
     db
       .prepare(
-        `INSERT INTO account_styles(line_account_id,style,answers_json,cards_json,settings_json,version,updated_at,updated_by,selected_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(line_account_id) DO UPDATE SET style=excluded.style,answers_json=excluded.answers_json,cards_json=excluded.cards_json,settings_json=excluded.settings_json,version=excluded.version,updated_at=excluded.updated_at,updated_by=excluded.updated_by,selected_at=excluded.selected_at`,
+        `INSERT INTO account_styles(line_account_id,style,answers_json,cards_json,settings_json,version,updated_at,updated_by,selected_at,selection_mode) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(line_account_id) DO UPDATE SET style=excluded.style,answers_json=excluded.answers_json,cards_json=excluded.cards_json,settings_json=excluded.settings_json,version=excluded.version,updated_at=excluded.updated_at,updated_by=excluded.updated_by,selected_at=excluded.selected_at,selection_mode=excluded.selection_mode`,
       )
       .bind(
         account,
@@ -349,10 +467,11 @@ export async function saveProfile(
         version,
         now,
         actor,
-        now,
+        selected ? now : null,
+        styleMode,
       ),
   );
-  if (answers.approval?.mode === 'configured') {
+  if (selected && answers.approval?.mode === 'configured') {
     const mode =
       answers.approval.value === true || answers.approval.value === 'manual'
         ? 'manual'
@@ -386,9 +505,15 @@ export async function saveProfile(
     (!choice || typeof choice !== 'object' || Array.isArray(choice))
   )
     throw new StyleError('invalid_choices');
-  for (const item of set.definition.items) {
+  for (const item of selected ? set.definition.items : []) {
+    if (!set.autoInsert && !choice?.[item.key]) continue;
     if (existing.some((e) => e.item_key === item.key)) continue;
-    if(['template','rich_menu'].includes(item.kind)&&answers.content&&answers.content.mode!=='configured')continue;
+    if (
+      ['template', 'rich_menu'].includes(item.kind) &&
+      answers.content &&
+      answers.content.mode !== 'configured'
+    )
+      continue;
     const intrinsicFeature =
       item.kind === 'booking_menu'
         ? 'booking'
@@ -662,6 +787,8 @@ export async function saveProfile(
   }
   return {
     style,
+    styleMode,
+    styleSelected: selected,
     answers,
     settings,
     version,
@@ -675,8 +802,9 @@ export async function featureReadiness(
   feature: string,
 ) {
   const p = await profile(db, account),
-    answers: Record<string, SetupAnswer> = JSON.parse(p?.answers_json ?? '{}');
-  if (!features[feature]) throw new StyleError('invalid_feature');
+    answers = profileAnswers(p);
+  if (!Object.hasOwn(features, feature))
+    throw new StyleError('invalid_feature');
   let configured =
     answers[feature]?.mode === 'configured' &&
     answers[feature]?.value !== false;
@@ -714,12 +842,12 @@ export async function featureReadiness(
     ready: configured,
     state: configured ? 'ready' : 'preparing',
     message: configured ? null : '現在準備中です',
-    href: features[feature],
+    ...featureLink(feature),
   };
 }
 export async function styleWarnings(db: D1Database, account: string) {
   const p = await profile(db, account),
-    answers: Record<string, SetupAnswer> = JSON.parse(p?.answers_json ?? '{}');
+    answers = profileAnswers(p);
   const areas = (
     await db
       .prepare(
@@ -753,23 +881,23 @@ export async function styleWarnings(db: D1Database, account: string) {
         feature,
         areaId: area.id,
         groupId: area.groupId,
-        href: features[feature],
+        ...featureLink(feature),
         customerState: 'preparing',
       });
   }
   return {
     count: warnings.length,
     items: warnings,
-    pending: questionKeys
+    pending: questionsForStyle(p?.style ?? 'standard')
       .filter((k) => !answers[k] || answers[k].mode === 'later')
       .map((key) => ({
         key,
-        href: features[key],
+        ...featureLink(key),
         mode: answers[key]?.mode ?? 'later',
       })),
-    manual: questionKeys
+    manual: questionsForStyle(p?.style ?? 'standard')
       .filter((k) => answers[k]?.mode === 'manual')
-      .map((key) => ({ key, href: features[key] })),
+      .map((key) => ({ key, ...featureLink(key) })),
   };
 }
 
@@ -786,7 +914,7 @@ export async function initializeAccountStyle(
   });
   await db
     .prepare(
-      'UPDATE account_styles SET selected_at=NULL WHERE line_account_id=? AND version=1',
+      `UPDATE account_styles SET selected_at=NULL,selection_mode='later',answers_json=json_set(answers_json,'$.style',json('{"mode":"later"}')) WHERE line_account_id=? AND version=1`,
     )
     .bind(account)
     .run();

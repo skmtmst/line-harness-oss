@@ -1,8 +1,8 @@
 'use client'
 import { FOLDER_SELECT_COLORS } from '@/components/shared/folder-select'
 
-import { KIND_TABS, KIND_LABEL, WORDS, type TagQuickFilter, TAG_QUICK_FILTERS } from './store-list-options'
-export { KIND_TABS } from './store-list-options'
+import { STARTER_SET_TAB, KIND_TABS, KIND_LABEL, WORDS, type TagQuickFilter, TAG_QUICK_FILTERS } from './store-list-options'
+export { KIND_TABS, hqTemplateTabsForStarterSets } from './store-list-options'
 
 import { type HqStoreListProps } from './store-list-types'
 export { type HqStoreListProps } from './store-list-types'
@@ -35,7 +35,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
+import { Tabs, type TabItem } from '@/components/shared/tabs'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
@@ -161,12 +161,12 @@ export default function HqStoreList(props: HqStoreListProps) {
       <Tabs
         size="compact"
         label={`${words.title}の種類`}
-        items={KIND_TABS.map((tab) => ({
+        items={[...KIND_TABS.map((tab): TabItem => ({
           label: tab.label,
           count: kindCounts?.[tab.kind],
           current: kind === tab.kind,
           onClick: () => { onKindChange(tab.kind); setPage(1) },
-        }))}
+        })), STARTER_SET_TAB]}
       />
   ) : undefined
 

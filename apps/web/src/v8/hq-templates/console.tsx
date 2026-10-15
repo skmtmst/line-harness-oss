@@ -58,7 +58,7 @@ import SavedDistributionDialog from './saved-distribution-dialog'
 import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders, ALL_ACCOUNTS } from './distribution-accounts'
 import HqAttributes from './attributes'
 import { useAttributeTab } from './attribute-tabs'
-import HqStoreList from './store-list'
+import HqStoreList, { KIND_TABS } from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
@@ -145,6 +145,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved' || folderDistribution !== null)
   /* テンプレートの7種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
   const [kind, setKind] = useState<TemplateKind>('message')
+  /* 初期セットの画面のタブ（B-322）から `?kind=` で戻ったときは、その種類のタブを開く。 */
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('kind')
+    if (KIND_TABS.some((tab) => tab.kind === wanted)) setKind(wanted as TemplateKind)
+  }, [])
   const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
   const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
   /* 一覧の集計（API-18：今月送った数・新しい版を未配布）。取れなければ null（数の帯は「—」か行から数える）。 */
