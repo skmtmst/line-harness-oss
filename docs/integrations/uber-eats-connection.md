@@ -447,5 +447,33 @@ requesting production access.
    4. 3 が `success: true` で `environment: "sandbox"` のときだけ、本文 `{}` で実のトークン取得を1回。
       失敗したら再送せず、HTTP状態と `code` / `uberCode` / `status` を返す。
 
-**まだ実際の接続は1回も成功していません。** 上の試験77件（通信の層16件＋設定の読み取り6件＋
-受け口55件）はすべて作り物の応答に対するもので、接続の成功を示すものではありません。
+   ### 6-4. Sandbox の実トークン取得に成功（2026-10-16 01:43 JST）
+
+   PR #1739 をマージし、Git SHA
+   `af2c2bf0e6ab339e4722fc8607b5a4d3ecf4b08b` を Worker と管理画面へ配備した。
+   配備 run `38770186820` は成功し、両方の公開SHAも一致した。
+   Worker Version は `95e674a7-e188-4ed4-8e9d-2bc81ab057d0`。
+
+   指定順で次を確かめた。
+
+   1. POST と同じ `https://stg-api.musubo.jp` の `GET /api/health` は HTTP 200 で、
+      `git_commit` は上のマージSHAと一致した。
+   2. 32バイトの乱数から probe secret をメモリ内で作り直し、
+      検証Workerの暗号化された秘密設定へ登録した。値は表示・保存していない。
+      登録で作られた Version `d5c4f5be-0e81-42ca-9ad5-69049b2e49df` が100%になり、
+      マージSHA、`sandbox` 設定、3つのUber関連secretの名前が揃っていることを確かめた。
+   3. 本文 `{"mode":"check"}` の署名付きPOSTは HTTP 200 で次を返した。
+      この下見は Uber へ送らず、冷却時間も使っていない。
+
+      ```json
+      {"success":true,"mode":"check","environment":"sandbox","oauthConfigured":true}
+      ```
+
+   4. 下見の成功後だけ、本文 `{}` で実のトークン取得を**1回だけ**実行した。
+      HTTP 200、`success: true`、`environment: "sandbox"`、
+      `scope: ["eats.order"]`、`expiresInSec: 2592000` だった。
+      トークン値、Client Secret、probe secret、署名値は会話・ログ・Gitへ残していない。
+      再送も行っていない。
+
+**Sandbox の `client_credentials` による最小の実接続は成功しました。**
+利用者のログインを伴う認可画面と、実際の注文API操作は別工程であり、今回は実行していません。
