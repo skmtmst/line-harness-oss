@@ -1,4 +1,5 @@
 import { testHqForm, issueHqFormTestToken, revokeHqFormTestToken } from '../services/hq-templates/form-test.js';
+import { importHqTags } from '../services/hq-templates/tag-import.js';
 import { previewRichMenu } from '../services/hq-templates/rich-menu-preview.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
@@ -121,6 +122,7 @@ hqTemplates.delete('/api/hq/templates/media', async c => {
   }
 });
 hqTemplates.post('/api/hq/templates/rich-menu-preview', inputJsonBoundary(), async c => c.json({success:true,data:await previewRichMenu(dbFor(c.env),await authority(c),await body(c),c.env.IMAGES)}));
+for(const [suffix,execute] of [['/preview',false],['',true]] as const)hqTemplates.post(`/api/hq/templates/tags/import${suffix}`,inputJsonBoundary(),async c=>c.json({success:true,data:await importHqTags(dbFor(c.env),await authority(c),await body(c),execute)}));
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/kind-counts', async c => {
