@@ -92,7 +92,7 @@ export default function CustomerInfoPanel({
             const age = spec.key === 'birthday' && !hidden.includes('fixed:age') ? fixedFieldValue(shownFields, 'age').value : null
             const display = value && age ? `${value}（${age}歳）` : value
             const field = shownFields.find(field => field.fixedKey === spec.key)!
-            return <div className={styles.row} key={spec.key}>
+            return <div className={styles.row} key={spec.key} data-layout={spec.key === 'allergy' && editing ? 'stack' : undefined}>
               <dt>{spec.label}</dt>
               <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
                 : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />
