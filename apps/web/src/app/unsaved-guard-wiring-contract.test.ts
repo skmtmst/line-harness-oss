@@ -173,6 +173,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/friend-detail/info-tab.tsx':
+    '友だち詳細の情報欄。dirty は［キャンセル］を押せるかの判定だけに使う（vX3wQ）。保存前の離脱確認は以前から無く、番兵を足すかは司令塔に確認へ記録する（2026-10-15 作業役 E）',
   'components/friend-fields/edit-tag-page-v4.tsx':
     '保管済みタグの名前と説明の訂正。元の取消は確認なしで入力を破棄するため、共通作成型も dirty=false で同じ動きを保つ。番兵の要否は削除台帳の司令塔に確認へ記録する',
   'v8/restaurant/google/google.tsx':
