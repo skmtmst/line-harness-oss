@@ -22,6 +22,9 @@
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
 }
 :global(:root) .headingText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
+/* 「この画面の説明」（B-245）を開いても、右の操作（店舗の欄・主ボタン）を題の行に残す。説明の長い1行が幅を取り、操作が次の行へ落ちていた（qf3ky）。 */
+:global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
+:global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 :global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
