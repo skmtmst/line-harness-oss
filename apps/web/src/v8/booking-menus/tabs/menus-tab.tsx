@@ -21,6 +21,7 @@ import { menuPriceLabel } from '../lib/menu-price'
 import { bookingErrorMessage } from '../lib/menu-validation'
 import MenuVersionHistory from '../menu-version-history'
 import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus, type LoadStatus } from './shared'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import styles from '../settings.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
@@ -331,7 +332,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                     >
                       {menu.name}
                     </button>
-                    {menu.category_label ? <TagPill name={menu.category_label} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
+                    {/* 分類には色の項目が無い。絵 owaS3・P6EdLW どおり、色の一覧の先頭（青）の丸で出す。 */}
+                    {menu.category_label ? <TagPill name={menu.category_label} color={FOLDER_SELECT_COLORS[0].value} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
                   </span>
                   {menu.description ? <span className={styles.menuDesc}>{menu.description}</span> : null}
                 </span>
