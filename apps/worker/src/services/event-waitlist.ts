@@ -1,3 +1,4 @@
+import { eventModeRemaining } from './event-mode-capacity.js';
 import {
   activeTenantLineAccountSql,
   resolveLineCredential,
@@ -26,6 +27,7 @@ export type EventWaitlistOfferSender = (offer: {
 }) => Promise<void>;
 
 interface OccurrenceRow {
+  classroom_capacity:number|null;online_capacity:number|null;
   id: string;
   event_id: string;
   event_name: string;
@@ -38,6 +40,7 @@ interface OccurrenceRow {
 }
 
 interface WaitingRow {
+  participation_mode: 'classroom'|'online';
   id: string;
   line_account_id: string;
   friend_id: string;
@@ -236,7 +239,7 @@ async function loadOccurrence(
 ): Promise<OccurrenceRow | null> {
   return db
     .prepare(
-      `SELECT s.id, s.event_id, s.starts_at, s.ends_at, s.capacity, s.version,
+      `SELECT s.id, s.event_id, s.starts_at, s.ends_at, s.capacity, s.version, s.classroom_capacity,s.online_capacity,
               e.name AS event_name, e.venue_name, e.venue_url
          FROM event_slots s
          JOIN events e ON e.id = s.event_id
@@ -440,7 +443,7 @@ export async function getEventOccurrenceApplicants(
       offeredSeats,
       remainingSeats: occurrence.capacity == null
         ? null
-        : Math.max(0, occurrence.capacity - activeSeats),
+        : occurrence.capacity==null?Infinity:Math.max(0, occurrence.capacity - activeSeats),
     },
     waitlistHistory: (historyRows.results ?? []).map((row) => ({
       id: row.id,
@@ -754,12 +757,12 @@ export async function acceptEventWaitlistOffer(
          identity_key, party_size, answer_snapshot_json, first_participation,
          first_participation_attended_count, first_participation_checked_at,
          event_version_id, event_snapshot_json, approval_expires_at,
-         created_at, updated_at
+         created_at, updated_at, participation_mode
        )
        SELECT ?, w.line_account_id, w.event_id, w.slot_id, w.friend_id, 'confirmed', ?,
               w.identity_key, w.party_size, w.answer_snapshot_json, w.first_participation,
               w.first_participation_attended_count, w.first_participation_checked_at,
-              w.event_version_id, w.event_snapshot_json, NULL, ?, ?
+              w.event_version_id, w.event_snapshot_json, NULL, ?, ?, w.participation_mode
          FROM event_waitlist w
          JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
          JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
@@ -880,6 +883,7 @@ export async function promoteEventWaitlist(
     .prepare(
       `SELECT id FROM event_waitlist
         WHERE slot_id = ? AND status = 'offered' AND offer_expires_at > ?
+          AND NOT EXISTS(SELECT 1 FROM event_slots s WHERE s.id=event_waitlist.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL))
         LIMIT 1`,
     )
     .bind(occurrence.id, nowIso)
@@ -892,9 +896,13 @@ export async function promoteEventWaitlist(
   const waiting = await db
     .prepare(
       `SELECT id, line_account_id, friend_id, party_size, version, created_at,
-              event_snapshot_json
+              event_snapshot_json,participation_mode
          FROM event_waitlist
         WHERE slot_id = ? AND status = 'waiting'
+          AND NOT EXISTS(SELECT 1 FROM event_slots s WHERE s.id=event_waitlist.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL)
+            AND CASE WHEN event_waitlist.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END IS NOT NULL
+            AND COALESCE((SELECT SUM(b.party_size) FROM event_bookings b WHERE b.slot_id=s.id AND b.participation_mode=event_waitlist.participation_mode AND b.status IN('requested','confirmed')),0)
+              + COALESCE((SELECT SUM(w.party_size) FROM event_waitlist w WHERE w.slot_id=s.id AND w.participation_mode=event_waitlist.participation_mode AND w.status IN('offered','accepted')),0) + event_waitlist.party_size>CASE WHEN event_waitlist.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END)
         ORDER BY sort_order ASC, created_at ASC, id ASC
         LIMIT 1`,
     )
@@ -904,14 +912,17 @@ export async function promoteEventWaitlist(
     return { kind: 'noop', reason: 'no_waiting', occurrenceVersion, promoted: null };
   }
 
-  if (occurrence.capacity == null) {
+  if (occurrence.capacity == null && occurrence.classroom_capacity==null && occurrence.online_capacity==null) {
     return { kind: 'noop', reason: 'no_capacity', occurrenceVersion, promoted: null };
   }
   const activeSeats = await getEventOccurrenceUsedSeats(db, occurrence.id);
-  const remaining = Math.max(0, occurrence.capacity - activeSeats);
+  const remaining = occurrence.capacity==null?Infinity:Math.max(0, occurrence.capacity - activeSeats);
   if (waiting.party_size > remaining) {
     return { kind: 'noop', reason: 'party_too_large', occurrenceVersion, promoted: null };
   }
+
+  const modeRemaining=await eventModeRemaining(db,occurrence.id,waiting.participation_mode??'classroom');
+  if(modeRemaining!==null&&waiting.party_size>modeRemaining)return {kind:'noop',reason:'party_too_large',occurrenceVersion,promoted:null};
 
   // 緊急停止 (#1050): reminder_dispatch 停止中は席の確保 (offered 化) と
   // 案内通知をしない。待機者は waiting のまま残り、復旧後に次の促進が届く。
@@ -945,17 +956,17 @@ export async function promoteEventWaitlist(
           AND (SELECT version FROM event_slots WHERE id = event_waitlist.slot_id) = ?
           AND EXISTS (
             SELECT 1 FROM event_slots slot
-             WHERE slot.id = event_waitlist.slot_id AND slot.capacity IS NOT NULL
-               AND COALESCE((SELECT SUM(b.party_size) FROM event_bookings b
+             WHERE slot.id = event_waitlist.slot_id AND (slot.capacity IS NOT NULL OR slot.classroom_capacity IS NOT NULL OR slot.online_capacity IS NOT NULL) AND (slot.capacity IS NULL OR (COALESCE((SELECT SUM(b.party_size) FROM event_bookings b
                      WHERE b.slot_id = slot.id AND b.status IN ('requested','confirmed')), 0)
                  + COALESCE((SELECT SUM(held.party_size) FROM event_waitlist held
                      WHERE held.slot_id = slot.id AND held.status IN ('offered','accepted')), 0)
-                 + event_waitlist.party_size <= slot.capacity
+                 + event_waitlist.party_size <= slot.capacity))
           )
           AND NOT EXISTS (
             SELECT 1 FROM event_waitlist pending
              WHERE pending.slot_id = event_waitlist.slot_id
                AND pending.status = 'offered' AND pending.offer_expires_at > ?
+               AND (pending.participation_mode=event_waitlist.participation_mode OR NOT EXISTS(SELECT 1 FROM event_slots s WHERE s.id=pending.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL)))
           )
           AND NOT EXISTS (
             SELECT 1 FROM event_bookings b
