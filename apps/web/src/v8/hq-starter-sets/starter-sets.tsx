@@ -16,7 +16,8 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import type { AccountStyle } from '@line-crm/shared'
+import type { AccountStyle, StyleTemplateSample } from '@line-crm/shared'
+import Dialog from '@/components/shared/dialog'
 import { hqStyleApi, type StarterSetItem, type StyleStarterSet } from '@/lib/api-styles'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifySaved } from '@/components/shared/toast'
@@ -58,6 +59,11 @@ export default function HqStarterSetsV8() {
   const [removing, setRemoving] = useState<StarterSetItem['kind'] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  /* テンプレートの見本（B-311 追記4・組4 hqStyleApi.templateSamples）。業種を替えたら読み直す。 */
+  const [samples, setSamples] = useState<StyleTemplateSample[] | null>(null)
+  const [samplesError, setSamplesError] = useState(false)
+  const [sampleOpen, setSampleOpen] = useState<StyleTemplateSample | null>(null)
+  const [samplesTick, setSamplesTick] = useState(0)
 
   const load = useCallback(async () => {
     setError('')
@@ -70,6 +76,13 @@ export default function HqStarterSetsV8() {
     }
   }, [])
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let cancelled = false
+    setSamples(null)
+    setSamplesError(false)
+    void hqStyleApi.templateSamples(active).then((res) => { if (!cancelled && res.success) setSamples(res.data.items) }).catch(() => { if (!cancelled) setSamplesError(true) })
+    return () => { cancelled = true }
+  }, [active, samplesTick])
 
   /* 使っているアカウントの数は口が返さない（API-CONTRACT-4 §10）。数は出さない。 */
   const rows = STYLE_CHOICES.map(({ value: style }) => ({ id: style, label: styleLabel(style), count: null }))
@@ -163,7 +176,47 @@ export default function HqStarterSetsV8() {
           </div>
         )}
         {groups.some((group) => group.kind === 'automation') && <Notice tone="info" icon={<Info aria-hidden="true" />}>自動で送る物は、店が一度確かめて［動かす］を押すまで送りません。直したあとは［今のアカウントへ配る］で、上書きか新しく作るかを選んで配ります（配る前に確かめの画面が出ます）。統括の無い店には musubo の標準の初期セットが入ります。</Notice>}
+        <section className={styles.samples} aria-labelledby="hss-samples">
+          <div className={styles.sectionHead}>
+            <h3 id="hss-samples" className={styles.sectionTitle}>テンプレートの見本</h3>
+            <HelpTip label="テンプレートの見本の説明">この業種で新しいアカウントに「【見本】」の名前で入るメッセージです。差し込み（名前・日時・店名・URL）は送る前に入れます。</HelpTip>
+            <span className={styles.spacer} />
+            {samples ? <span className={styles.sampleCount}>{`${samples.length}件`}</span> : null}
+          </div>
+          {samplesError ? <Notice tone="danger" action={<Button onClick={() => setSamplesTick((value) => value + 1)}>もう一度試す</Button>}>見本を読み込めませんでした。</Notice> : samples === null ? <p className={styles.empty} role="status">読み込んでいます…</p> : (
+            <div className={styles.table}>
+              <GridTable label="テンプレートの見本" design={{ columns: 'minmax(0, 1fr) var(--hss-col-kind) var(--hss-col-kind) var(--hss-col-open)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', fontSize: 'var(--text-body)' }}>
+                <GridHeadRow>
+                  <GridCell role="columnheader">名前</GridCell>
+                  <GridCell role="columnheader">種類</GridCell>
+                  <GridCell role="columnheader">差し込み</GridCell>
+                  <GridCell role="columnheader">操作</GridCell>
+                </GridHeadRow>
+                {samples.map((sample) => (
+                  <GridRow key={sample.key} className={styles.sampleRow}>
+                    <GridCell className={styles.name}><span className={styles.sampleName} title={sample.name}>{sample.name}</span></GridCell>
+                    <GridCell>{sample.category === 'common' ? '共通' : styleLabel(sample.category)}</GridCell>
+                    <GridCell>{sample.placeholders.length ? `${sample.placeholders.length}つ` : 'なし'}</GridCell>
+                    <GridCell><Button size="compact" onClick={() => setSampleOpen(sample)}>中身を見る</Button></GridCell>
+                  </GridRow>
+                ))}
+              </GridTable>
+            </div>
+          )}
+        </section>
       </div>
+      <Dialog open={sampleOpen !== null} title={sampleOpen?.name ?? ''} description={sampleOpen?.preparation} size="medium" onCancel={() => setSampleOpen(null)}>
+        {sampleOpen ? (
+          <div className={styles.sampleBody}>
+            <p className={styles.sampleText}>{sampleOpen.text}</p>
+            {sampleOpen.placeholders.length ? (
+              <ul className={styles.placeholders} aria-label="差し込み">
+                {sampleOpen.placeholders.map((item) => <li key={item.token}><StatusBadge tone={item.requiresConfiguration ? 'warning' : 'neutral'} dot>{item.label}</StatusBadge></li>)}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </Dialog>
       {preparing.dialog}
       <ConfirmDialog
         open={removing !== null}

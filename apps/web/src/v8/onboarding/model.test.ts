@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { answerOf, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, stepNames, summarizeSetup } from './model'
+import { answersForApi, answerOf, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, stepNames, summarizeSetup } from './model'
 
 const state = {
   style: 'restaurant' as const, styleSelected: true, version: 1,
@@ -12,12 +12,14 @@ const state = {
 }
 
 describe('はじめの質問の決まり（B-313・組4の質問キー）', () => {
-  it('質問は口の質問キーだけ。飲食店向けはスタイル・見た目＋7問', () => {
+  it('飲食は 11 問（B-313 が正）。口に無い質問は「準備中」で、答えを保存しない', () => {
     const keys = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content']
-    expect(stepNames('restaurant').map((step) => step.key)).toEqual(['style', 'image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'content'])
+    expect(stepNames('restaurant').map((step) => step.short)).toEqual(['使い方のスタイル', '見た目', '予約の確定の仕方', 'お支払い', 'キャンセルの期限', '前日のお知らせ', '来店スタンプ', 'クーポン', '席・卓', '営業時間', '受け付ける人数'])
     for (const style of ['restaurant', 'salon', 'consult', 'lesson', 'ec', 'standard'] as const) {
-      for (const q of questionsFor(style)) expect(keys, q.key).toContain(q.key)
+      for (const q of questionsFor(style)) expect(keys.includes(q.key) || q.pendingApi === true, q.key).toBe(true)
     }
+    const sent = answersForApi({ approval: { mode: 'configured', value: 'automatic' }, cancelDeadline: { mode: 'configured', value: 'day_before' }, hours: { mode: 'later' } })
+    expect(sent).toEqual({ approval: { mode: 'configured', value: 'automatic' }, booking: { mode: 'configured', value: true } })
   })
 
   it('はい・いいえの答えは真偽で、あとで・手動は mode だけで送る', () => {
@@ -57,7 +59,7 @@ describe('はじめにやること（Bdfxm）', () => {
     expect(summary.rows[0].action.href).toBe('/visit-stamps')
     expect(summary.rows[1].action.preparing).toBe('お支払い')
     expect(summary.done).toBe(3)
-    expect(summary.total).toBe(9)
+    expect(summary.total).toBe(11)
   })
 
   it('未定（あとで）の質問は入れない：答えが無い物は済みに数えず、行も出さない', () => {

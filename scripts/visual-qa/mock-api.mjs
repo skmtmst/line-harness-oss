@@ -2252,6 +2252,10 @@ const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'stamps', areaId: 'a
 const HQ_STARTER_SETS = [
   { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, definition: { items: STYLE_SETUP_ITEMS.map((item) => item.key === 'reminder' ? { ...item, name: '前日のリマインダー' } : item) } },
 ]
+const STYLE_TEMPLATE_SAMPLES = [
+  ['sample-reservation-confirm', '予約の確認', 'common'], ['sample-reminder', '前日のリマインド', 'common'], ['sample-day', '当日の案内', 'common'], ['sample-thanks', '来店のお礼', 'common'],
+  ['sample-review', '口コミのお願い', 'common'], ['sample-closed', '臨時休業のお知らせ', 'common'], ['sample-course', 'コースの予約確認', 'restaurant'], ['sample-seat-ready', '席の準備ができました', 'restaurant'], ['sample-banquet', '宴会の事前確認', 'restaurant'],
+].map(([key, name, category]) => ({ key, name, category, text: `{{name}} 様\n${name}のご案内です。{{account.name}}`, placeholders: [{ token: '{{name}}', label: 'お名前', requiresConfiguration: false }, { token: '{{account.name}}', label: '店名', requiresConfiguration: false }], preparation: '日時・場所などは送る前に共通情報へ入れてください。', starterItem: { key, kind: 'template', name: `【見本】${name}`, text: name }, hqDefinition: {} }))
 const HQ_STYLE_ATTENTION = {
   asOf: '2026-10-15T08:30:00.000Z',
   items: [
@@ -2272,6 +2276,7 @@ function styleSetupRead(method, pathname, query) {
   if (pathname === '/api/dashboard/style/starter-items') return { success: true, data: { items: STYLE_SETUP_STATES } }
   if (pathname === '/api/hq/style-starter-sets') return { success: true, data: HQ_STARTER_SETS }
   if (pathname === '/api/hq/style-attention') return { success: true, data: HQ_STYLE_ATTENTION }
+  if (pathname === '/api/hq/style-template-samples' || pathname === '/api/dashboard/style/template-samples') return { success: true, data: { style: query.get('style') ?? 'restaurant', items: STYLE_TEMPLATE_SAMPLES } }
   return null
 }
 function styleSetupWrite(method, pathname) {

@@ -59,6 +59,21 @@ export type Question = {
   skipped?: string
   /** 設定の画面がまだ無いときの機能の名前。押すと準備中の窓（B-314）。 */
   preparing?: string
+  /**
+   * 口（組4）がまだこの質問のキーを受け付けない。答えは画面の中だけで持ち、保存しない（札「準備中」）。
+   * 口が受け付けたら、ここを外して API_QUESTION_KEYS に足すだけでつながる。
+   */
+  pendingApi?: boolean
+}
+
+/** 口が受け付ける質問のキー（組4 `questionKeys`）。保存はこのキーだけ送る。 */
+export const API_QUESTION_KEYS = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content'] as const
+
+/** 保存する答え：口のキーだけ。予約の確定の仕方を答えた（その場で／承認）＝予約を使う、を booking に写す。 */
+export function answersForApi(answers: Record<string, SetupAnswer>): Record<string, SetupAnswer> {
+  const out = Object.fromEntries(Object.entries(answers).filter(([key]) => (API_QUESTION_KEYS as readonly string[]).includes(key)))
+  if (!out.booking && answers.approval?.mode === 'configured') out.booking = { mode: 'configured', value: true }
+  return out
 }
 
 const RULES = '/booking/menus?tab=rules'
@@ -99,9 +114,9 @@ const Q: Record<string, Question> = {
     preparing: 'お支払い',
   },
   reminders: {
-    key: 'reminders', short: '予約のお知らせ', title: '予約のお知らせを LINE で送りますか？', description: '予約の確定・前日のお知らせを自動で送ります。最初は止めた状態で入り、最後に確かめてから動かします。',
+    key: 'reminders', short: '前日のお知らせ', title: '予約の前日にお知らせを送りますか？', description: '予約の確定・前日のお知らせを自動で送ります。最初は止めた状態で入り、最後に確かめてから動かします。',
     choices: yesNo(
-      { icon: 'bell', label: '送る', note: '予約の日時・場所・キャンセルの方法を送ります' },
+      { icon: 'bell', label: '前日の 18:00 に送る', note: '予約の日時・場所・キャンセルの方法を送ります' },
       { icon: 'bellOff', label: '送らない', note: 'お知らせは入れません' },
     ),
     where: 'リマインダ', manualHref: '/reminders', manualNote: 'リマインダの画面を開きます',
@@ -159,13 +174,83 @@ const Q: Record<string, Question> = {
   },
 }
 
+const PENDING: Record<string, Question> = {
+  cancelDeadline: {
+    key: 'cancelDeadline', short: 'キャンセルの期限', title: 'お客さまはいつまでキャンセルできますか？', description: 'LINE からキャンセルできる期限です。過ぎたらお店へ連絡してもらいます。',
+    choices: [
+      { value: 'day_before', icon: 'calendarCheck', label: '前日まで', note: '前日の 23:59 までキャンセルできます' },
+      { value: 'hours_3', icon: 'clock', label: '3 時間前まで', note: '予約の 3 時間前までキャンセルできます' },
+      { value: 'none', icon: 'ban', label: '期限なし', note: '予約の時間までいつでもキャンセルできます' },
+    ],
+    recommended: { consult: 'hours_3' },
+    where: '予約設定 › 予約のルール', manualHref: RULES, manualNote: '予約のルールの画面を開きます',
+    todo: { title: 'キャンセルの期限を決める', note: 'LINE からキャンセルできる期限です', action: '決める' }, pendingApi: true,
+  },
+  seats: {
+    key: 'seats', short: '席・卓', title: '席・卓はどう入れますか？', description: '予約を受ける席の数です。卓ごとの人数はあとで直せます。',
+    choices: [
+      { value: 'sample', icon: 'users', label: '見本の席を入れる（4 人卓 × 6）', note: 'あとで卓を足す・減らすことができます' },
+      { value: 'none', icon: 'ban', label: '席を分けない', note: '時間ごとの組数だけで受け付けます' },
+    ],
+    where: '座席・卓管理', manualHref: '/restaurant-test/tables', manualNote: '座席・卓の画面を開きます',
+    todo: { title: '席・卓を入れる', note: '予約を受ける席の数です', action: '入れる' }, pendingApi: true,
+  },
+  nomination: {
+    key: 'nomination', short: '担当者の指名', title: '担当者の指名を受け付けますか？', description: 'お客さまが予約のときに担当者を選べるようにします。',
+    choices: [
+      { value: 'allow', icon: 'user', label: '指名を受け付ける', note: '指名なしも選べます' },
+      { value: 'none', icon: 'users', label: '指名は受け付けない', note: '空いている担当者に入ります' },
+    ],
+    where: '予約設定 › 担当者', manualHref: '/booking/menus?tab=staff', manualNote: '担当者の画面を開きます',
+    todo: { title: '担当者の指名を決める', note: '予約のときに担当者を選べるかどうかです', action: '決める' }, pendingApi: true,
+  },
+  assignment: {
+    key: 'assignment', short: '担当の割り当て', title: '面談の担当はどう決めますか？', description: '予約が入ったときの担当の決め方です。',
+    choices: [
+      { value: 'auto', icon: 'users', label: '自動で割り当てる', note: '空いている担当に順番に入ります' },
+      { value: 'customer', icon: 'user', label: 'お客さまが選ぶ', note: '担当を選んで予約してもらいます' },
+    ],
+    where: '予約設定 › 担当者', manualHref: '/booking/menus?tab=staff', manualNote: '担当者の画面を開きます',
+    todo: { title: '担当の割り当てを決める', note: '予約が入ったときの担当の決め方です', action: '決める' }, pendingApi: true,
+  },
+  classCapacity: {
+    key: 'classCapacity', short: 'クラスの定員', title: '1 クラスの定員は？', description: '1 回のクラスで受け付ける人数です。',
+    choices: [
+      { value: '8', icon: 'users', label: '8 人', note: '少人数のクラスです' },
+      { value: '20', icon: 'users', label: '20 人', note: '大人数のクラスです' },
+    ],
+    where: 'イベント予約', manualHref: '/events', manualNote: 'イベント予約の画面を開きます',
+    todo: { title: 'クラスの定員を決める', note: '1 回のクラスで受け付ける人数です', action: '決める' }, pendingApi: true,
+  },
+  hours: {
+    key: 'hours', short: '営業時間', title: '予約を受け付ける時間は？', description: '予約を受け付ける曜日と時間です。休みの日はあとで足せます。',
+    choices: [
+      { value: 'day', icon: 'clock', label: '11:00〜22:00（毎日）', note: '昼と夜の両方で受け付けます' },
+      { value: 'night', icon: 'clock', label: '17:00〜23:00（毎日）', note: '夜だけ受け付けます' },
+    ],
+    where: '予約設定 › 営業時間', manualHref: '/booking/menus?tab=hours', manualNote: '営業時間の画面を開きます',
+    todo: { title: '営業時間を入れる', note: '予約を受け付ける曜日と時間です', action: '入れる' }, pendingApi: true,
+  },
+  partySize: {
+    key: 'partySize', short: '受け付ける人数', title: '1 回の予約で受け付ける人数は？', description: 'LINE から予約できる人数です。多い人数はお店へ連絡してもらいます。',
+    choices: [
+      { value: '1-6', icon: 'users', label: '1〜6 人', note: '7 人からはお店へ連絡してもらいます' },
+      { value: '1-10', icon: 'users', label: '1〜10 人', note: '宴会も LINE で受け付けます' },
+    ],
+    where: '予約設定 › 予約のルール', manualHref: RULES, manualNote: '予約のルールの画面を開きます',
+    todo: { title: '受け付ける人数を決める', note: 'LINE から予約できる人数です', action: '決める' }, pendingApi: true,
+  },
+}
+Object.assign(Q, PENDING)
+
+/* B-313（オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
 const BY_STYLE: Record<AccountStyle, string[]> = {
-  restaurant: ['booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'content'],
-  salon: ['booking', 'approval', 'payment', 'reminders', 'tickets', 'stamps', 'coupons', 'content'],
-  consult: ['booking', 'approval', 'payment', 'reminders', 'outcome', 'content'],
-  lesson: ['booking', 'approval', 'payment', 'reminders', 'tickets', 'coupons', 'content'],
+  restaurant: ['approval', 'payment', 'cancelDeadline', 'reminders', 'stamps', 'coupons', 'seats', 'hours', 'partySize'],
+  salon: ['approval', 'payment', 'cancelDeadline', 'reminders', 'tickets', 'stamps', 'coupons', 'nomination', 'hours'],
+  consult: ['approval', 'payment', 'cancelDeadline', 'reminders', 'outcome', 'assignment', 'hours'],
+  lesson: ['approval', 'payment', 'cancelDeadline', 'reminders', 'tickets', 'coupons', 'classCapacity', 'hours'],
   ec: ['coupons', 'content'],
-  standard: ['booking', 'content'],
+  standard: ['content'],
 }
 
 /** 1問目（スタイル）と 2問目（見た目＝口の image）は形が違うので、名前だけを持つ。 */

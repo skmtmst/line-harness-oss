@@ -3,6 +3,7 @@
   --hss-col-kind: 140px;
   --hss-col-how: 220px;
   --hss-col-menu: 28px;
+  --hss-col-open: 104px;
   --hss-row-h: 60px;
   --hss-title-lh: 27px;
   --hss-auto-pad: 14px 16px;
@@ -110,4 +111,46 @@
 
 .row {
   min-height: var(--hss-row-h);
+}
+
+.samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+.sampleCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.sampleRow {
+  min-height: var(--polish-table-row);
+}
+
+.sampleName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sampleBody {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+.sampleText {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  white-space: pre-wrap;
+}
+
+.placeholders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--polish-space-row);
 }

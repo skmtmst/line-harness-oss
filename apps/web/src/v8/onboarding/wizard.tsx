@@ -18,7 +18,7 @@ import Select from '@/components/shared/select'
 import { SetupIcon } from './icons'
 import { SampleMenuPhone, SampleMenuTiles } from './sample-menu'
 import {
-  LOOK_CHOICES, STYLE_CHOICES, answerOf, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
+  LOOK_CHOICES, STYLE_CHOICES, answerOf, answersForApi, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
   type Question, type StarterItemState, type StyleState,
 } from './model'
 import styles from './wizard.module.css'
@@ -100,7 +100,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   }
 
   const save = async (next: Record<string, SetupAnswer>, nextChoices = choices) => {
-    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: next, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
+    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: answersForApi(next), choices: Object.keys(nextChoices).length ? nextChoices : undefined })
     if (!res.success) throw new Error('save failed')
     setVersion(res.data.version)
     setDirty(false)
@@ -310,6 +310,9 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       <div className={styles.questionRow}>
         <StepList steps={steps} index={index} answers={answers} styleSelected onSelect={(i) => setStep(i)} />
         <div className={styles.question}>
+          {question.pendingApi ? (
+            <p className={styles.pending}><StatusBadge tone="neutral" dot>{PREPARING_WORD}</StatusBadge>この質問の答えは、まだ保存されません（使えるようになったら保存します）。</p>
+          ) : null}
           <RadioCardGroup legend={question.short} className={styles.stack}>
             {mains.map((item) => (
               <RadioCard key={item.value} name={`setup-${question.key}`} value={item.value} checked={choice === item.value} onChange={setChoice} title={choiceLabel(question, item, style)} note={item.note} icon={<SetupIcon name={item.icon} />} />
