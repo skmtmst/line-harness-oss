@@ -1014,7 +1014,7 @@
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
 
 ### 下の帯の左端の操作（F組4回目・Q）
-- 持ち主：`components/shared/sticky-bar-action.tsx` の `StickyBarAction`（`sticky-bar.tsx` からも公開）。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。帯自身は配置だけを持ち、実際の削除・保管の処理と確認窓は呼び出す画面が保つ。危険な削除入口は `destructive` を渡し、共通 `Button` の `danger`（赤）で表示する。
+- 持ち主：`components/shared/sticky-bar-action.tsx` の `StickyBarAction`（`sticky-bar.tsx` からも公開）。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。帯自身は配置だけを持ち、実際の削除・保管の処理と確認窓は呼び出す画面が保つ。危険な削除入口は `destructive` を渡し、共通 `Button` の `danger-outline`（白地・枠・赤い文字と印）で表示する。確認窓の確定操作は `danger`（赤い地）のままにする。
 
 - 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。
 
@@ -1067,7 +1067,7 @@
 
 - **B-266 道具の2段**：ListToolbarFrameは狭い白い板で先頭と検索を同じ段へ、残りを次の段へそろえる。左列の作るボタンの全幅指定は先頭の口へ持ち込まない。ListToolbarOptional(collapse=overflow)は入りきらない組だけを操作名つきの入口に畳み、元の操作と入力は保持する。文字だけを小さくしたり無名の「…」へ消したりしない。
 ### 下の帯の左端の操作（F組4回目・Q）
-- 持ち主：`components/shared/sticky-bar-action.tsx` の `StickyBarAction`（`sticky-bar.tsx` からも公開）。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。帯自身は配置だけを持ち、実際の削除・保管の処理と確認窓は呼び出す画面が保つ。危険な削除入口は `destructive` を渡し、共通 `Button` の `danger`（赤）で表示する。
+- 持ち主：`components/shared/sticky-bar-action.tsx` の `StickyBarAction`（`sticky-bar.tsx` からも公開）。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。帯自身は配置だけを持ち、実際の削除・保管の処理と確認窓は呼び出す画面が保つ。危険な削除入口は `destructive` を渡し、共通 `Button` の `danger-outline`（白地・枠・赤い文字と印）で表示する。確認窓の確定操作は `danger`（赤い地）のままにする。
 
 - 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。
 
