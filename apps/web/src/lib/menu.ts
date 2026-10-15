@@ -263,6 +263,21 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
    * 管理者は予約設定を選ぶ。
    */
   '/booking/staff/shifts': ['booking-own-shifts', 'booking-menus'],
+  /*
+   * 左メニューの項目と別の URL に置いた画面（2026-10-15 判定役 Eo56k・YMVFD）。
+   * 宣言が無いと、どの項目も選ばれず、属する組も閉じたままになっていた。
+   * 成果とアフィリエイトの各タブ（/affiliates?tab=…）は「成果とアフィリエイト」、
+   * 担当スタッフの一覧・追加は「予約設定」の担当スタッフタブ、
+   * 重複の確認は友だちの主タブの1枚、枠を閉じる知らせは店舗ダッシュボードから開く。
+   */
+  '/affiliates': 'affiliates',
+  '/affiliates/new': 'affiliates',
+  '/affiliate-offers': 'affiliates',
+  '/affiliate-offers/new': 'affiliates',
+  '/booking/staff': 'booking-menus',
+  '/booking/staff/new': 'booking-menus',
+  '/duplicates': 'friends',
+  '/restaurant-test/close-tasks': 'restaurant-dashboard',
 }
 
 /**
