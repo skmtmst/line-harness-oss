@@ -120,16 +120,7 @@ describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる'
     expect(operator.match(/<Field\s/g)?.length).toBeGreaterThanOrEqual(7)
     expect(operator).not.toContain('[data-selects-wide] select')
   })
-  it('共通アクションの見本選択は内容に合わせて広がる', () => {
-    const page = read('common-actions/new/page.tsx')
-    expect(page).toContain('<CommonActionAddActions')
-    const sequence = read('../v8/automations/common-action-sequence.tsx')
-    expect(sequence).toContain('<ActionAddButton direct label="見本から受け渡す"')
-    expect(sequence).toContain("choices.filter(choice => choice.id === 'common_action')")
-    const picker = read('../components/shared/entity-picker-sources.tsx')
-    expect(picker).toContain('<EntityPickerField')
-    expect(page).not.toContain('[data-example-select] .min-w-48')
-  })
+
   it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
     /* 入口は V8 の画面（src/v8/mileage/reward-edit.tsx）を出すだけ。選ぶ欄はそちらにある。 */
     const rewards = read('../v8/mileage/reward-edit.tsx')

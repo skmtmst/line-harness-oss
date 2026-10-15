@@ -164,7 +164,7 @@ export default function HqTemplateDetail({
           {onRemove ? <RowMenu appearance="box" label="そのほかの操作" menuLabel={`ひな形「${detail.template.name}」の操作`} items={[{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: onRemove }]} /> : null}
         </div>
       ) : null}
-      <Card variant="aside" aria-label="このテンプレートについて">
+      <Card layout="vertical" contentPadding="var(--tpl-eds-about-pad)" gap="var(--tpl-eds-about-gap)" aria-label="このテンプレートについて">
         <CardHeader size="content" title="このテンプレートについて" />
         <dl className={styles.aboutList}>
           <div className={styles.aboutRow}><dt>種類</dt><dd>{kindLabel}</dd></div>
@@ -241,12 +241,12 @@ export default function HqTemplateDetail({
         ) : null}
         {compare && inUse && current && compare.from === inUse.version && compare.to === current.version ? compareBox : null}
 
-        <Card variant="form" aria-label="本文">
+        <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="本文">
           <CardHeader size="content" title={`${kind === 'message' ? '本文' : '中身'}${current?.is_draft && distributedCount > 0 ? '（下書き）' : ''}`} meta={kind === 'message' ? '{ } は差し込み。受け取る人ごとに変わります。' : summary ?? '中身の要約を読めませんでした'} action={canEdit ? <Button variant="secondary" onClick={onEdit} disabled={busy}><Pencil size={14} aria-hidden="true" />編集する</Button> : undefined} />
           <div className={styles.bodyBox}>{tag ? <TagPill name={tag.name} color={tagColor} /> : kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
         </Card>
 
-        <Card variant="form" aria-label="配った先">
+        <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="配った先">
           <CardHeader size="content" title="配った先" meta={distributedCount > 0
             ? `${distributedCount} アカウントに配りました。新しい版を配ると、${distributedCount} アカウントのテンプレートが新しい版になります。`
             : 'まだどのアカウントにも配っていません。配ると、ここに並びます。'} />
@@ -282,7 +282,7 @@ export default function HqTemplateDetail({
           ) : null}
         </Card>
 
-        <Card variant="form" aria-label="版の履歴">
+        <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="版の履歴">
           <CardHeader size="content" title="版の履歴" meta="戻すと、その版を下書きとして作り直します。配るまで配った先は変わりません" />
           {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>

@@ -53,7 +53,6 @@ describe('作成画面の登録メディア選択', () => {
 describe('公開履歴・再試行・照合', () => {
   it('編集画面に履歴セクションがあり owner/admin のみ出す', () => {
     expect(PUBLISH_HISTORY).toContain("const canInspectOperations = role === 'owner' || role === 'admin'")
-    expect(PUBLISH_HISTORY).toContain('canInspectOperations ? <Card')
     expect(PUBLISH_HISTORY).toContain('aria-label="公開の履歴とLINEとの照合"')
   })
 

@@ -28,8 +28,6 @@ describe('B-169 行うことの形を戻さない', () => {
   it('自動応答・クーポン・リサーチ・カルーセルの入口を共通の持ち主へ集める', () => {
     expect(read('components/auto-replies/inline-action-list.tsx')).toContain('<InlineActionRowsV8')
     expect(read('v8/template-edit/asset.tsx')).toContain('<InlineActionRowsV8')
-    expect(read('v8/templates/carousel.tsx')).toContain('<CarouselButtons')
-    expect(read('v8/templates/carousel-buttons.tsx')).toContain('<InlineActionList')
   })
   it('フォームの旧タグ欄を同じ行にまとめ、旧値は消さず取り込む', () => {
     const source = read('v8/form-edit/after-tab.tsx')

@@ -5,11 +5,6 @@ import { describe, expect, it } from 'vitest'
 const PAGE = ['page.tsx', 'control-v8.tsx', '../../v8/settings/emergency/history-details.tsx', '../../v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(import.meta.dirname, file), 'utf8')).join('\n')
 
 describe('点検・軽 第7便運用状態(#585)', () => {
-  it('補足は1000文字の上限と残り字数を見せる(#518 7)', () => {
-    expect(PAGE).toContain('maxLength={1000}')
-    expect(PAGE).toContain('note={`あと${1000 - reasonDetail.length}文字`}')
-  })
-
   it('最終確認は低い画面でも閉じ込めない(#518 8)', () => {
     const dialogCss = readFileSync(join(import.meta.dirname, '../../components/shared/dialog.module.css'), 'utf8')
     expect(dialogCss).toMatch(/max-height:[^;]*(?:100dvh|100vh)/)

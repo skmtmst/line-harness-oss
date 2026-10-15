@@ -1,5 +1,8 @@
 'use client'
 
+import type { DefinitionEditorProps, ConsoleProps } from './console-types'
+export type { DefinitionEditorProps } from './console-types'
+
 import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { flushListUrlState, notifyListLocation, useListLocation, useListUrlValue } from '@/components/shared/list-url-state'
@@ -92,29 +95,6 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
-
-/** 種類ごとの中身の編集部品（タグ・リッチメニュー・回答フォーム・シナリオ）。入口が今の部品を渡す。 */
-export interface DefinitionEditorProps {
-  type: TemplateType
-  value: TemplateDefinition
-  disabled: boolean
-  editing?: boolean
-  tenantId?: string
-  onChange: (next: TemplateDefinition) => void
-  onBusyChange?: (busy: boolean) => void
-  onMediaUploaded?: (media: TemplateMedia) => void
-  richMenuReferences?: { tags?: Array<{ id: string; name: string }>; templates?: Array<{ id: string; name: string }>; forms?: Array<{ id: string; name: string }> }
-  formReferences?: import('@/components/forms/form-refs').FormRefs
-  onRichMenuNameChange?: (name: string) => void
-  onCanonicalSave?: (definition: Extract<TemplateDefinition, { tag: unknown } | { form: unknown }>, andAnother?: boolean) => void | Promise<void>
-  onCanonicalCancel?: () => void
-}
-
-interface ConsoleProps {
-  type: TemplateType
-  DefinitionEditor?: ComponentType<DefinitionEditorProps>
-  RichMenuCreate?: ComponentType<{ host: RichMenuCreateHost }>
-}
 
 export default function HqTemplatesV8(props: ConsoleProps) {
   const attribute = useAttributeTab('/hq/friend-attributes')
@@ -603,7 +583,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   const refreshResult = () => void perform(async () => {
     if (!detail || !pendingRun)
-
 
  return
     const loaded = await hqTemplatesApi.result(detail.template.id, pendingRun)
