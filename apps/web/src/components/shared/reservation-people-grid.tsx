@@ -56,7 +56,7 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
       onError('移動できませんでした。予約は元のままです。最新の予約を読み込んでください。')
     }
   }
-  return <Card frame="inset" overflow="hidden" data-people-day-grid>
+  return <Card frame="inset" contentPadding="0" overflow="hidden" data-people-day-grid>
     <div className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-head>
       <div className={styles.head}>時刻</div>
       {staff.map(resource => <div key={resource.id} className={styles.head} title={resource.label}><Avatar name={resource.label} size={24} /><strong>{resource.label}</strong></div>)}
