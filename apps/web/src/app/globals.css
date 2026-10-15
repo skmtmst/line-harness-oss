@@ -2870,7 +2870,7 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-picker-row-h: 36px;
   --tpl-picker-row-gap: 8px;
   /* 2段の行（WjFWW 送るアカウント：名前の下に人数と状態）。 */
-  /* 1つ選ぶ窓の候補（f63Jza：行 52＝上下8・名前と補足の2段）。 */ --tpl-picker-single-card-pad: 8px 12px;
+  /* 1つ選ぶ窓の候補（f63Jza：行 52＝上下8・名前と補足の2段）。 */ --tpl-picker-single-card-pad: 8px 12px; /* EpTBB：統括の「テンプレートを選ぶ」窓（候補4件が全部見える高さ）。 */ --tpl-source-picker-body-h: 420px;
   --tpl-picker-stack-row-h: 52px; --tpl-picker-stack-row-pad: 6px 12px; --tpl-picker-stack-gap: 2px; --tpl-picker-stack-sub-lh: 16px;
   --tpl-picker-row-pad: 0 10px;
   --tpl-picker-gap: 8px;
