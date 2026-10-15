@@ -152,6 +152,10 @@ export interface FormBookingConfig {
   menuId: string;
   staffId?: string | null;
   daysAhead?: number;
+  /** 「メニューを選んでもらう」の保存値。未指定は既存の1メニュー固定。 */
+  allowMenuSelection?: boolean;
+  /** 「未承認で入れて店が承認する」の保存値。未指定は既存の受付設定を保つ。 */
+  requireApproval?: boolean;
 }
 
 /**
@@ -1330,6 +1334,12 @@ export function validateFormDefinition(layout: FormLayout): string | null {
           return `回答データの見出し「${block.name}」が重複しています`;
         }
         seenNames.add(block.name);
+        if (block.type === "booking" && block.booking != null) {
+          if (typeof block.booking !== "object" || Array.isArray(block.booking)) return `${at}の予約設定を確認してください`;
+          for (const [key, label] of [["allowMenuSelection", "メニューを選んでもらう"], ["requireApproval", "未承認で入れる"]] as const) {
+            if (block.booking[key] !== undefined && typeof block.booking[key] !== "boolean") return `${at}の「${label}」はオン・オフで指定してください`;
+          }
+        }
         if (block.type === "file") {
           if (block.fileKinds !== undefined && (!Array.isArray(block.fileKinds) || !block.fileKinds.length || block.fileKinds.some(kind => !["image", "pdf", "identity"].includes(kind)))) return `${at}で受け取る種類を1つ以上選んでください`;
           if (block.fileKind && !["image", "pdf", "identity"].includes(block.fileKind)) return `${at}のファイルの種類を選んでください`;

@@ -7629,7 +7629,10 @@ export const api = {
         name?: string
         description?: string | null
         fields?: unknown
-        /** 送ると fields もこちらから作り直される */
+        /**
+         * 送ると fields もこちらから作り直される。
+         * 予約のつまみは各ブロックのbooking.allowMenuSelection/requireApproval。
+         */
         layout?: FormLayout
         onSubmitTagId?: string | null
         onSubmitMessageType?: string | null
