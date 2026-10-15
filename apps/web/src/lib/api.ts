@@ -9393,9 +9393,9 @@ export const api = {
   */
   manualLinks: {
     /** 画面から1つ引く。**開けないと分かっているものは URL が null で返る。** */
-    lookup: (screen: string) =>
+    lookup: (screen: string, keyKind: 'screen' | 'task' = 'screen') =>
       fetchApi<ApiResponse<{ key: string; url: string | null; status: 'ok' | 'broken' | 'unset' }>>(
-        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}`,
+        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}${keyKind === 'task' ? '&keyKind=task' : ''}`,
       ),
     list: () =>
       fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(

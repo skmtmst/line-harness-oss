@@ -243,6 +243,8 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
 export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   // LINEアカウントの登録は統括の「アカウント」から開く（左メニューは統括のまま・絵 xj3zz）。
   '/accounts/new': 'hq-stores',
+  // 飲食店の店舗を追加（ao15G・faGn4）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
+  '/restaurant-test/stores/new': 'hq-stores',
   '/accounts?tab=migration': 'friends',
   /*
    * /conversions の1画面に「成果とアフィリエイト」と「コンバージョン」の
