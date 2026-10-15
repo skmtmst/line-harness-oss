@@ -79,6 +79,7 @@
 
 .zoneHint {
   margin: 0;
+  text-align: center;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: 12px; /* fontSize: 12 */
 }
@@ -228,3 +229,6 @@
 .zone[data-variant='upload'] .zoneTitle { font-size: var(--text-heading); }
 .zone[data-variant='upload']:focus-visible { outline: 2px solid var(--color-focus-ring); }
 }
+
+/* 欄の中の別の入れ方（「ライブラリから選ぶ」）。 */
+.secondary { display: inline-flex; }

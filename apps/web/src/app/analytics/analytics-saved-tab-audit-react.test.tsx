@@ -131,6 +131,16 @@ async function render() {
   await act(async () => { root.render(<AnalyticsPage />) })
 }
 
+/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・B-253）。 */
+async function scheduleMenuItem(label: string): Promise<HTMLElement> {
+  const trigger = Array.from(host.querySelectorAll('button')).find((item) => item.getAttribute('aria-label')?.startsWith('定期レポート「'))
+  if (!trigger) throw new Error('定期レポートの「…」が見つからない')
+  await act(async () => { trigger.click() })
+  const found = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) => item.textContent?.trim() === label)
+  if (!found) throw new Error(`メニューの項目が見つからない: ${label}`)
+  return found
+}
+
 function button(label: string): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
     (item) => item.textContent?.trim() === label,
@@ -223,11 +233,11 @@ describe('R456 アカウント切替後に旧応答で置き換えない', () =>
     expect(host.textContent).toContain('Aのレポート')
 
     // しまう確認を開いておく（確認窓はポータルのため document 全体で見る）
-    await act(async () => { button('しまう').click() })
+    await act(async () => { (await scheduleMenuItem('しまう')).click() })
     expect(document.body.textContent).toContain('定期レポートをしまいますか')
 
     // 止める→失敗→再読込が始まる（応答はまだ返さない）
-    await act(async () => { button('止める').click() })
+    await act(async () => { (await scheduleMenuItem('止める')).click() })
     expect(releaseA).not.toBeNull()
 
     // しまう確認を開いたままBへ切り替える

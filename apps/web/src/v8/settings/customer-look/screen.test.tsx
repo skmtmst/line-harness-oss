@@ -9,7 +9,7 @@ vi.mock('@/lib/api',async original=>({...await original<typeof import('@/lib/api
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a',selectedAccount:{name:'店A'}})}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>mock.role,canManageRole:(role:string)=>['owner','admin'].includes(role)}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{},useHideSettingsNav:()=>{}}))
-vi.mock('@/components/layout/settings-nav-v8',()=>({SettingsNavV8:()=>null}))
+vi.mock('@/components/layout/settings-inner-nav',()=>({default:()=>null}))
 vi.mock('@/components/templates/settings-page',()=>({SettingsPage:({children,preview,saveActions,saveStatus}:Pick<ComponentProps<typeof import('@/components/templates/settings-page').SettingsPage>, 'children'|'preview'|'saveActions'|'saveStatus'>)=><div>{children}{preview}{saveStatus}{saveActions}</div>}))
 vi.mock('@/components/shared/customer-look-preview',()=>({default:({look}:{look:typeof DEFAULT_CUSTOMER_LOOK})=><p>見本：{look.preset}</p>}))
 vi.mock('@/components/shared/toast',()=>({notifyToast:()=>{}}))

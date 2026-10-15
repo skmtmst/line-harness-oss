@@ -4,8 +4,13 @@
   min-width: 0;
   color: var(--color-ink);
   background: var(--color-canvas);
+  /* 本文が短くても白い板の下まで伸ばし、下の操作帯を板の下に置く（右の見え方の欄も切らない）。 */
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   /* 余白の段 --space-2〜32 は globals.css の :root が持つ（統括の一括配信など、この外枠の外で使っても 0 にしない）。 */
 }
+.root > [data-template-region='body'] { flex: 1 0 auto; }
 .header { display: flex; align-items: center; gap: var(--space-24); padding: var(--space-16) var(--space-24); border-bottom: 1px solid var(--color-hairline); }
 .heading { flex-shrink: 0; }
 .heading h2 { font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh);   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

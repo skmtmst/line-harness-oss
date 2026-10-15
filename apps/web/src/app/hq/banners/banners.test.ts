@@ -102,7 +102,7 @@ describe('統括 バナー生成', () => {
 
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
     expect(frame).toContain('<Dialog')
-    expect(frame).toContain("kind === 'detail' || kind === 'reference' ? 960")
+    expect(frame).toContain("kind === 'detail' ? 960")
     expect(dialogCss).toMatch(/position:\s*fixed/)
     expect(dialogCss).toMatch(/width:\s*min\(/)
     expect(modal).not.toMatch(/width:\s*1160|width:\s*1920/)

@@ -36,10 +36,12 @@
   width: var(--tpl-op-audit-what-w);
 }
 
-/* 操作の名前は長いと2行に折る（絵の「代理ログイン（書き込み）」）。 */
+/* 操作の名前は1行。長いと「…」で切り、乗せると全文（絵の「代理ログイン（書き…」）。 */
 .colWhat.colWhat {
   padding-right: var(--tpl-op-audit-what-pad);
-  white-space: normal;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .colTenant {

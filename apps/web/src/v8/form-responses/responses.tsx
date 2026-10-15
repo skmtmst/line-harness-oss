@@ -389,8 +389,10 @@ function Responses() {
     <div className={styles.rail}>
       {view === 'rows' && selected ? (
         <Card variant="aside" gap="var(--polish-space-row)" aria-label={`回答の詳細：${selected.friendName ?? '不明'}`}>
-          <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
-          {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
+          <div className={styles.railHead}>
+            <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
+            {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
+          </div>
           <dl className={styles.detailList}>
             <div className={styles.detailRow}>
               <dt>答えた日時</dt>

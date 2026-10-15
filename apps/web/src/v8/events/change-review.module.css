@@ -49,7 +49,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--tpl-ev-num-w) var(--tpl-ev-num-w) var(--tpl-ev-num-w) var(--tpl-ev-state-w);
   align-items: center;
-  min-height: var(--tpl-ev-row-h);
+  min-height: var(--tpl-ev-review-row-h);
 }
 .headRow {
   min-height: var(--tpl-chip-h);
@@ -216,8 +216,8 @@
   gap: var(--tpl-wh-ops-gap);
   padding: var(--tpl-ev-band-pad);
   border-radius: var(--radius-segment);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
+  background: var(--tpl-ev-band-bg);
+  color: var(--tpl-ev-band-ink);
 }
 .bandDanger {
   background: var(--color-status-danger-soft);

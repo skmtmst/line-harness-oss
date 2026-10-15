@@ -63,7 +63,7 @@
   display: grid;
   grid-template-rows: subgrid;
   grid-row: span 4;
-  row-gap: var(--tpl-hq-form-gap);
+  row-gap: var(--tpl-hq-body-gap);
   min-width: 0;
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
@@ -73,7 +73,7 @@
   box-shadow: var(--card-shadow);
 }
 
-.cardWarn { outline-color: var(--color-status-warn-deep); }
+.cardWarn { outline-color: var(--card-edge); }
 /* 帯を含む中身に高さを合わせ、並ぶカードは grid の高さを共有する。 */
 
 .cardHead {
@@ -83,6 +83,7 @@
   gap: var(--tpl-hq-attach-gap);
   min-width: 0;
   flex-shrink: 0;
+  margin-bottom: var(--tpl-hq-form-gap);
 }
 
 .logo {
@@ -146,7 +147,7 @@
   align-items: center;
   align-self: end;
   gap: var(--tpl-hq-plan-head-gap);
-  margin-top: auto;
+  margin-top: var(--tpl-hq-body-gap);
   flex-shrink: 0;
 }
 @container v8-page (max-width: 1099px) {

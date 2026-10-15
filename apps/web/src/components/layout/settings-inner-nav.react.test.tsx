@@ -89,6 +89,8 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByRole('link', { name: 'プール管理' })).toBeTruthy())
     const links = view.getAllByRole('link').map((link) => link.textContent)
     expect(links).toEqual([
+      // B-237（10-11）で足したお客さまのデザイン。絵 ewM7i では会社とロゴ（API 待ち）の次。
+      'お客さまのデザイン',
       'はじめの設定',
       'LINEアカウント',
       'プール管理',
@@ -167,6 +169,17 @@ describe('★V8 設定の中のメニュー', () => {
     // 必須項目（はじめの設定・機能設定・運用状態）は残る
     expect(labels).toContain('はじめの設定')
     expect(labels).toContain('機能設定')
+  })
+
+  it('隠れる項目でも、いま開いている画面なら選ばれた形で出す（閲覧のみのログインユーザー A35Gh）', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
+    fixture.pathname = '/staff'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    const link = view.getByRole('link', { name: 'ログインユーザー' })
+    expect(link.getAttribute('aria-current')).toBe('page')
+    expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
   })
 
   it('任意機能がオフなら専用の項目は出ない', async () => {

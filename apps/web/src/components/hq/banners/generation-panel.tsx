@@ -1,9 +1,10 @@
 'use client'
 
-import { ChevronDown, Images, Layers, Plus, Scissors, Sparkles, Upload, X } from 'lucide-react'
+import { ChevronDown, FileUp, Images, Layers, Plus, Scissors, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
+import FileDropzone from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import LimitState from './limit-state'
 import styles from './generation-panel.module.css'
@@ -194,7 +195,22 @@ export default function GenerationPanel({
 
             {value.references.length < BANNER_MAX_REFERENCE_IMAGES ? (
               <>
-                <div className="grid grid-cols-2 gap-2">
+                {v8Layout ? (
+                  /* 絵 iMnph：参照画像は落とす欄（題・ドラッグ＆ドロップ・制限）と、その中の「ライブラリから選ぶ」。 */
+                  <FileDropzone
+                    variant="upload"
+                    /* 押せる欄の中の印は共通で16に縮むので、絵の24を直に指定する。 */
+                    icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} className="text-ink-secondary" />}
+                    title="参照画像を追加"
+                    hint={<>ドラッグ＆ドロップ<br />またはクリックしてファイルをアップロード<br />（1ファイル10メガバイト以内・PNG・JPEG・WebP）</>}
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={disabled}
+                    busy={referenceBusy}
+                    aria-label="参照画像のファイルを選ぶ"
+                    secondary={<Button variant="text" textTone="accent" disabled={disabled || referenceBusy} onClick={onPickReference}>ライブラリから選ぶ</Button>}
+                    onFiles={(files) => { if (files[0]) onUploadReference(files[0]) }}
+                  />
+                ) : <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
                     <Images aria-hidden="true" className="h-4 w-4" />
                     ライブラリから選ぶ
@@ -214,7 +230,7 @@ export default function GenerationPanel({
                       if (file) onUploadReference(file)
                     }}
                   />
-                </div>
+                </div>}
                 {value.references.length === 0 ? (
                   <p className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>
                     {`ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を ${BANNER_MAX_REFERENCE_IMAGES} 枚まで選べます。`}
@@ -562,7 +578,7 @@ function Field({
 /**
  * 出力サイズ。Pencil ★BG-B `xy4EW` の小さい箱（`o2XyUk`/`aCyxg`）。
  *
- * LINE の規格を2列の小さいカードで並べ、選んだカードを淡い緑にする（共通のラジオカード）。
+ * LINE の規格を小さいカードで並べ（V8 は絵 zOpMG・p03ImY・tSgl6 どおり1列の低い行：左に全文の名前と寸法、右に丸）、選んだカードを淡い緑にする（共通のラジオカード）。
  * 390px の脇のパネルに収まる細さにするため `variant="compact"` を使う
  * （2026-10-06 オーナー指示「出力サイズのボタンが大きい。もっとスマートな幅に」）。
  * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
@@ -596,7 +612,7 @@ function OutputSize({
         <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
         <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
-      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-1.5'}>
+      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-1.5'}>
         {[...line, ...(showOthers ? others : [])].map((preset) => (
           <RadioCard
             key={preset.key}

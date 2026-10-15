@@ -34,6 +34,12 @@
   background: var(--color-canvas-sunken);
 }
 
+/* 計算で決まる読むだけの欄（年齢など）。絵 vX3wQ：灰色の地・薄い文字。 */
+.field[data-look='derived'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
 .field:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;

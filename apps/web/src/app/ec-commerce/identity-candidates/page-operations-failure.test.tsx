@@ -133,7 +133,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '候補を見る' })).toBeTruthy()
     // 集計の数はサーバが数えた値を出す（w1W8h：絵の言葉）。
-    expect(screen.getByText('人が決める（つき合わせ 5 のうち）')).toBeTruthy()
+    expect(screen.getByText('人が決める（5 件のうち）')).toBeTruthy()
     expect(screen.getByText('¥50,000')).toBeTruthy()
   })
 
@@ -171,7 +171,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     mocks.operations.mockResolvedValue(OPERATIONS_OK)
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     // 集計の数が戻り、失敗の文言は消える。
-    await waitFor(() => expect(screen.getByText('人が決める（つき合わせ 5 のうち）')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('人が決める（5 件のうち）')).toBeTruthy())
     expect(screen.queryByText('読み込めませんでした')).toBeNull()
   })
 

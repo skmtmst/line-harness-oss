@@ -796,7 +796,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
-    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
+    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} fixedNext focusBlockId={selectedBlockId} />
   )
 
   const preview = (
@@ -819,7 +819,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <div className={styles.urlRow}>
               {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
               <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
-              <CopyTextButton value={answerUrl} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="回答用URLをコピー" />
+              <CopyTextButton variant="secondary" icon={<Copy size={15} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             {canEdit ? (

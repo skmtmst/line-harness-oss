@@ -10,3 +10,4 @@
 
 /* dJZ7Q：共通のまとめて選ぶ中身を窓の中に入れる高さ。 */
 .picker { display: flex; flex-direction: column; }
+.selectAll { display: flex; align-items: center; min-height: var(--tpl-hq-save-row-h); padding: var(--tpl-hq-save-row-pad); box-shadow: var(--tpl-htn-line-bottom); font-size: var(--text-caption); }

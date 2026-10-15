@@ -30,6 +30,8 @@ const axisName={resource:'時間',floor:'座席表',list:'一覧',month:'月'}
 /** 経路の札。label を渡すと、その名前で出す（予約経路の連携の表のように、口が媒体の名前を持つとき）。 */
 export function ReservationSource({value,note,label}:{value:string;note?:string|null;label?:string}){return <span className={styles.source} data-source={value} title={label}>{label??(value==='manual'&&note?.startsWith('ウォークイン')?'ウォークイン':source(value))}</span>}
 export function ReservationDetailsActions({children}:{children:ReactNode}){return <div className={styles.detailActions}>{children}</div>}
+/** 盤の色の見本（予約元ごとの箱の色）。道具の段に1行で置く（GcyTr）。 */
+export function ReservationLegend({items,label='予約の色'}:{items:Array<{label:string;tone:'info'|'warning'|'success'|'neutral'|'danger'}>;label?:string}){return <span className={styles.legendInline} role="list" aria-label={label}>{items.map(item=><span key={item.label} role="listitem" data-state={item.tone}>{item.label}</span>)}</span>}
 export function ReservationFacts({items}:{items:Array<{label:string;value:ReactNode}>}){return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>}
 export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEntry;dense?:boolean}) {
  if(dense)return <div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong><ReservationFacts items={[{label:'アレルギー',value:entry.dining?.allergy||entry.currentAllergy?<StatusBadge size="dining" tone="info" surface="white">{entry.dining?.allergy||entry.currentAllergy}</StatusBadge>:'—'},{label:'記念日',value:entry.dining?.anniversary||'—'},...(entry.dining?.seatPreference?[{label:'席の好み',value:entry.dining.seatPreference}]:[]),...(entry.dining?.courseAllergens?.length?[{label:'コースの注意',value:entry.dining.courseAllergens.join('・')}]:[]),...(entry.currentAllergy&&entry.dining?.allergy&&entry.currentAllergy!==entry.dining.allergy?[{label:'今回の注意',value:entry.currentAllergy}]:[])]}/></div>
@@ -53,7 +55,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  monthNamePresentation?:'readable';
  kind?:'people'|'seats';entries:ReservationBoardEntry[];resources:ReservationBoardResource[];axis?:ReservationAxis;onAxis?:(axis:ReservationAxis)=>void;
  canWrite?:boolean;busy?:boolean;onOpen:(id:string)=>void;onMove?:(id:string,move:ReservationBoardMove)=>Promise<void>;
- menus?:(entry:ReservationBoardEntry)=>ReactNode; actions?:(entry:ReservationBoardEntry)=>ReactNode;toolbar?:ReactNode;trailingToolbar?:ReactNode;notice?:ReactNode;floor?:RestaurantFloor;
+  menus?:(entry:ReservationBoardEntry)=>ReactNode; actions?:(entry:ReservationBoardEntry)=>ReactNode;toolbar?:ReactNode;trailingToolbar?:ReactNode;notice?:ReactNode;floor?:RestaurantFloor;
  loadPrintEntries?:()=>Promise<ReservationBoardEntry[]>;printContext?:string;title?:string;compact?:boolean;dates?:string[];slots?:ReservationBoardSlot[];
  onSlot?:(resourceId:string,startsAt:string)=>void;
 }) {

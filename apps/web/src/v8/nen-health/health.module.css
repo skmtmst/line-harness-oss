@@ -294,7 +294,8 @@
   margin: 0;
   padding: var(--tpl-nph-summary-note-pad);
   border-radius: var(--radius-control);
-  background: var(--color-table-head);
+  /* 絵（BVuYh）：案内の青の地。 */
+  background: var(--color-status-info-soft);
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   line-height: normal;
@@ -322,6 +323,11 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: normal;
+}
+.chartCaption[data-tone='warn'],
+:global(:root) .logCell[data-tone='warn'],
+:global(:root) .logCell[data-tone='warn'] * {
+  color: var(--color-status-warn-deep);
 }
 .chartBars {
   display: flex;

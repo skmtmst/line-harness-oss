@@ -223,7 +223,7 @@ const TAG_EC_CUSTOMER_AUTOMATION = {
 
 
 /* 詳細の絵（UTbi1）の template-1。一覧の行（TEMPLATES）は変えず、詳細と版の口だけこの形を返す。 */
-const TEMPLATE_1_CONTENT = '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
+const TEMPLATE_1_CONTENT = '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
 const TEMPLATE_1_DETAIL = (template) => ({
   ...template,
   folderId: 'tf-booking',
@@ -260,8 +260,8 @@ const TEMPLATE_1_DETAIL = (template) => ({
   },
 })
 const TEMPLATE_1_VERSIONS = [
-  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
-  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
+  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
+  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
 ]
 
 
@@ -351,7 +351,11 @@ function hqTemplateDefinitionHtn(row) {
       ...(i === 0 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/booking' }, intent: 'url' } : i < 3 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/news' }, intent: 'url' } : { actionType: 'message', actionData: { text: label }, intent: 'text' }),
       label,
     }))
-    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [{ id: 'visual-page-1', name: 'トップ', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas }] } }
+    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [
+      { id: 'visual-page-1', name: '予約', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas },
+      /* 切替タブの2枚目（絵 cmRZc の直すタブ「タブ2「会員」」）。 */
+      { id: 'visual-page-2', name: '会員', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas: areas.map((area) => ({ ...area, id: `${area.id}-p2` })) },
+    ] } }
   }
   if (row.template_type === 'form') {
     return {
@@ -1441,6 +1445,9 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'flow-2', store_id: null, flow_type: 'reservation_2h', title: '本日のご来店をお待ちしております', body: 'お店までの道順と、駐車場のご案内です。', timing_minutes: -120, is_enabled: 1, delivery_mode: 'preview_only' },
     { id: 'flow-3', store_id: null, flow_type: 'post_visit', title: '本日はありがとうございました', body: '次回使えるデザートのサービス券をお送りします。', timing_minutes: 180, is_enabled: 0, delivery_mode: 'preview_only' },
     { id: 'flow-4', store_id: null, flow_type: 'review_request', title: 'よろしければご感想をお聞かせください', body: 'Google の口コミに書いていただけるとうれしいです。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
+    /* 融合の板 n9vvGx の「会員証」「ワンタップ予約」（常設）。 */
+    { id: 'flow-5', store_id: null, flow_type: 'member_card', title: 'デジタル会員証', body: 'スタンプカードと来店履歴を見られます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
+    { id: 'flow-6', store_id: null, flow_type: 'one_tap_booking', title: '前回と同じ内容で予約', body: '店舗・人数・コースを前回と同じにして予約できます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
   ],
 }
 /*
@@ -2802,11 +2809,13 @@ const VISUAL_COMPOSE_BUBBLES = [
   } } },
   { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
     columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      /* 絵の小さな写真の代わり（撮影は外へ取りに行かないので、その場の色の絵）。 */
+      thumbnailImageUrl: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="${['#c98a4b', '#8fae6b', '#d9a066'][index]}"/><rect y="120" width="300" height="80" fill="${['#a8663a', '#6f8f4f', '#b97f4a'][index]}"/></svg>`)}`,
       title, text: '秋のおすすめ商品をご案内します',
       actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
     }))),
   } },
-  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+  { id: 'visual-audio', type: 'audio', content: { fileName: 'autumn-greeting.m4a', state: {
     location: { title: '', address: '', latitude: '', longitude: '' },
     video: { originalContentUrl: '', previewImageUrl: '' },
     audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
@@ -3047,6 +3056,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/connection') return GOOGLE_CONNECTION_DATA
+  // SNS 連携（y3GGTs）の Instagram：まだつないでいない（絵の「まだつないでいません」）。汎用の一覧を返すと読み込み中のまま止まる。
+  if (method === 'GET' && pathname === '/api/instagram/connection') return { success: true, data: { state: 'disconnected', replyEnabled: false } }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {
     return { success: true, reviews: GOOGLE_REVIEWS, page: 1, perPage: 20, total: GOOGLE_REVIEWS.length, connection: GOOGLE_CONNECTION }
   }
@@ -4172,7 +4183,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         name: '店舗のご案内',
         category: '未分類',
         messageType: 'text',
-        messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
+        messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
         folderId: null,
         question: null,
         questionStatus: 'draft',
@@ -4258,6 +4269,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  // 店のアレルギーの選択肢（本物は accountAllergyOptions。まだ保存していない店は決まりの8つ・版0）。
+  if (method === 'GET' && pathname === '/api/account-settings/allergy-options') {
+    return { success: true, data: { version: 0, options: ['卵', '乳', '小麦', 'そば', '落花生', 'えび', 'かに', 'くるみ'] } }
   }
   if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
     return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }

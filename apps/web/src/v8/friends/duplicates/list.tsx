@@ -124,7 +124,8 @@ export default function DuplicatesListV8() {
               value={null}
               valueText={kpi.valueText}
               unit={kpi.unit}
-              valueTextWithUnit
+              /* 絵 hn6Y8：数のあとに単位（18 組）。 */
+              valueTextWithUnit={Boolean(kpi.unit)}
               detail={kpi.detail}
               help={kpi.help}
             />
@@ -171,7 +172,7 @@ export default function DuplicatesListV8() {
 
         <Card variant="records" padding="roomy" aria-labelledby="dup-candidates-title">
           <h3 id="dup-candidates-title" className={styles.panelTitle}>重複の候補</h3>
-          <DataTable className={styles.table} columnSizing="content">
+          <DataTable className={styles.table}>
             <colgroup>
               <col />
               <col className={styles.colConfidence} />

@@ -676,7 +676,7 @@
 
 .intervalLine {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--tpl-bm-6);
   min-height: var(--tpl-bm-36);
 }
@@ -1484,10 +1484,15 @@
 }
 
 /* メニューの分類札の帯。 */
+/* 実 LIFF と同じく1行（入りきらない札は横へ送る）。スマホの器が 310 の画面になっても2段に折らない。 */
 .phoneCats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: var(--tpl-bm-6);
+  overflow: hidden;
+  padding: 2px; /* 選んだ札の枠を切らない */
+  margin: -2px;
 }
 
 .phoneCat {
@@ -1498,6 +1503,8 @@
   color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-12);
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .phoneCatNow {
@@ -1815,3 +1822,19 @@
 }
 
 .warnBand, .warnBandNoticePlacement { margin: 0; flex-shrink: 0; }
+
+/* 畳んだ右欄の2つのボタン（VFxWU）。 */
+.narrowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bm-6);
+}
+
+/* 開ける時間の行：欄の上をそろえ、範囲の添え書き（1〜1000）は数の欄の下に垂らす。文字と×は欄の高さの中で真ん中。 */
+.intervalLine > .intervalTilde,
+.intervalLine > .sameTimeLabel,
+.intervalLine > .iconRemove {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tpl-bm-36);
+}

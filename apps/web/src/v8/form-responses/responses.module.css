@@ -167,7 +167,20 @@
 .railButtonsWide > * {
   width: 100%;
 }
+.railHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+/* 題の行に「…」を並べるので、行の高さは「…」に合わせて詰めない（MKQyJ）。 */
+.railHead > :last-child:not(:first-child) { flex: none; margin-block: -6px; }
 .railTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-label);
@@ -231,14 +244,14 @@
   font-weight: 700;
 }
 .railButtons {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
   gap: var(--tpl-toolbar-gap);
   margin-top: var(--tpl-wh-ops-gap);
 }
+/* 絵 MKQyJ：2つを同じ幅の候補で並べ、文字より狭くはしない（等分の列に押し込むとボタン同士が重なった）。 */
 .railButtons > * {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: max-content;
 }
 .search {
   display: flex;
