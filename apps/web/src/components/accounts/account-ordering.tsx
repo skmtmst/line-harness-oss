@@ -283,7 +283,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     const compactNode = (account: AccountItem, depth: number): ReactNode => {
       const parent = accounts.find((item) => item.id === account.parentLineAccountId)
       return <div key={account.id} className={depth > 0 ? compact.child : undefined}>
-        <DialogContentRow size="account" align="start" className={compact.row}
+        <DialogContentRow size="account" align="start"
           data-account-id={account.id} data-depth={depth} draggable={!saving}
           onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
