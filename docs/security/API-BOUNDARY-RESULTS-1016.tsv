@@ -1478,3 +1478,9 @@ GET	/api/operations/incidents/:id	401	403	403	403
 POST	/api/operations/incidents	401	403	403	403
 POST	/api/operations/incidents/:id/restore-preview	401	403	403	403
 POST	/api/operations/incidents/:id/restore	401	403	403	403
+GET	/api/operations/security-alerts	401	403	403	403
+POST	/api/operations/security-alerts/:id/acknowledge	401	403	403	403
+POST	/api/operations/security-alerts/:id/resolve	401	403	403	403
+GET	/api/ops/security-alerts	401	403	403	403
+POST	/api/ops/security-alerts/:id/acknowledge	401	403	403	403
+POST	/api/ops/security-alerts/:id/resolve	401	403	403	403

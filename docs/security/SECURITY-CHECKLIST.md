@@ -15,6 +15,8 @@
 
 2026-10-16の修正では、`08c94923e3` を保持し、試験前に最新取得した開発枝 `5ace6976dc519607874959df2b9f6396868e27a2` をmergeした。続きでは開発枝 `765373beee065d1ef2e6f846cfc7d38f176f786c` を通常mergeした。担当：kenta / Codex。修正・残件・オーナーの手順・故障対照は[修正記録](SECURITY-FIXES-1016.md)。本番・検証DB、secret、配備先の設定は変更していない。
 
+B-343の追加では開発基点`b4adb688bd42c359d1539dbf802b5ad888a9e647`を通常mergeし、[気づき方](DETECTION.md)・[時間割と原因別の直し方](INCIDENT-RUNBOOK.md#漏えいの疑いから復旧までの時間割b-343)・[お客さまへの案内](CUSTOMER-NOTICE.md)・[監視APIの契約](SECURITY-MONITOR-CONTRACT.md)を用意。これはS39の2人の実地練習や配備先の安全確認を済にするものではない。[追加の検証記録](SECURITY-DETECTION-1016.md)を併せて読む。
+
 表のパスはリポジトリのルートから。命令は原則として読むだけ。「検証で確認」は、別途用意した架空データの環境で担当者が行う次の作業。実際のお客さまへ試し送信しない。
 
 ## ログインと権限
@@ -27,7 +29,7 @@
 | S04 | 統括・店・別アカウントの境界・高 | `tenant-scope.ts`、各APIの所属確認と境界試験を読む。画面の「統括／店」と内部のowner/admin/staffを同じ意味と考えない | 済：共通の所属範囲検査とAPI別の制限がある。全経路の実動作はS07 | `apps/worker/src/middleware/tenant-scope.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/calendar.security.test.ts` |
 | S05 | 閲覧のみでは変更・鍵取得ができない・高 | `auth.ts` の安全なHTTPメソッド以外の拒否、`denyReadOnly` を読む | 済：更新の一律拒否と、鍵情報などを読むこと自体の拒否がある。続きでCSV・export・downloadの拒否も追加し、機能ごとの閲覧権限からの書出しも止める | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/staff-api-key.security.test.ts` |
 | S06 | 代理ログインは範囲・理由・履歴で制限する・高 | `resolveImpersonation`、伏せ字、書き出し拒否、理由付き表示、禁止操作を読む | 済：セッションに結び付き、既定は閲覧のみ。個人情報は既定で伏せ、解約等を禁止する | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/routes/ops.ts`、`apps/worker/src/middleware/train30-impersonation.test.ts` |
-| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,652経路の一覧](API-ROUTE-INVENTORY-1016.tsv)と[管理1,479経路の共通境界](API-BOUNDARY-RESULTS-1016.tsv)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](API-ROUTE-REVIEW-1016.md)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
+| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,658経路の一覧](API-ROUTE-INVENTORY-1016.tsv)と[管理1,485経路の共通境界](API-BOUNDARY-RESULTS-1016.tsv)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](API-ROUTE-REVIEW-1016.md)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
 | S08 | 2人と不要アカウントの実際の権限・高 | 各サービスのメンバー画面とmusuboのユーザー管理を2人で確認し、[権限表](TWO-FACTOR-SETUP.md#誰に何の権限があるか)へ名前・役割だけ記録 | 分からない：アカウントの実際の割り当ては取得していない | `docs/brain/Memory.md`、`apps/worker/src/routes/staff.ts` |
 | S09 | 二段階認証と回復手段・高 | [設定手順](TWO-FACTOR-SETUP.md)で各自の設定を確認。musubo側も二段階認証の設定と暗号化用secretの有無を担当者と確認 | 分からない：登録・必須化のコードはあるが、2人の設定と本番の鍵は未確認 | `apps/worker/src/routes/admin-auth.ts`、`apps/worker/src/lib/mfa-config.ts`、`apps/worker/src/routes/admin-auth-mfa-enforcement.test.ts` |
 
@@ -148,4 +150,12 @@ S07・S15・S22・S24・S28の「試験が本当の故障を見付けるか」�
 | S36 | コード反映時にDEPLOY_ENV=productionを値の種類だけで確認し、承認後に本番設定のRESTAURANT_TEST_ENABLEDをfalseへ整理。検証はstaging＋true。本番の設定や配備は今回は変更していない | 配備後に管理API・通知入口・内部sandbox入口が404、飲食店cron/予約メールも停止。架空の検証でstagingだけ動く。単に設定ファイルを直しただけでは実配備確認に数えない |
 | S37 | オーナー/マサトさんがGitHub Settings → General → Danger Zone → Change repository visibilityで非公開化を実施し、共同開発者・Actions・Pagesへの影響を確認 | `gh repo view skmtmst/line-harness-oss --json visibility` がPRIVATE。未ログインの別ブラウザでソースが読めない。Pages等の公開は別に確認。過去のコピーや漏れた鍵は回収できないためS19/S38も続ける |
 | S38 | 現在の枝・公開していた枝/tag・削除済み文書・画像・添付に加え、Releases/Actions artifacts/Pagesの公開物を一覧化し、文字は検査、画像/動画は目視。顧客資料は担当者が非公開環境で照合。記録保全と必要な連絡を決めてから公開停止・削除を実施 | 別の架空画像・架空顧客文書を混ぜた検査対象で、文字/目視の両方が見付けることを先に確認。対象件数・担当・確認結果だけ記録。履歴の書換え・forceは禁止のまま、既存履歴の扱いは司令塔へ |
-| S39 | 2人で「全員ログインできない」「誤配信」「秘密漏えい」「DB破損」を各15分の机上練習。連絡網、判断役/操作役、手動返信など停止対象外、承認先、戻す版とDBの互換性を確認。承認した使い捨て環境で停止/復元を試す | 故障中は確認失敗、停止後は新しい自動送信0、復元後の予約/配信状態が一致。連絡不能の代替手段と実測時間を記録。実客への送信や本番停止を練習に使わない |
+| S39 | 2人で「全員ログインできない」「誤配信」「秘密漏えい」「DB破損」を各15分の机上練習。B-343の時間割と案内の型も使い、1時間/24時間/72時間の担当を確認。連絡網、手動返信など停止対象外、承認先、戻す版とDBの互換性を確認。承認した使い捨て環境で停止/復元を試す | 故障中は確認失敗、停止後は新しい自動送信0、復元後の予約/配信状態が一致。連絡不能の代替手段と実測時間を記録。実客への送信や本番停止を練習に使わない |
+
+### B-343：気づく仕組みの反映（上の40項目とは別）
+
+- [ ] 司令塔が689の採番の衝突を再確認し、承認・クリーン確認・控え・dry-runを終えてからDBへ適用する。本作業では作成のみ。既存監査の時刻索引も追加するため、所要時間と対象を先に確認する。
+- [ ] 司令塔がコードを検証へ配備し、Claudeが[API契約](SECURITY-MONITOR-CONTRACT.md)に沿って運用状態の要対応へ接続する。未取得・監視停止・Slack未設定を正常表示しない。
+- [ ] オーナーが通知先と担当の連絡網、基準値を確認する。架空記録で警告→Slack→受領→解消→新しい操作で再発を確認し、既存の古い記録だけでは再発しないことも確認する。
+- [ ] オーナーがCloudflare側の監視停止・全HTTPの急増・署名失敗、GitHubの秘密混入、外部サービスの鍵変更を見張る。今回の監査集計外の項目は[DETECTION](DETECTION.md)に沿って担当と確認時刻を決める。
+- [ ] 「わな」の値は検証だけの案。採用する場合は実在の権限や友だちを使わず、1回の接触で必ず通知し、値を出さず、本番で有効化できないことを先に確認する。
