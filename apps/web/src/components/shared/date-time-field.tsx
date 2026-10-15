@@ -14,7 +14,7 @@ import styles from './date-time-field.module.css'
  *
  * ブラウザ任せの `<input type="datetime-local">` / `<input type="time">` は、
  * 表示が英語の書式になり、画面ごとに見た目も違った。欄の見た目は DateField と
- * 同じ（高さ40・14px）で、表示は日本語（例：`2026年10月1日（木）10:00`）。
+ * 同じ（高さ36・14px）で、表示は日本語（例：`2026年10月1日（木）10:00`）。
  *
  * 値は今までどおりの文字列で受け渡す（日本時間）。
  * - 日時：`datetime-local` と同じ `YYYY-MM-DDTHH:mm`（空は `''`）。秒付き
@@ -43,6 +43,8 @@ export default function DateTimeField({
   invalid = false,
   required = false,
   placeholder = '日時を選ぶ',
+  labelFormat = 'full',
+  clearable = true,
   minuteStep = 1,
   id,
   name,
@@ -53,7 +55,7 @@ export default function DateTimeField({
 }: {
   value?: string
   defaultValue?: string
-  /** 36pxの欄と並べる場合。既定は日付と同じ40px。 */
+  /** 細い欄（32px）。既定は日付と同じ36px（ほかの欄と同じ・B-145）。 */
   size?: 'default' | 'compact'
   onChange?: (value: string) => void
   min?: string
@@ -67,6 +69,10 @@ export default function DateTimeField({
   placeholder?: string
   /** ★V8 の時刻の列の分のきざみ（分）。既定は 1。 */
   minuteStep?: number
+  /** 表の中の狭い欄は「10/2（木）14:00」（年を省く）。全文は title で読める。 */
+  labelFormat?: 'full' | 'short'
+  /** 空にできない欄（登録者の基準日など）は「日時を消す」を置かない。 */
+  clearable?: boolean
   id?: string
   name?: string
   className?: string
@@ -145,7 +151,7 @@ export default function DateTimeField({
           className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
           data-size={size}
           data-readonly=""
-          value={parsed ? formatDateTimeLabel(parsed) : ''}
+          value={parsed ? (labelFormat === 'short' ? formatShortDateTimeLabel(parsed) : formatDateTimeLabel(parsed)) : ''}
           placeholder="—"
           title={parsed ? formatDateTimeLabel(parsed) : undefined}
           aria-label={ariaLabel}
@@ -165,6 +171,7 @@ export default function DateTimeField({
         type="button"
         className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
         data-size={size}
+        data-no-clear={clearable ? undefined : ''}
         disabled={disabled}
         data-invalid={invalid || undefined}
         aria-invalid={invalid || undefined}
@@ -188,10 +195,10 @@ export default function DateTimeField({
       >
         <Calendar aria-hidden="true" className={dateStyles.icon} />
         <span className={parsed ? dateStyles.value : dateStyles.placeholder}>
-          {parsed ? formatDateTimeLabel(parsed) : placeholder}
+          {parsed ? (labelFormat === 'short' ? formatShortDateTimeLabel(parsed) : formatDateTimeLabel(parsed)) : placeholder}
         </span>
       </button>
-      {parsed && !disabled ? (
+      {parsed && !disabled && clearable ? (
         <button
           type="button"
           className={dateStyles.clear}
@@ -274,7 +281,7 @@ type TimeFieldProps = {
   step?: number
   /** 分のきざみ（分）。`step` より優先。分の刻みを決める。 */
   minuteStep?: number
-  /** ★V8 の欄の高さ。`field`＝40（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。 */
+  /** ★V8 の欄の高さ。`field`＝36（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。 */
   size?: TimeFieldSize
   disabled?: boolean
   /** 閲覧のみ。値を見せて打てない・時計を出さない。 */
@@ -323,6 +330,12 @@ export function parseDateTime(value: string): ParsedDateTime | null {
 }
 
 /** 「2026年10月1日（木）10:00」 */
+/** 年を省いた短い形（例：10/2（木）14:00）。 */
+export function formatShortDateTimeLabel(parsed: ParsedDateTime): string {
+  const d = parsed.date
+  return `${d.getMonth() + 1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）${pad(parsed.hours)}:${pad(parsed.minutes)}`
+}
+
 export function formatDateTimeLabel(parsed: ParsedDateTime): string {
   return `${formatDateLabel(parsed.date)}${pad(parsed.hours)}:${pad(parsed.minutes)}`
 }

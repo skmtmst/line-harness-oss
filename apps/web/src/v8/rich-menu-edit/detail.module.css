@@ -31,7 +31,7 @@
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 
 /* 公開の進み：段（余白10/0・下に線）。名前 13・済み 12/600 緑。 */
-.stepRow { display: flex; align-items: center; gap: var(--tpl-eds-action-gap); padding: var(--tpl-eds-row-pad); box-shadow: var(--shadow-row-line); }
+.stepRow { display: flex; align-items: center; gap: var(--tpl-eds-action-gap); padding: var(--tpl-eds-step-pad); box-shadow: var(--shadow-row-line); }
 .stepOk { flex-shrink: 0; color: var(--color-accent-deep); }
 .stepNg { flex-shrink: 0; color: var(--color-status-danger); }
 .stepQuiet { flex-shrink: 0; color: var(--color-ink-faint); }
@@ -68,4 +68,6 @@
 .aboutList { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); margin: 0; }
 .aboutRow { display: flex; align-items: center; gap: var(--tpl-eds-about-row-gap); padding: var(--tpl-eds-about-row-pad); box-shadow: var(--shadow-row-line); }
 .aboutRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); white-space: nowrap; }
+.aboutRow > dd.stateOk { color: var(--color-accent-deep); }
+.checkIcon { flex-shrink: 0; color: var(--color-accent-deep); }
 .aboutRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }

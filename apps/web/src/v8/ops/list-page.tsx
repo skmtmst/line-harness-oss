@@ -1,14 +1,15 @@
 import { Children, Fragment, cloneElement, isValidElement, type ComponentProps, type ReactNode } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { ListPage, type ListPageProps } from '@/components/templates'
-import { PageContent } from '@/components/templates/page-frame'
+import parts from './parts.module.css'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 
 export function OpsListPage({ stats, ...props }: ListPageProps) {
-  return <ListPage {...props} stats={<>
-    <PageContent><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
+  /* 頭の下は詰める（絵：題の下 14 で運営の帯。ふつうの一覧の頭の下の余白だと帯が 20 下がる）。 */
+  return <ListPage {...props} bottomSpacing={props.bottomSpacing ?? 'compact'} stats={<>
+    <div className={parts.opsNotice}><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></div>
     {stats}
   </>} />
 }

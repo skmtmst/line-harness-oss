@@ -55,8 +55,10 @@
 .selectBox :global(button) { width: 100%; }
 
 
-.valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: var(--tpl-rule-row-gap); }
-.valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); color: var(--color-ink-faint); }
+/* いまの中身・新しい中身は題の行をそろえる（絵 AYc6O）。新しい中身だけ文字数の行があるので下ぞろえにしない。 */
+.valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: var(--tpl-rule-row-gap); }
+/* 矢印は欄の高さの中央：共通の欄の題の行20＋間6だけ下げる。 */
+.valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); margin-top: var(--tpl-field-control-offset); color: var(--color-ink-faint); }
 .savedNote { margin: 0; color: var(--color-success); font-size: var(--text-label); }
 
 /* 変える前に影響を見る：行は 余白12/0・間6・下に線。前は薄い赤、後は薄い緑（角8・余白10）。 */
@@ -121,9 +123,7 @@
 }
 .sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-chip-label-lh); }
 .sideFields { display: flex; flex-direction: column; gap: var(--tpl-body-gap); }
-/* 使える期間：日付の欄（共通部品）は高さ40、絵は36。欄の間を 4 ずつ詰めて下の行を絵にそろえる。 */
 .periodCard { gap: var(--tpl-body-gap); }
-.periodCard .sideFields:first-of-type { gap: var(--tpl-sub-gap); }
 .inlineError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-sub-gap); }
 
 /* 決めた日に変える：箱 余白16・間6・題13/700。行は 34.5（線は下）。 */
@@ -178,9 +178,6 @@
 .historyDate { flex: 0 0 var(--tpl-ar-cv-history-date-w); color: var(--color-ink); white-space: nowrap; }
 .historyText { min-width: 0; color: var(--color-ink); }
 .historyTextQuiet { min-width: 0; color: var(--color-ink-secondary); }
-.statusBox { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); }
-.statusBox :global(button[disabled]) { opacity: 1; color: var(--color-ink-faint); }
-.statusLabel { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
 /* スマホの中の届いた吹き出し（アイコン34・名前10・吹き出し 幅200・11.5/18・時刻9）。 */
 .talkRow { display: flex; gap: var(--tpl-label-tag-gap); }

@@ -228,7 +228,7 @@ setError(cause instanceof Error?cause.message:'保存できませんでした。
   }
   const fieldError=(field:RichVideoIssue['field'])=>issue?.field===field?<p id={`rv-${field}-error`} className={styles.error}>{issue.message}</p>:null
   const accountName=accounts.find(a=>a.id===selectedAccountId)?.name??'公式アカウント'
-  const phone=<LinePreview note="リッチビデオの見え方" caption="配信日 10:00" accountName={accountName}>
+  const phone=<LinePreview title={null} note="リッチビデオの見え方" caption="配信日 10:00" accountName={accountName}>
     <div className={styles.assetRow}><span className={styles.assetAvatar} aria-hidden="true">{accountName.slice(0,1)}</span><div className={videoStyles.bubble}>
       <div className={videoStyles.video}>{draft.previewImageUrl ? <video src={draft.originalContentUrl} poster={draft.previewImageUrl} controls playsInline aria-label="動画のプレビュー"/> : <span className={videoStyles.play}><Play size={20} aria-hidden="true"/></span>}</div>
       {draft.buttonEnabled?<span className={videoStyles.action}>{draft.actionLabel}</span>:null}

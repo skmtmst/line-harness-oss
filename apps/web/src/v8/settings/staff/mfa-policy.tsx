@@ -61,7 +61,7 @@ export default function MfaPolicy({ loginPath = '/login' }: { loginPath?: '/logi
         actions={policy?.canEdit ? <SaveErrorField names={["required"]}><Toggle checked={policy.required} label="ログインで二段階認証を必須にする" disabled={busy || policy.configured === false} onChange={value => value ? setTurnOn(true) : void save(false)} /></SaveErrorField> : undefined} />
       {error ? <Notice tone="danger" message={error} /> : null}
       {policy?.notice ? <Notice tone="warn" message={policy.notice} /> : null}
-      {policy ? <Card surface="muted" padding="compact"><AuthDetailRow label="登録済み" value={`${policy.registered ?? '—'} / ${policy.total ?? '—'} 人`} actions={policy.canEdit ? <Button variant="text" onClick={() => void showUnregistered()}>未登録の人を見る →</Button> : undefined} /></Card> : <ListState kind={error ? 'error' : 'loading'} onRetry={() => void load()} />}
+      {policy ? <Card surface="muted" padding="compact"><AuthDetailRow label="登録済み" value={`${policy.registered ?? '—'} / ${policy.total ?? '—'} 人`} actions={policy.canEdit ? <Button variant="text" size="inline" onClick={() => void showUnregistered()}>未登録の人を見る →</Button> : undefined} /></Card> : <ListState kind={error ? 'error' : 'loading'} onRetry={() => void load()} />}
       <AuthHelp>切り替えられるのはオーナー（運営）だけです。切り替えは記録に残ります。</AuthHelp>
       <ConfirmDialog open={turnOn} title="二段階認証をオンにする" description="全員が一度ログアウトします。まだ登録していない人は、次のログインで登録できます。" confirmLabel="オンにする" onConfirm={() => void save(true)} onCancel={() => setTurnOn(false)} busy={busy} error={error} />
       <Dialog open={unregistered !== null} title="二段階認証が未登録の人" onCancel={() => setUnregistered(null)} cancelLabel="閉じる" error={peopleError}>

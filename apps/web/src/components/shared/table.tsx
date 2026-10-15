@@ -230,8 +230,10 @@ export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'c
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, annotation, selection, className, grow }: {
+export function NameCell({ name, folder, nameCarriesDot, annotation, selection, className, grow }: {
   name: ReactNode
+  /** 名前が色の丸を持つ札（タグの札）のとき、フォルダの丸を置かない。 */
+  nameCarriesDot?: boolean
   /** 名前の横の状態札。名前やリンクの中には入れない。 */
   annotation?: ReactNode
   /** Selection stays outside the truncatable name, including its context menu. */
@@ -243,7 +245,7 @@ export function NameCell({ name, folder, annotation, selection, className, grow 
 }) {
   return (
     <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
+      <div className={shell.name}><FolderDotName folder={folder} nameCarriesDot={nameCarriesDot} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
     </td>
   )
 }

@@ -70,7 +70,7 @@ test('使った・取り消しで、このページに無くても「まだあ�
    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('60件中 1〜20件')
    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
-   expect(body.textContent).toContain('理由を書いて明細を足します')
+   expect(body.textContent).toContain('取り消しの明細を足します')
    await act(async () => toggle.click())
    expect(body.hidden).toBe(true)
    await act(async () => toggle.click())

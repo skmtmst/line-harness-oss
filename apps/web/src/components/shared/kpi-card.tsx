@@ -72,8 +72,11 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
-  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
-  detailLayout?: 'qualifier'
+  /**
+   * 'qualifier'：説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。
+   * 'single'：帯の補足を1行＋省略にする（全文は title）。狭いマスで最後の1字だけ次の行に落ちる文に使う。
+   */
+  detailLayout?: 'qualifier' | 'single'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
@@ -195,6 +198,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"

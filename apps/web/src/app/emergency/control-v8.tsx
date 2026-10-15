@@ -82,6 +82,12 @@ function failureText(error: unknown, fallback: string): string {
 type Feedback = { tone: 'success' | 'warning' | 'danger'; text: string } | null
 
 const HISTORY_FETCH_LIMIT = 200
+/** 記録の表の「何を」は短い言い方（絵 OHwbU：一斉配信・シナリオ）。全文は title で見る。 */
+const CAPABILITY_SHORT: Partial<Record<keyof typeof CAPABILITY_LABEL, string>> = {
+  broadcast_dispatch: '一斉配信',
+  scenario_dispatch: 'シナリオ',
+}
+const capabilityShort = (capability: keyof typeof CAPABILITY_LABEL) => CAPABILITY_SHORT[capability] ?? CAPABILITY_LABEL[capability]
 /** 記録の表に出す件数。全部は更新履歴のタブで見る。 */
 const RECORD_LIMIT = 10
 
@@ -96,8 +102,15 @@ function formatMonthDay(value: string | null): string {
 /** 「8/14 19:02〜19:40」の形。終わりが無ければ始まりだけ出す。 */
 function formatStopRange(start: string | null, end: string | null): string {
   if (!start) return '日時不明'
-  if (!end) return formatOperationDate(start)
-  return `${formatOperationDate(start)}〜${formatOperationDate(end)}`
+  const from = new Date(start)
+  if (!Number.isFinite(from.getTime())) return formatOperationDate(start)
+  const time = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  const head = `${from.getMonth() + 1}/${from.getDate()} ${time(from)}`
+  if (!end) return head
+  const to = new Date(end)
+  if (!Number.isFinite(to.getTime())) return head
+  const sameDay = from.getFullYear() === to.getFullYear() && from.getMonth() === to.getMonth() && from.getDate() === to.getDate()
+  return `${head}〜${sameDay ? time(to) : `${to.getMonth() + 1}/${to.getDate()} ${time(to)}`}`
 }
 
 function stopMinutes(start: string | null, end: string | null): number | null {
@@ -719,7 +732,7 @@ const EmergencyControlV8 = (
                       </td>
                       <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId}</td>
                       <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellTruncate}>
-                        {entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}
+                        {entry.capabilities.map(capabilityShort).join('・')}
                       </td>
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
                         {entry.reason}

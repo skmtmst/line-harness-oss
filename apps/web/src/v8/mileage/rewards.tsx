@@ -3,7 +3,6 @@
 import StatusBadge from '@/components/shared/status-badge'
 import { mileageStatusTone } from './parts'
 
-import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 
 import { createAccountTracker, createMileageRewardsFetchGuards, createSingleFlightLock } from './redemption-request-guard'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -28,7 +27,8 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows, useManagedFolders, folderDotFor } from '@/components/shared/managed-folder-panel'
+import { useFolderMove } from '@/components/shared/use-folder-move'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -36,7 +36,6 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
 import { formatMileageDate, formatMileageNumber } from './display'
@@ -48,7 +47,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 マイル「使い道」（板 `S35pO`、状態は見本帳 `zaqP9`）。
@@ -58,8 +57,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 操作（中身を見る・…）」。止める／出すは行の「…」。頭の CSV は見えている
  * 表の中身を出す。要対応の交換（届かなかった分のやり直し）は表の下に残す。
  *
- * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
- * 見え方の切り替えとして持つ（保存はしない）。
+ * フォルダの列は共通のフォルダ（kind `mileage_reward`）。行の名前の前に色の丸、「…」の「フォルダへ移す」。
  */
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
@@ -177,6 +175,8 @@ export default function RewardsTab() {
   const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [folder, setFolder] = useListUrlValue<Folder>('folder', 'すべて')
+  const { folders, error: folderError, reload: reloadFolders } = useManagedFolders('mileage_reward', accountId)
+  const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
   const [publishedOnly, setPublishedOnly] = useListUrlValue('publishedOnly', false)
   const [draftOnly, setDraftOnly] = useListUrlValue('draftOnly', false)
   const [preset, setPreset] = useState('default')
@@ -472,21 +472,11 @@ export default function RewardsTab() {
 
   const publishedCount = rewards.filter((r) => r.status === 'published').length
   const draftCount = rewards.filter((r) => r.status === 'draft').length
-  const folderCounts = useMemo(() => {
-    const counts = new Map<Folder, number>()
-    counts.set('すべて', rewards.length)
-    counts.set('未分類', 0)
-    for (const reward of rewards) {
-      const key = folderOf(reward)
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-    return counts
-  }, [rewards])
-
   const shown = useMemo(() => {
     const keyword = search.trim()
     const filtered = rewards.filter((reward) => {
       if (folder !== 'すべて' && folderOf(reward) !== folder) return false
+      if (folderId !== 'all' && (folderId === 'unfiled' ? Boolean(reward.folderId) : reward.folderId !== folderId)) return false
       if (publishedOnly && reward.status !== 'published') return false
       if (draftOnly && reward.status !== 'draft') return false
       if (keyword && !reward.name.includes(keyword)) return false
@@ -500,7 +490,7 @@ export default function RewardsTab() {
       return [...filtered].sort((a, b) => (a.currentVersion?.requiredMiles ?? 0) - (b.currentVersion?.requiredMiles ?? 0))
     }
     return [...filtered].sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [draftOnly, folder, preset, publishedOnly, rewards, search])
+  }, [draftOnly, folder, folderId, preset, publishedOnly, rewards, search])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const visible = shown.slice((page - 1) * pageSize, page * pageSize)
@@ -508,6 +498,7 @@ export default function RewardsTab() {
     setSearchInput('')
     setSearch('')
     setFolder('すべて')
+    setFolderId('all')
     setPublishedOnly(false)
     setDraftOnly(false)
     setPreset('default')
@@ -571,10 +562,10 @@ export default function RewardsTab() {
         presentation="band"
         title="いちばん人気"
         icon={<Star size={14} aria-hidden="true" />}
-        value={ready && popularName ? 0 : null}
-        valueText={ready && popularName ? popularName : undefined}
-        unit=""
-        detail={ready ? (popularCount == null ? '交換の回数は未取得' : popularCount === 0 ? 'まだ交換されていません' : popularName ? `今月 ${formatMileageNumber(popularCount)}件` : '使い道の名前は未取得') : emptyValue('unknown')}
+        /* 大きい数字の場所には今月の交換の件数、名前は下の段（B-195：数の場所に名前を入れない）。 */
+        value={ready && popularName && popularCount != null ? popularCount : null}
+        unit="件"
+        detail={ready ? (popularCount == null ? '交換の回数は未取得' : popularCount === 0 ? 'まだ交換されていません' : popularName ? `今月いちばん：${popularName}` : '使い道の名前は未取得') : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -588,42 +579,30 @@ export default function RewardsTab() {
     </KpiBand>
   )
 
-  /*
-   * 左の列は共通の ManagedFolderPanel。使い道のフォルダの口（mileage_reward_folders）はまだ使えるようになっていないので
-   * 「すべて」だけ。口ができたら kind を渡すだけで、追加・「…」（名前・色・並べ替え・消す）・未分類が出る。
-   */
   const createButton = (full: boolean) => (
     <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
       <Plus size={15} aria-hidden="true" /> 使い道を作る
     </CreateButton>
   )
 
+  const chooseFolder = (id: string) => { setPage(1); setFolderId(id) }
   const folderPanel = (
-    <ManagedFolderPanel
-      kind={null}
-      folders={[]}
-      onChanged={() => undefined}
-      canManage={!readonly}
-      createAction={createButton(true)}
-      reserveCreateSpace={false}
-      itemLabel="使い道"
-      activeId="all"
-      onSelect={() => undefined}
-      allCount={folderCounts.get('すべて') ?? null}
-    />
+    <ManagedFolderPanel kind="mileage_reward" accountId={accountId} folders={folders}
+      onChanged={async () => { await reloadFolders(); await load() }} canManage={!readonly} createAction={createButton(true)}
+      reserveCreateSpace={false} itemLabel="使い道" activeId={folderId} onSelect={chooseFolder}
+      allCount={status === 'ready' ? rewards.length : null} error={folderError}
+      unfiledCount={status === 'ready' ? rewards.filter((reward) => !reward.folderId).length : null}
+      countOf={(item) => status === 'ready' ? rewards.filter((reward) => reward.folderId === item.id).length : null}
+      onDeleted={(id) => { if (folderId === id) chooseFolder('all'); void load() }} />
   )
-  const kindSelect = (
-    <div className={styles.narrowFolder}>
-      <SaveErrorField names={["folder","page"]}><Select
-        aria-label="種類"
-        value={folder}
-        options={FOLDERS.map((key) => ({ value: key, label: key === 'すべて' ? '種類：すべて' : `${key === '未分類' ? 'そのほか' : key} ${formatMileageNumber(folderCounts.get(key) ?? 0)}` }))}
-        onChange={(value) => { setPage(1); setFolder(value as Folder) }}
-      /></SaveErrorField>
-    </div>
-  )
-
-
+  const folderMove = useFolderMove({ accountId, canEdit: !readonly, items: visible, folders,
+    move: async (reward, targetId) => {
+      if (!accountId) throw new Error('アカウントを選んでください')
+      const result = await api.mileage.moveRewardToFolder(reward.id, accountId, targetId)
+      if (!result.success) throw new Error('使い道をフォルダへ移せませんでした')
+    },
+    onChanged: async () => { await load(); await reloadFolders() },
+  })
 
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
@@ -656,7 +635,6 @@ export default function RewardsTab() {
     <MileageToolbar
       narrow={narrow}
       notices={<ToolbarNotices
-        info="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
         error={actionError}
         success={menuNotice}
       />}
@@ -668,11 +646,8 @@ export default function RewardsTab() {
           if (!value) { setSearch(''); setPage(1) }
         },
       }}
-      chips={<><ListToolbarOptional compact label="種類">{kindSelect}</ListToolbarOptional>{chips}</>}
-      narrowLead={<>
-        {createButton(false)}
-        {kindSelect}
-      </>}
+      chips={chips}
+      narrowLead={createButton(false)}
       trailing={<>
         <SavedSelect
           value={preset}
@@ -728,6 +703,7 @@ export default function RewardsTab() {
                 disabledReason: '反映しています',
                 onSelect: () => void changeState(reward),
               }] : []),
+              { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(reward) },
               {
                 id: 'duplicate',
                 label: '複製',
@@ -751,8 +727,8 @@ export default function RewardsTab() {
             <Th align="right" className={styles.colNeed}>必要なマイル</Th>
             <Th collapseAt="narrow" className={styles.colGives} title={rankBenefits.length === 0 ? 'ランクの使い道はまだありません' : rankBenefits.map((rank) => `${rank.rewardName}・${formatNumber(rank.requiredMiles)} マイルから・今すぐ届く人 ${formatNumber(rank.reachableFriendCount)} 人・交換済み ${formatNumber(rank.redeemedFriendCount)} 人`).join('／')}>交換すると渡るもの</Th>
             <Th align="right" collapseAt="narrow" className={styles.colMonth}>今月 交換された</Th>
-            <Th className={styles.colStateWide}>状態</Th>
-            <Th className={styles.colOpsWide}>操作</Th>
+            <Th className={styles.colRewardState}>状態</Th>
+            <Th className={styles.colRewardOps}>操作</Th>
           </TableHeadRow>
         </thead>
         <tbody>
@@ -764,7 +740,7 @@ export default function RewardsTab() {
               <Tr key={reward.id} data-table-layout="columns" data-row-id={reward.id}>
                 <Td grow>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
-                  <FolderDotName folder={null}>
+                  <FolderDotName folder={folderDotFor(folders, reward.folderId)}>
                     <span title={reach ? `今すぐ届く人 ${formatNumber(reach.reachableFriendCount)} 人` : '届く人数は未取得'}><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
 
@@ -781,12 +757,11 @@ export default function RewardsTab() {
                 <Td align="right" collapseAt="narrow" className={styles.colMonth}>
                   <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)} 件`}</span>
                 </Td>
-                <Td className={styles.colStateWide}>
+                <Td className={styles.colRewardState}>
                   <StatusBadge tone={mileageStatusTone(pill.tone)}>{pill.text}</StatusBadge>
                 </Td>
-                <Td className={styles.colOpsWide}>
+                <Td className={styles.colRewardOps}>
                   <span className={styles.rowActions}>
-                    <Button href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}>中身を見る</Button>
                     {rowMenu(reward)}
                   </span>
                 </Td>
@@ -908,7 +883,9 @@ export default function RewardsTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
+      help="行の「…」から 編集・自分で交換をテスト・出すのを止める・フォルダへ移す・複製。"
+      /* 案内は「この画面の説明」の帯（題の右の口で開け閉めする。S35pO・B-245）。 */
+      explanation="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す
@@ -916,13 +893,14 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={folderPanel}
-      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('mileage_reward', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >
       {body}
       {!failedSection && retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
       {failedSection}
+      {folderMove.overlays}
     </MileageFrame></SaveErrorScope>
   )
 }

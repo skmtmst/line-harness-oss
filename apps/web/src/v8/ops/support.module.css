@@ -331,3 +331,18 @@
     width: 100%;
   }
 }
+
+/* 絵 P0jhqO：返信の操作は1行。返信するは行の右端。間の空きは左寄せの2つと右寄せの3つの境目だけ。 */
+.actions {
+  flex-wrap: nowrap;
+}
+
+.actions > .spacer {
+  margin-inline-end: calc(var(--tpl-op-me-gap) * -1);
+}
+
+/* 絵 P0jhqO：数の帯は白い板の端から端まで。下の注意帯とは間 4。 */
+.band {
+  margin-inline: calc(-1 * var(--polish-space-section));
+  margin-bottom: calc(-1 * var(--tpl-op-me-gap));
+}

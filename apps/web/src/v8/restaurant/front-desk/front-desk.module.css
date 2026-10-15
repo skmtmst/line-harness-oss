@@ -71,6 +71,14 @@
   cursor: pointer;
 }
 
+/* 選んだ行は緑の枠の中の1行。押せる札の共通の地（緑の線・影）は付けない（絵 svUTk）。 */
+:global(html:root) .friendBox button.friendRow.friendRow[aria-pressed='true'] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+}
+
 .friendRow:focus-visible {
   outline: var(--tpl-e1-line-2) solid var(--color-status-info);
   outline-offset: var(--tpl-e1-line-2);

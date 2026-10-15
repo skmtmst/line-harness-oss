@@ -85,8 +85,9 @@ describe('飲食店向けHQと店舗追加動線', () => {
 
   it('マニュアルURLをJSXへ直書きせず、空の間は押し口を出さない', () => {
     expect(wizard).toContain('MANUAL_LINKS')
-    expect(wizard).toContain('return href')
-    expect(wizard).toContain('<Button disabled title=')
+    expect(wizard).toContain('if (!href) return null')
+    expect(wizard).not.toContain('<Button disabled title=')
+    expect(wizard).toContain("useTaskManualHref(ONBOARDING_GUIDE_KEY)")
     expect(manualLinks).toContain("createOfficialAccount: ''")
     expect(manualLinks).toContain("enableMessagingApi: ''")
     expect(manualLinks).toContain("findChannelCredentials: ''")

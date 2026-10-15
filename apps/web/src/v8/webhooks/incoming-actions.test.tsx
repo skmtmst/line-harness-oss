@@ -46,16 +46,14 @@ it('閲覧だけの人には変更・保存を出さない', () => {
   expect(screen.getByText('前のタグ')).toBeTruthy(); expect(screen.queryByRole('button', { name: '行うことを足す' })).toBeNull()
   expect(screen.queryByRole('button', { name: '行うことを保存する' })).toBeNull(); expect(mocks.resources).not.toHaveBeenCalled()
 })
-it('未変更の保存には理由があり、変更後は理由を外して保存できる', async () => {
+it('未変更の間は保存を出さず、変更すると保存を出して押せる', async () => {
   mocks.resources.mockResolvedValue({ success: true, data: resources })
   render(<IncomingActions detail={detail} accountId="owner-account" readOnly={false} onSaved={saved} onGuardReady={() => {}} />)
-  const button = screen.getByRole('button', { name: '行うことを保存する' }) as HTMLButtonElement
-  expect(button.disabled).toBe(true)
-  expect(button.title).toBe('行うことを変更すると保存できます')
+  expect(screen.queryByRole('button', { name: '行うことを保存する' })).toBeNull()
   expect(mocks.save).not.toHaveBeenCalled()
   await addTag()
+  const button = screen.getByRole('button', { name: '行うことを保存する' }) as HTMLButtonElement
   expect(button.disabled).toBe(false)
-  expect(button.title).toBe('')
 })
 
 it('既存のオートメーション参照を日本語で示し、別の行を追加しても保存する参照は変えない', async () => {

@@ -261,7 +261,7 @@ export default function ReportTab() {
           setPeriod(when === 'last' ? 'last_month' : 'this_month')
         }}
       />
-      <PeriodPicker days={days} onChange={setDays} customRange={customRange} onRangeChange={setRange} />
+      <PeriodPicker size="small" days={days} onChange={setDays} customRange={customRange} onRangeChange={setRange} />
       <PerPageSelect value={pageSize} onChange={setPageSize} />
     </>
   )

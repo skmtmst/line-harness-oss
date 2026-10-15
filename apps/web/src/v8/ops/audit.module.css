@@ -24,11 +24,6 @@
   max-width: 100%;
 }
 
-/* 絵の日付の欄は高さ36（共通の欄は40）。この画面の道具の段だけ。 */
-.date.date :global(button) {
-  height: var(--tpl-op-control-h);
-}
-
 .colAt {
   width: var(--tpl-op-audit-at-w);
 }

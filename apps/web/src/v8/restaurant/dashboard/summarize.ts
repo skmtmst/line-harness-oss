@@ -46,7 +46,9 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
   const phone = live.filter((r) => r.source === 'phone' || (r.source === 'manual' && !isWalkIn(r))).length
   const byHour = new Map<number, number>()
   for (const r of live) {
-    const hour = new Date(Date.parse(r.starts_at)+9*3600000).getUTCHours()
+    // 表の時刻（lib/format）と同じく、時差の無い文字は UTC として読む。ブラウザの時計で読むと日本では 9 時間ずれる。
+    const iso = /Z$|[+-]\d{2}:?\d{2}$/i.test(r.starts_at) ? r.starts_at : `${r.starts_at.replace(' ', 'T')}Z`
+    const hour = new Date(Date.parse(iso) + 9 * 3600000).getUTCHours()
     byHour.set(hour, (byHour.get(hour) ?? 0) + r.guest_count)
   }
   let peak: TodaySummary['peak'] = null

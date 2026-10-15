@@ -21,6 +21,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
         create: (...args: unknown[]) => net.create(...args),
         list: async () => ({ success: true, data: [{ id: 'of-1', name: '紹介A', description: null, rewardAmount: 1000, rewardMiles: 0, lineAccountId: null, tagId: null, scenarioId: null, isActive: true, createdAt: '2026-10-01T00:00:00Z' }] }),
       },
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [{ id: 'aof-1', kind: 'affiliate_offer', name: '定期便', parentId: null, displayOrder: 0, itemCount: 0, color: '#3B82F6', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }] }) },
       affiliates: { ...actual.api.affiliates, allReport: async () => ({ success: true, data: [] }) },
       conversionApprovals: {
         ...actual.api.conversionApprovals,
@@ -108,11 +109,11 @@ test('209：承認を読み切れなかったときは、平均報酬を言い�
   await waitFor(() => expect(screen.getByText('件数が多く、全部は数えられませんでした')).toBeTruthy())
 })
 
-test('B-136：成果のときの動き（タグ・シナリオ・マイル）は上の絞り込み。選ぶ物のないフォルダ列を出さず、絞り込みを保つ（W2）', async () => {
+test('h7dmB：左は案件のフォルダの列。成果のときの動き（タグ・シナリオ・マイル）は道具の段に置かず、よく使う絞り込みから選ぶ', async () => {
   net.capStatus.mockResolvedValue({ success: true, data: { version: null } })
   render(<OffersTab />)
   await screen.findByRole('button', { name: '紹介Aの操作' })
-  expect(document.querySelector('[data-template-region="folders"]')).toBeNull()
-  expect(document.body.textContent).not.toContain('フォルダを追加')
-  expect(screen.getAllByLabelText('成果のときの動き').length).toBeGreaterThan(0)
+  expect(document.querySelector('[data-template-region="folders"]')).not.toBeNull()
+  expect(screen.queryAllByLabelText('成果のときの動き')).toHaveLength(0)
+  expect(screen.getAllByLabelText('よく使う絞り込み').length).toBeGreaterThan(0)
 })

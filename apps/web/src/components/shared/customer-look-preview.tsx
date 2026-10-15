@@ -21,7 +21,7 @@ export default function CustomerLookPreview({look,accountName}: {look:CustomerLo
  return <div className={styles.preview}>
   <h3 className={styles.title}>お客さまの見え方</h3>
   <Tabs size="compact" label="見本の画面" items={[['booking','予約'],['form','回答フォーム'],['history','予約の履歴'],['stamp','来店スタンプ']].map(([key,label])=>({label,current:page===key,onClick:()=>setPage(key)}))}/>
-  <div style={vars}>{page==='form'?<FormPhone layout={layout} accountLook={look} pageIndex={0} accountName={accountName} bookingMenus={[]}/>:
+  <div style={vars}>{page==='form'?<FormPhone layout={layout} accountLook={look} pageIndex={0} accountName={accountName} bookingMenus={[]} caption={null}/>:
    <LiffPhoneFrame accountName={accountName} accent={palette.main} title={page==='history'?'予約の履歴':page==='stamp'?'来店スタンプ':'ご予約'} label="お客さまの画面の見本">
     <div className={styles.content}>
      {page==='booking'?<><div className={styles.segment}>週で見る　　月で見る</div><h2>ご希望の日時</h2><p>〈　{bookingSample.month}月 第1週　〉</p><div className={styles.week}>{bookingSample.days.map(({day,date})=><span key={day} data-selected={date===bookingSample.selectedDate || undefined}>{day}<strong>{date}</strong>・</span>)}</div><div className={styles.times}>{['9:00','10:00','13:00','14:00','15:00','16:00'].map(time=><span key={time} data-selected={time===bookingSample.time||undefined}>{time}</span>)}</div><div className={styles.footer}><p>{bookingSummary}</p><span className={styles.primary}>内容を確かめる</span></div></>:

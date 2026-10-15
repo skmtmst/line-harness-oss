@@ -441,7 +441,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await fillPublishSchedule()
 
     richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
-    fireEvent.click(screen.getByRole('button', { name: '下書きのまま保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await flush()
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)

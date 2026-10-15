@@ -14,7 +14,11 @@ import {
   ArrowRight,
   BookOpen,
   CalendarClock,
-  CircleHelp,
+  CircleDashed,
+  CopyPlus,
+  Info,
+  RefreshCw,
+  Upload,
   Send,
   Users,
   Zap,
@@ -25,6 +29,7 @@ import {
   RectangleVertical,
   Repeat,
   Smartphone,
+  Tag,
 } from 'lucide-react'
 import {
   RICH_MENU_DIMENSIONS,
@@ -144,6 +149,20 @@ const NEXT_LABEL: Record<Exclude<StepKey, 'publish'>, string> = {
   shape: '次へ：ボタンの動き',
   buttons: '次へ：誰に出すか',
   audience: '次へ：公開',
+}
+
+/** 統括のひな形（host）の手順の名前（絵 UgZPJ・BVSbe・ME78d）。複数のアカウントへ配る画面なので③④が店と違う。 */
+const HQ_STEP_LABEL: Record<StepKey, string> = {
+  shape: '形と画像',
+  buttons: 'ボタンの動き',
+  audience: '配る先',
+  publish: '確かめて配る',
+}
+
+const HQ_NEXT_LABEL: Record<Exclude<StepKey, 'publish'>, string> = {
+  shape: '次へ：ボタンの動き',
+  buttons: '次へ：配る先',
+  audience: '次へ：確かめて配る',
 }
 
 /* ---------- 面の見本（作る①「面の分け方」。Pencil では大きい側が7つ） ---------- */
@@ -503,8 +522,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 統括のひな形（host）：手順の間は画面の中に持ち、最後に一度だけ保存する（店はこれまでどおり手順ごとに下書きを保存）。
    * 統括の画面で持てない欄（登録メディア・計測リンク・トークを開いたとき・出す相手の条件・公開の確かめ）は出さない。
    */
-  const stepLabel = (key: StepKey) => (host && key === 'publish' ? '配る' : STEP_LABEL[key])
-  const nextLabel = (key: Exclude<StepKey, 'publish'>) => (host && key === 'audience' ? '次へ：配る' : NEXT_LABEL[key])
+  /* 統括（UgZPJ・BVSbe・ME78d）：③は「配る先」、④は「確かめて配る」。 */
+  /* 統括の④「配ったときの扱い」（同じ名前があるとき）。配る前の確認の初めの選択として渡す。 */
+  const [hqDuplicateMode, setHqDuplicateMode] = useState<'overwrite' | 'alias'>('overwrite')
+  const stepLabel = (key: StepKey) => (host ? HQ_STEP_LABEL[key] : STEP_LABEL[key])
+  const nextLabel = (key: Exclude<StepKey, 'publish'>) => (host ? HQ_NEXT_LABEL[key] : NEXT_LABEL[key])
   const { selectedAccount } = useAccount()
   const publishAttempt = useRef(new ManualPublishAttempt())
   /* ①の画像の枠ごとのファイル入力（タブの順）。 */
@@ -1804,7 +1826,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const stepperSteps = STEP_KEYS.map((key, i) => ({
     key,
     label: stepLabel(key),
-    state: (i !== stepIndex && i <= maxStepIndex ? 'done' : 'todo') as 'done' | 'todo',
+    /* 統括（UgZPJ・BVSbe・ME78d）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。 */
+    state: (host ? i < stepIndex : i !== stepIndex && i <= maxStepIndex) ? 'done' as const : 'todo' as const,
     onSelect: i !== stepIndex && i <= maxStepIndex ? () => goToStep(key) : undefined,
   }))
 
@@ -1830,14 +1853,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         const seed = await hostSeedFromShape()
         if (!seed) return
         hydrate(groupFromSeed(seed))
-        host.onSave(seed, distribute)
+        host.onSave(seed, distribute, hqDuplicateMode)
       } finally {
         setSaving(false)
       }
       return
     }
     if (!validateBasics()) return
-    host.onSave(seedNow(), distribute)
+    host.onSave(seedNow(), distribute, hqDuplicateMode)
   }
   function seedNow(): HqRichMenuSeed {
     return {
@@ -1896,8 +1919,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
                     下書きを保存
                   </Button>
-                  <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配るアカウントを選べます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
-                    保存する
+                  <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配る前の確認へ進みます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
+                    <Upload size={14} aria-hidden="true" />
+                    {host.selectedCount > 0 ? `${formatNumber(host.selectedCount)} アカウントへ配る` : 'アカウントへ配る'}
                   </Button>
                 </>
               ) : (
@@ -1920,7 +1944,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               ) : (
                 <>
                   <Button type="button" disabled={busy || !canOperate} busy={saving} busyLabel="保存中…" onClick={() => void saveDraft()}>
-                    下書きのまま保存
+                    下書きを保存
                   </Button>
                   <Button
                     type="button"
@@ -2430,14 +2454,65 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     )
   }
 
+  /*
+   * ======== 統括の手順③：配る先（絵 UgZPJ）========
+   * 配るアカウント（統括が渡す1行の欄）→ 各アカウントで誰に出すか。
+   * 統括のひな形が持てるのは「全員（配った先の既定）」か「決めない（各アカウントで決める）」の2つ。
+   * 絵の「タグが付いた人」と「トークを開いたとき」は、ひな形の口に値が無いので出さない（機能待ち）。
+   */
+  function renderHqAudience() {
+    if (!host) return null
+    return (
+      <>
+        {host.distribute}
+        <Card variant="form" gap="normal">
+          <SectionHeader
+            title="各アカウントで誰に出すか"
+            help="配った先のアカウントで、このメニューを誰に出すかの初めの形です。配ったあとに各アカウントで変えられます。"
+            helpLabel="各アカウントで誰に出すかの説明"
+          />
+          <SaveErrorField names={["audience","displayAudience"]}><RadioCardGroup legend="各アカウントで誰に出すか" className="grid grid-cols-2 gap-3">
+            <RadioCard
+              name="audience"
+              value="all"
+              checked={audience === 'all'}
+              onChange={() => setAudience('all')}
+              title="全員"
+              icon={<Users aria-hidden="true" />}
+              note="全員の既定のメニューにする"
+            />
+            <RadioCard
+              name="audience"
+              value="targeted"
+              checked={audience !== 'all'}
+              onChange={() => setAudience('targeted')}
+              title="決めない"
+              icon={<CircleDashed aria-hidden="true" />}
+              note="誰に出すかは各アカウントで"
+            />
+          </RadioCardGroup></SaveErrorField>
+          <div className={styles.infoBand}>
+            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+            <span>
+              {audience === 'all'
+                ? '「全員」にすると、配った先で既定のメニューとして届きます。LINE に出て、いまの既定のメニューと入れ替わるのは、各アカウントで公開したときです。'
+                : '配った先では下書きのまま届きます。誰に出すかは、各アカウントで決めます。'}
+            </span>
+          </div>
+        </Card>
+      </>
+    )
+  }
+
   /* ======== 手順③：誰に出すか ======== */
   function renderAudience() {
+    if (host) return renderHqAudience()
     return (
       <>
         {/* 出す相手 */}
         <Card variant="form" gap="normal">
           <SectionHeader title="出す相手" />
-          <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className={`grid ${host ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             <RadioCard
               name="audience"
               value="all"
@@ -2445,7 +2520,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onChange={() => setAudience('all')}
               title="すべての友だち"
               icon={<Users aria-hidden="true" />}
-              note="ほかの出し分けに当てはまらない人に出る（既定）"
+              note="全員の既定のメニューにする"
             />
             <RadioCard
               name="audience"
@@ -2460,21 +2535,24 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 }
               }}
               title="条件に当てはまる友だちだけ"
-              icon={<CircleHelp aria-hidden="true" />}
+              icon={<Tag aria-hidden="true" />}
               note={host ? '条件は配った先のアカウントで決めます' : 'タグ・友だち情報などで絞る'}
             />
+            {/* 絵 OxEMM の3つ目。登録だけして、出す相手は一覧の「表示先」・シナリオ・切替タブで決める。 */}
+            {host ? null : (
+              <RadioCard
+                name="audience"
+                value="none"
+                checked={audience === 'none'}
+                onChange={() => setAudience('none')}
+                title="決めない"
+                icon={<CircleDashed aria-hidden="true" />}
+                note="シナリオ・切替タブから出す"
+              />
+            )}
           </RadioCardGroup></SaveErrorField>
 
-          {host ? (
-            <div className={styles.infoBand}>
-              <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
-              <span>
-                {audience === 'all'
-                  ? '配ると、各アカウントで既定のメニューにするかどうかを選べます。'
-                  : '配った先では下書きのまま届きます。どの友だちに出すかは、各アカウントで条件を決めます。'}
-              </span>
-            </div>
-          ) : audience === 'all' ? (
+          {audience === 'all' ? (
             <div className={styles.infoBand}>
               <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
               <span>
@@ -2507,28 +2585,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           )}
         </Card>
 
-        {/* 出す順番（統括：配った先の出す順番。小さいほど先） */}
-        {host ? (
-          <Card variant="form" gap="normal">
-            <div className={`flex flex-col ${styles.stackCompact}`}>
-              <SectionHeader title="出す順番" />
-              <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます。配った先の順番として届きます</p>
-            </div>
-            <ol className={styles.orderList}>
-              <li className={`${styles.orderRow} ${styles.orderRowSelf}`}>
-                <span className={styles.orderNum}>{targetingPriority + 1}</span>
-                <span className={styles.orderName}>{`${name || '（名前未入力）'}（このメニュー${audience === 'all' ? '・既定' : ''}）`}</span>
-              </li>
-            </ol>
-            <Field label="順番（1 がいちばん先）" htmlFor="rm-hq-order">
-              <SaveErrorField names={["targetingPriority","displayOrder","priority","targeting_priority"]}><NumberInput numericText id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
-                const next = Number(e.target.value.replace(/[^0-9]/g, ''))
-                setTargetingPriority(Number.isFinite(next) && next > 0 ? Math.min(next, 999) - 1 : 0)
-              }} /></SaveErrorField>
-            </Field>
-          </Card>
-        ) : null}
-        {host ? null : <Card variant="form" gap="normal">
+        <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="出す順番" actions={editGroupId && canOperate ? <Button type="button" variant="text" size="inline" onClick={() => {
               setPriorityInput(String(targetingPriority + 1)); setPriorityOpen(true)
@@ -2550,10 +2607,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           {audience === 'targeted' ? (
             <p className={styles.fieldHint}>新しく作るメニューはいちばん下に置きます。前に出したいときは、あとで編集画面の「出す順番」から変えられます。</p>
           ) : null}
-        </Card>}
+        </Card>
 
-        {/* トークを開いたとき（統括のひな形は持たない。配った先で決める） */}
-        {host ? null : <Card variant="form" gap="normal">
+        {/* トークを開いたとき */}
+        <Card variant="form" gap="normal">
           <SectionHeader title="トークを開いたとき" />
           <div className={styles.segRow}>
             <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
@@ -2567,24 +2624,142 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onChange={(v) => setDefaultOpen(v === 'open')}
             /></SaveErrorField>
           </div>
-        </Card>}
+        </Card>
+      </>
+    )
+  }
+
+  /*
+   * ======== 統括の手順④：確かめて配る（絵 BVSbe）========
+   * 確かめる（形と面ごとの動き）→ 足りないもの（画面の中で分かる所だけ）→ 配ったときの扱い（同じ名前があるとき）。
+   * アカウントごとの足りないもの（そのアカウントに無いタグなど）と同じ名前のメニューの数は、
+   * 保存したあとの「配る前の確認」で口（preflight）が返すので、ここでは数を作らない（機能待ち）。
+   */
+  function renderHqPublish() {
+    const sizeLabel = (group?.size ?? size) === 'large' ? '大きい' : '小さい'
+    const pageCount = group ? pages.length : tabCount + 1
+    const showTab = pageCount > 1
+    const actionRows = (group ? pages : []).flatMap((page) => page.areas.map((area, index) => ({
+      key: `${page.id}:${area.id}`,
+      letter: String.fromCharCode(65 + index),
+      name: `${showTab ? `${page.name}・` : ''}${areaDisplayName(area, index)}`,
+      summary: areaActionSummary(area),
+    })))
+    const missingRows = actionRows.filter((row) => !row.summary)
+    const missingImages = (group ? pages : []).filter((page) => !page.imageR2Key)
+    const firstPage = group ? pages[0] ?? null : null
+    const shapeUrl = firstPage?.imageR2Key && host ? host.imageUrl(firstPage.imageR2Key) : null
+    return (
+      <>
+        <Card variant="form" gap="normal">
+          <SectionHeader title="確かめる" />
+          <div className={styles.hqReview}>
+            <div className={styles.hqReviewShape}>
+              <MenuPreview
+                size={group?.size ?? size}
+                imageUrl={shapeUrl}
+                areas={firstPage ? firstPage.areas.map((a) => ({ x: a.boundsX, y: a.boundsY, w: a.boundsWidth, h: a.boundsHeight })) : null}
+                pages={[]}
+                activePageId={null}
+              />
+              <p className={styles.cardNote}>{`${sizeLabel}・${totalAreaCount}面・${showTab ? `切替タブ ${pageCount}ページ` : '切替タブなし'}`}</p>
+            </div>
+            <div className={styles.hqReviewActions}>
+              <p className={styles.hqReviewLabel}>面ごとの動き</p>
+              <ul className={styles.hqActionList}>
+                {actionRows.map((row) => (
+                  <li key={row.key} className={styles.hqActionRow}>
+                    <span className={styles.hqActionLetter} aria-hidden="true">{row.letter}</span>
+                    <span className={styles.hqActionName} title={row.name}>{row.name}</span>
+                    <span className={row.summary ? styles.hqActionValue : `${styles.hqActionValue} ${styles.summaryValueWarn}`}>{row.summary || '未設定'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Card>
+
+        <Card variant="form" gap="normal">
+          <SectionHeader title="足りないもの" help="配る前に、この画面で分かる足りないものです。アカウントごとに無いタグ・テンプレートなどは、保存したあとの配る前の確認で一覧にします。" helpLabel="足りないものの説明" />
+          <ul className={styles.checkList}>
+            {missingRows.length > 0 ? (
+              <li className={styles.checkRow}>
+                <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>{`面 ${missingRows.map((row) => row.letter).join('・')} の動きが未設定`}</p>
+                  <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
+                </span>
+              </li>
+            ) : null}
+            {missingImages.length > 0 ? (
+              <li className={styles.checkRow}>
+                <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>{showTab ? `${missingImages.map((page) => page.name).join('・')} の画像が無い` : '画像が無い'}</p>
+                  <p className={styles.checkNote}>画像が無いと、配った先で公開できません。①で選びます</p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                </span>
+              </li>
+            ) : (
+              <li className={styles.checkRow}>
+                <CircleCheck className={`${styles.checkIcon} ${styles.checkIconOk}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>画像・大きさ・面の数</p>
+                  <p className={styles.checkNote}>{`${RICH_MENU_DIMENSIONS[group?.size ?? size].width}×${RICH_MENU_DIMENSIONS[group?.size ?? size].height}・${totalAreaCount}面`}</p>
+                </div>
+              </li>
+            )}
+            {missingRows.length === 0 && actionRows.length > 0 ? (
+              <li className={styles.checkRow}>
+                <CircleCheck className={`${styles.checkIcon} ${styles.checkIconOk}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>ボタンの動き</p>
+                  <p className={styles.checkNote}>すべての面に動きがあります</p>
+                </div>
+              </li>
+            ) : null}
+          </ul>
+        </Card>
+
+        <Card variant="form" gap="normal">
+          <SectionHeader title="配ったときの扱い" help="配った先に同じ名前のリッチメニューがあるときの扱いです。公開中のメニューは上書きしません。" helpLabel="配ったときの扱いの説明" />
+          <RadioCardGroup legend="配ったときの扱い" className="grid grid-cols-2 gap-3">
+            <RadioCard
+              name="hq-duplicate"
+              value="overwrite"
+              checked={hqDuplicateMode === 'overwrite'}
+              onChange={() => setHqDuplicateMode('overwrite')}
+              title="同じ名前があれば上書き"
+              icon={<RefreshCw aria-hidden="true" />}
+              note="今のメニューを入れ替える"
+            />
+            <RadioCard
+              name="hq-duplicate"
+              value="alias"
+              checked={hqDuplicateMode === 'alias'}
+              onChange={() => setHqDuplicateMode('alias')}
+              title="新しく作る"
+              icon={<CopyPlus aria-hidden="true" />}
+              note="今のメニューは残し、別に作る"
+            />
+          </RadioCardGroup>
+          <div className={styles.infoBand}>
+            <span className={styles.infoBandIcon}><Info size={16} aria-hidden /></span>
+            <span>同じ名前のメニューがあるアカウントだけ、この扱いになります。どのアカウントに同じ名前があるかは、配る前の確認で一覧にし、そこで1つずつ変えられます。</span>
+          </div>
+        </Card>
       </>
     )
   }
 
   /* ======== 手順④：公開 ======== */
   function renderPublish() {
-    if (host) {
-      return (
-        <>
-          {host.distribute}
-          <div className={styles.infoBand}>
-            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
-            <span>配ると、選んだアカウントにリッチメニューが下書きとして届きます。既定のメニューにするか・LINE に出すかは、各アカウントで決めます。</span>
-          </div>
-        </>
-      )
-    }
+    if (host) return renderHqPublish()
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (done) {
       return (
@@ -2604,8 +2779,86 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </Card>
       )
     }
+    /*
+     * 板 `F4gELj`：公開の前に「確かめる」（見本と面ごとの動き）と「足りないもの」を上に置く。
+     * 面の動きは②、画像は①で決めるので、足りないときはその手順へ戻る口を出す。
+     */
+    const reviewSize = group?.size ?? size
+    const reviewDims = `${RICH_MENU_DIMENSIONS[reviewSize].width}×${RICH_MENU_DIMENSIONS[reviewSize].height}`
+    const reviewSizeLabel = SIZE_OPTIONS.find((o) => o.value === reviewSize)?.label ?? ''
+    const missingFaces = pages.flatMap((p) => p.areas
+      .map((area, i) => ({ area, letter: String.fromCharCode(65 + i), page: p }))
+      .filter((x) => !isAreaActionConfigured(x.area)))
+    const missingImages = pages.filter((p) => !p.imageR2Key)
+    const review = group ? (
+      <>
+        <Card variant="form" gap="normal" aria-label="確かめる">
+          <SectionHeader title="確かめる" />
+          <div className={styles.reviewRow}>
+            <div className={styles.reviewThumb}>
+              <MenuPreview size={reviewSize} imageUrl={previewImageUrl} areas={previewAreas} pages={[]} activePageId={null} />
+              <p className={styles.reviewCaption}>{reviewSizeLabel}・{totalAreaCount}面・{pages.length > 1 ? `切替タブ${pages.length}つ` : '切替タブなし'}</p>
+            </div>
+            <div className={styles.reviewFaces}>
+              <p className={styles.reviewFacesTitle}>面ごとの動き</p>
+              <ul className={styles.faceList}>
+                {pages.map((p) => (
+                  <li key={p.id} className={styles.faceGroup}>
+                    {pages.length > 1 ? <p className={styles.faceGroupName}>{p.name}</p> : null}
+                    <ul className={styles.faceList}>
+                      {p.areas.map((area, i) => {
+                        const summary = areaActionSummary(area)
+                        return (
+                          <li key={area.id} className={styles.faceRow}>
+                            <span className={styles.faceLetter} aria-hidden="true">{String.fromCharCode(65 + i)}</span>
+                            <span className={styles.faceName} title={areaDisplayName(area, i)}>{areaDisplayName(area, i)}</span>
+                            <span className={summary ? styles.faceSummary : styles.faceSummaryWarn} title={summary || undefined}>{summary || '未設定'}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Card>
+        <Card variant="form" gap="normal" aria-label="足りないもの">
+          <SectionHeader title="足りないもの" help="公開する前に、押しても何も起きない面や画像の抜けがないかを見ます。直すときは、それを決める手順へ戻ります。" helpLabel="足りないものの説明" />
+          <ul className={styles.checkList}>
+            {missingFaces.length > 0 ? (
+              <li className={styles.checkRow}>
+                <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>{pages.length > 1 ? `${missingFaces.length}つの面の動きが未設定` : `面 ${missingFaces.map((x) => x.letter).join('・')} の動きが未設定`}</p>
+                  <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
+                </span>
+              </li>
+            ) : null}
+            <li className={styles.checkRow}>
+              {missingImages.length > 0
+                ? <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                : <CheckIcon state="ok" />}
+              <div className={styles.checkBody}>
+                <p className={styles.checkName}>画像・大きさ・面の数</p>
+                <p className={styles.checkNote}>{missingImages.length > 0 ? '画像がまだありません。①で選びます' : `${reviewDims}・${totalAreaCount}面`}</p>
+              </div>
+              {missingImages.length > 0 ? (
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                </span>
+              ) : null}
+            </li>
+          </ul>
+        </Card>
+      </>
+    ) : null
     return (
       <>
+        {review}
         {/* いつ公開するか */}
         <Card variant="form" gap="normal">
           <SectionHeader title="いつ公開するか" actions={!host && group ? <RichMenuSchedules key={`${accountId}:${group.id}`} groupId={group.id} canOperate={canOperate && !aggregateOnly} restoreMenus={restoreMenus} /> : undefined} />
@@ -2661,7 +2914,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             </div>
             <div className={styles.endRow}>
               <span className={styles.endDate}>
-                <Field label="終わる日時" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
+                <Field label="終わる日時" labelHidden optional={false}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
                   value={publishPlan.endsAt}
                   onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
@@ -2669,7 +2922,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 /></SaveErrorField></Field>
               </span>
               <span>に終わり、</span>
-              <Field label="終わったらどうする" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
+              <Field label="終わったらどうする" labelHidden optional={false}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
@@ -2681,6 +2934,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               /></SaveErrorField></Field>
               <span>に戻す</span>
             </div>
+            {/* 欄ごとに出すと狭い欄の下で折り返すので、行の下に1つだけ出す。 */}
+            {!endEnabled ? <p className={styles.endNote} role="note">「終わりを決める」をオンにすると設定できます</p> : null}
           </div>
         </Card>
 
@@ -2851,16 +3106,22 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           </CreateSummaryCard>
         ) : null}
 
-        {step === 'audience' && host ? (
+        {(step === 'audience' || step === 'publish') && host ? (
           <CreateSummaryCard
-            title="誰に出すか"
+            title={step === 'audience' ? '配る先' : '配ると'}
             rows={[
-              { key: 'audience', label: '出す相手', value: audience === 'all' ? 'すべての友だち（既定）' : '配った先で店が決める' },
-              { key: 'order', label: '出す順番', value: `${targetingPriority + 1}番目` },
+              { key: 'accounts', label: '配るアカウント', value: host.selectedCount > 0 ? formatNumber(host.selectedCount) : 'まだ選んでいません' },
+              {
+                key: 'friends',
+                label: step === 'audience' && host.selectedCount > 0 ? `出る人（${formatNumber(host.selectedCount)} アカウントの合計）` : '出る人（合計）',
+                value: audience !== 'all'
+                  ? '各アカウントで決める'
+                  : host.selectedCount === 0
+                    ? emptyValue('none')
+                    : host.friendTotal == null ? emptyValue('unknown') : `${formatNumber(host.friendTotal)} 人`,
+              },
             ]}
-          >
-            <p className={styles.cardNote}>出る人数は、配った先の友だちで決まります。</p>
-          </CreateSummaryCard>
+          />
         ) : null}
         {step === 'audience' && !host ? (
           <CreateSummaryCard
@@ -2883,9 +3144,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           </CreateSummaryCard>
         ) : null}
 
-        {step === 'publish' && host ? (
-          <CreateSummaryCard title="配ると" rows={host.distributeSummary} />
-        ) : null}
         {step === 'publish' && !host ? (
           <CreateSummaryCard
             title="公開すると"

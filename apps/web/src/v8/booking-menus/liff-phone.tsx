@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 
 /**
@@ -255,7 +256,7 @@ export function LiffPhoneDatetimeStep({
           <span className={`${styles.phoneViewItem} ${view === 'calendar' ? styles.phoneViewItemNow : ''}`}>カレンダー</span>
         </div>
         <div className={styles.phoneDays}>
-          <span className={styles.phoneDayNav} aria-hidden="true">‹</span>
+          <ChevronLeft className={styles.phoneDayNav} aria-hidden="true" />
           {days.map((date) => {
             const d = new Date(`${date}T00:00:00Z`)
             const hasSlots = (byDate.get(date)?.length ?? 0) > 0
@@ -265,7 +266,7 @@ export function LiffPhoneDatetimeStep({
             return (
               <span
                 key={date}
-                className={`${styles.phoneDay} ${isNow ? styles.phoneDayNow : ''} ${!hasSlots ? styles.phoneDayOff : ''}`}
+                className={`${styles.phoneDay} ${isNow ? styles.phoneDayNow : ''} ${isClosed ? styles.phoneDayOff : !hasSlots ? styles.phoneDayFull : ''}`}
               >
                 <span className={styles.phoneDayDow}>{WEEKDAY_JP[d.getUTCDay()]}</span>
                 <span className={styles.phoneDayNum}>{d.getUTCDate()}</span>
@@ -273,7 +274,7 @@ export function LiffPhoneDatetimeStep({
               </span>
             )
           })}
-          <span className={styles.phoneDayNav} aria-hidden="true">›</span>
+          <ChevronRight className={styles.phoneDayNav} aria-hidden="true" />
         </div>
         {selected && (
           <p className={styles.phoneSectionLabel}>{formatJpDay(selected)}の空き</p>

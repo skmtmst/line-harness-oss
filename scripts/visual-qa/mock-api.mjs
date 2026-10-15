@@ -97,7 +97,7 @@ import {
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, AD_CONVERSION_LOG_SUMMARY, AD_EVENT_MAPPINGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
   STAFF_MEMBERS, LOGIN_AUDIT,
-  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_OFFER_FOLDERS, MILEAGE_REWARD_FOLDERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
@@ -1278,7 +1278,7 @@ const TRAFFIC_POOL_ACCOUNTS = [
   { id: 'pool-event-2025', poolId: 'pool-event', lineAccountId: 'visual-qa-account-event-2025', isActive: true, createdAt: '2026-06-02T00:00:00.000Z' },
 ]
 
-/** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
+/** 機能31の固定応答。本物と同じ全ID・版を返す。成果とアフィリエイトは絵の左メニュー（成果と分析の先頭）に出ているので入れる。 */
 const FEATURES = {
   scenarios: true, broadcasts: true, templates: true, reminders: true,
   auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
@@ -1286,7 +1286,7 @@ const FEATURES = {
   friend_add_routing: true, multi_store_hierarchy: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
-  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
+  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: true, mileage: true,
   ec_commerce: true, line_notifications: true, nen_campaigns: true,
   restaurant_test: true,
 }
@@ -1294,8 +1294,8 @@ const FEATURES = {
 /** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
 const EC_SUBSCRIPTIONS = {
   items: [
-    { id: 'sub-1', friendId: 'friend-1', ownerName: '高橋 直人', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 8, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
-    { id: 'sub-3', friendId: 'friend-3', ownerName: '木村 亮', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: null, nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-1', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-1', ownerName: '高橋 直人', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 8, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-3', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-3', ownerName: '木村 亮', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: null, nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-4', friendId: 'friend-4', ownerName: '中村 彩', petName: 'ぷりんちゃん', contractNumber: 'SUB-12528', status: 'paused', statusLabel: '休止中です', riskReason: null, nextShippingAt: null, cycle: 'おやつ定期便（毎月）', items: '鹿肉クッキー × 2', amount: 3600, continuedCount: 4, startedAt: '2026-05-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-2', friendId: 'friend-2', ownerName: '前田 さくら', petName: 'そらくん', contractNumber: 'SUB-12503', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-09', cycle: 'おやつ定期便（毎月）', items: '鹿肉ジャーキー × 1', amount: 4200, continuedCount: 8, startedAt: '2026-01-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-5', friendId: 'friend-5', ownerName: '大西 健一', petName: 'レオくん', contractNumber: 'SUB-12532', status: 'cancelled', statusLabel: '止まりました', riskReason: null, nextShippingAt: null, cycle: 'フード定期便（毎月）', items: '鹿肉フード × 1', amount: 9800, continuedCount: 3, startedAt: '2026-05-01', cancelledAt: '2026-09-01', cancellationReason: '使いきれない', syncedAt: '2026-09-06T09:58:00+09:00' },
@@ -1429,6 +1429,9 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'flow-2', store_id: null, flow_type: 'reservation_2h', title: '本日のご来店をお待ちしております', body: 'お店までの道順と、駐車場のご案内です。', timing_minutes: -120, is_enabled: 1, delivery_mode: 'preview_only' },
     { id: 'flow-3', store_id: null, flow_type: 'post_visit', title: '本日はありがとうございました', body: '次回使えるデザートのサービス券をお送りします。', timing_minutes: 180, is_enabled: 0, delivery_mode: 'preview_only' },
     { id: 'flow-4', store_id: null, flow_type: 'review_request', title: 'よろしければご感想をお聞かせください', body: 'Google の口コミに書いていただけるとうれしいです。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
+    /* 融合の板 n9vvGx の「会員証」「ワンタップ予約」（常設）。 */
+    { id: 'flow-5', store_id: null, flow_type: 'member_card', title: 'デジタル会員証', body: 'スタンプカードと来店履歴を見られます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
+    { id: 'flow-6', store_id: null, flow_type: 'one_tap_booking', title: '前回と同じ内容で予約', body: '店舗・人数・コースを前回と同じにして予約できます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
   ],
 }
 /*
@@ -1852,7 +1855,9 @@ const REJECTED_APPROVALS = [
   duplicateFlag: false,
 }))
 
+/* 成果承認は選んだアカウントの分だけ出す（lineAccountId で絞る）。見本は撮影のアカウントに付ける。 */
 const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
+  .map((item) => ({ lineAccountId: ACCOUNT.id, ...item }))
 
 const SHAPES = {
   '/api/public/brand': { name: '株式会社 然', iconUrl: null },
@@ -2300,6 +2305,13 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /* Al4Ek（B-177 ③）：シナリオの複製。止めたコピーを作って返す（保存はしない）。通・きっかけは取得の口が同じ形を返すので足さずに済む。 */
+  if ((method === 'POST' && pathname === '/api/scenarios') || (method === 'PUT' && pathname === '/api/scenarios/scenario-copy')) {
+    return { ...FRIEND_SCENARIOS[0], id: 'scenario-copy', name: `${FRIEND_SCENARIOS[0].name} のコピー`, isActive: false }
+  }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/actions') return { ...SCENARIO_ACTIONS[0], id: `scenario-copy-action-${Date.now()}`, scenarioId: 'scenario-copy' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/triggers') return { ...SCENARIO_TRIGGERS[0], id: 'scenario-copy-trigger' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/steps') return { ...SCENARIO_STEPS[0], id: `scenario-copy-step-${Date.now()}`, scenarioId: 'scenario-copy' }
   /*
    * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
@@ -2781,11 +2793,13 @@ const VISUAL_COMPOSE_BUBBLES = [
   } } },
   { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
     columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      /* 絵の小さな写真の代わり（撮影は外へ取りに行かないので、その場の色の絵）。 */
+      thumbnailImageUrl: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="${['#c98a4b', '#8fae6b', '#d9a066'][index]}"/><rect y="120" width="300" height="80" fill="${['#a8663a', '#6f8f4f', '#b97f4a'][index]}"/></svg>`)}`,
       title, text: '秋のおすすめ商品をご案内します',
       actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
     }))),
   } },
-  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+  { id: 'visual-audio', type: 'audio', content: { fileName: 'autumn-greeting.m4a', state: {
     location: { title: '', address: '', latitude: '', longitude: '' },
     video: { originalContentUrl: '', previewImageUrl: '' },
     audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
@@ -3440,6 +3454,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
+  /*
+    マニュアルの正本表から1つ引く口（API 組2 の契約：screen または key、keyKind=screen/task）。
+    画面のボタンは URL がある時だけ出るので、撮る板の分だけ URL を入れる：
+    手順キー onboarding-line-guide（店舗を追加 ao15G・faGn4 のガイド）と画面キー 25-1（共通アクションの版 ziSgL のマニュアル）。
+    一覧の正本表（MANUAL_LINKS・cIdA2 の3行）には足さない。
+  */
+  if (method === 'GET' && pathname === '/api/manual-links/lookup') {
+    const key = query.get('key') ?? query.get('screen') ?? ''
+    const keyKind = query.get('keyKind') ?? 'screen'
+    const urls = { 'task:onboarding-line-guide': 'https://help.musubo.example/guides/line-account', 'screen:25-1': 'https://help.musubo.example/automations' }
+    const url = urls[`${keyKind}:${key}`] ?? null
+    return { success: true, data: { key, url, status: url ? 'ok' : 'unset', version: url ? 1 : null } }
+  }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }
@@ -3770,7 +3797,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   // ★V8 L48eY：本移行と照合が終わった履歴（/friends/migrations?tab=uid&run=visual-uid-run-done）。
   if (pathname === '/api/friends/migrations/visual-uid-run-done') {
-    return { success: true, data: { ...UID_MIGRATION_DONE, items: [], itemTotal: 0, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
+    return { success: true, data: { ...UID_MIGRATION_DONE, items: [
+      { id: 'uid-done-1', oldUid: 'old_uid_00018', newUid: 'new_uid_00018', candidateName: '高橋 直人', evidenceType: 'operator_csv', classification: 'auto', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+      { id: 'uid-done-2', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+    ], itemTotal: 2, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
   }
   if (pathname === '/api/friends/migrations/visual-uid-run') {
     return { success: true, data: {
@@ -4119,7 +4149,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         },
       }
     }
-    return { success: true, data: TEMPLATES }
+    // 本物はアカウントの分だけ返し、各行にアカウントを持つ。送れる候補の絞り込み（accountId 一致）で落ちないようにする（f63Jza）。
+    return { success: true, data: TEMPLATES.map((item) => ({ accountId: query.get('account_id') ?? ACCOUNT.id, ...item })) }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   /* 設計 NCbYn（編集中に競合）：一覧に出ない ID。使われる場所は無く、本文に URL が1つある。 */
@@ -4325,6 +4356,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
     return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'mileage_reward') {
+    return { success: true, data: MILEAGE_REWARD_FOLDERS, unfiledCount: 0 }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'affiliate_offer') {
+    return { success: true, data: AFFILIATE_OFFER_FOLDERS, unfiledCount: AFFILIATE_OFFERS.filter((offer) => !offer.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'conversion') {
     return { success: true, data: CONVERSION_FOLDERS, unfiledCount: 0 }
@@ -5351,7 +5388,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed' || item.status === 'excluded' || item.status === 'retry_wait')
       : LINE_NOTIFICATION_DELIVERIES.items
     ).map(toPublic)
-    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
+    // 板 g3iDs の今月の送信枠（1,041 / 5,000 通）。本物は includeQuota=1 のときだけ quota を足す。
+    const quota = query.get('includeQuota') === '1'
+      ? { quota: { state: 'available', total: 5000, used: 1041, remaining: 3959, asOf: '2026-09-27T12:00:00.000+09:00' } }
+      : {}
+    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit), ...quota }, pagination: { total: items.length, limit, offset } }
   }
   /* 運用者へのお知らせのチーム（板 gjUz3 の「チーム」欄・sDXNy の宛先）。高橋・佐々木・中川の3人（LINE は2人）。 */
   if (pathname === '/api/notifications/teams') {
