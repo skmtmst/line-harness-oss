@@ -922,10 +922,10 @@ CREATE TABLE analytics_report_schedules (
       OR (cadence = 'monthly' AND month_day IS NOT NULL AND weekday IS NULL))
 );
 
-CREATE TABLE analytics_result_audience_members (
-  audience_id         TEXT NOT NULL REFERENCES analytics_result_audiences(id) ON DELETE CASCADE,
-  friend_id           TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
-  PRIMARY KEY (audience_id, friend_id)
+CREATE TABLE "analytics_result_audience_members" (
+ audience_id TEXT NOT NULL REFERENCES "analytics_result_audiences"(id) ON DELETE CASCADE,
+ friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+ PRIMARY KEY(audience_id,friend_id)
 );
 
 CREATE TABLE "analytics_result_audiences" (
