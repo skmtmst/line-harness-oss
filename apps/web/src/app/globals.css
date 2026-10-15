@@ -3129,3 +3129,10 @@ html:root button:not([role='tab']):is([aria-pressed='true'], [data-current]:not(
   --tpl-inbox-email-heading-height: 66px;
   --tpl-inbox-email-heading-end: 80px;
 }
+
+:root {
+  --tpl-people-time-width: 56px;
+  --tpl-people-hour-height: 56px;
+  --tpl-people-block-height: 44px;
+  --tpl-people-block-gap: 4px;
+}
