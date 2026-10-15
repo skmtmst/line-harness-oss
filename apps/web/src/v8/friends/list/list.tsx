@@ -777,7 +777,7 @@ export default function FriendsListV8() {
         <colgroup>
           <col className={styles.colCheck} />
           <col className={styles.colStar} />
-          <col />
+          <col className={styles.colName} />
           {displayColumns.map(column => <col key={column.key} />)}
           <col className={styles.colMenu} />
         </colgroup>
@@ -820,6 +820,7 @@ export default function FriendsListV8() {
                     <button
                       type="button"
                       className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
+                      data-part="attention-star"
                       aria-pressed={attention}
                       aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
                       onClick={() => void toggleAttention(friend)}
@@ -834,7 +835,11 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
+                  {/* 絵 nF4ts・x6QsVz：名前の前に顔の丸（写真が無ければ頭文字）。 */}
+                  <div className={styles.friendCell}>
+                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
+                    <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
+                  </div>
                 </Td>
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (
