@@ -35,6 +35,8 @@ import {
   exchangeAuthorizationCode as exchangeUberAuthorizationCode,
 } from '../services/uber-eats.js';
 import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
+import { verifySupportRelay } from '../services/support-relay.js';
+import { platformCooldownStore, probeUberSandboxToken, uberProbeSecret } from '../services/ubereats-token-probe.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
 import {
@@ -2140,3 +2142,63 @@ restaurantDelivery.get(
     }
   },
 );
+
+/**
+ * Uber Eats Sandbox への最小の実接続（トークン1回）を配備先の中から行う口。画面は持たない。
+ *
+ * Application ID と Client Secret は配備先の暗号化された秘密設定で読み戻せないため、
+ * 外から curl で叩くには秘密値を取り出すことになる。取り出さずに済むよう、
+ * 「配備先の中から1回だけ送って、結果の形だけを返す」入口をここに置く。
+ *
+ * - 管理画面の認証は通さない（`/api/` で始まらないため共通認証の対象外）。
+ *   代わりに `/webhooks/xserver/support-email` と同じ合言葉の署名で守る。
+ *   `x-nen-timestamp`（通算秒10桁）と `x-nen-signature`（`<時刻>.<本文>` の HMAC-SHA256・16進）。
+ * - 返すのは「取れたか」と `scope` と残り秒だけ。
+ *   **トークンの値と Client Secret は返さない・記録しない。**
+ * - 接続先が Sandbox でないときは送らない。冷却時間の中でも送らない。
+ */
+restaurantDelivery.post('/internal/ubereats/sandbox-token-probe', async (c) => {
+  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  const secret = uberProbeSecret(c.env);
+  // 合言葉が無いあいだは口を閉じたまま。誰でも叩ける状態にはしない。
+  if (!secret) return c.json({ success: false, code: 'probe_not_configured' }, 503);
+  const rawBody = await c.req.text();
+  const verified = await verifySupportRelay(
+    secret,
+    c.req.header('x-nen-timestamp'),
+    c.req.header('x-nen-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, code: 'probe_unauthorized' }, 401);
+  const outcome = await probeUberSandboxToken({
+    env: c.env,
+    store: platformCooldownStore(dbFor(c.env)),
+    fetch: (url, init) => fetch(url, init),
+    nowMs: Date.now(),
+  });
+  switch (outcome.kind) {
+    case 'ok':
+      return c.json({
+        success: true,
+        environment: 'sandbox',
+        scope: outcome.scope,
+        expiresInSec: outcome.expiresInSec,
+      });
+    case 'sandbox_only':
+      return c.json({ success: false, code: 'probe_sandbox_only' }, 403);
+    case 'cooldown':
+      return c.json({ success: false, code: 'probe_cooldown', retryAfterSec: outcome.retryAfterSec }, 429);
+    case 'uber_error':
+      // 残すのは分類済みの符号だけ。Uber から返った自由文・本文は保存も表示もしない。
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.json(
+        { success: false, code: outcome.code, uberCode: outcome.uberCode, status: outcome.status },
+        502,
+      );
+    case 'network_failed':
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.json({ success: false, code: 'probe_network_failed' }, 502);
+    default:
+      return c.json({ success: false, code: 'oauth_not_configured' }, 503);
+  }
+});
