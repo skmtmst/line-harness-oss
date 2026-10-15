@@ -191,7 +191,7 @@ export default function CsvMigrationsV8() {
       </Card>
 
       <Card layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-history-title">
-        <CardHeader size="content" headingLevel={3} titleId="csv-history-title" title={<>書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></>} />
+        <CardHeader size="content" headingLevel={3} titleId="csv-history-title" title="書き出し・取り込みの履歴" help={<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip>} />
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
