@@ -1,3 +1,4 @@
+import { consumePublicIngressReceipt, getMeasurementSite, siteAllowsHost, normalizeSiteHost } from '@line-crm/db';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -64,14 +65,14 @@ async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
  */
 function corsHeaders(): Record<string, string> {
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   };
 }
 
-siteTracking.options('/api/site/collect', (c) => c.body(null, 204, corsHeaders()));
+siteTracking.options('/api/site/collect', (c) => c.body(null, 204, { ...corsHeaders(), ...(c.req.header('Origin') ? { 'Access-Control-Allow-Origin': c.req.header('Origin')! } : {}) }));
 
 // POST /api/site/collect — 訪問と操作の記録
 //
@@ -88,6 +89,8 @@ siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
       valueNum?: unknown;
       referrer?: unknown;
       trackingKey?: unknown;
+      siteId?: unknown;
+      sourceEventId?: unknown;
       consent?: unknown;
       consentDecision?: unknown;
     }>();
@@ -99,6 +102,17 @@ siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
     }
     const lineAccountId = await getSiteTrackingAccountId(c.env.DB, trackingKey);
     if (!lineAccountId) return c.body(null, 204, corsHeaders());
+    const siteId = typeof body.siteId === 'string' ? body.siteId : '';
+    const sourceEventId = typeof body.sourceEventId === 'string' ? body.sourceEventId : '';
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(sourceEventId)) return c.body(null, 204, corsHeaders());
+    const site = siteId ? await getMeasurementSite(c.env.DB, siteId) : null;
+    if (!site || site.stopped_at !== null || site.line_account_id !== lineAccountId) return c.body(null, 204, corsHeaders());
+    const origin = c.req.header('Origin');
+    let host: string | null = null;
+    try { if (origin && ['https:', 'http:'].includes(new URL(origin).protocol)) host = normalizeSiteHost(new URL(origin).hostname); } catch { /* 不正な送信元は記録しない。 */ }
+    if (!host || !await siteAllowsHost(c.env.DB, siteId, host)) return c.body(null, 204, corsHeaders());
+    c.header('Access-Control-Allow-Origin', origin!);
+
 
     // 計測がオフのaccountへは書かない（#859 site_tracking）。それでも204を
     // 返すのは、埋め込み先の公開サイトから設定状態を推測させないため。
@@ -121,12 +135,13 @@ siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
       return c.body(null, 204, corsHeaders());
     }
 
+    if (!await consumePublicIngressReceipt(c.env.DB, { kind: 'site_event', scopeId: siteId, key: sourceEventId })) return c.body(null, 204, corsHeaders());
     await recordSiteEvent(c.env.DB, {
       visitorId,
       lineAccountId,
       eventType: eventType as SiteEventType,
       consent,
-      host: body.host,
+      host,
       // クエリ文字列の除去は recordSiteEvent の中で行う。
       // 受け口ごとに書くと、必ずどこかで忘れる。
       path: body.path,
@@ -189,9 +204,11 @@ siteTracking.get('/api/site/script.js', (c) => {
     return id;
   }
   function send(payload) {
-    if (!TRACKING_KEY) return;
+    if (!TRACKING_KEY || !SITE_ID) return;
     payload.visitorId = visitorId();
     payload.trackingKey = TRACKING_KEY;
+    payload.siteId = SITE_ID;
+    payload.sourceEventId = payload.sourceEventId || makeId();
     // 同意の状態 (#818)。granted 以外はサーバー側で記録せず件数だけ数える。
     payload.consent = readConsent() || 'unset';
     var body = JSON.stringify(payload);
@@ -214,7 +231,7 @@ siteTracking.get('/api/site/script.js', (c) => {
       host: location.hostname,
       path: path,
       consent: 'granted',
-      sourceEventId: null,
+      sourceEventId: makeId(),
     };
     var body = JSON.stringify(payload);
     if (navigator.sendBeacon) {
