@@ -17,9 +17,9 @@ import ColorWell from '@/components/shared/color-well'
 import {Field,FieldError} from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import SectionHeader from '@/components/shared/section-header'
+import Disclosure from '@/components/shared/disclosure'
 import CustomerDesignPicker from '@/components/shared/customer-design-picker'
 import CustomerLookPreview from '@/components/shared/customer-look-preview'
-import Disclosure from '@/components/shared/disclosure'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import {useSaveConflict} from '@/components/shared/save-conflict'
@@ -65,13 +65,12 @@ export default function CustomerLookScreen() {
     {!canEdit?<ReadOnlyNotice/>:null}
     <Card padding="roomy" layout="vertical" gap="normal"><SectionHeader title="デザインの型" description="型を押すと、右の見本がすぐ変わります"/>
      <CustomerDesignPicker value={draft.preset} columns={2} readOnly={!canEdit||saving} onChange={preset=>patch({preset})}/>
-     <Disclosure appearance="inset" size="compact" key={draft.preset==='custom'?'custom':'preset'} title="カスタムの色と書体" hint="主の色・背景の色・見出しの書体" defaultOpen={draft.preset==='custom'}>
-     {draft.preset==='custom'?<>
+     {/* 型の下に「カスタムの色と書体」の開け閉めする段を常に置く（VsZ25）。入力できるのはカスタムを選んだときだけ。 */}
+     <Disclosure appearance="inset" size="compact" key={draft.preset==='custom'?'custom':'preset'} title="カスタムの色と書体" hint="主の色・背景の色・見出しの書体" defaultOpen={draft.preset==='custom'}>{draft.preset==='custom'?<>
       {canEdit&&!saving?<><Field label="主の色"><ColorWell label="主の色" value={draft.primaryColor??customerPalette(DEFAULT_CUSTOMER_LOOK).main} allowAlpha={false} allowClear={false} onChange={value=>value&&patch({primaryColor:value})}/></Field>
        <Field label="背景の色"><ColorWell label="背景の色" value={draft.backgroundColor??customerPalette(DEFAULT_CUSTOMER_LOOK).background} allowAlpha={false} allowClear={false} onChange={value=>value&&patch({backgroundColor:value})}/></Field>
        <Field label="見出しの書体"><Select aria-label="見出しの書体" value={draft.headingFont} onChange={headingFont=>patch({headingFont:headingFont as CustomerLook['headingFont']})} options={[{value:'default',label:'型に合わせる'},{value:'mincho',label:'明朝'},{value:'marugothic',label:'丸いゴシック'},{value:'sans',label:'ゴシック'}]}/></Field></>:<dl><dt>主の色</dt><dd>{draft.primaryColor??'型に合わせる'}</dd><dt>背景の色</dt><dd>{draft.backgroundColor??'型に合わせる'}</dd><dt>見出しの書体</dt><dd>{draft.headingFont}</dd></dl>}
-     </>:<><p>カスタムを選ぶと、色と書体を自分で決められます。</p>{canEdit&&!saving?<Button onClick={()=>patch({preset:'custom'})}>カスタムにする</Button>:null}</>}
-     </Disclosure>
+     </>:<p>型の色と書体を使っています。自分で決めるときは、上の「カスタム」を選んでください。</p>}</Disclosure>
     </Card>
    </>}
  </SettingsPage><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} subject="デザインの変更" onSave={save} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave}/></SaveErrorScope>

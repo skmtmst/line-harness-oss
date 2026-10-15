@@ -97,7 +97,7 @@ import {
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, AD_CONVERSION_LOG_SUMMARY, AD_EVENT_MAPPINGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
   STAFF_MEMBERS, LOGIN_AUDIT,
-  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_OFFER_FOLDERS, MILEAGE_REWARD_FOLDERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
@@ -1278,7 +1278,7 @@ const TRAFFIC_POOL_ACCOUNTS = [
   { id: 'pool-event-2025', poolId: 'pool-event', lineAccountId: 'visual-qa-account-event-2025', isActive: true, createdAt: '2026-06-02T00:00:00.000Z' },
 ]
 
-/** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
+/** 機能31の固定応答。本物と同じ全ID・版を返す。成果とアフィリエイトは絵の左メニュー（成果と分析の先頭）に出ているので入れる。 */
 const FEATURES = {
   scenarios: true, broadcasts: true, templates: true, reminders: true,
   auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
@@ -1286,7 +1286,7 @@ const FEATURES = {
   friend_add_routing: true, multi_store_hierarchy: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
-  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
+  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: true, mileage: true,
   ec_commerce: true, line_notifications: true, nen_campaigns: true,
   restaurant_test: true,
 }
@@ -4332,6 +4332,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
     return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'mileage_reward') {
+    return { success: true, data: MILEAGE_REWARD_FOLDERS, unfiledCount: 0 }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'affiliate_offer') {
+    return { success: true, data: AFFILIATE_OFFER_FOLDERS, unfiledCount: AFFILIATE_OFFERS.filter((offer) => !offer.folderId).length }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'conversion') {
     return { success: true, data: CONVERSION_FOLDERS, unfiledCount: 0 }
   }
@@ -5357,7 +5363,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed' || item.status === 'excluded' || item.status === 'retry_wait')
       : LINE_NOTIFICATION_DELIVERIES.items
     ).map(toPublic)
-    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
+    // 板 g3iDs の今月の送信枠（1,041 / 5,000 通）。本物は includeQuota=1 のときだけ quota を足す。
+    const quota = query.get('includeQuota') === '1'
+      ? { quota: { state: 'available', total: 5000, used: 1041, remaining: 3959, asOf: '2026-09-27T12:00:00.000+09:00' } }
+      : {}
+    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit), ...quota }, pagination: { total: items.length, limit, offset } }
   }
   /* 運用者へのお知らせのチーム（板 gjUz3 の「チーム」欄・sDXNy の宛先）。高橋・佐々木・中川の3人（LINE は2人）。 */
   if (pathname === '/api/notifications/teams') {

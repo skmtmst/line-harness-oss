@@ -22,7 +22,8 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -420,9 +421,13 @@ export default function WebhooksInteractionsV8() {
                     <StatusBadge tone={reply.failed ? 'danger' : 'success'}>{reply.text}</StatusBadge>
                   </Td>
                   <Td align="right" className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
-                  <Td className={styles.colOps}>
-                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`} busyLabel="読み込み中…">中身を見る</Button>
-                  </Td>
+                  <ActionCell className={styles.colOps}>
+                    <RowMenu
+                      label={`「${item.webhookName}」の操作`}
+                      title="操作"
+                      items={[{ id: 'view', label: '中身を見る', onSelect: () => openDetail(item) }]}
+                    />
+                  </ActionCell>
                 </Tr>
               )
             })}
@@ -440,7 +445,7 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
-      help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
       explanation="失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。"
       boardId="Uv9AA"
       headingSize="regular"

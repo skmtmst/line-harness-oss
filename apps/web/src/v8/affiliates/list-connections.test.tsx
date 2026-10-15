@@ -21,6 +21,7 @@ vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   const people = () => Array.from({ length: data.size }, (_, i) => ({ id: `af-${i}`, name: `紹介者${i + 1}`, referralCode: `code-${i}` }))
   return { ...actual, api: { ...actual.api,
+    folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
     affiliateOffers: { ...actual.api.affiliateOffers, list: async () => ({ success: true, data: [{ id: 'of-1', name: '案件A', isActive: true, rewardAmount: 100, rewardMiles: 0, createdAt: '2026-10-01T00:00:00Z' }] }) },
     affiliates: { ...actual.api.affiliates, list: async () => ({ success: true, data: people() }), allReport: async () => ({ success: true, data: [] }) },
     conversionApprovals: { ...actual.api.conversionApprovals, holdDays: async () => ({ success: true, data: { holdDays: 7 } }), list: async (params: { status?: string }) => ({ success: true, data: params.status === 'approved' ? people().map((p, i) => ({ eventId: `e-${i}`, affiliateId: p.id, affiliateName: p.name, friendName: p.name, lineAccountId: 'account-a', offerId: 'of-1', offerName: '案件A', approvalStatus: 'approved', value: 100, rewardAmount: 10, createdAt: '2026-10-01T00:00:00Z' })) : params.status === 'pending' ? [{ eventId: 'pending-1', friendName: '成果A', lineAccountId: 'account-a', approvalStatus: 'pending', createdAt: '2026-10-01T00:00:00Z' }] : [] }) },

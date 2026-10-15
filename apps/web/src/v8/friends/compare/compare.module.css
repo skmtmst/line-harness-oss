@@ -165,7 +165,6 @@
 .faint { color: var(--color-ink-faint); }
 
 /* 下の帯：左に「別の人だった」、中央に保留・結び付ける（画面の下に追従）。 */
-.footer { position: sticky; bottom: var(--tpl-fr-stack-gap); z-index: 20; }
 /* 1152 の板（p15At）：確認済みの札は値のすぐ後ろ。 */
 @container v8-page (max-width: 1000px) {
   .attr { gap: var(--tpl-fr-area-gap); }

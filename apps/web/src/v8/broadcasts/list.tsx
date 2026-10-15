@@ -18,7 +18,7 @@ import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, 
 import { useBroadcastFolderSelection } from './folder-selection'
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ArrowUpDown, Eye } from 'lucide-react';
+import { ArrowUpDown, Eye, Folder as FolderIcon } from 'lucide-react';
 import type { Folder, Tag } from '@line-crm/shared';
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api';
 import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message';
@@ -32,6 +32,8 @@ import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -225,6 +227,8 @@ export default function BroadcastListV8() {
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
+  /* 行を選んでまとめてフォルダへ移す（絵 l5V9a の左の選ぶ欄）。選ぶのはこのページの行だけ。 */
+  const bulkAnchorRef = useRef<HTMLButtonElement | null>(null)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
@@ -972,6 +976,7 @@ export default function BroadcastListV8() {
       <tbody>
         {[0, 1, 2, 3, 4].map((n) => (
           <Tr key={n} className={styles.row}>
+            <Td className={styles.selectCell} />
             <Td><Skeleton width={200} height={16} /><Skeleton width={140} height={12} /></Td>
             <Td><Skeleton width={72} height={22} className="rounded-pill" /></Td>
             {narrow ? null : <Td><Skeleton width={120} height={12} /></Td>}
@@ -1106,7 +1111,6 @@ export default function BroadcastListV8() {
       </RovingTbody>
     </DataTable>
   )
-
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
       <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"

@@ -20,6 +20,7 @@ import {
   Send,
   Stamp,
   Trash2,
+  Undo2,
 } from 'lucide-react'
 import { notifyToast } from '@/components/shared/toast'
 import {
@@ -37,6 +38,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Progress from '@/components/shared/progress'
+import Notice from '@/components/shared/notice'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import { ApprovalRequestFields } from '@/components/broadcasts/broadcast-approval'
@@ -556,7 +558,7 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval }: { broadcast
           <li key={step.key} className={styles.railItem} data-state={state} data-finished={finished || undefined} data-kind="delivery">
             {index > 0 ? <span className={styles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
             <span className={styles.railStep}>
-              <span className={styles.railMark} aria-hidden="true">{state === 'done' ? <Check size={11} strokeWidth={3} /> : null}</span>
+              <span className={styles.railMark} aria-hidden="true">{state === 'done' && !finished ? <Check size={11} strokeWidth={3} /> : null}</span>
               <span className={styles.railLabel} aria-current={state === 'current' ? 'step' : undefined}>{step.label}</span>
             </span>
           </li>
@@ -632,9 +634,9 @@ function Overview({
         />
       ) : null}
       {state?.approval.status === 'pending' ? (
-        <p className={styles.deadline}>
+        <Notice tone="warn" appearance="soft" className={styles.deadline}>
           承認されないまま {scheduledLabel ?? '送る時刻'} を過ぎると、送らずに期限切れになります。
-        </p>
+        </Notice>
       ) : null}
 
       {canEdit && approval.canReRequest && state ? (
@@ -670,7 +672,7 @@ function Overview({
           countText={`${formatNumber(broadcast.successCount)} / ${formatNumber(total)} 件`}
         />
       ) : null}
-      <KpiBand density="compact">
+      <KpiBand>
         {isSent ? (
           <>
             <KpiCard title="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} presentation="band" />
@@ -853,7 +855,7 @@ function ApprovalBox({
               disabled={approval.busy || reason.trim() === ''}
               title={reason.trim() === '' ? '差し戻すときは理由が要ります' : undefined}
             >
-              <ArrowLeft aria-hidden="true" />
+              <Undo2 aria-hidden="true" />
               差し戻す
             </Button>
             <Button variant="primary" onClick={approval.onApprove} disabled={approval.busy}>

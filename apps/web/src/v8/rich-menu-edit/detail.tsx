@@ -395,7 +395,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 <p className={styles.cardNote} title={publishedInfo}>管理画面の記録と、LINE上の状態がずれていないかを見ます</p>
               </div>
               {!runsError && draftDiffers === true ? <Notice tone="warn" message="編集中の下書きは公開中の版と違います。公開すると、この下書きで上書きされます。" /> : null}
-              <div className={styles.checkBox}>{!checkError && diffs?.length === 0 ? <ShieldCheck className={styles.stepOk} size={15} aria-hidden="true" /> : null}
+              <div className={styles.checkBox}>
+                {!checkError && diffs !== null && diffs.length === 0 ? <ShieldCheck size={16} aria-hidden="true" className={styles.checkIcon} /> : null}
                 <div className={styles.checkText}>
                   {checkError ? <span className={styles.errorText}>{checkError}</span>
                     : diffs === null ? <span>LINEと照らし合わせています…</span>

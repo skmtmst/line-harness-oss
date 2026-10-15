@@ -125,9 +125,9 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   // 表の行：いつ送るか・送るもの・ようすの札。
   expect(board?.textContent).toContain('友だちになった')
   expect(board?.textContent).toContain('動いている')
-  // 板 `ZSbFY` 全行の操作欄に「中身を見る」「設定」。
-  expect(board?.textContent).toContain('中身を見る')
-  expect(board?.querySelector('[aria-label="「顧客台帳（CRM）」の設定"]')).not.toBeNull()
+  // 板 `ZSbFY` 行の右端は「…」だけ（B-253）。中身を見る・やり直すはその中。
+  expect(board?.querySelector('[aria-label="「顧客台帳（CRM）」の操作"]')).not.toBeNull()
+  expect([...board!.querySelectorAll('a, button')].some((element) => element.textContent === '中身を見る')).toBe(false)
 })
 
 test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る', async () => {
@@ -144,8 +144,9 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board?.textContent).toContain('失敗あり')
   expect(board?.textContent).toContain('失敗 2 回')
-  // 板 `ZSbFY` 行3の操作欄。「…」の中の「失敗をやり直す」ではなく表のボタンの文言で見る。
-  expect(board?.textContent).toContain('やり直す')
+  // 板 `ZSbFY` 行3の「…」の中に「失敗をやり直す」が入る（B-253）。
+  await act(async () => { (board!.querySelector('[aria-label="「予約台帳」の操作"]') as HTMLButtonElement).click() })
+  expect([...document.querySelectorAll('[role="menuitem"]')].some((node) => node.textContent?.includes('失敗をやり直す'))).toBe(true)
 })
 
 test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。フォルダに入った送り先は名前の前にそのフォルダの色の丸（B-136）', async () => {
@@ -197,8 +198,13 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタ�
   const clickable = [...board!.querySelectorAll('a, button')]
   expect(clickable.some((element) => element.textContent?.includes('送り先を作る'))).toBe(false)
   expect(clickable.some((element) => element.textContent === '設定')).toBe(false)
-  // 見るだけの操作（中身を見る）は残る。
-  expect(clickable.some((element) => element.textContent?.includes('中身を見る'))).toBe(true)
+  // 見るだけの操作（送信の記録を見る）は行の「…」の中に残る。
+  const trigger = board!.querySelector('[aria-label="「顧客台帳（CRM）」の操作"]') as HTMLButtonElement
+  expect(trigger).not.toBeNull()
+  await act(async () => { trigger.click() })
+  const items = [...document.querySelectorAll('[role="menuitem"]')].map((node) => node.textContent ?? '')
+  expect(items.some((text) => text.includes('送信の記録を見る'))).toBe(true)
+  for (const action of ['直す', '止める', '削除する', '試しに送る', '鍵を作り直す']) expect(items).not.toContain(action)
 })
 
 test('旧テーマ属性でも現役の一覧が出て ZSbFY が出る', async () => {
@@ -232,8 +238,8 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')!
   expect(board.textContent).toContain('動いている')
-  // 「設定」を開いて「止める」を押す。口の返事を待たず札が変わる。
-  const settingButton = [...board.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '「顧客台帳（CRM）」の設定')!
+  // 「…」を開いて「止める」を押す。口の返事を待たず札が変わる。
+  const settingButton = [...board.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '「顧客台帳（CRM）」の操作')!
   expect(settingButton.getAttribute('aria-haspopup')).toBe('menu')
   expect(settingButton.getAttribute('aria-expanded')).toBe('false')
   await act(async () => { settingButton.click() })

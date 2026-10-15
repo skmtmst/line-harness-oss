@@ -604,13 +604,6 @@
   font-size: var(--text-label);
   line-height: var(--tpl-nm-name-lh);
 }
-.historyLead {
-  margin: 0;
-  word-break: normal;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-nm-row-size);
-  line-height: var(--tpl-nm-bubble-lh);
-}
 .historyFields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

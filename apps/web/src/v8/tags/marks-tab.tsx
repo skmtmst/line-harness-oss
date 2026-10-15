@@ -2,7 +2,7 @@
 
 import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react';
+import { Archive, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -24,7 +24,6 @@ import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import Select from '@/components/shared/select'
-import { ListPager } from '@/components/templates/list-page'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
@@ -42,7 +41,7 @@ import styles from './list.module.css'
 import type { AttributeListHost } from './attribute-host';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -367,6 +366,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   ]
 
   const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
+  const archivedCount = useMemo(() => items.filter((mark) => Boolean(mark.archivedAt)).length, [items])
 
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
@@ -434,13 +434,14 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
                       <span className={styles.truncate}>{mark.name}</span>
                     </span> : <RowNameLink
                       href={host ? "#" : editHref}
-                      className={styles.markPill}
-                      style={{ '--mark-color': mark.color } as CSSProperties}
                       title={mark.name}
                       onClick={(event) => { event.stopPropagation(); if (host) { event.preventDefault(); if (canEdit) host.onEdit(mark.id) } }}
                     >
-                      <span className={styles.markPillDot} aria-hidden="true" />
-                      <span className={styles.truncate}>{mark.name}</span>
+                      {/* 札は文字の幅（絵 vKDj5）。名前のリンクは列いっぱいの塊なので、札は中の span で描く。 */}
+                      <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties}>
+                        <span className={styles.markPillDot} aria-hidden="true" />
+                        <span className={styles.truncate}>{mark.name}</span>
+                      </span>
                     </RowNameLink>}
                   </ContextMenu>
                   {mark.archivedAt ? <StatusBadge size="annotation" dot={false}>保管</StatusBadge> : null}
@@ -466,11 +467,6 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
           })}
         </tbody>
       </DataTable>
-
-      <ListPager>
-        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り"
-          range={{ total: visible.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, visible.length) }} />
-      </ListPager>
 
       {/* 表の下の段（安全確認）。 */}
       <section className={styles.safetyNote}>
@@ -508,6 +504,11 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
+        pagination={status === 'ready' ? (
+          // ページ送りは表の下の安全確認のあと、板の下（絵 vKDj5）。
+          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り"
+            range={{ total: visible.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, visible.length) }} />
+        ) : undefined}
         skeleton explanation={explanation ? '対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。' : undefined}
         toolbar={<>
           <ListToolbarSearchSlot>
@@ -530,9 +531,10 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
               { value: 'unused', label: '使っている：なし' },
             ]}
           /></SaveErrorField>
-          {!host ? <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
-          <span className={styles.toolbarSpacer} />
-          <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
+          {!host ? <FilterChip selected={onlyArchived} icon={<Archive aria-hidden="true" />} count={archivedCount || undefined} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
+          <ListToolbarEnd>
+            <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
+          </ListToolbarEnd>
         </>}
       >
         {actionError ? (

@@ -1,13 +1,14 @@
 'use client'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CircleHelp, Link as LinkIcon, UserX } from 'lucide-react'
+import { Clock, Link as LinkIcon, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { DashboardColumns } from '@/components/templates'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
@@ -24,7 +25,6 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
 
 /*
  * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
@@ -310,22 +310,26 @@ function CompareInner() {
               </DataTable>
             </section>
 
-            <div className={styles.footer}>
-              <StickyBar destructive={
+            <StickyBar
+              destructive={(
                 <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
                   <UserX size={14} aria-hidden="true" />
                   別の人だった
-                </Button>} actions={<>
+                </Button>
+              )}
+              actions={(
+                <>
                   <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
-                    <CircleHelp size={14} aria-hidden="true" />
+                    <Clock size={14} aria-hidden="true" />
                     あとで決める（保留）
                   </Button>
                   <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
                     <LinkIcon size={14} aria-hidden="true" />
                     同じ人として結び付ける
                   </Button>
-                </>} />
-            </div>
+                </>
+              )}
+            />
           </>
         ) : null}
       </div>

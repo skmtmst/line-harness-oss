@@ -265,8 +265,9 @@ export default function HqBroadcastList() {
     }
   }
 
+  /* 店の一覧（l5V9a）と同じ2段：探す／札 … 件数・並び。1段にまとめると件数と並びが縦に割れる。 */
   const toolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
@@ -314,7 +315,7 @@ export default function HqBroadcastList() {
     )
   } else {
     content = (
-      <DataTable columnSizing="content" className={styles.table} data-design="hq-broadcasts">
+      <DataTable className={styles.table} data-design="hq-broadcasts">
         <thead>
           <TableHeadRow>
             <Th className={styles.colTitle}>タイトル・内容</Th>

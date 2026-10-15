@@ -34,6 +34,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
     lineAccounts: { list: async () => ({ success: true, data: [] }) },
     tags: { list: async () => ({ success: true, data: [] }) },
     scenarios: { list: async () => ({ success: true, data: [] }) },
+    folders: { list: async () => ({ success: true, data: [] }) },
   },
 }))
 
@@ -70,7 +71,7 @@ describe('h7dmB 案件タブの絵合わせ', () => {
     expect(screen.getAllByText('公開中').length).toBeGreaterThan(0)
     expect(screen.getAllByText('下書き').length).toBeGreaterThan(0)
     expect(screen.queryAllByRole('button', { name: '編集する' })).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: '秋の紹介キャンペーンの操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '定期便の初回の操作' }))
     expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
     expect(screen.queryByText('停止・終了')).toBeNull()
   })

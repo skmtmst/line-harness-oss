@@ -593,7 +593,7 @@ function VisitStampsScreen() {
                     <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio></SaveErrorField>
                     <div className={styles.hoursRow}>
                       <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'hours'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'hours', hours: interval.hours ?? 3 } })}>前の押印から</Radio></SaveErrorField>
-                      <SaveErrorField names={["hours","interval.hours"]}><NumberInput {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
+                      <SaveErrorField names={["hours","interval.hours"]}><NumberInput {...fieldProps('intervalHours')} note={false} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
                       <span className={styles.plain}>時間あける（1〜23）</span>
                     </div>
                     {fieldError('intervalHours')}

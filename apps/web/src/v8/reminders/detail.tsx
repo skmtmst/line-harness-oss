@@ -474,7 +474,7 @@ function ReminderDetailV8() {
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
       <PageHeading title={data.reminder.name}
-        crumbs={<><p className={styles.meta}>{meta}</p></>}
+        help={<>{meta}</>}
         tabs={<><Tabs
           label="リマインダの詳細"
           items={[

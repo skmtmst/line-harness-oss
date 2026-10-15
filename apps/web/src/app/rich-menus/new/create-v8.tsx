@@ -12,7 +12,7 @@ import {
   ArrowRight,
   BookOpen,
   CalendarClock,
-  CircleHelp,
+  CircleDashed,
   Send,
   Users,
   Zap,
@@ -23,6 +23,7 @@ import {
   RectangleVertical,
   Repeat,
   Smartphone,
+  Tag,
 } from 'lucide-react'
 import {
   RICH_MENU_DIMENSIONS,
@@ -2445,7 +2446,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onChange={() => setAudience('all')}
               title="すべての友だち"
               icon={<Users aria-hidden="true" />}
-              note="ほかの出し分けに当てはまらない人に出る（既定）"
+              note="全員の既定のメニューにする"
             />
             <RadioCard
               name="audience"
@@ -2460,10 +2461,21 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 }
               }}
               title="条件に当てはまる友だちだけ"
-              icon={<CircleHelp aria-hidden="true" />}
+              icon={<Tag aria-hidden="true" />}
               note={host ? '条件は配った先のアカウントで決めます' : 'タグ・友だち情報などで絞る'}
             />
-            {host ? null : <RadioCard name="audience" value="none" checked={audience === 'none'} onChange={() => setAudience('none')} title="決めない" icon={<BookOpen aria-hidden="true" />} note="シナリオ・切替タブから出す" />}
+            {/* 絵 OxEMM の3つ目。登録だけして、出す相手は一覧の「表示先」・シナリオ・切替タブで決める。 */}
+            {host ? null : (
+              <RadioCard
+                name="audience"
+                value="none"
+                checked={audience === 'none'}
+                onChange={() => setAudience('none')}
+                title="決めない"
+                icon={<CircleDashed aria-hidden="true" />}
+                note="シナリオ・切替タブから出す"
+              />
+            )}
           </RadioCardGroup></SaveErrorField>
 
           {host ? (

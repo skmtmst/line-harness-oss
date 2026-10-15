@@ -70,7 +70,8 @@
 /* 休業日：休みにした日に予約がある人への注意（絵 KRgTQ は帯ではなく字だけ）。 */
 .closedNote {
   margin: 0;
-  color: var(--color-status-warn-deep);
+  /* 注意の色（橙の字・絵 KRgTQ #94600a）。赤（取り消せない操作）ではない。 */
+  color: var(--color-warning);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-17);
 }
@@ -165,7 +166,7 @@
 
 .sideTitle {
   display: flex;
-  align-self: stretch;
+  align-self: flex-start;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -413,7 +414,6 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
-  /* 一覧の名前は黒の太字（§6.5 の 2・絵 owaS3）。押せることは下線で示す。 */
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
@@ -850,7 +850,7 @@
   align-items: flex-start;
   gap: var(--tpl-bm-2);
   height: var(--tpl-bm-46);
-  padding: var(--tpl-bm-6);
+  padding: var(--tpl-bm-8);
   border: 0;
   outline: 1px solid var(--color-hairline);
   outline-offset: calc(var(--tpl-bm-1) * -1);
@@ -886,7 +886,7 @@
 }
 
 .calMark {
-  font-size: var(--tpl-bm-9);
+  font-size: var(--tpl-bm-11);
   font-weight: 400;
   line-height: var(--tpl-bm-13);
 }
@@ -1631,12 +1631,11 @@
 }
 
 .phoneDayNav {
+  display: inline-flex;
   flex-shrink: 0;
   width: var(--tpl-bm-16);
-  color: var(--v8-liff-sub);
-  font-size: var(--tpl-bm-14);
-  font-weight: 600;
-  text-align: center;
+  height: var(--tpl-bm-16);
+  color: var(--color-ink);
 }
 
 .phoneDay {
@@ -1664,28 +1663,39 @@
 }
 
 .phoneDayDow {
-  color: var(--color-ink-faint);
+  color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-10);
   line-height: var(--tpl-bm-14);
 }
 
 .phoneDayNum {
   color: var(--color-ink);
-  font-size: var(--tpl-bm-14);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: var(--tpl-bm-16);
   font-weight: 700;
   line-height: var(--tpl-bm-19);
   font-variant-numeric: tabular-nums;
 }
 
+.phoneDayNow .phoneDayNum {
+  color: var(--v8-liff-primary);
+}
+
+.phoneDayOff .phoneDayNum {
+  color: var(--v8-liff-idle);
+}
+
 .phoneDayState {
   color: var(--v8-liff-primary);
-  font-size: var(--text-nano);
-  font-weight: 600;
+  font-size: var(--tpl-bm-9);
+  font-weight: 400;
   line-height: var(--tpl-bm-13);
 }
 
-.phoneDayOff .phoneDayState {
-  color: var(--color-ink-faint);
+/* 休み＝地も数字も薄く。満＝地は白のまま、札だけ薄く（絵 KRgTQ）。 */
+.phoneDayOff .phoneDayState,
+.phoneDayFull .phoneDayState {
+  color: var(--v8-liff-idle);
 }
 
 /* 時刻の札。 */
@@ -1704,8 +1714,9 @@
   outline-offset: calc(var(--tpl-bm-1) * -1);
   border-radius: var(--radius-control);
   color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: var(--tpl-bm-15);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1713,6 +1724,7 @@
   outline-color: var(--v8-liff-primary);
   background: var(--v8-liff-primary);
   color: var(--color-canvas);
+  font-weight: 700;
 }
 
 .phoneSlotOff {
@@ -1724,8 +1736,8 @@
 .phoneSectionLabel {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
   line-height: var(--tpl-bm-20);
 }
 
@@ -1740,8 +1752,8 @@
 
 .phoneFootPick {
   color: var(--v8-liff-primary);
-  font-size: var(--tpl-bm-12);
-  font-weight: 600;
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }

@@ -80,13 +80,15 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(add); fireEvent.click(add) })
     expect(add.disabled).toBe(true)
     expect(add.title).toBe('選択肢は4つまでです。')
-    for (const number of [4, 3, 2]) await act(async () => { fireEvent.click(screen.getByRole('button', { name: `選択肢 ${number} を消す` })) })
-    const last = screen.getByRole('button', { name: '選択肢 1 を消す' }) as HTMLButtonElement
+    for (const number of [4, 3, 2]) await act(async () => { fireEvent.click(screen.getByRole('button', { name: `選択肢 ${number} を削除する` })) })
+    const last = screen.getByRole('button', { name: '選択肢 1 を削除する' }) as HTMLButtonElement
     expect(last.disabled).toBe(true)
     expect(last.title).toBe('選択肢は1つ以上必要です。')
     await act(async () => { fireEvent.click(last) })
     expect(screen.getAllByLabelText('ボタンの文字（20文字まで）')).toHaveLength(1)
     expect(name.value).toBe('継続を確認する')
+    // 押したときの動きは「押されたら」の欄から窓で開いて決める（l87p1J）。
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
     const message = screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement
     await act(async () => { fireEvent.change(message, { target: { value: '入力を保つ' } }) })
     const hideMessage = screen.getByRole('checkbox', { name: 'ユーザーメッセージを使用しない' })

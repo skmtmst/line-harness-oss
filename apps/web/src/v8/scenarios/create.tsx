@@ -445,7 +445,7 @@ export default function ScenarioCreateV8() {
       </div>
 
       <Card variant="form" gap="normal" aria-label="シナリオ情報" id="scenario-step-info">
-        <CardHeader title="シナリオ情報" />
+        <CardHeader size="stacked" title="シナリオ情報" />
         <SettingsFormRow layout="name-folder">
           <div ref={nameWrapRef}>
             <Field label="シナリオ名" required error={nameError} errorId="scenario-name-error">
@@ -493,7 +493,7 @@ export default function ScenarioCreateV8() {
       </Card>
 
       <Card variant="form" gap="normal" aria-label="配信方式">
-        <CardHeader title="配信方式" meta="作ったあとは変えられません" size="stacked" />
+        <CardHeader size="stacked" title={<>配信方式 <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip></>} />
         <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"

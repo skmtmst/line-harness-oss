@@ -36,7 +36,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.meta { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-note-lh); }
 
 /* ---- 左の本文と右の列 ---- */
 .split { display: flex; flex: 1; min-width: 0; }

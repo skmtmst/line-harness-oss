@@ -156,7 +156,7 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field>
+            <div className={styles.property}><Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field></div>
             <StatePill tone="ok">連携中</StatePill>
             {periodControl}
             <span className={styles.spacer} />
@@ -165,7 +165,8 @@ export default function SearchConsoleV8() {
           <Card variant="form" aria-labelledby="sc-trend-title">
             <CardHeader size="stacked" titleId="sc-trend-title" title="検索クリックの推移（日別クリック数）" />
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
-              <ValueBarChart label="日別クリック数の推移" unit="クリック" presentation="summary" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
+              {/* 絵どおり目盛りの無い小さい棒（summary）。日付の文字は部品の下の段に出し、最後の日に「反映待ち」を添える。 */}
+              <ValueBarChart label="日別クリック数の推移" unit="クリック" presentation="summary" items={data.daily.map((row, index) => ({ key: row.key, label: index === data.daily.length - 1 ? `${shortDay(row.key)}（反映待ち）` : shortDay(row.key), value: row.clicks }))} />
             </>}
           </Card>
           <DashboardColumns layout="cards">{[

@@ -236,7 +236,7 @@ describe('外部連携 V8', () => {
     // 新しい要素を渡して、Context の切替と同じように再描画する。
     const screen = () => <><WebhooksOutgoingV8 /><ToastHost /></>
     await render(screen())
-    await act(async () => { buttons().find((element) => element.getAttribute('aria-label') === '「顧客台帳」の設定')!.click() })
+    await act(async () => { buttons().find((element) => element.getAttribute('aria-label') === '「顧客台帳」の操作')!.click() })
     await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull())
     await act(async () => { buttons().find((element) => element.getAttribute('role') === 'menuitem' && element.textContent === '止める')!.click() })
     expect(started).toBe(true)
