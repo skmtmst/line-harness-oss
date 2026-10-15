@@ -1079,7 +1079,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   }
   const sectionTitle = tab === 'invited' ? '招待中' : tab === 'roles' ? '権限のかたまり' : 'いまいる人'
   const listCard = (
-    <section className={styles.card} aria-label={sectionTitle} id="staff-list">
+    <section className={styles.card} aria-label={sectionTitle} id="staff-list" data-list-folders={false}>
       <div className={styles.cardHead}>
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>{sectionTitle}</h2>
