@@ -974,9 +974,11 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
   }
 });
 
-// Existing-follower migration is an explicit, persisted, one-time job.
-// No cron polls LINE: connection/UI performs a one-item capability probe, then
-// operator-approved step requests advance the D1 cursor until completion.
+// Existing-follower migration is an explicit, persisted, one-time job. The
+// cursor lives in D1, so the scheduled lane carries it to completion whether or
+// not a browser is open; step requests resume the same cursor under the same
+// lock, and each run spends its whole time/subrequest budget instead of
+// advancing one fixed page.
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const id = c.req.param('id')!;
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
@@ -1042,12 +1044,18 @@ lineAccounts.post(
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
     const client = new LineClient(account.channel_access_token);
-    const result = await processFollowerImportStep(
+    const run = processFollowerImportStep(
       c.env.DB,
       client as unknown as FollowerImportClient,
       account.id,
     );
-    return c.json({ success: true, data: result });
+    /*
+     * 画面を閉じられても、この 1 回ぶんは走り切らせる。途中で切られると
+     * 進んだ分は D1 に残るがロックだけが先に取られた状態になり、続きを
+     * 拾えるまで待たされる。`waitUntil` は試験には無いので失敗は無視する。
+     */
+    try { c.executionCtx.waitUntil(run); } catch { /* 試験では executionCtx が無い */ }
+    return c.json({ success: true, data: await run });
   },
 );
 
