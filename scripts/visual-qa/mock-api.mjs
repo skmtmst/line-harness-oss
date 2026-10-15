@@ -351,7 +351,11 @@ function hqTemplateDefinitionHtn(row) {
       ...(i === 0 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/booking' }, intent: 'url' } : i < 3 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/news' }, intent: 'url' } : { actionType: 'message', actionData: { text: label }, intent: 'text' }),
       label,
     }))
-    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [{ id: 'visual-page-1', name: 'トップ', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas }] } }
+    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [
+      { id: 'visual-page-1', name: '予約', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas },
+      /* 切替タブの2枚目（絵 cmRZc の直すタブ「タブ2「会員」」）。 */
+      { id: 'visual-page-2', name: '会員', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas: areas.map((area) => ({ ...area, id: `${area.id}-p2` })) },
+    ] } }
   }
   if (row.template_type === 'form') {
     return {
