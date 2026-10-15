@@ -54,6 +54,8 @@ tags: [memory, core]
 
 ## 進行中（2026-10-15）
 
+- oneF2x HEAVY 8割役：70%以下名簿との交差35板（直す33・作り直す1・絵修正1）。F4gELjの確認/不足2区画、OxEMMのnone選択と次へ/公開の役目印を6c95166735へ保存。関連126/型/lintエラー0/新規所有指摘0、3幅/1440自己左右はheavy待ち。到達・正式候補0。詳細docs/qa/one-f2x-heavy-80-1015.md、外部F2x/heavy-80-1015。MID/Claude20板/共通部品/Pen/台帳/親EC/DB/配備/push/PRは未変更。
+
 - oneF2x J6/J7・PUNCH再開：本線d12包含、列車38最新68f580f6f9を9b707dcfacへ両側の記録保持でmerge。前回の入力/説明を1cbf86cad1、Kから継承した比較画面をd4f455a99dへ保存。関連22ファイル284件・型・lintエラー0・所有新規/一時許可0。現行browser-hostを通さなかった実寸の初回は測定前失敗として原本保持し、手順だけ修正。優先4板12条件/本番build/単板1440自己撮影はheavy待ち。完成/候補/RECIPES追加0。Pen/台帳/親EC/push/PR/DB/配備は変更なし。詳細docs/qa/one-f2x-j7-1015.md。
 
 - oneF2x再開：列車38 352c8を22f10222ce、F提供6ac85をf182992ddfへ取り込み。関連53/型/lintエラー0/所有新規0成功だが、全Webは5ファイル11件失敗・2236ファイル13334件成功で停止。F21の曜日switch追随7件、共通CSSの前置き2件、消えたcheckListの例外1件、Button利用先一覧1件をFへ。新しい版のbuild/3幅/自己撮影/鍵は未実施、完成/候補/RECIPES追加0。基準22fの17板51条件と2写真を新しい版の証拠へ流用しない。docs/qa/one-f2x-owner-f-1015.md・外部F2x/owner-f-1015/RESULT.json。コミットまで、Pen/台帳/親EC/DB/配備/push/PRなし。
