@@ -548,7 +548,7 @@ const EmergencyControlV8 = (
           valueTone={isStopped ? 'danger' : 'default'}
           detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
         <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
-        <KpiCard title="いちばん長かった停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
+        <KpiCard title="最長の停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
           detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
         <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
           detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
