@@ -6,6 +6,8 @@
 
 すべて既存の管理者ログイン・CSRF・所属検査の対象。画面側は `apps/web/src/lib/api-security-monitor.ts` の `securityMonitorApi` を使う（共通 `fetchApi` 経由）。共有の型は `packages/shared/src/security-monitor.ts`。
 
+6経路は`GET /openapi.json`にも掲載。入力・返却値・エラーの記載は`apps/worker/src/routes/security-monitor-openapi.ts`。既存の仕様と同じ確認表で、記載の欠落を検査する。
+
 | メソッド・パス | 入力 | 返るもの | 権限・試験 |
 | --- | --- | --- | --- |
 | GET `/api/operations/security-alerts` | `account_id`必須、`offset`は0以上の整数 | 未解決の項目、集計状態、基準値、総数と表示位置 | owner/admin＋その店の所属。閲覧のみも可。他店・同統括の担当外・指定なしは403 |
