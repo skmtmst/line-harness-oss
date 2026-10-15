@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import TopBar from '@/components/shared/top-bar'
+import { PageChromeProvider, usePageChrome } from '@/components/shell/page-chrome'
 import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
 import SidebarVersion from '@/components/layout/sidebar-version'
 import { SidebarBrand } from '@/components/layout/sidebar-identity'
@@ -60,14 +61,7 @@ export function opsTitleForPath(pathname: string): string {
   return hit?.label ?? ''
 }
 
-export default function OpsShellV8({
-  me,
-  meError,
-  onRetryMe,
-  pathname,
-  banner,
-  children,
-}: {
+type OpsShellProps = {
   me: OpsMe | null
   meError: string
   onRetryMe: () => void
@@ -75,7 +69,22 @@ export default function OpsShellV8({
   /** 代理ログイン中の帯など、板の上に出すもの。 */
   banner?: ReactNode
   children: ReactNode
-}) {
+}
+
+/** 中の画面が usePageTitle で渡した名前（記事の題名など）を上の帯のパンくずの最後に出す。 */
+export default function OpsShellV8(props: OpsShellProps) {
+  return <PageChromeProvider><OpsShellFrame {...props} /></PageChromeProvider>
+}
+
+function OpsShellFrame({
+  me,
+  meError,
+  onRetryMe,
+  pathname,
+  banner,
+  children,
+}: OpsShellProps) {
+  const pageChrome = usePageChrome()
   const [collapsed, setCollapsed] = useState(false)
   const [drawer, setDrawer] = useState(false)
   const drawerRef = useOverlayFocus<HTMLElement>(drawer, () => setDrawer(false))
@@ -181,7 +190,7 @@ export default function OpsShellV8({
         <div className={`${shellStyles.side} ${styles.side}`}>
           <div className="hidden xl:block v8-topbar-wrap">
             <TopBar
-              title={title ? `運営 › ${title}` : '運営'}
+              title={title ? `運営 › ${title}${pageChrome.title ? ` › ${pageChrome.title}` : ''}` : '運営'}
               manualHref={null}
               accounts={[{ id: 'ops', label: '運営コンソール', mark: 'm' }]}
               selectedAccountId="ops"

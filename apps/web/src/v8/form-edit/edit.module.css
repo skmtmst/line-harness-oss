@@ -243,6 +243,8 @@
 .phoneQTitle { display: flex; align-items: center; gap: var(--tpl-fe-phone-progress-gap); font-size: var(--tpl-fe-phone-q-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); }
 .phoneRequired { font-size: var(--tpl-fe-badge-size); font-weight: 700; color: var(--color-danger); }
 .phoneSpacer { flex: 1; }
+/* 次へを下に固定するとき（リサーチ）。下の印の分だけ下を空ける。 */
+.phoneFoot { flex: none; padding: var(--tpl-fe-phone-form-pad) var(--tpl-fe-phone-form-pad) calc(var(--tpl-fe-phone-form-pad) + var(--polish-space-field)); }
 .phoneNext { flex: none; height: var(--tpl-fe-phone-next-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-r); background: var(--fe-phone-main, var(--color-accent)); color: var(--color-canvas); font-size: var(--tpl-fe-body-size); font-weight: 700; }
 .phoneMenu { flex: none; height: var(--tpl-fe-phone-menu-h); display: flex; align-items: center; justify-content: center; gap: var(--tpl-fe-phone-progress-gap); font-size: var(--tpl-fe-small-size); font-weight: 600; color: var(--tpl-fe-phone-menu-color); box-shadow: var(--tpl-fe-line-top); }
 .phoneHome { flex: none; height: var(--tpl-fe-phone-home-h); display: flex; justify-content: center; }

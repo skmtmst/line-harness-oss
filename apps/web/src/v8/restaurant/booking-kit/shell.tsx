@@ -112,7 +112,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, children }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -144,6 +144,8 @@ export default function RestaurantShell({ boardId, title, description, explanati
   /** 既存の頭の内側余白。頭を持つ器の中では none を渡す。 */
   headingInset?: 'none'
   headSize?: 'compact'
+  /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 UVnvR）。 */
+  hideSubtitle?: boolean
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
   usePageTitle(title)
@@ -221,7 +223,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
   ) : (
     children(ctx)
   )
-  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect size="full" aria-label="店舗" noun="店舗" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
+  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
   const noticeBand = loadError !== null && snapshot?.organization ? <ListState kind="error" title={savedButUnread ? "保存しましたが、最新の表示を読み込めませんでした" : "最新の表示を読み込めませんでした"} error={loadError} onRetry={()=>void load()}/> : notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
@@ -240,8 +242,11 @@ export default function RestaurantShell({ boardId, title, description, explanati
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
-        subtitle={typeof description === 'function' ? description(ctx) : ctx?.store?.name}
-        help={<>{typeof description === 'function' ? '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}{explanation ? <p>{explanation}</p> : null}</>}
+        /* 題の下の店名は出さない（店舗は右の欄で分かる・qf3ky）。店舗で変わる説明の行（関数）だけ出す。 */
+        subtitle={hideSubtitle || typeof description !== 'function' ? undefined : description(ctx)}
+        help={typeof description === 'function' ? hideSubtitle ? description(ctx) : '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}
+        /* いつも出る説明は「この画面の説明」の帯へ（B-245）。「？」に混ぜない。 */
+        explanation={explanation}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>

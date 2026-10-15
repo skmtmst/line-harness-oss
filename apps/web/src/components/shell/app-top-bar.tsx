@@ -203,7 +203,8 @@ export default function AppTopBar() {
    */
   const onlyHome = pageCrumbs === null || pageCrumbs.every((crumb) => crumb.label === 'ホーム')
   const parentCrumb = onlyHome ? parentCrumbForPath(pathname) : null
-  const crumbs = finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHq)
+  // LINEアカウントの登録（/accounts/new）も統括の外側なので「設定」の段を足さない（絵 xj3zz）。
+  const crumbs = finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHqShellPath(pathname))
   const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
   const hqShell = isHqShellPath(pathname)
   const [hqName, setHqName] = useState<string | null>(null)

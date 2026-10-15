@@ -1,3 +1,4 @@
-.connection { display: flex; align-items: center; gap: var(--tpl-bcpick-chip-gap); max-width: var(--tpl-picker-preview-width); min-width: 0; }
-.reason { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); }
-@media (max-width: 700px) { .reason { display: none; } }
+/* 2段目の状態（WjFWW）。ふだんは補足の灰色、要確認は琥珀、送れないは赤。 */
+.connection { flex: none; white-space: nowrap; }
+.connection[data-tone='warning'] { color: var(--color-warning); }
+.connection[data-tone='danger'] { color: var(--color-danger); }

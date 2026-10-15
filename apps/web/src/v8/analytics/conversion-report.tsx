@@ -1,5 +1,6 @@
 'use client'
 
+import HelpTip from '@/components/shared/help-tip'
 import { ValueBarChart } from '@/components/shared/charts'
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
@@ -110,7 +111,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
               <span role="columnheader" className={styles.rcol} data-w="62">前の期間</span>
               <span role="columnheader" className={styles.rcol} data-w="48">増減</span>
               <span role="columnheader" className={styles.rcol} data-w="200">いちばん多い経路</span>
-              <span role="columnheader" className={styles.rcol} data-w="36"><span className={styles.srOnly}>操作</span></span>
+              <span role="columnheader" className={styles.rcol} data-w="36"><span className={styles.srOnly}>操作</span><HelpTip label="成果地点の表の説明">行の「…」から 成果地点を開く・日ごとの表を見る。コンバージョンの画面からは「レポートで見る」でここへ来ます。</HelpTip></span>
             </div>
             {report.byDefinition.length === 0
               ? <div className={styles.emptyRow} role="row"><span role="cell">成果地点がありません</span></div>
@@ -123,7 +124,6 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
                 <span role="cell" className={styles.rcol} data-w="36"><RowMenu point={item} onShowDaily={() => setPointId(item.conversionPointId)} /></span>
               </div>)}
           </div>
-          <p className={styles.reportNote}>行の「…」から 成果地点を開く・日ごとの表を見る。コンバージョンの画面からは「レポートで見る」でここへ来ます。</p>
         </> : null}
     </div>}
   </RoutesFrame>

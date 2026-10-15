@@ -117,6 +117,10 @@ describe('V8 オートメーションの見本（c7dxp）', () => {
     await render()
     expect(host.querySelector('[data-design-node="c7dxp"]')).not.toBeNull()
     expect(chipLabels()).toEqual([
+      'すべて 8', '友だちになった', 'メッセージを受け取った', 'タグが付いた', 'フォームに答えた', '+2',
+    ])
+    await act(async () => { named('+2')[0]!.click() })
+    expect(chipLabels()).toEqual([
       'すべて 8', '友だちになった', 'メッセージを受け取った', 'タグが付いた', 'フォームに答えた', '予約が確定した', '注文が確定した',
     ])
     expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(8)

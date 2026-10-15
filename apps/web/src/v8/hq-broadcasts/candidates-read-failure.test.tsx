@@ -91,7 +91,7 @@ async function selectAccounts(...names: string[]) {
   fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
   const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
   for (const name of names) fireEvent.click(within(dialog).getByRole('checkbox', { name, exact: true }))
-  fireEvent.click(within(dialog).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+  fireEvent.click(within(dialog).getByRole('button', { name: `選ぶ（${names.length}件）` }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 

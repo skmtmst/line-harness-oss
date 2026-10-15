@@ -157,7 +157,7 @@ export default function ListToolbar({
         <div className={styles.row2} data-toolbar-row>
           {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters, preserveFilterChips)}{secondary}</div> : null}
           {actions ? <span className={styles.actions} data-toolbar-actions>{actions}</span> : null}
-          {trailing || sort || trailingAccessory ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
+          {trailing || sort || trailingAccessory ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>, trailingAccessory)}</div> : null}
         </div>
       ) : null}
     </div>
@@ -205,14 +205,19 @@ export function ListToolbarSearchSlot({ children, width, search }: { children?: 
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
   const { trailingAccessory } = useContext(LeadingContext)
-  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{children}</>)}</span>
+  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(children, trailingAccessory)}</span>
 }
 
 /** B-244: the shared end owns order; keep each control and its handler intact. */
-function orderedTrailingTools(nodes: ReactNode): ReactNode[] {
+function orderedTrailingTools(nodes: ReactNode, accessory?: ReactNode): ReactNode[] {
   const flatten = (items: ReactNode): ReactNode[] => Children.toArray(items).flatMap(node => isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment ? flatten(node.props.children) : [node])
   const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2 })[toolbarRole(node)]
-  return flatten(nodes).sort((a, b) => rank(a) - rank(b))
+  const tools = flatten(nodes).sort((a, b) => rank(a) - rank(b))
+  if (!accessory) return tools
+  // 一覧の操作の説明（？）は、絞り込み・並びのあと、件数の直前（OylSV・uNsEy）。
+  const at = tools.findIndex(node => rank(node) === 2)
+  const keyed = isValidElement(accessory) && accessory.key == null ? cloneElement(accessory, { key: 'list-help' }) : accessory
+  return at < 0 ? [...tools, keyed] : [...tools.slice(0, at), keyed, ...tools.slice(at)]
 }
 
 /** B-244/266: retain named tools; an overflow group keeps its explicit name. */

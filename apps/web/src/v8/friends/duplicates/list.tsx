@@ -82,7 +82,7 @@ export default function DuplicatesListV8() {
     {
       key: 'deliveries', title: '重なって届いた配信',
       valueText: '—',
-      unit: '',
+      unit: '件',
       detail: '配信実績の接続を待っています',
       help: d.data
         ? `配信の実績を接続したあと、同じ人に2通届いた分をここに出します。いまの見積りは1配信あたり ¥${formatNumber(d.data.wastedPerBroadcastYen)}（¥${formatNumber(d.data.msgUnitYen)}/通）です。`

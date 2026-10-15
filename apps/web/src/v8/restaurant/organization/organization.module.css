@@ -189,8 +189,10 @@
   font-weight: 600;
 }
 
-.fieldRequired {
-  color: var(--color-danger);
+/* 窓の中で2列をまたぐ欄（vCEKM の LINE公式アカウント）。 */
+.fieldWide {
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .formActions {

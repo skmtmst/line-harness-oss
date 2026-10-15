@@ -126,7 +126,9 @@ describe('参加者管理のV8（uNsEy）', () => {
       expect(host.textContent).toContain(label)
     }
     expect(host.textContent).toContain('Kenta Kawano')
-    const detail = host.querySelector('a[href="/chats?friend=friend-1"]')
+    // 行の右端は「…」（決まり：ボタンを並べない）。開くと「チャットを見る」でトークへ行ける。
+    await act(async () => { (host.querySelector('button[aria-label="Kenta Kawanoの操作"]') as HTMLButtonElement).click() })
+    const detail = document.querySelector('a[href="/chats?friend=friend-1"]')
     expect(detail).not.toBeNull()
     expect(detail!.textContent).toContain('チャットを見る')
   })

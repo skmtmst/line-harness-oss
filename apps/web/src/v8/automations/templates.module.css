@@ -11,7 +11,7 @@
   padding-block: var(--polish-space-card) var(--polish-space-section);
 }
 
-/* きっかけの札の段（1行・右端に再読み込み）。 */
+/* きっかけの札の段（1行・札の続きに再読み込み。絵 c7dxp）。 */
 .tools {
   display: flex;
   align-items: center;
@@ -31,9 +31,6 @@
   align-items: center;
   gap: var(--tpl-wb-tm-tools-gap);
   min-width: 0;
-}
-.spacer {
-  flex: 1;
 }
 
 .cardTitle {
