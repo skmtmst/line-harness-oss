@@ -109,7 +109,8 @@ import {
 } from '@/app/rich-menus/edit/publish-plan-draft'
 import styles from './create-v8.module.css'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
-import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { HQ_RICH_MENU_INTENTS, hqRichMenuDefinitionFromSeed, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { previewHqRichMenu, type HqRichMenuPreview, type HqRichMenuDraft } from '@/lib/api-hq-authoring'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
@@ -473,6 +474,9 @@ function MenuPreview({
   )
 }
 
+/** 配る前の確認の参照の種類の呼び名（口は kind を英字で返す）。 */
+const HQ_REFERENCE_LABEL: Record<string, string> = { booking: '予約ページ', form: '回答フォーム', template: 'テンプレート', tag: 'タグ', scenario: 'シナリオ', stamp_card: 'スタンプカード', liff: 'LIFF' }
+
 /* ---------- 統括のひな形（host）の画面の中の下書き ---------- */
 
 /** 統括のひな形の中身を、作る画面の下書き（Group）にする。サーバーには作らない。 */
@@ -692,6 +696,28 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       }),
     [name, chatBarText, audience, targetingPriority, targetingCondition, folderId, defaultOpen, hqTagName, pages],
   )
+
+  /*
+   * 統括だけ：配る前の確認の口（組1・POST /api/hq/templates/rich-menu-preview）。保存・配布はしない。
+   * ②の右「各アカウントで使うもの」と③の右「同じ名前のメニューがある」の数を、選んだアカウントについて読む。
+   * 中身が保存できる形でないとき（画像が無いなど）は、定義なしで名前の重なりだけ読む。
+   */
+  const [hqPreview, setHqPreview] = useState<HqRichMenuPreview | null>(null)
+  const hqPreviewIds = host?.selectedIds ?? []
+  const hqPreviewKey = host && (step === 'buttons' || step === 'audience' || step === 'publish') ? `${hqPreviewIds.join(',')}|${name.trim()}|${draftSignature()}` : ''
+  useEffect(() => {
+    if (!hqPreviewKey || hqPreviewIds.length === 0 || !name.trim()) { setHqPreview(null); return }
+    let live = true
+    const timer = setTimeout(() => {
+      let definition: HqRichMenuDraft | undefined
+      try { definition = hqRichMenuDefinitionFromSeed(seedNow()) as unknown as HqRichMenuDraft } catch { definition = undefined }
+      void previewHqRichMenu({ name: name.trim(), accountIds: hqPreviewIds, ...(definition ? { definition } : {}) })
+        .then((result) => { if (live) setHqPreview(result) })
+        .catch(() => { if (live) setHqPreview(null) })
+    }, 400)
+    return () => { live = false; clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hqPreviewKey])
 
   const signatureNow = useCallback(
     () => (group ? draftSignature() : createInputSignature()),
@@ -3129,7 +3155,26 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           />
         ) : null}
 
-        {step === 'buttons' && (!host || selectedArea) ? (
+        {step === 'buttons' && host ? (
+          <CreateSummaryCard
+            title="各アカウントで使うもの"
+            rows={host.selectedCount === 0
+              ? [{ key: 'accounts', label: '配るアカウント', value: 'まだ選んでいません' }]
+              : (hqPreview && hqPreview.references.length === 0 ? [{ key: 'none', label: '配った先で探すもの', value: emptyValue('none') }] : hqPreview?.references ?? []).map((ref) => 'sourceId' in ref ? ({
+                key: `${ref.kind}:${ref.sourceId}`,
+                label: `${HQ_REFERENCE_LABEL[ref.kind] ?? '参照'}「${ref.name ?? '名前なし'}」`,
+                value: <span className={ref.availableAccountCount < ref.totalAccountCount ? styles.summaryValueWarn : undefined}>{`${ref.availableAccountCount} / ${ref.totalAccountCount}`}</span>,
+              }) : ref)}
+          >
+            <p className={styles.cardNote}>
+              {host.selectedCount === 0
+                ? '予約ページ・回答フォーム・タグ・差し込みは、配った先の各アカウントの同じ名前のものを使います。配る先は③で選びます。'
+                : `今選んでいる ${formatNumber(host.selectedCount)} アカウントのうち、同じ名前があるアカウントの数。無いアカウントは④で知らせます。`}
+            </p>
+          </CreateSummaryCard>
+        ) : null}
+
+        {step === 'buttons' && !host ? (
           <CreateSummaryCard
             title="押された回数（今月）"
             rows={
@@ -3165,6 +3210,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     ? emptyValue('none')
                     : host.friendTotal == null ? emptyValue('unknown') : `${formatNumber(host.friendTotal)} 人`,
               },
+              ...(step === 'audience' && host.selectedCount > 0 && hqPreview ? [{
+                key: 'same-name',
+                label: '同じ名前のメニューがある',
+                value: <span className={hqPreview.summary.sameNameAccountCount > 0 ? styles.summaryValueWarn : undefined}>{formatNumber(hqPreview.summary.sameNameAccountCount)}</span>,
+              }] : []),
             ]}
           />
         ) : null}

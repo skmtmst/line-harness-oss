@@ -249,9 +249,9 @@ export function AreaProperties({
   const tapKinds: TapActionKind[] = [
     ...(allowed('url') ? ['uri' as const] : []),
     ...(allowed('text') ? ['message' as const] : []),
-    ...(allowed('url') && !isHq ? ['booking' as const] : []),
+    ...(allowed('url') ? ['booking' as const] : []),
     ...(allowed('form') ? ['form' as const] : []),
-    ...(allowed('url') && !isHq ? ['booking_history' as const, 'visit_stamp' as const] : []),
+    ...(allowed('url') ? ['booking_history' as const, 'visit_stamp' as const] : []),
   ]
   /* リッチメニューだけの種類（テンプレートを送る・タブ切り替え・電話・postback・日時・コピー）は今のまま残す。 */
   const extraKinds: TapActionExtraKind[] = intentOptions

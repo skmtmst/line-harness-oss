@@ -982,6 +982,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         </Card>
       ),
       selectedCount: menuTargets.length,
+      selectedIds: menuTargets,
       friendTotal: menuFriendTotal,
       busy,
       notice: notices,

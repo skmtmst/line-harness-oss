@@ -2,6 +2,7 @@
  * 統括のリッチメニューを店の作る画面で作る口（B-36・gobhu〜gQabc）：画面の中の下書き ↔ 統括のひな形の定義。
  */
 import { describe, expect, it } from 'vitest'
+import { tapActionLiffUrl } from './tap-actions'
 import { hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition, type HqRichMenuSeed } from './hq-rich-menu-create'
 
 const area = (id: string, intent: string, actionData: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
@@ -42,6 +43,18 @@ describe('統括のリッチメニューの下書き → ひな形の定義', ()
     expect(def.richMenu).toMatchObject({ displayAudience: 'tag', displayTagName: '会員', defaultOpen: false })
     const back = hqRichMenuSeedFromDefinition(def, null)
     expect(back).toMatchObject({ displayAudience: 'tag', displayTagName: '会員', defaultOpen: false })
+  })
+
+  it('予約・予約履歴・来店スタンプは種類だけを保存し、戻すと LIFF の仮の URL に戻る', () => {
+    const liff = (kind: 'booking' | 'booking_history' | 'visit_stamp', ref = '') => area('l-' + kind, 'url', { uri: tapActionLiffUrl('{{liff_id}}', kind, ref) })
+    const def = hqRichMenuDefinitionFromSeed(seed([liff('booking', 'menu-1'), liff('booking_history'), liff('visit_stamp')]))
+    const areas = def.richMenu.pages[0].areas as unknown as Array<{ intent: string; actionData: Record<string, string>; actionType: string }>
+    expect(areas.map((a) => a.intent)).toEqual(['booking', 'booking_history', 'visit_stamp'])
+    expect(areas[0]).toMatchObject({ actionType: 'uri', actionData: { menuId: 'menu-1' } })
+    expect(areas[1].actionData).toEqual({})
+    const back = hqRichMenuSeedFromDefinition(def, null)
+    expect(back.pages[0].areas.map((a) => a.intent)).toEqual(['url', 'url', 'url'])
+    expect(hqRichMenuDefinitionFromSeed(back)).toEqual(def)
   })
 
   it('タグ名が空のまま「タグが付いた人」では保存できない', () => {

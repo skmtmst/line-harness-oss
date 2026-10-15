@@ -2,6 +2,7 @@ import type { Area } from '@/components/rich-menus/canvas-editor'
 import type { RichMenuCreateValue } from '@/components/rich-menus/rich-menu-create-form'
 import type { RichMenuDefinition } from './hq-templates-api'
 import { TEMPLATES } from './rich-menu-templates'
+import { tapActionFromUri, tapActionLiffUrl } from './tap-actions'
 
 export class HqRichMenuCompatibilityError extends Error {
   /** 画面にそのまま出せる日本語の理由。 */
@@ -202,22 +203,27 @@ export function hqRichMenuSeedFromDefinition(definition: RichMenuDefinition, fol
       id: page.id,
       name: page.name,
       imageR2Key: page.imageR2Key || null,
-      areas: page.areas.map((area) => ({
+      areas: page.areas.map((area) => {
+        // 予約・予約履歴・来店スタンプは、店の画面と同じ LIFF の URL（配った先の LIFF ID に付け替える仮の印）で持つ。
+        const wide = area as { intent?: string; actionData: Record<string, string> }
+        const liffKind = wide.intent === 'booking' || wide.intent === 'booking_history' || wide.intent === 'visit_stamp' ? wide.intent : null
+        const liffRef = liffKind === 'booking' ? wide.actionData.menuId ?? '' : liffKind === 'visit_stamp' ? wide.actionData.cardId ?? '' : ''
+        return ({
         id: area.id,
         boundsX: area.bounds.x,
         boundsY: area.bounds.y,
         boundsWidth: area.bounds.width,
         boundsHeight: area.bounds.height,
-        actionType: area.actionType,
-        actionData: { ...area.actionData },
-        intent: area.intent ?? null,
+        actionType: liffKind ? 'uri' as const : area.actionType,
+        actionData: liffKind ? { uri: tapActionLiffUrl('{{liff_id}}', liffKind, liffRef) } : { ...area.actionData },
+        intent: liffKind ? 'url' as const : area.intent ?? null,
         label: area.label ?? null,
         tagIds: [...(area.tagIds ?? [])],
         scoreChange: null,
         templateId: area.templateId ?? null,
         formId: area.formId ?? null,
         trackedLinkId: null,
-      })),
+      })}),
     })),
   }
 }
@@ -247,6 +253,9 @@ export function hqRichMenuDefinitionFromSeed(seed: HqRichMenuSeed): RichMenuDefi
         const intent = area.intent
         if (!intent || !(HQ_RICH_MENU_INTENTS as readonly string[]).includes(intent)) fail(`「${name}」の動きを決めてください（統括では URL・メッセージ・回答フォーム・テンプレート・メニューの切り替えだけ選べます）。`)
         const hqIntent = intent as typeof HQ_RICH_MENU_INTENTS[number]
+        const uriData = String((area.actionData as Record<string, unknown> | undefined)?.uri ?? '')
+        const liff = hqIntent === 'url' ? tapActionFromUri(uriData) : null
+        const liffKind = liff && (liff.kind === 'booking' || liff.kind === 'booking_history' || liff.kind === 'visit_stamp') ? liff.kind : null
         if (area.tagIds?.length && hqIntent !== 'text' && hqIntent !== 'template') fail(`「${name}」でタグを付けられるのは「メッセージを送る」「テンプレートを送る」だけです。`)
         const data = area.actionData ?? {}
         const actionData: Record<string, string> = hqIntent === 'url' ? { uri: String(data.uri ?? '') }
@@ -255,6 +264,17 @@ export function hqRichMenuDefinitionFromSeed(seed: HqRichMenuSeed): RichMenuDefi
           : {}
         const id = HQ_ID.test(area.id) && !used.has(area.id) ? area.id : uniqueId('area', used)
         used.add(id)
+        if (liffKind) {
+          // 配った先の LIFF に付け替えるので、URL は持たず「種類」と（あれば）参照の ID だけを持つ。
+          return {
+            id,
+            bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
+            actionType: 'uri' as const,
+            actionData: liffKind === 'booking' && liff?.refId ? { menuId: liff.refId } : liffKind === 'visit_stamp' && liff?.refId ? { cardId: liff.refId } : {},
+            intent: liffKind as never,
+            ...(area.label?.trim() ? { label: area.label.trim() } : {}),
+          }
+        }
         return {
           id,
           bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
