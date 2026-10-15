@@ -18,11 +18,14 @@ vi.mock('../lib/api.js', () => ({
     rescheduleMyBooking: vi.fn(),
     availability: vi.fn(),
     bookingPaymentStatus: vi.fn(),
+    menus: vi.fn().mockResolvedValue({ menus: [] }),
     startBookingPayment: vi.fn(),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
     bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   },
 }));
+const openWindow = vi.hoisted(() => vi.fn());
+vi.mock('@line/liff', () => ({ default: { openWindow } }));
 vi.mock('../lib/user-message.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/user-message.js')>()), logFailure: vi.fn() }));
 
 const { api } = await import('../lib/api.js');
@@ -46,22 +49,19 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const render2 = () => render(<MemoryRouter initialEntries={['/booking/history?liffId=test']}><BookingHistory /></MemoryRouter>);
 
 it('未払いは共通の札と払う期限、［お支払いへ進む］で支払いのページへ', async () => {
-  const assign = vi.fn();
-  vi.stubGlobal('location', { ...window.location, assign });
   render2();
   expect(await screen.findByText('未払い ¥4,400')).toBeTruthy();
   expect(screen.getByText('支払い済み ¥8,800')).toBeTruthy();
   expect(screen.getByText(/までにお支払いください/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'お支払いへ進む' }));
   await vi.waitFor(() => expect(api.startBookingPayment).toHaveBeenCalledWith('unpaid'));
-  await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_test_1'));
-  vi.unstubAllGlobals();
+  await vi.waitFor(() => expect(openWindow).toHaveBeenCalledWith({ url: 'https://checkout.stripe.com/c/pay/cs_test_1', external: true }));
 });
 
 it('払い済みの予約をキャンセルするときは、全額返金を先に知らせる', async () => {
   render2();
   await screen.findByText('支払い済み ¥8,800');
-  const cancels = screen.getAllByRole('button', { name: 'キャンセルする' });
+  const cancels = screen.getAllByRole('button', { name: 'キャンセル' });
   fireEvent.click(cancels[cancels.length - 1]);
   expect(await screen.findByText('お支払い済みの ¥8,800 は全額返金します')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'キャンセルして返金を受ける' })).toBeTruthy();

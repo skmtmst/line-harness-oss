@@ -224,7 +224,7 @@ const TAG_EC_CUSTOMER_AUTOMATION = {
 
 
 /* 詳細の絵（UTbi1）の template-1。一覧の行（TEMPLATES）は変えず、詳細と版の口だけこの形を返す。 */
-const TEMPLATE_1_CONTENT = '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
+const TEMPLATE_1_CONTENT = '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
 const TEMPLATE_1_DETAIL = (template) => ({
   ...template,
   folderId: 'tf-booking',
@@ -261,8 +261,8 @@ const TEMPLATE_1_DETAIL = (template) => ({
   },
 })
 const TEMPLATE_1_VERSIONS = [
-  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
-  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
+  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
+  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
 ]
 
 
@@ -352,7 +352,11 @@ function hqTemplateDefinitionHtn(row) {
       ...(i === 0 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/booking' }, intent: 'url' } : i < 3 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/news' }, intent: 'url' } : { actionType: 'message', actionData: { text: label }, intent: 'text' }),
       label,
     }))
-    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [{ id: 'visual-page-1', name: 'トップ', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas }] } }
+    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [
+      { id: 'visual-page-1', name: '予約', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas },
+      /* 切替タブの2枚目（絵 cmRZc の直すタブ「タブ2「会員」」）。 */
+      { id: 'visual-page-2', name: '会員', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas: areas.map((area) => ({ ...area, id: `${area.id}-p2` })) },
+    ] } }
   }
   if (row.template_type === 'form') {
     return {
@@ -3053,6 +3057,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/connection') return GOOGLE_CONNECTION_DATA
+  // SNS 連携（y3GGTs）の Instagram：まだつないでいない（絵の「まだつないでいません」）。汎用の一覧を返すと読み込み中のまま止まる。
+  if (method === 'GET' && pathname === '/api/instagram/connection') return { success: true, data: { state: 'disconnected', replyEnabled: false } }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {
     return { success: true, reviews: GOOGLE_REVIEWS, page: 1, perPage: 20, total: GOOGLE_REVIEWS.length, connection: GOOGLE_CONNECTION }
   }
@@ -4178,7 +4184,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         name: '店舗のご案内',
         category: '未分類',
         messageType: 'text',
-        messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
+        messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
         folderId: null,
         question: null,
         questionStatus: 'draft',
@@ -4264,6 +4270,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  // 店のアレルギーの選択肢（本物は accountAllergyOptions。まだ保存していない店は決まりの8つ・版0）。
+  if (method === 'GET' && pathname === '/api/account-settings/allergy-options') {
+    return { success: true, data: { version: 0, options: ['卵', '乳', '小麦', 'そば', '落花生', 'えび', 'かに', 'くるみ'] } }
   }
   if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
     return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }

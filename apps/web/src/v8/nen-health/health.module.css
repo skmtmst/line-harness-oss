@@ -324,6 +324,11 @@
   font-size: var(--text-caption);
   line-height: normal;
 }
+.chartCaption[data-tone='warn'],
+:global(:root) .logCell[data-tone='warn'],
+:global(:root) .logCell[data-tone='warn'] * {
+  color: var(--color-status-warn-deep);
+}
 .chartBars {
   display: flex;
   align-items: flex-end;

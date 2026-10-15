@@ -280,7 +280,7 @@ async function setSelectValue(select: HTMLSelectElement, value: string) {
 }
 
 describe('N-037 staffの情報欄は読み取り専用（403と画面を一致）', () => {
-  it('管理者には入力欄と「キャンセル」「保存」と項目を作る口（情報欄を管理）が出る', async () => {
+  it('管理者には入力欄と［キャンセル］［保存する］、情報欄を管理への入口が出る', async () => {
     setRole('admin')
     await render('info')
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
@@ -288,9 +288,8 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.disabled).toBe(false)
     expect(buttonsByText('保存する')).toHaveLength(1)
     expect(buttonsByText('キャンセル')).toHaveLength(1)
-    // お店の項目があるときは見出しの「情報欄を管理」から作る（下の帯には置かない）。
-    expect(linksByText('項目を作る').length + linksByText('情報欄を管理').length).toBeGreaterThan(0)
-    // 保存できる人には「保存できるのは…」の注意を出さない（絵 vX3wQ の下の帯はボタンだけ）。
+    // 項目を作るのは「情報欄を管理」から（下の帯は［キャンセル］［保存する］だけ・絵 vX3wQ）。
+    expect(linksByText('情報欄を管理').length).toBeGreaterThan(0)
     expect(document.body.textContent).not.toContain('保存できるのはオーナー・管理者')
   })
 

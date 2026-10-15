@@ -1,6 +1,6 @@
 'use client'
-import { useListUrlValue } from '@/components/shared/list-url-state'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -29,6 +29,7 @@ import {
   EMPTY_GENERATION_INPUT,
   activeGeneration,
   exportSizeText,
+  presetSizeLabel,
   inputFromGeneration,
   packedTextLines,
   readFileAsBase64,
@@ -252,6 +253,9 @@ function ProjectInner() {
   }, [status, generations, running, runLoop])
 
   const validation = validateGenerationInput(input, maxCount)
+  // 左に［配る］の帯が出ている間は、札を寸法だけの短い形にして左の帯へ重ねない（絵 tSgl6「1040 × 1040」）。
+  const sizePreset = presets.find((preset) => preset.key === input.presetKey)
+  const sizeChipText = selectedImages.length > 0 && sizePreset ? presetSizeLabel(sizePreset) : exportSizeText(presets, input.presetKey)
   const refusal = usageRefusal(usage, input.count)
   const blockedReason = !engineReady
     ? '画像生成の接続設定がまだありません。運営にお問い合わせください'
@@ -683,15 +687,16 @@ function ProjectInner() {
                   <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
                   <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
                 </> : undefined}
-                status={selectedImages.length > 0 ? undefined : usage && input.count > usage.month.remaining
+                status={selectedImages.length > 0 ? undefined : running ? `${running.requestedCount}枚中${doneSoFar}枚できました・今月の残り${usage?.month.remaining ?? emptyValue('unknown')}枚` : usage && input.count > usage.month.remaining
                   ? <span className={styles.limitText} title={`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}>今月の上限に達しています<span className={styles.nowrap}>{`（必要 ${input.count}枚）`}</span></span>
                   : usageStatusText(usage, input.count)}
-                info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
+                info={sizeChipText ? <ExportSizeChip text={sizeChipText} /> : <span className={styles.generationInfo}>寸法 —</span>}
                 actions={
                   running ? (
                     <>
                       <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
-                      <Button variant="primary" disabled>
+                      {/* key：生成する→生成中で同じボタンを使い回すと、前の言葉の幅のまま固まり文字が切れた（p03ImY）。 */}
+                      <Button key="running" variant="primary" disabled>
                         <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
                         生成中… 画面を離れても続きます
                       </Button>

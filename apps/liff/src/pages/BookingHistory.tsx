@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import liff from '@line/liff';
+import { loadPaymentViews, type PaymentView } from '../lib/booking-payment-view.js';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api, type BookingHistoryItem, type BookingPayment } from '../lib/api.js';
+import { api, type BookingHistoryItem } from '../lib/api.js';
 import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import { logFailure } from '../lib/user-message.js';
@@ -56,7 +58,8 @@ function errorCode(err: unknown): string | undefined {
 }
 
 /**
- * 予約の履歴 (★V8・YvTJ3)。「これから／これまで」の切り替え。
+ * 予約の履歴 (★V8・nWby5。前の板 YvTJ3)。「これから／これまで」の切り替え。
+ * カードに支払いの状態（未払い・支払い済み・返金済み・期限切れ・お店で払う）と領収書。
  * これからの予約のカードに「日時を変える／キャンセル」(F-6 本人の変更・取消)。
  * 送るには予約の版 (lock_version) が要るので、履歴の口が返した予約にだけ出す
  * (日時を変えるはメニューと担当も要る)。返さない予約には出さず、下の文で「トークでご連絡ください」と案内する。
@@ -82,23 +85,70 @@ export default function BookingHistory() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  /* これからの予約のお支払い（B-338・nWby5）。先払いの予約だけ返る。読めないときは札を出さない。 */
-  const [payments, setPayments] = useState<Record<string, BookingPayment | null>>({});
+  /* 予約ごとの支払いの札（nWby5）。読めない予約は札なし＝予約の状態の札を出す。 */
+  const [payments, setPayments] = useState<Record<string, PaymentView | null>>({});
+  const [paymentKey, setPaymentKey] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setFailed(false);
     api
       .me()
-      .then((next) => {
-        setData(next);
-        void Promise.all(next.upcoming.map((b) => Promise.resolve().then(() => api.bookingPaymentStatus(b.id)).then((res) => [b.id, res?.payment ?? null] as const).catch(() => [b.id, null] as const)))
-          .then((pairs) => setPayments(Object.fromEntries(pairs)));
-      })
+      .then(setData)
       .catch((e) => {
         logFailure('booking-history', e);
         setFailed(true);
       });
   }, [reloadKey]);
+
+  // 開いているタブの予約だけ支払いを読む。Stripe から戻ったとき（画面が見えたとき）も読み直す。
+  useEffect(() => {
+    if (!data) return;
+    let alive = true;
+    void loadPaymentViews(tab === 'upcoming' ? data.upcoming : data.past).then((views) => {
+      if (alive) setPayments((prev) => ({ ...prev, ...views }));
+    });
+    return () => { alive = false; };
+  }, [data, tab, paymentKey]);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') setPaymentKey((k) => k + 1); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  /** 未払いの先払いを Stripe の支払いページで払う（予約の 5 段目と同じ口。同じ申込は同じページが返る）。 */
+  async function runPay(booking: BookingHistoryItem) {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const res = await api.startBookingPayment(booking.id);
+      if (!res.checkoutUrl) {
+        setActionError('お支払いを始められませんでした。時間をおいて再度お試しください。');
+        return;
+      }
+      // 決済画面は外のブラウザで開く (店内の WebView では 3D セキュア等が動かないことがある)。
+      liff.openWindow({ url: res.checkoutUrl, external: true });
+      setNotice('お支払いのページを開きました。終わったらこの画面に戻ると、状態が変わります。');
+    } catch (err) {
+      logFailure('booking-history-pay', err);
+      setActionError('お支払いを始められませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openReceipt(view: PaymentView) {
+    setActionError(null);
+    if (!view.receiptUrl) {
+      // 領収書の URL を返す口は組1 に依頼中（B-314：入口は置き、押すと準備中の案内）。
+      setNotice('領収書は現在準備中です。必要なときはトークでお店にご連絡ください。');
+      return;
+    }
+    setNotice(null);
+    liff.openWindow({ url: view.receiptUrl, external: true });
+  }
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
@@ -108,7 +158,7 @@ export default function BookingHistory() {
   const canChange = (b: BookingHistoryItem) =>
     canCancel(b) && typeof b.menu_id === 'string' && typeof b.staff_id === 'string';
 
-  const paidCancel = pendingCancel && payments[pendingCancel.id]?.status === 'paid' ? payments[pendingCancel.id] : null;
+  const paidCancel = pendingCancel && payments[pendingCancel.id]?.kind === 'paid' ? payments[pendingCancel.id] : null;
 
   async function runCancel() {
     const target = pendingCancel;
@@ -131,24 +181,6 @@ export default function BookingHistory() {
       if (code === 'version_conflict' || code === 'not_editable' || code === 'booking_not_found') {
         setReloadKey((k) => k + 1);
       }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /* ［お支払いへ進む］：同じ予約は同じ支払いページを返す（今の口）。試験モードの間は本当の請求は起きない。 */
-  async function startPayment(booking: BookingHistoryItem) {
-    if (busy) return;
-    setBusy(true);
-    setActionError(null);
-    try {
-      const res = await api.startBookingPayment(booking.id);
-      if (res.checkoutUrl) window.location.assign(res.checkoutUrl);
-      else setActionError('お支払いのページを開けませんでした。時間をおいて、もう一度お試しください。');
-    } catch (err) {
-      logFailure('booking-history-pay', err);
-      setActionError('お支払いのページを開けませんでした。お支払いの期限が過ぎたときは、もう一度予約してください。');
-      setReloadKey((k) => k + 1);
     } finally {
       setBusy(false);
     }
@@ -216,7 +248,7 @@ export default function BookingHistory() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="予約の履歴" />
       <div
-        data-design-node="YvTJ3"
+        data-design-node="nWby5"
         className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-3 pb-40"
       >
         <h1 className="text-xl font-bold text-ink">予約の履歴</h1>
@@ -251,6 +283,9 @@ export default function BookingHistory() {
             {actionError && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
+            {notice && (
+              <p role="status" className="text-[13px] leading-5 text-ink-secondary">{notice}</p>
+            )}
             {list.length === 0 ? (
               tab === 'upcoming' ? (
                 <StatusView
@@ -263,24 +298,28 @@ export default function BookingHistory() {
               )
             ) : (
               <ul className="space-y-3.5">
-                {list.map((b) => (
+                {list.map((b) => {
+                  const pay = payments[b.id] ?? null;
+                  return (
                   <HistoryCard
                     key={b.id}
                     booking={b}
+                    payment={pay}
+                    onPay={pay?.kind === 'unpaid' && tab === 'upcoming' ? () => void runPay(b) : undefined}
+                    onReceipt={pay && (pay.kind === 'paid' || pay.kind === 'refunded') ? () => openReceipt(pay) : undefined}
                     disabled={busy}
                     onChange={canChange(b) ? () => void openChange(b) : undefined}
                     onCancel={canCancel(b) ? () => { setActionError(null); setPendingCancel(b); } : undefined}
-                    payment={tab === 'upcoming' ? payments[b.id] ?? null : null}
-                    onPay={tab === 'upcoming' ? () => void startPayment(b) : undefined}
                   />
-                ))}
+                  );
+                })}
               </ul>
             )}
             <p className="flex gap-1.5 text-[11.5px] leading-[17px] text-liff-sub">
               <Icon name="message-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 {anySelfChange
-                  ? 'キャンセルの期限を過ぎた予約の変更は、トークでご連絡ください。'
+                  ? '期限を過ぎた予約の変更は、トークでご連絡ください。'
                   : '予定の変更・キャンセルは、お店に LINE でご連絡ください。'}
               </span>
             </p>
@@ -300,12 +339,6 @@ export default function BookingHistory() {
       <ConfirmDialog
         open={pendingCancel !== null}
         surface={paidCancel ? 'sheet' : 'dialog'}
-        footer={paidCancel ? (
-          <div className="flex flex-col gap-2.5">
-            <Button variant="danger" disabled={busy} onClick={() => void runCancel()}>キャンセルして返金を受ける</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setPendingCancel(null)}>やめる</Button>
-          </div>
-        ) : undefined}
         title={
           paidCancel
             ? 'この予約をキャンセルしますか？'
@@ -317,10 +350,16 @@ export default function BookingHistory() {
           ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)}・${pendingCancel.menu_name}・${pendingCancel.staff_name}`
           : 'キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。'}
         error={actionError ?? undefined}
-        confirmLabel={paidCancel ? 'キャンセルして返金を受ける' : 'キャンセルする'}
-        cancelLabel={paidCancel ? 'やめる' : '閉じる'}
+        confirmLabel="キャンセルする"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
+        footer={paidCancel ? (
+          <div className="flex flex-col gap-2.5">
+            <Button variant="danger" disabled={busy} onClick={() => void runCancel()}>キャンセルして返金を受ける</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setPendingCancel(null)}>やめる</Button>
+          </div>
+        ) : undefined}
         onCancel={() => {
           if (!busy) setPendingCancel(null);
         }}

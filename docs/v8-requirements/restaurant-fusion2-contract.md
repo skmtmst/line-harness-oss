@@ -57,3 +57,7 @@
 | 629 | 共通のできごと・受取記録（計画の632を空きの最小番号へ採番） |
 
 飲食1の626・627を保持する。**飲食3の計画629は、この実装の629と別の内容。次の作成直前に再採番が必要。** オーナー承認台帳は `~/lh-work/design/v8/APPROVED-MIGRATIONS`。共有・適用後の改名をしない。push・PR・D1・配備は司令塔が別工程で行う。PR番号確定後、pendingの反映履歴をPR番号のファイル名へ変え、本文にも番号を足す。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [飲食 操作と挙動](behavior/restaurant-fusion.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](behavior/integration-failures.md)、毎日の流れは [daily-operations](behavior/daily-operations.md)。
