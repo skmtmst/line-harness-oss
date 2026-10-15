@@ -62,6 +62,10 @@
 }
 :root .tpBody { flex: none; }
 :root .tpBody .tpList > * { flex-shrink: 0; }
+/* 1つ選ぶ窓：送るのは候補の一覧だけ。検索欄・「N件中」・下の帯は窓の中で動かない。
+   プレビューなどで高さが足りないときは、一覧が小さくなりすぎないよう最低の高さを持ち、足りない分だけ全体を送る。 */
+:root .singleBody .tpList > .tpCards,
+:root .tpBody .tpList > .tpCards { flex: 1 1 auto; min-height: 8rem; overflow-y: auto; }
 .tpSide {
   display: grid;
   grid-template-rows: 1fr auto;
