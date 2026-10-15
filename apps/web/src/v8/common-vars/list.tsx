@@ -1,4 +1,5 @@
 'use client'
+import Disclosure from '@/components/shared/disclosure'
 
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';

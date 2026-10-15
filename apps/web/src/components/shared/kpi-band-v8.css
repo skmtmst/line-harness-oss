@@ -87,7 +87,7 @@ html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][da
   height: var(--tpl-band-compact-number-lh);
 }
 
-/* 補足は1行で省略し、全文はtitle。行き先は次の行へ保つ。 */
+/* 補足は文節で折り返す。single指定は1行で省略し、全文はtitle。行き先は次の行へ保つ。 */
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: column; align-items: flex-start; }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child {
   display: block; flex: none; width: 100%; white-space: normal;

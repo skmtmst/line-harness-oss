@@ -912,7 +912,6 @@ export default function MenuFormV8() {
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage elementRef={formRef} boardId={conflict ? 'v5L19Z' : 'QqER7'} dirty={false}
         noticeSpacing="band"
-        notice={conflict ? <div ref={conflictRef} data-design="Bar" data-design-node="v5L19Z"><SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} /></div> : undefined}
         status={conflict ? 'ほかの人の変更を確かめてから保存してください' : undefined}
         footerActions={(
             <>

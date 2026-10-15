@@ -276,7 +276,7 @@ export default function KpiCard({
 
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || action) || undefined} className={styles.detail}>
-        <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detail}</span>
+        <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}

@@ -1,4 +1,5 @@
 'use client'
+import Avatar from '@/components/shared/avatar'
 import PageSizeSelect from '@/components/shared/page-size-select'
 
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
