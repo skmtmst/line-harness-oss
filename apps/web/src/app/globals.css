@@ -1577,7 +1577,7 @@
   --tpl-hb2-op-control-h: 36px; --tpl-hb2-op-control-radius: var(--polish-radius-control); --tpl-hb2-op-input-pad: 0 12px; --tpl-hb2-op-box-pad: 16px; --tpl-hb2-op-row-h: var(--polish-table-row); --tpl-hb2-op-row-pad: 8px 0; --tpl-hb2-op-chip-gap: 8px; --tpl-hb2-op-band-pad: 10px 14px;
   --tpl-hb2-op-preview-pad: 10px 12px; --tpl-hb2-op-preview-bg: #8fa9c4; --tpl-hb2-op-bubble-gap: 3px; --tpl-hb2-op-bubble-pad: 8px 11px; --tpl-hb2-op-bubble-radius: var(--polish-radius-card); --tpl-hb2-op-link-gap: 12px;
   --tpl-hb2-rm-section-pad: var(--polish-space-section); --tpl-hb2-rm-section-gap: var(--polish-space-field); --tpl-hb2-rm-title: var(--polish-text-section);
-  --tpl-hb2-np-min-h: calc(100dvh - 72px); --tpl-hb2-np-pad: 40px 24px; --tpl-hb2-np-card-w: 520px; --tpl-hb2-np-card-pad: var(--polish-space-card); --tpl-hb2-np-card-radius: var(--polish-radius-card); --tpl-hb2-np-lock: 56px; --tpl-hb2-np-text-lh: 21px; --tpl-hb2-np-badge-pad: 2px 8px; --tpl-hb2-np-actions-pad: 8px;
+  --tpl-hb2-np-min-h: calc(100dvh - 72px); --tpl-hb2-np-optical-bottom: 20dvh; /* 札を目で見た真ん中（少し上）へ：O5tUeE */ --tpl-field-control-offset: calc(20px + 6px); /* 共通の欄の題の行20＋間6（欄の横に置くボタン・矢印をそろえる） */ --tpl-hb2-np-pad: 40px 24px; --tpl-hb2-np-card-w: 520px; --tpl-hb2-np-card-pad: var(--polish-space-card); --tpl-hb2-np-card-radius: var(--polish-radius-card); --tpl-hb2-np-lock: 56px; --tpl-hb2-np-text-lh: 21px; --tpl-hb2-np-badge-pad: 2px 8px; --tpl-hb2-np-actions-pad: 8px;
   --tpl-hb2-sd-chip-pad: 6px 12px; --tpl-hb2-sd-text-h: 96px;
   /* リリース前の仕上げ：見つからない画面（Nx5dz）。 */
   --tpl-release-404-min-h: calc(100dvh - 72px); --tpl-release-404-bleed: -20px -24px -28px; --tpl-release-404-w: 420px; --tpl-release-404-pad: 28px 24px; --tpl-release-404-gap: 8px;
