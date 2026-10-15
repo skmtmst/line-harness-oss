@@ -1,7 +1,9 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
 import type { FormRequirement } from '@/lib/form-requirement'
-import { LogIn } from 'lucide-react'
+import { LogIn, Wallet, Store, Users, Inbox } from 'lucide-react'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
@@ -157,6 +159,12 @@ function DetailContent() {
           </>
         )}
       />
+      <KpiBand>
+        <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="月額" value={null} unit="" valueText={emptyValue('unknown')} detail={planLabel(tenant.plan_key)} />
+        <KpiCard presentation="cell" icon={<Store size={13} aria-hidden="true" />} title="アカウント" value={accounts.filter((a) => !a.archived_at).length} unit="件" detail={accounts.some((a) => a.archived_at || !a.is_active) ? `停止・アーカイブ ${accounts.filter((a) => a.archived_at || !a.is_active).length} 件` : 'すべて動いている'} />
+        <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="友だち" value={accounts.filter((a) => !a.archived_at).reduce((sum, a) => sum + a.friend_count, 0)} unit="人" detail="動いている店舗の合計" />
+        <KpiCard presentation="cell" icon={<Inbox size={13} aria-hidden="true" />} title="お問い合わせ" value={null} unit="" valueText={emptyValue('unknown')} detail="件数はまだ取得できません" />
+      </KpiBand>
       <div className={parts.stack}>
         {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
@@ -261,7 +269,7 @@ function DetailContent() {
             {audit.length === 0 ? (
               <ListState permissionScope="hq" kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
             ) : (
-              <GridTable label="運営の操作" framed={false} design={{ columns: 'var(--tpl-op-dt-at-w) var(--tpl-op-ann-state-w) var(--tpl-op-dt-what-w) minmax(0, 1fr)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+              <GridTable label="運営の操作" framed={false} design={{ columns: 'var(--tpl-op-dt-at-w) var(--tpl-op-ann-state-w) calc(var(--tpl-op-dt-what-w) + 64px) minmax(0, 1fr)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
                 <GridHeadRow>
                   <GridCell role="columnheader">日時</GridCell>
                   <GridCell role="columnheader">運営者</GridCell>
