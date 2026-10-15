@@ -55,8 +55,9 @@
 .selectBox :global(button) { width: 100%; }
 
 
-.valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: var(--tpl-rule-row-gap); }
-.valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); color: var(--color-ink-faint); }
+/* 左右のラベルは上でそろえる（右だけ文字数が下に出るため、下そろえだと左のラベルが下がる）。矢印は入力欄の高さに置く＝ラベルの行18＋欄の間。 */
+.valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: var(--tpl-rule-row-gap); }
+.valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); margin-top: calc(18px + var(--polish-space-row)); color: var(--color-ink-faint); }
 .savedNote { margin: 0; color: var(--color-success); font-size: var(--text-label); }
 
 /* 変える前に影響を見る：行は 余白12/0・間6・下に線。前は薄い赤、後は薄い緑（角8・余白10）。 */

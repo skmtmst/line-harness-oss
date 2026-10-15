@@ -929,7 +929,7 @@
   --tpl-bc-note-lh: 17px; --tpl-bc-tools-gap: 10px; --tpl-bc-search-w: 280px; --tpl-bc-narrow-search-w: 180px; --tpl-bc-status-select-w: 152px; --tpl-bc-page-size-w: 96px;
   --tpl-bc-control-gap: 6px; --tpl-bc-date-pad: 0 10px; --tpl-bc-ghost-pad: 0 14px; --tpl-bc-sort-h: 30px; --tpl-bc-popover-w: 260px; --tpl-bc-save-input-w: 240px;
   --tpl-bc-cell-pad-block: 9px; --tpl-bc-head-pad-block: 13px; --tpl-bc-col-gap: 16px; --tpl-bc-edge-pad: 20px; --tpl-bc-cell-lh: 18px; --tpl-bc-result-lh: 19px;
-  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px;
+  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
   --tpl-bc-badge-gap: 5px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 28px 24px; --tpl-bc-state-icon: 32px;
   --tpl-title-size: var(--polish-text-page); --tpl-title-weight: 700; --tpl-title-lh: 32px;
   /* ウェビナーの編集・参加者・分析・コメント演出（j7PP04・VWNaA・LPOe7・Q0Jrk・pvimJ・E7iAYs・XCUNf・uNsEy・z2dgw・Omqd4）。 */
@@ -997,13 +997,13 @@
   --tpl-hql-form-storage-w: 136px; --tpl-hql-form-state-w: 96px; --tpl-hql-form-dest-w: 290px; --tpl-hql-form-actions-w: 148px;
   /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 0px; --tpl-hq-home-warn-pull: -10px;
   --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;
-  --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-card-pad: var(--polish-space-card); --tpl-an-card-gap: var(--polish-space-row); --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
+  --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-history-w: 460px; --tpl-an-card-pad: var(--polish-space-card); --tpl-an-card-gap: var(--polish-space-row); --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
   /* ★V8 編集・詳細の画面（リッチメニューの編集・テンプレートの詳細・タグの編集）。 */
   --tpl-eds-back-gap: 4px; --tpl-eds-aside-w: 380px; --tpl-eds-aside-pad: var(--polish-space-card); --tpl-eds-aside-gap: 14px;
   --tpl-eds-content-pad: 24px 28px; --tpl-eds-content-gap: 16px; --tpl-eds-card-pad: var(--polish-space-section); --tpl-eds-card-gap: var(--polish-space-row);
   --tpl-eds-card-title-lh: 22px; --tpl-eds-note-lh: 17px; --tpl-eds-head-gap: 8px; --tpl-eds-title-gap: 2px;
   --tpl-eds-band-pad: 12px 16px; --tpl-eds-band-gap: 12px; --tpl-eds-band-title-lh: 19px;
-  --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-row-gap: 12px;
+  --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-step-pad: 14px 0; --tpl-eds-row-gap: 12px;
   --tpl-eds-kind-w: 96px; --tpl-eds-ver-w: 120px; --tpl-eds-state-w: 80px; --tpl-eds-state-wide-w: 101px; --tpl-eds-ghost-h: 36px; --tpl-eds-ghost-pad: 0 14px; --tpl-eds-ghost-gap: 6px;
   --tpl-eds-name-lh: 19px; --tpl-eds-ver-pad: 10px 12px; --tpl-eds-ver-meta-lh: 16px;
   --tpl-eds-side-actions-gap: 8px; --tpl-eds-more: 36px; --tpl-eds-about-pad: 16px; --tpl-eds-about-gap: 4px; --tpl-eds-about-row-pad: 9px 0; --tpl-eds-about-row-gap: 8px;
@@ -1053,13 +1053,13 @@
   --tpl-stamp-card-w: 340px;
   --tpl-stamp-card-gap: var(--polish-space-row);
   --tpl-stamp-card-pad: var(--polish-space-card);
-  --tpl-stamp-hours-w: 64px;
+  --tpl-stamp-hours-w: 64px; --tpl-stamp-check-w: 18px;
   --tpl-stamp-expiry-slot-w: 140px;
   --tpl-stamp-expiry-length-w: 120px;
   --tpl-stamp-appearance-gap: 16px;
   --tpl-e78-qr-zero: 0; --tpl-e78-qr-progress: 4px; --tpl-e78-qr-thumb: 96px; --tpl-e78-qr-count: 44px;
   /* 来店スタンプ（提案 E-7 w4SBbv）。 */ --tpl-e78-body-pad: 4px 24px 24px; --tpl-e78-body-gap: 28px; --tpl-e78-row-gap: 24px; --tpl-e78-card-pad: var(--polish-space-card); --tpl-e78-card-gap: var(--polish-space-row); --tpl-e78-card-gap-s: 12px; --tpl-e78-card-h: 579px; --tpl-e78-radius: var(--polish-radius-card); --tpl-e78-radius-s: var(--polish-radius-small); --tpl-e78-radius-xs: var(--polish-radius-small); --tpl-e78-title-gap: 6px; --tpl-e78-title-size: var(--polish-text-section); --tpl-e78-title-lh: 23px; --tpl-e78-field-gap: var(--polish-space-field); --tpl-e78-pair-gap: var(--polish-space-field); --tpl-e78-label-size: var(--polish-text-support); --tpl-e78-label-lh: 20px; --tpl-e78-name-size: var(--polish-text-body); --tpl-e78-name-lh: 21px; --tpl-e78-sub-size: var(--polish-text-support); --tpl-e78-sub-lh: 18px; --tpl-e78-tiny-size: 10px; --tpl-e78-tiny-lh: 15px; --tpl-e78-reward-pad: 10px 12px; --tpl-e78-chip-w: 56px; --tpl-e78-chip-h: 28px; --tpl-e78-pill: var(--polish-radius-pill); --tpl-e78-preview-pad: 14px; --tpl-e78-slot: 36px; --tpl-e78-slot-gap: 8px; --tpl-e78-slot-line: 1.5px; --tpl-e78-radio-gap: 8px; --tpl-e78-indent: 28px; --tpl-e78-switch-pad: 8px 0; --tpl-e78-section-gap: var(--polish-space-field); --tpl-e78-head-pad: 13px 20px; --tpl-e78-row-pad: 9px 20px; --tpl-e78-col-gap: 16px; --tpl-e78-col-photo: 72px; --tpl-e78-thumb-w: 56px; --tpl-e78-thumb-h: 40px; --tpl-e78-col-stamps: 64px; --tpl-e78-col-date: 110px; --tpl-e78-col-state: 250px; --tpl-e78-side-w: 380px; --tpl-e78-step-gap: 8px; --tpl-e78-step-size: 16px; --tpl-e78-step-lh: 24px; --tpl-e78-col-when: 120px; --tpl-e78-col-count: 150px; --tpl-e78-col-why: 240px; --tpl-e78-col-actor: 200px; --tpl-e78-col-menu: 36px; --tpl-e78-row-h: var(--polish-table-row); --tpl-e78-paper-row-h: var(--polish-table-row); --tpl-e78-edge: 20px; --tpl-e78-photo-max: 480px; --tpl-e78-icon: 14px; --tpl-e78-pin-w: 120px; --tpl-e78-ring: inset 0 0 0 1px var(--color-hairline); --tpl-e78-ring-reward: inset 0 0 0 1.5px var(--color-accent-deep);
-  --tpl-fx4-viewer-create-h: 36px; /* 一斉配信の閲覧のみ（NtCE3）：隠した「配信を作る」の場所 */ --tpl-fx4-viewer-add-h: 28px; /* 隠した「フォルダを追加」の場所 */ --tpl-fx4-footer-inset: 12px; /* 型の下の帯の左右（絵の下の帯 left 12） */ --tpl-fx4-bc-col-result-wide: 230px; /* 一斉配信の広い板の結果の列（絵 214＋間16） */
+  --tpl-fx4-viewer-create-h: 36px; /* 一斉配信の閲覧のみ（NtCE3）：隠した「配信を作る」の場所 */ --tpl-fx4-viewer-add-h: 28px; /* 隠した「フォルダを追加」の場所 */ --tpl-fx4-footer-inset: 12px; /* 型の下の帯の左右（絵の下の帯 left 12） */ --tpl-fx4-bc-col-result-wide: 176px; /* 一斉配信の広い板の結果の列（絵 l5V9a：選ぶ欄を足した後の 176） */
   --tpl-r2-op-sum-gap: 6px; --tpl-r2-op-key-w: 150px; --tpl-r2-op-name-w: 200px; --tpl-r2-op-confirm-row-h: var(--polish-table-row);
   --tpl-r2-ch-band-bg: #e6f4ea; --tpl-r2-ch-band-ink: #1f7a3a; --tpl-r2-ch-row-h: var(--polish-table-row); --tpl-r2-ch-col-60: 60px; --tpl-r2-ch-col-100: 100px; --tpl-r2-ch-col-110: 110px; --tpl-r2-ch-col-120: 120px; --tpl-r2-ch-col-200: 200px;
   --tpl-r2-rail-compact-pad: 16px; --tpl-r2-rail-compact-content-width: 247px;
@@ -1181,7 +1181,7 @@
   --tpl-ml-col-gap: 16px; --tpl-ml-head-h: var(--polish-table-head); --tpl-ml-head-pad: 13px 20px; --tpl-ml-row-h: var(--polish-table-row); --tpl-ml-row-pad: 9px 20px;
   --tpl-ml-viewer-create-h: 55px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
   --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: calc(6 * var(--text-caption) + var(--tpl-badge-dot) + var(--polish-status-gap) + 2 * var(--space-8)); --tpl-ml-col-ops: 108px;
-  --tpl-ml-col-need: 88px; --tpl-ml-col-gives: 150px; --tpl-ml-col-month: 92px; --tpl-ml-col-state-wide: 96px; --tpl-ml-col-ops-wide: 160px;
+  --tpl-ml-col-need: 88px; --tpl-ml-col-gives: 150px; --tpl-ml-col-month: 92px; --tpl-ml-col-state-wide: 96px; --tpl-ml-col-state-reward: 224px; --tpl-ml-col-ops-wide: 160px;
   --tpl-ml-col-rank: 72px; --tpl-ml-col-balance: 76px; --tpl-ml-col-change: 72px; --tpl-ml-col-last: 140px; --tpl-ml-col-ops-balance: 150px;
   --tpl-ml-col-delta: 56px; --tpl-ml-col-why: 180px; --tpl-ml-col-after: 62px; --tpl-ml-col-who: 90px; --tpl-ml-col-ops-history: 140px;
   --tpl-ml-col-score: 80px; --tpl-ml-col-band: 80px; --tpl-ml-col-trend: 100px; --tpl-ml-col-react: 130px; --tpl-ml-col-ops-menu: 60px; --tpl-ml-score-row-h: var(--polish-table-row);
@@ -1447,7 +1447,7 @@
   --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
   /* LINEアカウントの詳細（ihjfd）・送受信を止める（CFAyf）・資格情報（Msb1j）・アーカイブ（WOfBN）・登録の編集（n9Z2P）・乗り換え（x2dSNv）。 */
   /* acct：登録の手順の下と、乗り換えの本文の寸法（既定の設定フォームは保つ）。 */
-  --tpl-acct-hierarchy-row-pad: 8px 12px;
+  --tpl-acct-hierarchy-indent: 24px; --tpl-acct-hierarchy-row-pad-y: 10px; --tpl-acct-hierarchy-row-pad-x: 12px; --tpl-acd-dlg-band-pad-y: 10px; --tpl-acd-dlg-band-pad-x: 12px;
   --tpl-acct-hierarchy-footer-pad: 14px 24px 22px;
   --tpl-acct-register-body-pad: 12px 24px 24px;
   --tpl-acct-basic-pad: 20px 20px 44px;
@@ -1867,7 +1867,7 @@
   --tpl-fr-dup-card-pad: var(--polish-space-card); --tpl-fr-dup-num-lh: 27px; --tpl-fr-dup-thead-h: var(--polish-table-head); --tpl-fr-dup-thead-pad: 11px 12px 0 0;
   --tpl-fr-dup-col-confidence: 92px; --tpl-fr-dup-col-evidence: 212px; --tpl-fr-dup-col-account: 162px; --tpl-fr-dup-col-status: 102px;
   --tpl-fr-dup-col-action: 118px; --tpl-fr-dup-col-num: 102px; --tpl-fr-dup-col-num-last: 98px; --tpl-fr-dup-row-compact-h: 51px; --tpl-fr-chip-pad: 10px;
-  --tpl-fr-search-xs: 200px; --tpl-fr-dup-n-col-account: 132px; --tpl-fr-dup-pager-h: 42px;
+  --tpl-fr-search-xs: 200px; --tpl-fr-dup-n-col-account: 152px; --tpl-fr-dup-n-col-evidence: 176px; --tpl-fr-dup-pager-h: 42px;
   --tpl-fr-cmp-subject-pad: 18px; --tpl-fr-cmp-name-gap: 6px; --tpl-fr-cmp-name-size: var(--polish-text-body); --tpl-fr-cmp-name-lh: 25px; --tpl-fr-cmp-sub-gap: 6px;
   --tpl-fr-cmp-attrs-gap: 2px; --tpl-fr-cmp-attr-h: 34px; --tpl-fr-cmp-attr-label: 86px; --tpl-fr-cmp-card-gap: var(--polish-space-row); --tpl-fr-cmp-line-h: 47px;
   --tpl-fr-cmp-panel-pad: var(--polish-space-section); --tpl-fr-cmp-panel-lh: 20px; --tpl-fr-cmp-radio-gap: 17px; --tpl-fr-cmp-check-gap: 6px;

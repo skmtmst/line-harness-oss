@@ -907,9 +907,10 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
 
   /* ===== 右の詳細パネルと停止の確認 ===== */
   const detailCard = panelPoint ? (
-    <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}>
-      <div className={styles.panelHead}>
-
+    <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}
+      footer={canEdit && panelPoint.status !== 'stopped' ? <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button> : undefined}>
+      <div className={styles.panelLine}>
+        <StatePill point={panelPoint} />
         <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
           ...(canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
             id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
@@ -919,16 +920,25 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
         ]} />
       </div>
-      <p className={styles.panelLine}>
-        <StatePill point={panelPoint} />
-        <span title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</span>
-      </p>
-      <p className={styles.panelText}>{`今月の成果：${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
-      <p className={styles.panelText}>{`使われている場所：${usageLabel(panelPoint)}`}</p>
+      <div className={styles.panelFact}>
+        <p className={styles.panelLabel}>何が起きたら数えるか</p>
+        <p className={styles.panelText} title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</p>
+      </div>
+      <div className={styles.panelFact}>
+        <p className={styles.panelLabel}>今月の成果</p>
+        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
+      </div>
+      <div className={styles.panelFact}>
+        <p className={styles.panelLabel}>使われている場所</p>
+        <p className={styles.panelText}>{usageLabel(panelPoint)}</p>
+      </div>
       {panelPoint.measureMethod === 'webhook' ? (
-        <p className={styles.panelText}>
-          {`受け口：POST /api/conversions/ingest/${panelPoint.id}${panelPoint.ingest.disabledAt ? '（止まっています）' : panelPoint.ingest.configured ? '（動いています）' : '（まだ鍵を発行していません）'}`}
-        </p>
+        <div className={styles.panelFact}>
+          <p className={styles.panelLabel}>受け口</p>
+          <p className={styles.panelText}>
+            {`POST /api/conversions/ingest/${panelPoint.id}${panelPoint.ingest.disabledAt ? '（止まっています）' : panelPoint.ingest.configured ? '（動いています）' : '（まだ鍵を発行していません）'}`}
+          </p>
+        </div>
       ) : null}
       {issuedSecret && panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.secretBox} role="status">{`発行した鍵（この表示でだけ見られます。連携先へ渡してください）：${issuedSecret}`}</p>
@@ -943,10 +953,9 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <Button onClick={() => void publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
         ) : null}
       </div>
-      {canEdit && panelPoint.status !== 'stopped' ? (
+      {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
         <div className={styles.panelButtons}>
-          {panelPoint.state !== 'draft' ? <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button> : null}
-          <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
+          <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button>
         </div>
       ) : null}
     </DetailPanel>

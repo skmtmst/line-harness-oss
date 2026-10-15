@@ -1,12 +1,13 @@
 'use client'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CircleHelp, Link2, UserX } from 'lucide-react'
+import { Clock, Link2, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
@@ -308,24 +309,26 @@ function CompareInner() {
               </DataTable>
             </section>
 
-            <div className={styles.footer}>
-              <div className={styles.footerBar}>
+            <StickyBar
+              destructive={(
                 <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
                   <UserX size={14} aria-hidden="true" />
                   別の人だった
                 </Button>
-                <div className={styles.footerCenter}>
+              )}
+              actions={(
+                <>
                   <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
-                    <CircleHelp size={14} aria-hidden="true" />
+                    <Clock size={14} aria-hidden="true" />
                     あとで決める（保留）
                   </Button>
                   <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
                     <Link2 size={14} aria-hidden="true" />
                     同じ人として結び付ける
                   </Button>
-                </div>
-              </div>
-            </div>
+                </>
+              )}
+            />
           </>
         ) : null}
       </div>

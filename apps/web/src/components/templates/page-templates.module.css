@@ -451,6 +451,8 @@
 /* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
+/* 画面が道具の段を本文の直下に置いたとき（中身と一緒に読み込む一覧）も、型の道具の段と同じ余白にする。本文は表のために左右 0。 */
+:global(:root) .listBody .content > :global([data-shared-part='list-toolbar']) { box-sizing: border-box; padding: var(--tpl-toolbar-pad-block) var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
 /* 表を道具の段と同じ内側に置く板（YMVFD）。表は左右24の内側、ページ送りの中身はその表の内側24。 */
 :global(:root) .listBody[data-table-inset] .content { padding-inline: var(--tpl-list-inset); }
@@ -507,8 +509,11 @@
 .listSection { display: flex; flex-direction: column; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); gap: var(--polish-space-card); }
 .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-side-w); margin-right: 0; gap: var(--polish-space-card); }
 .detailColumns[data-presentation='analysis'] .detailColumnAside { display: flex; flex-direction: column; min-height: 0; padding-left: 0; border-left: 0; gap: var(--polish-space-card); }
+/* 保存した分析（bglah）：右の履歴は表と操作が入るので広い欄。 */
+.detailColumns[data-presentation='analysis'][data-detail-columns='analysis-history'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-history-w); }
 @container v8-page (max-width: 1099px) {
  .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr); }
+ .detailColumns[data-presentation='analysis'][data-detail-columns='analysis-history'] { grid-template-columns: minmax(0, 1fr); }
  .detailColumns[data-presentation='analysis'] .detailColumnAside { display: none; }
  .detailColumns[data-presentation='analysis'] .detailColumnAside[data-expanded] { display: flex; }
 }

@@ -12,17 +12,16 @@ import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows, useManagedFolders, folderDotFor } from '@/components/shared/managed-folder-panel'
+import { useFolderMove } from '@/components/shared/use-folder-move'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ListPagination from '@/components/shared/list-pagination'
-import Select from '@/components/shared/select'
 import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
-import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import {
   currentSettlementPeriod,
   deltaText,
@@ -50,7 +49,7 @@ import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 成果とアフィリエイト「案件」（板 `h7dmB`）。
@@ -59,18 +58,15 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 組み直した。データの口は今と同じ（案件・アカウント・タグ・シナリオの名前・承認の全件）。
  * 行の「…」は 編集・決まり・公開を止める（公開する）・複製。複製は下書きで作る。
  *
- * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
- * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
+ * フォルダの列：共通のフォルダ（kind `affiliate_offer`）。行の名前の前に色の丸、「…」の「フォルダへ移す」。
+ * 成果が出たときの動き（タグ・シナリオ・マイル）での見え方は「よく使う絞り込み」から選ぶ（保存しない）。
  */
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
 type LoadState = 'loading' | 'ready' | 'error'
 
-/*
- * 成果が出たときの動きで分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
- * 上の絞り込み（「成果のときの動き」の選ぶ欄）に置く（B-136 2026-10-09）。
- */
+/* 成果が出たときの動きで分けた見え方（保存しない）。「よく使う絞り込み」から選ぶ。 */
 const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer) => boolean }> = [
   { key: 'all', label: '動き：すべて', match: () => true },
   { key: 'tag', label: 'タグを付ける', match: (o) => Boolean(o.tagId) },
@@ -83,6 +79,8 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
   { value: 'open-reward', label: '公開中・報酬が高い順', filters: ['open'], sort: 'reward' },
   { value: 'draft', label: '下書きだけ', filters: ['draft'], sort: 'newest' },
+  { value: 'tag', label: 'タグを付ける案件', filters: [], sort: 'newest', folder: 'tag' },
+  { value: 'scenario', label: 'シナリオを始める案件', filters: [], sort: 'newest', folder: 'scenario' },
   { value: 'miles', label: 'マイルを渡す案件', filters: [], sort: 'newest', folder: 'miles' },
   { value: 'name', label: '案件名の順', filters: [], sort: 'name' },
 ]
@@ -106,7 +104,9 @@ export default function OffersTab() {
 
   const [query, setQuery] = useListUrlValue('q', '')
   const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
-  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
+  const [folder, setFolder] = useListUrlValue<FolderKey>('action', 'all')
+  const { folders, error: folderError, reload: reloadFolders } = useManagedFolders('affiliate_offer', accountId)
+  const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
   const [sort, setSort] = useListUrlValue<'newest' | 'name' | 'reward'>('sort', 'newest')
   const [saved, setSaved] = useState('')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
@@ -234,7 +234,9 @@ export default function OffersTab() {
     ? Math.round(approvedThisMonth.reduce((sum, item) => sum + (item.rewardAmount ?? 0), 0) / approvedThisMonth.length)
     : null
 
-  const foldered = useMemo(() => offers.filter(FOLDERS.find((f) => f.key === folder)?.match ?? (() => true)), [offers, folder])
+  const foldered = useMemo(() => offers
+    .filter(FOLDERS.find((f) => f.key === folder)?.match ?? (() => true))
+    .filter((offer) => folderId === 'all' || (folderId === 'unfiled' ? !offer.folderId : offer.folderId === folderId)), [offers, folder, folderId])
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return foldered
@@ -264,6 +266,7 @@ export default function OffersTab() {
     setQuery('')
     setFilters([])
     setFolder('all')
+    setFolderId('all')
     setSaved('')
     setPage(1)
   }
@@ -416,32 +419,20 @@ export default function OffersTab() {
     </CreateButton>
   )
 
-  /* 左の列は共通の ManagedFolderPanel。案件をフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
+  const chooseFolder = (id: string) => resetPage(() => setFolderId(id))
   const folderPanel = (
-    <ManagedFolderPanel
-      kind={null}
-      folders={[]}
-      onChanged={() => undefined}
-      canManage={!readonly}
-      createAction={createButton(true)}
-      reserveCreateSpace={false}
-      itemLabel="案件"
-      activeId="all"
-      onSelect={() => undefined}
-      allCount={ready ? offers.length : null}
-    />
+    <ManagedFolderPanel kind="affiliate_offer" accountId={accountId} folders={folders}
+      onChanged={async () => { await reloadFolders(); await loadOffers() }} canManage={!readonly} createAction={createButton(true)}
+      reserveCreateSpace={false} itemLabel="案件" activeId={folderId} onSelect={chooseFolder}
+      allCount={ready ? offers.length : null} error={folderError}
+      unfiledCount={ready ? offers.filter((offer) => !offer.folderId).length : null}
+      countOf={(item) => ready ? offers.filter((offer) => offer.folderId === item.id).length : null}
+      onDeleted={(id) => { if (folderId === id) chooseFolder('all'); void loadOffers() }} />
   )
-
-  const folderSelect = (
-    <div className={styles.narrowFolder}>
-      <SaveErrorField names={["folder"]}><Select
-        aria-label="成果のときの動き"
-        value={folder}
-        options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${offers.filter(item.match).length}` }))}
-        onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
-      /></SaveErrorField>
-    </div>
-  )
+  const folderMove = useFolderMove({ accountId, canEdit: !readonly, items: paged, folders,
+    move: async (offer, targetId) => { const result = await api.affiliateOffers.update(offer.id, { folderId: targetId }); if (!result.success) throw new Error('案件をフォルダへ移せませんでした') },
+    onChanged: async () => { await loadOffers(); await reloadFolders() },
+  })
 
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
@@ -479,9 +470,9 @@ export default function OffersTab() {
       narrow={narrow}
       notices={null}
       search={{ placeholder: '案件名・説明で探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={<><ListToolbarOptional compact label="成果のときの動き">{folderSelect}</ListToolbarOptional>{chips}</>}
+      chips={chips}
       trailing={trailing}
-      narrowLead={<>{createButton(false)}{folderSelect}</>}
+      narrowLead={createButton(false)}
     />
   )
 
@@ -506,7 +497,7 @@ export default function OffersTab() {
               <Tr key={offer.id} data-table-layout="columns" data-row-id={offer.id}>
                 <Td grow>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                    <FolderDotName folder={null} dot={!narrow}>
+                    <FolderDotName folder={folderDotFor(folders, offer.folderId)} dot={!narrow}>
                       {readonly ? (
                         <span><TruncatedText value={String(offer.name ?? '')} /></span>
                       ) : (
@@ -545,6 +536,7 @@ export default function OffersTab() {
                         { id: 'terms', label: '決まり（受付期間・上限・数える期間）', onSelect: () => setTermsTarget(offer) },
                         ...(readonly ? [] : [
                           { id: 'publish', label: offer.isActive ? '公開を止める' : '公開する', disabled: busyId !== null, disabledReason: 'ほかの操作を反映しています', onSelect: () => { void togglePublish(offer) } },
+                          { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(offer) },
                           { id: 'duplicate', label: '複製（下書きで作る）', disabled: busyId !== null, disabledReason: 'ほかの操作を反映しています', onSelect: () => { void duplicate(offer) } },
                         ]),
                       ]}
@@ -592,7 +584,7 @@ export default function OffersTab() {
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
-      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('affiliate_offer', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
       folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
@@ -607,6 +599,7 @@ export default function OffersTab() {
             onSaved={() => { void loadOffers() }}
           />
         ) : null}
+        {folderMove.overlays}
         {termsTarget ? <OfferTermsDialog offer={termsTarget} onClose={() => setTermsTarget(null)} /> : null}
       </>}
     >

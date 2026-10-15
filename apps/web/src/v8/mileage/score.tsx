@@ -36,6 +36,7 @@ import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -1115,9 +1116,9 @@ function ScoreHistoryDialog({
       ) : items.length === 0 ? (
         <ListState kind="empty" title="点数が変わった記録はありません" description="メッセージへの返信やリンクのクリックなど、決めたきっかけがあると記録されます。" />
       ) : (
-        <DataTable columnSizing="content" aria-label="点数の変化の明細">
+        <Card variant="records" contentPadding="0" aria-label="点数の変化の明細の一覧"><DataTable columnSizing="content" aria-label="点数の変化の明細" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-section)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--polish-text-body)' }}>
           <thead>
-            <TableHeadRow>
+            <TableHeadRow data-table-layout="columns">
               <Th>いつ</Th>
               <Th>できごと</Th>
               <Th align="right">点</Th>
@@ -1126,7 +1127,7 @@ function ScoreHistoryDialog({
           </thead>
           <tbody>
             {items.map((item) => (
-              <Tr key={item.id}>
+              <Tr key={item.id} data-table-layout="columns">
                 <DateCell><time data-list-date-time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></DateCell>
                 <Td grow title={`${actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}・${item.scoreBefore == null || item.scoreAfter == null ? '前後の点数は未取得' : `${formatMileageNumber(item.scoreBefore)} 点 → ${formatMileageNumber(item.scoreAfter)} 点`}・${item.mode === 'manual' ? `手で変更（${item.executedByStaffName ?? '担当者は未取得'}）` : '自動で加算'}`}><TruncatedText value={actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)} /></Td>
                 <Td align="right">
@@ -1138,7 +1139,7 @@ function ScoreHistoryDialog({
               </Tr>
             ))}
           </tbody>
-        </DataTable>
+        </DataTable></Card>
       )}
       </div>
     </Dialog>

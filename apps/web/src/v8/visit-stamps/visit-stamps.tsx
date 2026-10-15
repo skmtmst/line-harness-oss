@@ -594,7 +594,7 @@ function VisitStampsScreen() {
                     <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio></SaveErrorField>
                     <div className={styles.hoursRow}>
                       <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'hours'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'hours', hours: interval.hours ?? 3 } })}>前の押印から</Radio></SaveErrorField>
-                      <SaveErrorField names={["hours","interval.hours"]}><NumberInput {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
+                      <SaveErrorField names={["hours","interval.hours"]}><NumberInput {...fieldProps('intervalHours')} note={false} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
                       <span className={styles.plain}>時間あける（1〜23）</span>
                     </div>
                     {fieldError('intervalHours')}
@@ -630,8 +630,14 @@ function VisitStampsScreen() {
                   </span>
                   {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変える', onSelect: () => setRankOpen(true) }]} />}
                 </div>
-                <Field label="カードを受け取った時のボーナス友だちがカードを受け取った時に押す数（0〜50）＋"><SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><NumberInput unit="個" {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField>
-</Field>
+                <div className={styles.receiptRow}>
+                  <span className={styles.texts}>
+                    <span className={styles.name}>カードを受け取った時のボーナス</span>
+                    <span className={styles.sub}>友だちがカードを受け取った時に押す数（0〜50）</span>
+                  </span>
+                  <Plus size={14} aria-hidden="true" />
+                  <SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><NumberInput unit="個" note={false} {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField>
+                </div>
                 {fieldError('receiptBonus')}
                 <div className={styles.row2}>
                   <div className={styles.field}>

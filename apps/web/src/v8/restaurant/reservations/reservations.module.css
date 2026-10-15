@@ -609,6 +609,8 @@
 .nextActions{justify-content:flex-end;}.nextActions>*{flex:0 0 auto;}
 .sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
 .sourcePicker{flex-basis: var(--tpl-rest1-restaurant-reservations-reservations-flex-basis-1);width: var(--tpl-rest1-restaurant-reservations-reservations-width-1);}
+/* 軸に「月」が増えて段がちょうど満杯になり、印刷だけが2段目へ落ちていた（R2w4j）。段を割る判定は細い幅で行い、余りがあれば元の幅まで伸ばす。 */
+.sourcePicker{flex: 1 1 calc(var(--tpl-rest1-restaurant-reservations-reservations-width-1) - var(--polish-space-section)); width: auto; max-width: var(--tpl-rest1-restaurant-reservations-reservations-width-1); min-width: 0;}
 
 .nextActions{align-items:center;justify-content:space-between;}.nextActions > *{flex:0 0 auto;}.nextBox{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-4);}.sideCard{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-1);}.sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
 

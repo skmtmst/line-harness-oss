@@ -26,7 +26,7 @@ import {
 import styles from './sidebar.module.css'
 import {
   Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
+  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Trophy, Type, UserPlus, Users, Video, type LucideIcon,
 } from 'lucide-react'
 
 /*
@@ -53,6 +53,7 @@ const V8_NAV_ICONS: Record<string, LucideIcon> = {
   'booking-menus': CalendarCog,
   events: Ticket,
   'booking-own-shifts': Clock,
+  affiliates: Trophy,
 }
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
