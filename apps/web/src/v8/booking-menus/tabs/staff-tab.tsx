@@ -2,7 +2,7 @@
 
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RowNameLink } from '@/components/shared/table'
 import HelpTip from '@/components/shared/help-tip'
 import { ListChecks, Plus } from 'lucide-react'
@@ -18,6 +18,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { EMPTY_STAFF, StaffEditModal } from '../staff-edit-dialog'
 import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '../../booking-payments/assignment'
 import StatusBadge from '@/components/shared/status-badge'
+import { bookingPaymentAdminApi } from '@/lib/api-booking-payment-admin'
 import assignStyles from '../../booking-payments/assignment.module.css'
 import {
   AccountIcon,
@@ -67,6 +68,16 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const assignment = useAssignment({ kind: 'staff', accountId })
   const [assignTarget, setAssignTarget] = useState<BookingStaff | null>(null)
   const staffOrder = staff.map((person) => person.id)
+  /* 今日の担当（組3：店の今日の申込・確定・済みの件数）。読めないときは「—」。 */
+  const [todayCounts, setTodayCounts] = useState<Record<string, number> | null>(null)
+  useEffect(() => {
+    let alive = true
+    setTodayCounts(null)
+    void Promise.resolve().then(() => bookingPaymentAdminApi.staffTodayCounts(accountId))
+      .then((response) => { if (alive) setTodayCounts(Object.fromEntries(response.data.items.map((item) => [item.staffId, item.todayCount]))) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [accountId])
   useV8TabEdit({
     dirty: assignment.dirty,
     saving: assignment.saving,
@@ -175,6 +186,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         <span className={styles.staffColMenus}>担当メニュー</span>
         <span className={assignStyles.priorityCell}>優先度</span>
         <span className={assignStyles.limitCell}>1日の上限</span>
+        <span className={assignStyles.limitCell}>今日の担当</span>
         <span className={styles.staffColNoAssign}>指名なし</span>
         <span className={styles.staffColWork}>勤務（今週）</span>
         <span className={styles.staffColLink}>カレンダー・ログイン</span>
@@ -231,6 +243,9 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             </span>
             <span className={assignStyles.limitCell}>
               <span className={styles.staffCellMain}>{assignment.resources[person.id]?.dailyLimit ? `${assignment.resources[person.id]?.dailyLimit} 件` : '上限なし'}</span>
+            </span>
+            <span className={assignStyles.limitCell}>
+              <span className={styles.staffCellMain}>{todayCounts && person.id in todayCounts ? `${todayCounts[person.id]} 件` : emptyValue('unknown')}</span>
             </span>
             <span className={styles.staffColNoAssign}>
               <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : emptyValue('unknown')}</span>
@@ -289,7 +304,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         value={assignTarget ? assignment.resources[assignTarget.id] : undefined}
         onClose={() => setAssignTarget(null)}
         onApply={(patch) => { if (assignTarget) assignment.setResource(assignTarget.id, patch) }} />
-      <AssignmentConflict state={assignment} unit="件" order={staffOrder} names={Object.fromEntries(staff.map((person) => [person.id, person.name]))} />
+      <AssignmentConflict state={assignment} unit="件" order={staffOrder} subject="指名なしの予約の割り当て方" names={Object.fromEntries(staff.map((person) => [person.id, person.name]))} />
 
       {editing ? (
         <StaffEditModal staff={editing} onSave={saveStaff} onClose={() => setEditing(null)} />

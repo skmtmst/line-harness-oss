@@ -5,6 +5,10 @@ import { CalendarDays, Download, FileText, Info, RotateCcw, Send } from 'lucide-
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { downloadCsv } from '@/components/shared/csv-download'
+import { jstDate } from '@/lib/jst-datetime'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -64,6 +68,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   const [refunding, setRefunding] = useState(false)
   const [refundError, setRefundError] = useState<string | null>(null)
   const generation = useRef(0)
+  const [exporting, setExporting] = useState(false)
+  const [linkPreview, setLinkPreview] = useState<{ name: string; url: string | null } | null>(null)
 
   const reload = useCallback(async () => {
     const mine = ++generation.current
@@ -84,10 +90,35 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   function menuFor(record: PaymentRecord): ActionMenuItem[] {
     return [
       ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={15} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
-      ...(canEdit && (record.status === 'pending' || record.status === 'expired') ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={15} aria-hidden="true" />, onSelect: () => notifyToast(`${NOT_READY}支払いのリンクを LINE で送る操作は、もうすぐ使えます。`) }] : []),
+      ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={15} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
       ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={15} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
       ...(canEdit && record.status === 'paid' ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundTarget(record); setRefundStep(1); setRefundAmount(''); setRefundError(null) } }] : []),
     ]
+  }
+
+  /* 支払いのリンクは模擬だけ（組3：dryRun。LINE・Stripe へは送らない。sent:false を「送った」と言わない）。 */
+  async function previewLink(record: PaymentRecord) {
+    try {
+      const response = await bookingPaymentAdminApi.previewPaymentLink(accountId, record.id)
+      setLinkPreview({ name: record.friendName ?? 'お客さま', url: response.data.checkoutUrl })
+    } catch (cause) {
+      notifyToast(cause instanceof ApiError && cause.status === 404 ? 'この支払いは、もうリンクを作れません（支払い済み・期限切れ）。'
+        : cause instanceof ApiError && cause.status === 409 ? 'この予約は、いまオンラインで払う形ではありません。'
+          : 'リンクを作れませんでした。もう一度お試しください。')
+    }
+  }
+
+  async function exportCsv() {
+    setExporting(true)
+    try {
+      const blob = await bookingPaymentAdminApi.exportCsv(accountId, { q: query.trim(), status, method, period })
+      const text = await blob.text()
+      downloadCsv(text.startsWith('\uFEFF') ? text : `\uFEFF${text}`, `お支払いの記録-${jstDate(new Date()).replaceAll('-', '')}.csv`)
+    } catch (cause) {
+      notifyToast(cause instanceof ApiError && cause.status === 413 ? '1万件を超えるため書き出せません。期間や状態で絞ってください。' : 'CSVを書き出せませんでした。もう一度お試しください。')
+    } finally {
+      setExporting(false)
+    }
   }
 
   async function refund() {
@@ -114,7 +145,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     <div className={styles.records} data-design="PaymentRecords">
       <div className={styles.recordsHead}>
         <h2 className={styles.recordsTitle}>お支払いの記録<HelpTip label="お支払いの記録の数え方">入金は今月に支払いが済んだ合計、返金は今月に返金した合計です。未払いで流れた枠は、お支払いを待つ時間を過ぎて取り消した仮の予約です。</HelpTip></h2>
-        {load.state === 'ready' ? <Button onClick={() => notifyToast(`${NOT_READY}CSVで書き出す操作は、もうすぐ使えます。`)}><Download size={15} aria-hidden="true" />CSVで書き出す</Button> : null}
+        {load.state === 'ready' ? <Button busy={exporting} onClick={() => void exportCsv()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button> : null}
       </div>
 
       {load.state === 'not-ready' ? (
@@ -163,6 +194,10 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         </>
       )}
 
+      <Dialog open={linkPreview !== null} title="支払いのリンク（試験モード）" description={`${linkPreview?.name ?? ''}さん用のリンクを作りました。いまは模擬なので、LINE には送っていません。`}
+        cancelLabel="閉じる" onCancel={() => setLinkPreview(null)}>
+        {linkPreview?.url ? <CopyTextButton value={linkPreview.url} label="リンクをコピー" aria-label="支払いのリンクをコピー" /> : <p className={styles.minor}>リンクはまだ作られていません。</p>}
+      </Dialog>
       <ConfirmDialog
         open={refundTarget !== null && refundStep === 1}
         title={`${refundTarget?.friendName ?? 'お客さま'}さんに返金しますか？`}

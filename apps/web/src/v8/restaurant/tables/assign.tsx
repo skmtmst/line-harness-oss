@@ -69,7 +69,7 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
       ) : null}
       <AssignmentRowDialog open={target !== null} name={target ? `卓 ${target.code}` : ''} unit="組" value={target ? assignment.resources[target.id] : undefined}
         onClose={() => setTarget(null)} onApply={(patch) => { if (target) assignment.setResource(target.id, patch) }} />
-      <AssignmentConflict state={assignment} unit="組" order={order} names={Object.fromEntries(rows.map((table) => [table.id, `卓 ${table.code}`]))} />
+      <AssignmentConflict state={assignment} unit="組" order={order} subject="卓の割り当て方" names={Object.fromEntries(rows.map((table) => [table.id, `卓 ${table.code}`]))} />
     </div>
   )
 }
