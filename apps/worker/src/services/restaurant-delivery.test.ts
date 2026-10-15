@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   UBER_OAUTH_CALLBACK_PATH,
+  deliveryWebhookIpAllowlist,
+  isDeliveryWebhookIpAllowed,
   uberOAuthClient,
   uberWebhookSecret,
   type DeliveryEnv,
@@ -56,5 +58,86 @@ describe('Uber Eats のログイン連携の設定', () => {
         RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: 'static-secret-value-that-is-long-enough',
       }),
     ).toBeNull();
+  });
+});
+
+/**
+ * 通知を受け取っていい送信元IPの一覧の試験（出前館QA#7）。
+ * 試験用のIPは文書用に予約された範囲（192.0.2.0/24・198.51.100.0/24・203.0.113.0/24）だけを使う。
+ */
+describe('通知の送信元IPの許可リストの読み取り', () => {
+  it('どこにも書かれていなければ null＝制限しない。いまの動きを変えない', () => {
+    expect(deliveryWebhookIpAllowlist({}, 'demaecan')).toBeNull();
+  });
+
+  it('共通の値はどのサービスにも効く', () => {
+    const env: DeliveryEnv = { RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' };
+    expect(deliveryWebhookIpAllowlist(env, 'demaecan')).toEqual(['203.0.113.5']);
+    expect(deliveryWebhookIpAllowlist(env, 'ubereats')).toEqual(['203.0.113.5']);
+    expect(deliveryWebhookIpAllowlist(env, 'rocketnow')).toEqual(['203.0.113.5']);
+  });
+
+  it('サービスごとの指定があればそちらが先で、共通は混ぜない', () => {
+    const env: DeliveryEnv = {
+      RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5',
+      RT_DELIVERY_DEMAECAN_WEBHOOK_IP_ALLOWLIST: '198.51.100.7, 198.51.100.8',
+    };
+    expect(deliveryWebhookIpAllowlist(env, 'demaecan')).toEqual(['198.51.100.7', '198.51.100.8']);
+    expect(deliveryWebhookIpAllowlist(env, 'ubereats')).toEqual(['203.0.113.5']);
+  });
+
+  it('空欄や読点だけの書き間違いは「誰も通さない」にせず制限なしへ戻す', () => {
+    expect(deliveryWebhookIpAllowlist({ RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '  ' }, 'demaecan')).toBeNull();
+    expect(deliveryWebhookIpAllowlist({ RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: ' , , ' }, 'demaecan')).toBeNull();
+  });
+});
+
+describe('通知の送信元IPの照合', () => {
+  it('一覧が null のときは全部通す', () => {
+    expect(isDeliveryWebhookIpAllowed('203.0.113.5', null)).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('', null)).toBe(true);
+  });
+
+  it('1件ずつの指定は文字列の一致で見る', () => {
+    expect(isDeliveryWebhookIpAllowed('203.0.113.5', ['203.0.113.5'])).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('203.0.113.6', ['203.0.113.5'])).toBe(false);
+  });
+
+  it('IPv6 も1件ずつなら大文字小文字を揃えて一致で見る', () => {
+    expect(isDeliveryWebhookIpAllowed('2001:DB8::1', ['2001:db8::1'])).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('2001:db8::2', ['2001:db8::1'])).toBe(false);
+  });
+
+  it('送信元が取れなかったときは通さない', () => {
+    expect(isDeliveryWebhookIpAllowed('', ['203.0.113.5'])).toBe(false);
+    expect(isDeliveryWebhookIpAllowed('   ', ['203.0.113.5'])).toBe(false);
+  });
+
+  it('IPv4 のまとまり指定は範囲で見る', () => {
+    expect(isDeliveryWebhookIpAllowed('203.0.113.200', ['203.0.113.0/24'])).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('203.0.114.1', ['203.0.113.0/24'])).toBe(false);
+    expect(isDeliveryWebhookIpAllowed('192.0.2.130', ['192.0.2.128/25'])).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('192.0.2.127', ['192.0.2.128/25'])).toBe(false);
+    expect(isDeliveryWebhookIpAllowed('192.0.2.1', ['192.0.2.1/32'])).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('192.0.2.2', ['192.0.2.1/32'])).toBe(false);
+  });
+
+  it('/0 は全許可。32ビットの桁あふれで取り違えない', () => {
+    expect(isDeliveryWebhookIpAllowed('198.51.100.1', ['0.0.0.0/0'])).toBe(true);
+  });
+
+  it('何件か並べたうちの1つに当たれば通す', () => {
+    const list = ['198.51.100.7', '203.0.113.0/24'];
+    expect(isDeliveryWebhookIpAllowed('198.51.100.7', list)).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('203.0.113.9', list)).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('192.0.2.9', list)).toBe(false);
+  });
+
+  it('書き間違いの行は無視して、他の行の判断を壊さない', () => {
+    // 幅が範囲外・0埋め・IPv6 のまとまり指定はその行だけ飛ばす。
+    const list = ['203.0.113.0/33', '010.0.0.1', '2001:db8::/32', '198.51.100.7'];
+    expect(isDeliveryWebhookIpAllowed('198.51.100.7', list)).toBe(true);
+    expect(isDeliveryWebhookIpAllowed('203.0.113.9', list)).toBe(false);
+    expect(isDeliveryWebhookIpAllowed('2001:db8::1', list)).toBe(false);
   });
 });

@@ -43,8 +43,10 @@ import {
   DELIVERY_SERVICES,
   DELIVERY_SERVICE_LABELS,
   canTransitionOrder,
+  deliveryWebhookIpAllowlist,
   deliveryWebhookSecret,
   dispatchToDeliveryService,
+  isDeliveryWebhookIpAllowed,
   isDeliveryService,
   isIntakeStopPreset,
   intakeStopUntil,
@@ -1806,16 +1808,34 @@ async function ingestCancel(
 /**
  * 各サービスからの通知の受け口。
  *
- * 担当者の認証は通らない。守りは3つで、
- * 1) サービスごとの合言葉によるHMAC-SHA256の署名検証、
- * 2) 5分の時刻ずれ制限、
- * 3) 受信台帳 `rt_delivery_events` の UNIQUE (service, external_event_id) による重複排除。
+ * 担当者の認証は通らない。守りは4つで、
+ * 1) 送信元IPの許可リスト（設定されているときだけ。出前館QA#7）、
+ * 2) サービスごとの合言葉によるHMAC-SHA256の署名検証、
+ * 3) 5分の時刻ずれ制限、
+ * 4) 受信台帳 `rt_delivery_events` の UNIQUE (service, external_event_id) による重複排除。
  * 署名が合わない通知は本文を保存しない。
  */
 restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async (c) => {
   const service = c.req.param('service');
   if (!isDeliveryService(service)) {
     return c.json({ success: false, error: 'Unknown service' }, 404);
+  }
+  // 送信元IPの確認は本文を読む前に行う。許可外からの通知は本文も台帳も残さない。
+  const allowlist = deliveryWebhookIpAllowlist(c.env, service);
+  if (allowlist !== null) {
+    const sourceIp =
+      c.req.header('cf-connecting-ip') ||
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      c.req.header('x-real-ip') ||
+      '';
+    if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
+      // 符号だけを記録する。相手のIPは記録に残すと問い合わせの材料になるので残す。
+      console.error(
+        '[rt-delivery] webhook source ip is not allowed',
+        JSON.stringify({ service, sourceIp }),
+      );
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
   }
   const secret = deliveryWebhookSecret(c.env, service);
   if (!secret) {

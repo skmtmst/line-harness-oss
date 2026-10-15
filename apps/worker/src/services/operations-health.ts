@@ -48,6 +48,15 @@ function jstCutoff(nowIso: string, backMs: number): string {
   return new Date(Date.parse(nowIso) + JST_OFFSET_MS - backMs).toISOString().replace('Z', '');
 }
 
+/**
+ * `rt_delivery_*` の台帳と比べるための境界を秒で返す。
+ * これらの受信・依頼の時刻は `nowSec()` の通算秒（INTEGER）で入るため、
+ * JST 文字列を返す jstCutoff とは混ぜられない。
+ */
+function epochCutoff(nowIso: string, backMs: number): number {
+  return Math.floor((Date.parse(nowIso) - backMs) / 1000);
+}
+
 /** JST の月初・翌月初を、台帳の JST 壁時計（オフセット無し）と同じ形で返す。 */
 function jstMonthBounds(nowIso: string): { monthStart: string; monthEnd: string; resetAt: string } {
   const jst = new Date(Date.parse(nowIso) + JST_OFFSET_MS);
@@ -90,6 +99,69 @@ async function recentCheckResults(
     }
     return { status: row.status as OperationHealthStatus, failed };
   });
+}
+
+/** デリバリー連携の失敗を見る幅。受付中の店で1時間気づかないのは遅い。 */
+const DELIVERY_FAILURE_WINDOW_MS = 60 * 60_000;
+/** 再試行を使い切った（exhausted）送信は、連続失敗の重さを「異常」側まで上げる。 */
+const DELIVERY_EXHAUSTED_WEIGHT = 3;
+
+/**
+ * デリバリー連携（出前館・Uber Eats・ロケットナウ）の直近の失敗を数える。
+ * 出前館QA#3「各APIでエラーの発生を監視する仕組み」をこの確認で受け持つ。
+ * 板の9行を増やさないため、外部連携の確認へ畳んで数える。
+ *
+ * `rt_delivery_*` の時刻は `nowSec()` の通算秒なので epochCutoff で境界を作る。
+ * 台帳がまだ無い配備では 0 件として返す。ここで投げると isolate が
+ * 外部連携の確認ごと「確認できず」に落とし、Webhook や Sheets の失敗も見えなくなる。
+ */
+async function deliveryIntegrationFailures(
+  db: D1Database,
+  lineAccountId: string,
+  observedAt: string,
+): Promise<{ activeCount: number; failingCount: number; maxFailures: number }> {
+  try {
+    const cutoff = epochCutoff(observedAt, DELIVERY_FAILURE_WINDOW_MS);
+    // つなぎ終わっているサービスの数と、連携が切れたままのサービスの数。
+    // 切断（error）は連続失敗の数え方と別系なので、Sheets の要再接続と同じく警告側へ足す。
+    const states = await db.prepare(
+      `SELECT COUNT(*) AS active_count,
+              COALESCE(SUM(CASE WHEN connection_status = 'error' THEN 1 ELSE 0 END), 0) AS error_count
+         FROM rt_delivery_service_states
+        WHERE account_id = ? AND connection_status IN ('connected','error')`,
+    ).bind(lineAccountId).first<{ active_count: number; error_count: number }>();
+    // 送信の失敗。サービス単位で1件と数え、同じ相手の連打で件数が膨らまないようにする。
+    const dispatches = await db.prepare(
+      `SELECT COUNT(DISTINCT service) AS failing_count,
+              COALESCE(MAX(CASE WHEN status = 'exhausted' THEN ? ELSE attempts END), 0) AS max_failures
+         FROM rt_delivery_dispatches
+        WHERE account_id = ? AND requested_at >= ?
+          AND status IN ('failed','retryable_failed','exhausted')`,
+    ).bind(DELIVERY_EXHAUSTED_WEIGHT, lineAccountId, cutoff)
+      .first<{ failing_count: number; max_failures: number }>();
+    // 受信の取りこぼし。相手からの通知を処理できなかったものを同じように数える。
+    const events = await db.prepare(
+      `SELECT COUNT(DISTINCT service) AS failing_count,
+              COALESCE(MAX(attempts), 0) AS max_failures
+         FROM rt_delivery_events
+        WHERE account_id = ? AND received_at >= ? AND status IN ('failed','retryable_failed')`,
+    ).bind(lineAccountId, cutoff).first<{ failing_count: number; max_failures: number }>();
+    return {
+      activeCount: Number(states?.active_count ?? 0),
+      failingCount:
+        Number(states?.error_count ?? 0)
+        + Number(dispatches?.failing_count ?? 0)
+        + Number(events?.failing_count ?? 0),
+      maxFailures: Math.max(
+        Number(dispatches?.max_failures ?? 0),
+        Number(events?.max_failures ?? 0),
+      ),
+    };
+  } catch (error) {
+    // 符号だけ残す。相手の本文・注文の中身は記録に出さない。
+    console.error('[operations-health] delivery failure count skipped', String(error));
+    return { activeCount: 0, failingCount: 0, maxFailures: 0 };
+  }
 }
 
 async function countRecentFailures(
@@ -248,14 +320,23 @@ async function collectChecks(
                 COALESCE(MAX(consecutive_failures), 0) AS max_failures
            FROM google_sheets_integrations WHERE line_account_id = ?`,
       ).bind(account.id).first<{ active_count: number; failing_count: number; max_failures: number }>();
-      const failing = Number(row?.failing_count ?? 0) + Number(sheets?.failing_count ?? 0);
-      const maxFailures = Math.max(Number(row?.max_failures ?? 0), Number(sheets?.max_failures ?? 0));
+      // 出前館QA#3: デリバリー連携（出前館・Uber Eats・ロケットナウ）の送信・受信の失敗と
+      // 連携切れも同じ確認に畳む。板の9行は増やさない。
+      const delivery = await deliveryIntegrationFailures(db, account.id, observedAt);
+      const failing = Number(row?.failing_count ?? 0)
+        + Number(sheets?.failing_count ?? 0)
+        + delivery.failingCount;
+      const maxFailures = Math.max(
+        Number(row?.max_failures ?? 0),
+        Number(sheets?.max_failures ?? 0),
+        delivery.maxFailures,
+      );
       const status: OperationHealthStatus = maxFailures >= 3 ? 'danger' : failing > 0 ? 'warning' : 'normal';
       return result('external_integrations', status,
         status === 'normal' ? '外部連携に連続失敗はありません' : '外部連携に連続失敗があります',
         'outgoing_webhooks', observedAt,
         {
-          activeCount: Number(row?.active_count ?? 0) + Number(sheets?.active_count ?? 0),
+          activeCount: Number(row?.active_count ?? 0) + Number(sheets?.active_count ?? 0) + delivery.activeCount,
           failingCount: failing,
           maxConsecutiveFailures: maxFailures,
         },
