@@ -32,6 +32,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+import Card from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
 
 /* ★V8-B 緊急コントロール（板 OHwbU）。停止・復旧・本人確認・冪等キーと
  * 競合後の読み直しは、この現役の部品だけで守る。 */
@@ -748,6 +750,7 @@ const EmergencyControlV8 = (
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
         tone="default" contentLayout="form" confirmation
+        designTop={confirmMode === 'stop' ? 150 : undefined} fitViewport
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
           ? '止める前に、何と何人に関わるかを実測で確かめました。'
@@ -786,27 +789,19 @@ const EmergencyControlV8 = (
         <div>
           {confirmMode === 'stop' ? (
             <>
-              <div className={styles.confirmTargets}>
+              <Card surface="muted" corner="control" contentPadding="var(--polish-space-field)" gap="tight">
                 <p className={styles.dialogLabel}>止める対象：{accountName}</p>
-                {selectedTargets.map((key) => (
-                  <div key={key} className={styles.confirmTargetRow}>
-                    <span>{targetLabels[key].label}</span>
-                    <strong>{impactText(key)}</strong>
-                  </div>
-                ))}
-              </div>
-              <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
-              <div className={styles.confirmReason}><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><input
-                  id="emergency-reason-v8"
-                  aria-label="止める理由"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  disabled={mutationLocked || running}
-                  maxLength={200}
-                  placeholder="例：宛先の絞り込みを間違えた"
-                  className={styles.dialogInput}
-                  style={{ maxWidth: '100%' }}
-                /></SaveErrorField></Field></div>
+                <p>{selectedTargets.map((key) => `${targetLabels[key].label} ${impactText(key)}`).join('・')}</p>
+              </Card>
+              <DialogFormRow><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><TextField
+                id="emergency-reason-v8"
+                aria-label="止める理由"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                disabled={mutationLocked || running}
+                maxLength={200}
+                placeholder="例：宛先の絞り込みを間違えた"
+              /></SaveErrorField></Field></DialogFormRow>
               <DialogFormRow><Field label="補足" htmlFor="emergency-detail-v8" optional note={`あと${1000 - reasonDetail.length}文字`}>
                 <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
                   id="emergency-detail-v8"
@@ -819,7 +814,6 @@ const EmergencyControlV8 = (
                   className={styles.detailTextarea}
                 /></SaveErrorField>
               </Field></DialogFormRow>
-              <p className={styles.dialogHint}>停止前にすでに LINE へ渡したものは取り消せません。</p>
             </>
           ) : (
             <>
@@ -835,10 +829,11 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <DialogFormRow><Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><SaveErrorField names={["confirmWord","confirm_word"]}><TextField
+          <DialogFormRow>
+            <p>確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力してください</p>
+            <Field label="確認の文字" required><SaveErrorField names={["confirmWord","confirm_word"]}><TextField
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
-              autoFocus
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
             /></SaveErrorField></Field></DialogFormRow>
@@ -869,7 +864,10 @@ const EmergencyControlV8 = (
               )}
             </div>
           ) : null}
-          <p className={styles.dialogHint}>この操作は記録に残り、ログインユーザーへ通知されます。</p>
+          {confirmMode === 'stop' ? <DialogFormRow><Notice tone="warn" appearance="soft" icon={null}>
+            停止前にすでに LINE へ渡したものは取り消せません。止めたことはログインユーザー全員に知らせます。
+            <span>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</span>
+          </Notice></DialogFormRow> : <p className={styles.dialogHint}>この操作は記録に残り、ログインユーザーへ通知されます。</p>}
         </div>
       </Dialog>
 
