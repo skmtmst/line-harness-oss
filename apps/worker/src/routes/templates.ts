@@ -917,6 +917,9 @@ templates.get('/api/templates/:id/versions', async (c) => {
         questionStatus: v.question_status,
         effectiveFrom: v.effective_from,
         createdAt: v.created_at,
+        createdByStaffId: v.created_by_staff_id,
+        creatorName: v.creator_name ?? null,
+        creatorNameSource: v.creator_name ? 'current_staff_profile' : null,
       })),
     });
   } catch (err) {
