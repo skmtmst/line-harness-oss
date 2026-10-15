@@ -8,7 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BellRing, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
@@ -32,6 +32,7 @@ import styles from './settings-inner-nav.module.css'
  * 2026-10-06：夕41 の並び（専用の小見出し・プール管理なし）から、今の絵の並びへ。
  */
 const SETTINGS_ORDER = [
+  '/settings/customer-look', // お客さまのデザイン（B-237・絵 ewM7i では会社とロゴの次＝今は先頭）
   '/getting-started', // はじめの設定
   '/accounts', // LINEアカウント
   '/pools', // プール管理
@@ -47,6 +48,7 @@ const SETTINGS_ORDER = [
 
 /** 絵の印（lucide）。 */
 const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
+  '/settings/customer-look': Palette,
   '/getting-started': Rocket,
   '/accounts': MessageCircle,
   '/pools': Layers,
@@ -62,6 +64,7 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
 
 /** 左のメニュー（lib/menu）に無く、設定の中のメニューにだけ出す項目。 */
 const SETTINGS_ONLY_ITEMS: MenuItem[] = [
+  { id: 'settings-customer-look', href: '/settings/customer-look', label: 'お客さまのデザイン', icon: '', note: '予約・回答フォームなど、お客さまに見える画面のデザイン', required: true },
   { id: 'settings-sns', href: '/settings/sns', label: 'SNS 連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
   { id: 'settings-booking-media', href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: '', note: '店ごとの予約サイト・グルメ媒体の URL と、他のサイトの枠を閉じる知らせ', required: true },
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
@@ -153,7 +156,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    */
   const itemVisible = (item: MenuItem): boolean => {
     if ((item.href === '/settings/booking-media' || item.href === '/settings/delivery') && !restaurantTestUiEnabled()) return false
-    if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
+    if ((item.href === '/staff' || item.href === '/settings/customer-look') && staffRole !== 'owner' && staffRole !== 'admin') return false
     if (item.href === '/accounts' && staffRole === 'staff') return false
     const permissionKey = item.permissionKey ?? item.href
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false

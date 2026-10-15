@@ -89,6 +89,8 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByRole('link', { name: 'プール管理' })).toBeTruthy())
     const links = view.getAllByRole('link').map((link) => link.textContent)
     expect(links).toEqual([
+      // B-237（10-11）で足したお客さまのデザイン。絵 ewM7i では会社とロゴ（API 待ち）の次。
+      'お客さまのデザイン',
       'はじめの設定',
       'LINEアカウント',
       'プール管理',
