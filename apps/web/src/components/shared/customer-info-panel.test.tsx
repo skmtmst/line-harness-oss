@@ -32,7 +32,7 @@ test('birthday with derived age and allergy, visible basics, shared display pref
   const first=render(<CustomerInfoPanel {...props}/>)
   for(const spec of FIXED_FRIEND_FIELDS.filter(f=>f.key!=='age')) expect(screen.getByText(spec.label)).toBeTruthy()
   expect(screen.queryByText('年齢')).toBeNull()
-  expect(screen.getByText(/2000-01-01（\d+歳）/)).toBeTruthy()
+  expect(screen.getByText(/2000年1月1日（\d+歳）/)).toBeTruthy()
   expect(screen.getByRole('button',{name:'編集'})).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'表示項目を編集'}))
   fireEvent.click(screen.getByRole('checkbox',{name:'タグ'}))
