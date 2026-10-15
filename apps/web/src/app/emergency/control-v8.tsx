@@ -733,9 +733,10 @@ const EmergencyControlV8 = (
                       <td title={formatStopRange(entry.stoppedAt, entry.resolvedAt)} className={styles.cellTruncate}>
                         {formatStopRange(entry.stoppedAt, entry.resolvedAt)}
                       </td>
-                      <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId}</td>
-                      <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellTruncate}>
-                        {entry.capabilities.map(capabilityShort).join('・')}
+                      {/* 絵 OHwbU：だれがは名前だけ（役割・拠点は title）。何を は「・」の切れ目で折る（語の途中で切らない）。 */}
+                      <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId.replace(/[（(].*$/, '').trim() || entry.actorId}</td>
+                      <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellWrapWords}>
+                        {entry.capabilities.map((capability, i) => <span key={capability}>{capabilityShort(capability)}{i < entry.capabilities.length - 1 ? '・' : ''}</span>)}
                       </td>
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
                         {entry.reason}
