@@ -4,6 +4,7 @@ import type { Context, Next } from 'hono';
 import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
+import { isOutputRequest } from './output-audit.js';
 
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -535,6 +536,9 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
   // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
   if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+$/.test(path)) return true;
+  // This compatibility URL is a LIFF operation and verifies the customer in
+  // the event route. Only this method/path bypasses administrator login.
+  if (normalizedMethod === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(path)) return true;
   // LIFF の回答・開封・途中保存は route 側で LINE 署名を見る。
   if (
     normalizedMethod === 'POST' &&
@@ -776,6 +780,11 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
+  const outputRequest = isOutputRequest(path, c.req.query('format'), method);
+  if (staff.readOnly && outputRequest) {
+    return c.json({ success: false, error: '閲覧のみの権限では書き出しを実行できません' }, 403);
+  }
+
   // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
   // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
   // 運営メンバーは、運営会社の統括に属する通常の staff として作る。
@@ -791,7 +800,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
     const granted = requiredPermission
       && (staff.permissionKeys?.includes(requiredPermission)
-        || (SAFE_METHODS.has(method) && staff.viewPermissionKeys?.includes(requiredPermission)));
+        || (SAFE_METHODS.has(method) && !outputRequest && staff.viewPermissionKeys?.includes(requiredPermission)));
     if (!requiredPermission || !granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }

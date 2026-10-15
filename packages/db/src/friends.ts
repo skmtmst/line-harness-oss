@@ -1,5 +1,6 @@
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export interface Friend {
   id: string;
   line_user_id: string;
@@ -126,11 +127,14 @@ export async function getFriendByLineUserIdForAccount(
       .prepare(
         `SELECT * FROM friends
           WHERE line_user_id = ?
-            AND (line_account_id = ? OR line_account_id IS NULL)
+            AND (line_account_id = ? OR (line_account_id IS NULL AND EXISTS (
+              SELECT 1 FROM line_accounts legacy_owner WHERE legacy_owner.id = ?
+                AND COALESCE(legacy_owner.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
+            )))
           ORDER BY (line_account_id = ?) DESC
           LIMIT 1`,
       )
-      .bind(lineUserId, lineAccountId, lineAccountId)
+      .bind(lineUserId, lineAccountId, lineAccountId, lineAccountId)
       .first<Friend>();
   }
   return db.prepare('SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL LIMIT 1').bind(lineUserId).first<Friend>();

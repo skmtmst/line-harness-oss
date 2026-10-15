@@ -189,6 +189,9 @@ async function resolveWebinarCaller(
   if (!lineUserId) return c.json({ error: 'unauthorized' }, 401);
   const loaded = await loadActiveWebinar(c, slug);
   if (loaded instanceof Response) return loaded;
+  if (!await verifyCallerLineUserId(
+    c.req.header('Authorization'), c.env, loaded.webinar.account_id,
+  )) return c.json({ error: 'unauthorized' }, 401);
   const friend = await getFriendByLineUserIdForAccount(
     c.env.DB, lineUserId, loaded.webinar.account_id,
   );
@@ -200,7 +203,7 @@ async function loadActiveWebinar(
   c: Context<Env>,
   slug: string,
 ): Promise<{ webinar: Webinar } | Response> {
-  const webinar = await getWebinarBySlug(c.env.DB, slug);
+  const webinar = await getWebinarBySlug(c.env.DB, slug, { activeAccountOnly: true });
   if (!webinar || webinar.status !== 'active') {
     return c.json({ error: 'not_found' }, 404);
   }
@@ -884,7 +887,7 @@ webinarRoutes.get('/webinar-assets/:token/:slug/*', async (c) => {
   const valid = await verifyWebinarToken(c.env.LINE_CHANNEL_SECRET, slug, token, nowEpoch());
   if (!valid) return c.json({ error: 'forbidden' }, 403);
 
-  const webinar = await getWebinarBySlug(c.env.DB, slug);
+  const webinar = await getWebinarBySlug(c.env.DB, slug, { activeAccountOnly: true });
   if (!webinar || !webinar.video_prefix) return c.json({ error: 'not_found' }, 404);
 
   const prefix = `/webinar-assets/${token}/${slug}/`;

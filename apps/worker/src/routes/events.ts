@@ -56,6 +56,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   acceptEventWaitlistOffer,
   getEventWaitlistOffer,
+  getEventWaitlistOfferAccountId,
   getMyEventWaitlist,
   cancelMyEventWaitlist,
   createEventWaitlistOfferSender,
@@ -2183,7 +2184,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
 events.get('/api/liff/events/me', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
@@ -2250,7 +2251,7 @@ events.get('/api/liff/events/me', async (c) => {
 async function eventWaitlistCaller(c: Context<Env>) {
   const lineAccountId = await resolveAccountIdFromLiff(c);
   if (!lineAccountId) return bad(c, 'liff_account_resolution_failed', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, lineAccountId);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   return { lineAccountId, callerLineUserId };
 }
@@ -2282,7 +2283,7 @@ events.post('/api/liff/events/me/waitlist/:waitlistId/cancel', inputJsonBoundary
 events.get('/api/liff/events/me/:bookingId', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
@@ -2319,7 +2320,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
 events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
@@ -2444,7 +2445,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const idemKey = c.req.header('Idempotency-Key');
   if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(
@@ -2730,7 +2731,7 @@ events.get('/api/liff/events/:id', async (c) => {
     | null = null;
   let caller: string | null = null;
   try {
-    caller = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+    caller = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   } catch {
     caller = null;
   }
@@ -2857,6 +2858,9 @@ function startsAtJst(utcIso: string): string {
 events.get('/api/liff/events/waitlist/:token', async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const offerAccountId = await getEventWaitlistOfferAccountId(c.env.DB, c.req.param('token'));
+  if (!offerAccountId) return bad(c, 'waitlist_offer_not_found', 404);
+  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return bad(c, 'unauthorized', 401);
   const data = await getEventWaitlistOffer(c.env.DB, { token: c.req.param('token'), callerLineUserId });
   if (!data) return bad(c, 'waitlist_offer_not_found', 404);
   return c.json({ success: true, data });
@@ -2865,6 +2869,9 @@ events.get('/api/liff/events/waitlist/:token', async (c) => {
 events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const offerAccountId = await getEventWaitlistOfferAccountId(c.env.DB, c.req.param('token'));
+  if (!offerAccountId) return bad(c, 'waitlist_offer_not_found', 404);
+  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return bad(c, 'unauthorized', 401);
   const result = await acceptEventWaitlistOffer(c.env.DB, {
     token: c.req.param('token'),
     callerLineUserId,
@@ -2973,7 +2980,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const idemKey = c.req.header('Idempotency-Key');
   if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
 
   // is_following=1 必須: フォロー解除した友だちは push が届かない。

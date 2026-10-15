@@ -537,6 +537,7 @@ app.use('*', timingMark('rate'));
 // LIFF/public routes skip staff auth. Apply their tenant wall before auth and
 // before any route handler can persist a form/booking/member write.
 app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
+app.use('/api/events/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);

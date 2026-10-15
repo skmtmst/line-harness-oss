@@ -6,6 +6,7 @@ import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
 import {
   claimPhotoNotificationDelivery,
+  activeTenantLineAccountSql,
   completePhotoNotificationDelivery,
   findRewardedAdoptedDuplicate,
   getEffectivePhotoRewardPolicy,
@@ -138,7 +139,9 @@ async function currentFriend(c: Context<Env>): Promise<FriendRow | null> {
     `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id,
             a.channel_access_token, a.channel_access_token_encrypted
        FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
-      WHERE f.id = ? AND f.is_following = 1 LIMIT 1`,
+      WHERE f.id = ? AND f.is_following = 1
+        AND (f.line_account_id IS NULL OR (a.is_active = 1 AND a.archived_at IS NULL
+          AND ${activeTenantLineAccountSql('a.id')})) LIMIT 1`,
   ).bind(friend.id).first<FriendRow>();
 }
 
