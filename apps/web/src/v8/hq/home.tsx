@@ -219,9 +219,7 @@ export default function HqHomeV8() {
         : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`) }
+      if (!fieldFailure) setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -230,6 +228,8 @@ export default function HqHomeV8() {
 
   const login = (accountId: string) => {
     setSelectedAccountId(accountId)
+    /* 引き継ぎが途中なら続きから動かす。見た目は変えず、答えも待たない（cron でも進む）。 */
+    if (canManage) void api.lineAccounts.stepFollowerImport(accountId).catch(() => undefined)
     // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
     router.push(back ?? '/')
