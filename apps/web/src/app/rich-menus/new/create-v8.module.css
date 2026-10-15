@@ -589,13 +589,13 @@
 .hqReview { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: start; }
 .hqReviewShape { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .hqReviewActions { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.hqReviewLabel { margin: 0; color: var(--color-ink-secondary); font-size: 12px; line-height: 17px; }
+.hqReviewLabel { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-rm-review-label-lh); }
 .hqActionList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
-.hqActionRow { display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 6px 0; box-shadow: var(--shadow-row-line); }
+.hqActionRow { display: flex; align-items: center; gap: 12px; min-height: var(--tpl-rm-review-action-h); padding: 6px 0; box-shadow: var(--shadow-row-line); }
 .hqActionLetter {
-  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-  border-radius: 999px; background: var(--color-canvas-sunken); color: var(--color-accent-deep);
-  font-size: 12px; font-weight: 600;
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-rm-review-letter); height: var(--tpl-rm-review-letter);
+  border-radius: var(--radius-pill); background: var(--color-canvas-sunken); color: var(--color-accent-deep);
+  font-size: var(--text-label); font-weight: 600;
 }
-.hqActionName { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
-.hqActionValue { flex: none; color: var(--color-ink-secondary); font-size: 12px; white-space: nowrap; }
+.hqActionName { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.hqActionValue { flex: none; color: var(--color-ink-secondary); font-size: var(--text-label); white-space: nowrap; }

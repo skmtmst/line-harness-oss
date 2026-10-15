@@ -138,6 +138,7 @@ export function SaveConflictBand({
   compareBusy = false,
   compareDisabled = false,
   reloadHref,
+  reloadVariant = 'secondary',
   onCompare,
   compareHref,
   onReload,
@@ -148,6 +149,8 @@ export function SaveConflictBand({
   compareBusy?: boolean
   compareDisabled?: boolean
   reloadHref?: string
+  /** 板ごとの主・副の指定。副を既定とし、既存の緑の読み直しを保つ画面だけ主にする。 */
+  reloadVariant?: 'primary' | 'secondary'
   /** 「違いを比べる」を押したとき（窓を開くなど）。compareHref と どちらかを渡す。 */
   onCompare?: () => void
   /** 比べる先が別の画面のときは、ボタンをその画面へのリンクにする（新しいタブでも開ける）。 */
@@ -174,7 +177,7 @@ export function SaveConflictBand({
           違いを比べる
         </Button>
       ) : null}
-      {reloadHref ? <Button href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button onClick={onReload}>
+      {reloadHref ? <Button variant={reloadVariant} href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant={reloadVariant} onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける
       </Button>}

@@ -289,7 +289,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
           onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
           onDrop={(event) => dropOn(event, account.id)}>
-          <GripHorizontal size={12} aria-hidden="true" />
+          <GripHorizontal className={compact.grip} size={12} aria-hidden="true" />
           <span className={compact.name} title={account.displayName || account.name}>{account.displayName || account.name}</span>
           <span className={compact.relationship}>{depth === 0 ? '最上位（親）' : `${parent?.displayName || parent?.name || '上位アカウント'}の${depth === 1 ? '子' : '孫'}`}</span>
           {moveMenu(account)}
