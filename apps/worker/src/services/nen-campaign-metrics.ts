@@ -2,7 +2,7 @@ import { getLineAccountById, jstNow } from '@line-crm/db';
 
 import { getNenCampaign, nenCampaignFormIssue } from './nen-engagement.js';
 
-const MAX_DELIVERY_ATTEMPTS = 5;
+import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
 const DAY_MS = 86_400_000;
 
 export class NenCampaignMetricsError extends Error {
@@ -317,7 +317,7 @@ export async function getNenPetMetrics(
       `SELECT COUNT(DISTINCT f.id) AS total,
               COUNT(DISTINCT CASE WHEN p.id IS NULL THEN f.id END) AS unregistered
          FROM friends f
-         LEFT JOIN nen_pet_profiles p ON p.friend_id = f.id
+         LEFT JOIN nen_pet_profiles p ON p.friend_id = f.id AND p.archived_at IS NULL
         WHERE f.line_account_id = ? AND f.is_following = 1`,
     ).bind(lineAccountId).first<{ total: number; unregistered: number }>(),
     db.prepare(
@@ -329,7 +329,7 @@ export async function getNenPetMetrics(
               END) AS birthday_this_month
          FROM nen_pet_profiles p
          JOIN friends f ON f.id = p.friend_id
-        WHERE f.line_account_id = ?`,
+        WHERE p.archived_at IS NULL AND f.line_account_id = ?`,
     ).bind(lineAccountId).first<{
       total: number; birthday_registered: number; birthday_missing: number; birthday_this_month: number;
     }>(),
@@ -342,7 +342,7 @@ export async function getNenPetMetrics(
     db.prepare(
       `SELECT COALESCE(NULLIF(TRIM(p.breed), ''), '未登録') AS breed, COUNT(*) AS total
          FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-        WHERE f.line_account_id = ? GROUP BY COALESCE(NULLIF(TRIM(p.breed), ''), '未登録')
+        WHERE p.archived_at IS NULL AND f.line_account_id = ? GROUP BY COALESCE(NULLIF(TRIM(p.breed), ''), '未登録')
         ORDER BY total DESC, breed`,
     ).bind(lineAccountId).all<{ breed: string; total: number }>(),
     db.prepare(
@@ -848,7 +848,7 @@ export async function retryNenDelivery(
   // 確認後に状態・理由・版のどれかが変わった行は1件も更新されず409になる。
   const result = await db.prepare(
     `UPDATE nen_delivery_jobs
-        SET status = 'pending', attempts = 0, scheduled_at = ?, last_error = NULL,
+        SET status = 'pending', attempts = 0, next_attempt_at = NULL, claim_token = NULL, scheduled_at = ?, last_error = NULL,
             retry_generation = retry_generation + 1, version = version + 1,
             last_retry_reason = ?, last_retry_requested_by = ?, last_retry_requested_at = ?,
             updated_at = ?
