@@ -346,7 +346,7 @@ export default function DashboardV8() {
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 28} supportedDays={[1,7,28]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 28, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last28')} />
-        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />表示を変える</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
