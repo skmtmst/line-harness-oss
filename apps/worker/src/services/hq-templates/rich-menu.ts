@@ -171,7 +171,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = richMenuReferences(d);
   // D1 allows 100 bound parameters per statement. The atomic snapshot guard
   // needs the seven root bindings, reference bindings, and one expected snapshot.
-  if (8 + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
+  if (8 + (g.displayAudience === 'tag' ? 1 : 0) + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
   const assertContext = (c: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>) => {
     if (c.tenantId !== authority.tenantId) fail('FORBIDDEN'); ident(c.targetAccountId);
   };
