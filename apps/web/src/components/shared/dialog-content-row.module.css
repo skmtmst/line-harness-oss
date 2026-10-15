@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .row {
   display: flex;
   align-items: center;
@@ -22,3 +24,4 @@
 .row[data-align='start'] { justify-content: flex-start; }
 
 .row[data-size='account'] { min-height: var(--tpl-htn-row-h); }
+}
