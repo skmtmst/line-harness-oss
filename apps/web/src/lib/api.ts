@@ -7552,6 +7552,7 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    exportResponses: (formId: string, accountId: string) => fetchApiBlob(`/api/forms/${encodeURIComponent(formId)}/exports?account_id=${encodeURIComponent(accountId)}`, { method: 'POST', accountId }),
     submission: (formId: string, submissionId: string, accountId: string) =>
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
@@ -7901,6 +7902,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
     update: (id: string, accountId: string, data: {
+      expectedRevision?: number
       filename?: string
       folderId?: string | null
       /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
@@ -7910,6 +7912,7 @@ export const api = {
     }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
+        headers: data.expectedRevision === undefined ? undefined : { 'If-Match': String(data.expectedRevision) },
         body: JSON.stringify(data),
       }),
     /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */
@@ -9970,8 +9973,8 @@ export const api = {
       ),
   },
   affiliates: {
-    list: () =>
-      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates'),
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates' + (accountId ? `?accountId=${encodeURIComponent(accountId)}` : '')),
     get: (id: string) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`),
     // Admin-side create. Codes are auto-generated (random) — no manual `code`
@@ -12264,6 +12267,7 @@ export const api = {
       fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
+    exportCsv: (accountId: string, kind: 'balances' | 'history' | 'rewards' | 'scores', reason: string) => fetchApiBlob('/api/mileage/exports', { method: 'POST', accountId, body: JSON.stringify({ accountId, kind, reason }) }),
     rewardFolders: (accountId: string) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>(`/api/mileage/reward-folders?accountId=${encodeURIComponent(accountId)}`),
     createRewardFolder: (accountId: string, name: string) => fetchApi<ApiResponse<{ id: string; name: string; displayOrder: number; count: number }>>('/api/mileage/reward-folders', { method: 'POST', body: JSON.stringify({ accountId, name }) }),
     reorderRewardFolders: (accountId: string, ids: string[]) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>('/api/mileage/reward-folders/order', { method: 'PUT', body: JSON.stringify({ accountId, ids }) }),
