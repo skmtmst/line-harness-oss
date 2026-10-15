@@ -73,6 +73,8 @@ vi.mock('@line-crm/db', async () => {
 
 const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantDelivery } = await import('./restaurant-delivery.js');
+const { signSupportRelay } = await import('../services/support-relay.js');
+const { UBER_PROBE_LAST_RUN_KEY } = await import('../services/ubereats-token-probe.js');
 type Env = import('../index.js').Env;
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
@@ -247,6 +249,8 @@ async function postWebhook(
     signature?: string;
     secret?: string;
     rawBody?: string;
+    /** 送信元IPの見え方。Cloudflare が付ける見出しと同じ名前で渡す。 */
+    headers?: Record<string, string>;
   } = {},
 ) {
   const rawBody = init.rawBody ?? JSON.stringify(payload);
@@ -260,6 +264,7 @@ async function postWebhook(
         'Content-Type': 'application/json',
         'x-nen-timestamp': String(timestamp),
         'x-nen-signature': signature,
+        ...(init.headers ?? {}),
       },
       body: rawBody,
     },
@@ -603,6 +608,101 @@ describe('受信口（受入条件3）', () => {
     expect(order?.cancel_reason_code).toBe('customer_request');
     // 外へ送り返す操作ではないので送信台帳は使わない。
     expect(dispatchRows()).toHaveLength(0);
+  });
+});
+
+/* ====================== 受信口の送信元IPの制限（出前館QA#7） ====================== */
+
+describe('受信口の送信元IPの制限（出前館QA#7）', () => {
+  it('許可リストが未設定なら、いまと同じようにIPを見ずに受け取る', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '203.0.113.99' },
+    });
+    expect(response.status).toBe(200);
+    expect(eventRows()).toHaveLength(1);
+  });
+
+  it('許可リストにあるIPからの通知はそのまま取り込む', async () => {
+    env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '203.0.113.5' },
+    });
+    expect(response.status).toBe(200);
+    expect(eventRows()).toHaveLength(1);
+  });
+
+  it('許可リストにないIPは403で断り、本文も受信台帳も残さない', async () => {
+    env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '198.51.100.9' },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ success: false, error: 'Forbidden' });
+    expect(eventRows()).toHaveLength(0);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 0 });
+  });
+
+  it('送信元が分からない通知も、許可リストがあるときは403で断る', async () => {
+    env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
+    const response = await postWebhook(orderCreatedPayload());
+    expect(response.status).toBe(403);
+    expect(eventRows()).toHaveLength(0);
+  });
+
+  it('まとまりでの指定（203.0.113.0/24）は範囲の中なら通す', async () => {
+    env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.0/24' } as Env['Bindings'];
+    const inside = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '203.0.113.240' },
+    });
+    expect(inside.status).toBe(200);
+
+    const outside = await postWebhook(orderCreatedPayload({ eventId: 'evt-outside' }), {
+      headers: { 'cf-connecting-ip': '203.0.114.1' },
+    });
+    expect(outside.status).toBe(403);
+    expect(eventRows()).toHaveLength(1);
+  });
+
+  it('サービスごとの指定は共通の指定より先に効く', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '192.0.2.1',
+      RT_DELIVERY_UBEREATS_WEBHOOK_IP_ALLOWLIST: '198.51.100.7',
+    } as Env['Bindings'];
+
+    // 共通側のIPはこのサービスでは通らない。
+    const common = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '192.0.2.1' },
+    });
+    expect(common.status).toBe(403);
+
+    const perService = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '198.51.100.7' },
+    });
+    expect(perService.status).toBe(200);
+    expect(eventRows()).toHaveLength(1);
+  });
+
+  it('IPの確認は鍵と署名より先。許可外なら署名が正しくても403', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5',
+      RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: undefined,
+    } as Env['Bindings'];
+    // 鍵が無ければ本来は503だが、IPで断る方が先なので403になる。
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'cf-connecting-ip': '198.51.100.9' },
+    });
+    expect(response.status).toBe(403);
+  });
+
+  it('cf-connecting-ip が無い配備では x-forwarded-for の先頭を見る', async () => {
+    env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'x-forwarded-for': '203.0.113.5, 198.51.100.9' },
+    });
+    expect(response.status).toBe(200);
+    expect(eventRows()).toHaveLength(1);
   });
 });
 
@@ -1382,5 +1482,287 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(calls).toHaveLength(0);
       expect(JSON.stringify(await res.json())).not.toContain('access_token');
     });
+  });
+});
+
+/* ====================== 受信口の応答時間（出前館QA#10） ====================== */
+
+/**
+ * 出前館QA#10「出前館からのリクエストに対して1秒以内での応答が可能である」の実測。
+ *
+ * 測るのは受信口に入ってから応答を返すまでの処理だけ。
+ * 署名の検証・受信台帳への記録・注文（またはキャンセル）の取り込み・受信台帳の締めが含まれる。
+ * 署名を作るのは相手の仕事なので、要求は測る前に組み立てておく。
+ *
+ * この数字は同じコードを手元の SQLite に当てた値である。回線の往復と D1 の遠隔呼び出しは
+ * 含まれないため、配備後にもう一度測り直す前提の下限として読む。
+ * 1秒という約束に対して手元で桁違いに余裕があることを確かめ、
+ * 外への送信を応答の前に挟まない（受け取って即返す）作りを固定するのがここの役目。
+ */
+describe('受信口の応答時間（出前館QA#10）', () => {
+  /** 出前館との約束。1件の応答がこれを超えてはいけない。 */
+  const BUDGET_MS = 1000;
+  /** 測る回数。1回だけだと最初の読み込みの重さに引きずられる。 */
+  const SAMPLES = 20;
+
+  function percentile(sorted: number[], ratio: number): number {
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * ratio) - 1));
+    return sorted[index] ?? 0;
+  }
+
+  /**
+   * 署名まで作り終えた呼び出しを並べる。
+   * 署名づくり（相手側の仕事）を測ってしまわないよう、ここで先に済ませる。
+   */
+  async function prepared(
+    count: number,
+    make: (index: number) => unknown,
+  ): Promise<Array<() => Promise<Response>>> {
+    const instance = app();
+    const calls: Array<() => Promise<Response>> = [];
+    for (let index = 0; index < count; index += 1) {
+      const rawBody = JSON.stringify(make(index));
+      const signature = await signWebhook(NOW_SEC, rawBody);
+      calls.push(async () =>
+        instance.request(
+          '/api/restaurant-test/delivery/webhooks/ubereats',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-nen-timestamp': String(NOW_SEC),
+              'x-nen-signature': signature,
+            },
+            body: rawBody,
+          },
+          env,
+        ),
+      );
+    }
+    return calls;
+  }
+
+  /** 1件ずつ順番に叩いて、かかった時間を集める。時計は偽物にしていない performance を使う。 */
+  async function measure(
+    label: string,
+    calls: Array<() => Promise<Response>>,
+  ): Promise<{ p50: number; p95: number; max: number }> {
+    const durations: number[] = [];
+    for (const call of calls) {
+      const startedAt = performance.now();
+      const response = await call();
+      durations.push(performance.now() - startedAt);
+      // 速いだけで中身が落ちていては意味がない。全件 200 で返ること。
+      expect(response.status).toBe(200);
+    }
+    durations.sort((left, right) => left - right);
+    const stats = {
+      p50: percentile(durations, 0.5),
+      p95: percentile(durations, 0.95),
+      max: durations[durations.length - 1] ?? 0,
+    };
+    // QAの備考欄へ書き写すための実測値。console.info は試験の中で差し替えていない。
+    console.info(
+      `[QA#10] ${label} n=${calls.length} p50=${stats.p50.toFixed(1)}ms`
+      + ` p95=${stats.p95.toFixed(1)}ms max=${stats.max.toFixed(1)}ms budget=${BUDGET_MS}ms`,
+    );
+    return stats;
+  }
+
+  it('注文の取り込みは1件ずつ1秒以内に応答する', async () => {
+    // 最初の1回は読み込みと組み立ての重さが乗る。測る前に捨てる。
+    await postWebhook(
+      orderCreatedPayload({ eventId: 'evt-warmup', externalOrderId: 'UE-WARM', orderNumber: '#UE-WARM' }),
+    );
+    const calls = await prepared(SAMPLES, (index) =>
+      orderCreatedPayload({
+        eventId: `evt-perf-${index}`,
+        externalOrderId: `UE-${8000 + index}`,
+        orderNumber: `#UE-${8000 + index}`,
+      }),
+    );
+
+    const stats = await measure('order.created', calls);
+    expect(stats.max).toBeLessThan(BUDGET_MS);
+    // 取りこぼしがないこと。暖機の1件を足した数になる。
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({
+      n: SAMPLES + 1,
+    });
+  });
+
+  it('品数が上限（100品）の注文でも1秒以内に応答する', async () => {
+    // 受信口が受け付ける品数の上限。手元で測れる最も重い取り込み。
+    const items = Array.from({ length: 100 }, (_unused, index) => ({
+      name: `品目${index + 1}`,
+      quantity: 1,
+      amount: 500,
+    }));
+    const calls = await prepared(5, (index) => ({
+      event_id: `evt-bulk-${index}`,
+      event_type: 'order.created',
+      store_id: 'store-shibuya',
+      order: {
+        external_order_id: `UE-${8500 + index}`,
+        order_number: `#UE-${8500 + index}`,
+        total_amount: 50_000,
+        pickup_method: '配達（Uber Eats 配達員）',
+        wanted_at: NOW_SEC + 1500,
+        received_at: NOW_SEC - 30,
+        items,
+      },
+    }));
+
+    const stats = await measure('order.created(100品)', calls);
+    expect(stats.max).toBeLessThan(BUDGET_MS);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_order_items').get()).toMatchObject({
+      n: 500,
+    });
+  });
+
+  it('キャンセルの取り込みも1件ずつ1秒以内に応答する', async () => {
+    for (let index = 0; index < SAMPLES; index += 1) {
+      seedOrder({ id: `order-perf-${index}`, status: 'cooking', externalOrderId: `UE-${7000 + index}` });
+    }
+    const calls = await prepared(SAMPLES, (index) => ({
+      event_id: `evt-cancel-perf-${index}`,
+      event_type: 'order.canceled',
+      store_id: 'store-shibuya',
+      cancel: { external_order_id: `UE-${7000 + index}`, canceled_by: 'customer' },
+    }));
+
+    const stats = await measure('order.canceled', calls);
+    expect(stats.max).toBeLessThan(BUDGET_MS);
+    expect(
+      testDb.raw.prepare(`SELECT COUNT(*) AS n FROM rt_delivery_orders WHERE status = 'canceled'`).get(),
+    ).toMatchObject({ n: SAMPLES });
+  });
+
+  it('再送された通知は取り込みへ進まず、取り込みより速く返す', async () => {
+    const payload = orderCreatedPayload({
+      eventId: 'evt-dup-perf',
+      externalOrderId: 'UE-7900',
+      orderNumber: '#UE-7900',
+    });
+    expect((await postWebhook(payload)).status).toBe(200);
+    const calls = await prepared(SAMPLES, () => payload);
+
+    const stats = await measure('order.created(再送)', calls);
+    expect(stats.max).toBeLessThan(BUDGET_MS);
+    // 受信台帳の一意制約で弾くだけ。注文は増えない。
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 1 });
+  });
+
+  it('応答を返す前に相手のサービスへ送信しない。外向きの通信は応答に乗らない', async () => {
+    // 1秒の約束を守れる根拠は「受け取って即返す」こと。
+    // 受信の処理の中で外へ繋ぎに行くと、相手の遅さがそのまま応答時間になる。
+    await postWebhook(orderCreatedPayload({ eventId: 'evt-no-egress', externalOrderId: 'UE-7800' }));
+    expect(deliveryCalls).toHaveLength(0);
+  });
+});
+
+/**
+ * Uber Sandbox への接続確認（トークン1回）の口。
+ * 配備先の秘密設定を外へ出さずに「中から1回だけ送る」ための運用の口なので、
+ * 管理画面の認証ではなく合言葉の署名で守る。ここでは守りの側を確かめる。
+ */
+describe('Uber Sandbox 接続確認の口', () => {
+  const PROBE_PATH = '/internal/ubereats/sandbox-token-probe';
+  /** 32文字以上でないと口は開かない（uberProbeSecret）。本物の値ではない。 */
+  const PROBE_SECRET = 'ubereats-probe-secret-0123456789ab';
+
+  /** 合言葉で署名して投げる。`署名なし` のときは見出しを付けない。 */
+  async function postProbe(options: { secret?: string | null; skew?: number } = {}) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (options.secret) {
+      const timestamp = String(Math.floor(Date.now() / 1000) + (options.skew ?? 0));
+      headers['x-nen-timestamp'] = timestamp;
+      headers['x-nen-signature'] = await signSupportRelay(options.secret, timestamp, '{}');
+    }
+    return app().request(PROBE_PATH, { method: 'POST', headers, body: '{}' }, env);
+  }
+
+  it('合言葉が未設定なら口は開かない。署名があっても実行しない', async () => {
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ code: 'probe_not_configured' });
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('署名がない・違う・時刻がずれている依頼は実行しない', async () => {
+    env = { ...env, RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET } as Env['Bindings'];
+
+    const noSignature = await postProbe();
+    expect(noSignature.status).toBe(401);
+    await expect(noSignature.json()).resolves.toMatchObject({ code: 'probe_unauthorized' });
+
+    const wrongSecret = await postProbe({ secret: 'wrong-probe-secret-0123456789abcdef' });
+    expect(wrongSecret.status).toBe(401);
+
+    // 署名は正しいが時刻が10分先。使い回しを防ぐため受け取らない。
+    const stale = await postProbe({ secret: PROBE_SECRET, skew: 600 });
+    expect(stale.status).toBe(401);
+
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('接続先が Sandbox でないときは実行しない。本番の Uber へは送らない', async () => {
+    env = { ...env, RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET } as Env['Bindings'];
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'probe_sandbox_only' });
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('成功したら権限の名と残り秒だけを返す。トークンの値・秘密値は返さない', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET,
+      RT_DELIVERY_UBEREATS_ENVIRONMENT: 'sandbox',
+    } as Env['Bindings'];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        deliveryCalls.push({ url, init });
+        return new Response(
+          JSON.stringify({ access_token: 'probe-access-token', expires_in: 2_592_000, scope: 'eats.order' }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({
+      success: true,
+      environment: 'sandbox',
+      scope: ['eats.order'],
+      expiresInSec: 2_592_000,
+    });
+    expect(body).not.toContain('probe-access-token');
+    expect(body).not.toContain('test-client-secret');
+    expect(body).not.toContain(PROBE_SECRET);
+    // 外へ出たのは Sandbox のトークンの口へ1回だけ。
+    expect(deliveryCalls).toHaveLength(1);
+    expect(deliveryCalls[0]?.url).toBe('https://sandbox-login.uber.com/oauth/v2/token');
+  });
+
+  it('冷却時間の中の2回目は実行せず、待ち秒を返す', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET,
+      RT_DELIVERY_UBEREATS_ENVIRONMENT: 'sandbox',
+    } as Env['Bindings'];
+    testDb.raw
+      .prepare('INSERT OR REPLACE INTO platform_settings (key, value) VALUES (?, ?)')
+      .run(UBER_PROBE_LAST_RUN_KEY, String(Date.now()));
+
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as { code: string; retryAfterSec: number };
+    expect(body.code).toBe('probe_cooldown');
+    expect(body.retryAfterSec).toBeGreaterThan(0);
+    expect(deliveryCalls).toHaveLength(0);
   });
 });
