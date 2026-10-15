@@ -86,8 +86,9 @@ export type KpiCardProps = {
   /**
    * 'qualifier'：説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。
    * 'single'：帯の補足を1行＋省略にする（全文は title）。狭いマスで最後の1字だけ次の行に落ちる文に使う。
+   * 'inline-action'：補足の右に行き先（action）を同じ行で並べる（xxKtW）。
    */
-  detailLayout?: 'qualifier' | 'single'
+  detailLayout?: 'qualifier' | 'single' | 'inline-action'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
