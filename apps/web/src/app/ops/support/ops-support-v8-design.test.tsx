@@ -109,7 +109,15 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     await settle()
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('stage=waiting'))).toBe(true)
     expect(body).toContain('優先度')
-    expect(body).toContain('並び：優先度')
+    const sort = host.querySelector<HTMLButtonElement>('button[aria-label="並び替え"]')!
+    expect(sort).toBeTruthy()
+    await act(async () => { sort.click() })
+    await settle()
+    const newest = [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find(button => button.textContent?.includes('新しい順'))!
+    expect(newest).toBeTruthy()
+    await act(async () => { newest.click() })
+    await settle()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('sort=newest'))).toBe(true)
     // 行
     expect(body).toContain('#1042')
     expect(body).toContain('然-NEN-本部・優先度 高')
