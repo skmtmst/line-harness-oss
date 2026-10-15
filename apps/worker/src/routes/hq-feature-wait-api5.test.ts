@@ -54,6 +54,9 @@ describe('Upx1c: 保存した通数・差し込みで統括テンプレートを
     expect((await request('?type=template&message_count=single&has_interpolations=true')).body.data.map(row => row.id).sort()).toEqual([ids[0],ids[2]].sort());
     expect((await request('?type=template&has_interpolations=false')).body.data.map(row => row.id)).toEqual([ids[1]]);
     expect((await request('?type=template&message_count=multiple')).body.data).toEqual([]);
+    expect((await request('?type=template&kind=message&search=本文だけ&undistributed=true&folder_id=')).body.data.map(row=>row.id)).toEqual([ids[1]]);
+    expect((await request('?type=template&kind=message&search=%7B%7Bname%7D%7D')).body.data.map(row=>row.id).sort()).toEqual([ids[0],ids[1]].sort());
+    expect((await request('?type=template&undistributed=false')).body.data).toEqual([]);
     expect(JSON.stringify(listed.body)).not.toContain('名前 {{name}} 様');
     expect(totalChanges()).toBe(writes);
     expect(fetch).not.toHaveBeenCalled();
