@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChartNoAxesColumn, MoreHorizontal } from 'lucide-react'
+import { ArrowRight, Inbox, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
@@ -12,6 +12,7 @@ import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
 import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
+import { normalizeActionLabel } from './action-words'
 
 function hasDetail(node: ReactNode): boolean {
   return React.Children.toArray(node).some(child => {
@@ -36,7 +37,7 @@ function staticMenuDescription(menu: ReactNode): string | undefined {
 
 export type KpiCardProps = {
   title: string
-  /** 図柄。省略時は棒グラフ。`null` で図柄なし（X4STXS の絵どおり）。 */
+  /** 図柄。省略時は数のマスの標準Inbox。`null` は印のない絵だけで使う。 */
   icon?: ReactNode
   /** V8: 数の右に出す増減の札。 */
   delta?: ReactNode
@@ -61,6 +62,8 @@ export type KpiCardProps = {
    * 渡したときは value と unit を使わない（★V6 37-6 の数値カード帯）。
    */
   valueText?: string
+  /** 数字の範囲を数と単位で読む。片方を取得できないときは範囲全体が不明。 */
+  valueRange?: { from: number | null | undefined; to: number | null | undefined }
   /** 「18 / 20人」のように、整形した値にも単位を添える。 */
   valueTextWithUnit?: boolean
   /**
@@ -69,6 +72,8 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
+  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
+  detailLayout?: 'qualifier'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
@@ -84,6 +89,8 @@ export type KpiCardProps = {
    * `description` と両方渡したときは `help` を使う。
    */
   help?: ReactNode
+  /** 題から説明を開くのが既定。「？」が描かれている題だけquestionを指定。 */
+  helpDisplay?: 'label' | 'question'
   /** 「？」の見出し。省略時は title。読み上げ名は「{見出し}の説明」。 */
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
@@ -99,7 +106,7 @@ export type KpiCardProps = {
   badge?: string
   /** warning は「見ておくとよい」。止まっている・壊れている（danger）ほど強くない注意に使う。 */
   badgeTone?: 'accent' | 'neutral' | 'warning' | 'danger'
-  action?: { label: string; href: string }
+  action?: { label: string; href: string; onClick?: never } | { label: string; onClick: () => void; href?: never }
   loading?: boolean
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
   presentation?: 'card' | 'band' | 'cell' | 'inline'
@@ -136,9 +143,11 @@ export default function KpiCard({
   unitSpacing = 'normal',
   signed = false,
   detail,
+  detailLayout,
   description,
   descriptionLabel,
   help,
+  helpDisplay = 'label',
   helpLabel,
   helpHref,
   helpHrefLabel,
@@ -153,6 +162,7 @@ export default function KpiCard({
   className,
   valueTone = 'default',
   valueText,
+  valueRange,
   valueTextWithUnit = false,
   ...cardProps
 }: KpiCardProps) {
@@ -163,16 +173,21 @@ export default function KpiCard({
     補足は見出しの「？」（HelpTip）へ。開閉・Esc・外側・1つだけの
     扱いは HelpTip が持つので、カード側は中身を渡すだけにする。
   */
-  const textIsNumber = valueText === undefined || isKpiNumberText(valueText)
+  const rangeText = valueRange === undefined ? undefined
+    : isCountableValue(valueRange.from) && isCountableValue(valueRange.to)
+      ? `${formatNumber(valueRange.from)} → ${formatNumber(valueRange.to)}` : '—'
+  const textIsNumber = valueRange !== undefined || valueText === undefined || isKpiNumberText(valueText)
   const statusText = textIsNumber ? undefined : valueText
-  const numberText = textIsNumber ? valueText : undefined
+  const numberText = rangeText ?? (textIsNumber ? valueText : undefined)
   const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
   const tip = help ?? description ?? menuDescription
   const hasTip = tip !== undefined && tip !== null
+  const explanation = <>{tip}{helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}</>
+  const explanationLabel = descriptionLabel ?? `${helpLabel ?? title}の説明`
 
   const numberAndUnit = <>
     <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-    {(numberText !== undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
+    {(numberText !== undefined && valueRange === undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
   </>
 
   return (
@@ -180,6 +195,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}
@@ -195,17 +211,20 @@ export default function KpiCard({
           title={title || undefined}
         >
           {icon === null ? null : (
-            <span className={styles.icon} aria-hidden="true">
-              {icon ?? <ChartNoAxesColumn size={14} />}
+            <span data-kpi-icon className={styles.icon} aria-hidden="true">
+              {icon ?? <Inbox size={14} />}
             </span>
           )}
-          <span className={styles.labelText}>
+          {hasTip && helpDisplay === 'label' ? (
+            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{title}</span>}>
+              {explanation}
+            </HelpTip>
+          ) : <span className={styles.labelText}>
             {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
-          </span>
-          {hasTip ? (
-            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`} className={styles.tip}>
-              {tip}
-              {helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}
+          </span>}
+          {hasTip && helpDisplay === 'question' ? (
+            <HelpTip label={explanationLabel} className={styles.tip}>
+              {explanation}
             </HelpTip>
           ) : null}
         </p>
@@ -242,16 +261,18 @@ export default function KpiCard({
 
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
-        <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
+        <span role="note" className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}
           </button>
         ) : null}
         {action ? (
-          <Link href={action.href} className={styles.link}>
-            <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
-          </Link>
+          action.href !== undefined ? <Link href={action.href} className={styles.link}>
+            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
+          </Link> : <button type="button" className={styles.link} onClick={action.onClick}>
+            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
+          </button>
         ) : null}
       </p>
     </div>

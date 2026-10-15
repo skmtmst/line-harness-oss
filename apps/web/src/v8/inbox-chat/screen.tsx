@@ -3115,7 +3115,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(item.assignedStaffName ?? '未').charAt(0)}
                               </span>
-                              <span className="truncate">担当：{item.assignedStaffName ?? '未割り当て'}</span>
+                              <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
                             </span>
                           </div>
                         </div>
@@ -3218,7 +3218,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(operatorName ?? '未').charAt(0)}
                               </span>
-                              <span className="truncate">担当：{operatorName ?? '未割り当て'}</span>
+                              <span className="truncate">{`担当：${operatorName ?? '未割り当て'}`}</span>
                             </span>
                           </div>
                         </div>

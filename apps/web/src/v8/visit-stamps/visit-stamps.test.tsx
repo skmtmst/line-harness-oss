@@ -86,6 +86,10 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
     expect(fx.replace).toHaveBeenLastCalledWith('/visit-stamps?tab=paper&friend=f1&from=detail#card', { scroll: false })
     expect((await screen.findByRole('tab', { name: /紙のカードの移行/ })).getAttribute('aria-selected')).toBe('true')
+    await screen.findByRole('button', { name: /さんの .*個を承認/ })
+    const paperTable = document.querySelector('table[data-design="visit-stamp-paper"]')
+    expect(paperTable?.parentElement?.getAttribute('data-column-sizing')).toBe('controls')
+    expect(paperTable?.querySelector('tbody [data-cell-grow]')).not.toBeNull()
     expect(screen.queryByRole('textbox', { name: '使い方の説明' })).toBeNull()
     expect(screen.queryByRole('heading', { name: '店で手入力' })).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
@@ -177,7 +181,7 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 2, pageSize: 20 }))
     expect(await screen.findByText('88 件中 21〜40 件')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '記録の表示件数' }))
-    fireEvent.click(await screen.findByRole('button', { name: '10 件ずつ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '10件表示' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 10 }))
     expect(await screen.findByText('88 件中 1〜10 件')).toBeTruthy()
   })
@@ -358,4 +362,13 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(await screen.findByRole('tab', { name: /紙のカードの移行/ }))
     await waitFor(() => expect(fx.paperPhoto).toHaveBeenCalledWith('acc-1', 'ph-9'))
   })
+})
+
+it('変更していない設定は保存しない理由を出し、変更後に外す', async () => {
+ render(<VisitStampsV8 />)
+ await screen.findByDisplayValue(card.name)
+ for (const name of ['キャンセル','保存する']) expect(screen.getByRole('button',{name}).getAttribute('aria-description')).toBe('変更していません')
+ fireEvent.change(screen.getByDisplayValue(card.name), {target:{value:'新しいカード名'}})
+ const save = screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement
+ expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)
 })

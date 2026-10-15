@@ -161,6 +161,9 @@
 }
 :root .row + .row .bodyCell { border-top: 0; }
 :root .name { line-height: 18px; }
+:root .statusCell { padding-block: 0; }
+.statusStack { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-slot-gap); width: max-content; max-width: 100%; }
+.statusPrimary { display: inline-flex; align-items: center; gap: var(--tpl-slot-gap); white-space: nowrap; }
 :root .sub { margin-top: var(--tpl-sub-gap); line-height: 16px; }
 :root .memo { line-height: 16px; }
 :root .row[data-table-layout='columns'] {
@@ -324,7 +327,7 @@
 :root .frame[data-table-density] :is(thead, tbody) { display: block; }
 :root .frame[data-table-density] tr {
   display: grid;
-  grid-template-columns: var(--table-columns);
+  grid-template-columns: var(--table-content-columns, var(--table-columns));
   align-items: center;
   column-gap: var(--table-grid-gap,var(--tpl-sb-ec-gap));
   height: auto;
@@ -408,12 +411,14 @@
   line-height: var(--tpl-sb-ec-lh);
 }
 :root .frame[data-grid-table] .table tbody tr {min-height:var(--table-grid-row-height,0px);}
+:root .frame[data-grid-table] .table tbody tr { font-size: var(--table-body-text-size); }
 :root .frame[data-grid-table] .table thead tr {
+  font-size: var(--table-head-text-size);
   padding: var(--table-head-padding);
   background: var(--color-surface-pearl);
   box-shadow: none;
 }
-:root .frame[data-grid-table] .table :is(th, td) {
+html:root .frame[data-grid-table] .table.table > :is(thead, tbody) > tr > :is(th, td):nth-child(n) {
   min-width: 0;
   height: auto;
   padding: 0;
@@ -592,3 +597,20 @@ html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:no
 html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:not(:has([colspan])) > td {
   height: var(--polish-table-row); min-height: var(--polish-table-row);
 }
+
+/* Content-sized list columns keep their existing padding and truncation budget. */
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr > :is(th, td)[data-content-name-column] {
+  width: auto; min-width: 0;
+}
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr > :is(th, td)[data-content-support-column] {
+  width: var(--list-content-column-width);
+}
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-name-column] {
+  flex: 1 1 0;
+}
+html:root .frame:is([data-column-sizing='content'], [data-column-sizing='controls']) .table.table tr[data-table-layout='columns'] > :is(th, td)[data-content-support-column] {
+  flex: 0 0 var(--list-content-column-width); min-width: 0;
+}
+
+/* 中身で測る設定表でも、全行が同じ列幅を使う。外部リンクの印も幅に含める。 */
+:root .frame[data-grid-table][data-column-sizing='content'] .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }

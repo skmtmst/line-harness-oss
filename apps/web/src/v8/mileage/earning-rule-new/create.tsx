@@ -1,5 +1,6 @@
 'use client'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
@@ -41,6 +42,7 @@ import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
@@ -82,9 +84,16 @@ function conflictWho(data: unknown): { who: string | null; at: string | null } {
 }
 
 export default function EarningRuleCreateV8() {
-  const saveErrors = useSaveFormErrors()
+  const canManage = canManageRole(useStaffRole())
   usePageTitle('たまる決めごとを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: LIST_HREF }])
+  if (!canManage) return <CreatePage boardId="ctLwT" title="たまる決めごとを作る" readOnly dirty={false}
+    footerActions={<Button href={LIST_HREF}>一覧へ戻る</Button>}>{null}</CreatePage>
+  return <EarningRuleCreateBody />
+}
+
+function EarningRuleCreateBody() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
@@ -276,12 +285,12 @@ export default function EarningRuleCreateV8() {
   const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : emptyValue('unknown'))
   const preview = (
     <div className={styles.side}>
-      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="er-new-trial">
+      <Card variant="aside" aria-labelledby="er-new-trial">
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle} id="er-new-trial">この設定だとこう貯まります</h2>
-          <button type="button" className={styles.trialButton} onClick={() => void runTrial()} disabled={trialBusy}>
+          <Button variant="text" onClick={() => void runTrial()} disabled={trialBusy}>
             {trialBusy ? '数えています' : '試算する'}
-          </button>
+          </Button>
         </div>
         <p className={styles.sideNote}>この30日にあてはめた見込み</p>
         {trialError ? <Notice tone="danger" message={trialError} /> : null}
@@ -306,7 +315,7 @@ export default function EarningRuleCreateV8() {
           </div>
         </dl>
       </Card>
-      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="er-new-caution">
+      <Card variant="aside" aria-labelledby="er-new-caution">
         <h2 className={styles.sideTitle} id="er-new-caution">気をつけること</h2>
         <p className={styles.caution}>
           ・付けたマイルはあとから消せません（減らすで取り消しの明細を足します）
@@ -323,6 +332,8 @@ export default function EarningRuleCreateV8() {
       title="たまる決めごとを作る"
       help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
+      previewLabel="試算を見る"
+      previewTitle="マイルの試算"
       preview={preview}
       hidePreviewWhenNarrow
       footerActions={(
@@ -339,15 +350,12 @@ export default function EarningRuleCreateV8() {
     >
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError('')} /> : null}
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-rule">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="er-new-rule">どのルールか</h2>
-          <p className={styles.cardNote}>きっかけになる行動を選びます</p>
-        </div>
-        <Field label="名前" htmlFor="er-name" error={errorOf('er-name')} requirement={b244Requirements.name}>
+      <Card variant="form" aria-labelledby="er-new-rule">
+        <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
+        <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
           <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
-        <div className={styles.fieldRow}>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.pickLabel}>きっかけ</span>
@@ -374,7 +382,7 @@ export default function EarningRuleCreateV8() {
               options={selected.sources.map(([optionValue, label]) => ({ value: optionValue, label }))}
             /></SaveErrorField>
           </div>
-        </div>
+        </SettingsFormRow>
         <button type="button" className={styles.linkButton} onClick={() => setShowConditions((v) => !v)} aria-expanded={showConditions}>
           ＋ 条件を足す（タグ・友だち情報など）
         </button>
@@ -386,34 +394,17 @@ export default function EarningRuleCreateV8() {
         ) : null}
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-amount">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="er-new-amount">何マイル付けるか</h2>
-        </div>
-        <div className={styles.fieldRow}>
+      <Card variant="form" aria-labelledby="er-new-amount">
+        <CardHeader size="stacked" titleId="er-new-amount" title="何マイル付けるか" />
           <div className={styles.field}>
-            <Field label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
+            <Field required label="マイル" htmlFor="er-amount" note="付け方：決まった数" error={errorOf('er-amount')}>
               <SaveErrorField names={["amount"]}><NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} /></SaveErrorField>
             </Field>
           </div>
-          <div className={styles.field}>
-            <span className={styles.pickLabel}>付け方</span>
-            <Select
-              aria-label="付け方"
-              value="決まった数"
-              onChange={() => {}}
-              size="full"
-              options={[{ value: '決まった数', label: '決まった数' }]}
-              disabled
-            />
-          </div>
-        </div>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-who">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="er-new-who">受け取る人・使えるまで</h2>
-        </div>
+      <Card variant="form" aria-labelledby="er-new-who">
+        <CardHeader size="stacked" titleId="er-new-who" title="受け取る人・使えるまで" />
         <SaveErrorField names={["beneficiary"]}><RadioCardGroup legend="受け取る人" className={styles.choiceRow}>
           <RadioCard name="beneficiary" value="actor" checked={beneficiary === 'actor'} onChange={() => setBeneficiary('actor')}
             icon={<User size={16} />} title="行動した本人" note="そのまま本人の残高に" />
@@ -428,11 +419,9 @@ export default function EarningRuleCreateV8() {
         </RadioCardGroup></SaveErrorField>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-limit">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="er-new-limit">付けすぎを防ぐ</h2>
-        </div>
-        <div className={styles.fieldRow}>
+      <Card variant="form" aria-labelledby="er-new-limit">
+        <CardHeader size="stacked" titleId="er-new-limit" title="付けすぎを防ぐ" />
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.pickLabel}>1日に数える回数</span>
             <SaveErrorField names={["dailyCap","daily_cap"]}><Select
@@ -457,8 +446,8 @@ export default function EarningRuleCreateV8() {
               ]}
             /></SaveErrorField>
           </div>
-        </div>
-        <div className={styles.fieldRow}>
+        </SettingsFormRow>
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.label}>開始日</span>
             <SaveErrorField names={["validFrom","valid_from"]}><DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" /></SaveErrorField>
@@ -471,7 +460,7 @@ export default function EarningRuleCreateV8() {
             <SaveErrorField names={["validUntil","valid_until"]}><DateField id="er-until" value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" invalid={Boolean(errorOf('er-until'))} aria-describedby={errorOf('er-until') ? 'er-until-error' : undefined} /></SaveErrorField>
             {errorOf('er-until') ? <p id="er-until-error" className={styles.error} role="alert">{errorOf('er-until')}</p> : null}
           </div>
-        </div>
+        </SettingsFormRow>
         {/* 絵には無いが、倍率・期限・取り消し・通知・すぐ動かすの欄は落とさない（段の最後に畳んで置く）。 */}
         <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
           <div className={styles.detailsBody}>

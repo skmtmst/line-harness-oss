@@ -642,3 +642,15 @@ it('B-173: 統括でリサーチの質問と公開版を読み込み下書きへ
  await waitFor(()=>expect(hq.create).toHaveBeenCalled());
  expect(JSON.parse(hq.create.mock.calls[0][0].messageBubblesJson)[0]).toMatchObject({type:'research',content:{hqTemplateId:'research1',hqTemplateVersionId:'v1'}});
 });
+
+
+it('本文の手順でも作成型を重ねず、見出し・入力・保存帯を同じ板に保つ', async () => {
+  params.value = new URLSearchParams('step=message')
+  const { container } = render(React.createElement(HqBroadcastCreate))
+  await waitFor(() => expect(screen.getByText(/メッセージ（/)).not.toBeNull())
+  expect(container.querySelectorAll('[data-page-template="create"]')).toHaveLength(1)
+  const frame = container.querySelector('[data-page-template="create"]')!
+  expect(frame.querySelector('[data-template-region="heading"]')).not.toBeNull()
+  expect(frame.querySelector('[data-template-region="content"] [role="textbox"]')).not.toBeNull()
+  expect(frame.querySelector('[data-sticky-actions]')).not.toBeNull()
+})

@@ -20,7 +20,8 @@
  *
  * 出力：<out>/pattern-audit.json と <out>/pattern-audit.md。数は「候補」なので、直す前に目で確かめる。
  */
-import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync, statSync } from 'node:fs'
+import ts from 'typescript'
 import { dirname, join, relative, resolve, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -32,6 +33,28 @@ import { clearSourceEvidence, sourceEvidence } from './pattern-source-evidence.m
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_CATALOG = join(HERE, 'v8-pattern-catalog.json')
+
+/** 名前だけで通さず、再公開をたどって登録済みの実ファイルに照合する。 */
+function isRegisteredComponent(codeRoot, imported, owners, fromFile, seen = new Set()) {
+  if (!imported) return false
+  const stem = imported.path.startsWith('@/') ? join(codeRoot, 'apps/web/src', imported.path.slice(2))
+    : fromFile && imported.path.startsWith('.') ? resolve(dirname(fromFile), imported.path) : null
+  if (!stem || relative(codeRoot, stem).startsWith('..')) return false
+  const file = [stem, `${stem}.tsx`, `${stem}.ts`, join(stem, 'index.tsx'), join(stem, 'index.ts')].find(path => existsSync(path) && statSync(path).isFile())
+  if (!file || seen.has(`${file}:${imported.name}`)) return false
+  seen.add(`${file}:${imported.name}`)
+  const rel = relative(codeRoot, file).replaceAll('\\', '/')
+  if (owners.files.includes(rel) && owners.components.includes(imported.name)) return true
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  for (const node of source.statements) {
+    if (owners.files.includes(rel) && imported.name === 'default' && ts.isFunctionDeclaration(node)
+      && owners.components.includes(node.name?.text) && node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)) return true
+    if (!ts.isExportDeclaration(node) || !node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier) || !node.exportClause || !ts.isNamedExports(node.exportClause)) continue
+    const exported = node.exportClause.elements.find(binding => binding.name.text === imported.name)
+    if (exported && isRegisteredComponent(codeRoot, { path: node.moduleSpecifier.text, name: exported.propertyName?.text ?? exported.name.text }, owners, file, seen)) return true
+  }
+  return false
+}
 
 const CODE_ROOTS = ['apps/web/src', 'apps/liff/src']
 const CODE_EXT = /\.(tsx?|css)$/
@@ -77,6 +100,8 @@ export function compilePattern(pattern, catalog = { _global: { excludeFiles: [],
   const glob = catalog._global
   const components = owner.components ?? []
   pattern._code = {
+    choiceOwners: catalog.patterns?.find(p => p.id === 'action-list')?.owner?.code ?? { files: [], components: [] },
+    headingOwners: catalog.patterns?.find(p => p.id === 'page-head')?.owner?.code ?? { files: [], components: [] },
     excludeFiles: [...glob.excludeFiles, ...(code.excludeFiles ?? []).map((s) => rx(s)), ...(owner.files ?? []).map((f) => rx(`${escapeRe(f)}$`))],
     ownerFiles: (owner.files ?? []).map((f) => rx(`${escapeRe(f)}$`)),
     canonicalUse: code.canonicalUse ? rx(code.canonicalUse) : (components.length ? rx(`<(${components.map(escapeRe).join('|')})\\b|\\b(${components.map(escapeRe).join('|')})\\(`) : null),
@@ -245,11 +270,27 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
       const proof = sourceEvidence(rel, content, m.index, m[0].length)
       if (proof?.comment) continue
+      // 題の型へ直接渡した説明の文字は、操作の手書きとは分ける。
+      // help内のbuttonや偽の型は、この照合を通らない。
+      if (signal.id === 'own-extra' && proof?.attribute === 'help' && proof.literalAttribute && codeRoot
+        && isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], p.headingOwners)) continue
+      // 正の行うことの選択肢へ渡す label は、押したらの欄の手書きではない。
+      // 実在する持ち主への import と JSX のデータの口を両方照合する。
+      if (signal.id === 'own-extra' && proof?.literalProperty === 'label' && ['options', 'choices'].includes(proof.attribute) && codeRoot) {
+        const imported = proof.imports?.[proof.tag]
+        const ownerFile = imported?.path.startsWith('@/') ? 'apps/web/src/' + imported.path.slice(2) + '.tsx' : null
+        const ownerName = imported?.name === 'default' ? proof.tag : imported?.name
+        if (ownerFile && p.choiceOwners.files.includes(ownerFile) && p.choiceOwners.components.includes(ownerName) && existsSync(join(codeRoot, ownerFile))) continue
+      }
       // 共通の欄・浮く面へ渡す読み上げ属性は、その面を画面が手書きした証拠ではない。
       if (proof?.imports?.[proof.tag]?.path.startsWith('@/components/') && codeRoot && existsSync(join(codeRoot, 'apps/web/src', proof.imports[proof.tag].path.slice(2) + '.tsx')) && ['role', 'aria-modal', 'aria-invalid'].includes(proof.attribute) && ['raw-dialog', 'raw-alert', 'own-invalid'].includes(signal.id)) continue
       // 必須・エラーのFieldで正の押したらの欄を包んでも、手書きの選択肢にはならない。
       if (signal.id === 'more' && pattern.owner?.code?.components?.includes(proof?.tag) && proof.imports?.[proof.tag]?.path.startsWith('@/components/shared/') && p.ownerFiles.some(re => re.test('apps/web/src/' + proof.imports[proof.tag].path.slice(2) + '.tsx'))) continue
       if (signal.id === 'own-label' && proof?.imports?.[proof.tag]?.path === '@/components/shared/form-controls' && proof.descendantTags?.some(tag => pattern.owner?.code?.components?.includes(tag) && proof.imports?.[tag]?.path.startsWith('@/components/shared/'))) continue
+      // 固定の行うことの選択肢は、shared ActionListへ渡す設定。隣の手書きやeditor内のJSXは別に検査する。
+      if (signal.id === 'own-extra' && proof?.tag && proof.attribute === 'options'
+        && proof.imports?.[proof.tag]?.path === '@/components/shared/fixed-action-list' && codeRoot
+        && existsSync(join(codeRoot, 'apps/web/src/components/shared/fixed-action-list.tsx'))) continue
       if (proof?.searchString && ['raw-grid', 'raw-dialog', 'raw-alert', 'raw-check', 'own-listbox'].includes(signal.id)) continue
       if (signal.id === 'own-phone' && proof && !proof.returnsJsx) continue
       if (signal.id === 'own-phone' && ownedReturn(proof, pattern)) continue

@@ -271,9 +271,14 @@ test("static site does not collect information, install trackers, or embed exter
 test("mobile controls, native FAQ, reduced motion and sample disclosures are present", async () => {
   const html = await page("/");
   assert.match(html, /aria-controls="mobile-nav"/);
-  assert.equal([...html.matchAll(/data-demo="/g)].length, 3);
-  assert.equal([...html.matchAll(/<details>/g)].length, 5);
-  assert.match(html, /表示はサンプル/);
+  assert.match(html, /id="mobile-nav"[^>]*hidden/);
+  // The admin tour is drawn from inert JSON; every screen is a labelled sample.
+  const tour = JSON.parse(html.match(/<script type="application\/json" id="tourData">([^<]*)<\/script>/)[1]);
+  assert.equal(tour.length, 10);
+  assert.ok(tour.some((t) => t.name === "Instagram"));
+  // FAQ is native <details>, so it works without JavaScript.
+  assert.equal([...html.matchAll(/<details class="faq-item">/g)].length, 5);
+  assert.match(html, /画面はいずれも説明用のサンプルです/);
   assert.match(html, /実際の管理画面の表示とは異なります/);
   const css = await readFile(
     new URL("../public/assets/site.css", import.meta.url),
@@ -288,6 +293,7 @@ test("package contains only static public output, not source or configuration", 
   const files = await readdir(preview.output);
   assert.deepEqual(files.sort(), [
     ".htaccess",
+    "404.html",
     "assets",
     "contact",
     "index.html",
@@ -315,4 +321,61 @@ test("the retention notice uses the same day count as the deletion implementatio
     const html = await page(route);
     assert.match(html, new RegExp(`${spec.dataRetentionDays}日`));
   }
+});
+
+test("pages carry no inline styles or external fonts, so the strict CSP renders them as designed", async () => {
+  const css = await readFile(join(preview.output, "assets", "site.css"), "utf8");
+  for (const route of preview.paths) {
+    const html = await page(route);
+    assert.doesNotMatch(html, /\sstyle="/, `${route}: style attribute is blocked by style-src 'self'`);
+    assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic/);
+    assert.doesNotMatch(html, /<script(?![^>]*(?:src="\/assets\/site\.js"|type="application\/(?:ld\+)?json"))[^>]*>/);
+    for (const [, name] of html.matchAll(/class="[^"]*\b(s-[0-9a-f]{10})\b/g))
+      assert.ok(css.includes(`.${name}{`), `${route}: missing generated rule ${name}`);
+  }
+  const js = await readFile(new URL("../public/assets/site.js", import.meta.url), "utf8");
+  assert.doesNotMatch(js, /setAttribute\(\s*["']style/);
+});
+
+test("Google Business Profile and Instagram are both described with the confirm-before-send rule", async () => {
+  const html = await page("/");
+  assert.match(html, /GoogleとInstagramへ同時に投稿/);
+  assert.match(html, /あなたが内容を確かめて実行したときだけ/);
+  assert.match(html, /自動で送ることはありません/);
+});
+
+test("release checklist: titles, descriptions, OGP, icons and structured data", async () => {
+  const production = await build({ production: true, output: join(dir, "production-meta") });
+  for (const route of production.paths) {
+    const html = await page(route, production.output);
+    const title = html.match(/<title>([^<]+)<\/title>/)[1];
+    assert.match(title, / \| musubo$/, `${route}: title is "内容 | サイト名"`);
+    const description = html.match(/<meta name="description" content="([^"]+)">/)[1];
+    assert.ok(description.length >= 140 && description.length <= 300, `${route}: description ${description.length}字`);
+    const url = `${config.origin}${route}`;
+    assert.ok(html.includes(`<link rel="canonical" href="${url}">`));
+    assert.ok(html.includes(`<meta property="og:url" content="${url}">`));
+    assert.ok(html.includes(`<meta property="og:image" content="${config.origin}/assets/og.png">`));
+    assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+    assert.match(html, /rel="apple-touch-icon"/);
+    assert.match(html, /rel="manifest" href="\/assets\/site\.webmanifest"/);
+    assert.match(html, /<meta name="theme-color" content="#143e34">/);
+    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)[1]);
+    const types = ld["@graph"].map((node) => node["@type"]);
+    assert.ok(types.includes("Organization") && types.includes("WebSite"));
+    assert.equal(types.includes("BreadcrumbList"), route !== "/");
+    assert.match(html, new RegExp(`© \\d{4} ${config.operator.name}`));
+  }
+  const manifest = JSON.parse(await readFile(join(production.output, "assets", "site.webmanifest"), "utf8"));
+  for (const icon of manifest.icons) await stat(join(production.output, icon.src));
+  for (const file of ["og.png", "favicon-16.png", "favicon-32.png", "apple-touch-icon.png", "icon-512.png"])
+    await stat(join(production.output, "assets", file));
+  const htaccess = await readFile(join(production.output, ".htaccess"), "utf8");
+  assert.match(htaccess, /RewriteCond %\{HTTPS\} !on\nRewriteRule \^ https:\/\/musubo\.jp%\{REQUEST_URI\} \[R=301,L\]/);
+  assert.match(htaccess, /ErrorDocument 404 \/404\.html/);
+  const notFound = await readFile(join(production.output, "404.html"), "utf8");
+  assert.match(notFound, /content="noindex,nofollow"/);
+  assert.match(notFound, /<h1>ページが見つかりません<\/h1>/);
+  assert.match(notFound, /href="\/"/);
+  assert.doesNotMatch(await readFile(join(production.output, "sitemap.xml"), "utf8"), /404/);
 });

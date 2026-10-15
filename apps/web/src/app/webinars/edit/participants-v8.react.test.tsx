@@ -135,7 +135,7 @@ describe('参加者管理のV8（uNsEy）', () => {
     const host = render()
     await act(async () => undefined)
     await act(async () => undefined)
-    const chip = [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('視聴完了'))
+    const chip = [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('視聴完了') && el.hasAttribute('aria-pressed'))
     await act(async () => {
       chip!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })

@@ -11,7 +11,7 @@ import MembersPageV8 from '@/v8/nen-members/members'
 const calls = vi.hoisted(() => ({ members: vi.fn() }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { members: calls.members } }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error { status?: number } }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => null, canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => null, canManageRole: () => true, useStaffIdentity: () => ({ id: 'test-staff' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {} }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),

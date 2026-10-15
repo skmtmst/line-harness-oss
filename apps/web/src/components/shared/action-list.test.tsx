@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ActionList, { ActionAddButton, type ActionChoice } from './action-list'
+import ActionList, { ActionRow, ActionAddButton, type ActionChoice } from './action-list'
 
 type Item = { id: string; text: string }
 const choices: ActionChoice<Item>[] = [
@@ -83,3 +83,12 @@ describe('B-169 行うことの共通部品', () => {
     expect(screen.getByText('A')).toBeTruthy()
   })
 })
+
+it('Y1 名前と値は同じまとまりで読み、設定操作とメニューを両方保つ', () => {
+ const toggle=vi.fn();const {container}=render(<ActionRow title="本人に知らせる" number={1} extra="成果1件ごとに" onToggle={toggle} onRemove={()=>{}} />);
+ const name=container.querySelector('[data-action-name]')!,value=container.querySelector('[data-action-value]')!;
+ expect(name.parentElement).toBe(value.parentElement);
+ fireEvent.click(screen.getByRole('button',{name:'本人に知らせる'}));expect(toggle).toHaveBeenCalledTimes(1);
+ expect(name.parentElement?.contains(screen.getByRole('button',{name:'1つ目の行うことのその他操作'}))).toBe(false);
+ expect(value.textContent).toBe('成果1件ごとに');
+});

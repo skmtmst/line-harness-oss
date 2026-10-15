@@ -1,11 +1,14 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+
 import { canManageRole } from '@/lib/staff-role';
 import { RowNameLink } from '@/components/shared/table';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import { ListToolbarSort } from '@/components/shared/list-toolbar';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useTenantWideAccess } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react';
@@ -38,7 +41,7 @@ import { usePageTitle } from '@/components/shell/page-chrome';
 import { formatNumber } from '@/lib/format';
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api';
 import { useStaffRole } from '@/lib/staff-role';
-import { failedCount, jpDateTime, runBadge, sendTotals } from './model';
+import { failedCount, runBadge, sendTotals } from './model';
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot';
 import { emptyValue } from '@/components/shared/empty-value';
@@ -94,6 +97,7 @@ export default function HqBroadcastList() {
   const saveErrors = useSaveFormErrors()
 
   const router = useRouter()
+  const narrow = useNarrowViewport()
   usePageTitle('一括配信')
   const role = useStaffRole()
   const canManage = useTenantWideAccess()
@@ -276,7 +280,7 @@ export default function HqBroadcastList() {
             </FilterChip>
           ))}
         </div>
-        <span className={styles.spacer} aria-hidden="true" />
+        <ListToolbarEnd>
         <div className={styles.pageSizeBox}>
           <SaveErrorField names={["pageSize","page_size"]}><Select
             aria-label="表示件数"
@@ -287,6 +291,7 @@ export default function HqBroadcastList() {
           /></SaveErrorField>
         </div>
 <ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
+        </ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )
@@ -309,14 +314,14 @@ export default function HqBroadcastList() {
     )
   } else {
     content = (
-      <DataTable className={styles.table} data-design="hq-broadcasts">
+      <DataTable columnSizing="content" className={styles.table} data-design="hq-broadcasts">
         <thead>
           <TableHeadRow>
             <Th className={styles.colTitle}>タイトル・内容</Th>
             <Th className={styles.colStatus}>状態</Th>
             <Th className={styles.colAudience}>配信条件</Th>
             <Th className={styles.colDate}>配信日時</Th>
-            <Th className={styles.colResultWide}>結果</Th>
+            {!narrow && <Th className={styles.colResultWide}>結果</Th>}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -346,17 +351,17 @@ export default function HqBroadcastList() {
                   <span className={styles.cellSub}>{audienceText(run)}</span>
                 </Td>
                 <Td>
-                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
+                  <span className={styles.cellMain}>{run.scheduledAt ? <ListDateTime value={run.scheduledAt} /> : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
                   {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
                 </Td>
-                <Td>
+                {!narrow && <Td>
                   {sent ? (
                     <>
                       <span className={styles.resultMain}>{`${formatNumber(reached)} 人に届いた`}</span>
                       {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : rateLine(live, reached) ? <span className={styles.cellSub}>{rateLine(live, reached)}</span> : null}
                     </>
                   ) : <span className={styles.cellMain}>{emptyValue('unknown')}</span>}
-                </Td>
+                </Td>}
                 <Td className={styles.colMenu}>
                   <div className={styles.menuBox}>
                     <RowActions subjectName={run.title} menuItems={[
@@ -375,8 +380,7 @@ export default function HqBroadcastList() {
 
   const pager = runs && filtered.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件` : `${formatNumber(filtered.length)} 件`}</span>
-      {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="一括配信のページ送り" /> : null}
+      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="一括配信のページ送り" range={{ total: filtered.length, first: (current - 1) * pageSize + 1, last: Math.min(current * pageSize, filtered.length) }} />
     </ListPagePagination>
   ) : null
 

@@ -1,3 +1,7 @@
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import Pagination from '../shared/pagination'
+import { Pager as NenPager } from '../../v8/nen-campaigns/list'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
@@ -42,7 +46,6 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['運営 お問い合わせ', '../../v8/ops/support.tsx'],
   ['自動化の実行記録', '../../v8/automations/runs.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
-  ['Webhook のやり取り', '../../v8/webhooks/interactions.tsx'],
   // 受信一覧（旧inbox部品 ../inbox/inbox-list.tsx）は、どの入口からも読まれなくなったので外した（2026-10-06）。
   ['スタッフの操作記録', '../staff/login-audit.tsx'],
 ]
@@ -74,28 +77,26 @@ describe('ListRange 統一（監査6 #667）', () => {
       } else if (path === '../../app/rich-menus/page.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + 1')
         expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
-        expect(source).toContain('formatNumber(groupTotal)')
+        expect(source).toContain('total: groupTotal')
         expect(source).toContain('<Pagination page=')
         expect(source).not.toContain('pageCount > 1 ?')
-      } else if (path === '../../v8/webhooks/interactions.tsx') {
-        expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
-        expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
       } else if (path === '../../v8/automations/runs.tsx') {
         expect(source).toContain('data.pagination.offset + 1')
         expect(source).toContain('data.pagination.offset + data.items.length')
-        expect(source).toContain('formatNumber(total)')
+        expect(renderToStaticMarkup(React.createElement(Pagination, { page: 6, pageCount: 7, onPageChange: () => {}, range: { total: 325, first: 251, last: 300 } }))).toContain('325件中 251〜300件')
         expect(source).toContain('<Pagination')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
-        expect(source).toContain('<ListRange total={shown.length}')
+        expect(source).toContain('range={{ total: shown.length')
         expect(source).toContain('<Pagination page=')
         expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webinars/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + visibleItems.length')
-        expect(source).toContain('paginationSummary(visibleTotal,')
+        expect(source).toContain('range={{ total: visibleTotal')
         expect(source).toContain('const pager = hasListData ?')
       } else if (path === '../../v8/nen-campaigns/list.tsx') {
-        expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
+        expect(renderToStaticMarkup(React.createElement(NenPager, { total: 25, page: 2, size: 20, onPage: () => {} }))).toContain('25件中 21〜25件')
+        expect(renderToStaticMarkup(React.createElement(NenPager, { total: 0, page: 1, size: 20, onPage: () => {} }))).toContain('0件')
         expect(source).toContain('<Pagination')
       } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },
@@ -112,13 +113,7 @@ describe('ListRange 統一（監査6 #667）', () => {
     },
   )
 
-  it('V8の実行結果は取得した全件数と表示範囲をページ送りへ渡す', () => {
-    const source = read('../../v8/friend-add-runs/runs.tsx')
-    expect(source).toContain('<Pagination')
-    expect(source).toContain('summary={`${formatNumber(data.total)} 件中')
-    expect(source).toContain('(cursorPage - 1) * perPage + 1')
-    expect(source).toContain('(cursorPage - 1) * perPage + items.length')
-  })
+  // 実行結果の総数・表示範囲・カーソル移動は runs-v8.react.test.tsx で実描画する。
 
   it('B-231：単一ページもカーソル式の共通ページ送りを使う', () => {
     const source = read('../../v8/friend-add/list.tsx')

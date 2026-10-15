@@ -1,3 +1,4 @@
+import { bookingHistoryItem } from '../services/booking-history-item.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../services/booking-confirmed-effects.js';
@@ -150,7 +151,7 @@ booking.use('/api/booking/admin/bookings.csv', outputAuditMiddleware);
 booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
 
 booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
-booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({event:'waitlist_reconcile_failed'}));}}});
+booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({"code":"waitlist_reconcile_failed"}));}}});
 
 
 // 予約の作成・変更・承認の成功後に、同じ店舗内の重なりを確認する。
@@ -439,7 +440,7 @@ export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | 
     /* decode 失敗は無視: 候補 URL のみで verify を試す */
   }
 
-  console.log('[verifyCallerLineUserId] candidates:', candidates.length, candidates.join(','));
+  console.log(JSON.stringify({"code":"routes_booking_log"}));
 
   for (const channelId of candidates) {
     const res = await fetch('https://api.line.me/oauth2/v2.1/verify', {
@@ -452,9 +453,7 @@ export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | 
       if (verified.sub) return verified.sub;
     } else {
       const errBody = await res.text().catch(() => '');
-      console.log(
-        `[verifyCallerLineUserId] verify fail channel=${channelId} status=${res.status} body=${errBody.slice(0, 200)}`,
-      );
+      console.log(JSON.stringify({"code":"routes_booking_log"}));
     }
   }
   return null;
@@ -1036,7 +1035,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceEventId: bookingId,
       subjectKey: body.menu_id,
       occurredAt: nowIso,
-    }).catch((error) => console.error('booking action score failed:', error)),
+    }).catch((error) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   // 予約をきっかけにするリマインダへ登録する。通知やタグ付与と同じく
@@ -1050,7 +1049,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceId: bookingId,
       sourceEventId: bookingId,
       lineAccountId: accountId,
-    }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   if (autoConfirm) {
@@ -1059,13 +1058,13 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     try {
       await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env) });
     } catch (error) {
-      console.error('booking auto-confirm side effects failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}));
     }
   } else {
     // Fire-and-forget notification — failures must not roll back the booking.
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
-        console.error('booking notify (requested) failed:', err),
+        console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"})),
       ),
     );
   }
@@ -1080,7 +1079,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceEventId: bookingId,
       message: '新しい予約が入りました',
       executionMode: 'automatic',
-    }).catch((err) => console.error('booking operator notification failed:', err)),
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   // R150: 「予約が入ったとき」を購読する送信Webhookへも届ける。
@@ -1098,7 +1097,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         staffId: body.staff_id,
         startsAt: startsAt.toISOString(),
       },
-    }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+    }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   // notifyForBooking と同じく fire-and-forget。タグ付与失敗は予約成功扱い。
@@ -1115,20 +1114,14 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     c.executionCtx.waitUntil(
       (async () => {
         if (!(await isAssignableAutoTag(c.env.DB, tagId, accountId))) {
-          console.warn(JSON.stringify({
-            event: 'booking_auto_tag_skipped',
-            reason: 'tag_not_active_in_account',
-            tag_id: tagId,
-            line_account_id: accountId,
-            booking_id: bookingId,
-          }));
+          console.warn(JSON.stringify({"code":"booking_auto_tag_skipped","route":"POST /api/liff/booking/requests"}));
           return;
         }
         await attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
           defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
           workerUrl: c.env.WORKER_URL,
         });
-      })().catch((err) => console.error('booking auto-tag failed:', err)),
+      })().catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
     );
   }
 
@@ -1139,7 +1132,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
     );
   } catch (error) {
-    console.error('prepay decision failed:', error);
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}));
   }
 
   const responseBody = {
@@ -1510,7 +1503,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId }));
+    console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"POST /api/liff/booking/:id/cancel"}));
   }
   return c.json({
     status: 'cancelled',
@@ -1556,7 +1549,7 @@ async function runSelfBookingCancelSideEffects(
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch {
-    console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: row.id }));
+    console.error(JSON.stringify({"code":"booking_waitlist_promote_failed"}));
   }
   return {
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
@@ -1612,7 +1605,7 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const upcoming = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.customer_note,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.status, b.customer_note,
               b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               COALESCE(m.cancel_deadline_hours_before * 60, bs.cancel_deadline_minutes_before, 1440) AS cancel_deadline_minutes_before,
@@ -1631,7 +1624,7 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1645,7 +1638,7 @@ booking.get('/api/liff/booking/me', async (c) => {
     .bind(friendId, accountId, new Date().toISOString())
     .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results.map(row => ({ ...row, cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results } satisfies BookingHistoryResponse);
+  return c.json({ upcoming: upcoming.results.map(row => ({ ...bookingHistoryItem(row), cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results.map(bookingHistoryItem) } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
@@ -1667,7 +1660,7 @@ booking.get('/api/booking/admin/customers', async (c) => {
     });
     return c.json({ customers });
   } catch (error) {
-    console.error('GET /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"GET /api/booking/admin/customers"}));
     return c.json({ error: 'customer_data_unavailable' }, 503);
   }
 });
@@ -1686,7 +1679,7 @@ booking.get('/api/booking/admin/customers/:id', async (c) => {
       ? c.json({ customer })
       : c.json({ error: 'booking_customer_not_found' }, 404);
   } catch (error) {
-    console.error('GET /api/booking/admin/customers/:id error:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"GET /api/booking/admin/customers/:id"}));
     return c.json({ error: 'customer_data_unavailable' }, 503);
   }
 });
@@ -1854,7 +1847,7 @@ booking.post(
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
         return inputError(c, { error: code }, 422, [code.slice('booking_customer_'.length, -'_invalid'.length)]);
       }
-      console.error('POST /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/customers"}));
       return c.json({ error: 'customer_data_unavailable' }, 503);
     }
   },
@@ -2276,7 +2269,7 @@ booking.get('/api/booking/admin/settings', async (c) => {
     if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
     return c.json({ success: true, data: settings });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_settings_read_failed' }));
+    console.error(JSON.stringify({"code":"booking_settings_read_failed","route":"GET /api/booking/admin/settings"}));
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
   }
 });
@@ -2326,7 +2319,7 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
       result.status === 'created' ? 201 : 200,
     );
   } catch {
-    console.error(JSON.stringify({ event: 'booking_settings_save_failed' }));
+    console.error(JSON.stringify({"code":"booking_settings_save_failed","route":"PUT /api/booking/admin/settings"}));
     return c.json({ success: false, error: 'booking_settings_save_failed' }, 503);
   }
 });
@@ -2338,7 +2331,7 @@ booking.get('/api/booking/admin/resources', async (c) => {
     const resources = await listBookingAdminResources(c.env.DB, accountId);
     return c.json({ success: true, data: { resources } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resources_read_failed' }));
+    console.error(JSON.stringify({"code":"booking_resources_read_failed","route":"GET /api/booking/admin/resources"}));
     return c.json({ success: false, error: 'booking_resources_unavailable' }, 503);
   }
 });
@@ -2360,7 +2353,7 @@ booking.post('/api/booking/admin/resources', requirePermission(BOOKING_SETTINGS_
     };
     return c.json({ success: true, data: item }, 201);
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resource_create_failed' }));
+    console.error(JSON.stringify({"code":"booking_resource_create_failed","route":"POST /api/booking/admin/resources"}));
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -2416,7 +2409,7 @@ booking.patch('/api/booking/admin/resources/:id', requirePermission(BOOKING_SETT
     };
     return c.json({ success: true, data: item });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resource_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_resource_update_failed","route":"PATCH /api/booking/admin/resources/:id"}));
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -2450,7 +2443,7 @@ booking.delete('/api/booking/admin/resources/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: { id: c.req.param('id') } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resource_delete_failed' }));
+    console.error(JSON.stringify({"code":"booking_resource_delete_failed","route":"DELETE /api/booking/admin/resources/:id"}));
     return c.json({ success: false, error: 'booking_resource_delete_failed' }, 503);
   }
 });
@@ -2462,7 +2455,7 @@ booking.get('/api/booking/admin/exceptions', async (c) => {
     const items = await listBookingAvailabilityExceptions(c.env.DB, accountId);
     return c.json({ success: true, data: { items } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exceptions_read_failed' }));
+    console.error(JSON.stringify({"code":"booking_exceptions_read_failed","route":"GET /api/booking/admin/exceptions"}));
     return c.json({ success: false, error: 'booking_exceptions_unavailable' }, 503);
   }
 });
@@ -2482,7 +2475,7 @@ booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS
     if (!item) return inputError(c, { success: false, error: 'scope_not_found' }, 422, ["scopeKind","kind","dateFrom","dateTo","scopeId","reason","intervals"]);
     return c.json({ success: true, data: item }, 201);
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exception_create_failed' }));
+    console.error(JSON.stringify({"code":"booking_exception_create_failed","route":"POST /api/booking/admin/exceptions"}));
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -2528,7 +2521,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: result.item });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exception_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_exception_update_failed","route":"PATCH /api/booking/admin/exceptions/:id"}));
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -2564,7 +2557,7 @@ booking.delete('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SE
     }
     return c.json({ success: true, data: { id: c.req.param('id') } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exception_delete_failed' }));
+    console.error(JSON.stringify({"code":"booking_exception_delete_failed","route":"DELETE /api/booking/admin/exceptions/:id"}));
     return c.json({ success: false, error: 'booking_exception_delete_failed' }, 503);
   }
 });
@@ -2790,7 +2783,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
       })),
     });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_menu_list_failed' }));
+    console.error(JSON.stringify({"code":"booking_menu_list_failed","route":"GET /api/booking/admin/menus"}));
     return c.json({ error: 'booking_menu_data_unavailable' }, 503);
   }
 });
@@ -2827,7 +2820,7 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
       data: { id: c.req.param('id'), version: result.version, resources: result.resources },
     });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_menu_resources_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_menu_resources_update_failed","route":"PUT /api/booking/admin/menus/:id/resources"}));
     return c.json({ success: false, error: 'booking_menu_resources_save_failed' }, 503);
   }
 });
@@ -3302,7 +3295,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
     }
     return c.json({ success: true, data: { id: c.req.param('id'), version: result.version } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_menu_settings_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_menu_settings_update_failed","route":"PATCH /api/booking/admin/menus/:id"}));
     return c.json({ success: false, error: 'booking_menu_save_failed' }, 503);
   }
 });
@@ -3627,7 +3620,7 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"DELETE /api/booking/admin/waitlist/:id"}));
     }
   }
   return c.json({ status: 'cancelled' });
@@ -3739,7 +3732,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"DELETE /api/liff/booking/waitlist/:id"}));
     }
   }
   return c.json({ status: 'cancelled' });
@@ -4923,7 +4916,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
             lineAccountId: accountId,
           });
         } catch (error) {
-          console.error('reminder reschedule (booking update) failed:', error);
+          console.error(JSON.stringify({"code":"routes_booking_failed"}));
           v6Sync = 'failed';
         }
       }
@@ -4941,7 +4934,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
           cancelReason: `booking_updated_notifications_off:${bookingId}:by:${self ? `self:${self.lineUserId}` : (c.get('staff')?.id ?? 'admin')}`,
         });
       } catch (error) {
-        console.error('reminder cancel (booking update) failed:', error);
+        console.error(JSON.stringify({"code":"routes_booking_failed"}));
         v6Sync = 'failed';
       }
     }
@@ -4956,7 +4949,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
         startsAtIso: newStartsAt.toISOString(),
       });
     } catch (error) {
-      console.error('reminder reconcile (booking update) failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed"}));
       v6Sync = 'failed';
     }
   }
@@ -4999,7 +4992,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
     });
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'changed', changeOperationId).catch((err) =>
-        console.error('booking notify (changed) failed:', err),
+        console.error(JSON.stringify({"code":"routes_booking_failed"})),
       ),
     );
   }
@@ -5220,7 +5213,7 @@ booking.post(
       await notifyForBooking(c.env.DB, bookingId, notificationKind, op.id, `booking-notification-retry:${op.id}`);
     } catch (error) {
       outcome = 'failed';
-      console.error('booking notification retry failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings/:id/notifications/:runId/retry"}));
     }
     const refreshed = await c.env.DB
       .prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = ?`)
@@ -5740,7 +5733,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       adminPrepayOnly = decision.prepayOnly;
       adminPrepayNotice = await prepayNoticeFor(c.env.DB, accountId, decision);
     } catch (error) {
-      console.error('prepay decision failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings"}));
     }
   }
   const initialStatus = (adminPrepayOnly ? 'requested' : 'confirmed') satisfies BookingStatus;
@@ -5918,7 +5911,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           staffId: body.staff_id,
           startsAt: startsAt.toISOString(),
         },
-      }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+      }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings"}))),
     );
   }
   const [reminderRows, operationRows, customerContext] = await Promise.all([
@@ -6854,7 +6847,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
       access_token: null,
     }, googleCredentials(c.env));
   } catch (error) {
-    console.error('Google Calendar verification failed:', error);
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"PUT /api/booking/admin/staff/:id/google-calendar"}));
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'google_service_account_not_configured' ? 503 : 422;
     return inputError(c, { error: status === 503 ? 'service_account_not_configured' : 'calendar_not_accessible' }, status, []);
@@ -7420,7 +7413,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
           staffId: row.staff_id,
           startsAt: row.starts_at,
         },
-      }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+      }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"}))),
     );
   } else if (next === 'rejected') {
     // N-065: 却下でも V6 の未送信予定は止める (通知だけでは送り続ける)。
@@ -7458,7 +7451,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, id, 'rejected').catch((err) =>
-        console.error('booking notify (rejected) failed:', err),
+        console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"})),
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
@@ -7508,7 +7501,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         bookingId: id,
         lineAccountId: accountId,
         remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
-      }).catch((error) => console.error('Google Calendar delete failed:', error)),
+      }).catch((error) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"}))),
     );
     // キャンセル待ち：空いた枠を登録の早い順で1人に知らせる。
     // 知らせの失敗で取り消し自体を失敗させない。
@@ -7519,7 +7512,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         startsAt: row.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: id }));
+      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"PATCH /api/booking/admin/requests/:id"}));
     }
   }
 

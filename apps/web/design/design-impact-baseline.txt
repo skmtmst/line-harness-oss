@@ -85,6 +85,7 @@ shared-button-importer components/chats/inbox-filter-panel.tsx
 shared-button-importer components/chats/saved-view-dialog.tsx
 shared-button-importer components/chats/template-folder-select.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
+shared-button-importer components/dashboard/qr-stopped-notice.tsx
 shared-button-importer components/events/event-questions-editor.tsx
 shared-button-importer components/feature-disabled-gate.tsx
 shared-button-importer components/forms/choice-table.tsx
@@ -135,6 +136,7 @@ shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/folder-editor-dialog.tsx
 shared-button-importer components/shared/use-folder-move.tsx
 shared-button-importer components/templates/detail-columns.tsx
+shared-button-importer components/shared/dialog-usage-table.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
@@ -146,6 +148,8 @@ shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/shared/save-conflict.tsx
 shared-button-importer components/shared/entity-picker.tsx
 shared-button-importer components/shared/source-picker-dialog.tsx
+shared-button-importer components/shared/sticky-bar-action.tsx
+shared-button-importer components/shared/sticky-save-actions.tsx
 shared-button-importer components/shared/tag-picker-field.tsx
 shared-button-importer components/shared/tap-extras-field.tsx
 shared-button-importer components/shared/target-missing.tsx
@@ -233,8 +237,8 @@ shared-button-importer v8/mileage/adjust-dialog.tsx
 # ★V8 予約設定（owaS3 ほか）を src/v8/booking-menus に書き直した。
 shared-button-importer v8/booking-menus/assign.tsx
 shared-button-importer v8/booking-menus/channels-tab.tsx
+shared-button-importer v8/booking-menus/channels-tables.tsx
 shared-button-importer v8/booking-menus/menu-form.tsx
-shared-button-importer v8/booking-menus/settings.tsx
 shared-button-importer v8/booking-menus/staff-edit-dialog.tsx
 shared-button-importer v8/booking-menus/tabs/holidays-tab.tsx
 shared-button-importer v8/booking-menus/tabs/hours-tab.tsx
@@ -296,6 +300,7 @@ shared-button-importer v8/analytics/funnel.tsx
 shared-button-importer v8/analytics/cross.tsx
 shared-button-importer v8/analytics/search-console.tsx
 shared-button-importer v8/nen-posts/review.tsx
+shared-button-importer v8/nen-posts/review-summary.tsx
 shared-button-importer v8/nen-posts/policy-history.tsx
 shared-button-importer v8/nen-posts/detail.tsx
 shared-button-importer v8/nen-members/members.tsx
@@ -315,7 +320,6 @@ shared-button-importer v8/ops/dashboard.tsx
 shared-button-importer v8/ops/members.tsx
 shared-button-importer v8/ops/audit.tsx
 shared-button-importer v8/ops/announcements.tsx
-shared-button-importer v8/ops/knowledge.tsx
 shared-button-importer v8/ops/knowledge-article.tsx
 shared-button-importer v8/ops/tenants.tsx
 shared-button-importer v8/ops/tenant-detail.tsx
@@ -334,6 +338,7 @@ shared-button-importer v8/reminders/ui.tsx
 shared-button-importer v8/webinar-edit/analytics.tsx
 shared-button-importer v8/webinar-edit/basic-form.tsx
 shared-button-importer v8/webinar-edit/basic.tsx
+shared-button-importer v8/webinar-edit/comment-stats.tsx
 shared-button-importer v8/webinar-edit/comments.tsx
 shared-button-importer v8/webinar-edit/cta.tsx
 shared-button-importer v8/webinar-edit/edit.tsx
@@ -350,7 +355,7 @@ shared-button-importer v8/restaurant/google/posts.tsx
 shared-button-importer v8/restaurant/google/profile.tsx
 shared-button-importer v8/restaurant/google/reviews.tsx
 shared-button-importer v8/restaurant/google/settings.tsx
-shared-button-importer v8/restaurant/line-followup/line-followup.tsx
+shared-button-importer v8/restaurant/line-followup/flow-editor.tsx
 shared-button-importer v8/restaurant/organization/organization.tsx
 shared-button-importer v8/restaurant/store-new/store-new.tsx
 # ★V8 飲食店テスト（在庫 Y8SjT2・予約台帳 l9NlC0・座席 BERxg・メニュー MJoJR）。src/v8/restaurant に一から書いた。
@@ -369,6 +374,7 @@ shared-button-importer v8/settings/accounts/accounts.tsx
 shared-button-importer v8/settings/staff/mfa-policy.tsx
 shared-button-importer v8/settings/staff/self-mfa.tsx
 shared-button-importer v8/settings/staff/staff.tsx
+shared-button-importer v8/settings/features/reorder-dialog.tsx
 shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx
@@ -486,6 +492,7 @@ shared-button-importer components/shared/list-state.tsx
 
 shared-button-importer components/shared/form-file-attachments.tsx
 shared-button-importer components/shared/form-document-retention.tsx
+shared-button-importer components/shared/customer-info-mileage.tsx
 shared-button-importer components/shared/customer-info-panel.tsx
 shared-button-importer components/friend-fields/linked-action-list.tsx
 shared-button-importer components/shared/action-list.tsx
@@ -500,6 +507,7 @@ shared-button-importer v8/automations/create/friend-multi-select.tsx
 shared-button-importer v8/form-edit/after-tab.tsx
 shared-button-importer v8/hq-deliveries/console.tsx
 shared-button-importer components/shared/reservation-board.tsx
+shared-button-importer components/shared/reservation-month.tsx
 shared-button-importer components/shared/restaurant-floor-editor.tsx
 shared-button-importer v8/visit-stamps/qr.tsx
 shared-button-importer v8/restaurant/reservations/waitlist.tsx
@@ -532,3 +540,9 @@ shared-button-importer components/shared/aggregation-status.tsx
 shared-button-importer components/shared/friend-filter-band.tsx
 shared-button-importer components/shared/save-feedback.tsx
 shared-button-importer components/shared/inbox-list.tsx
+shared-button-importer v8/booking-menus/menu-settings-page.tsx
+shared-button-importer v8/booking-menus/settings-view.tsx
+shared-button-importer v8/mileage/history-table.tsx
+shared-button-importer v8/tags/fields-table.tsx
+shared-button-importer v8/tags/fields-view.tsx
+shared-button-importer v8/restaurant/organization/organization-forms.tsx

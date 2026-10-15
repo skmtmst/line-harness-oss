@@ -1,10 +1,12 @@
 'use client'
+import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, BookOpen, Check, Trash2 } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SeatTile from '@/components/shared/seat-tile'
 import CheckCard from '@/components/shared/check-card'
 import Button from '@/components/shared/button'
@@ -14,7 +16,7 @@ import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
-import DateField from '@/components/shared/date-field'
+import StockListHeading from './stock-list-heading'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -44,25 +46,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
  */
 
-type Alloc = { ota: number; line: number; walkin: number }
-type Hours = RestaurantOpeningDay[]
-
-type SlotInfo = {
-  row: RestaurantInventory
-  time: string
-  seats: number
-  tables: RestaurantTable[]
-  free: number
-  ratio: number
-}
-
-type Conflict = {
-  who: string
-  at: string
-  scope: string
-  attemptedAlloc: Alloc | null
-  attemptedHours: Hours | null
-}
 
 const allocOf = (row: RestaurantInventory | undefined): Alloc =>
   row ? { ota: row.ota_capacity, line: row.line_capacity, walkin: row.walk_in_capacity } : { ota: 0, line: 0, walkin: 0 }
@@ -338,13 +321,14 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   const gridTables = tables.slice().sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || tableOrder(a, b))
   /* 閉じる先は、メール転送で今も予約が届いている媒体（受付を各媒体の管理画面で閉じるもの）。 */
   const closingChannels = channels.filter((channel) => channel.receiveMethod === 'email_forward' && channel.status === 'receiving')
-  const canCloseNote = Boolean(selected && lowSlot(selected) && !closedSlots.includes(selected.row.id))
+  const canCloseNote = Boolean(canEdit && selected && lowSlot(selected) && !closedSlots.includes(selected.row.id))
 
   const setDay = (weekday: number, next: RestaurantOpeningDay['periods']) =>
     setHoursDraft((current) => (current ?? emptyWeek()).map((day) => (day.weekday === weekday ? { ...day, periods: next } : day)))
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {!canEdit ? <ReadOnlyNotice /> : null}
       {channelsError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
       {loadError ? (
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
@@ -413,11 +397,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>OTA・LINE・当日の合計が総数を超えると保存できません。予約媒体へは書き戻しません（検証中）</p>
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
-            <div className={styles.sectionHeadRow}>
-              <CardHeader size="stacked" titleId="rs-stock-title" title={`時間帯ごとの在庫（${dayLabel(date)}）`} meta="予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます" />
-              <span className={styles.datePicker}><SaveErrorField names={["date"]}><DateField aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></SaveErrorField></span>
+            <StockListHeading date={date} busy={busy} onChange={changeDate}>
               {canEdit && slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', onSelect: generateSlots }]} /> : null}
-            </div>
+            </StockListHeading>
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
@@ -439,11 +421,11 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <DataTable presentation="inventory">
                 <thead>
                   <TableHeadRow>
-                    <Th className={styles.colTime}>時間</Th>
-                    <Th className={styles.colUse}>利用状況</Th>
-                    <Th className={styles.colSeats} align="right">席数</Th>
-                    <Th className={styles.colTables}>埋まっている卓</Th>
-                    <Th className={styles.colFree} align="right">空き</Th>
+                    <Th truncate className={styles.colTime}>時間</Th>
+                    <Th truncate className={styles.colUse}>利用状況</Th>
+                    <Th truncate className={styles.colSeats} align="right">席数</Th>
+                    <Th truncate className={styles.colTables}>埋まっている卓</Th>
+                    <Th truncate className={styles.colFree} align="right">空き</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody>

@@ -194,7 +194,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     })
     await mount()
 
-    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる（任意）：選ぶ"]')!
+    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる：選ぶ"]')!
     expect(toggle).toBeTruthy()
     await click(toggle)
     const options = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')]

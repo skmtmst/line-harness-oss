@@ -1,5 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import styles from './sticky-bar.module.css'
+import { normalizeStickySaveActions } from './sticky-save-actions'
+
+export { default as StickyBarAction } from './sticky-bar-action'
 
 /**
  * 下部追従バー。作成・編集画面の最下段。Pencil V5 の `Ai3fq`。
@@ -77,13 +80,14 @@ export default function StickyBar({
       {actions}
     </div>
   )
+  const sharedActions = normalizeStickySaveActions(actions)
   if (split) return (
     <div data-shared-part="sticky-bar" className={[styles.bar, styles.splitBar, outlined ? styles.outlined : null, className].filter(Boolean).join(' ')}
       style={{ '--sticky-trailing-width': split.trailingWidth } as CSSProperties}>
       <div className={styles.splitLead}>{split.lead}</div>
       <div className={styles.splitTrailing}>
         {info ? <div className={styles.info}>{info}</div> : null}
-        <div className={styles.actions} data-sticky-actions>{actions}</div>
+        <div className={styles.actions} data-sticky-actions>{sharedActions}</div>
       </div>
     </div>
   )
@@ -105,7 +109,7 @@ export default function StickyBar({
         {status ? <p className={styles.status} title={typeof status === 'string' ? status : undefined}>{status}</p> : null}
       </div>
       {info ? <div className={styles.info}>{info}</div> : null}
-      <div className={styles.actions} data-sticky-actions>{actions}</div>
+      <div className={styles.actions} data-sticky-actions>{sharedActions}</div>
       {/*
        * 右端は空ける。ここに何か置くと中央が中央でなくなる。
        * ただし一言を渡した画面は、承認済み ★BG-B `X2oLn` の右の列

@@ -152,11 +152,10 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(updateProject).toHaveBeenCalledWith('p1', { isFavorite: false })
   })
 
-  it('お気に入り・生成中・アーカイブは上の絞り込みの札。左のフォルダの列は「すべて」だけで、フォルダを追加は置かない（B-136）', async () => {
+  it('お気に入り・生成中・アーカイブは上の絞り込みの札。選ぶ物のないフォルダ列を出さず、絞り込みを保つ（W2）（B-136）', async () => {
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
-    const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-    expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
+    expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
     expect(host.textContent).not.toContain('フォルダを追加')
     const chips = host.querySelector('[role="group"][aria-label="見るもので絞り込む"]') as HTMLElement
     expect(chips.textContent).toContain('お気に入り 1')

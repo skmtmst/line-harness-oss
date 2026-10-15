@@ -73,7 +73,7 @@ restaurantTest.use('/api/restaurant-test/*', async (c,next) => {
  await next();
  if(!['POST','PUT','PATCH','DELETE'].includes(c.req.method)||!c.res.ok||c.req.path.endsWith('/closures/preview'))return;
  await processVisitStampQueue(c.env);
- try{await processRestaurantEvents(c.env);await processScenarioSourceJobs(c.env);}catch{console.error(JSON.stringify({event:"restaurant_event_dispatch_deferred"}));}
+ try{await processRestaurantEvents(c.env);await processScenarioSourceJobs(c.env);}catch{console.error(JSON.stringify({"code":"restaurant_event_dispatch_deferred"}));}
  const organization=await organizationFor(c);if(!organization)return;
  const dirty=await dbFor(c.env).prepare(`SELECT q.store_id FROM rt_inventory_rule_queue q JOIN rt_stores s ON s.id=q.store_id
  WHERE s.organization_id=? AND (? IS NULL OR s.id=?) LIMIT 100`).bind(organization.id,organization.scopedStoreId,organization.scopedStoreId).all<{store_id:string}>();
@@ -87,7 +87,7 @@ restaurantTest.onError((error, c) => {
   throw error;
 });
 
-restaurantTest.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&!c.req.path.endsWith('/closures/preview')&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org){const stores=await dbFor(c.env).prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=? AND (? IS NULL OR id=?)').bind(org.id,org.scopedStoreId,org.scopedStoreId).all<{id:string;line_account_id:string|null}>();for(const store of stores.results)await processBookingWaitlists(c.env,store.line_account_id??undefined,store.id);}}catch{console.error(JSON.stringify({event:'seat_waitlist_reconcile_failed'}));}}});
+restaurantTest.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&!c.req.path.endsWith('/closures/preview')&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org){const stores=await dbFor(c.env).prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=? AND (? IS NULL OR id=?)').bind(org.id,org.scopedStoreId,org.scopedStoreId).all<{id:string;line_account_id:string|null}>();for(const store of stores.results)await processBookingWaitlists(c.env,store.line_account_id??undefined,store.id);}}catch{console.error(JSON.stringify({"code":"seat_waitlist_reconcile_failed"}));}}});
 
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
@@ -755,7 +755,7 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
       try {
         await deleteUncommittedLineAccount(dbFor(c.env), createdLineAccountId);
       } catch {
-        console.error(JSON.stringify({ event: 'restaurant_store_wizard_rollback_failed' }));
+        console.error(JSON.stringify({"code":"restaurant_store_wizard_rollback_failed","route":"POST /api/restaurant-test/stores/connect"}));
       }
     }
     if (error instanceof LineTokenIssueError) {
@@ -775,7 +775,7 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
     if (/UNIQUE constraint failed.*line_accounts\.channel_id/i.test(message)) {
       return c.json({ success: false, error: 'このLINE公式アカウントは既に登録されています' }, 409);
     }
-    console.error(JSON.stringify({ event: 'restaurant_store_wizard_failed', reason: 'internal' }));
+    console.error(JSON.stringify({"code":"restaurant_store_wizard_failed","route":"POST /api/restaurant-test/stores/connect"}));
     return c.json({ success: false, error: '店舗を追加できませんでした。時間を置いてもう一度お試しください。' }, 500);
   }
 });
@@ -1465,7 +1465,7 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
         tableId: next.table_id,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'seat_waitlist_promote_failed', reservationId: current.id }));
+      console.error(JSON.stringify({"code":"seat_waitlist_promote_failed","route":"PATCH /api/restaurant-test/reservations/:id"}));
     }
   }
   return c.json({ success: true, data: { id: current.id, version: current.customer_version+1 } });
@@ -1656,7 +1656,7 @@ restaurantTest.delete('/api/restaurant-test/seat-waitlist/:id', requireRole('own
         tableId: entry.table_id,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'seat_waitlist_promote_failed', waitlistId: id }));
+      console.error(JSON.stringify({"code":"seat_waitlist_promote_failed","route":"DELETE /api/restaurant-test/seat-waitlist/:id"}));
     }
   }
   return c.json({ success: true, data: { status: 'cancelled' } });

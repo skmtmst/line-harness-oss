@@ -133,7 +133,14 @@ export default function scanOwnerRules() {
     if (r.width < 300 || r.height < 28) continue
     const content = descendants(row).filter(d => d.matches('button,input,a,svg') || d.childElementCount===0 && d.textContent.trim())
     if (!content.length) continue
-    const right = Math.max(...content.map(d=>d.getBoundingClientRect().right))
+    const right = Math.max(...content.map(d => {
+      // A bare cell includes its padding; measure the visible text, not the cell box.
+      if (d.childElementCount === 0 && d.textContent.trim() && !d.matches('button,input,a,svg,[role="button"]')) {
+        const range = document.createRange(); range.selectNodeContents(d)
+        return range.getBoundingClientRect().right
+      }
+      return d.getBoundingClientRect().right
+    }))
     const gap = r.right-right
     if (gap < 12) add('edge',row,{deficit:Math.ceil(12-gap)})
   }
@@ -155,8 +162,21 @@ export default function scanOwnerRules() {
         return true
       })
       if (leaves.length) {
-        const top = Math.min(...leaves.map(d=>d.getBoundingClientRect().top))-r.top
-        const bottom = r.bottom-Math.max(...leaves.map(d=>d.getBoundingClientRect().bottom))
+        const leafRect = leaf => {
+          const style = css(leaf)
+          // 同じ面の編集本文は、箱の外縁ではなく描かれた文字を測る。
+          // 別の枠・地・輪を持つ内側の操作は従来どおり外縁を測る。
+          const sameSurface = style.backgroundColor === c.backgroundColor || style.backgroundColor === 'rgba(0, 0, 0, 0)'
+          if (leaf.hasAttribute('contenteditable') && sameSurface && !hasBorder(style) && style.outlineStyle === 'none') {
+            const range = document.createRange(); range.selectNodeContents(leaf)
+            const text = range.getBoundingClientRect()
+            if (text.width > 0 && text.height > 0) return text
+          }
+          return leaf.getBoundingClientRect()
+        }
+        const rects = leaves.map(leafRect)
+        const top = Math.min(...rects.map(rect=>rect.top))-r.top
+        const bottom = r.bottom-Math.max(...rects.map(rect=>rect.bottom))
         if (top < 8 || bottom < 8) add('tight',el,{topDeficit:Math.max(0,Math.ceil(8-top)),bottomDeficit:Math.max(0,Math.ceil(8-bottom))})
       }
     }
@@ -199,7 +219,8 @@ export default function scanOwnerRules() {
   for (const panel of document.querySelectorAll('[data-design-part="drawer"]')) {
     if (!visible(panel) || innerWidth < 540) continue
     const width = panel.getBoundingClientRect().width
-    const allowed = panel.getAttribute('data-width') === 'composer' ? [Math.min(1160, innerWidth)] : [480, 540]
+    const viewportWidth = innerWidth - (panel.hasAttribute('data-viewport-inset') ? 32 : 0)
+    const allowed = panel.getAttribute('data-width') === 'composer' ? [Math.min(1160, viewportWidth)] : [480, 540]
     if (!allowed.some(value => Math.abs(width - value) <= 1)) add('drawerwidth', panel, { width, expected: allowed.join('/') })
   }
   return findings

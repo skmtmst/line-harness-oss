@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,12 +8,63 @@ import { spawnSync } from 'node:child_process'
 import scan from './owner-rules-browser.mjs'
 import { assess, record, measurePage } from './layout-defects.mjs'
 import './list-row-height.test.mjs'
+import './csv-publication-layout.test.mjs'
 
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
+
+test('header edge measures the text inside padded cells and still detects text or controls too near the edge', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const edge = async () => (await page.evaluate(scan)).filter(f => f.kind === 'edge')
+    for (const label of ['状態・操作', '<button>操作</button>']) {
+      await page.setContent(shell(`<table style="width:600px"><thead><tr><th style="height:40px;padding:0 24px;text-align:right">${label}</th></tr></thead></table>`))
+      assert.deepEqual(await edge(), [], 'the cell box reaches the edge but its text/control has 24px of inset')
+      await page.locator('th').evaluate(el => el.style.paddingInlineEnd = '4px')
+      assert.ok((await edge()).some(f => f.measure.deficit >= 8), 'real 4px inset remains a failure')
+      await page.locator('th').evaluate(el => el.style.paddingInlineEnd = '24px')
+      assert.deepEqual(await edge(), [])
+    }
+  } finally { await browser.close() }
+})
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
 const table = body => `<div role="table" data-shared-part="list-table" style="width:600px">${body}</div>`
+test('同じ面の編集本文は描いた文字の余白を測り、余白0・別枠の端接触は止める', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const content = (padding, ownFrame = '') => shell(`<section style="width:240px;height:120px;background:white;border:1px solid gray"><div contenteditable="true" role="textbox" style="height:100%;padding:${padding}px;background:white;${ownFrame}">編集する本文</div></section>`)
+    for (const editable of ['true', 'false']) {
+      await page.setContent(content(12).replace('contenteditable="true"', `contenteditable="${editable}"`))
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 0)
+    }
+    await page.setContent(content(0))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    await page.setContent(content(12, 'border:1px solid black;'))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    await page.setContent(content(12, 'background:#ddd;'))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+  } finally { await browser.close() }
+})
+test('本文と差し込みの一つの枠は読み込み順によらず内側の影を外し、外側のフォーカスを保つ', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const bodyCSS = readFileSync(new URL('../../src/components/shared/message-insert-row.module.css', import.meta.url), 'utf8')
+    const editorCSS = readFileSync(new URL('../../src/components/shared/insert-text-field.module.css', import.meta.url), 'utf8')
+    for (const ordered of [[bodyCSS, editorCSS], [editorCSS, bodyCSS]]) {
+      await page.setContent(shell(`<style>:root{--control-shadow:0 1px 2px #aaa;--color-canvas:white;--color-control-border:gray;--color-focus-ring:blue;--tpl-nc-body-pad:10px 12px}${ordered.join('\n')}</style><div class="body" style="height:120px;width:240px"><div class="editor editorCompact" data-insert-field contenteditable="true" style="height:100%;padding:12px">編集する本文</div></div>`))
+      assert.equal(await page.locator('[data-insert-field]').evaluate(el => getComputedStyle(el).boxShadow), 'none')
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 0)
+      await page.locator('[data-insert-field]').focus()
+      assert.equal(await page.locator('.body').evaluate(el => getComputedStyle(el).outlineWidth), '2px')
+      await page.locator('[data-insert-field]').evaluate(el => { el.style.padding = '0px' })
+      assert.ok((await page.evaluate(scan)).some(f => f.kind === 'tight'))
+    }
+  } finally { await browser.close() }
+})
 test('B-245：共通の説明ボタンは青で出し、印だけの手書きや頭の外の青は検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const control = (label, classes = 'page-explanation_toggle__test') => `<button type="button" class="${classes}" data-shared-part="page-explanation-toggle" aria-controls="explanation" aria-expanded="false" style="color:#2563eb;background:transparent;border:0">${label}</button>`
@@ -58,7 +109,7 @@ const repairs = {
 }
 
 test('14種類を実寸で故障注入し、修正すれば検出0（ブラウザ1つ）', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({viewport:{width:1152,height:900}})
     for (const [kind,html] of Object.entries(cases)) {
@@ -93,7 +144,7 @@ test('14種類を実寸で故障注入し、修正すれば検出0（ブラウ�
   } finally { await browser.close() }
 })
 test('操作帯の前の余白は、印付きのボタンや入力の下端から測る', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const control of [
@@ -127,7 +178,7 @@ test('新規の故障をCLIが非0で止める。理由なしの除外は使え�
 })
 
 test('共通スマホの外枠・島・上の帯と画像枠は除外し、隣の黒い箱と余白不足は落とす', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [1152, 1440, 1920]) {
@@ -148,7 +199,7 @@ test('共通スマホの外枠・島・上の帯と画像枠は除外し、隣�
 })
 
 test('一覧の判定を足しても、既存GridTableの幅による畳み方を失わない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8')
@@ -162,7 +213,7 @@ test('一覧の判定を足しても、既存GridTableの幅による畳み方�
 
 
 test('共通の余白が実際に16pxになり、カレンダーを一覧の器に変えない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
@@ -175,7 +226,7 @@ test('共通の余白が実際に16pxになり、カレンダーを一覧の器�
 
 
 test('選ぶ箱の短い題は1行、状態の隣の短いマークは切れない', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
@@ -188,7 +239,7 @@ test('選ぶ箱の短い題は1行、状態の隣の短いマークは切れな�
 
 
 test('閉じた設定は描画扱いにせず、開いたら重なり・黒い面を検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(shell('<details><summary>設定</summary><div style="position:relative;background:#222;color:white;width:200px;height:80px"><span style="display:block">中の文字その一</span><span style="display:block;margin-top:-20px">中の文字その二</span></div></details>'))
@@ -201,7 +252,7 @@ test('閉じた設定は描画扱いにせず、開いたら重なり・黒い�
 })
 
 test('編集用の吹き出しをLINEの見本と取り違えず、本当の重なりを検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const bubble = '<div class="bubble" style="position:relative;width:300px;height:150px"><span style="display:block">編集の文字その一</span><span style="display:block;margin-top:-20px">編集の文字その二</span><textarea style="position:absolute;left:0;top:30px;width:300px;height:100px" aria-label="本文"></textarea></div>'
@@ -215,7 +266,7 @@ test('編集用の吹き出しをLINEの見本と取り違えず、本当の重�
 })
 
 test('窓の中のスクロールの続きを余白不足と誤判定せず、実際の下端の不足は落とす', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage({viewport:{width:1152,height:900}})
     const content='<section style="border:1px solid;width:320px;height:180px;padding:16px;display:flex;flex-direction:column"><h2 style="margin:0">題</h2><div style="min-height:0;flex:1;overflow-y:auto"><p style="height:300px">続きは送って読める内容</p></div><footer>下の操作</footer></section>'
@@ -227,7 +278,7 @@ test('窓の中のスクロールの続きを余白不足と誤判定せず、�
 })
 
 test('列で組む表も見出しと本文の右端・中央・左余白がそろう', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
@@ -268,13 +319,31 @@ test('列で組む表も見出しと本文の右端・中央・左余白がそ�
 })
 
 test('B-243：引き出し600への画面側上書きを検出し、480/540と配信作成1160は通す', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({viewport:{width:1440,height:900}})
     for (const width of [480,540,600,1160]) {
       await page.setContent(shell(`<aside data-design-part="drawer" ${width===1160?'data-width="composer"':''} style="width:${width}px;height:300px;background:white">内容</aside>`))
       const failures = (await page.evaluate(scan)).filter(f=>f.kind==='drawerwidth')
       assert.equal(failures.length, width===600?1:0)
+    }
+  } finally { await browser.close() }
+})
+
+test('余白を指定した広い引き出しは3幅で収まり、元の幅や余分な縮小を検出する', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    for (const viewport of [1152, 1440, 1920]) {
+      await page.setViewportSize({ width: viewport, height: 900 })
+      const expected = Math.min(1160, viewport - 32)
+      for (const width of [expected, expected - 32, expected + 32]) {
+        await page.setContent(shell(`<aside data-design-part="drawer" data-width="composer" data-viewport-inset style="width:${width}px;height:300px;background:white">内容</aside>`))
+        const failures = (await page.evaluate(scan)).filter(f => f.kind === 'drawerwidth')
+        assert.equal(failures.length, width === expected ? 0 : 1)
+      }
+      await page.setContent(shell(`<aside data-design-part="drawer" data-width="composer" style="width:${Math.min(1160, viewport)}px;height:300px;background:white">内容</aside>`))
+      assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'drawerwidth').length, 0)
     }
   } finally { await browser.close() }
 })

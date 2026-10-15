@@ -98,7 +98,7 @@ describe('KdFRI アフィリエイタータブの実入口の集計・権限・�
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '成果を見る' }).length).toBe(3)
     })
-    // 閲覧だけの人には作る・選ぶ操作を出さない
+    // 閲覧のみの人には作る操作と選ぶ枠を出さず、見る操作は残す。
     expect(screen.queryByRole('link', { name: /アフィリエイターを作る/ })).toBeNull()
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
     // 探す・絞る・見るは使える

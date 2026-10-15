@@ -140,7 +140,7 @@ describe('R578 メニューの取得失敗と未登録を言い分ける', () =>
     await renderNew()
     await screen.findByText('メニューを読み込めませんでした')
 
-    const name = screen.getByPlaceholderText('田中 美咲') as HTMLInputElement
+    const name = screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement
     fireEvent.change(name, { target: { value: '田中' } })
 
     fail = false
@@ -149,6 +149,6 @@ describe('R578 メニューの取得失敗と未登録を言い分ける', () =>
     fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
     await screen.findByRole('checkbox', { name: /カット/ })
     expect(screen.queryByText('メニューを読み込めませんでした')).toBeNull()
-    expect((screen.getByPlaceholderText('田中 美咲') as HTMLInputElement).value).toBe('田中')
+    expect((screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement).value).toBe('田中')
   })
 })

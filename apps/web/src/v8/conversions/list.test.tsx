@@ -212,8 +212,10 @@ describe('V8 コンバージョンの一覧', () => {
     expect(calls).toContain('GET /api/conversions/definitions/cp-1/delete-impact')
     const card = screen.getByRole('dialog', { name: '商品を買ったを止めますか？' })
     expect(card.textContent).toContain('2か所で使われています。どうしますか。')
+    expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toContain('2か所で使われています。どうしますか。')
     const stop = Array.from(card.querySelectorAll('button')).find((button) => button.textContent === '止める') as HTMLButtonElement
     expect(stop.disabled).toBe(true)
+    expect(stop.title).toContain('止める理由を入力してください')
     fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '計測の仕方を変えるため' } })
     expect(stop.disabled).toBe(false)
   })

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { listRowContentLines } from '../../src/components/shared/list-row-density.mjs'
 
@@ -10,7 +10,7 @@ const globals = read('../../src/app/globals.css')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
 
 test('B-254: rendered content selects 52/60, general tables stay 56; incorrect markers fail', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const table = (id, list = false, template = false, content = '名前') => `<section ${list ? 'data-list-skeleton' : ''}><div class="frame" ${template ? 'data-table-presentation="template-list"' : ''}><table id="${id}" class="table"><tbody><tr class="row" data-shared-part="list-row"><td class="bodyCell">${content}</td></tr></tbody></table></div></section>`

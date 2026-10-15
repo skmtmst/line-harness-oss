@@ -10,6 +10,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const staff = vi.hoisted(() => ({ role: 'owner' as string | null }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => staff.role }))
+
 const lineAccountsList = vi.hoisted(() => vi.fn())
 const poolsCreate = vi.hoisted(() => vi.fn())
 const poolsAccountsAdd = vi.hoisted(() => vi.fn())
@@ -60,6 +63,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  staff.role = 'owner'
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -205,4 +209,15 @@ it('保存成功後は離脱確認を解除して一覧へ進む', async () => {
   const event = new Event('beforeunload', { cancelable: true })
   window.dispatchEvent(event)
   expect(event.defaultPrevented).toBe(false)
+})
+
+it.each([null, 'admin', 'staff', 'viewer'])('owner以外の直接URL（%s）は入力と保存を出さず作成を呼ばない', async (role) => {
+  staff.role = role
+  await renderV8()
+  expect(host.textContent).toContain('プールを作れるのはオーナーだけです')
+  expect(host.querySelector('#pool-create-form')).toBeNull()
+  expect(host.querySelector('button[form="pool-create-form"]')).toBeNull()
+  expect(host.querySelector('a[href="/pools"]')).toBeTruthy()
+  expect(lineAccountsList).not.toHaveBeenCalled()
+  expect(poolsCreate).not.toHaveBeenCalled()
 })

@@ -16,6 +16,7 @@ import { Link2, ExternalLink } from 'lucide-react'
 import { ecEventLabel } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TruncatedText from '@/components/shared/truncated-text'
 import Drawer from '@/components/shared/drawer'
 import { ApiError, api, type EcActionExecution, type EcOrderDetail, type EcOrderDetailEvent } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -65,7 +66,7 @@ const PAYOUT_RESULT_TEXT: Record<string, string> = { paid: '支払い完了', fa
 function TimeRow({ time, children, extra }: { time: string; children: ReactNode; extra?: ReactNode }) {
   return (
     <li className={styles.timeRow}>
-      <span className={styles.time}>{time}</span>
+      <span className={styles.time}><TruncatedText value={time} /></span>
       <span className={styles.timeBody}>
         <span className={styles.timeText}>{children}</span>
         {extra}
@@ -197,7 +198,7 @@ export default function OrderDrawer({
     : true
 
   return (
-    <Drawer open={open} width="order" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
+    <Drawer open={open} width="order" heightMode="viewport" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
       description={order ? <>
         {friendId && order.customerName
           ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{`${order.customerName}さん`}</Link>

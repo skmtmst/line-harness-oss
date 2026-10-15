@@ -26,6 +26,7 @@ export default function CopyTextButton({
   'aria-label': ariaLabel,
   disabled = false,
   variant = 'text',
+  size,
 }: {
   /** クリップボードへ書き込む全文。表示用文字列ではなく取り出したい値。 */
   value?: string
@@ -36,6 +37,8 @@ export default function CopyTextButton({
   disabled?: boolean
   /** コードの下など、本文の操作は共通Buttonの形を使う。行内は文字操作のまま。 */
   variant?: 'text' | 'primary' | 'secondary'
+  /** 本文の操作は共通Buttonの小さいリンクの形でそろえる。 */
+  size?: 'inline'
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
   'aria-label': string
 }) {
@@ -101,10 +104,13 @@ export default function CopyTextButton({
     )
   }
 
-  if (variant !== 'text') {
+  if (variant !== 'text' || size === 'inline') {
     return (
       <Button
         variant={variant}
+        size={size}
+        className={size === 'inline' ? styles.button : undefined}
+        textTone={size === 'inline' && state === 'copied' ? 'accent' : undefined}
         role={role}
         disabled={disabled}
         onClick={(event) => { event.stopPropagation(); void copy() }}
@@ -120,7 +126,7 @@ export default function CopyTextButton({
   /*
    * 表の中の「編集」「削除」と同じく枠なしの文字操作にそろえる。
    * 「コピー」と「コピー済み」で幅が変わると列が揺れるので、
-   * 長いほうに合わせて固定幅（w-16）にする。
+   * 長いほうに合わせて共通の幅を予約する。表の操作列も同じ幅を読む。
    */
   return (
     <button
@@ -130,8 +136,7 @@ export default function CopyTextButton({
       onClick={(event) => { event.stopPropagation(); void copy() }}
       aria-label={ariaLabel}
       title={state === 'copied' ? 'コピーしました' : label}
-      style={{ width: 'max-content', minWidth: 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap' }}
-      className={`${styles.button} w-16 shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
+      className={`${styles.button} shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
         state === 'copied'
           ? 'text-success font-semibold'
           : 'text-action hover:underline'

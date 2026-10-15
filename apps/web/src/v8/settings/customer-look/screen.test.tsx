@@ -22,7 +22,17 @@ test('REQ-F01 競合時は入力を残し、最新の版を読んでから保存
  fireEvent.click(screen.getByRole('radio',{name:/モダン/}));expect(screen.getByText('見本：modern')).toBeTruthy();expect(mock.save).not.toHaveBeenCalled();
  mock.save.mockRejectedValue(new ApiError(409,'他の人が変更しました'));fireEvent.click(screen.getByRole('button',{name:'保存する'}));await screen.findByRole('alert');expect(screen.getByText('見本：modern')).toBeTruthy();
  expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(true);
+ expect(screen.getByRole('button',{name:'保存する'}).getAttribute('aria-description')).toBe('最新のデザインを読み直してから保存してください');
  mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:4}});fireEvent.click(screen.getByRole('button',{name:'最新を読み直す'}));await vi.waitFor(()=>expect(mock.get).toHaveBeenCalledTimes(2));expect(screen.getByText('見本：modern')).toBeTruthy();
  mock.save.mockResolvedValue({success:true,data:{look:{...DEFAULT_CUSTOMER_LOOK,preset:'modern'},version:5}});await vi.waitFor(()=>expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(false));fireEvent.click(screen.getByRole('button',{name:'保存する'}));await vi.waitFor(()=>expect(mock.save).toHaveBeenCalledTimes(2));expect(mock.save).toHaveBeenLastCalledWith('a',expect.objectContaining({preset:'modern'}),4);
 })
 test('閲覧だけなら変更と保存を出さない',async()=>{mock.role='viewer';mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}});render(<CustomerLookScreen/>);await screen.findByText('見本：line');expect(screen.queryByRole('radio')).toBeNull();expect(screen.queryByRole('button',{name:'保存する'})).toBeNull()})
+
+test('未変更の理由を出し、変更後は理由を外して保存できる', async () => {
+ mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}})
+ render(<CustomerLookScreen/>); await screen.findByRole('radio',{name:/モダン/})
+ for (const name of ['キャンセル','保存する']) expect(screen.getByRole('button',{name}).getAttribute('aria-description')).toBe('変更していません')
+ fireEvent.click(screen.getByRole('radio',{name:/モダン/}))
+ const save = screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement
+ expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)
+})

@@ -8,7 +8,6 @@ import { Field } from '@/components/shared/form-controls'
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
-import Link from '@/components/shared/list-navigation'
 import {
   AlignLeft,
   CalendarCheck,
@@ -32,7 +31,7 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
+import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -310,10 +309,6 @@ function OpenBlock(props: RowProps) {
   )
 }
 
-function blockTitleKind(block: FormBlock): string {
-  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
-}
-
 function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return <Field label={label} htmlFor={htmlFor}>{children}</Field>
 }
@@ -422,6 +417,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
             className={styles.choiceRemove}
             aria-label={`選択肢「${choice.label}」を消す`}
             disabled={choices.length <= 1 || (block.fixedField === 'allergy' && choice.isOther)}
+            title={block.fixedField === 'allergy' && choice.isOther ? '自由に書く選択肢は、アレルギーの書き足しに使うため消せません' : choices.length <= 1 ? '選択肢を1つ以上残してください' : undefined}
             onClick={() => set({ choices: choices.filter((_, i) => i !== index) })}
           >
             <X size={15} aria-hidden="true" />

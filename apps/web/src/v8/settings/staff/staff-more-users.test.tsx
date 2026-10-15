@@ -64,3 +64,23 @@ test('全員より少ないときは「続きを読み込む」で残りを足�
   await waitFor(() => expect(net.users).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 200 })))
   await waitFor(() => expect(screen.queryByRole('button', { name: '続きを読み込む' })).toBeNull())
 })
+
+test('役割の区別を共通札へ渡し、名前と権限の読み取りを保つ', async () => {
+  const roles = ['administrator', 'operations', 'reception', 'view_only', 'custom']
+  net.users.mockResolvedValue({ success: true, data: {
+    items: roles.map((roleBundle, index) => ({ ...user(index), roleBundle })),
+    pagination: { total: roles.length, limit: 200, offset: 0 },
+    summary: { active: roles.length, suspended: 0, mfaEnabled: 0, invited: 0 },
+  } })
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+  vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+  render(<StaffV8 />)
+  const table = await screen.findByRole('table', { name: 'いまいる人の一覧' })
+  await waitFor(() => expect(table.querySelectorAll('[data-role]')).toHaveLength(5))
+  const badges = [...table.querySelectorAll('[data-role]')].map(badge => [badge.getAttribute('data-role'), badge.getAttribute('data-tone'), badge.textContent])
+  expect(badges).toEqual([
+    ['administrator', 'success', '管理者'], ['operations', 'info', '運用'],
+    ['reception', 'warning', '受付'], ['view_only', 'neutral', '見るだけ'],
+    ['custom', 'neutral', '個別設定'],
+  ])
+})

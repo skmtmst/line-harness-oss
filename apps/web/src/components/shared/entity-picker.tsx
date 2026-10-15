@@ -9,15 +9,14 @@ import Button from './button'
 import Checkbox from './checkbox'
 import FilterChip from './filter-chip'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
-import Radio from './radio'
 import SearchField from './search-field'
 import Select from './select'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
-import SelectionDialog from './selection-dialog'
 import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
 import Dialog from './dialog'
 import TagPill from './tag-pill'
+import useNarrow from './use-picker-narrow'
 
 /*
  * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（B-155・163・164・165・175）。
@@ -69,26 +68,13 @@ function matches(item: EntityPickerItem, query: string) {
   return !q || item.name.toLocaleLowerCase().includes(q) || Boolean(item.keywords?.toLocaleLowerCase().includes(q)) || Boolean(item.content?.toLocaleLowerCase().includes(q))
 }
 
-/** 窓の幅が狭いときはフォルダの列を選ぶ欄に畳む（白い板 1100px 未満で畳む決まりに合わせる）。 */
-function useNarrow(threshold: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [narrow, setNarrow] = useState(false)
-  useEffect(() => {
-    const node = ref.current
-    if (!node || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < threshold))
-    observer.observe(node)
-    return () => observer.disconnect()
-  })
-  return [ref, narrow] as const
-}
-
 function CreateLink({ href, label }: { href?: string; label?: string }) {
   if (!href || !label) return null
   return <Link className={styles.createLink} href={href} target="_blank" rel="noopener">{`作る画面へ：${label}`}<ArrowUpRight size={13} aria-hidden="true" /></Link>
 }
 
 type SingleProps = {
+  scrollBody?: boolean
   title: string
   /** 窓の頭の説明。省くと題だけ。 */
   description?: string
@@ -121,7 +107,6 @@ type SingleProps = {
   onCancel: () => void
 }
 
-/** B-165：受信箱とすべての選ぶ窓が共有する640pxの器。 */
 export type EntityPickerWindowProps = {
   title: string
   description?: string
@@ -132,25 +117,31 @@ export type EntityPickerWindowProps = {
   initialFocusId?: string
   /** データ取得を呼ぶ側で管理するときの中身。窓の形は共通のまま。 */
   children: ReactNode
+  scrollBody?: boolean
   footer: ReactNode
   band?: ReactNode
 }
-export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
-  if ('children' in props) return <Dialog open dirty={false} title={props.title} description={props.description}
+
+export function EntityPickerWindow(props: EntityPickerWindowProps) {
+  return <Dialog open dirty={false} title={props.title} description={props.description}
     designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
+    contentLayout={props.scrollBody ? 'form' : undefined} designContentPadding={props.scrollBody ? '0' : undefined}
     busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel}
     footer={<>
-      {props.children}
+      {props.scrollBody ? null : props.children}
       {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
       {props.band}
       <div className={styles.tpFoot}>{props.footer}</div>
-    </>} />
-  return <SingleEntityPickerDialog {...props} />
+    </>}>{props.scrollBody ? props.children : null}</Dialog>
+}
+
+export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
+  return 'children' in props ? <EntityPickerWindow {...props} /> : <SingleEntityPickerDialog {...props} />
 }
 
 /** 行を選ぶ間は仮の選択。確定したときだけ呼ぶ側の値を変える。 */
 function SingleEntityPickerDialog({
-  title, description, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
+  title, description, scrollBody = false, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
   state, listFooter, preview, error, busy = false, confirmDisabled = false, readOnly = false, createHref, createLabel,
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel,
 }: SingleProps) {
@@ -175,7 +166,7 @@ function SingleEntityPickerDialog({
   if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
-  return <EntityPickerDialog title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
+  return <EntityPickerDialog scrollBody={scrollBody} title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?
@@ -184,11 +175,11 @@ function SingleEntityPickerDialog({
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>}
+      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>}
     </div>
     </>}
   >
-    <div ref={panelRef} className={shell.body}>
+    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : ''}`}>
       {hasFolders && !narrow ? <div className={shell.folders}>
         <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
@@ -382,6 +373,7 @@ type FieldBase = {
   valuePrefix?: string
   compact?: boolean
   disabled?: boolean
+  disabledReason?: string
   readOnly?: boolean
   invalid?: boolean
   createHref?: string
@@ -426,11 +418,12 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, disabledReason, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
   color?: string | null
   disabled?: boolean; readOnly?: boolean; invalid?: boolean; id?: string
+  disabledReason?: string
   buttonRef?: Ref<HTMLButtonElement>
   describedBy?: string
   'aria-describedby'?: string
@@ -445,9 +438,9 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   const empty = !name
   const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
   const isInvalid = invalid || Boolean(field?.invalid)
-  return <div className={styles.field} data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
+  return <div className={styles.field} data-entity-picker-field data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
-      disabled={disabled} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
+      disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
       aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}
     {Icon ? <Icon className={styles.fieldIcon} size={16} aria-hidden="true" /> : null}
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
@@ -457,7 +450,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
-    {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
+    {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
     {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix ? actionLabel : null}<ChevronRight size={16} /></span>}
   </div>
 }
@@ -478,14 +471,14 @@ export function describePicked(items: EntityPickerItem[], folders: EntityPickerF
 
 /** 画面の欄。「選んだもの（印・名前・補足）＋［選ぶ］／［変える］」の1行。押すと窓が開く。 */
 export function EntityPickerField(props: SingleField | MultiField) {
-  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
+  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, disabledReason, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
   const [open, setOpen] = useState(props.defaultOpen ??false)
   const title = props.title ?? `${noun}を選ぶ`
   const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
   const pickedColor = props.multiple ? undefined : items.find(item => item.id === props.value)?.color
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly}
       ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} compact={props.compact}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)

@@ -43,7 +43,6 @@ import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -857,9 +856,9 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     </div>
   )
   const sortBox = (
-    <div className={styles.sortBox}>
+    <>
       <SortSelect value={sort} onChange={(value) => setSort(value as PointSort)} options={SORT_OPTIONS} label="並び：" />
-    </div>
+    </>
   )
   const savedBox = (
     <div className={styles.savedBox}>
@@ -954,11 +953,16 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   ) : null
 
   const stopCard = stopTarget ? (
-    <Dialog open contentLayout="form" title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
+    <Dialog open contentLayout="form" description={stopImpactLoading
+          ? '利用先と影響を読み込んでいます。'
+          : stopImpact
+            ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
+            : '利用先と影響を読み込めませんでした。'} title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
           variant="primary"
           disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
+          disabledReason={stopping ? '止めています。' : stopImpactLoading ? '利用先と影響を確認しています。' : !stopReason.trim() ? '止める理由を入力してください。' : stopAction === 'replace' && !replacementId ? '差し替え先を選んでください。' : undefined}
           onClick={() => void runStop()}
           busy={stopping || stopImpactLoading}
           busyLabel="止めています"
@@ -967,13 +971,6 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         </Button>
       </DialogActions>}>
 
-      <p className={styles.stopDescription}>
-        {stopImpactLoading
-          ? '利用先と影響を読み込んでいます。'
-          : stopImpact
-            ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
-            : '利用先と影響を読み込めませんでした。'}
-      </p>
       <p>止めると、使っている配信・流入リンク・アフィリエイトでも、この成果地点では数えなくなります。</p>
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
@@ -1138,8 +1135,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
 
   const pager = !loading && !loadFailed && shown.length > 0 ? (
     <ListPager>
-      <ListRange total={shown.length} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + current.length} />
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" range={{ total: shown.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + current.length }} />
     </ListPager>
   ) : null
 

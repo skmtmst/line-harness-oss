@@ -9,6 +9,7 @@
  */
 import Link from '@/components/shared/list-navigation'
 import Card from '@/components/shared/card'
+import TextLink from '@/components/shared/text-link'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -217,7 +218,7 @@ export default function NotificationsV8() {
             tone="danger"
             message={error}
             action={loadError !== null && listFailure?.retryable ? (
-              <button type="button" onClick={() => void load(0, false)} className={styles.retry}>もう一度読み込む</button>
+              <Button type="button" variant="text" onClick={() => void load(0, false)}>もう一度読み込む</Button>
             ) : undefined}
           />
         ) : null}
@@ -271,7 +272,7 @@ export default function NotificationsV8() {
               ? '未読のお知らせはありません。'
               : '未読は青い点と太字。押すと既読になり、行の右から関係する画面へ移れます'}
           </p>
-          <Link href="/line-notifications?tab=operator" className={styles.settingsLink}>通知設定</Link>
+          <TextLink href="/line-notifications?tab=operator">通知設定</TextLink>
         </div>
 
         {hasMore ? (

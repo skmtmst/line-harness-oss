@@ -1,6 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-.map{width:calc(100% - var(--tpl-floor-map-inset) * 2);margin:14px var(--tpl-floor-map-inset) 16px;height:auto;display:block;background:var(--color-surface-pearl);touch-action:none;}
+.map{width:calc(100% - var(--tpl-floor-map-inset) * 2);margin:var(--polish-space-card) var(--tpl-floor-map-inset) var(--polish-space-card);height:auto;display:block;background:var(--color-surface-pearl);touch-action:none;}
 .outline{fill:var(--color-canvas);stroke:var(--color-ink);stroke-width:var(--tpl-floor-outline-w);}
 .fixture{fill:var(--color-surface-pearl);stroke:var(--color-control-border);}
 .table rect,.table ellipse{fill:var(--color-canvas);stroke:var(--color-control-border);}.stopped rect,.stopped ellipse{fill:var(--color-shell);stroke:var(--color-control-border);}

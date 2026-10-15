@@ -1,14 +1,16 @@
 'use client'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
-import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
+import { Armchair, CalendarCheck, Check, Phone, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import EntitySelect from '@/components/shared/entity-select'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import TextLink from '@/components/shared/text-link'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -72,6 +74,7 @@ function TodayStore() {
   const d = useStoreToday(selectedAccountId)
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [walkInOpen, setWalkInOpen] = useState(false)
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [busyId, setBusyId] = useState('')
   const now = Date.now()
   const tables = useMemo(() => (d.snapshot?.tables ?? []).filter((t) => t.store_id === d.store?.id), [d.snapshot, d.store])
@@ -133,7 +136,7 @@ function TodayStore() {
 
   const actions = d.store ? (
     <><EntitySelect compact aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
-      <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button></>:null}
+      <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Phone size={16} aria-hidden="true" />電話予約</Button></>:null}
     </>
   ) : null
 
@@ -147,7 +150,6 @@ function TodayStore() {
   } else {
     body = (
       <>
-        <div className={styles.stats}>
           <KpiBand data-restaurant-fusion="dashboard" gridClassName="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <KpiCard
               presentation="band"
@@ -188,17 +190,11 @@ function TodayStore() {
                 : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
             />
           </KpiBand>
-        </div>
         {first ? (
           <div className={styles.closeRow}>
-            <div className={styles.closeBand} role="status" data-close-band="">
-              <Bell size={18} aria-hidden="true" className={styles.closeIcon} />
-              <div className={styles.closeText}>
-                <p className={styles.closeTitle}>{`他の予約サイトの枠を閉じてください（未対応 ${pending.length} 件）`}</p>
-                <p className={styles.closeDetail}>
-                  {`${slotTitle(first.startsAt)} の枠が${reasonText(first)} → ${openItems(first).map((item) => item.name).join('・')} の枠を閉じてください`}
-                </p>
-              </div>
+            <Notice tone="warn" role="status" data-close-band=""
+              heading={`他の予約サイトの枠を閉じてください（未対応 ${pending.length} 件）`}
+              action={<div className={styles.closeActions}>
               {firstMedium?.adminUrl ? (
                 <Button external href={firstMedium.adminUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
               ) : null}
@@ -208,11 +204,15 @@ function TodayStore() {
                 </Button>
               ) : null}
               <TextLink href="/restaurant-test/close-tasks">すべて見る</TextLink>
-            </div>
+              </div>}
+            >
+              {`${slotTitle(first.startsAt)} の枠が${reasonText(first)} → ${openItems(first).map((item) => item.name).join('・')} の枠を閉じてください`}
+            </Notice>
           </div>
         ) : null}
-        <DashboardRow
-          variant="restaurant" asideSize="restaurant"
+        <DashboardRow variant="restaurant">
+          <DetailColumns presentation="card" asideLabel="今日の回転・媒体・口コミを見る"
+          expanded={asideExpanded} onExpandedChange={setAsideExpanded}
           aside={<SidePanel rotation={d.rotation} media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
@@ -223,6 +223,7 @@ function TodayStore() {
             onVisited={(id) => void markVisited(id)}
             onUndo={(id) => void undoVisited(id)}
           />
+          </DetailColumns>
         </DashboardRow>
       </>
     )

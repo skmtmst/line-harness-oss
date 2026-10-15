@@ -3,11 +3,12 @@
 import { useCardHeights } from './use-card-heights'
 import React, { type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './card.module.css'
+import { OptionalBadge } from './form-controls'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
   frame?: 'raised' | 'inset'
-  layout?: 'block' | 'vertical' | 'horizontal'
+  layout?: 'block' | 'vertical' | 'horizontal' | 'media'
   /**
    * 設定の箱。'settings' は16の余白・10の間（EC設定）。
    * 'integration'（外部連携の設定）・'preview'（見本）は枠と内側の間を持つ。
@@ -63,7 +64,7 @@ export default function Card({
     spacing === 'roomy' ? styles.spacingRoomy : null,
     spacing === 'tight' ? styles.spacingTight : null,
     spacing === 'controls' ? styles.spacingControls : null,
-    layout === 'vertical' ? styles.vertical : layout === 'horizontal' ? styles.horizontal : null,
+    layout === 'vertical' ? styles.vertical : layout === 'horizontal' ? styles.horizontal : layout === 'media' ? styles.media : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'compact' ? styles.paddingCompact : null,
     padding === 'default' ? styles.paddingDefault : null,
@@ -87,8 +88,14 @@ export default function Card({
   )
 }
 
+/** Content between edge-to-edge media and the card's end. */
+export function CardContent({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={[styles.content, className].filter(Boolean).join(' ')}>{children}</div>
+}
+
 export function CardHeader({
   title,
+  optional = false,
   meta,
   action,
   size = 'standard',
@@ -97,9 +104,10 @@ export function CardHeader({
   titleId,
 }: {
   title: ReactNode
+  optional?: boolean
   meta?: ReactNode
   action?: ReactNode
-  size?: 'standard' | 'roomy' | 'stacked' | 'panel' | 'restaurant'
+  size?: 'standard' | 'roomy' | 'stacked' | 'panel' | 'restaurant' | 'content'
   actionTone?: 'accent' | 'info'
   headingLevel?: 2 | 3
   titleId?: string
@@ -107,11 +115,11 @@ export function CardHeader({
   const Heading = headingLevel === 3 ? 'h3' : 'h2'
   return (
     <div
-      className={[styles.header, size === 'roomy' && styles.headerRoomy, size === 'stacked' && styles.headerStacked, size === 'panel' && styles.headerPanel, size === 'restaurant' && styles.headerRestaurant].filter(Boolean).join(' ')}
+      className={[styles.header, size === 'roomy' && styles.headerRoomy, size === 'stacked' && styles.headerStacked, size === 'panel' && styles.headerPanel, size === 'restaurant' && styles.headerRestaurant, size === 'content' && styles.headerContent].filter(Boolean).join(' ')}
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>
-        <Heading id={titleId} className={styles.title}>{title}</Heading>
+        <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (

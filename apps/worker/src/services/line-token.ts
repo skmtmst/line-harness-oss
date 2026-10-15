@@ -9,11 +9,7 @@ export function recordLineTokenDefaultFallback(input: {
   accountId: string | null;
   context: string;
 }): void {
-  console.log(JSON.stringify({
-    event: 'line_token_default_fallback',
-    accountId: input.accountId ?? null,
-    context: input.context,
-  }));
+  console.log(JSON.stringify({"code":"line_token_default_fallback"}));
 }
 
 /**

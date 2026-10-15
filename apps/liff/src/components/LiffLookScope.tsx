@@ -42,11 +42,13 @@ function loadLook(key: string): Promise<LiffLook> {
 export default function LiffLookScope({
   className,
   designNode,
+  appearance,
   children,
 }: {
   className?: string;
   /** 板の絵と突き合わせる札 (元々根に付いていたものだけ受け渡す)。 */
   designNode?: string;
+  appearance?: 'stamp';
   children: ReactNode;
 }) {
   const key = currentLiffId();
@@ -66,12 +68,13 @@ export default function LiffLookScope({
   }, [key]);
 
   const active = look ?? DEFAULT_LOOK;
+  const vars = { ...lookStyleVars(active), ...(appearance === 'stamp' && active.theme !== 'line' ? { '--liff-radius-stamp-control': 'var(--liff-radius)' } : {}), ...(appearance === 'stamp' && active.theme === 'line' && !active.primaryColor ? { '--color-liff-primary': 'var(--color-accent-deep)' } : {}) };
   return (
     <div
       data-liff-theme={active.theme}
       data-design-node={designNode}
       className={className}
-      style={lookStyleVars(active) as CSSProperties}
+      style={vars as CSSProperties}
     >
       {children}
     </div>

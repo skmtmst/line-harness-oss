@@ -207,7 +207,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
 
     // 握り潰されていない: 呼び出し口へ投げ直したうえで、記録も出している。
     expect(
-      errorSpy.mock.calls.some((call) => String(call[0]).includes('step=scenario_enroll')),
+      errorSpy.mock.calls.some((call) => String(call[0]).includes('services_friend_tag_attach_failed')),
     ).toBe(true);
   });
 

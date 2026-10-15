@@ -1840,7 +1840,7 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
   const secret = deliveryWebhookSecret(c.env, service);
   if (!secret) {
     // 合言葉が未設定・短すぎる場合は検証できない。受け取らずに設定不足として返す。
-    console.error('[rt-delivery] webhook secret is not configured', JSON.stringify({ service }));
+    console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
@@ -1945,10 +1945,7 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
     return c.json({ success: true, result: 'ignored' });
   } catch (error) {
     // 例外の本文は残さない。種類だけを符号にして台帳へ入れ、相手には再試行を促す。
-    console.error(
-      '[rt-delivery] webhook processing failed',
-      JSON.stringify({ service, name: error instanceof Error ? error.name : 'unknown' }),
-    );
+    console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
     await closeEvent('retryable_failed', 'processing_failed');
     return c.json({ success: false, error: 'Processing failed' }, 503);
   }
@@ -2259,10 +2256,7 @@ restaurantDelivery.get(
         )
         .bind(code_, Date.now(), store.id)
         .run();
-      console.error(
-        '[rt-delivery] ubereats oauth exchange failed',
-        JSON.stringify({ code: code_, storeId: store.id }),
-      );
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
       return c.redirect(uberReturnUrl(c, lineAccountId, `error:${code_}`));
     }
   },

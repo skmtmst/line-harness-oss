@@ -9,6 +9,7 @@ import type {
   ReactNode,
 } from 'react'
 import styles from './button.module.css'
+import { normalizeActionLabel, normalizeActionNode } from './action-words'
 
 type CommonProps = {
   /**
@@ -45,12 +46,18 @@ type CommonProps = {
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
   presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
+  /** Authored action words only; entity names and arbitrary values remain unchanged. */
+  actionWording?: boolean
+  /** 保存・公開・比較など、明示した役目の印。省略時は従来の描画を保つ。 */
+  icon?: ReactNode
   children: ReactNode
 }
 
 type NativeButtonProps = CommonProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'href' | 'aria-busy'> & {
     href?: never
+    /** 既存の無効条件に対応する理由。押せる状態では表示しない。 */
+    disabledReason?: string | null
     /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
     ref?: React.Ref<HTMLButtonElement>
     /**
@@ -112,8 +119,9 @@ function hasButtonText(children: ReactNode): boolean {
     return hasButtonText(child.props.children)
   })
 }
-function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:string;'aria-labelledby'?:string}) {
-  return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+function iconButtonLabel(props: {children:ReactNode;title?:string;actionWording?:boolean;'aria-label'?:string;'aria-labelledby'?:string}) {
+  const label = props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+  return props.actionWording && typeof label === 'string' ? normalizeActionLabel(label) : label
 }
 
 /** 字の色の指定を束ねの名前へ。`action`（既定）は何も足さない。 */
@@ -131,11 +139,11 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
-        {children}
+        {icon}{props.actionWording ? normalizeActionNode(children) : children}
         {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
@@ -146,7 +154,9 @@ export default function Button(props: ButtonProps) {
 
 function NativeButton(props: NativeButtonProps & { classes: string }) {
   const {
-    children,
+    children: rawChildren,
+    icon,
+    actionWording: _actionWording,
     classes,
     className: _className,
     variant: _variant,
@@ -163,10 +173,12 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     doneLabel = '保存しました',
     widthReserve = 'states',
     disabled,
+    disabledReason,
     ref,
     onClick,
     ...buttonProps
   } = props
+  const children = props.actionWording ? normalizeActionNode(rawChildren) : rawChildren
 
   /*
    * ★V7 仕上げ §2「保存中・完了」。DOM に出す文字は常に今のラベル1つだけ
@@ -206,6 +218,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
     measuredLabelRef.current = measurementKey
+    el.style.width = ''
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (widthReserve === 'idle') {
@@ -263,11 +276,14 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      title={disabled && disabledReason ? disabledReason : buttonProps.title}
+      aria-description={disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
       aria-label={iconButtonLabel(props)}
       onClick={handleClick}
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
       {shownDone ? <Check size={15} aria-hidden="true" /> : null}
+      {!busyNow && !shownDone ? icon : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>
     {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}

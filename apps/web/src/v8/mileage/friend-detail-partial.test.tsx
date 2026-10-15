@@ -19,8 +19,10 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined
 const today = new Date().toISOString()
 let rank: string | null = null
 let rankLoaded = false
+let pendingBalance = 0
+let historyCount = 340
 let connections: Array<{ accountId: string; accountName: string }> | undefined
-beforeEach(() => { rank = null; rankLoaded = false; connections = undefined })
+beforeEach(() => { rank = null; rankLoaded = false; connections = undefined; pendingBalance = 0; historyCount = 340 })
 const entry = (id: string) => ({
   id, entryType: 'grant', status: 'available', amount: 10, reason: '来店', source: 'rule', hasSourceEvent: false,
   sourceReferenceId: null, ruleName: null, mode: 'automatic', executedByStaffName: null, lineAccountId: 'acc',
@@ -35,13 +37,13 @@ vi.mock('@/lib/api', async (importOriginal) => {
       friends: {
         ...actual.api.friends,
         get: async () => ({ success: true, data: { id: 'f1', displayName: '田中', createdAt: '2026-01-01T00:00:00Z' } }),
-        mileage: async () => ({ success: true, data: { summary: { available: 0, pending: 0, lifetimeEarned: 0, spent: 0 }, history: [], insights: null, connections } }),
+        mileage: async () => ({ success: true, data: { summary: { available: 0, pending: pendingBalance, lifetimeEarned: 0, spent: 0 }, history: [], insights: null, connections } }),
       },
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'staff' } }) },
       mileage: {
         ...actual.api.mileage,
-        friendsV6: async () => rankLoaded ? ({ success: true, data: { items: [{ friendId: 'f1', rank, rankReason: 'ランクは未公開です', available: 0, pending: 0, monthChange: 0 } ] } }) : ({ success: false, error: 'x' }),
-        history: async () => ({ success: true, data: { items: Array.from({ length: 100 }, (_, i) => entry(`e${i}`)), summary: { byType: [] }, pagination: { total: 340, limit: 100, offset: 0 } } }),
+        friendsV6: async () => rankLoaded ? ({ success: true, data: { items: [{ friendId: 'f1', rank, rankReason: 'ランクは未公開です', available: 0, pending: pendingBalance, monthChange: 0 } ] } }) : ({ success: false, error: 'x' }),
+        history: async () => ({ success: true, data: { items: Array.from({ length: 100 }, (_, i) => entry(`e${i}`)), summary: { byType: [] }, pagination: { total: historyCount, limit: 100, offset: 0 } } }),
       },
     },
   }
@@ -53,7 +55,7 @@ afterEach(cleanup)
 test('最新100件より多いとき、今月の数は「数えられません」、件数は一部と書く', async () => {
   render(<FriendDetailV8 />)
   await screen.findByText('最新100 件だけでは数えられません')
-  expect(screen.getByText(/最新100 件（全340 件）のうち/)).toBeTruthy()
+  expect(screen.getByText(/最新100件（全340件）のうち/)).toBeTruthy()
 })
 
 test('未公開のランクを最高到達にせず、未取得の接続先と付与回数を0にしない', async () => {
@@ -78,4 +80,19 @@ test('最高ランクと接続先0件を区別し、接続先の同じアカウ�
   connections = [{ accountId: 'a', accountName: '本店' }, { accountId: 'a', accountName: '本店' }]
   render(<FriendDetailV8 />)
   expect(await screen.findByTitle('本人確認済みの接続先：本店')).toBeTruthy()
+})
+
+test('待ち残高があるとき明細0件を待ちなしと言わない', async () => {
+  pendingBalance = 120
+  historyCount = 100
+  render(<FriendDetailV8 />)
+  await screen.findByText('確定待ちの残高があります。明細を確認してください')
+  expect(screen.queryByText('確定待ちはありません')).toBeNull()
+})
+
+test('一部取得した明細の0件は取得範囲を示す', async () => {
+  pendingBalance = 120
+  render(<FriendDetailV8 />)
+  await screen.findByText('最新100 件のうち 0 件が確定待ち')
+  expect(screen.queryByText('確定待ちはありません')).toBeNull()
 })

@@ -8,6 +8,7 @@ import { CONFIRM_WIDTH } from './destination-policy'
 
 interface ConfirmDialogProps {
   open: boolean
+  contentLayout?: 'form'
   title: string
   /** 削除の対象名。削除の題と実行ボタンの文言は共通部品が持つ。 */
   deleteName?: string
@@ -70,6 +71,9 @@ interface ConfirmDialogProps {
   onConfirm?: () => void
   /** 実行ボタンを押せない形で出す（WEB228：確かめのチェックが入るまで）。 */
   confirmDisabled?: boolean
+  confirmDisabledReason?: string
+  actionWidthReserve?: 'states' | 'idle'
+  confirmPlacement?: 'start'
   onCancel: () => void
 }
 
@@ -78,6 +82,7 @@ export { deleteConfirmationTitle, normalizeDeleteTitle } from './delete-confirma
 /** ブラウザ標準 confirm の代わりに使う、管理画面共通の確認ダイアログ。 */
 export default function ConfirmDialog({
   open,
+  contentLayout,
   title,
   deleteName,
   description,
@@ -105,6 +110,9 @@ export default function ConfirmDialog({
   primaryAction = 'confirm',
   onConfirm,
   confirmDisabled = false,
+  confirmDisabledReason,
+  actionWidthReserve,
+  confirmPlacement,
   onCancel,
 }: ConfirmDialogProps) {
   const [executing, setExecuting] = useState(false)
@@ -143,6 +151,7 @@ export default function ConfirmDialog({
   return (
     <Dialog
       open={open}
+      contentLayout={contentLayout}
       title={deleteName !== undefined ? deleteConfirmationTitle(deleteName) : isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
@@ -152,6 +161,9 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy || executing}
       confirmDisabled={confirmDisabled}
+      confirmDisabledReason={confirmDisabledReason}
+      actionWidthReserve={actionWidthReserve}
+      confirmPlacement={confirmPlacement}
       error={error || executionError}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}

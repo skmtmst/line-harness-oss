@@ -1,18 +1,20 @@
 'use client'
 
-import { jstDate } from '@/lib/jst-datetime'
-import { Download, FileSearch, Info, Inbox } from 'lucide-react'
+import { Download, FileSearch, Inbox } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { DashboardColumns } from '@/components/templates/dashboard-page'
 import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { FriendsSectionHead } from '../shared/head'
 import { slashDateTime } from '../duplicates/words'
@@ -21,6 +23,7 @@ import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrat
 import styles from './migrations.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -73,14 +76,11 @@ export default function CsvMigrationsV8() {
     <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" onRetry={() => void m.load()} />
   ) : (
     <>
-      <p className={styles.band}>
-        <Info size={16} aria-hidden="true" />
-        <span>書き出しても友だちの情報は変わりません。取り込みは、まず確認だけをします（追加・更新・変更なし・競合・エラーの内訳）。</span>
-      </p>
+      <Notice tone="info" message="書き出しても友だちの情報は変わりません。取り込みは、まず確認だけをします（追加・更新・変更なし・競合・エラーの内訳）。" />
 
-      <div className={styles.pair}>
-        <section className={styles.card} aria-labelledby="csv-export-title">
-          <h3 id="csv-export-title" className={styles.cardTitle}>CSVで書き出す</h3>
+      <DashboardColumns layout="cards">{[
+        <Card key="export" layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-export-title">
+          <CardHeader title="CSVで書き出す" titleId="csv-export-title" headingLevel={3} size="content" />
           <div className={styles.field}>
             <span className={styles.fieldLabel}>アカウント</span>
             <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><EntitySelect
@@ -105,27 +105,29 @@ export default function CsvMigrationsV8() {
           <p className={styles.small} title="Shift_JISの書き出しはまだ使えません">文字コード：UTF-8</p>
           {m.manageLocked ? <p className={styles.small}>{MANAGE_FORBIDDEN}</p> : null}
           <div className={styles.cardFoot}>
-            {m.exportResult ? (
-              <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}>
+            {m.exportResult && !m.manageLocked ? (
+              <Button variant="text" size="inline" disabled={m.busy} busy={m.downloadId === m.exportResult.id} busyLabel="保存しています…" onClick={() => void m.downloadExport(m.exportResult!.id)}>
                 {`CSVで書き出す（${m.exportResult.rowCount ?? emptyValue('unknown')}件）`}
-              </a>
+              </Button>
             ) : null}
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
             {m.manageLocked ? null : (
-              <Button variant="primary" disabled={m.busy} busy={m.busy && !m.summary} onClick={() => void m.createExport()} title="件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。">
+              <Button variant="primary" disabled={m.busy} busy={m.busy && !m.summary && !m.downloadId} onClick={() => void m.createExport()} title="件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。">
                 <Download size={14} aria-hidden="true" />
                 書き出しを作る
               </Button>
             )}
           </div>
-        </section>
+        </Card>,
 
-        <section className={styles.card} aria-labelledby="csv-import-title">
-          <h3 id="csv-import-title" className={styles.cardTitle}>CSVを取り込む</h3>
+        <Card key="import" layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-import-title">
+          <CardHeader title="CSVを取り込む" titleId="csv-import-title" headingLevel={3} size="content" />
           <FileDropzone
             className={styles.drop}
-            title="ここにCSVを置く"
-            hint="このシステムから書き出したUTF-8のCSV・5MBまで"
+            variant="upload"
+            disabled={m.manageLocked || m.busy}
+            title="CSVを追加"
+            hint={<>ドラッグ＆ドロップ<br />またはクリックしてファイルをアップロード<br />（1ファイル5メガバイト以内・UTF-8 の CSV）</>}
             accept=".csv,text/csv"
             onFiles={(files) => void m.onPickFile(files[0] ?? null)}
           />
@@ -142,16 +144,15 @@ export default function CsvMigrationsV8() {
               </Button>
             )}
           </div>
-        </section>
-      </div>
+        </Card>
+      ]}</DashboardColumns>
 
       {m.message ? <p role="status" className={styles.message}>{m.message}</p> : null}
 
-      <section className={styles.card} aria-labelledby="csv-result-title">
-        <div className={styles.cardHead}>
-          <h3 id="csv-result-title" className={styles.cardTitle}>{m.summary && m.file ? `確認の結果：${m.file.name}` : '確認の結果'}</h3>
-          <p className={styles.cardSub}>{m.summary ? 'まだ友だち情報は変えていません' : 'CSVを選んで「まず確認だけする」を押すと、ここに内訳が出ます'}</p>
-        </div>
+      <Card layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-result-title">
+        <CardHeader size="content" headingLevel={3} titleId="csv-result-title"
+          title={m.summary && m.file ? `確認の結果：${m.file.name}` : '確認の結果'}
+          meta={m.summary ? 'まだ友だち情報は変えていません' : 'CSVを選んで「まず確認だけする」を押すと、ここに内訳が出ます'} />
         <KpiBand gridClassName="grid grid-cols-5">
           {([
             ['add', '追加', '人', ''],
@@ -186,51 +187,49 @@ export default function CsvMigrationsV8() {
             <p className={styles.small}>{m.summary ? '競合・エラーのある行を直して、もう一度「まず確認だけする」からやり直してください。' : '反映は、確認の結果を見てからです。'}</p>
           )}
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="csv-history-title">
-        <h3 id="csv-history-title" className={styles.cardTitle}>
-          書き出し・取り込みの履歴
-          <HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip>
-        </h3>
+      <Card layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-history-title">
+        <CardHeader size="content" headingLevel={3} titleId="csv-history-title" title={<>書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></>} />
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
-          <DataTable className={styles.table}>
-            <colgroup>
-              <col className={styles.colDate} />
-              <col className={styles.colKind} />
-              <col className={styles.colKind} />
-              <col />
-              <col className={styles.colState} />
-            </colgroup>
+          <DataTable columnSizing="content" grid={{
+            columns: 'var(--tpl-fr-mig-col-date) var(--tpl-fr-mig-col-kind) var(--tpl-fr-mig-col-kind) minmax(0, 1fr) var(--tpl-fr-mig-col-state)',
+            padding: '0 var(--polish-space-card)',
+            headPadding: 'var(--polish-space-field) var(--polish-space-card)',
+            gap: 'var(--tpl-toolbar-gap)',
+            rowHeight: 'var(--tpl-fr-mig-row-h)',
+            headTextSize: 'var(--text-caption)',
+            bodyTextSize: 'var(--text-caption)',
+          }}>
             <thead>
               <TableHeadRow>
-                <Th className={styles.th}>日時</Th>
-                <Th className={styles.th}>種類</Th>
-                <Th className={styles.th}>件数</Th>
-                <Th className={styles.th}>した人</Th>
-                <Th className={styles.th}>状態</Th>
+                <Th>日時</Th>
+                <Th>種類</Th>
+                <Th>件数</Th>
+                <Th grow>した人</Th>
+                <Th>状態</Th>
               </TableHeadRow>
             </thead>
             <tbody>
               {m.jobs.map((job) => {
                 const account = m.accounts.find((item) => item.id === job.line_account_id)?.name
                 const count = job.row_count ?? job.total_count ?? null
-                const downloadable = job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString())
+                const downloadable = !m.manageLocked && job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString())
                 return (
                   <Tr key={`${job.kind}-${job.id}`} className={styles.row}>
-                    <Td className={styles.td}>{slashDateTime(job.created_at)}</Td>
-                    <Td className={styles.td}><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
-                    <Td className={styles.td}>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
-                    <Td className={styles.td}>{job.created_by_name}</Td>
-                    <Td className={styles.td}>
+                    <Td>{slashDateTime(job.created_at)}</Td>
+                    <Td><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
+                    <Td>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
+                    <Td grow><TruncatedText value={job.created_by_name ?? emptyValue('unknown')} /></Td>
+                    <Td>
                       <span className={styles.stateCell}>
-                        <span className={`${styles.pill} ${job.status === 'completed' ? styles.pillOk : job.status === 'previewed' ? styles.pillWarn : styles.pillMuted}`}>
+                        <StatusBadge tone={job.status === 'completed' ? 'success' : job.status === 'previewed' ? 'warning' : 'neutral'} size="compact">
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
-                        </span>
+                        </StatusBadge>
                         {downloadable ? (
-                          <a className={styles.link}>CSVで書き出す</a>
+                          <Button variant="text" size="inline" disabled={m.busy} busy={m.downloadId === job.id} busyLabel="保存しています…" onClick={() => void m.downloadExport(job.id)}>CSVで書き出す</Button>
                         ) : null}
                       </span>
                     </Td>
@@ -240,7 +239,7 @@ export default function CsvMigrationsV8() {
             </tbody>
           </DataTable>
         )}
-      </section>
+      </Card>
     </>
   )
 
@@ -256,7 +255,7 @@ export default function CsvMigrationsV8() {
           </Button>
         )}
       />
-      <div className={styles.body}>{body}</div>
+      <PageContent>{body}</PageContent>
     </PageFrame>
   )
 }

@@ -14,7 +14,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Phone, X } from 'lucide-react'
+import { Calendar, CalendarPlus, CalendarX, CircleAlert, Phone, X } from 'lucide-react'
 import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -23,11 +23,15 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
+import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
+import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
+import FilterChip from '@/components/shared/filter-chip'
+import { ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
-import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
+import FolderPanel from '@/components/shared/folder-panel'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -199,6 +203,7 @@ export default function BookingsPage() {
    * 知らない値は既定へ落とす。
    */
   const urlInitRef = useRef(false)
+  const [ledgerRestored, setLedgerRestored] = useState(false)
   // R317: 復元で絞り込みが変わっても、戻したページは1へ戻さない。
   const pageResetRef = useRef({ seenMount: false, restoreTransition: false })
   useEffect(() => {
@@ -262,6 +267,7 @@ export default function BookingsPage() {
     if (bookingParam) {
       setActiveBookingId(bookingParam)
     }
+    setLedgerRestored(true)
   }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
@@ -789,7 +795,7 @@ export default function BookingsPage() {
     ...(activeBookingId ? [`booking=${encodeURIComponent(activeBookingId)}`] : []),
   ].join('&')
   useEffect(() => {
-    if (!urlInitRef.current) return
+    if (!urlInitRef.current || !ledgerRestored) return
     try {
       window.sessionStorage.setItem(
         LEDGER_STORAGE_KEY,
@@ -805,7 +811,7 @@ export default function BookingsPage() {
     if (current !== ledgerQuery) {
       router.replace(ledgerQuery ? `/booking/bookings?${ledgerQuery}` : '/booking/bookings')
     }
-  }, [ledgerQuery, router])
+  }, [ledgerQuery, ledgerRestored, router])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
@@ -890,7 +896,7 @@ export default function BookingsPage() {
       {canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new"><Phone size={16} aria-hidden="true" />電話の予約を入れる</Button> : null}
     </>
   )
-  const pageHead = <PageHeading title="予約管理" actions={headingActions} />
+  const pageHead = <PageHeading title="予約管理" help={view === 'month' ? '予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。' : undefined} actions={headingActions} />
 
   const dialogs = (
     <>
@@ -964,65 +970,44 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4" data-design-node="acRIl">
+    <BookingLedgerFrame view={view}>
       {pageHead}
+      <BookingLedgerBody view={view} readOnly={!canOperate}
+        stats={<>
+          {summaryError && (
+            // 集計の失敗でも一覧は使える。
+            <p className="text-ink-secondary text-xs" role="status">
+              集計を読み込めませんでした。一覧はそのまま使えます。
+              <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
+            </p>
+          )}
 
-      {/*
-        ★V7 `x63W5x`：一覧の失敗でページ上のピンクの帯は出さない。
-        一覧の場所の ListState error だけにまとめる。
-      */}
-
-      {summaryError && (
-        // ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
-        // 小さく1行だけ。一覧はそのまま使える。文言は契約試験が守る。
-        <p className="text-ink-secondary text-xs" role="status">
-          集計を読み込めませんでした。一覧はそのまま使えます。
-          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
-        </p>
-      )}
-
-      {/*
-        ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
-        失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
-      */}
-      <KpiBand data-design="KPIs">
-        <KpiCard icon={null} presentation="band"
-          title="今月の予約"
-          value={summaryReady ? kpi.total : null}
-          unit="件"
-          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
-        />
-        <KpiCard icon={null} presentation="band" title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
-        {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
-            承認待ちを出す。要対応であることは変わらない。 */}
-        <KpiCard icon={null} presentation="band"
-          title="変更依頼"
-          value={summaryReady ? summary.requested : null}
-          unit="件"
-          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
-        />
-        <KpiCard icon={null} presentation="band"
-          title="キャンセル"
-          value={summaryReady ? kpi.cancelled : null}
-          unit="件"
-          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
-        />
-      </KpiBand>
-
-
-      {/* R90: 今月の表示では対象の期間と状態を明示する。 */}
-      {view === 'month' ? (
-        <p className="text-ink-secondary text-xs" role="status">
-          今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find((item) => item.key === tab)?.label ?? ''}」で表示しています。
-        </p>
-      ) : null}
-
-      <div
-        data-design="Body"
-        className="flex flex-col items-start gap-4 xl:flex-row"
-      >
-        <div data-design="Folders" className="shrink-0" style={{ width: FOLDER_RAIL_WIDTH }}>
-          <FolderPanel
+          {/* 未取得の数と、取得済みの0件を区別する。 */}
+          <KpiBand data-design="KPIs">
+            <KpiCard icon={view === 'month' ? <Calendar size={16} aria-hidden="true" /> : null} presentation="band"
+              title="今月の予約"
+              value={summaryReady ? kpi.total : null}
+              unit="件"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+            />
+            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" help={view === 'month' ? '今月の予約のうち、確定して来店を予定している件数です。' : undefined} helpDisplay="question" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
+            {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
+                承認待ちを出す。要対応であることは変わらない。 */}
+            <KpiCard icon={view === 'month' ? <CircleAlert size={16} aria-hidden="true" /> : null} presentation="band"
+              title="変更依頼"
+              value={summaryReady ? summary.requested : null}
+              unit="件"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
+            />
+            <KpiCard icon={view === 'month' ? <CalendarX size={16} aria-hidden="true" /> : null} presentation="band"
+              title="キャンセル"
+              value={summaryReady ? kpi.cancelled : null}
+              unit="件"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
+            />
+          </KpiBand>
+        </>}
+        folders={<FolderPanel
             heading="メニュー"
             rows={[
               { id: 'all', label: 'すべて', count: summary.total },
@@ -1035,25 +1020,26 @@ export default function BookingsPage() {
             activeId={menuFilter}
             onSelect={setMenuFilter}
             total={`${summary.total} 件`}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {/*
-            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
-            右端にCSVで書き出す。
-            #670 17: 押せない「保存した条件」(準備中です)は置かない。
-            押せない口を並べると「まだ何かある」と読める。条件の保存が
-            要るときは、動く形で足し直す。
-            設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
-            1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
-          */}
-          <div data-design="Bar">
-          <div data-design="Saved">
-          <ListToolbar
+          />}
+        folderNav={{
+          label: 'メニュー',
+          activeId: menuFilter,
+          onSelect: setMenuFilter,
+          rows: [{ id: 'all', label: 'すべて', count: summary.total }, ...menus.map(menu => ({ id: menu.name, label: menu.name, count: menuCounts.get(menu.name) ?? 0 }))],
+        }}
+        toolbar={<>
+          {view === 'month' ? <Notice tone="info" role="status">今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</Notice> : null}
+            <ListToolbar
             search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
             filters={
               <>
+                {view === 'month' ? <>
+                  <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
+                  <ResponsiveFilterChips label="期間">
+                    <FilterChip selected={range === 'today'} onChange={() => setRange(range === 'today' ? 'all' : 'today')}>今日</FilterChip>
+                    <FilterChip selected={range === 'week'} onChange={() => setRange(range === 'week' ? 'all' : 'week')}>今週</FilterChip>
+                  </ResponsiveFilterChips>
+                </> : <>
                 <span className="text-ink-faint text-xs">よく使う</span>
                 {STATUS_TABS.map(({ key, label }) => (
                   <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
@@ -1079,13 +1065,16 @@ export default function BookingsPage() {
                   }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'week' ? 'all' : 'week')} aria-pressed={range === 'week'}>
                   今週
                 </Button>
-                {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
+
+                </>}
+                {/* 担当者と予約経路は一覧と件数の両方を絞り込む。 */}
                 <EntitySelect
                   aria-label="担当者で絞り込む"
+                  valuePrefix={view === 'month' ? '担当：' : undefined}
                   value={staffFilter}
                   onChange={setStaffFilter}
                   options={[
-                    { value: 'all', label: '担当: すべて' },
+                    { value: 'all', label: view === 'month' ? 'すべて' : '担当: すべて' },
                     ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
                   ]}
                 />
@@ -1098,17 +1087,25 @@ export default function BookingsPage() {
               </>
             }
             trailing={
-              /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
+              /* CSVにも画面と同じ絞り込みを使う。 */
               selectedAccountId ? (
                 <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す
                 </Button>
               ) : null
             }
           />
-          </div>
-          </div>
-
-          {!selectedAccountId ? (
+        </>}
+        pagination={view === 'month'
+          ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} range={{ total, first: (current - 1) * PAGE_SIZE + 1, last: Math.min(current * PAGE_SIZE, total) }} />
+          : <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <ListRange
+              total={total}
+              first={(current - 1) * PAGE_SIZE + 1}
+              last={Math.min(current * PAGE_SIZE, total)}
+            />
+            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
+          </div>}>
+        {!selectedAccountId ? (
             <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
               サイドバーでアカウントを選択してください
             </div>
@@ -1305,17 +1302,7 @@ export default function BookingsPage() {
               </p>
             )}
           </div>
-
-          <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <ListRange
-              total={total}
-              first={(current - 1) * PAGE_SIZE + 1}
-              last={Math.min(current * PAGE_SIZE, total)}
-            />
-            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
-          </div>
-        </div>
-      </div>
+      </BookingLedgerBody>
 
       {/* V8「サクサク感」C①・E：表の行の詳細パネル。確認の窓は残す。v7は引き出しのまま。 */}
       {(
@@ -1380,7 +1367,7 @@ export default function BookingsPage() {
       )}
 
       {dialogs}
-    </div>
+    </BookingLedgerFrame>
   )
 }
 

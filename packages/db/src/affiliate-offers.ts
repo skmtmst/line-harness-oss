@@ -528,7 +528,7 @@ export async function freezeConversionApproval(
       inputs.fixedReward, inputs.rewardMiles, eventId,
     ).run();
   } catch (error) {
-    console.error(`freezeConversionApproval failed (event=${eventId}):`, error);
+    console.error(JSON.stringify({"code":"src_affiliate_offers_failed"}));
   }
 }
 

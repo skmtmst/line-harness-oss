@@ -138,6 +138,7 @@
 :root .labelText {
   display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+:root .labelHelp { display: inline-flex; flex: 1 1 auto; min-width: 0; flex-shrink: 1; }
 /* 帯の「？」は題の直後ではなく行の右端（絵のマスの右端どおり）。
    文が伸びて「？」を右へ押し出す（「…」の扱いは G3 のまま）。 */
 :root .tip { flex-shrink: 0; display: inline-flex; height: 24px; align-items: center; }
@@ -168,7 +169,7 @@
   color: var(--color-ink-faint); font-size: 12px; font-weight: 400; line-height: 18px;
 }
 :root .detailText { min-width: 0; flex: 1; }
-:root .link { font-size: 12px; font-weight: 500; line-height: 18px; }
+:root .link { min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
 :root .card[data-kpi-presentation='band'] {
   border-radius: 0; outline-color: transparent; box-shadow: none;
 }

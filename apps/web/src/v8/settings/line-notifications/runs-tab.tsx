@@ -2,7 +2,7 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ban, CircleX, Mail, RotateCw } from 'lucide-react'
+import { CircleX, Mail, RotateCw, UserX } from 'lucide-react'
 import {
   filterNotificationRuns,
   loadNotificationRuns,
@@ -181,7 +181,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           * WEB202：送れなかった一覧にはメールで届いたもの（受付済み）は出ないので、ここでは数えない。
           */}
         <KpiCard presentation="band" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<UserX size={16} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
         <KpiCard presentation="band" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
         <KpiCard presentation="band" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
       </KpiBand>

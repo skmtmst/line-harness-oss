@@ -188,7 +188,7 @@ export default function EcIdentityCandidatesScreen() {
           />
         </KpiBand>
 
-        <p className={styles.band} title={AUTO_LINK_NOTE}>{AUTO_LINK_NOTE}</p>
+
 
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
@@ -269,7 +269,7 @@ export default function EcIdentityCandidatesScreen() {
 
         {detail ? (
           <>
-          <Drawer contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
+          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />
@@ -299,6 +299,8 @@ export default function EcIdentityCandidatesScreen() {
       boardId="w1W8h"
       layout="narrow-nav"
       title="EC連携"
+      explanation={AUTO_LINK_NOTE}
+      explanationKey="ec-identity"
       help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={<Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={shared.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>}
     >

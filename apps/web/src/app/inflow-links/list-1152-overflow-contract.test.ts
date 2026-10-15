@@ -10,7 +10,7 @@ const PAGE = readFileSync(resolve(__dirname, "../../v8/inflow-links/list.tsx"), 
 
 describe("inflow-links 一覧の1152幅", () => {
   it("表は共通の列の並びで幅の中に収める", () => {
-    expect(PAGE).toContain("<DataTable columnLayout={{");
+    expect(PAGE).toMatch(/<DataTable\b[^>]*\bcolumnLayout=\{\{/);
     expect(PAGE).toContain('data-table-layout="columns"');
     expect(PAGE).not.toContain("data-scroll-x");
     const css = readFileSync(resolve(__dirname, "../../v8/inflow-links/list.module.css"), "utf8");

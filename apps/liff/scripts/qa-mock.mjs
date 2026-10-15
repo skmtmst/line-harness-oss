@@ -22,6 +22,10 @@ import { createServer } from 'node:http';
 const PORT = Number(process.env.QA_MOCK_PORT ?? 8790);
 
 const state = { delayMs: 0, fail: null };
+let qaAvailableMiles = 1250;
+let qaBankProfile = null;
+const qaRedemptions = new Map();
+const qaBankSaves = new Map();
 
 // 見本の言葉・日付は ★V8 の絵 (gVjiC・EscPA・y1bs9A など) に合わせる。
 const QA_EVENT = {
@@ -205,7 +209,7 @@ function json(res, status, body) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Content-Length': Buffer.byteLength(text),
   });
   res.end(text);
@@ -352,12 +356,26 @@ function qaForm() {
   };
 }
 
+function qaDocumentForm() {
+  return {
+    id: 'qa-document', name: '書類確認', description: '試験用の書類入力です。実際の書類は使わないでください。', isActive: true,
+    layout: {
+      version: 2, header: [],
+      sections: [{ id: 'qa-document-section', name: '書類', blocks: [{
+        id: 'qa-document-file', kind: 'input', type: 'file', name: 'identity', label: '本人確認書類',
+        required: true, fileKind: 'identity', fileBothSides: true, fileMaxCount: 2,
+      }] }],
+      options: { confirmDialog: { enabled: false } },
+    },
+  };
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     });
     res.end();
     return;
@@ -381,6 +399,10 @@ const server = createServer(async (req, res) => {
   if (pathname === '/__qa/reset' && req.method === 'POST') {
     state.delayMs = 0;
     state.fail = null;
+    qaAvailableMiles = 1250;
+    qaBankProfile = null;
+    qaRedemptions.clear();
+    qaBankSaves.clear();
     json(res, 200, state);
     return;
   }
@@ -728,6 +750,21 @@ const server = createServer(async (req, res) => {
   {
     const m = pathname.match(/^\/api\/forms\/([^/]+)\/files$/);
     if (method === 'POST' && m) {
+      if (m[1] === 'qa-document') {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const bytes = Buffer.concat(chunks);
+        const side = url.searchParams.get('side');
+        if (!['front', 'back'].includes(side) || !bytes.length || url.searchParams.get('block_id') !== 'qa-document-file') {
+          json(res, 400, { success: false, error: 'invalid_document_upload' });
+          return;
+        }
+        json(res, 200, { success: true, data: { file: {
+          fileId: `qa-document-${side}`, side, filename: url.searchParams.get('filename') || 'qa.png',
+          mimeType: req.headers['content-type'] || 'image/png', size: bytes.length, state: 'ready',
+        } } });
+        return;
+      }
       json(res, 200, {
         success: true,
         data: { key: 'qa-key', url: 'https://example.com/qa.png', mimeType: 'image/png', size: 123 },
@@ -747,7 +784,8 @@ const server = createServer(async (req, res) => {
     if (method === 'GET' && m) {
       // 本物と同じ包み。試し合言葉付きは本物と同じく isTest:true を足す。
       const testToken = url.searchParams.get('test_token');
-      json(res, 200, { success: true, data: testToken ? { ...qaForm(), isTest: true } : qaForm() });
+      const form = m[1] === 'qa-document' ? qaDocumentForm() : qaForm();
+      json(res, 200, { success: true, data: testToken ? { ...form, isTest: true } : form });
       return;
     }
   }
@@ -789,6 +827,69 @@ const server = createServer(async (req, res) => {
       json(res, seat[0], seat[1]);
       return;
     }
+  }
+
+  if (method === 'GET' && pathname === '/api/liff/mileage/rewards') {
+    json(res, 200, { success: true, availableMiles: qaAvailableMiles, rewards: [{
+      id: 'qa-reward-1', name: 'QA 割引券', description: '試験用の交換先', imageUrl: null,
+      currentVersion: { requiredMiles: 100 }, canRedeem: qaAvailableMiles >= 100,
+      unavailableReason: qaAvailableMiles >= 100 ? null : '必要なマイルが足りません',
+    }] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/liff/mileage/rewards/qa-reward-1/redeem') {
+    await readBody(req);
+    const key = req.headers['idempotency-key'];
+    if (!key) { json(res, 400, { error: '再実行キーを確認してください' }); return; }
+    if (!qaRedemptions.has(key)) {
+      if (qaAvailableMiles < 100) { json(res, 409, { error: '必要なマイルが足りません' }); return; }
+      qaAvailableMiles -= 100;
+      qaRedemptions.set(key, { status: 'succeeded', rewardName: 'QA 割引券', customerMessage: '試験用です', rewardCode: 'QA-ONLY', message: null });
+    }
+    json(res, 200, qaRedemptions.get(key));
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/affiliate/bank') {
+    json(res, 200, { success: true, data: qaBankProfile });
+    return;
+  }
+  if (method === 'PUT' && pathname === '/api/liff/affiliate/bank') {
+    const body = await readBody(req);
+    const key = req.headers['idempotency-key'];
+    const fingerprint = JSON.stringify(body);
+    const prior = qaBankSaves.get(key);
+    if (prior) {
+      json(res, prior.fingerprint === fingerprint ? 200 : 409, prior.fingerprint === fingerprint
+        ? { success: true, data: prior.profile } : { success: false, error: '同じ再実行キーが別の入力に使われています' });
+      return;
+    }
+    if (body.expectedVersion !== (qaBankProfile?.version ?? 0)) {
+      json(res, 409, { success: false, error: '振込先が更新されています' }); return;
+    }
+    if (!req.headers['idempotency-key'] || !/^\d{1,8}$/.test(body.accountNumber ?? '')) {
+      json(res, 400, { success: false, error: '振込先を確認してください' }); return;
+    }
+    const { bankCode, bankName, branchCode, branchName, accountType, accountHolderName } = body;
+    qaBankProfile = { bankCode, bankName, branchCode, branchName, accountType, accountHolderName,
+      accountLast4: body.accountNumber.slice(-4), version: (qaBankProfile?.version ?? 0) + 1 };
+    qaBankSaves.set(key, { fingerprint, profile: qaBankProfile });
+    json(res, 200, { success: true, data: qaBankProfile });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/affiliate/statements') {
+    json(res, 200, { success: true, data: [{ id: 'qa-statement-1', totalAmount: 1000, createdAt: '2026-10-01T00:00:00Z', expiresAt: null }] });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/affiliate/statements/qa-statement-1/download') {
+    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>', '<< /Length 0 >>\nstream\n\nendstream'];
+    let pdf = '%PDF-1.4\n'; const offsets = [0];
+    for (const [i, object] of objects.entries()) { offsets.push(Buffer.byteLength(pdf)); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; }
+    const xref = Buffer.byteLength(pdf);
+    pdf += `xref\n0 5\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Access-Control-Allow-Origin': '*', 'Content-Disposition': 'attachment; filename="qa-statement.pdf"' });
+    res.end(pdf);
+    return;
   }
 
   // ---- アフィリエイト・ mileage ----
@@ -876,10 +977,10 @@ const server = createServer(async (req, res) => {
       mileage: {
         programId: 'qa-program',
         programName: 'QA マイル',
-        available: 1250,
+        available: qaAvailableMiles,
         pending: 500,
         lifetimeEarned: 2000,
-        spent: 750,
+        spent: 2000 - qaAvailableMiles,
       },
       history: [],
       insights: {

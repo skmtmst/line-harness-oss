@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -108,12 +109,8 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
 
     const optionLabels = async (buttonId: string) => {
       const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
-  const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
-  if (toggle && !toggle.checked) await act(async () => { toggle.click() })
-  // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-  const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
-      expect(button).toBeTruthy()
-      await act(async () => { button!.click() })
+  await act(async () => { screen.getByRole('button', { name: '行うことを足す' }).click() })
+  await act(async () => { screen.getByRole('menuitem', { name: switchName }).click() })
       const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')]
         .map((el) => el.getAttribute('aria-label') ?? '')
       return labels
@@ -128,11 +125,8 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     })
     // シナリオは選ぶ窓。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-    const scenarioToggle = host.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="シナリオ配信を始める"]')
-    if (scenarioToggle && !scenarioToggle.checked) await act(async () => { scenarioToggle.click() })
-    const scenarioOpen = host.querySelector<HTMLButtonElement>('button[aria-label="開始するシナリオ：選ぶ"]')
-    expect(scenarioOpen).toBeTruthy()
-    await act(async () => { scenarioOpen!.click() })
+    await act(async () => { screen.getByRole('button', { name: '行うことを足す' }).click() })
+    await act(async () => { screen.getByRole('menuitem', { name: 'シナリオ配信を始める' }).click() })
     const scenarioLabels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')]
       .map((el) => el.getAttribute('aria-label') ?? '')
     expect(scenarioLabels.some((text) => text.includes('有効シナリオ'))).toBe(true)

@@ -6,7 +6,6 @@ import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ExternalLink } from 'lucide-react';
 import { validateFlexContent } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
@@ -16,7 +15,9 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
 import Dialog from '@/components/shared/dialog'
+import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
@@ -583,26 +584,16 @@ export default function TemplateDetailV8() {
         )}
       >
         <div className={styles.dialogList}>
-          {usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
-            <div key={row.key} className={styles.blockedRow}>
-              <span className={styles.usageKind}>{row.kind}</span>
-              <span className={styles.dialogName} ><TruncatedText value={String(row.name ?? '')} /></span>
-              {row.href
-                ? <TextLink external href={row.href} className={styles.ghostButton}>開いて差し替える</TextLink>
-                : <span className={styles.dialogState}>開ける画面がありません</span>}
-            </div>
-          ))}
+          <DialogUsageTable rows={usageRows.slice(0, BLOCKED_VISIBLE)} />
           {usageCount > BLOCKED_VISIBLE ? <p className={styles.dialogMore}>ほか {usageCount - BLOCKED_VISIBLE} か所</p> : null}
         </div>
       </Dialog>
 
       {/* 使っていないときの削除の確認（V6JFnd）。 */}
-      <ConfirmDialog
+      <TemplateDeleteDialog
         open={deleteOpen && usageCount === 0}
         title={`テンプレート「${template.name}」を削除しますか？`}
         description={templateDeleteDescription(usageCount)}
-        confirmLabel="削除する"
-        destructive
         busy={deleting}
         error={deleteError}
         onConfirm={() => remove()}
@@ -611,7 +602,6 @@ export default function TemplateDetailV8() {
           setDeleteOpen(false)
           setDeleteError('')
         }}
-        designNode="V6JFnd"
       />
 
       <ConfirmDialog

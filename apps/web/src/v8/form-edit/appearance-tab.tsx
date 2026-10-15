@@ -36,6 +36,7 @@ import { Field, FieldError } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * 「受付と見た目」のタブ（tpRRT）。受付のきまり・色と文字・背景とリンクの見え方・
@@ -250,11 +251,11 @@ export function AppearanceTab(props: Props) {
           <span>次へ</span>
           <span>送る</span>
         </div>
-        <div className={styles.wordsRow}>
+        <SettingsFormRow layout="columns" columns={3}>
           <SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField>
           <SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField>
           <SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-about-title">

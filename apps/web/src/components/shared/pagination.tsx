@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useId } from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
+export type PaginationRange = { total: number | null | undefined; first: number; last: number; unit?: string }
 
 export type PaginationProps = {
   page: number
@@ -15,6 +16,8 @@ export type PaginationProps = {
    * 表示があるので、この中身は v8 のときだけ出る。
    */
   summary?: React.ReactNode
+  /** 件数の書き方は共通部品が持つ。画面からは数値と単位だけ渡す。 */
+  range?: PaginationRange
   /** 予約台帳の枠内で、絵の広めの件数帯を描く。 */
   spacing?: 'roomy' | 'restaurant'
   /** カーソル式は前・現在・次だけ。任意の番号へは移動しない。 */
@@ -65,24 +68,32 @@ export default function Pagination({
   disabled = false,
   className,
   summary,
+  range,
   spacing,
   mode = 'numbered',
 }: PaginationProps) {
+  const reasonId = useId()
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
+  const pausedReason = disabled ? '現在、ページを移動できません。' : undefined
+  const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)
+  const nextReason = pausedReason ?? (current >= total ? '最後のページです。' : undefined)
 
   if (!Number.isFinite(pageCount) || pageCount <= 0) return null
 
   return (
     <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
-      {summary ? <span className={styles.summary}>{summary}</span> : null}
+      {range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
+        : summary ? <span className={styles.summary}>{summary}</span> : null}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
         onClick={() => onPageChange(current - 1)}
         disabled={disabled || current <= 1}
         aria-label="前のページ"
+        title={previousReason}
+        aria-describedby={previousReason ? `${reasonId}-previous` : undefined}
       >
         <span className={styles.controlLabel}>前へ</span>
         <span className={styles.controlGlyph} aria-hidden="true">
@@ -101,6 +112,8 @@ export default function Pagination({
               .join(' ')}
             onClick={() => onPageChange(item)}
             disabled={disabled}
+            title={pausedReason}
+            aria-describedby={pausedReason ? `${reasonId}-paused` : undefined}
             aria-label={`${item}ページ目へ`}
             aria-current={item === current ? 'page' : undefined}
           >
@@ -114,18 +127,24 @@ export default function Pagination({
         onClick={() => onPageChange(current + 1)}
         disabled={disabled || current >= total}
         aria-label="次のページ"
+        title={nextReason}
+        aria-describedby={nextReason ? `${reasonId}-next` : undefined}
       >
         <span className={styles.controlLabel}>次へ</span>
         <span className={styles.controlGlyph} aria-hidden="true">
           ›
         </span>
       </button>
+      {previousReason ? <span id={`${reasonId}-previous`} hidden>{previousReason}</span> : null}
+      {nextReason ? <span id={`${reasonId}-next`} hidden>{nextReason}</span> : null}
+      {pausedReason ? <span id={`${reasonId}-paused`} hidden>{pausedReason}</span> : null}
     </nav>
   )
 }
 
 /** 固定版jX2Uwの件数。人数の一覧も同じ配置で単位だけ渡す。 */
 export function paginationSummary(total: number | null | undefined, from: number, to: number, unit = '件'): string {
+  if (total === 0) return `0${unit}`
   const count = total != null && Number.isFinite(total) ? total.toLocaleString('ja-JP') : '—'
   const first = to > 0 ? from : 0
   return `${count}${unit}中 ${first.toLocaleString('ja-JP')}〜${to.toLocaleString('ja-JP')}${unit}`

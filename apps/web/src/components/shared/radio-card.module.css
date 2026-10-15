@@ -351,3 +351,8 @@ html:root .card:not(.row) { position: relative; display: flex; flex-direction: c
 html:root .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }
 /* 行型の選択は丸だけで示す。カードの選択枠を引き継がない。 */
 html:root .card.row { outline-color: transparent; box-shadow: none; background: transparent; }
+
+html:root .card[data-choice-indicator='check'] > .radio { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+html:root .card[data-choice-indicator='check'] .body { padding-right: 0; }
+html:root .card[data-choice-indicator='check'] .title { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
+.check { width: var(--space-16); height: var(--space-16); flex-shrink: 0; color: var(--color-accent-deep); }

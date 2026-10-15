@@ -26,6 +26,7 @@ import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CreateColumns } from '@/components/templates/create-page'
 import { useFormErrors } from '@/lib/use-form-errors'
 import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
@@ -2151,7 +2152,7 @@ export default function BroadcastForm({
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
-    <div className={styles.body}>
+    <CreateColumns>
       <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
@@ -2378,7 +2379,7 @@ export default function BroadcastForm({
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
             state={templateCandidatesStatus === 'loading' ?
-                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><p role="alert">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</p></SaveErrorField> : undefined}
+                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
                     ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
               ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
@@ -2569,11 +2570,11 @@ export default function BroadcastForm({
           ['送る日時', sendWhenLabel ?? '未設定'],
           ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} title={validate() || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>
-    </div>
+    </CreateColumns>
 
     <StickyBar className={styles.footer} actions={(
       <>

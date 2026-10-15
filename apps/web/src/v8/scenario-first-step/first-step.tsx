@@ -9,7 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from 'lucide-react';
+import { Filter, PencilLine, Tag as TagIcon, Users } from 'lucide-react';
 import { countTemplateTextCharacters, type DeliveryMode, type Scenario, type ScenarioStep, type Tag, type Template } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
@@ -32,10 +32,9 @@ import { Field } from '@/components/shared/form-controls';
 import { TimeField } from '@/components/shared/date-time-field';
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Notice from '@/components/shared/notice'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
@@ -143,7 +142,6 @@ export default function ScenarioFirstStepV8() {
   const [offsetMinutesRemainder, setOffsetMinutesRemainder] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [previewOpen, setPreviewOpen] = useState(false)
 
   /** 別のシナリオへ切り替わったとき、前のシナリオの入力を持ち越さない。 */
   const resetForm = () => {
@@ -232,7 +230,6 @@ export default function ScenarioFirstStepV8() {
 
         if (caught instanceof ApiError && caught.status === 404) {
           { if (!fieldFailure)
-
 
           setError('') }
           setLoadMissing(true)
@@ -444,7 +441,6 @@ export default function ScenarioFirstStepV8() {
       const detail = submitError instanceof ApiError ? submitError.message : ''
       { if (!fieldFailure)
 
-
       setError(
         detail
           ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
@@ -549,13 +545,7 @@ export default function ScenarioFirstStepV8() {
       ) : null}
     </LinePreview>
   )
-  const preview = narrow ? (
-    <div className={styles.previewOpen}>
-      <Button type="button" onClick={() => setPreviewOpen(true)}>
-        <Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る
-      </Button>
-    </div>
-  ) : phone
+  const preview = phone
 
   const tagName = tags.find((t) => t.id === targetTagId)?.name
   const conditionCount = targetCondition ? pruneCondition(targetCondition)?.rules.length ?? 0 : 0
@@ -589,6 +579,7 @@ export default function ScenarioFirstStepV8() {
       )}
       help={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
       preview={preview}
+      notice={!canEdit ? <ReadOnlyNotice role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice> : undefined}
       status={saving ? '保存しています' : browserDraft.label ?? undefined}
       footerActions={(
         <>
@@ -609,9 +600,7 @@ export default function ScenarioFirstStepV8() {
         </>
       )}
     >
-      {!canEdit ? (
-        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
-      ) : null}
+
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
       <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
@@ -620,11 +609,8 @@ export default function ScenarioFirstStepV8() {
         ここで決めるのは「この1通目を誰に送るか」。シナリオがいつ始まるか（友だち追加時など）は
         シナリオ編集と「友だち追加時の配信」で決める。2か所で同じことを聞かない。
       */}
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="この1通目を誰に送るか">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>この1通目を誰に送るか</h2>
-          <p className={styles.cardDesc}>開始のきっかけは、このあとの編集で決めます</p>
-        </div>
+      <Card variant="form" gap="normal" aria-label="この1通目を誰に送るか">
+        <CardHeader size="stacked" title={<>この1通目を誰に送るか</>} meta={<>開始のきっかけは、このあとの編集で決めます</>} />
         <SaveErrorField names={["targetMode","value","card.value"]}><RadioCardGroup legend="この1通目を誰に送るか" className={styles.targetRow}>
           {targetCards.map((card) => (
             <RadioCard
@@ -658,11 +644,8 @@ export default function ScenarioFirstStepV8() {
         ) : null}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="1通目の内容">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>1通目の内容</h2>
-          <p className={styles.cardDesc}>空のままでも進めます。テンプレートや画像は、このあとの編集でも選べます</p>
-        </div>
+      <Card variant="form" gap="normal" aria-label="1通目の内容">
+        <CardHeader size="stacked" title={<>1通目の内容</>} meta={<>空のままでも進めます。テンプレートや画像は、このあとの編集でも選べます</>} />
 
         {/* いつ。右に届く日時の例。方式で欄が変わる（時刻で指定＝日後の時刻・経過時間＝日・時間・分）。 */}
         <div className={styles.whenRow}>
@@ -769,7 +752,7 @@ export default function ScenarioFirstStepV8() {
                   onValueChange={(next) => editBody(next)}
                   placeholder="はじめまして。友だち追加ありがとうございます。"
                   aria-label="本文"
-                  className={styles.bodyField}
+                  editorSize="message"
                 /></SaveErrorField>
                 <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} count={`${formatNumber(bodyLength)} / ${formatNumber(LINE_TEXT_LIMIT)}`} />
               </MessageBody>
@@ -818,16 +801,7 @@ export default function ScenarioFirstStepV8() {
           onClose={() => setConditionOpen(false)}
         />
       ) : null}
-      <ConfirmDialog
-        open={previewOpen}
-        title="LINEでの見え方"
-        description="この1通目が届く形です。"
-        confirmLabel="閉じる"
-        onConfirm={() => setPreviewOpen(false)}
-        onCancel={() => setPreviewOpen(false)}
-      >
-        {phone}
-      </ConfirmDialog>
+
     </CreatePage></SaveErrorScope>
   )
 }

@@ -60,12 +60,11 @@ export function useAttributeTab(path: string): { tab: AttributeTabKey; select: (
 
 export function AttributeTabs({ tab, onSelect }: { tab: AttributeTabKey; onSelect: (key: AttributeTabKey) => void }) {
   return (
-    <div className={styles.tabsBox}>
       <Tabs
+        size="compact"
         label="タグの種類"
         items={ATTRIBUTE_TABS.map(([key, label]) => ({ label, current: tab === key, onClick: () => onSelect(key) }))}
       />
-    </div>
   )
 }
 

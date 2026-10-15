@@ -23,12 +23,14 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import FixedActionList from '@/components/shared/fixed-action-list'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -83,6 +85,7 @@ function commissionRateError(payoutKind: PayoutKind, value: string): string | nu
 
 export default function CreateAffiliateV8() {
   const saveErrors = useSaveFormErrors()
+  const canEdit = canManageRole(useStaffRole())
   usePageTitle('アフィリエイターを作る')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
   usePageCrumbs([{ label: '成果とアフィリエイト', href: LIST_PATH }])
@@ -288,6 +291,7 @@ export default function CreateAffiliateV8() {
   }
 
   const runSave = async (after: 'continue' | 'finish') => {
+    if (!canEdit) return
     if (saving) return
     setSaveError('')
     setSaveNote('')
@@ -351,23 +355,28 @@ export default function CreateAffiliateV8() {
     </div>
   )
 
+  if (!canEdit) return <CreatePage boardId="RaMf3" title="アフィリエイターを作る" readOnly footerActions={<Button href="/affiliates?tab=affiliates">一覧へ戻る</Button>}>{null}</CreatePage>
+
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
       hidePreviewWhenNarrow
+      readOnly={!canEdit}
       boardId="RaMf3"
       title="アフィリエイターを作る"
       help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
+      previewLabel="紹介リンクを見る"
+      previewTitle="紹介リンク"
       preview={preview}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
         <Button href={LIST_PATH}>キャンセル</Button>
-        <Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存しています" onClick={() => void runSave('continue')}>
+        {canEdit ? <><Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存しています" onClick={() => void runSave('continue')}>
           {partialSave ? '追加情報の保存を再開する' : '保存して続けて作る'}
         </Button>
         <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
-      </>} dirty={false}
+      </> : null}</>} dirty={false}
     >
 
       {partialSave && createdId ? (
@@ -386,31 +395,28 @@ export default function CreateAffiliateV8() {
         </Notice>
       ) : null}
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="だれを登録するか">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>だれを登録するか</h2>
-          <p className={styles.cardNote}>会社でも個人でも登録できます</p>
-        </div>
-        <div className={styles.grid2}>
-          <Field label="名前（表示名）" htmlFor="af-name" error={fieldErrors.name} requirement={b244Requirements.name}>
-            <SaveErrorField names={["name"]}><TextField id="af-name" value={name} onChange={(event) => { setName(event.target.value); clearField('name') }} placeholder="例：ペットライフ編集部" maxLength={120} /></SaveErrorField>
+      <Card variant="form" aria-label="だれを登録するか">
+        <CardHeader size="stacked" title="だれを登録するか" meta="会社でも個人でも登録できます" />
+        <SettingsFormRow>
+          <Field requirement={b244Requirements.name} label="名前（表示名）" htmlFor="af-name" error={fieldErrors.name}>
+            <SaveErrorField names={["name"]}><TextField readOnly={!canEdit} id="af-name" value={name} onChange={(event) => { setName(event.target.value); clearField('name') }} placeholder="例：ペットライフ編集部" maxLength={120} /></SaveErrorField>
           </Field>
           <Field label="紹介コード（リンクの最後に付く）" htmlFor="af-code" error={fieldErrors.code}
             help="登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。">
-            <SaveErrorField names={["code"]}><TextField id="af-code" value={code} onChange={(event) => { setCode(event.target.value); clearField('code') }} placeholder="petlife2026" maxLength={64} /></SaveErrorField>
+            <SaveErrorField names={["code"]}><TextField readOnly={!canEdit} id="af-code" value={code} onChange={(event) => { setCode(event.target.value); clearField('code') }} placeholder="petlife2026" maxLength={64} /></SaveErrorField>
           </Field>
-        </div>
-        <Field label="連絡先メール" htmlFor="af-email"><SaveErrorField names={["email"]}><TextField id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} /></SaveErrorField></Field>
-        <div className={styles.friendRow}>
+        </SettingsFormRow>
+        <Field label="連絡先メール" htmlFor="af-email"><SaveErrorField names={["email"]}><TextField readOnly={!canEdit} id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} /></SaveErrorField></Field>
+        {canEdit ? <div className={styles.friendRow}>
           <Button type="button" aria-expanded={friendPickerOpen} onClick={() => setFriendPickerOpen((open) => !open)}>
             <LinkIcon size={15} aria-hidden="true" /> LINE の友だちと結びつける
           </Button>
           <span className={styles.inlineNote}>
             {selectedFriend ? `結びつける友だち：${selectedFriend.displayName}` : '結びつけると、本人が LINE で成果を見られます'}
           </span>
-        </div>
+        </div> : null}
         {/* 閉じていても中身は置いておく（hidden）。開くと選んだ値・検索がそのまま残る。 */}
-        <div className={styles.friendPicker} hidden={!friendPickerOpen}>
+        <div className={styles.friendPicker} hidden={!canEdit || !friendPickerOpen}>
             {!selectedAccountId ? (
               <p className={styles.cardNote}>画面上部でLINEアカウントを選ぶと、友だちを検索できます。</p>
             ) : (
@@ -424,7 +430,7 @@ export default function CreateAffiliateV8() {
                     setFriendReload((value) => value + 1)
                   }}
                 >
-                  <SaveErrorField names={["friendSearchInput","friend_search_input"]}><TextField aria-label="友だちの名前で探す" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" /></SaveErrorField>
+                  <SaveErrorField names={["friendSearchInput","friend_search_input"]}><TextField readOnly={!canEdit} aria-label="友だちの名前で探す" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" /></SaveErrorField>
                   <Button type="submit">検索</Button>
                 </form>
                 <SaveErrorField names={["friendId","friend_id"]}><EntitySelect
@@ -466,11 +472,8 @@ export default function CreateAffiliateV8() {
         </div>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="いくら払い、いつ締めるか">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>いくら払い、いつ締めるか</h2>
-          <p className={styles.cardNote}>報酬の決め方は、案件ごとの額より先にこの人の決まりが使われます</p>
-        </div>
+      <Card variant="form" aria-label="いくら払い、いつ締めるか">
+        <CardHeader size="stacked" title="いくら払い、いつ締めるか" meta="報酬の決め方は、案件ごとの額より先にこの人の決まりが使われます" />
         <SaveErrorField names={["affiliate-payout-kind","value","kind.value","payoutKind"]}><RadioCardGroup legend="報酬の決め方" className={styles.choiceGrid}>
           {PAYOUT_KINDS.map((kind) => (
             <RadioCard
@@ -487,36 +490,23 @@ export default function CreateAffiliateV8() {
         </RadioCardGroup></SaveErrorField>
         {payoutKind === 'rate' ? (
           <Field label="売上に対する割合（%）" htmlFor="af-rate" error={fieldErrors.rate}>
-            <SaveErrorField names={["commissionRate","commission_rate"]}><NumberInput unit="%" id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" /></SaveErrorField>
+            <SaveErrorField names={["commissionRate","commission_rate"]}><NumberInput readOnly={!canEdit} unit="%" id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" /></SaveErrorField>
           </Field>
         ) : null}
-        <div className={styles.grid2}>
-          <Field label="締めと支払い" htmlFor="af-cycle"><SaveErrorField names={["payoutCycle","payout_cycle"]}><TextField id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} /></SaveErrorField></Field>
+        <SettingsFormRow>
+          <Field label="締めと支払い" htmlFor="af-cycle"><SaveErrorField names={["payoutCycle","payout_cycle"]}><TextField readOnly={!canEdit} id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} /></SaveErrorField></Field>
           <Field label="保留期間" htmlFor="af-hold" error={fieldErrors.hold} help="返品・キャンセルを待つ期間です。過ぎた成果が次の締めに入ります。">
             <SaveErrorField names={["holdDays","hold_days"]}><Select id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={(value) => { setHoldDays(value); clearField('hold') }} options={holdOptions} /></SaveErrorField>
           </Field>
-        </div>
+        </SettingsFormRow>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="成果が出たときにすること">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>成果が出たときにすること</h2>
-          <p className={styles.cardNote}>任意</p>
-        </div>
-        <div className={styles.switchRow}>
-          <SaveErrorField names={["notifyOnConversion","notify_on_conversion"]}><SettingCheckbox checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} /></SaveErrorField>
-          <div className={styles.switchBody}>
-            <p className={styles.switchName}>本人に LINE で知らせる</p>
-            <p className={styles.switchNote}>成果 1 件ごとに</p>
-          </div>
-        </div>
-        <div className={styles.switchRow}>
-          <SaveErrorField names={["startTracking","isActive","start_tracking"]}><SettingCheckbox checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} /></SaveErrorField>
-          <div className={styles.switchBody}>
-            <p className={styles.switchName}>すぐに計測を始める</p>
-            <p className={styles.switchNoteFaint}>{startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}</p>
-          </div>
-        </div>
+      <Card variant="form" aria-label="成果が出たときにすること">
+        <CardHeader size="stacked" title="成果が出たときにすること" optional />
+        <FixedActionList options={[
+          { id: 'notify', label: '本人に LINE で知らせる', enabled: notifyOnConversion, onEnabledChange: setNotifyOnConversion, summary: '成果 1 件ごとに' },
+          { id: 'tracking', label: 'すぐに計測を始める', enabled: startTracking, onEnabledChange: setStartTracking, summary: '登録したらすぐに数え始めます' },
+        ]} />
       </Card>
 
       {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}

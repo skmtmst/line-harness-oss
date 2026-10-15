@@ -29,6 +29,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('統括の配信設定を共通の一覧と配布画面で扱う', () => {
+  it('名前が空の作成は保存の理由を出し、入力すると解除する', async () => {
+    render(<HqDeliveryConsole type="auto_reply" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'ひな形を作る', exact: true }))
+    const save = await screen.findByRole('button', { name: '下書きを保存する' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(save.title).toBe('統括での名前を入力してください。')
+    fireEvent.click(save)
+    expect(calls.create).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('統括での名前'), { target: { value: '予約の返事' } })
+    expect(save.disabled).toBe(false)
+    expect(save.title).toBe('')
+  })
+
   it('友だち追加の本文を入れ子の設定へ保存し、配布先を選べる', async () => {
     render(<HqDeliveryConsole type="friend_add_rule" />)
     fireEvent.click(await screen.findByRole('button', { name: '追加のお礼', exact: true }))

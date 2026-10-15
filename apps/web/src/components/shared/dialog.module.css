@@ -187,12 +187,6 @@
   padding: 10px 12px;
 }
 
-:root .calloutDanger .description {
-  color: var(--color-danger);
-  font-size: 11px;
-  line-height: 17px;
-}
-
 .callout .title {
   font-size: var(--text-body);
 }
@@ -373,6 +367,11 @@
 }
 
 :root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
+:root .calloutDanger .description {
+  color: var(--color-danger);
+  font-size: 11px;
+  line-height: 17px;
+}
 :root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
@@ -444,3 +443,31 @@ html:root .stepCurrent { background: var(--color-selection-border); color: var(-
 
 /* 入力を含む確認窓は、欄を本文幅にそろえる。 */
 html:root .content[data-content-layout='form'] { align-items: stretch; }
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: var(--space-8);
+}
+
+html:root .panel[data-layout='inset'] { padding: var(--polish-space-section); gap: var(--space-16); }
+html:root .panel[data-layout='inset'] > .headerRow,
+html:root .panel[data-layout='inset'] > .content { padding: 0; }
+html:root .panel[data-layout='inset'] .headerContent { gap: var(--tpl-hb-dialog-head-gap); }
+html:root .panel[data-layout='inset'] .content { align-items: stretch; }
+html:root .panel[data-layout='inset'] .actions { padding: var(--space-16) 0 0; }
+.actionLead { display: flex; margin-right: auto; }
+
+html:root .panel[data-confirm-placement='start'] .actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+html:root .panel[data-confirm-placement='start'] .actions > button:first-of-type {
+  grid-area: 1 / 2;
+}
+html:root .panel[data-confirm-placement='start'] .actions > button:last-of-type {
+  grid-area: 1 / 1;
+  justify-self: start;
+}

@@ -20,6 +20,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
   'v8/settings/customer-look/screen.tsx',
   'v8/hq-deliveries/console.tsx',
@@ -154,6 +155,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
   // 予約設定V8のタブ分割。書きかけは V8TabEditContext で親へ報告し、
   // 番兵（useUnsavedGuard＋離脱確認）は殻の settings-v8.tsx が持つ。
   // ★V8 予約設定（src/v8/booking-menus）のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。
+  'v8/booking-menus/settings-view.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/shared.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/hours-tab.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/holidays-tab.tsx': 'v8/booking-menus/settings.tsx',

@@ -94,11 +94,13 @@ describe('V8 knowledge UI', () => {
     await act(async () => root.render(<OpsKnowledgePage />)); await flush()
     expect(host.querySelector('[data-design-node="h114s"]')).not.toBeNull()
     expect(host.textContent).toContain('承認待ち')
-    expect(host.textContent).toContain('開く')
+    expect(host.querySelector('button[aria-label$="を開く"]')).not.toBeNull()
     expect(host.textContent).not.toContain('FAQ')
     expect(host.textContent).not.toContain('公開範囲')
     expect(host.querySelector('button[aria-label="記事の種類"]')).not.toBeNull()
-    expect(host.querySelectorAll('[role="columnheader"]')).toHaveLength(7)
+    expect(host.querySelectorAll('thead th')).toHaveLength(7)
+    const usage = Array.from(host.querySelectorAll('[data-kpi-label]')).find(label => label.textContent?.includes('使われた回数'))
+    expect(usage?.querySelector('[data-kpi-icon] .lucide-thumbs-up')).toBeTruthy()
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
     // 板 `eSXxA`「記事を承認する前に」：2つ確かめてから保存して承認する。
@@ -193,7 +195,7 @@ describe('V8 knowledge UI', () => {
 describe('V8 ナレッジの集計範囲', () => {
   it('一覧から開くと記事画面になり、開いただけでは保存・承認しない', async () => {
     await act(async () => root.render(<OpsKnowledgePage />)); await flush()
-    await act(async () => button('開く').click()); await flush()
+    await act(async () => (host.querySelector('button[aria-label$="を開く"]') as HTMLButtonElement).click()); await flush()
     expect(host.querySelector('[data-design-node="R5ckwJ"]')).not.toBeNull()
     expect(host.querySelector('aside')?.textContent).toContain('解決の根拠')
     expect(mocks.update).not.toHaveBeenCalled()

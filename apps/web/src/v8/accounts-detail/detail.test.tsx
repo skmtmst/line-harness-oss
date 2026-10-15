@@ -125,6 +125,21 @@ const type = async (el: HTMLInputElement, value: string) => {
 }
 
 describe('LINEアカウントの詳細（V8 ihjfd）', () => {
+  it.each([
+    [5000, 4500, '上限 5,000／警告 4,500'],
+    [5000, null, '上限 5,000／警告なし'],
+    [null, null, '上限は未設定'],
+  ])('友だち数から上限と警告人数の補足を全文確認できる（%s/%s）', async (capacity, warning, label) => {
+    account = { ...ACCOUNT, friendCapacity: capacity as number | null, capacityWarnAt: warning as number | null }
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    const explanation = [...host.querySelectorAll<HTMLElement>('[title]')].find(node => node.title === label)
+    expect(explanation).toBeTruthy()
+    expect(explanation?.textContent).toContain('1,284')
+    if (capacity === null) expect(explanation?.textContent).toContain('上限なし')
+    expect(sent).toHaveLength(0)
+  })
+
   it('管理者には編集・差し替え・止めるを出し、動いているあいだはアーカイブを押せない（理由を書く）', async () => {
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
@@ -135,6 +150,8 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(buttons('送受信を止める')).toHaveLength(1)
     const archive = buttons('アーカイブする')[0] as HTMLButtonElement
     expect(archive.disabled).toBe(true)
+    expect(archive.title).toContain('先に送受信を止めてください')
+    expect(document.getElementById(archive.getAttribute('aria-describedby')!)?.textContent).toContain('先に送受信を止めてください')
     expect(document.body.textContent).toContain('先に送受信を止めてください')
     expect(document.body.textContent).toContain('高田 誠')
   })

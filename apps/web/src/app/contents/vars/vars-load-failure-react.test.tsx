@@ -223,7 +223,7 @@ describe('m26m 一覧の取得失敗は件数を0と誤案内しない', () => {
     await act(async () => { fireEvent.click(retry) })
     expect(await screen.findByText('営業時間')).toBeTruthy()
     // 復旧後は実件数（2件）を戻す。
-    expect(await screen.findByText(/^2 件$/)).toBeTruthy()
+    expect(await screen.findByText(/^2件中 1〜2件$/)).toBeTruthy()
     expect(allRowText()).toContain('2')
   })
 
@@ -233,7 +233,7 @@ describe('m26m 一覧の取得失敗は件数を0と誤案内しない', () => {
 
     expect(await screen.findByText('営業時間')).toBeTruthy()
     // 一覧は読めているので実件数を出す。未知にしない。
-    expect(screen.getByText(/^2 件$/)).toBeTruthy()
+    expect(screen.getByText(/^2件中 1〜2件$/)).toBeTruthy()
     expect(allRowText()).toContain('2')
   })
 })

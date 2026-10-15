@@ -1,5 +1,5 @@
 'use client'
-import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from 'lucide-react'
+import { Inbox, Check, Download, Send } from 'lucide-react'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -527,10 +527,10 @@ function Bookings({ eventId }: { eventId: string }) {
       help={subLine || '開催回ごとの申込・承認・キャンセル待ちを確認できます。'}
       contentPadding="var(--tpl-roster-body-pad)"
       stats={<KpiBand data-design="KPIs">
-        <KpiCard presentation="band" title="申込" icon={<Users size={13} />} value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
-        <KpiCard presentation="band" title="承認待ち" icon={<CalendarClock size={13} />} value={ready ? requestedSeats : null} unit="件" detail="" />
-        <KpiCard presentation="band" title="キャンセル待ち" icon={<Armchair size={13} />} value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
-        <KpiCard presentation="band" title="キャンセル" icon={<CalendarX size={13} />} value={ready ? cancelledCount : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="申込" value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
+        <KpiCard presentation="band" title="承認待ち" value={ready ? requestedSeats : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="キャンセル待ち" value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
+        <KpiCard presentation="band" title="キャンセル" value={ready ? cancelledCount : null} unit="件" detail="" />
       </KpiBand>}
       actions={(
         <div className={styles.headActions}>
@@ -709,7 +709,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確認中…">
+              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
                 送る
               </Button>
             </div></Field></div>

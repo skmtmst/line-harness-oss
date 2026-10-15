@@ -34,7 +34,7 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/inbox/activity-digest error:', err);
+    console.error(JSON.stringify({"code":"routes_inbox_failed","route":"GET /api/inbox/activity-digest"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -61,7 +61,7 @@ inbox.get('/api/inbox/unanswered', async (c) => {
     const result = await computeUnansweredInbox(c.env.DB, opts);
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('GET /api/inbox/unanswered error:', err);
+    console.error(JSON.stringify({"code":"routes_inbox_failed","route":"GET /api/inbox/unanswered"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -75,7 +75,7 @@ inbox.get('/api/inbox/unanswered/count', async (c) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('GET /api/inbox/unanswered/count error:', err);
+    console.error(JSON.stringify({"code":"routes_inbox_failed","route":"GET /api/inbox/unanswered/count"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

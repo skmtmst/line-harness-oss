@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), loginMembers: vi.fn(), linkMembershipLogin: vi.fn(), updateMembership: vi.fn(), listIntakeAddresses: vi.fn(),
-  gate: vi.fn(), cancel: vi.fn(), role: 'owner' as string | null,
+  storeGroups: vi.fn(), gate: vi.fn(), cancel: vi.fn(), role: 'owner' as string | null,
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -27,6 +27,7 @@ beforeEach(() => {
   fixture.updateMembership.mockResolvedValue({ success: true })
   fixture.linkMembershipLogin.mockResolvedValue({ success: true })
   fixture.listIntakeAddresses.mockResolvedValue({ data: [] })
+  fixture.storeGroups.mockResolvedValue({ data: [] })
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
@@ -59,7 +60,7 @@ it('閲覧のみには作る・編集・変更・停止・発行のボタンを�
   render(<OrganizationV8 />)
   expect(await screen.findByText('試験担当')).toBeTruthy()
   expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
-  for (const name of ['店舗を追加する', '編集', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
+  for (const name of ['店舗を追加する', '編集する', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
 })
@@ -98,7 +99,8 @@ it('ユーザーの保存中は窓の×・キャンセル・Escで閉じられ�
 it('WEB169：店舗編集のタイムゾーンは日本時間の表示だけ', async () => {
   render(<OrganizationV8 />)
   await screen.findAllByText('試験店')
-  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  fireEvent.click(screen.getByRole('button', { name: '試験店のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
   expect(screen.queryByRole('textbox', { name: 'タイムゾーン' })).toBeNull()
   expect(screen.getByRole('dialog').textContent).toContain('日本時間（Asia/Tokyo）')
 })
@@ -109,4 +111,22 @@ it('B-241 login candidate failure shows retry rather than an empty selector',asy
  const error=await screen.findByText('ログインメンバーを読み込めませんでした')
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('ログインメンバーを読み込めませんでした')).toBeNull())
+})
+
+it('未発行の取り込みアドレスは未設定で表示し、発行の操作を保つ', async () => {
+  render(<OrganizationV8 />)
+  const heading = await screen.findByText('予約メール取り込みアドレス')
+  await waitFor(() => expect(fixture.listIntakeAddresses).toHaveBeenCalledWith('account-1', 'store'))
+  await waitFor(() => expect(heading.closest('section')!.textContent).toContain('未設定'))
+  expect(within(heading.closest('section')!).getByRole('button', { name: 'アドレスを発行' })).toBeTruthy()
+})
+
+it('担当の役割は日本語で示し、保存用の役割IDは保つ', async () => {
+  render(<OrganizationV8 />)
+  const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
+  expect(within(row).getByText('スタッフ')).toBeTruthy()
+  fireEvent.click(within(row).getByRole('button', { name: '変更' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('button', { name: '役割' }).textContent).toContain('スタッフ')
+  expect(dialog.querySelector<HTMLInputElement>('input[name="role"]')?.value).toBe('staff')
 })

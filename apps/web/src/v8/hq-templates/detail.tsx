@@ -18,7 +18,8 @@ import LinePreview from '@/components/shared/line-preview'
 import TagPill from '@/components/shared/tag-pill'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { ChangeBox, DetailFrame } from '@/v8/template-detail/detail'
+import { DetailPage } from '@/components/templates/detail-page'
+import { ChangeBox } from '@/v8/template-detail/detail'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
@@ -214,12 +215,15 @@ export default function HqTemplateDetail({
 
   return (
     <div className={styles.page} data-design-node="pQ4fH">
-      <DetailFrame
+      <DetailPage layout="record-detail" contentPadding="0"
         title={detail.template.name}
         identity={backLink}
-        description={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
-        preview={side}
+        help={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
+        summary={side}
+        summaryLabel="LINE の見え方"
+        summaryPreview={{ label: 'LINE の見え方', title: 'LINE の見え方' }}
       >
+        <div className={styles.content}>
         {canEdit ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</ReadOnlyNotice></div>}
         {notices}
         {canEdit ? (
@@ -349,7 +353,8 @@ export default function HqTemplateDetail({
             </>
           )}
         </section>
-      </DetailFrame>
+      </div>
+      </DetailPage>
 
       <ConfirmDialog
         open={restoreTarget !== null}

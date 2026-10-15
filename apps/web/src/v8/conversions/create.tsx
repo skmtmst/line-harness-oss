@@ -33,7 +33,7 @@ import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import ConditionBuilder, { findConditionDraftIssue, isEmptyCondition, pruneCondition } from '@/components/shared/condition-builder'
 import type { SegmentCondition } from '@/lib/segment-condition'
@@ -45,6 +45,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
@@ -539,7 +540,6 @@ function ConversionCreate() {
 
   /* 帯は共通部品（save-conflict）に寄せた。名前の重なりと先の保存で題を言い分ける。 */
   const conflictBand = conflict ? (
-    <div className={styles.conflictSlot}>
     <SaveConflictBand
       designNode="cXqlS"
       title={serverConflict && !duplicateName
@@ -549,7 +549,6 @@ function ConversionCreate() {
       compareHref={compareHref}
       onReload={reloadLatest}
     />
-    </div>
   ) : null
 
   return (
@@ -560,6 +559,8 @@ function ConversionCreate() {
       help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
+      previewLabel="試算を見る"
+      previewTitle="成果の試算"
       preview={viewerOnly ? undefined : previewColumn}
       footerActions={footerActions} dirty={false}
     >
@@ -571,12 +572,9 @@ function ConversionCreate() {
 
       {viewerOnly ? null : (<>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-what">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="cv-new-what">何が起きたら数えますか</h2>
-          <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
-        </div>
-        <Field density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined} requirement={b244Requirements.name}>
+      <Card variant="form" aria-labelledby="cv-new-what">
+        <CardHeader size="stacked" titleId="cv-new-what" title="何が起きたら数えますか" meta="名前は一覧で見分けるため。お客さまには見えません" />
+        <Field requirement={b244Requirements.name} density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
           <SaveErrorField names={["name","fieldIssue","field_issue"]}><TextField
             aria-label="成果地点の名前"
             value={name}
@@ -625,11 +623,8 @@ function ConversionCreate() {
         </div>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-dedup">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="cv-new-dedup">同じ人を何回まで数えるか</h2>
-          <p className={styles.cardNote}>くり返し起きるできごとは、数えすぎを防ぎます</p>
-        </div>
+      <Card variant="form" aria-labelledby="cv-new-dedup">
+        <CardHeader size="stacked" titleId="cv-new-dedup" title="同じ人を何回まで数えるか" meta="くり返し起きるできごとは、数えすぎを防ぎます" />
         <SaveErrorField names={["conversion-create-dedup","deduplicationMode"]}><RadioCardGroup legend="同じ人を何回まで数えるか" className={styles.dedupRow}>
           <RadioCard
             name="conversion-create-dedup"
@@ -661,12 +656,9 @@ function ConversionCreate() {
         </RadioCardGroup></SaveErrorField>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-value">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="cv-new-value">金額をどう出すか</h2>
-          <p className={styles.cardNote}>アフィリエイトの報酬や、配信ごとの売上の計算に使います</p>
-        </div>
-        <div className={styles.fieldRow}>
+      <Card variant="form" aria-labelledby="cv-new-value">
+        <CardHeader size="stacked" titleId="cv-new-value" title="金額をどう出すか" meta="アフィリエイトの報酬や、配信ごとの売上の計算に使います" />
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.pickLabel}>金額の出し方</span>
             <div className={styles.selectBox}>
@@ -697,10 +689,10 @@ function ConversionCreate() {
               /></SaveErrorField>
             </div>
           </div>
-        </div>
+        </SettingsFormRow>
         {valueModeNotice ? <p className={styles.fieldNote} role="status">{valueModeNotice}</p> : null}
         {valueMode === 'fixed' ? (
-          <Field density="input" label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
+          <Field density="input" required label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
             <SaveErrorField names={["value","fieldIssue","field_issue"]}><NumberInput numericText unit="円"
               aria-label="決まった金額"
               inputMode="numeric"
@@ -712,11 +704,8 @@ function ConversionCreate() {
         ) : null}
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-exclusion" id="cv-exclusion">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
-          <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
-        </div>
+      <Card variant="form" aria-labelledby="cv-new-exclusion" id="cv-exclusion">
+        <CardHeader size="stacked" titleId="cv-new-exclusion" title="数えない条件" meta="任意。テスト用の注文などを除きます" />
         <Field density="input" label="メモ"><SaveErrorField names={["exclusionMemo","fieldIssue","exclusion_memo","field_issue"]}><TextField
             id="cv-memo"
             aria-label="数えない条件のメモ"
@@ -739,18 +728,15 @@ function ConversionCreate() {
         </div>
       </Card>
 
-      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="cv-new-more">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="cv-new-more">下書きと詳細設定</h2>
-          <p className={styles.cardNote}>任意。すぐに数えはじめないときや、紐づける日数を変えるときに</p>
-        </div>
+      <Card variant="form" aria-labelledby="cv-new-more">
+        <CardHeader size="stacked" titleId="cv-new-more" title="下書きと詳細設定" meta="任意。すぐに数えはじめないときや、紐づける日数を変えるときに" />
         <SaveErrorField names={["saveAsDraft","draft","save_as_draft"]}><Checkbox
           checked={saveAsDraft}
           onCheckedChange={setSaveAsDraft}
           description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
         >まだ計測せず、下書きとして保存する</Checkbox></SaveErrorField>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
-          <div className={styles.fieldRow}>
+          <SettingsFormRow layout="columns">
             <Field density="input" note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
               <SaveErrorField names={["attributionDays","fieldIssue","attribution_days","field_issue"]}><NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
@@ -765,7 +751,7 @@ function ConversionCreate() {
               <span className={styles.label}>集計対象アカウント</span>
               <p id="cv-account" className={styles.fixedBox} title="画面上部で選んでいるLINEアカウントに固定されます">{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
             </div>
-          </div>
+          </SettingsFormRow>
         </Disclosure>
       </Card>
       </>)}

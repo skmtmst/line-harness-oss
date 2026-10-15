@@ -379,50 +379,5 @@
   width: var(--tpl-scn-saved-w);
 }
 
-/* 1152 の板（wjfLe）の道具の段：案内の帯 → 1段目 → 2段目。 */
-.narrowTools {
-  display: flex;
-  flex-basis: 100%;
-  flex-direction: column;
-  gap: var(--tpl-toolbar-pad-block);
-}
-
-.narrowRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
-}
-
-.narrowRow + .narrowRow {
-  margin-top: calc(var(--tpl-toolbar-gap) - var(--tpl-toolbar-pad-block));
-}
-
-.narrowFolder {
-  width: var(--tpl-scn-folder-w);
-}
-
-.narrowFolder :global(*) {
-  max-width: 100%;
-}
-
-.narrowFolder :global(button) {
-  width: 100%;
-}
-
-.narrowSearch {
-  width: var(--tpl-kw-input-w);
-}
-
-.narrowSpacer {
-  flex: 1 1 0;
-}
-
-.narrowRow > .savedBox { width: var(--tpl-scn-saved-icon-w); }
-
-/* 1152 の板：見出しの行は絵の 40 に対して道具の段の2段ぶん詰める。 */
-.narrowTable thead th {
-  height: var(--tpl-scn-narrow-head-h);
-}
-
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

@@ -277,6 +277,15 @@ jobs:
             node scripts/visual-qa/v8-pattern-audit.mjs \
               --code . --out "$RUNNER_TEMP/pattern-ownership"
           fi
+      - name: Guard newly added source visual contracts (B-273)
+        env:
+          SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --test scripts/verify-no-source-visual-contracts.test.mjs
+          base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
+          node scripts/verify-no-source-visual-contracts.mjs --base "$base"
+          node --test apps/web/scripts/v8-guard/code-size.test.mjs
+          node apps/web/scripts/v8-guard/code-size.mjs --base "$base"
       - name: Build shared packages
         run: >-
           pnpm
@@ -371,6 +380,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
         run: node scripts/codex/revfix-c-liff-browser.mjs
+      - name: Verify LIFF security headers and public SDK compatibility
+        run: node scripts/codex/train32-security-browser.mjs worker
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -546,6 +557,8 @@ jobs:
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
         run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+      - name: Verify admin security headers and auth interactions
+        run: node scripts/codex/train32-security-browser.mjs web
       - name: Upload MFA browser failure context
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -571,6 +584,7 @@ jobs:
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
       NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+      V8_SPEED_ENFORCEMENT: ${{ vars.V8_SPEED_ENFORCEMENT }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -607,7 +621,7 @@ jobs:
         run: |
           pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
           pnpm --filter web build
-          mv apps/web/out /tmp/head-out
+          cp -a apps/web/out /tmp/head-out
       - name: Build the base admin against the same mock API
         if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
         env:
@@ -650,7 +664,15 @@ jobs:
       # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
       - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
-        run: node --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs
+        env:
+          V8_GUARD_BASE: http://127.0.0.1:4310
+          DIALOG_DESCRIPTION_REPORT: ${{ runner.temp }}/v8-guard/dialog-description-band.json
+        run: |
+          node apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/form-columns.test.mjs apps/web/scripts/v8-guard/create-consistency.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/dialog-description-band.test.mjs apps/web/scripts/v8-guard/create-input-layout.test.mjs apps/web/scripts/v8-guard/form-badge-layout.test.mjs apps/web/scripts/v8-guard/form-card-header.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/required-badge.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/create-preview-layout.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/shift-entry-layout.test.mjs apps/web/scripts/v8-guard/dialog-actions.test.mjs apps/web/scripts/v8-guard/dialog-settings.test.mjs apps/web/scripts/v8-guard/dialog-content.test.mjs apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs
+      - name: Narrow preview opens once and preserves form input
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs
       - name: Train 17 waitlist failure and inflow mouse regressions
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
@@ -669,50 +691,26 @@ jobs:
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
-      # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
-      # 主要10画面を V8 で開き、1画面5回測った中央値で比べる。
-      # 落とすのは悪化だけ：時間は基準より20%×CI倍率1.30、JS は1KB超の増加。
-      # ただし同じ PR で基準表を更新していれば JS 超過は通す
-      # （機能追加で JS は増える。理由は PR に書くこと）。
-      # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
-      # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed measurement and reference policy controls
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
       - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
-        # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
-        continue-on-error: true
-        # 画面の必須検査が落ちても、速度は別に測って原因を分ける。
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           V8_SPEED_PROFILE: ci
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          allow_js=0
-          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] \
-            && git diff --name-only "$BASE_SHA...$HEAD_SHA" -- apps/web/scripts/v8-guard/speed-budget.json | grep -q .; then
-            allow_js=1
-            echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
-          fi
-          ALLOW_JS_BASELINE_UPDATE="$allow_js" pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
-      - name: Train 17 absolute targets (reference)
-        continue-on-error: true
+        run: pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: Train 17 absolute targets
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
-      - name: 2000 friends meet absolute speed targets (reference)
+      - name: 2000 friends meet absolute speed targets
         id: stress_speed
-        # 速度だけ参考。測れなかったときも失敗を残し、次の工程で警告する。
-        continue-on-error: true
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           V8_SPEED_PROFILE: ci
         run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
-      - name: PERF-01 fixed list speed targets (reference)
+      - name: PERF-01 fixed list speed targets
         id: perf3_targets
-        # タグ1秒・長い処理65ms。既存の倍率付き判定とは別に固定目標を残す。
-        continue-on-error: true
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
       - name: Report speed reference results (including incomplete measurements)
@@ -725,8 +723,17 @@ jobs:
       - name: Virtual table selection, keyboard and layout
         if: steps.scope.outputs.run == 'true'
         run: |
-          node --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
           node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
+      - name: Rich-menu label font sizes at three widths (m22a)
+        if: steps.scope.outputs.run == 'true'
+        env:
+          RICH_MENU_FONT_INPUT: ${{ runner.temp }}/v8-guard/rich-menu-input.json
+          RICH_MENU_FONT_OUTPUT: ${{ runner.temp }}/v8-guard/rich-menu-fonts.json
+        run: |
+          pnpm --filter web exec vitest run --config scripts/v8-guard/rich-menu-browser-vitest.config.ts
+          node apps/web/scripts/v8-guard/render-fonts.mjs < "$RICH_MENU_FONT_INPUT" > "$RICH_MENU_FONT_OUTPUT"
+          node --test apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs
       - name: Upload V8 screen guard results
         if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

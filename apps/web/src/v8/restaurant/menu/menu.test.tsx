@@ -113,8 +113,43 @@ describe('MJoJR メニュー管理', () => {
     role.value = 'staff'
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /メニューを追加する/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /の操作$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
   })
+})
+
+it('閲覧のみでも提供時間と所要時間を詳細で読み、保存はできない', async () => {
+  role.value = 'staff'
+  render(<MenuPage />)
+  await screen.findByText('メニュー一覧')
+  const name = screen.getAllByRole('button').find(button => button.getAttribute('title') === '秋の鹿肉コース')!
+  fireEvent.click(name)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText(/提供時間：/)).toBeTruthy()
+  expect(within(dialog).queryByRole('button', { name: /保存/ })).toBeNull()
+  expect(dialog.querySelector('fieldset')).toBeNull()
+  expect(within(dialog).queryByRole('textbox')).toBeNull()
+  expect(within(dialog).getByText('メニューの内容')).toBeTruthy()
+  expect(within(dialog).getByText('所要時間')).toBeTruthy()
+  expect(within(dialog).getByText('アレルギー')).toBeTruthy()
+  expect(fixture.updateMenu).not.toHaveBeenCalled()
+  expect(fixture.createMenu).not.toHaveBeenCalled()
+})
+
+it('閲覧窓では現在の価格と変更予定の価格を別々に読む', async () => {
+  role.value = 'staff'
+  const data = snapshotOf()
+  data.menuItems[0] = { ...data.menuItems[0], price: 1200, pendingPrice: 2500 }
+  fixture.snapshot.mockResolvedValue({ data })
+  render(<MenuPage />)
+  await screen.findByText('メニュー一覧')
+  const name = screen.getAllByRole('button').find(button => button.getAttribute('title') === data.menuItems[0].name)!
+  fireEvent.click(name)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('¥1,200')).toBeTruthy()
+  expect(within(dialog).getByText('変更予定の価格')).toBeTruthy()
+  expect(within(dialog).getByText('¥2,500')).toBeTruthy()
+  expect(fixture.updateMenu).not.toHaveBeenCalled()
 })

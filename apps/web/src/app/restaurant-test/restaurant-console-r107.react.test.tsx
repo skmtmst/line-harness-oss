@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), updateMembership: vi.fn(), updateTable: vi.fn(), updateMenu: vi.fn(), loginMembers: vi.fn(), listIntakeAddresses: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), storeGroups: vi.fn(), updateMembership: vi.fn(), updateTable: vi.fn(), updateMenu: vi.fn(), loginMembers: vi.fn(), listIntakeAddresses: vi.fn() }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/components/layout/header', () => ({ default: () => null }))
@@ -30,7 +30,7 @@ const data = {
 }
 
 beforeEach(() => {
-  fixture.snapshot.mockResolvedValue({ data })
+  fixture.storeGroups.mockResolvedValue({data:[]});fixture.snapshot.mockResolvedValue({ data })
   fixture.loginMembers.mockResolvedValue({data:[]})
   fixture.listIntakeAddresses.mockResolvedValue({data:[]})
   for (const key of ['updateMembership', 'updateTable', 'updateMenu'] as const) fixture[key].mockResolvedValue({ success: true })
@@ -42,11 +42,14 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     render(<RestaurantScreen view="tables" />)
     const detail = await screen.findByRole('heading', { name: '卓の詳細' })
     const panel = detail.closest('section')!
-    fireEvent.click(within(panel).getByRole('button', { name: /変更$/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('窓際'), { target: { value: '奥席' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', expect.objectContaining({ label: '奥席' })))
-    fireEvent.click(within(panel).getByRole('button', { name: /停止$/ }))
+    await waitFor(() => expect((within(panel).getByRole('button', { name: /のその他操作$/ }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '止める' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', { isActive: false }))
   })
@@ -76,6 +79,9 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     if(view === 'organization') {
       fireEvent.click(await screen.findByRole('button',{name:'佐藤のその他操作'}))
       fireEvent.click(screen.getByRole('menuitem',{name:'再開'}))
+    } else if (view === 'tables') {
+      fireEvent.click(await screen.findByRole('button', { name: /のその他操作$/ }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '再開' }))
     } else fireEvent.click(await screen.findByRole('button', { name: /再開$/ }))
     await waitFor(() => expect(fixture[method]).toHaveBeenCalledWith('account-1', id, expect.objectContaining(expected)))
   })

@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 点検の道具は素のJSで型定義を持たない。
-import { DEFAULT_CATALOG, forwardedEntryMoves, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, stripThemeScope } from './v8-pattern-audit.mjs'
+import { DEFAULT_CATALOG, forwardedEntryMoves, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, scanCodeFile, stripThemeScope } from './v8-pattern-audit.mjs'
 
 const ROOT = join(__dirname, '../..')
 
@@ -70,6 +70,55 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('題の正の型へ渡す説明を実ファイルまで照合し、偽の再公開や説明内の操作は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/templates/create-page.tsx', 'export function CreatePage() { return null }')
+    put(root, 'apps/web/src/components/templates/index.ts', "export { CreatePage } from './create-page'")
+    const file = 'apps/web/src/v8/demo/help.tsx'
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file.endsWith('help.tsx'))
+    put(root, file, "import { CreatePage as Page } from '@/components/templates'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(0)
+    put(root, file, "import { CreatePage } from '@/components/templates/create-page'; export const P = () => <CreatePage help={'タグを付ける条件を設定します'} />")
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/shared/create-page.tsx', 'export default function CreatePage() { return null }')
+    put(root, file, "import Page from '@/components/shared/create-page'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(0)
+    put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help={<button>タグを付ける</button>} />")
+    expect(findings()).toHaveLength(1)
+    put(root, file, "import { CreatePage } from './own-page'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/index.ts', "export { CreatePage } from './own-page'")
+    put(root, 'apps/web/src/components/templates/own-page.tsx', 'export function CreatePage() { return null }')
+    put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(1)
+  })
+  it('正の行うことの選択肢データを通し、同じ語の手書きや偽の持ち主は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/shared/action-list.tsx', 'export default function ActionList() { return null }')
+    put(root, 'apps/web/src/components/shared/fixed-action-list.tsx', 'export default function FixedActionList() { return null }')
+    put(root, 'apps/web/src/v8/demo/choices.tsx', [
+      "import FixedActionList from '@/components/shared/fixed-action-list'",
+      "import ActionList from '@/components/shared/action-list'",
+      "export const P = () => <><FixedActionList options={[{id:'tag',label:'タグを付ける'}]} /><ActionList choices={[{id:'score',label:'スコアを足す'}]} /></>",
+    ].join('\n'))
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file.endsWith('choices.tsx'))
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "export const P = () => <button>タグを付ける</button>")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from './own-actions'; export const P = () => <FixedActionList options={[{label:'タグを付ける'}]} />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from '@/components/shared/fixed-action-list'; export const P = () => <FixedActionList options={[{label:'別の動作',editor:<button>タグを付ける</button>}]} />")
+    expect(findings()).toHaveLength(1)
+  })
+  it('ページ送りの件数文の再導入を止め、共通部品へ渡す数値は通す', () => {
+    const { root } = fixture()
+    const file = 'apps/web/src/v8/other/pager.tsx'
+    put(root, file, 'export const Pager = () => <Pagination page={1} pageCount={1} onPageChange={change} range={{ total: 7, first: 1, last: 7 }} />')
+    const audit = () => run({ code: root, only: ['pagination'] })
+    const before = audit()
+    put(root, file, 'export const Pager = () => <Pagination page={1} pageCount={1} onPageChange={change} summary={`${total}件中 ${first}〜${last}件`} />')
+    expect(newCodeFindings(before, audit()).some((item: { signal: string }) => item.signal === 'own-range-text')).toBe(true)
+  })
   it('移動した同じ中身は通し、コピー・中身の変更・移動先の新しい手書きは止める', () => {
     const { root } = fixture()
     const old = 'apps/web/src/v8/other/source.tsx'
@@ -381,4 +430,19 @@ describe('列車26b: ファイル移動と共通部品の読み上げ属性', ()
     put(root, rel, `export function Probe(){return <><div role="dialog" aria-label="元の窓">本文</div><div role="dialog" aria-label="元の窓">複製</div><div role="dialog" aria-label="別の窓">本文</div></>}`)
     expect(newCodeFindings(before, run({ code: root, pen })).filter((hit: {pattern:string})=>hit.pattern==='dialog')).toHaveLength(2)
   })
+})
+
+
+it('行うことの共通部品への設定だけを区別し、隣やeditor内の手書きと同名の自作は止める', () => {
+  const root = mkdtempSync(join(tmpdir(), 'fixed-action-ownership-'))
+  put(root, 'apps/web/src/components/shared/fixed-action-list.tsx', readFileSync(join(ROOT, 'apps/web/src/components/shared/fixed-action-list.tsx'), 'utf8'))
+  const catalog = loadCatalog()
+  const pattern = catalog.patterns.find((p: { id: string }) => p.id === 'tap-extra')
+  const file = 'apps/web/src/v8/demo/create.tsx'
+  const shared = `import Actions from '@/components/shared/fixed-action-list'; export default function Page() { return <Actions options={[{ id: 'tag', label: 'タグを付ける', enabled: false, onEnabledChange() {} }]} /> }`
+  const scan = (source: string) => scanCodeFile(pattern, file, source, catalog._global, root).filter((hit: { signal: string }) => hit.signal === 'own-extra')
+  expect(scan(shared)).toHaveLength(0)
+  expect(scan(shared + `; export function Other() { return <button>タグを付ける</button> }`)).toHaveLength(1)
+  expect(scan(shared.replace("enabled: false", "editor: <button>タグを付ける</button>, enabled: false"))).toHaveLength(1)
+  expect(scan(shared.replace("@/components/shared/fixed-action-list", './fake'))).toHaveLength(1)
 })

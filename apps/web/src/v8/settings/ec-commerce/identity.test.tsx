@@ -9,7 +9,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({
   role: 'owner', operations: vi.fn(), overview: vi.fn(), select: vi.fn(), openDialog: vi.fn(),
 }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string) => role === 'owner' }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/staff-role')>()),
+  useStaffRole: () => fixture.role,
+  useStaffIdentity: () => ({ id: 'identity-reviewer', role: fixture.role }),
+  canManageRole: (role: string) => role === 'owner',
+}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/ec-commerce/identity-candidates', useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))

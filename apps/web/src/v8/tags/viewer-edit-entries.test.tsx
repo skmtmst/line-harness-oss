@@ -64,7 +64,7 @@ for (const [title, Component, query, actions] of entries) {
     state.query = query
     render(<Component />)
     if (role === 'staff') {
-      await screen.findByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+      await screen.findByText(/^閲覧のみで見ています。変える操作は(?:オーナーか)?管理者に頼んでください。$/)
       for (const name of actions) expect(screen.queryByRole('button', { name, exact: true })).toBeNull()
     } else {
       await waitFor(() => {
@@ -84,6 +84,11 @@ for (const [title, Component, name, menuTitle] of [
     state.searchEmpty = false
     const { container } = render(<Component accountId="acc-1" canEdit={role !== 'staff'} />)
     await screen.findAllByText(name)
+    if (title === '保存した検索') {
+      const open = screen.getByRole('link', { name: `「${name}」で友だち一覧を開く` })
+      expect(open.getAttribute('href')).toBe('/friends?savedSearch=search-1')
+      expect(open.querySelector('svg.lucide-arrow-right')).not.toBeNull()
+    }
     expect(screen.queryByRole('link', { name, exact: true }) !== null).toBe(role !== 'staff')
     fireEvent.click(container.querySelector('tbody tr')!)
     await screen.findByRole('dialog', { name })

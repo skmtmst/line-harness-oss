@@ -32,6 +32,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -39,7 +40,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DataTable, DateCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   actionScoreReasonLabel,
   formatMileageChange,
@@ -976,7 +977,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
+        <DialogFormRow><Field label="点数" htmlFor="ml-score-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -986,9 +987,9 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
           /></SaveErrorField>
-<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
+<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></DialogFormRow>
 
-        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
+        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -998,7 +999,7 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
           /></SaveErrorField>
-<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
+<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></DialogFormRow>
 
         <p className={styles.dlgCaption} title="既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。">この変更で起きること</p>
         <div className={styles.delta3}>
@@ -1008,11 +1009,11 @@ export function ScoreAdjustDialog({
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更量</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</p>
+            <p className={styles.deltaValue}><span className={validAmount ? 'text-accent-deep' : undefined}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</span></p>
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更後</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
+            <p className={styles.deltaValue}><span className={validAmount ? 'text-accent-deep' : undefined}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</span></p>
           </div>
         </div>
 
@@ -1114,36 +1115,30 @@ function ScoreHistoryDialog({
       ) : items.length === 0 ? (
         <ListState kind="empty" title="点数が変わった記録はありません" description="メッセージへの返信やリンクのクリックなど、決めたきっかけがあると記録されます。" />
       ) : (
-        <table className={styles.miniTable}>
-          <colgroup>
-            <col className={styles.miniColWhen} />
-            <col />
-            <col className={styles.miniColNum} />
-            <col className={styles.miniColNum} />
-          </colgroup>
+        <DataTable columnSizing="content" aria-label="点数の変化の明細">
           <thead>
-            <tr>
-              <Th className={styles.miniTh}>いつ</Th>
-              <Th className={styles.miniTh}>できごと</Th>
-              <Th className={`${styles.miniTh} ${styles.miniNum}`} align="right">点</Th>
-              <Th className={`${styles.miniTh} ${styles.miniNum}`} align="right">合計</Th>
-            </tr>
+            <TableHeadRow>
+              <Th>いつ</Th>
+              <Th>できごと</Th>
+              <Th align="right">点</Th>
+              <Th align="right">合計</Th>
+            </TableHeadRow>
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.id}>
-                <td className={styles.miniOneLine}><time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></td>
-                <td className={styles.miniOneLine} title={`${actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}・${item.scoreBefore == null || item.scoreAfter == null ? '前後の点数は未取得' : `${formatMileageNumber(item.scoreBefore)} 点 → ${formatMileageNumber(item.scoreAfter)} 点`}・${item.mode === 'manual' ? `手で変更（${item.executedByStaffName ?? '担当者は未取得'}）` : '自動で加算'}`}>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
-                <td className={styles.miniNum}>
-                  <span data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
+              <Tr key={item.id}>
+                <DateCell><time data-list-date-time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></DateCell>
+                <Td grow title={`${actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}・${item.scoreBefore == null || item.scoreAfter == null ? '前後の点数は未取得' : `${formatMileageNumber(item.scoreBefore)} 点 → ${formatMileageNumber(item.scoreAfter)} 点`}・${item.mode === 'manual' ? `手で変更（${item.executedByStaffName ?? '担当者は未取得'}）` : '自動で加算'}`}><TruncatedText value={actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)} /></Td>
+                <Td align="right">
+                  <span className={styles.historyDelta} data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
                     {formatMileageChange(item.scoreChange)}
                   </span>
-                </td>
-                <td className={styles.miniNum}>{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</td>
-              </tr>
+                </Td>
+                <Td align="right">{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</Td>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </DataTable>
       )}
       </div>
     </Dialog>

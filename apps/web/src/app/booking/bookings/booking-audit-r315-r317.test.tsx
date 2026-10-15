@@ -250,6 +250,24 @@ describe('監査 R316: 集計の見出しは選んだ期間を名指しする', 
 })
 
 describe('監査 R317: 条件と表示日をURLへ持ち、再読み込みで復元する', () => {
+  it('今月の表示で検索条件を変えても期間を保つ', async () => {
+    nav.search = 'view=month&status=confirmed&q=月の条件'
+    render(<BookingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^今月/ }).getAttribute('aria-pressed')).toBe('true')
+    })
+    const search = screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement
+    expect(search.value).toBe('月の条件')
+    fireEvent.change(search, { target: { value: '変更した条件' } })
+    await waitFor(() => {
+      expect(nav.replace.mock.calls.some(([url]) => String(url).includes('view=month') && new URL(String(url), 'http://localhost').searchParams.get('q') === '変更した条件')).toBe(true)
+    })
+    expect(screen.getByRole('button', { name: /^今月/ }).getAttribute('aria-pressed')).toBe('true')
+    expect((screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement).value).toBe('変更した条件')
+    const writes = nav.replace.mock.calls.map(([url]) => new URL(String(url), 'http://localhost'))
+    expect(writes.every(url => url.searchParams.get('view') === 'month')).toBe(true)
+  })
+
   it('URLの表示方法・絞り込み・検索語で一覧を開く', async () => {
     nav.search = 'view=list&status=completed&range=week&q=QA_R317'
     render(<BookingsPage />)

@@ -41,8 +41,8 @@ export function SidePanel({ media, google, latestReview, canWrite, now, rotation
   const connected = google?.connection.status === 'connected'
   return (
     <div className={styles.side}>
-      <Card padding="roomy" layout="vertical" gap="10px"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{[['稼働率',rotation?.utilization==null?'—':`${Math.round(rotation.utilization*100)}%`],['回転',rotation?.turnover==null?'—':`${rotation.turnover.toFixed(1)}回`],['滞在',rotation?.averageStayMinutes==null?'—':`${Math.round(rotation.averageStayMinutes)}分`],['無断取消',rotation?.noShowRate==null?'—':`${Math.round(rotation.noShowRate*100)}%`]].map(([label,value])=><div key={label}><span>{label}</span><strong title={value==='—'?'実測記録または営業時間がありません':undefined}>{value}</strong></div>)}</div></Card>
-      <Card padding="roomy" layout="vertical" gap="12px">
+      <Card padding="roomy" layout="vertical" gap="var(--polish-space-field)"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{[['稼働率',rotation?.utilization==null?'—':`${Math.round(rotation.utilization*100)}%`],['回転',rotation?.turnover==null?'—':`${rotation.turnover.toFixed(1)}回`],['滞在',rotation?.averageStayMinutes==null?'—':`${Math.round(rotation.averageStayMinutes)}分`],['無断取消',rotation?.noShowRate==null?'—':`${Math.round(rotation.noShowRate*100)}%`]].map(([label,value])=><div key={label}><span>{label}</span><strong title={value==='—'?'実測記録または営業時間がありません':undefined}>{value}</strong></div>)}</div></Card>
+      <Card padding="roomy" layout="vertical" gap="var(--polish-space-field)">
       <SectionHeader linkTone="action"
         title="予約サイト・グルメ媒体" note={media?.some(m=>m.storePageUrl||m.adminUrl)?<RowActions subjectName="媒体のリンク" menuItems={media.flatMap(m=>[...(m.storePageUrl?[{id:m.code+'-page',label:`${m.name}の店舗ページ`,href:m.storePageUrl,external:true,onSelect:()=>{}}]:[]),...(m.adminUrl?[{id:m.code+'-admin',label:`${m.name}の管理画面`,href:m.adminUrl,external:true,onSelect:()=>{}}]:[])])}/>:undefined}
         href="/settings/booking-media"
@@ -56,7 +56,7 @@ export function SidePanel({ media, google, latestReview, canWrite, now, rotation
         <p className={styles.sideText}>{media.map(m=>m.name).join('・')}</p>
       )}
 
-      </Card><Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
+      </Card><Card padding="roomy" layout="vertical" gap="var(--polish-space-field)"><SectionHeader linkTone="action"
         title="Google の口コミ"
         href={connected ? '/restaurant-test/google' : undefined}
         linkLabel={connected ? 'すべて見る' : undefined}
@@ -87,7 +87,7 @@ export function SidePanel({ media, google, latestReview, canWrite, now, rotation
         <p className={styles.sideText}>未返信の口コミはありません。</p>
       )}
 
-      </Card><Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
+      </Card><Card padding="roomy" layout="vertical" gap="var(--polish-space-field)"><SectionHeader linkTone="action"
         title="Instagram の新着"
         help="いまの Instagram 連携は、Googleビジネスの投稿を Instagram にも同時に出すところまでです。DM とコメントの新着は、受け取る口ができてからここに出します。"
         helpLabel="Instagram の新着の説明"

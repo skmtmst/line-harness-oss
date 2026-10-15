@@ -438,12 +438,7 @@ async function ensureSlackChannelMembers(
       // channel from being used or block invitations for the remaining
       // operators. Keep the failure visible in Worker logs and retry it on
       // the next PR event.
-      console.warn(JSON.stringify({
-        event: 'slack_pr_channel_member_invite_failed',
-        channel,
-        member,
-        error: message,
-      }));
+      console.warn(JSON.stringify({"code":"slack_pr_channel_member_invite_failed"}));
     }
   }
 }
@@ -528,12 +523,7 @@ async function ensureUpcomingPrRangeChannelWithoutBlocking(
     // Preparing the next 100-PR channel is preventive maintenance. A missing
     // Slack scope or a temporary API failure must never suppress the current
     // PR report. Every event from #x90 through #x00 retries the preparation.
-    console.warn(JSON.stringify({
-      event: 'slack_upcoming_pr_range_prepare_failed',
-      prNumber,
-      nextRangeStart: nextPrRangeStartToPrepare(prNumber),
-      error: String(error),
-    }));
+    console.warn(JSON.stringify({"code":"slack_upcoming_pr_range_prepare_failed"}));
   }
 }
 
@@ -600,13 +590,7 @@ async function updateTrackedParentStatus(
       },
     }, fetcher);
   } catch (error) {
-    console.warn(JSON.stringify({
-      event: 'slack_parent_status_update_failed',
-      channel,
-      threadTs,
-      status,
-      error: String(error),
-    }));
+    console.warn(JSON.stringify({"code":"slack_parent_status_update_failed"}));
     if (strict) throw error;
   }
 }
@@ -978,7 +962,7 @@ async function refreshSlackCommandCenter(
       }, fetcher);
     }
   } catch (error) {
-    console.warn(JSON.stringify({ event: 'slack_command_center_refresh_failed', error: String(error) }));
+    console.warn(JSON.stringify({"code":"slack_command_center_refresh_failed"}));
     if (strict) throw error;
   }
 }
@@ -1084,12 +1068,7 @@ async function ensureOpenTask(
     }, fetcher);
     permalink = permalinkResult.permalink || permalink;
   } catch (error) {
-    console.warn(JSON.stringify({
-      event: 'slack_permalink_fallback',
-      sourceChannel,
-      sourceThreadTs,
-      error: String(error),
-    }));
+    console.warn(JSON.stringify({"code":"slack_permalink_fallback"}));
   }
   await slackApi(token, 'chat.postMessage', {
     channel: taskChannel,

@@ -92,6 +92,8 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(list.body.data).toHaveLength(1);
     expect(list.body.data[0]).toMatchObject({ id: created.body.data.template.id, content_summary: summary,
       distributed_account_names: [], distributed_account_more: 0, distributed_account_count: 0 });
+    expect(list.body.data[0].message_type).toBe(type === 'template'
+      ? (definition as { template: { messageType: string } }).template.messageType : null);
     expect(JSON.stringify(list.body)).not.toContain(summaryBody);
     expect(JSON.stringify(list.body)).not.toContain('definition');
     expect(JSON.stringify(list.body)).not.toContain('hq-templates/');

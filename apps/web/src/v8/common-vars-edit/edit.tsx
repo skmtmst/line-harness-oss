@@ -12,7 +12,7 @@ import { notifySaved } from '@/components/shared/toast';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, Trash2, X } from 'lucide-react';
 import type { CommonVar, CommonVarChangeImpact, CommonVarDeleteImpact, CommonVarSchedule, Folder } from '@line-crm/shared';
 import Link from '@/components/shared/list-navigation'
 
@@ -30,6 +30,7 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
@@ -1070,16 +1071,9 @@ function EditCommonVarV8Inner() {
     )
   ) : undefined
 
-  return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
-      boardId={narrow ? 'C67dE' : 'AYc6O'}
-      title={item?.name ?? '共通情報を編集'}
-      help={item ? (
-        <>
-          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
+  const conflictNotice = item && conflict ? <>
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
-          {conflict ? (
-            /* 帯は共通部品（save-conflict）に寄せた。誰が・いつ保存したかの文はこの画面のまま。 */
+            {/* 誰が・いつ保存したかの文と、入力を残す動きは同じ。 */}
             <div className={styles.conflictSlot}>
               <SaveConflictBand
                 title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
@@ -1089,15 +1083,24 @@ function EditCommonVarV8Inner() {
                 onReload={adoptLatest}
               />
             </div>
-          ) : null}
+  </> : undefined
+
+  return (
+    <SaveErrorScope errors={saveErrors}><CreatePage
+      boardId={narrow ? 'C67dE' : 'AYc6O'}
+      title={item?.name ?? '共通情報を編集'}
+      help={item ? (
+        <>
+          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
+
         </>
       ) : undefined}
+      notice={conflictNotice}
+      noticeSpacing="band"
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <Button variant="danger" type="button" onClick={() => openDelete()} busyLabel="処理中…">
-          削除
-        </Button>
+        <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
       status={blocked.length > 0 ? `${blocked[0]}。直すまで保存できません。` : undefined}
       footerActions={(
@@ -1112,20 +1115,18 @@ function EditCommonVarV8Inner() {
           ) : null}
           {canWrite && item ? (
             conflict ? (
-              <Button type="button" variant="primary" onClick={() => setCompareOpen(true)} disabled={saving}>
-                <GitCompare size={14} aria-hidden="true" />
+              <Button type="button" variant="primary" icon={<GitCompare size={16} aria-hidden="true" />} onClick={() => setCompareOpen(true)} disabled={saving}>
                 比べてから保存
               </Button>
             ) : (
               <Button
                 type="button"
-                variant="primary"
+                variant="primary" icon={<Check size={16} aria-hidden="true" />}
                 disabled={saving || blocked.length > 0}
                 onClick={() => void save()}
                 busy={saving}
                 busyLabel="保存中…"
               >
-                <Check size={14} aria-hidden="true" />
                 {impactState === 'ready' && impact && usageTotal !== null
                   ? `${formatNumber(usageTotal)}か所に反映して保存`
                   : '保存する'}

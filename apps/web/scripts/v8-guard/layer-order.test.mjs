@@ -4,12 +4,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import postcss from 'postcss'
 import tailwind from '@tailwindcss/postcss'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 
 test('V8 controls keep their appearance when component CSS arrives before Tailwind reset', async () => {
   const globalsPath = fileURLToPath(new URL('../../src/app/globals.css', import.meta.url))
   const globals = (await postcss([tailwind()]).process(readFileSync(globalsPath, 'utf8'), { from: globalsPath })).css
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const [name, markup] of [
@@ -42,7 +42,7 @@ test('folder addition keeps the common button line height in either module order
   const globals = (await postcss([tailwind()]).process(readFileSync(globalsPath, 'utf8'), { from: globalsPath })).css
   const button = readFileSync(new URL('../../src/components/shared/button.module.css', import.meta.url), 'utf8')
   const folder = readFileSync(new URL('../../src/components/shared/folder-panel.module.css', import.meta.url), 'utf8')
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const measure = async (first, second) => {

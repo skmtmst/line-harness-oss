@@ -21,7 +21,7 @@ import RunsTab from './runs-tab'
 import styles from './screen.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { TextField, TextArea } from '@/components/shared/text-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
@@ -34,6 +34,8 @@ import { ApiError, api, fetchApi, type EcCommerceOverview, type EcNotificationSe
 import { useAccount } from '@/contexts/account-context'
 import { canOpenCustomerNotificationKpi, customerNotificationKpis, type CustomerNotificationKpi, type LineNotificationQuota } from './customer-kpis'
 import KpiCard from '@/components/shared/kpi-card'
+import Card from '@/components/shared/card'
+import TruncatedText from '@/components/shared/truncated-text'
 import FilterChip from '@/components/shared/filter-chip'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -1210,7 +1212,7 @@ function LineNotificationsPage() {
       <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
-    title="LINE通知"
+    title="LINE通知" help={tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}
     explanationKey={`line-notifications:${tab}`}
     explanation={tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
   >
@@ -1320,7 +1322,7 @@ function LineNotificationsPage() {
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
-    <section className={styles.table} data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
+    <Card padding="rows" overflow="hidden" data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
       {loadState === 'loading' ? (
         <div aria-busy="true" aria-label="顧客へのお知らせを読み込んでいます">
           <DelayedSkeleton
@@ -1361,18 +1363,18 @@ function LineNotificationsPage() {
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
-                <Td><FolderDotName>{canManage ? <button type="button" className={styles.name} title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</button> : <span className={styles.name} title={name}>{deliveryWords(setting).trigger || name}</span>}</FolderDotName></Td>
+                <Td><FolderDotName>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</FolderDotName></Td>
                 <Td className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</Td>
                 <Td className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
-                <Td className={styles.actions}>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</Td>
+                <ActionCell>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</ActionCell>
               </Tr>
             })}
           </tbody>
         </DataTable>}
-    </section>
+    </Card>
     </> : null}
   </SbSettingsScreen></SaveErrorScope>
 }

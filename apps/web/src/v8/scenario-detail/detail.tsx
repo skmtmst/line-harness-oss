@@ -10,16 +10,18 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { CircleAlert, RefreshCw } from 'lucide-react';
+import { CircleAlert, RefreshCw, Trash2 } from 'lucide-react';
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared';
 import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api';
-import StickyBar from '@/components/shared/sticky-bar'
+import StickyBar, { StickyBarAction } from '@/components/shared/sticky-bar'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
 import { TextField, TextArea } from '@/components/shared/text-field';
 import { startChecklist } from './start-checklist';
 import styles from './detail.module.css'
+import IconButton from '@/components/shared/icon-button'
+import { reorderMoveReason } from '@/components/shared/reorder-handle'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -2473,10 +2475,10 @@ export default function ScenarioDetailV8({
 
           {/* 数の帯：購読中・読み終えた・始まる見込み・離脱が多い所。 */}
           <KpiBand data-design="KPIs">
-            <KpiCard icon={null} title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
-            <KpiCard icon={null} title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
-            <KpiCard icon={null} title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
-            <KpiCard icon={null} title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
+            <KpiCard title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
+            <KpiCard title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
+            <KpiCard title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
+            <KpiCard title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
           </KpiBand>
 
           {/* 最後の1通の後（行）。変える入口はこの行の右。 */}
@@ -2560,30 +2562,32 @@ export default function ScenarioDetailV8({
                       <span className={styles.kindChip}>{kindLabel}</span>
                       {canEdit ? (
                         <span className={styles.stepOps}>
-                          <button
+                          <IconButton
                             type="button"
-                            className={styles.iconButton}
+                            size="row"
                             aria-label={`${step.stepOrder} 通目を上へ`}
                             disabled={index === 0}
+                            title={reorderMoveReason(index, sortedSteps.length, -1) ?? undefined}
                             onClick={(e) => {
                               e.stopPropagation()
                               void handleMoveStep(step.id, 'up')
                             }}
                           >
                             <ArrowUp aria-hidden />
-                          </button>
-                          <button
+                          </IconButton>
+                          <IconButton
                             type="button"
-                            className={styles.iconButton}
+                            size="row"
                             aria-label={`${step.stepOrder} 通目を下へ`}
                             disabled={index === sortedSteps.length - 1}
+                            title={reorderMoveReason(index, sortedSteps.length, 1) ?? undefined}
                             onClick={(e) => {
                               e.stopPropagation()
                               void handleMoveStep(step.id, 'down')
                             }}
                           >
                             <ArrowDown aria-hidden />
-                          </button>
+                          </IconButton>
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               appearance="plain"
@@ -2775,15 +2779,14 @@ export default function ScenarioDetailV8({
         <StickyBar
           destructive={
             canEdit ? (
-              <Button
-                variant="danger"
+              <StickyBarAction destructive
+                icon={Trash2}
+                label="このシナリオを削除する"
                 onClick={() => {
                   setDeleteScenarioError('')
                   setDeleteScenarioOpen(true)
                 }}
-              >
-                このシナリオを削除する
-              </Button>
+              />
             ) : undefined
           }
           actions={
@@ -2799,7 +2802,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary"
+                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : undefined}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)
@@ -2811,7 +2814,6 @@ export default function ScenarioDetailV8({
                   busy={saving}
 
                 >
-                  {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}
                 </Button>
               ) : null}

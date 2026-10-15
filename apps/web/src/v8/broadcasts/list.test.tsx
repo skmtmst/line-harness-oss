@@ -17,6 +17,8 @@ const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
+const narrow = vi.hoisted(() => ({ value: false }))
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -147,6 +149,21 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
 }
 
 describe('V8 一斉配信一覧（src/v8）の動き', () => {
+  it('狭い幅でも送信枠を保持し、下書きの絞り込みは使える', async () => {
+    narrow.value = true
+    try {
+      act(() => { root.render(<BroadcastListV8 />) })
+      await flush()
+      expect(host.querySelector('[data-kpi-label][title="今月の送信枠"]')).not.toBeNull()
+      expect(host.querySelector('[data-kpi-label][title="下書き"]')).toBeNull()
+      const draft = buttonByText('下書き 3')
+      expect(draft).toBeTruthy()
+      act(() => draft!.click())
+      await flush()
+      expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'draft' }))
+    } finally { narrow.value = false }
+  })
+
   it('行と数の帯・札の件数が出る', async () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
@@ -314,7 +331,7 @@ it('2ページ目を含む全配信を検索し、検索結果を20件ずつ表�
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '見つからない' } })
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
-  expect(host.textContent).toContain('0件中 0〜0件')
+  expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('0件')
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '' } })
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
@@ -332,6 +349,33 @@ it('全件検索が上限を超えたら部分的な検索結果を表示しな�
   await flush()
   expect(host.textContent).toContain('10,000件')
   expect(host.querySelector('tbody')?.textContent ?? '').not.toContain('未購入者フォロー')
+})
+it('配信日の共通入口から期間を指定し、選択表示と解除を保つ', async () => {
+  resetUrl()
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  const trigger = buttonByText('配信日：指定なし')!
+  expect(trigger.getAttribute('aria-pressed')).toBe('false')
+  act(() => { trigger.click() })
+  expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  act(() => { (host.querySelector('button[aria-label="配信日（開始）"]') as HTMLButtonElement).click() })
+  await flush()
+  const month = document.querySelector('[role="grid"]')!.getAttribute('aria-label')!.match(/(\d+)年(\d+)月/)!
+  const prefix = `${month[1]}-${month[2].padStart(2,'0')}`
+  const chooseDay = (day:string) => ([...document.querySelectorAll<HTMLButtonElement>('[role="grid"] button:not([data-outside])')].find(button=>button.textContent===day)!).click()
+  act(() => { chooseDay('1') })
+  act(() => { (host.querySelector('button[aria-label="配信日（終了）"]') as HTMLButtonElement).click() })
+  await flush()
+  act(() => { chooseDay('2') })
+  await flush()
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:`${prefix}-01`,to:`${prefix}-02`}))
+  expect(trigger.getAttribute('aria-pressed')).toBe('true')
+  act(() => { buttonByText('外す')!.click() })
+  await flush()
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:undefined,to:undefined}))
+  expect(trigger.getAttribute('aria-pressed')).toBe('false')
+  act(() => { buttonByText('閉じる')!.click() })
+  expect(trigger.getAttribute('aria-expanded')).toBe('false')
 })
 it('保存した検索の送信済み・表示件数・古い順も復元する', async () => {
   resetUrl()

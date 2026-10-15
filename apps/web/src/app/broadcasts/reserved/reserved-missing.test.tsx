@@ -86,6 +86,29 @@ const broadcast = {
 }
 
 describe('broadcasts/reserved の対象なし案内（R582）', () => {
+  it('現在の人数を取得し、配信対象の行に表示する', async () => {
+    apiMocks.get.mockResolvedValue({ success: true, data: broadcast })
+    apiMocks.preflight.mockResolvedValue({ success: true, data: {
+      audienceCount: 37, hiddenExcluded: 2, warnings: [],
+    } })
+    render(<Page />)
+    expect(await screen.findByText('このアカウントの友だち全員 37 人（除く見込み 2 人）')).toBeTruthy()
+    expect(apiMocks.preflight).toHaveBeenCalledWith(expect.objectContaining({
+      targetType: 'all', lineAccountId: 'visual-qa-account',
+      messageContent: broadcast.messageContent,
+    }))
+  })
+
+  it('人数の計算が失敗しても予約は表示し、0人と置き換えない', async () => {
+    apiMocks.get.mockResolvedValue({ success: true, data: broadcast })
+    apiMocks.preflight.mockRejectedValue(new ApiError(403))
+    render(<Page />)
+    expect(await screen.findByText('一斉配信を予約しました')).toBeTruthy()
+    expect(screen.getByText('このアカウントの友だち全員')).toBeTruthy()
+    expect(screen.queryByText(/全員 0 人/)).toBeNull()
+    expect(screen.queryByText('予約結果を読み込めませんでした')).toBeNull()
+  })
+
   it('存在しないIDでは一覧へ戻る口だけを出す', async () => {
     apiMocks.get.mockRejectedValue(new ApiError(404))
     render(<Page />)

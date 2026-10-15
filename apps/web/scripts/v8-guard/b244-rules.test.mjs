@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './b244-rules-browser.mjs'
 const shell = body => `<style>body{margin:0}*{box-sizing:border-box}main{width:900px}input,button{height:36px}svg{width:16px;height:16px}</style><main data-page-template="list">${body}</main>`
 const icon = '<svg aria-hidden="true"><path d="M1 1h10"/></svg>'
@@ -22,7 +22,7 @@ const repairs = {
   'toolbar-unnamed-menu': '<div data-list-toolbar><button>保存した条件を選ぶ</button></div>',
 }
 test('B-244の6種類を故障注入し、修正後は0。白い板の幅で2段を判定する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
     for (const [kind, html] of Object.entries(cases)) {

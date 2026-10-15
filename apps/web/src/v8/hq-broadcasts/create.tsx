@@ -1,5 +1,4 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
 
 import { jstDateOffset, scheduledJstIso } from '@/lib/jst-datetime'
 import { notifySaved } from '@/components/shared/toast'
@@ -34,10 +33,9 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
+import { CreatePage } from '@/components/templates/create-page'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -54,7 +52,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
-import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, runPeople, sendTotals, splitPreflightRows, toApiContent } from './model'
 import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
@@ -65,9 +63,11 @@ import type { TemplateEditHost } from '@/v8/template-edit/host'
 import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
-import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
-import { PageHeading } from '@/components/templates/page-frame'
+import MessageComposer from '@/components/shared/message-composer'
+import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Field } from '@/components/shared/form-controls'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -117,11 +117,6 @@ function errorText(caught: unknown, fallback: string): string {
   }
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
-}
-
-/** 送った人数（外したアカウントを除く）。 */
-function runPeople(run: HqBroadcastRun): number {
-  return run.targets.reduce((sum, t) => sum + (t.excluded ? 0 : t.totalCount || 0), 0)
 }
 
 /** 配信の中身の種類（「テキスト＋カルーセル」）。 */
@@ -269,7 +264,6 @@ export default function HqBroadcastCreate() {
   const [approvalRequestOpen, setApprovalRequestOpen] = useState(false)
   const [confirmCount, setConfirmCount] = useState('')
   const [previewConfirmed, setPreviewConfirmed] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
 
   const [when, setWhen] = useState<'now' | 'later'>('later')
@@ -809,25 +803,73 @@ export default function HqBroadcastCreate() {
 
   if (!canManage) {
     return (
-      <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><div className={formStyles.root}>
+      <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><PageFrame kind="create" boardId="BBRDb">
         <PageHeading title={<>一括配信を作る</>} />
-        <div className={formStyles.input}>
+        <PageContent>
           <Notice tone="info">一括配信を作れるのは、統括全体の編集権限がある人（オーナー・管理者）だけです。</Notice>
-        </div>
-      </div></SaveErrorScope></SaveErrorScope>
+        </PageContent>
+      </PageFrame></SaveErrorScope></SaveErrorScope>
     )
   }
 
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
+  const previewContent = <>            <div className={formStyles.previewHead}>
+              <h3>LINE の見え方</h3>
+              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
+                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
+                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
+              </div>
+            </div>
+            <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
+              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
+                empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
+                <div className="flex flex-col gap-3 text-ink">
+                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
+                </div>
+              </LinePreview>
+            </div>
+            <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
+            <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
+              ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
+              ['送る相手', `${audienceFull}（${peopleLabel}）`],
+              ['送る日時', sendWhenLabel],
+              ...(step === 'message' ? [['配信後のアクション', '—']] : []),
+            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
+            <div className={formStyles.previewActions}>
+              <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
+              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button>
+            </div>
+            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
+</>
+
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
-      <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <PageHeading title={<>一括配信を作る</>} headingSize="compact"
-        subtitle={<span aria-live="polite">{draftLabel}</span>}
+      <CreatePage boardId="BBRDb" dirty={false}
+        footerActions={(
+          <>
+            {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
+            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
+            {step !== 'confirm' ? (
+              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
+                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
+              </Button>
+            ) : (
+              <Button variant="primary" busy={checking || sending} disabled={sending || gate === 'pending'} onClick={() => void askSend()}>
+                {gate === 'needsRequest' ? '承認を依頼する' : gate === 'pending' ? '承認を待っています' : when === 'later' ? 'この内容で予約する' : '今すぐ送る'}
+              </Button>
+            )}
+          </>
+        )}
+        preview={previewContent}
+        previewLabel="LINEの見え方"
+        previewToggle={<PreviewLauncher>{previewContent}</PreviewLauncher>}
+        status={draftLabel}
+         title={<>一括配信を作る</>} headingSize="compact"
+        help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
         steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
-        actions={<>{/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}<Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button></>} />
+        >
         {error ? (
           <Notice
             tone="danger"
@@ -847,8 +889,7 @@ export default function HqBroadcastCreate() {
         ) : null}
         {draftState === 'error' ? <Notice tone="danger" role="alert">下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
-        <div className={formStyles.body}>
-          <div className={formStyles.input}>
+
             {/* ① 基本設定（lmWCZ） */}
             {shows('basic') ? (
               <section id="broadcast-step-basic" className={formStyles.section}>
@@ -872,10 +913,10 @@ export default function HqBroadcastCreate() {
                 <Field label="配信名" requirement={fields.requirement('title')} count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><input {...fields.bind('title')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
 <small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
-                <div className={formStyles.basicFields}>
+                <SettingsFormRow layout="columns">
                   <Field label="フォルダ"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></SaveErrorField></Field>
                   <Field label="社内メモ" help={<>友だちには表示されません。各アカウントの配信にも同じメモが残ります</>}><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></SaveErrorField></Field>
-                </div>
+                </SettingsFormRow>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
                 <div className={formStyles.recentList}>
                   {recent.length ? recent.map((item) => {
@@ -1138,58 +1179,8 @@ export default function HqBroadcastCreate() {
                 <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
               </div>
             ) : null}
-          </div>
-
-          {/* 店の一斉配信と同じ右の列（全部の段でいつも出す。白い板が 1100px 未満のときだけ畳み、頭のボタンで開く）。 */}
-          <aside id="hq-broadcast-line-preview" className={formStyles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
-            <div className={formStyles.previewHead}>
-              <h3>LINE の見え方</h3>
-              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
-              </div>
-              <Button className={formStyles.previewClose} size="compact" onClick={() => setPreviewOpen(false)}>閉じる</Button>
-            </div>
-            <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
-              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
-                empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
-                <div className="flex flex-col gap-3 text-ink">
-                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
-                </div>
-              </LinePreview>
-            </div>
-            <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
-            <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
-              ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
-              ['送る相手', `${audienceFull}（${peopleLabel}）`],
-              ['送る日時', sendWhenLabel],
-              ...(step === 'message' ? [['配信後のアクション', '—']] : []),
-            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-            <div className={formStyles.previewActions}>
-              <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
-              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button>
-            </div>
-            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
-          </aside>
-        </div>
-
-        <StickyBar className={formStyles.footer} actions={(
-          <>
-            {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
-            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
-            {step !== 'confirm' ? (
-              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
-                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
-              </Button>
-            ) : (
-              <Button variant="primary" busy={checking || sending} disabled={sending || gate === 'pending'} onClick={() => void askSend()}>
-                {gate === 'needsRequest' ? '承認を依頼する' : gate === 'pending' ? '承認を待っています' : when === 'later' ? 'この内容で予約する' : '今すぐ送る'}
-              </Button>
-            )}
-          </>
-        )} />
         {inlineEditor}
-    </div></MessageComposerPage>
+    </CreatePage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

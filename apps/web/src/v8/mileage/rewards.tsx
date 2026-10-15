@@ -582,7 +582,8 @@ export default function RewardsTab() {
         icon={<AlertCircle size={14} aria-hidden="true" />}
         value={redemptionsLoad === 'ready' ? redemptionsTotal : null}
         unit="件"
-        detail={<span className={styles.oneLine} title={failedReason ?? undefined}>{failedReason ?? '要対応の交換はありません'}</span>}
+        detail={failedReason ? '理由を確認してください' : '要対応の交換はありません'}
+        description={failedReason ?? undefined}
       />
     </KpiBand>
   )

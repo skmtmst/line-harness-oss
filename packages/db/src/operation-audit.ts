@@ -62,7 +62,7 @@ export async function recordOperation(
       )
       .run();
   } catch (err) {
-    console.error('recordOperation error:', err);
+    console.error(JSON.stringify({"code":"src_operation_audit_failed"}));
   }
   try {
     const actor = input.actorId
@@ -92,7 +92,7 @@ export async function recordOperation(
       retentionClass: input.friendId ? 'personal_data' : 'general',
     });
   } catch (err) {
-    console.error('audit_events operation insert failed:', err instanceof Error ? err.name : 'unknown');
+    console.error(JSON.stringify({"code":"src_operation_audit_failed"}));
   }
 }
 
