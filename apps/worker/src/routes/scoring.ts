@@ -1,3 +1,4 @@
+import { recordAuditEvent } from '@line-crm/db';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -116,6 +117,65 @@ function mileageV6Error(c: Parameters<typeof auditLog>[0], error: unknown) {
   console.error(JSON.stringify({"code":"routes_scoring_failed"}));
   return c.json({ success: false, error: 'マイル情報を処理できませんでした' }, 500);
 }
+
+function requireMileageExport(key: 'mileage.ledger.export' | 'action_score.list.export'): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    if (!staff || staff.readOnly || staff.role === 'staff'
+        || (staff.role !== 'owner' && !staff.permissionKeys?.includes(key))) {
+      return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+    }
+    return next();
+  };
+}
+
+scoring.post('/api/mileage/exports', async (c, next) => {
+  const staff = c.get('staff');
+  if (!staff || staff.readOnly || staff.role === 'staff' || (staff.role !== 'owner' && !staff.permissionKeys?.some(key => ['mileage.ledger.export','action_score.list.export'].includes(key)))) return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+  return next();
+}, inputJsonBoundary({ accountId: ['string'], kind: ['string'], reason: ['string'] }), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: string; kind?: string; reason?: string }>();
+    const accountId = body.accountId?.trim() ?? '';
+    if (!accountId || !await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: '対象のアカウントが見つかりません' }, 404);
+    if (!body.reason?.trim() || body.reason.length > 300) return inputError(c, { success: false, error: '書き出す理由を300字以内で入力してください' }, 400, ['reason']);
+    const kind = body.kind;
+    const staffForExport = c.get('staff');
+    if (staffForExport.role !== 'owner' && !staffForExport.permissionKeys?.includes(kind === 'scores' ? 'action_score.list.export' : 'mileage.ledger.export')) return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+    if (!['balances', 'history', 'rewards', 'scores'].includes(kind ?? '')) return inputError(c, { success: false, error: '書き出す種類を指定してください' }, 400, ['kind']);
+    const rows: Record<string, unknown>[] = [];
+    if (kind === 'rewards') rows.push(...(await getMileageRewardAdminOverview(c.env.DB, accountId)).rewards.map(row => ({ ...row })));
+    else {
+      let offset = 0;
+      while (true) {
+        const result = kind === 'balances'
+          ? await getMileageFriendsV6(c.env.DB, { lineAccountId: accountId, visibleAccountIds: [accountId], search: '', limit: 100, offset })
+          : kind === 'history'
+            ? await getMileageAdminHistory(c.env.DB, { accountId, visibleAccountIds: [accountId], limit: 100, offset })
+            : await getActionScoreOverview(c.env.DB, { accountId, limit: 100, offset });
+        rows.push(...result.items as unknown as Record<string, unknown>[]);
+        offset += result.items.length;
+        if (result.items.length === 0 || offset >= result.pagination.total) break;
+      }
+    }
+    const columns: Array<[string, string]> = kind === 'balances'
+      ? [['friendId','友だちID'],['displayName','名前'],['available','利用可能マイル'],['pending','確定待ち'],['lastChangedAt','更新日時']]
+      : kind === 'history'
+        ? [['id','記録ID'],['displayName','名前'],['amount','マイル'],['reason','理由'],['occurredAt','日時']]
+        : kind === 'scores'
+          ? [['friendId','友だちID'],['displayName','名前'],['currentScore','スコア'],['lastReason','理由'],['lastChangedAt','更新日時']]
+          : [['id','使い道ID'],['name','名前'],['status','状態'],['requiredMiles','必要マイル']];
+    const csv = '\uFEFF' + [columns.map(([,label])=>label), ...rows.map(row=>columns.map(([key])=>row[key]))]
+      .map(row=>row.map(mileageCsvCell).join(',')).join('\r\n') + '\r\n';
+    const staff = c.get('staff');
+    await recordAuditEvent(c.env.DB, { tenantId: staff?.tenantId, lineAccountId: accountId,
+      category: 'business', actorPrincipalId: staff?.id, actorRole: staff?.role ?? 'unknown',
+      action: kind === 'scores' ? 'action_score.list.export' : 'mileage.ledger.export',
+      targetKind: kind!, targetId: accountId, result: 'success', reason: body.reason.trim() });
+    return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${kind}.csv"`, 'Cache-Control': 'no-store' } });
+  } catch { return c.json({ success: false, error: '書き出しに失敗しました' }, 500); }
+});
 
 async function canUseMileageAccount(c: Parameters<typeof auditLog>[0], accountId: string) {
   if (!accountId) return false;
@@ -1541,7 +1601,7 @@ function mileageCsvCell(value: unknown): string {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
-scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'), async (c) => {
+scoring.get('/api/mileage/rules/export', requireMileageExport('mileage.ledger.export'), async (c) => {
   try {
     const staff = c.get('staff');
     const accountId = (c.req.query('accountId') ?? '').trim();
@@ -1937,6 +1997,9 @@ scoring.get('/api/action-scores/friends', requireRole('owner', 'admin', 'staff')
 
 // ========== スコアリングルールCRUD ==========
 
+scoring.use('/api/scoring-rules', async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410));
+scoring.use('/api/scoring-rules/*', async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410));
+
 scoring.get('/api/scoring-rules', async (c) => {
   try {
     const items = await getScoringRules(c.env.DB);
@@ -2060,7 +2123,9 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
     if (typeof body.scoreChange !== 'number' || !Number.isFinite(body.scoreChange)) {
       return inputError(c, { success: false, error: 'scoreChange must be a finite number' }, 400, ["scoreChange"]);
     }
+    if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 500) return inputError(c, { success: false, error: '点数を変更する理由が必要です' }, 400, ['reason']);
     const requestKey = c.req.header('Idempotency-Key');
+    if (!requestKey?.trim()) return inputError(c, { success: false, error: 'Idempotency-Key が必要です' }, 400, []);
     if (requestKey !== undefined && (!requestKey.trim() || requestKey.length > 128)) {
       return inputError(c, { success: false, error: 'Invalid Idempotency-Key' }, 400, ["friendId","rewardId","requestId"]);
     }
