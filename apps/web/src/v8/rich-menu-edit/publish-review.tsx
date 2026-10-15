@@ -6,6 +6,7 @@ import { areaDisplayName, type Area } from '@/components/rich-menus/canvas-edito
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import MediaSlot from '@/components/shared/media-slot'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 
@@ -26,8 +27,7 @@ export default function PublishReview({ pages, size, imageUrl, onEdit }: {
         title={pages.length > 1 ? `確かめる：${page.name}` : '確かめる'}
         description={`${size === 'large' ? '大きい' : '小さい'}・${page.areas.length}面${pages.length === 1 ? '・切替タブなし' : ''}`}
         listLabel={`${page.name}の面ごとの動き`}
-        imageUrl={page.imageR2Key ? imageUrl(page.imageR2Key) : null}
-        aspectRatio={dims.width / dims.height}
+        canvas={<MediaSlot readOnly size="compact" title={`${page.name}の画像`} previewAlt={`${page.name}の画像`} fit="contain" value={page.imageR2Key ? imageUrl(page.imageR2Key) : null} aspectRatio={`${dims.width} / ${dims.height}`} />}
         selectedId={null}
         onSelect={id => onEdit(page.id, 'buttons', id)}
         items={page.areas.map((area, index) => ({
