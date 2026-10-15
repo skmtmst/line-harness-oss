@@ -553,6 +553,10 @@ describe('統括の請求の数の帯（保存済み請求のみ）',()=>{
   });
   it('請求の未取得は0で埋めず、アカウント限定とスタッフ権限は拒否する',async()=>{
     const r=await call('GET','/api/hq/billing/metrics');const b=await r.json() as {data:StoredBillingMetrics};expect(b.data).toMatchObject({thisMonthBilledYen:null,unpaidInvoiceCount:null,unavailable:{invoices:'NOT_SYNCED'}});
+    testDb.raw.prepare("INSERT INTO billing_invoices(id,tenant_id,created_at,status,amount_due,amount_paid,currency,synced_at) VALUES ('past-only',?,'2020-01-01','paid',100,100,'jpy','2020-01-01')").run(DEFAULT_TENANT_ID);
+    expect((await (await call('GET','/api/hq/billing/metrics')).json() as {data:StoredBillingMetrics}).data).toMatchObject({thisMonthBilledYen:null,unavailable:{thisMonthBilledYen:'NOT_OBSERVED_THIS_MONTH'}});
+    setTenant({plan_status:'active',stripe_subscription_id:null});
+    expect((await (await call('GET','/api/hq/billing/metrics')).json() as {data:StoredBillingMetrics}).data.contractCount).toBe(1);
     expect((await call('GET','/api/hq/billing/metrics',undefined,{staff:staffOf({role:'staff'})})).status).toBe(403);
     testDb.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='staff-1'");expect((await call('GET','/api/hq/billing/metrics')).status).toBe(403);
   });
