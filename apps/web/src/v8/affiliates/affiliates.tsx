@@ -25,13 +25,8 @@ import ApprovalsTab from './approvals'
 import PaymentTab from './payment'
 import ReportTab from './report'
 
-const TITLE_BY_TAB: Record<AffiliateTabKey, string> = {
-  affiliates: '成果とアフィリエイト',
-  offers: '成果とアフィリエイト（案件）',
-  approvals: '成果とアフィリエイト（成果承認）',
-  payment: '成果とアフィリエイト（支払い）',
-  report: '成果とアフィリエイト（レポート）',
-}
+/* 上の帯・タブの題は画面名だけ（タブ名を括弧で足さない。u8xibp・Eo56k と同じ・2026-10-15 判定役）。 */
+const PAGE_TITLE = '成果とアフィリエイト'
 
 function AffiliatesInner() {
   const router = useRouter()
@@ -43,7 +38,7 @@ function AffiliatesInner() {
   const tab: AffiliateTabKey = AFFILIATE_TABS.some((item) => item.key === rawTab) ? (rawTab as AffiliateTabKey) : 'affiliates'
   const focusAffiliateId = params.get('affiliate')
 
-  usePageTitle(TITLE_BY_TAB[tab])
+  usePageTitle(PAGE_TITLE)
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const role = useStaffRole()
