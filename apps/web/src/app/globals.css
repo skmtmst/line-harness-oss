@@ -1006,7 +1006,7 @@
   --tpl-eds-card-title-lh: 22px; --tpl-eds-note-lh: 17px; --tpl-eds-head-gap: 8px; --tpl-eds-title-gap: 2px;
   --tpl-eds-band-pad: 12px 16px; --tpl-eds-band-gap: 12px; --tpl-eds-band-title-lh: 19px;
   --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-usage-pad: 14px 0; --tpl-eds-row-gap: 12px;
-  --tpl-eds-kind-w: 96px; --tpl-eds-ver-w: 120px; --tpl-eds-state-w: 80px; --tpl-eds-ghost-h: 36px; --tpl-eds-ghost-pad: 0 14px; --tpl-eds-ghost-gap: 6px;
+  --tpl-eds-kind-w: 96px; --tpl-eds-ver-w: 120px; --tpl-eds-state-w: 80px; --tpl-eds-state-wide-w: 101px; --tpl-eds-ghost-h: 36px; --tpl-eds-ghost-pad: 0 14px; --tpl-eds-ghost-gap: 6px;
   --tpl-eds-name-lh: 19px; --tpl-eds-ver-pad: 10px 12px; --tpl-eds-ver-meta-lh: 16px;
   --tpl-eds-side-actions-gap: 8px; --tpl-eds-more: 36px; --tpl-eds-about-pad: 16px; --tpl-eds-about-gap: 4px; --tpl-eds-about-row-pad: 9px 0; --tpl-eds-about-row-gap: 8px;
   --tpl-eds-dialog-gap: 14px; --tpl-eds-dialog-row-pad: 8px 0; --tpl-eds-dialog-more-pad: 6px 0 0; --tpl-eds-change-pad: 14px; --tpl-eds-change-gap: 6px;

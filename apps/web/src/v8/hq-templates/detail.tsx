@@ -25,6 +25,7 @@ import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
+import { RowMenu } from '@/components/shared/row-actions'
 
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -74,7 +75,7 @@ export function receivedLabels(row: HqTemplateReceivedVersion): { version: strin
 
 export default function HqTemplateDetail({
   detail, row, accounts, folderName, folderColor, canEdit, busy, notices, versions, versionsError, received, onReloadVersions, onCompare, onRestore,
-  onBack, onEdit, onDistribute, onDuplicate, onEnterAccount,
+  onBack, onEdit, onDistribute, onDuplicate, onEnterAccount, onRemove,
 }: {
   detail: TemplateDetail
   /** 一覧の行（配った先のアカウント名・数・中身の要約・今月送った数）。一覧に無いときは「—」。 */
@@ -99,6 +100,8 @@ export default function HqTemplateDetail({
   onDuplicate: () => void
   /** 配った先のアカウントに入る（店の画面へ切り替える）。 */
   onEnterAccount: (accountId: string) => void
+  /** 右上の「…」の［削除する］（店の詳細と同じ置き場。絵 pQ4fH）。渡さなければ「…」を出さない。 */
+  onRemove?: () => void
 }) {
   const [compare, setCompare] = useState<{ from: number; to: number; result: HqTemplateVersionComparison | null; error: string } | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<number | null>(null)
@@ -157,6 +160,7 @@ export default function HqTemplateDetail({
             <Copy size={14} aria-hidden="true" />
             複製する
           </Button>
+          {onRemove ? <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`ひな形「${detail.template.name}」の操作`} items={[{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: onRemove }]} /> : null}
         </div>
       ) : null}
       <section className={styles.aboutBox} aria-label="このテンプレートについて">
@@ -283,7 +287,7 @@ export default function HqTemplateDetail({
                 <span className={styles.usageKind} title={item.accountName}>{shortName(item.accountName)}</span>
                 <span className={styles.usageNameQuiet} title={item.accountName}>{item.accountName}</span>
                 <span className={styles.usageVersion} title={labels.version}>{labels.version}</span>
-                <span className={styles.usageState}>{labels.state}</span>
+                <span className={`${styles.usageState} ${styles.usageStateWide}`} title={labels.state}>{labels.state}</span>
                 {enterButton(accounts.some((account) => account.id === item.accountId) ? item.accountId : null)}
               </div>
             )
@@ -294,7 +298,7 @@ export default function HqTemplateDetail({
                   <span className={styles.usageKind} title={name}>{shortName(name)}</span>
                   <span className={styles.usageNameQuiet} ><TruncatedText value={String(name ?? '')} /></span>
                   <span className={styles.usageVersion}>—</span>
-                  <span className={styles.usageState}>受け取り済み</span>
+                  <span className={`${styles.usageState} ${styles.usageStateWide}`}>受け取り済み</span>
                   {enterButton(accountIdOf(name))}
                 </div>
               ))}
