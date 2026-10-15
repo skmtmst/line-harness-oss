@@ -60,6 +60,9 @@
 .chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 
 .count {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-chip-h);
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
   line-height: var(--tpl-fr-delta-lh);
