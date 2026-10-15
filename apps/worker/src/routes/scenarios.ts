@@ -1,4 +1,5 @@
 import { validateConditionForStorage } from './scenario-condition-validation.js';
+import type { ActionBody } from './scenario-action-input-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -1005,7 +1006,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
     let templateSnapshot: { message_type: string; message_content: string } | null = null;
     if (body.templateId !== undefined && body.templateId !== null) {
       const tpl = await c.env.DB
-        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ?`)
+        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ? AND message_bubbles_json IS NULL`)
         .bind(body.templateId)
         .first<{ id: string; message_type: string; message_content: string }>();
       if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
@@ -1612,17 +1613,6 @@ scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJ
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
 const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
-
-interface ActionBody {
-  hook?: string;
-  stepId?: string | null;
-  choiceIndex?: number | null;
-  actionType?: string;
-  config?: unknown;
-  condition?: unknown;
-  repeatOnRefire?: boolean;
-  sortOrder?: number;
-}
 
 function serializeAction(row: {
   id: string;

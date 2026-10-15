@@ -1,10 +1,11 @@
 import { RESERVATION_FILTER_STATUSES, parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict, validFloorCoordinate, validJoinGroup } from './restaurant-store-status.js';
-import type { RestaurantStoreRow } from './restaurant-store-status.js';
 import { extractBroadcastTemplateIds, refreshScenarioReferences } from '@line-crm/db';
 import { parseBroadcastMessageParts, buildMessages } from '../services/broadcast-message-set.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 
+import type {OrganizationRow,OrganizationContext,RestaurantStoreRow,SelectedRestaurantStore,SeatWaitlistEntryLike} from './restaurant-context-types.js';
+import { isCalendarDate as isExistingCalendarDate, scheduledJstIso } from '@line-crm/shared';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
 import { restaurantRotation } from '../services/restaurant-rotation.js';
@@ -80,22 +81,6 @@ restaurantTest.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS']
 
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
-
-type OrganizationRow = {
-  id: string;
-  account_id: string;
-  tenant_id: string | null;
-  tenant_name: string | null;
-  name: string;
-  status: string;
-};
-type OrganizationContext = OrganizationRow & { scopedStoreId: string | null };
-
-type SelectedRestaurantStore = {
-  id: string;
-  organization_id: string;
-  name: string;
-};
 
 async function organizationByTenantId(
   c: Context<Env>,
@@ -1583,17 +1568,6 @@ restaurantTest.post('/api/restaurant-test/seat-waitlist/:id/convert', requireRol
   return c.json({ success: true, data: { status: 'converted' } });
 });
 
-interface SeatWaitlistEntryLike {
-  hold_expires_at:string|null;
-  table_id:string|null;
-  line_uid:string|null;
-  customer_phone:string|null;
-  store_id: string;
-  starts_at: string;
-  guest_count: number;
-  status: string;
-}
-
 /** 旧来店URLも共通の保存口へ渡す。版と操作IDは全更新で必須。 */
 async function attendance(c:Context<Env>,legacy?:'visit'|'undo_visit') {
  if(!hasOrganizationSelector(c))return requiredAccount(c);
@@ -2121,7 +2095,7 @@ restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner'
  const template=await db.prepare('SELECT * FROM rt_store_followup_templates WHERE store_id=?').bind(storeId).first();
  if(!template)return c.json({success:false,error:'not_found'},404);
  const bindings=(await db.prepare('SELECT * FROM rt_store_followup_step_bindings WHERE store_id=? ORDER BY trigger,step_id').bind(storeId).all()).results;
- const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId).all()).results;
+ const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j LEFT JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? OR (j.source_kind='restaurant_anniversary' AND j.source_id=?) ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId,storeId).all()).results;
  return c.json({success:true,data:{template,bindings,jobs,editor:'common_scenario'}});
 });
 
@@ -2162,8 +2136,8 @@ const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{
  const org=await organizationFor(c),storeId=c.req.param('storeId')??'';
  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
  const b=await c.req.json<{expectedVersion?:number;trigger?:string;offsetMinutes?:number;enabled?:boolean}>().catch(()=>null);
- if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited'].includes(b.trigger??'')||!Number.isSafeInteger(b.offsetMinutes)||Math.abs(Number(b.offsetMinutes))>525600||typeof b.enabled!=='boolean')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger','offsetMinutes','enabled']);
- if((['reservation_24h','reservation_2h'].includes(b.trigger!)&&Number(b.offsetMinutes)>=0)||(['reservation_created','post_visit','review_request','waitlist_invited'].includes(b.trigger!)&&Number(b.offsetMinutes)<0))return inputError(c,{success:false,error:'invalid_timing'},400,['offsetMinutes']);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited','anniversary_before'].includes(b.trigger??'')||!Number.isSafeInteger(b.offsetMinutes)||Math.abs(Number(b.offsetMinutes))>525600||typeof b.enabled!=='boolean')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger','offsetMinutes','enabled']);
+ if((['reservation_24h','reservation_2h','anniversary_before'].includes(b.trigger!)&&Number(b.offsetMinutes)>=0)||(['reservation_created','post_visit','review_request','waitlist_invited','anniversary_before'].includes(b.trigger!)&&Number(b.offsetMinutes)<0))return inputError(c,{success:false,error:'invalid_timing'},400,['offsetMinutes']);
  const changed=await dbFor(c.env,storeId).prepare(`INSERT INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled)
   SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_store_followup_templates t JOIN scenario_steps step ON step.scenario_id=t.scenario_id
    WHERE t.store_id=? AND t.template_version=? AND step.id=?)

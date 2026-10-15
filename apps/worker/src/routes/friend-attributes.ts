@@ -1,4 +1,4 @@
-import { serializeMark } from './friend-mark-display.js';
+import { serializeMark } from './../services/support-mark-display.js';
 import { parseSupportMarkLocations } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';

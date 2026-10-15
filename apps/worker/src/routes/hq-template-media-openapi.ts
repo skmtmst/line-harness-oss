@@ -1,6 +1,7 @@
+import { api5Paths } from './api5-openapi.js';
 export const hqTemplateMediaPaths = {
 '/api/hq/templates/media': {
-      get: {tags:['HQ Templates'],summary:'自組織の登録メディアを選ぶ',parameters:[{name:'kind',in:'query',schema:{type:'string',enum:['video','audio','image']}},{name:'limit',in:'query',schema:{type:'integer',minimum:1,maximum:100}},{name:'cursor',in:'query',schema:{type:'string'}}],responses:{'200':{description:'items/nextCursor。itemsはselectable/sizeKb付き。未確認の動画・音声は選択不可'},'403':{description:'統括閲覧権限なし'}}},
+      get: api5Paths['/api/hq/templates/media'].get,
       post: {
         tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
         parameters: [

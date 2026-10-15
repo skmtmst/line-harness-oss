@@ -1,5 +1,7 @@
 import { extractBroadcastTemplateIds } from './template-reference-ids.js';
 export { extractBroadcastTemplateIds } from './template-reference-ids.js';
+import type { TemplateVersionRow } from './template-version-types.js';
+export type { TemplateVersionRow } from './template-version-types.js';
 import { jstNow } from './utils.js';
 import { getTemplateById, publishTemplate, saveTemplateDraft } from './templates.js';
 
@@ -12,23 +14,6 @@ import { getTemplateById, publishTemplate, saveTemplateDraft } from './templates
 // JSON の文字列検索ではなくこの表を見る。利用先の保存時に書き換える。
 
 export type TemplateVersionStatus = 'in_use' | 'reserved' | 'past';
-
-export interface TemplateVersionRow {
-  id: string;
-  template_id: string;
-  version_number: number;
-  message_type: string;
-  message_content: string;
-  carousel_actions_json: string | null;
-  carousel_tap_limit_mode: string | null;
-  carousel_tap_limit_text: string | null;
-  question_json: string | null;
-  question_status: string | null;
-  /** 使い始めの日時。空は「公開と同時」。 */
-  effective_from: string | null;
-  created_by_staff_id: string | null;
-  created_at: string;
-}
 
 /** 名前は同じ組織の現在の名簿から取得。保存時の名前の写しではない。 */
 export interface TemplateVersionView extends TemplateVersionRow {
@@ -146,6 +131,7 @@ export async function revertTemplateToVersion(
   const saved = await saveTemplateDraft(db, templateId, {
     messageType: version.message_type,
     messageContent: version.message_content,
+    messageBubblesJson: version.message_bubbles_json ?? null,
     carouselActions: carouselActions ?? null,
     carouselTapLimitMode: tapLimitMode,
     carouselTapLimitText: version.carousel_tap_limit_text,

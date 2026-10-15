@@ -1800,7 +1800,7 @@ describe('飲食3・共通フォローのHTTP境界',()=>{
   seedRestaurantFixture();
   expect((await request(path+'/request-start'+scope,{expectedVersion:version()})).status).toBe(409);
   const step='custom-review';
-  testDb.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES(?,'restaurant-followup:store-ginza',6,'text','同じ口コミの案内')").run(step);
+  testDb.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) SELECT ?,'restaurant-followup:store-ginza',COALESCE(MAX(step_order)+1,0),'text','同じ口コミの案内' FROM scenario_steps WHERE scenario_id='restaurant-followup:store-ginza'").run(step);
   const before=version();
   const binding={expectedVersion:before,trigger:'review_request',offsetMinutes:181,enabled:true};
   expect((await requestWithMethod(path+'/bindings/'+step+scope,'POST',binding)).status).toBe(200);

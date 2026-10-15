@@ -1,3 +1,5 @@
+import type { EventPayload } from './event-payload.js';
+export type { EventPayload } from './event-payload.js';
 import { patchFriendMetadata } from './friend-metadata.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
@@ -57,27 +59,6 @@ import {
   applyRichMenuTargeting,
   isTargetingTrigger,
 } from './rich-menu-targeting.js';
-
-export interface EventPayload {
-  /** 再配達されても同じ出来事と判定できる、発生元の不変ID。 */
-  sourceEventId?: string;
-  /** 発生元の台帳名。分析の冪等キーに使う。 */
-  sourceKind?: string;
-  /** 推測せず、発生元が持つタイムゾーン付き時刻を渡す。 */
-  occurredAt?: string;
-  friendId?: string;
-  eventData?: Record<string, unknown>;
-  conversionEventName?: string;
-  conversionValue?: number;
-  /** ISO通貨(例 USD)。無いときは円扱い。 */
-  conversionCurrency?: string;
-  /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
-  conversionAmountInMinorUnit?: boolean;
-  replyToken?: string;
-  /** Recovery must never turn a missing reply token into a billable push. */
-  recoveryWithoutReply?: boolean;
-  onRecoveryReview?: (code: 'reply_input_unavailable' | 'delivery_unknown') => void;
-}
 
 function toAdConversionAmount(value: unknown): number | undefined {
   const amount = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
@@ -613,6 +594,7 @@ async function executeAction(
       if (tplId) {
         const { getTemplateById } = await import('@line-crm/db');
         const tpl = await getTemplateById(db, tplId);
+        if(tpl?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
         if (tpl) {
           resolvedType = tpl.message_type;
           resolvedContent = tpl.message_content;

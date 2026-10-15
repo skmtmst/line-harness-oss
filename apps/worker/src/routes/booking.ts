@@ -3,6 +3,8 @@ import type { SelfBookingChange } from './booking-self-meet-sync.js';
 import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../services/booking-entitlements.js';
 import { featureReadiness, StyleError } from '../services/style-setup.js';
 import { defaultBookingPaymentSelection } from '../services/booking-payment-selection.js';
+import type { TodaySeatRow } from './booking-today-seat-types.js';
+import { resolveFormBookingAnswer, FormBookingAnswerError } from '../services/form-booking-answer.js';
 import { bookingHistoryItem } from '../services/booking-history-item.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
@@ -684,7 +686,7 @@ async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId
 booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
-  const idemKey = c.req.header('Idempotency-Key');
+  let idemKey = c.req.header('Idempotency-Key');
   if (!idemKey) return inputError(c, { error: 'missing_idempotency_key' }, 400, []);
 
   // 認証済み caller の LINE userId を Authorization: Bearer <id_token> から取得。
@@ -700,15 +702,26 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     entitlement_id?: string;
     payment_method?: 'onsite' | 'online';
     waitlist_id?: string;
+    formAnswer?: {formId:string;blockId:string;submissionKey:string};
   }>();
   if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);
   if (body.payment_method !== undefined && !['onsite','online'].includes(body.payment_method)) return inputError(c,{error:'invalid_payment_method'},400,['payment_method']);
   if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
-  if (!body.menu_id || !body.starts_at) {
-    return inputError(c, { error: 'missing_params' }, 400, ["menu_id","starts_at"]);
-  }
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  let formRequiresApproval = false;
+  if (body.formAnswer !== undefined) {
+    try {
+      const source = await resolveFormBookingAnswer(c.env.DB,body.formAnswer,accountId,friendId,await getAccountTimeZone(c.env.DB,accountId));
+      body.menu_id=source.menuId; body.staff_id=source.staffId; body.starts_at=source.startsAt;
+      delete body.waitlist_id;
+      idemKey=source.idempotencyKey; formRequiresApproval=source.requireApproval;
+    } catch(error) {
+      if(error instanceof FormBookingAnswerError)return c.json({error:error.message},error.status);
+      throw error;
+    }
+  }
+  if (!body.menu_id || !body.starts_at) return inputError(c,{error:'missing_params'},400,['menu_id','starts_at']);
 
   // Idempotency lookup は account+friend スコープ。同じ key を別 caller が送っても
   // それぞれの caller のキャッシュを返す（=cross-tenant leak 防止）。
@@ -852,7 +865,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
   }
   const requiresOnlinePayment = paymentConfig.mode === 'online' && menuRow.price > 0;
-  const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment;
+  const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment && !formRequiresApproval;
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
   const decidedAt = autoConfirm ? nowIso : null;
   const reserved = await reserveIdempotencyResponse(c.env.DB, {
@@ -3842,30 +3855,6 @@ async function seatTableLabels(
     .all<{ label: string }>();
   const labels = (siblings.results ?? []).map((row) => row.label);
   return labels.length > 0 ? labels.join('・') : table.label;
-}
-
-interface TodaySeatRow {
-  customer_version: number;
-  table_id: string | null;
-  table_ids_json: string;
-  source: string;
-  kind: 'seat';
-  id: string;
-  store_id: string;
-  store_name: string;
-  starts_at: string;
-  ends_at: string;
-  status: string;
-  customer_name: string;
-  guest_count: number;
-  table_label: string | null;
-  course_name: string | null;
-  visit_mark: {
-    kind: string;
-    late_minutes: number | null;
-    marked_by_name: string | null;
-    marked_at: string;
-  } | null;
 }
 
 async function getTodaySeatReservations(
@@ -7010,7 +6999,6 @@ function csvCell(value: unknown): string {
  * CSV行として混入し、式注入防御を迂回する (#959)。
  */
 function csvNoteValue(value: string): string {
-  // eslint-disable-next-line no-control-regex
   return value.replace(/[\x00-\x1F\x7F]/g, '');
 }
 

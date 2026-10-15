@@ -1,6 +1,8 @@
 import type { FormSubmitClaim } from './form-submit-claim-types.js';
 export type { FormSubmitClaimStatus, FormSubmitClaim } from './form-submit-claim-types.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import type { FormSubmission, FormDestinationWriteStatus } from './form-submission-types.js';
+export type { FormSubmission, FormDestinationWriteStatus } from './form-submission-types.js';
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
@@ -48,30 +50,6 @@ export interface Form {
   created_at: string;
   updated_at: string;
 }
-
-export interface FormSubmission {
-  id: string;
-  form_id: string;
-  friend_id: string | null;
-  form_version_id: string | null;
-  /** P（試し回答）：1 は公開前の試し。集計・一覧・書き戻しに出さない。 */
-  is_test: number;
-  data: string; // JSON string
-  destination_write_status: FormDestinationWriteStatus;
-  destination_write_attempted: number | null;
-  destination_write_succeeded: number | null;
-  destination_write_failed: number | null;
-  destination_write_completed_at: string | null;
-  created_at: string;
-}
-
-export type FormDestinationWriteStatus =
-  | 'pending'
-  | 'succeeded'
-  | 'partial'
-  | 'failed'
-  | 'not_requested'
-  | 'unknown';
 
 export interface FriendFormSubmission extends FormSubmission {
   form_name: string;

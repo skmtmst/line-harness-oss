@@ -185,6 +185,10 @@ function collectStaffApiClassification(extraRoutes: string[] = []): { all: strin
  * この一覧へ足す。どちらも PR の差分に残る。
  */
 const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
+    // Google 接続の connect/start と同じく店舗管理者以上に限る。
+    // Uber Eats のログイン連携の入口。店舗の代理で使えるトークンを得る操作なので
+    // デリバリー受注のうち、店舗の売上と受付そのものを止める4操作は店舗管理者以上に限る。
+    // 担当者が進める受注→準備完了→受け渡しと品切れ設定は auth.ts の対応表に載せている。
     'DELETE /api/ad-platforms/:id',
     'DELETE /api/affiliates/:id',
     'DELETE /api/broadcast-message-assets/:id',
@@ -512,14 +516,10 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/support/tickets/:id/reply',
     'POST /api/recipes',
     'POST /api/recipes/:id/clone',
-    // デリバリー受注のうち、店舗の売上と受付そのものを止める4操作は店舗管理者以上に限る。
-    // 担当者が進める受注→準備完了→受け渡しと品切れ設定は auth.ts の対応表に載せている。
     'POST /api/restaurant-test/delivery/intake/resume',
     'POST /api/restaurant-test/delivery/intake/stop',
     'POST /api/restaurant-test/delivery/orders/:id/cancel',
     'POST /api/restaurant-test/delivery/orders/:id/reject',
-    // Uber Eats のログイン連携の入口。店舗の代理で使えるトークンを得る操作なので
-    // Google 接続の connect/start と同じく店舗管理者以上に限る。
     'POST /api/restaurant-test/delivery/ubereats/connect/start',
     'POST /api/restaurant-test/floors',
     'POST /api/restaurant-test/followups/:storeId/bindings/:stepId',

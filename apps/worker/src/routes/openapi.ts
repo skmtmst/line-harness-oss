@@ -1,6 +1,7 @@
 import { stylePaths } from './styles-openapi.js';
 import { hqTemplateListPaths } from './hq-template-list-openapi.js';
 import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
+import { api5Paths } from './api5-openapi.js';
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
 import { api1AuthoringPaths } from './api1-authoring-openapi.js';
 import { api2FollowupPaths } from './api2-followups-openapi.js';
@@ -461,6 +462,7 @@ const spec = {
     },
     ...audit3Paths,
     ...auditstepsPaths,
+    ...api5Paths,
     ...api18Paths,
     ...api2FollowupPaths,
     ...api17Paths,
@@ -669,36 +671,6 @@ const spec = {
               ]
             }
           }
-        }
-      }
-    }
-  },
-  "/api/hq/templates/message-references": {
-    "get": {
-      "tags": [
-        "HQ Templates"
-      ],
-      "summary": "配布先の回答フォーム・シナリオの候補を取得",
-      "parameters": [],
-      "responses": {
-        "200": {
-          "description": "成功",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiResponse"
-              }
-            }
-          }
-        },
-        "403": {
-          "description": "権限がありません"
-        },
-        "409": {
-          "description": "確認した版や対象が変わりました"
-        },
-        "422": {
-          "description": "入力を確認してください"
         }
       }
     }

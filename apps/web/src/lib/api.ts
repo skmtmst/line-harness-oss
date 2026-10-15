@@ -1,5 +1,7 @@
 import type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
 export type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
+import type { NenPhotoPublicationList, AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+export type { NenPhotoPublicationList, AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
 import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
@@ -5449,47 +5451,6 @@ export type PhotoRewardPolicyVersion = {
   status: 'in_use' | 'reserved' | 'past'
 }
 
-/**
- * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
- * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
- * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
- */
-export type NenPhotoPublicationList = {
-  summary: {
-    publishedCount: number
-    placementCount: number
-    topPhoto: Record<string, unknown> | null
-    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
-    consentedCount: number
-    attentionCount: number
-    withdrawnCount: number
-  }
-  items: Array<Record<string, unknown>>
-  pendingWithdrawals: Array<Record<string, unknown>>
-  withdrawnItems: Array<Record<string, unknown>>
-}
-
-/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
-export type AccountHealthSummary = {
-  items: Array<{ lineAccountId: string; riskLevel: string | null }>
-  warningCount: number
-  dangerCount: number
-}
-
-export type PhotoAssetRun = {
-  id: string
-  photoId: string
-  lineAccountId: string
-  requestedVersion: number
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  requestedBy: string
-  createdAt: string
-  startedAt: string | null
-  completedAt: string | null
-  errorMessage: string | null
-  operation?: 'review' | 'public' | 'thumbnail' | 'all'
-}
-
 export type PhotoAssetStatus = {
   reviewVersion: number
   jobs: PhotoAssetRun[]
@@ -10185,6 +10146,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
         draftMessageContent: string | null;
         folderId: string | null;
@@ -10242,6 +10204,7 @@ export const api = {
           category: string;
           messageType: string;
           messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
           folderId: string | null;
           question: TemplateQuestion | null;
           questionStatus: 'draft' | 'published';
@@ -10271,6 +10234,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
         folderId: string | null;
@@ -10315,6 +10279,7 @@ export const api = {
         accountId: string | null;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         publishedVersion: number;
         publishedAt: string | null;
         published: boolean;
@@ -10346,13 +10311,15 @@ export const api = {
       /** 置き場。省略・null は未分類。 */
       folderId?: string | null
     }) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -10363,7 +10330,8 @@ export const api = {
         folderId?: string | null
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -10391,6 +10359,7 @@ export const api = {
         status: 'in_use' | 'reserved' | 'past';
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         carouselActions: unknown | null;
         carouselTapLimitMode: string | null;
         carouselTapLimitText: string | null;

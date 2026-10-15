@@ -4,7 +4,7 @@ const requestId={name:'requestId',in:'path',required:true,schema:{type:'string',
 const result={'200':{description:'予約版と本人を確認した結果'},'201':{description:'開始承認を申請した。送信は承認後'},'400':{description:'入力の型・時刻・版が不正'},'401':{description:'未認証'},'403':{description:'権限・取消期限を満たさない'},'404':{description:'本人・店舗・予約が対象範囲にない'},'409':{description:'予約版・起点版・公開版・返事・承認の競合'}};
 const json=(properties:Record<string,unknown>,required:string[])=>({required:true,content:{'application/json':{schema:{type:'object',properties,required}}}});
 const version={type:'integer',minimum:1};
-const binding={expectedVersion:version,trigger:{type:'string',enum:['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited']},offsetMinutes:{type:'integer'},enabled:{type:'boolean'}};
+const binding={expectedVersion:version,trigger:{type:'string',enum:['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited','anniversary_before']},offsetMinutes:{type:'integer'},enabled:{type:'boolean'}};
 const edit={parameters:[account,store,{name:'stepId',in:'path',required:true,schema:{type:'string'}}],requestBody:json(binding,Object.keys(binding)),responses:result};
 export const restaurantFollowupPaths={
  '/api/restaurant-test/followups/{storeId}':{get:{summary:'店の共通フォロー・起点・予約別の仕事を読む',parameters:[account,store],responses:result}},

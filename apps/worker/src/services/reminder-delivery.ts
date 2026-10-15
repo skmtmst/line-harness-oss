@@ -1,6 +1,8 @@
 import { formatBookingDatetime } from './reminder-date-format.js';
 export { formatBookingDatetime } from './reminder-date-format.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
+import type { ReminderDeliveryResult } from './reminder-delivery-result.js';
+export type { ReminderDeliveryResult } from './reminder-delivery-result.js';
 /**
  * リマインダ配信処理 — cronトリガーで定期実行
  *
@@ -72,15 +74,6 @@ export interface ReminderDeliveryOptions {
    * この後の再検証がシーム中の取消を拾うため、検証後注入テストで使う。
    */
   beforePush?: (run: { id: string; friendReminderId: string }) => Promise<void>;
-}
-
-export interface ReminderDeliveryResult {
-  succeeded: number;
-  skipped: number;
-  retrying: number;
-  failed: number;
-  /** 緊急停止で claim せず残した登録数（復旧後に届く）。 */
-  held: number;
 }
 
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
@@ -180,6 +173,7 @@ export async function buildReminderStepMessage(
     const pinned = options?.pinnedTemplateVersions?.[step.template_id];
     if (pinned != null) {
       const version = await getTemplateVersion(db, step.template_id, pinned);
+      if(version?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
       if (version) {
         messageType = version.message_type;
         messageContent = version.message_content;
@@ -188,6 +182,7 @@ export async function buildReminderStepMessage(
     }
     if (templateVersion == null) {
       const template = await getTemplateById(db, step.template_id);
+      if(template?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
       if (template) {
         messageType = template.message_type;
         messageContent = template.message_content;

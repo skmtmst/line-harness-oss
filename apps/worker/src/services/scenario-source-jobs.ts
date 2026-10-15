@@ -1,3 +1,4 @@
+import { scheduleRestaurantAnniversaries, restaurantAnniversaryState } from './restaurant-anniversary-followup.js';
 import { parseBroadcastMessageParts } from './broadcast-message-set.js';
 import { reservationInstant } from '@line-crm/shared';
 import { getLineAccountById, getFriendById, parseScenarioVersionSteps, activeTenantLineAccountSql, isOperationCapabilityStopped, type ScenarioVersion } from '@line-crm/db';
@@ -51,6 +52,7 @@ interface SourceState {
 }
 /** 同じ予約でも結果通知・来店確認・退店後を区別。旧通知を注意の改版で落とさない。 */
 async function sourceState(db: D1Database, j: ScenarioSourceJob): Promise<SourceState | null> {
+    if(j.source_kind==='restaurant_anniversary')return restaurantAnniversaryState(db,j);
     const sql = `SELECT t.store_id,b.trigger,t.template_version,s.timezone,t.approved_version_id,
   e.payload_json event_payload,r.starts_at,r.status,r.departed_at,r.customer_version,r.line_uid,r.ends_at,r.guest_count,s.name store_name,
   (SELECT name FROM rt_menu_items m WHERE m.id=r.course_id AND m.store_id=r.store_id) course_name
@@ -122,8 +124,9 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
     if (!restaurantTestEnabled(env))
         return 0;
     const db = dbFor(env);
+    await scheduleRestaurantAnniversaries(db);
     let sent = 0;
-    const jobs = (await db.prepare(`SELECT * FROM scenario_source_jobs WHERE source_kind IN('restaurant_reservation','restaurant_waitlist')
+    const jobs = (await db.prepare(`SELECT * FROM scenario_source_jobs WHERE source_kind IN('restaurant_reservation','restaurant_waitlist','restaurant_anniversary')
   AND status IN('pending','running','failed') AND attempt_count<50 AND julianday(scheduled_at)<=julianday(?)
   AND (lease_until IS NULL OR julianday(lease_until)<=julianday(?)) ORDER BY scheduled_at LIMIT 50`).bind(new Date().toISOString(), new Date().toISOString()).all<ScenarioSourceJob>()).results;
     for (const j of jobs) {
@@ -149,7 +152,7 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
                 throw new Error('friend_unavailable');
             if (state.trigger === 'waitlist_invited' && !/^https:\/\//.test(env.LIFF_URL ?? ''))
                 throw new Error('liff_unavailable');
-            const vars: Record<string, string> = { reservation_end: formatStartsAtForStore(reservationInstant(state.ends_at), state.timezone), guest_count: String(state.guest_count), course_name: state.course_name ?? '席のみ', store_name: state.store_name, reservation_datetime: formatStartsAtForStore(reservationInstant(state.starts_at), state.timezone),
+            const vars: Record<string, string> = state.trigger==='anniversary_before' ? {store_name:state.store_name,anniversary_date:formatStartsAtForStore(reservationInstant(state.starts_at),state.timezone)} : { reservation_end: formatStartsAtForStore(reservationInstant(state.ends_at), state.timezone), guest_count: String(state.guest_count), course_name: state.course_name ?? '席のみ', store_name: state.store_name, reservation_datetime: formatStartsAtForStore(reservationInstant(state.starts_at), state.timezone),
                 waitlist_book_url: `${(env.LIFF_URL ?? '').replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(j.source_id)}`,
                 waitlist_decline_url: `${(env.LIFF_URL ?? '').replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(j.source_id)}&action=decline`,
                 restaurant_going: `rc:${j.id}:going`, restaurant_change: `rc:${j.id}:change_requested`, restaurant_cancel: `rc:${j.id}:cancel` };
