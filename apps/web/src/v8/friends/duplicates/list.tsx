@@ -1,7 +1,7 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime';
-import { Inbox, Download, RotateCw } from 'lucide-react';
+import { Inbox, Download, Info, RotateCw } from 'lucide-react';
 
 import { formatNumber } from '@/lib/format';
 import { usePageTitle } from '@/components/shell/page-chrome';
