@@ -29,6 +29,7 @@ import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { MenuPaymentCard, useMenuPayment } from '../booking-payments/menu-payment'
 import FormSection from '@/components/shared/form-section'
 import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
@@ -121,7 +122,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const canDuplicate = role === null || canManageRole(role)
   const [loading, setLoading] = useState(true)
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft)
+  /* クラスのお支払い（B-305 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
+  const eventPayment = useMenuPayment('event', accountId, eventId)
+  const dirty = eventPayment.dirty || JSON.stringify(draft) !== JSON.stringify(savedDraft)
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
@@ -281,6 +284,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
+        await eventPayment.save(eventId)
         // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
         // questions:null を送り、質問を消してしまう（R82）。
         // 保存後は書きかけを解くので写しも揃える。
@@ -358,6 +362,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       onClick: () => { if (item.key === 'overview' || eventId) setTab(item.key) },
     }))} />
     {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId} /> : null}
+    {tab === 'overview' && eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} /> : null}
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
     {tab !== 'slots' ? <StickyBar status={tab === 'overview'
