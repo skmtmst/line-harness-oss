@@ -78,7 +78,8 @@ export default function CsvMigrationsV8() {
     <>
       <Notice tone="info" message="書き出しても友だちの情報は変わりません。取り込みは、まず確認だけをします（追加・更新・変更なし・競合・エラーの内訳）。" />
 
-      <DashboardColumns layout="cards">{[
+      {/* 書き出す・取り込むの2枚は同じ高さで、ボタンを同じ位置にそろえる（絵 T9gblG）。 */}
+      <DashboardColumns layout="cards" cardHeight="equal">{[
         <Card key="export" layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-export-title">
           <CardHeader title="CSVで書き出す" titleId="csv-export-title" headingLevel={3} size="content" />
           <div className={styles.field}>
@@ -190,11 +191,11 @@ export default function CsvMigrationsV8() {
       </Card>
 
       <Card layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-history-title">
-        <CardHeader size="content" headingLevel={3} titleId="csv-history-title" title={<>書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></>} />
+        <CardHeader size="content" headingLevel={3} titleId="csv-history-title" title="書き出し・取り込みの履歴" help={<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip>} />
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
-          <DataTable columnSizing="content" grid={{
+          <DataTable grid={{
             columns: 'var(--tpl-fr-mig-col-date) var(--tpl-fr-mig-col-kind) var(--tpl-fr-mig-col-kind) minmax(0, 1fr) var(--tpl-fr-mig-col-state)',
             padding: '0 var(--polish-space-card)',
             headPadding: 'var(--polish-space-field) var(--polish-space-card)',

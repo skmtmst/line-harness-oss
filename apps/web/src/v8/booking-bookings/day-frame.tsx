@@ -1,8 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { CalendarDays, CalendarPlus, CalendarX, CircleAlert } from 'lucide-react'
-import { BookingPage, BookingSidebarSection } from '@/components/templates/booking-page'
+import { CalendarDays, CalendarPlus, CalendarX, CircleAlert, Info } from 'lucide-react'
+import { BookingPage, BookingSidebarLinks, BookingSidebarNotes, BookingSidebarSection } from '@/components/templates/booking-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -45,7 +45,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
     <KpiCard presentation="band" icon={<CalendarX size={16} aria-hidden />} title="キャンセル" value={value(summary.cancelled)} unit="件" detail="この日" />
   </KpiBand>
   const aside = <>
-    <BookingSidebarSection title="次の予約">
+    <BookingSidebarSection title="次の予約" action={{ href: '/booking/bookings?view=list', label: period === "今日" ? "今日の予約をすべて見る" : "この日の予約をすべて見る" }}>
       {next ? <Card frame="inset" padding="compact" layout="vertical" gap="tight">
         <CardHeader size="panel" title={next.friend_name ?? '名前の登録なし'} meta={next.menu_name} action={<Avatar name={next.friend_name} size={32} />} />
         <CardContent><ReservationFacts items={[{ label: '日付', value: day }, { label: '時刻', value: `${formatTime(next.starts_at)}〜${formatTime(next.ends_at)}` }, { label: '担当', value: next.staff_name }]} /></CardContent>
@@ -53,14 +53,22 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
         {canWrite ? <Button href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変える</Button> : null}
       </Card> : <ListState kind="empty" title={ready ? '次の予約はありません' : '予約を読み込んでいます'} />}
     </BookingSidebarSection>
-    <BookingSidebarSection title="気をつけること"><p>{!ready ? '読み込んでいます' : summary.requested ? `未承認の予約が${summary.requested}件あります。` : 'いま確認が必要な予約はありません。'}</p>{ready && summary.phone + summary.other > 0 ? <p>LINE以外の予約は、連絡方法も確認してください。</p> : null}</BookingSidebarSection>
+    <BookingSidebarSection title={`${period} 気をつけること`}><BookingSidebarNotes items={!ready ? [{ icon: <Info size={14} aria-hidden />, title: '読み込んでいます' }] : [
+      summary.requested ? { icon: <CircleAlert size={14} aria-hidden />, title: `未承認の予約が${summary.requested}件`, detail: '承認するか、断るかを決めてください' } : { icon: <Info size={14} aria-hidden />, title: 'いま確認が必要な予約はありません' },
+      ...(summary.phone + summary.other > 0 ? [{ icon: <Info size={14} aria-hidden />, title: 'LINE以外の予約があります', detail: '連絡方法も確認してください' }] : []),
+    ]} /></BookingSidebarSection>
     <BookingSidebarSection title={`${day}の内訳`}><ReservationFacts items={[
       { label: '予約', value: ready ? `${summary.active}件` : '—' }, { label: 'うちLINEから', value: ready ? `${summary.line}件` : '—' },
       { label: 'うち電話', value: ready ? `${summary.phone}件` : '—' },
       ...(ready && summary.other > 0 ? [{ label: 'その他の受付', value: `${summary.other}件` }] : []),
       { label: '売上見込み', value: ready ? `¥${formatNumber(summary.sales)}` : '—' },
     ]} /></BookingSidebarSection>
-    <BookingSidebarSection title="つながる先"><Button variant="text" href="/booking/menus">予約設定</Button><Button variant="text" href="/reminders">リマインダ</Button><Button variant="text" href="/friends">友だち</Button><Button variant="text" href="/conversions">コンバージョン</Button></BookingSidebarSection>
+    <BookingSidebarSection title="つながる先"><BookingSidebarLinks links={[
+      { href: '/booking/menus', label: '予約設定', note: 'メニューと受付枠' },
+      { href: '/reminders', label: 'リマインダ', note: '前日・当日のお知らせ' },
+      { href: '/friends', label: '友だち', note: '来店の記録' },
+      { href: '/conversions', label: 'コンバージョン', note: '予約が入った' },
+    ]} /></BookingSidebarSection>
   </>
   return <BookingPage title="予約管理" help="担当者ごとの予約と空き枠を確認できます。" actions={actions} stats={stats} aside={aside}>
     {!canWrite ? <ReadOnlyNotice /> : null}{children}

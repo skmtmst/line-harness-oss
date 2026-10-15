@@ -14,13 +14,13 @@ const block = (selector: string) => {
 
 /**
  * 日時欄の横の「時刻を消す」「日付を消す」が 32px になり、隣の欄
- * （40px）と高さがずれていた。原因は素のボタン扱い（globals の
+ * （36px）と高さがずれていた。原因は素のボタン扱い（globals の
  * min-height:32px）で 24px の消すボタンが伸ばされること。
  * 消すボタンは欄の右端・欄と同じ高さ帯に収めることが約束。
  */
 describe('日時の消すボタンは欄の中に収まる（m22a）', () => {
-  it('欄の高さは 40px', () => {
-    expect(block('.field')).toMatch(/height:\s*40px/)
+  it('欄の高さは 36px（ほかの欄と同じ・B-145）', () => {
+    expect(block('.field')).toMatch(/height:\s*36px/)
   })
 
   it('消すボタンは欄の上下いっぱい（top:1px・bottom:1px）で固定の高さを持たない', () => {

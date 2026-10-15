@@ -12,5 +12,3 @@
 .unassignedName { overflow: hidden; text-overflow: ellipsis; }
 .unassignedItem { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
 .footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acct-hierarchy-footer-pad); }
-
-.moveMenu { margin-left: auto; }

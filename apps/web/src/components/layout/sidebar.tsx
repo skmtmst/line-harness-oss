@@ -650,7 +650,7 @@ export default function Sidebar({
       for (const root of [desktopRef.current, drawerRef.current]) {
         const nav = root?.querySelector<HTMLElement>('[data-sidebar-scroll]')
         const item = nav?.querySelector<HTMLElement>('[data-nav-active]')
-        if (nav && item) revealInScroller(nav, item)
+        if (nav && item) revealInScroller(nav, item, 8, item.closest<HTMLElement>(`.${styles.section}`))
       }
     }
     const frame = requestAnimationFrame(reveal)

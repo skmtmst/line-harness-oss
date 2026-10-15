@@ -97,7 +97,8 @@
 .spacer { flex: 1; min-width: 0; }
 
 /* ---- 表（行は線で区切る。行の高さを増やさないよう線は内側の影） ---- */
-.table { display: flex; flex-direction: column; gap: var(--tpl-rm-row-gap-lg); }
+/* 行は 56 の高さで間を空けずに並べる（行の間隔 56・絵 rbAig・loVfW。線は行の下の影）。 */
+.table { display: flex; flex-direction: column; gap: 0; }
 .headRow, .row {
   display: flex;
   align-items: center;

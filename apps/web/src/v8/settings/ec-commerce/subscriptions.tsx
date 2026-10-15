@@ -16,7 +16,7 @@ import SearchField from '@/components/shared/search-field'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
-import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import ListRange from '@/components/ui/list-range'
 import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -124,14 +124,15 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       {FILTERS.map((item) => <FilterChip key={item.key} selected={filter === item.key} icon={item.key === 'all' ? <CircleDot size={13} /> : <Star size={13} />} onChange={() => setFilter(item.key)}>{item.label}</FilterChip>)}
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">
-      <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
+      <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th aria-label="操作" /></TableHeadRow></thead>
       <tbody>{shown.map((item) => <Tr key={item.id} data-row-id={item.id}>
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
         <Td align="right">{item.amount == null ? emptyValue('unknown') : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
         <Td align="right">{item.continuedCount == null ? emptyValue('unknown') : `${item.continuedCount}回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
-        <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
+        {/* 行の右端は「…」1つ（B-253・絵 wqC8x）。中身を見る・ECで変更はその中。 */}
+        <ActionCell><RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'detail', label: '中身を見る', href: `/friends/detail?id=${encodeURIComponent(item.friendId)}` }, ...(item.manageUrl ? [{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }] : [])]} /></ActionCell>
       </Tr>)}</tbody>
     </DataTable>}
     <Notice tone="info" presentation="account-note" icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</Notice>

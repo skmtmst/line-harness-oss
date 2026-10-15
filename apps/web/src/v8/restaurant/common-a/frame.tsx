@@ -59,7 +59,7 @@ export function BoundaryBanner({ note = '予約媒体は受信専用・外部更
 }
 
 /** 板の頭と中身の並び（取得を持たない画面でも使う）。 */
-export function RestaurantPage({ boardId, title, description, descriptionAs, descriptionSize, picker, headPadTop, headTextGap, titleSize, bodyPadTop, bodyGap, children }: {
+export function RestaurantPage({ boardId, title, description, descriptionAs, descriptionSize, subtitle, picker, actions, headPadTop, headTextGap, titleSize, bodyPadTop, bodyGap, children }: {
   boardId: string
   title: string
   description: string
@@ -70,7 +70,11 @@ export function RestaurantPage({ boardId, title, description, descriptionAs, des
   descriptionAs?: 'text'
   /** 説明を本文の大きさ（13/20）にする。渡さないときは補足の 12/19 のまま。 */
   descriptionSize?: 'body'
+  /** 題の下の1行（店名・状態など）。渡すと説明は「?」の中のまま、この行を題の下に出す。 */
+  subtitle?: ReactNode
   picker?: ReactNode
+  /** 店舗を選ぶ欄の右に並べる板の操作（主のボタンなど）。 */
+  actions?: ReactNode
   /** 頭の上の余白を絵の値にする。渡さないときは共通の 24 のまま。 */
   headPadTop?: number
   /** 題と説明の間を絵の値にする。渡さないときは共通の 8 のまま。 */
@@ -93,13 +97,13 @@ export function RestaurantPage({ boardId, title, description, descriptionAs, des
     <PageFrame kind="list" boardId={boardId}>
       <PageHeading
         title={title}
-        subtitle={descriptionAs === 'text' ? description : undefined}
+        subtitle={descriptionAs === 'text' ? description : subtitle}
         subtitleSize={descriptionSize}
         help={descriptionAs === 'text' ? undefined : description}
         padTop={headPadTop}
         textGap={headTextGap}
         titleSize={titleSize}
-        actions={picker}
+        actions={picker || actions ? <>{picker}{actions}</> : undefined}
       />
       <div
         className={styles.body}
@@ -121,6 +125,10 @@ export default function RestaurantFrame({
   bannerNote,
   bodyPadTop,
   bodyGap,
+  pickerAs = 'tabs',
+  banner = true,
+  subtitle,
+  actions,
   children,
 }: {
   /** Pencil の板 ID（例 `CHz31`）。外枠へ付ける。 */
@@ -136,6 +144,14 @@ export default function RestaurantFrame({
   bodyPadTop?: number
   /** 中身の段の間を絵の値にする。渡さないときは共通の 16 のまま。 */
   bodyGap?: number
+  /** 店舗を選ぶ形。既定はタブ。`'select'` は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 n9vvGx）。 */
+  pickerAs?: 'tabs' | 'select'
+  /** 検証環境の帯を出すか。融合の板（n9vvGx）は帯を描かないので false。 */
+  banner?: boolean
+  /** 題の下の1行。選んでいる店舗から作る。 */
+  subtitle?: (store: RestaurantStore | null) => ReactNode
+  /** 店舗を選ぶ欄の右の操作。読み込み前は null を受け取る。 */
+  actions?: (ctx: RestaurantContext | null) => ReactNode
   children: (ctx: RestaurantContext) => ReactNode
 }) {
   usePageTitle(title)
@@ -186,7 +202,19 @@ export default function RestaurantFrame({
     [snapshot, selectedStoreId],
   )
 
-  const picker = snapshot && snapshot.stores.length > 0 ? (
+  const picker = snapshot && snapshot.stores.length > 0 ? pickerAs === 'select' ? (
+    <SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect
+      aria-label="店舗"
+      noun="店舗"
+      width={STORE_PICKER_WIDTH}
+      value={selectedStoreId}
+      onChange={setSelectedStoreId}
+      options={[
+        ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
+        ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),
+      ]}
+    /></SaveErrorField>
+  ) : (
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
 
 
@@ -199,16 +227,21 @@ export default function RestaurantFrame({
     /></SaveErrorField>
   ) : null
 
+  const ready = snapshot?.organization && !loading
+    ? { data: snapshot, store, selectedStoreId, busy, mutate, reload: load }
+    : null
   return (
     <RestaurantPage
       boardId={boardId}
       title={title}
       description={description}
+      subtitle={subtitle ? subtitle(store) : undefined}
       picker={picker}
+      actions={actions ? actions(ready) : undefined}
       bodyPadTop={bodyPadTop}
       bodyGap={bodyGap}
     >
-      <BoundaryBanner note={bannerNote} />
+      {banner ? <BoundaryBanner note={bannerNote} /> : null}
       {notice ? (
         <div role="status" className={`${styles.notice} ${notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError}`}>
           {notice.text}
@@ -223,7 +256,7 @@ export default function RestaurantFrame({
           <ListState kind="empty" title="店舗が登録されていません" description="統括から店舗を登録してください。" />
         </div>
       ) : (
-        children({ data: snapshot, store, selectedStoreId, busy, mutate, reload: load })
+        children(ready ?? { data: snapshot, store, selectedStoreId, busy, mutate, reload: load })
       )}
     </RestaurantPage>
   )

@@ -662,7 +662,7 @@ export default function WebhooksIncomingV8() {
               ? <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} />
               : selected.name}
           </h2>
-          <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '動いています' : '止めています'}</StatusBadge>
+          <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '有効' : '停止中'}</StatusBadge>
           <span className={styles.spacer} aria-hidden="true" />
           {canManage ? (
             <>

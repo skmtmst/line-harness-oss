@@ -475,8 +475,9 @@ function ReminderDetailV8() {
   return (
     <SaveErrorScope errors={saveErrors}><PageExplanationProvider pageKey="reminders:registrants"><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
       <PageHeading title={data.reminder.name}
-        help={<>{meta}</>}
+        help="登録した友だちごとに、基準日から決めた日時に通知を送ります。"
         explanationToggle={tab === 'registrants' ? <PageExplanationToggle /> : undefined}
+        crumbs={<><p className={styles.meta}>{meta}</p></>}
         tabs={<><Tabs
           label="リマインダの詳細"
           items={[
@@ -1115,23 +1116,23 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                     </Td>
                     <Td>
                       {/* 閲覧のみの人には、押せない操作を置かない。 */}
-                      {!canManage ? null : item.status === 'active' ? (
-                        dirty ? (
-                          <Button variant="primary" disabled={busy} busy={busy} busyLabel="保存しています" onClick={() => void saveDate(item)}>
-                            <Check size={15} aria-hidden="true" />基準日を保存
-                          </Button>
-                        ) : (
-                          <Button variant="text" disabled={busy} onClick={() => void changeStatus(item, 'cancel')}>
-                            <X size={15} aria-hidden="true" />取り消す
-                          </Button>
-                        )
-                      ) : item.status === 'cancelled' ? (
-                        <Button variant="text" disabled={busy} onClick={() => void changeStatus(item, 'resume')}>
-                          <RotateCcw size={15} aria-hidden="true" />再開する
+                      {/* 行の操作は「…」1つの中（B-253）。基準日を変えたときだけ、その場で保存するボタンを横に出す。閲覧のみの人には置かない。 */}
+                      {canManage && item.status === 'active' && dirty ? (
+                        <Button variant="primary" disabled={busy} busy={busy} busyLabel="保存しています" onClick={() => void saveDate(item)}>
+                          <Check size={15} aria-hidden="true" />基準日を保存
                         </Button>
                       ) : null}
-                    </Td>
-                  </Tr>
+                      {canManage && (item.status === 'active' || item.status === 'cancelled') ? (
+                        <RowMenu
+                          label={`${item.friendName || '登録者'}の操作`}
+                          title="その他の操作"
+                          items={item.status === 'active'
+                            ? [{ id: 'cancel', label: '取り消す', icon: <X size={16} aria-hidden="true" />, disabled: busy, onSelect: () => void changeStatus(item, 'cancel') }]
+                            : [{ id: 'resume', label: '再開する', icon: <RotateCcw size={16} aria-hidden="true" />, disabled: busy, onSelect: () => void changeStatus(item, 'resume') }]}
+                        />
+                      ) : null}
+                    </span>
+                  </div>
                 )
               })}
               </tbody></DataTable>

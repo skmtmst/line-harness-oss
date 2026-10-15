@@ -5,11 +5,37 @@ import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
+  AlarmClock,
+  AlignLeft,
+  Armchair,
+  Cake,
+  Calendar,
   CalendarCheck,
+  ChevronDown,
+  CircleDot,
+  Gift,
+  Heading,
+  HelpCircle,
+  Image as ImageIcon,
+  MousePointerClick,
+  Hash,
+  IdCard,
+  Languages,
+  Mail,
+  MapPin,
+  Minus,
+  Paperclip,
+  Phone,
+  Pilcrow,
+  ShieldAlert,
+  SquareCheck,
+  Star,
+  Type,
+  User,
   ExternalLink,
   Plus,
   X,
@@ -26,7 +52,7 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
+import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -39,8 +65,6 @@ import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/
 import { formJumpsInto } from '@/components/forms/form-definition-operations'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect from '@/components/shared/entity-select'
-import AddGrid from './add-blocks'
-import { formBlockIcon as blockIcon } from './block-icons'
 
 /*
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
@@ -147,7 +171,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} note={props.portable ? '本人確認書類の保存日数は、配った先の各アカウントの設定で決まります' : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </Card>
 
       <RenameDialog
@@ -192,6 +216,22 @@ function RenameDialog({ value, onCancel, onSave }: { value: string | null; onCan
 /* ---------------- ブロックの行 ---------------- */
 
 type RowProps = Props & { block: FormBlock; index: number }
+
+function blockIcon(block: FormBlock): ReactNode {
+  switch (block.kind) {
+    case 'image': return <ImageIcon size={15} aria-hidden="true" />
+    case 'heading': return <Heading size={15} aria-hidden="true" />
+    case 'text': return <AlignLeft size={15} aria-hidden="true" />
+    case 'button': return <MousePointerClick size={15} aria-hidden="true" />
+    default:
+      // 絵 m1cWEy・ijxur：5段階は星、ファイルはクリップ、自由に書くは段落の印、予約はカレンダー、ほかの質問は「？」。
+      if (block.type === 'booking') return <CalendarCheck size={15} aria-hidden="true" />
+      if (block.type === 'rating') return <Star size={15} aria-hidden="true" />
+      if (block.type === 'file') return <Paperclip size={15} aria-hidden="true" />
+      if (block.type === 'textarea') return <Pilcrow size={15} aria-hidden="true" />
+      return <HelpCircle size={15} aria-hidden="true" />
+  }
+}
 
 /** つまみ：矢印キーで上下へ、つかんで落とす先の行へ。 */
 function useRowDrag(props: RowProps) {
@@ -440,7 +480,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
       <span className={styles.saveSelect}>
         <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
-          compact
+          size="full"
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
@@ -454,12 +494,14 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
 }
 
 const DAYS_AHEAD = [7, 14, 30, 60]
+const noMeta = () => undefined
 
 function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const booking = block.booking ?? null
   const menus = refs.bookingMenus ?? []
   const staff = booking?.menuId ? (refs.bookingMenuStaff?.[booking.menuId] ?? []) : []
   const days = booking?.daysAhead ?? 14
+  const menuOptions = useMemo(() => menus.map((menu) => ({ ...menu, name: `${menu.name}・${menu.durationMinutes}分` })), [menus])
   const setBooking = (next: Partial<NonNullable<FormInputBlock['booking']>>) =>
     set({ booking: { menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
   return (
@@ -469,14 +511,12 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
           <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
-            options={menus}
+            /* 絵 ijxur：欄は「名前・かかる時間」の1つの札（横の補足は出さず、狭い列でも名前を残す）。 */
+            options={menuOptions}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
             placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
-            meta={(row) => {
-              const menu = menus.find((m) => m.id === row.id)
-              return menu ? `${menu.durationMinutes}分` : undefined
-            }}
+            meta={noMeta}
           /></SaveErrorField>
         </Labeled>
         <Labeled label="担当">
@@ -599,5 +639,42 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
 
 /* ---------------- ブロックを足す ---------------- */
 
+/** 足す札の印（絵 m1cWEy）。無い札は＋。 */
+const ADD_CARD_ICONS: Record<string, ReactNode> = Object.fromEntries(Object.entries({
+  radio: CircleDot, checkbox: SquareCheck, select: ChevronDown, rating: Star,
+  text: Minus, textarea: Pilcrow, contact: Mail, tel: Phone, address: MapPin,
+  name: User, kana: Languages, birthday: Cake, age: Hash, allergy: ShieldAlert,
+  anniversary: Gift, seat_preference: Armchair,
+  date: Calendar, time: AlarmClock, booking: CalendarCheck, file: Paperclip, identity: IdCard,
+  image: ImageIcon, heading: Heading, 'text-deco': Type, button: MousePointerClick,
+}).map(([key, Icon]) => [key, <Icon key={key} size={15} aria-hidden="true" />]))
+
 /** 統括も画像を追加できる。固有の参照は保存前に別途確認する。 */
 const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set()
+
+function AddGrid({ onAdd, hide, note }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string>; note?: string }) {
+  return (
+    <div className={styles.addBox}>
+      <p className={styles.addTitle}>ブロックを足す</p>
+      {/* 統括（u5MM7）：保存日数は配った先ごとに決まることを先に書く。 */}
+      {note ? <p className={styles.addNote}>{note}</p> : null}
+      {ADD_GROUPS.map((group) => (
+        <div key={group.title} className={styles.addGroup}>
+          <p className={styles.addGroupTitle}>{group.title}</p>
+          <div className={styles.addCards} data-writing={group.title === '書いてもらう' || undefined}>
+            {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
+              <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
+                <span className={styles.addCardTop}>
+                  {ADD_CARD_ICONS[card.key] ?? <Plus size={15} aria-hidden="true" />}
+                  <span className={styles.addCardLabel}>{card.label}</span>
+                  {card.fresh ? <span className={styles.newBadge}>新</span> : null}
+                </span>
+                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

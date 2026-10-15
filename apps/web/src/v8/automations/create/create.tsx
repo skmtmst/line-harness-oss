@@ -19,7 +19,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail, type AutomationDraftDetail } from '@/lib/api'
-import { ArrowDown, ArrowLeftRight, ArrowUp, Bell, ChevronDown, FilePen, FileText, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap, type LucideIcon } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, Bell, FilePen, FileText, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap, type LucideIcon } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'

@@ -66,10 +66,6 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
 }
 
-.importText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-htn-import-gap); min-width: 0; }
-.importText strong { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.importText span { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
-
 /* ⑤ 完了 */
 .doneLine {
   margin: 0; display: flex; align-items: center; gap: var(--tpl-htn-gap-s); /* 絵：印の円 22（線込み）＋間 10。lucide 24 の円は 22 なので間は 8 */
@@ -100,6 +96,3 @@
 .resultLead { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 
 .manualAck { padding: var(--tpl-htn-ack-pad); }
-
-/* 手順は題と同じ行。中身の幅だけ取り、狭いときは手順の名を省略する（共通の Steps の決まり）。 */
-.titleSteps { flex: 0 1 auto; min-width: 0; }

@@ -166,7 +166,7 @@
 
 .sideTitle {
   display: flex;
-  align-self: flex-start;
+  align-self: stretch;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -414,6 +414,7 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
+  /* 一覧の名前は黒の太字（§6.5 の 2・絵 owaS3）。押せることは下線で示す。 */
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
@@ -1483,10 +1484,15 @@
 }
 
 /* メニューの分類札の帯。 */
+/* 実 LIFF と同じく1行（入りきらない札は横へ送る）。スマホの器が 310 の画面になっても2段に折らない。 */
 .phoneCats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: var(--tpl-bm-6);
+  overflow: hidden;
+  padding: 2px; /* 選んだ札の枠を切らない */
+  margin: -2px;
 }
 
 .phoneCat {
@@ -1497,6 +1503,8 @@
   color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-12);
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .phoneCatNow {

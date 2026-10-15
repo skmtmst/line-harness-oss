@@ -111,7 +111,7 @@ export default function WebhooksSheetsV8() {
             )}
             <span className={styles.spacer} aria-hidden="true" />
             <Button
-              variant="danger"
+              variant="danger-outline"
               disabled={busy !== null}
               onClick={() => selectedAccountId && setDisconnectFor({ id: selectedAccountId, label: selectedAccount?.name?.trim() || selectedAccountId })}
             >

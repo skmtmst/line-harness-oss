@@ -96,14 +96,15 @@ async function renderPage() {
   await act(async () => {})
 }
 
-test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async () => {
+test('v8 では ralAc の鍵の表（札・行の右端の「…」）が出る', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ralAc"]')
   expect(board).not.toBeNull()
   expect(board?.textContent).toContain('予約システム連携')
   expect(board?.textContent).toContain('有効')
-  expect(board?.textContent).toContain('入れ替える')
+  // 行の右端は「…」1つ（B-253）。入れ替えるはその中。
+  expect(board?.querySelector('button[aria-label="「予約システム連携」の操作"]')).not.toBeNull()
   // 板 `ralAc` の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
   expect(board?.textContent).toContain('鍵を発行する')
   expect(board?.textContent).toContain('外の仕組みに書き写してから閉じてください')
@@ -177,7 +178,8 @@ test('鍵の入れ替えの競合理由は一覧を取り直したあとも残�
   })
   await renderPage()
   const row = host.querySelector('[data-row-id="tok-1"]')!
-  fireEvent.click(within(row as HTMLElement).getByRole('button', {name:'入れ替える'}))
+  fireEvent.click(within(row as HTMLElement).getByRole('button', {name:'「予約システム連携」の操作'}))
+  fireEvent.click(await screen.findByRole('menuitem', {name:'入れ替える'}))
   const confirm = await screen.findByRole('dialog', {name:'「予約システム連携」の鍵を入れ替えますか？'})
   fireEvent.click(within(confirm).getByRole('button', {name:'入れ替える'}))
   await waitFor(() => expect(refreshed).toBe(2))

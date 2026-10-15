@@ -6,13 +6,13 @@ import { api } from '@/lib/api'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
-import { MoreAction, RowMenu } from '@/components/shared/row-actions'
+import { MoreAction } from '@/components/shared/row-actions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
-import { Grid2X2, GripHorizontal, Save } from 'lucide-react'
+import { GripHorizontal, Save } from 'lucide-react'
 import compact from './account-ordering-v8.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -236,7 +236,6 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
   /** カードの「…」ボタンと移動先メニュー。カード全体はdivなので操作はボタンに寄せる。 */
   const moveMenu = (account: AccountItem) => {
     const name = account.displayName || account.name
-    if (onClose) return <span className={compact.moveMenu}><RowMenu appearance="box" label={`${name}の移動先を選ぶ`} items={moveMenuItems(account)} open={moveMenuFor === account.id} onOpenChange={open => setMoveMenuFor(open ? account.id : null)} triggerProps={{ disabled: saving }} /></span>
     return (
       <span className="relative ml-auto flex shrink-0 items-center">
         <MoreAction
@@ -299,11 +298,11 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     }
     return <SaveErrorScope errors={saveErrors}><>
       <Dialog open title="LINEアカウント階層を編集" designNode="a7lUk" designWidth={600} designTop={140}
-        designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 12px" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
-        footer={<DialogActions>
+        designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
+        footer={<div className={compact.footer}>
           <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} title={changed.length === 0 ? '構成を変更すると保存できます。' : undefined} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
-        </DialogActions>}>
+          <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
+        </div>}>
         <div className={compact.body}>
           <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>
           {error ? <Notice tone="danger" message={error} /> : null}

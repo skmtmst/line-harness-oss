@@ -100,20 +100,6 @@
 .panelTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-cmp-panel-lh); }
 .radios { display: flex; align-items: center; gap: var(--tpl-fr-cmp-radio-gap); }
 
-.fieldBox {
-  display: flex;
-  align-items: center;
-  min-height: var(--tpl-fr-control-h);
-  margin: 0;
-  padding: 0 var(--tpl-fr-stack-gap);
-  border-radius: var(--radius-control);
-  box-shadow: var(--tpl-fr-shadow-control);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-fr-cmp-panel-lh);
-}
-
 .checks { display: flex; flex-direction: column; gap: var(--tpl-fr-cmp-check-gap); }
 .fieldLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-cmp-panel-lh); margin-bottom: calc(var(--tpl-fr-cmp-check-gap) - var(--tpl-fr-stack-gap)); }
 .panelActions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }

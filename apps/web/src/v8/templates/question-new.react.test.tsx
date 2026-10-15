@@ -86,8 +86,9 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await frames()
-    expect(screen.getByRole('dialog', { name: /選択肢 1.*を押されたら/ })).toBeTruthy()
-    expect(screen.queryByRole('dialog', { name: /選択肢 2.*を押されたら/ })).toBeNull()
+    // 窓で直す形（l87p1J）：エラーのある選択肢 1 の窓だけが開く。
+    expect(screen.getByRole('dialog', { name: /選択肢 1「.*」を押されたら/ })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: /選択肢 2「.*」を押されたら/ })).toBeNull()
     const message = screen.getByLabelText('ユーザーメッセージ')
     expect(message.getAttribute('aria-invalid')).toBe('true')
     expect(screen.getByText('発言を短くしてください。')).toBeTruthy()
@@ -112,7 +113,6 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(last) })
     expect(screen.getAllByLabelText('ボタンの文字（20文字まで）')).toHaveLength(1)
     expect(name.value).toBe('継続を確認する')
-    expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
     // 押したときの動きは「押されたら」の欄から窓で開いて決める（l87p1J）。
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
     const message = screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement
@@ -125,7 +125,7 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(hideMessage) })
     expect(message.disabled).toBe(false)
     expect(message.value).toBe('入力を保つ')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '決める', exact: true })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '決める' })) })
     expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
     expect((screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement).value).toBe('入力を保つ')

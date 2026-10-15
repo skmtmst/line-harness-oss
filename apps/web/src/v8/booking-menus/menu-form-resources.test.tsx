@@ -233,7 +233,13 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     let resolveSave!: (value: unknown) => void
     fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
     await openEditor()
-    await pickEntities('使う設備', ['席A'])
+    await screen.findByText('個室A')
+    // 絵 v5L19Z：設備は札＋［変える］。窓で足して「この 2件にする」で決める。
+    fireEvent.click(screen.getByRole('button', { name: '使う設備：変える' }))
+    const picker = await screen.findByRole('dialog')
+    fireEvent.click(within(picker).getByRole('checkbox', { name: '席A' }))
+    fireEvent.click(within(picker).getByRole('button', { name: 'この 2件にする' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
     const saveButton = screen.getByRole('button', { name: '設備の割当を保存する' })
     // 同じ描画中に2イベントを届け、disabledへの再描画ではなくuseRefの
@@ -286,10 +292,9 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     await openEditor()
     expect(await screen.findByText('設備の割当は閲覧のみです。変更は管理者へ依頼してください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '設備の割当を保存する' })).toBeNull()
+    // 閲覧のみは札を外せず、欄は「見る」だけ。
     expect(screen.queryByRole('button', { name: '個室Aを外す' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '使う設備' }))
-    const dialog = await screen.findByRole('dialog')
-    expect((within(dialog).getByRole('checkbox', { name: '個室A' }) as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '使う設備：変える' })).toBeNull()
   })
 
   test.each(['', '0', '-1', '1.5', '1001'])('必要数%sは送信せず、入力を残す', async (value) => {
@@ -350,7 +355,7 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     await openEditor(target)
     const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
     expect((quantity as HTMLInputElement).disabled).toBe(true)
-    await pickEntities('使う設備', ['個室A（停止中）'])
+    fireEvent.click(screen.getByRole('button', { name: '個室A（停止中）を外す' }))
     expect(screen.queryByRole('spinbutton', { name: '個室Aの必要数' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
     await waitFor(() => expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', { expectedVersion: 1, resources: [] }))

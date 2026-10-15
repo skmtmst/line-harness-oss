@@ -202,7 +202,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
                 <span className={styles.staffCellMain}>{offered}つ</span>
               ) : (
                 <span className={styles.cellWarn}>
-                  0<span className={styles.staffMenuWarning} title="予約画面に出ません">予約画面に出ません</span>
+                  0<span className={styles.staffCellSub} title="予約画面に出ません">予約画面に出ません</span>
                 </span>
               )}
             </span>

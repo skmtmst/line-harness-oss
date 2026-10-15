@@ -238,7 +238,7 @@ export function OpsHead({
   return (
     <div className={styles.head}>
       <PageHeading title={title} help={description} actions={actions} inset="none" />
-      {band ?? stats}
+      {band}
       <Notice tone="warn" presentation="ops" className={styles.caution} data-ops-env={environment} icon={<ShieldCheck aria-hidden="true" />}>
         運営コンソール：契約先のデータを扱います。操作はすべて記録されます
       </Notice>

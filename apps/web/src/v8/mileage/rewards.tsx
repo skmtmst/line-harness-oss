@@ -9,7 +9,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
+import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, RotateCcw, Star } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -796,7 +796,7 @@ export default function RewardsTab() {
               <Th collapseAt="narrow" className={styles.colGives}>届かなかった理由</Th>
               <Th align="right" collapseAt="narrow" className={styles.colMonth}>試した回数</Th>
               <Th collapseAt="narrow" className={styles.colGives}>最後の更新</Th>
-              <Th className={styles.colOpsWide}>操作</Th>
+              <Th className={styles.colRewardOps}>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -805,7 +805,7 @@ export default function RewardsTab() {
                 <Td grow><FolderDotName><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></FolderDotName></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (
-                    <span className={styles.cellMain}>
+                    <span className={styles.stateWithHelp}>
                       確認中
                       <HelpTip label="確認中の説明">
                         送った結果が分からず、確定を確認しています。二重に送らないよう自動では動かしていません。
@@ -818,17 +818,23 @@ export default function RewardsTab() {
                 <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
                 <Td align="right" collapseAt="narrow" className={styles.colMonth}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
                 <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
-                <Td className={styles.colOpsWide}>
+                <Td className={styles.colRewardOps}>
+                  {/* 行の右端は「…」1つ（B-253）。もう一度届けるはその中。閲覧のみの人には置かない。 */}
                   {!readonly ? (
-                    <Button
-
-                      disabled={retryingId !== null}
-                      onClick={() => void retryRedemption(item)}
-                      busy={retryingId === item.id}
-                      busyLabel="やり直しています"
-                    >
-                      もう一度届ける
-                    </Button>
+                    <span className={styles.rowActions}>
+                      <div className={styles.menuBox}>
+                        <RowMenu
+                          label={`${item.rewardName}の交換の操作`}
+                          items={[{
+                            id: 'retry',
+                            label: retryingId === item.id ? 'やり直しています' : 'もう一度届ける',
+                            icon: <RotateCcw size={16} aria-hidden="true" />,
+                            disabled: retryingId !== null,
+                            onSelect: () => void retryRedemption(item),
+                          }]}
+                        />
+                      </div>
+                    </span>
                   ) : null}
                 </Td>
               </Tr>

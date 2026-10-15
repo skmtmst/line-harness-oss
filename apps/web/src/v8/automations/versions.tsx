@@ -10,7 +10,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
+import { BookOpen, GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -34,6 +34,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
+import { useManualHref } from '@/lib/use-manual-href'
 
 /** 利用先の種類（今の画面と同じ言葉）。 */
 const CONSUMER_LABELS: Record<string, string> = {
@@ -96,6 +97,8 @@ function VersionsInner() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /* 画面のマニュアル（正本表の画面キー）。URL がある時だけ出す。 */
+  const manualHref = useManualHref()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
   const [summary, setSummary] = useState<CommonActionSummary | null>(null)
   const [summaryError, setSummaryError] = useState('')
@@ -238,6 +241,7 @@ function VersionsInner() {
         <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
       </KpiBand></PageContent>}
       actions={<>
+        {manualHref ? <Button external href={manualHref}><BookOpen size={15} aria-hidden="true" />マニュアル</Button> : null}
         {canEdit && draft ? (
           <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>
         ) : canEdit && published ? (
@@ -312,7 +316,7 @@ function VersionsInner() {
                   <Th className={styles.colNum} align="right">実行中</Th>
                   <Th className={styles.colNum} align="right">待機中</Th>
                   <Th className={styles.colState}>状態</Th>
-                  <Th className={styles.colOps}>操作</Th>
+                  <Th className={styles.colOps} showActionLabel>操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>

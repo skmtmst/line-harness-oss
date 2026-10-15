@@ -395,6 +395,10 @@
 :root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
 :root .footer { display: block; width: 100%; flex-shrink: 0; }
 :root .footer:empty { display: none; }
+/* 画面がボタンを直に渡した下の段（footer）も、並びの間 8・高さの中心をそろえる。
+   直に並べると行の中の inline のボタンになり、間 0・上下がずれていた（yOyCg）。包みを渡す画面は変わらない。 */
+:root .footer:has(> :is(button, a)) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 左寄せのまま（これまでの見え方）。真ん中に寄せたい画面は包み（actions）を渡す。 */
 :root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
 html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 /* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */

@@ -14,7 +14,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Dialog from '@/components/shared/dialog'
 import { TextArea } from '@/components/shared/text-field'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot, { mediaLimitLabel } from '@/components/shared/media-slot'
@@ -125,6 +125,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       onClose()
     } catch {
       // 結果が分からない失敗では鍵を残し、同じ予約の再試行を二重に作らない。
+      // 先に予約できた分は入力から外してあるので、何件済んだかを添える（部分成功）。
       setError(`${completed ? `${completed}件は予約済みです。残りを` : ''}予約できませんでした。通信状態を確認して、もう一度お試しください。`)
     } finally {
       lock.current = false
@@ -194,7 +195,13 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
           {choice === 'custom' ? <DateTimeField disabled={busy} aria-label="送る日時を決める" value={custom} onChange={setCustom} /> : null}
         </div>
         <p className={styles.note}>受信箱の会話にも「これから送る予約」として出ます。</p>
-
+        {/* 絵は注意の下 12 にボタンが並ぶ（窓の下の線・帯なし）。共通の窓の帯は余白が 24 あるので、本文の続きに置く。 */}
+        <div className={styles.footer}>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+          <Button type="button" variant="primary" icon={<Clock3 aria-hidden="true" />} onClick={() => void reserve()} disabled={busy} busy={busy}>
+            {scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}
+          </Button>
+        </div>
       </div>
     </Dialog>
   )

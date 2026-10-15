@@ -32,6 +32,7 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
+import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
 import {
@@ -130,6 +131,17 @@ import {
   NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST, NEN_FEEDING_PRODUCTS, NEN_HEALTH_SUMMARY_KOMUGI,
   FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
+
+/** リッチメニューの撮影用画像：625×422（2500×1686 の 1/4）、薄い緑の面 3×2 を白い線で区切る。 */
+const RICH_MENU_QA_PNG = (() => {
+  const width = 625, height = 422, rgba = Buffer.alloc(width * height * 4)
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const line = x % Math.round(width / 3) < 2 || y % Math.round(height / 2) < 2 || x >= width - 2 || y >= height - 2
+    const i = (y * width + x) * 4
+    rgba[i] = line ? 255 : 160; rgba[i + 1] = line ? 255 : 214; rgba[i + 2] = line ? 255 : 178; rgba[i + 3] = 255
+  }
+  return encodePng({ width, height, rgba })
+})()
 
 /* リッチメニューの公開の進み（K-1）。default は今までの見本（割り当てで失敗）。 */
 const RICH_MENU_PUBLISH_PROGRESS = {
@@ -1429,6 +1441,9 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'flow-2', store_id: null, flow_type: 'reservation_2h', title: '本日のご来店をお待ちしております', body: 'お店までの道順と、駐車場のご案内です。', timing_minutes: -120, is_enabled: 1, delivery_mode: 'preview_only' },
     { id: 'flow-3', store_id: null, flow_type: 'post_visit', title: '本日はありがとうございました', body: '次回使えるデザートのサービス券をお送りします。', timing_minutes: 180, is_enabled: 0, delivery_mode: 'preview_only' },
     { id: 'flow-4', store_id: null, flow_type: 'review_request', title: 'よろしければご感想をお聞かせください', body: 'Google の口コミに書いていただけるとうれしいです。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
+    /* 融合の板 n9vvGx の「会員証」「ワンタップ予約」（常設）。 */
+    { id: 'flow-5', store_id: null, flow_type: 'member_card', title: 'デジタル会員証', body: 'スタンプカードと来店履歴を見られます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
+    { id: 'flow-6', store_id: null, flow_type: 'one_tap_booking', title: '前回と同じ内容で予約', body: '店舗・人数・コースを前回と同じにして予約できます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
   ],
 }
 /*
@@ -2302,6 +2317,13 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /* Al4Ek（B-177 ③）：シナリオの複製。止めたコピーを作って返す（保存はしない）。通・きっかけは取得の口が同じ形を返すので足さずに済む。 */
+  if ((method === 'POST' && pathname === '/api/scenarios') || (method === 'PUT' && pathname === '/api/scenarios/scenario-copy')) {
+    return { ...FRIEND_SCENARIOS[0], id: 'scenario-copy', name: `${FRIEND_SCENARIOS[0].name} のコピー`, isActive: false }
+  }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/actions') return { ...SCENARIO_ACTIONS[0], id: `scenario-copy-action-${Date.now()}`, scenarioId: 'scenario-copy' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/triggers') return { ...SCENARIO_TRIGGERS[0], id: 'scenario-copy-trigger' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/steps') return { ...SCENARIO_STEPS[0], id: `scenario-copy-step-${Date.now()}`, scenarioId: 'scenario-copy' }
   /*
    * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
@@ -2783,11 +2805,13 @@ const VISUAL_COMPOSE_BUBBLES = [
   } } },
   { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
     columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      /* 絵の小さな写真の代わり（撮影は外へ取りに行かないので、その場の色の絵）。 */
+      thumbnailImageUrl: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="${['#c98a4b', '#8fae6b', '#d9a066'][index]}"/><rect y="120" width="300" height="80" fill="${['#a8663a', '#6f8f4f', '#b97f4a'][index]}"/></svg>`)}`,
       title, text: '秋のおすすめ商品をご案内します',
       actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
     }))),
   } },
-  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+  { id: 'visual-audio', type: 'audio', content: { fileName: 'autumn-greeting.m4a', state: {
     location: { title: '', address: '', latitude: '', longitude: '' },
     video: { originalContentUrl: '', previewImageUrl: '' },
     audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
@@ -2854,6 +2878,9 @@ const VISIT_STAMP_ENTRIES = [
 function visitStampRead(pathname, query) {
   if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD, { ...VISIT_STAMP_CARD, id: 'vs-card-gold', name: 'ゴールドカード', settings: { ...VISIT_STAMP_CARD.settings, completion: 'repeat', nextCardId: null } }] }
   if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
+  // 店頭の QR（印刷用）は発行済みの形（絵 fpPlW：QR の画像・保存・印刷・作り直す・最後に作り直した日 9/1）。
+  const storefront = /^\/api\/visit-stamps\/cards\/([^/]+)\/storefront-qr$/.exec(pathname)
+  if (storefront) return { success: true, data: { id: 'vsqr-store-1', cardId: decodeURIComponent(storefront[1]), accountId: query.get('accountId') ?? 'acc-1', kind: 'storefront', url: 'https://liff.line.me/2000000000-demo/visit-stamps/s/vsqr-store-1', issuedAt: '2026-09-01T01:00:00.000Z', expiresAt: null, serverTime: '2026-10-15T01:00:00.000Z', status: 'active', generation: 2, count: 1, amount: null } }
   if (pathname === '/api/visit-stamps/entries') {
     const page = Math.max(1, Number(query.get('page') ?? 1)), pageSize = Math.min(200, Math.max(1, Number(query.get('pageSize') ?? 50)))
     const friendId = query.get('friendId'), kind = query.get('kind')
@@ -3442,6 +3469,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
+  /*
+    マニュアルの正本表から1つ引く口（API 組2 の契約：screen または key、keyKind=screen/task）。
+    画面のボタンは URL がある時だけ出るので、撮る板の分だけ URL を入れる：
+    手順キー onboarding-line-guide（店舗を追加 ao15G・faGn4 のガイド）と画面キー 25-1（共通アクションの版 ziSgL のマニュアル）。
+    一覧の正本表（MANUAL_LINKS・cIdA2 の3行）には足さない。
+  */
+  if (method === 'GET' && pathname === '/api/manual-links/lookup') {
+    const key = query.get('key') ?? query.get('screen') ?? ''
+    const keyKind = query.get('keyKind') ?? 'screen'
+    const urls = { 'task:onboarding-line-guide': 'https://help.musubo.example/guides/line-account', 'screen:25-1': 'https://help.musubo.example/automations' }
+    const url = urls[`${keyKind}:${key}`] ?? null
+    return { success: true, data: { key, url, status: url ? 'ok' : 'unset', version: url ? 1 : null } }
+  }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }
@@ -6631,9 +6671,9 @@ const server = createServer((req, res) => {
   }
 
   if (method === 'GET' && (url.pathname.startsWith('/api/rich-menu-images/') || url.pathname === '/images/hq-templates/visual-tenant-1/menu-member.png')) {
-    // 6面が見分けられる撮影専用画像。1px画像ではキャンバスが黒く見え、
-    // 画像本体を取得できたか判定できないため、実際の比率に近いPNGを返す。
-    const png = Buffer.from('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', 'base64')
+    // 6面が見分けられる撮影専用画像（大 2500×1686 の比・3×2 の面）。前の埋め込み PNG は途中で壊れていて、
+    // 上の細い帯しか描かれず「画像が潰れた」ように見えた（OxEMM）。
+    const png = RICH_MENU_QA_PNG
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(png)

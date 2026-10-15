@@ -48,6 +48,10 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+.cellNum.cellDanger {
+  color: var(--color-danger);
+}
 .rowCode {
   display: block;
   overflow: hidden;
@@ -404,6 +408,8 @@
 .colPayBank { width: var(--tpl-af-col-pay-bank); min-width: 0; }
 .colPayState { width: var(--tpl-af-col-pay-state); min-width: 0; }
 .colPayOps { width: var(--tpl-af-col-pay-ops); }
+/* 「…」1つだけの操作の列は右端に寄せる（絵 aINnz）。 */
+.colPayOps .menuBox { justify-content: flex-end; }
 
 /* 今回の締め（案内の帯のすぐ下・枠の中に 期間・対象・合計・締める）。 */
 .closeBox {

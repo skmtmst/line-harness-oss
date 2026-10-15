@@ -423,3 +423,22 @@ it('リサーチの回答後の処理は未動作と知らせ、設定は保存�
   await flush()
   expect(assetsCreate).toHaveBeenCalledWith(expect.objectContaining({kind:'research',payload:expect.objectContaining({answerActions:[]})}))
 })
+
+it('リサーチ（EsYo4）：選択肢は札の並び。札を押すとその選択肢の「行うこと」が出て、届き方はお客さまが答える画面', async () => {
+  await mount('kind=research&visual=1')
+  // 問1 は「止めたい」に点数が入っているので、その行うことが出ている。
+  const q1 = screen.getByRole('region', { name: '問 1' })
+  expect(q1.textContent).toContain('選択肢「止めたい」が選ばれたら')
+  expect(q1.textContent).toContain('スコアを足す')
+  expect(within(q1).getByRole('switch', { name: '問 1 を必ず答えてもらう' }).getAttribute('aria-checked')).toBe('true')
+  // 問2 は押すまで出さない。札を押すと出る。
+  const q2 = screen.getByRole('region', { name: '問 2' })
+  expect(q2.textContent).not.toContain('が選ばれたら')
+  await act(async () => { fireEvent.focus(within(q2).getByLabelText('問 2 の選択肢 2')) })
+  expect(q2.textContent).toContain('選択肢「おやつ」が選ばれたら')
+  expect(within(q2).getByRole('button', { name: /行うことを足す/ })).toBeTruthy()
+  // 届き方：LINE のトークではなく、答える画面（回答フォームの LIFF と同じ形）。
+  const preview = host.querySelector('[data-liff-phone-frame]')
+  expect(preview?.textContent).toContain('来月も定期便を続けたいと思いますか？')
+  expect(preview?.textContent).toContain('答えを送る')
+})

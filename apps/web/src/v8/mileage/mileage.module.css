@@ -48,7 +48,6 @@
 .colTrend { width: var(--tpl-ml-col-trend); }
 .colReact { width: var(--tpl-ml-col-react); min-width: 0; }
 .colOpsMenu { width: var(--tpl-ml-col-ops-menu); }
-.colOpsWide { width: var(--tpl-ml-col-ops-wide); }
 /* 右寄せの数の列（絵：右に 8 の余白）。 */
 .num { text-align: right; }
 .colState { width: var(--tpl-ml-col-state); }
@@ -96,6 +95,15 @@
 .menuBox {
   display: flex;
   align-items: center;
+}
+/* 状態の文字と「？」：間 4・行の真ん中（S35pO）。 */
+.stateWithHelp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-ink);
+  line-height: var(--tpl-text-sm-lh);
+  white-space: nowrap;
 }
 
 /* 表の下の案内。 */

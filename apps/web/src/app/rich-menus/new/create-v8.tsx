@@ -21,7 +21,6 @@ import {
   BookOpen,
   CalendarClock,
   CircleDashed,
-  CircleHelp,
   CopyPlus,
   Info,
   RefreshCw,
@@ -64,8 +63,6 @@ import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
-import HqMenuReview from '@/components/rich-menus/hq-menu-review'
-import PublishReview from '@/v8/rich-menu-edit/publish-review'
 import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
@@ -210,6 +207,92 @@ function areaDraftsWithSwitchTargets(areas: Area[]) {
   })
 }
 
+/* ---------- 小部品 ---------- */
+
+function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | undefined }) {
+  if (!metric) return <>—</>
+  if (metric.state !== 'available' || metric.value === null) {
+    return <>数えられません</>
+  }
+  return <>{formatNumber(metric.value)}人</>
+}
+
+function CheckIcon({ state }: { state: CheckState }) {
+  if (state === 'ok') return <CircleCheck className={`${styles.checkIcon} ${styles.checkIconOk}`} aria-hidden />
+  if (state === 'ng') return <CircleAlert className={`${styles.checkIcon} ${styles.checkIconNg}`} aria-hidden />
+  return <Circle className={`${styles.checkIcon} ${styles.checkIconYet}`} aria-hidden />
+}
+
+/**
+ * LINEでの見え方の中身（スマホの下・入力の帯の位置に出すリッチメニュー）。画像があれば実画像に面の線を重ね、
+ * 無ければ面の線（点線）だけ出し「画像を選ぶと、ここに出ます」（仕様書・公式照合より）。
+ * 下の帯（トーク画面の下の文言 ∨）は LinePreview が1本だけ描く（gobhu）。
+ */
+function MenuPreview({
+  size,
+  imageUrl,
+  areas,
+  pages,
+  activePageId,
+}: {
+  size: 'large' | 'compact'
+  imageUrl: string | null
+  areas: Array<{ x: number; y: number; w: number; h: number }> | null
+  pages: Array<{ id: string; name: string }>
+  activePageId: string | null
+}) {
+  const dims = RICH_MENU_DIMENSIONS[size]
+  const areaBoxes = areas && areas.length > 0 ? (
+    <div className={styles.previewMenuAreas} aria-hidden="true">
+      {areas.map((a, i) => (
+        <span
+          key={i}
+          className={styles.previewMenuAreaBox}
+          style={{
+            left: `${(a.x / dims.width) * 100}%`,
+            top: `${(a.y / dims.height) * 100}%`,
+            width: `${(a.w / dims.width) * 100}%`,
+            height: `${(a.h / dims.height) * 100}%`,
+          }}
+        />
+      ))}
+    </div>
+  ) : null
+  return (
+    <div>
+      {pages.length > 1 ? (
+        <div className={styles.previewMenuTabs} aria-hidden="true">
+          {pages.map((p) => (
+            <span key={p.id} className={p.id === activePageId ? `${styles.previewMenuTab} ${styles.previewMenuTabOn}` : styles.previewMenuTab}>
+              {p.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {imageUrl ? (
+        /* 枠の比は大きさ（大 2500×1686・小 2500×843）で決める。画像が別の比・読み途中でも高さが潰れない（OxEMM）。 */
+        <div className={styles.previewMenuImage} data-rich-menu-size={size} style={{ aspectRatio: `${dims.width} / ${dims.height}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
+          <img src={imageUrl} alt="メニューの画像" />
+          {areaBoxes}
+        </div>
+      ) : (
+        <div
+          className={styles.previewMenuEmpty}
+          data-rich-menu-size={size}
+          style={{ aspectRatio: `${dims.width} / ${dims.height}` }}
+        >
+          {areaBoxes}
+          <span className={styles.previewMenuEmptyText}>
+            画像を選ぶと、ここに出ます
+            {areas && areas.length > 0 ? `（${areas.length}面）` : ''}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ---------- 統括のひな形（host）の画面の中の下書き ---------- */
 
 /** 統括のひな形の中身を、作る画面の下書き（Group）にする。サーバーには作らない。 */
@@ -327,7 +410,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
-  const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
+  const [forms, setForms] = useState<Array<{ id: string; name: string; folderId?: string | null; updatedAt?: string | null }>>([])
   const [trackedLinks, setTrackedLinks] = useState<Array<{ id: string; name: string }>>([])
   const [otherMenus, setOtherMenus] = useState<RichMenuGroupListItem[]>([])
   const staffRole = useStaffRole()
@@ -506,7 +589,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setTemplates(templateRes.value.data.map(({ id, name }) => ({ id, name })))
     else noteFailure('テンプレート', templateRes)
     if (formRes.status === 'fulfilled' && formRes.value.success)
-      setForms(formRes.value.data.map(({ id, name }) => ({ id, name })))
+      setForms(formRes.value.data.map((row) => {
+        // 選ぶ窓（Pen dJZ7Q）の左のフォルダ列と行の更新日に使う。一覧と同じ応答の項目。
+        const extra = row as { folderId?: string | null; updatedAt?: string | null }
+        return { id: row.id, name: row.name, folderId: extra.folderId, updatedAt: extra.updatedAt }
+      }))
     else noteFailure('フォーム', formRes)
     if (linkRes.status === 'fulfilled' && linkRes.value.success)
       setTrackedLinks(linkRes.value.data.map(({ id, name }) => ({ id, name })))
@@ -1560,14 +1647,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const stepIndex = STEP_KEYS.indexOf(step)
   /*
    * 居場所は currentKey が決める。state は「済みか」だけを表すので、
-   * いまいる段は done にしない（まだ入力中）。
+   * いまいる段は done にしない（まだ入力中）。最後の「公開」は押して出すまで済みにしない
+   * （開き直した下書きで、まだ公開していないのに済みの印が付いていた。OxEMM）。
    */
   const stepperSteps = STEP_KEYS.map((key, i) => ({
     key,
     label: stepLabel(key),
-    /* 統括（UgZPJ・BVSbe・ME78d）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。 */
-    state: (host ? i < stepIndex : i !== stepIndex && i <= maxStepIndex) ? 'done' as const : 'todo' as const,
+    /* 統括（UgZPJ・BVSbe・ME78d）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。まだ公開していない「公開」の段は番号のまま（OxEMM）。 */
+    state: (host ? i < stepIndex : i !== stepIndex && i <= maxStepIndex && (key !== 'publish' || done !== null)) ? 'done' as const : 'todo' as const,
     onSelect: i !== stepIndex && i <= maxStepIndex ? () => goToStep(key) : undefined,
+    reachable: i !== stepIndex && i <= maxStepIndex,
   }))
 
   const headNote =
@@ -1683,7 +1772,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               ) : (
                 <>
                   <Button type="button" disabled={busy || !canOperate} busy={saving} busyLabel="保存中…" onClick={() => void saveDraft()}>
-                    下書きのまま保存
+                    下書きを保存
                   </Button>
                   <Button
                     type="button"
@@ -2518,9 +2607,86 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </Card>
       )
     }
+    /*
+     * 板 `F4gELj`：公開の前に「確かめる」（見本と面ごとの動き）と「足りないもの」を上に置く。
+     * 面の動きは②、画像は①で決めるので、足りないときはその手順へ戻る口を出す。
+     */
+    const reviewSize = group?.size ?? size
+    const reviewDims = `${RICH_MENU_DIMENSIONS[reviewSize].width}×${RICH_MENU_DIMENSIONS[reviewSize].height}`
+    const reviewSizeLabel = SIZE_OPTIONS.find((o) => o.value === reviewSize)?.label ?? ''
+    const missingFaces = pages.flatMap((p) => p.areas
+      .map((area, i) => ({ area, letter: String.fromCharCode(65 + i), page: p }))
+      .filter((x) => !isAreaActionConfigured(x.area)))
+    const missingImages = pages.filter((p) => !p.imageR2Key)
+    const review = group ? (
+      <>
+        <Card variant="form" gap="normal" aria-label="確かめる">
+          <SectionHeader title="確かめる" />
+          <div className={styles.reviewRow}>
+            <div className={styles.reviewThumb}>
+              <MenuPreview size={reviewSize} imageUrl={previewImageUrl} areas={previewAreas} pages={[]} activePageId={null} />
+              <p className={styles.reviewCaption}>{reviewSizeLabel}・{totalAreaCount}面・{pages.length > 1 ? `切替タブ${pages.length}つ` : '切替タブなし'}</p>
+            </div>
+            <div className={styles.reviewFaces}>
+              <p className={styles.reviewFacesTitle}>面ごとの動き</p>
+              <ul className={styles.faceList}>
+                {pages.map((p) => (
+                  <li key={p.id} className={styles.faceGroup}>
+                    {pages.length > 1 ? <p className={styles.faceGroupName}>{p.name}</p> : null}
+                    <ul className={styles.faceList}>
+                      {p.areas.map((area, i) => {
+                        const summary = areaActionSummary(area)
+                        return (
+                          <li key={area.id} className={styles.faceRow}>
+                            <span className={styles.faceLetter} aria-hidden="true">{String.fromCharCode(65 + i)}</span>
+                            <span className={styles.faceName} title={areaDisplayName(area, i)}>{areaDisplayName(area, i)}</span>
+                            <span className={summary ? styles.faceSummary : styles.faceSummaryWarn} title={summary || undefined}>{summary || '未設定'}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Card>
+        <Card variant="form" gap="normal" aria-label="足りないもの">
+          <SectionHeader title="足りないもの" help="公開する前に、押しても何も起きない面や画像の抜けがないかを見ます。直すときは、それを決める手順へ戻ります。" helpLabel="足りないものの説明" />
+          <ul className={styles.checkList}>
+            {missingFaces.length > 0 ? (
+              <li className={styles.checkRow}>
+                <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>{pages.length > 1 ? `${missingFaces.length}つの面の動きが未設定` : `面 ${missingFaces.map((x) => x.letter).join('・')} の動きが未設定`}</p>
+                  <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
+                </div>
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
+                </span>
+              </li>
+            ) : null}
+            <li className={styles.checkRow}>
+              {missingImages.length > 0
+                ? <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                : <CheckIcon state="ok" />}
+              <div className={styles.checkBody}>
+                <p className={styles.checkName}>画像・大きさ・面の数</p>
+                <p className={styles.checkNote}>{missingImages.length > 0 ? '画像がまだありません。①で選びます' : `${reviewDims}・${totalAreaCount}面`}</p>
+              </div>
+              {missingImages.length > 0 ? (
+                <span className={styles.checkAction}>
+                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                </span>
+              ) : null}
+            </li>
+          </ul>
+        </Card>
+      </>
+    ) : null
     return (
       <>
-        <PublishReview pages={pages} size={size} imageUrl={key => `${api.richMenuGroups.imageUrl(key)}?v=${imageVersion}`} onEdit={(pageId, targetStep, areaId) => { setActivePageId(pageId); setSelectedAreaId(areaId ?? null); goToStep(targetStep) }} />
+        {review}
         {/* いつ公開するか */}
         <Card variant="form" gap="normal">
           <SectionHeader title="いつ公開するか" actions={!host && group ? <RichMenuSchedules key={`${accountId}:${group.id}`} groupId={group.id} canOperate={canOperate && !aggregateOnly} restoreMenus={restoreMenus} /> : undefined} />
@@ -2576,7 +2742,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             </div>
             <div className={styles.endRow}>
               <span className={styles.endDate}>
-                <Field label="終わる日時" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
+                <Field label="終わる日時" labelHidden optional={false}><SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
                   value={publishPlan.endsAt}
                   onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
@@ -2584,7 +2750,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 /></SaveErrorField></Field>
               </span>
               <span>に終わり、</span>
-              <Field label="終わったらどうする" labelHidden optional={false} note={!endEnabled ? <span role="note">「終わりを決める」をオンにすると設定できます</span> : undefined}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
+              <Field label="終わったらどうする" labelHidden optional={false}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
@@ -2596,6 +2762,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               /></SaveErrorField></Field>
               <span>に戻す</span>
             </div>
+            {/* 欄ごとに出すと狭い欄の下で折り返すので、行の下に1つだけ出す。 */}
+            {!endEnabled ? <p className={styles.endNote} role="note">「終わりを決める」をオンにすると設定できます</p> : null}
           </div>
         </Card>
 

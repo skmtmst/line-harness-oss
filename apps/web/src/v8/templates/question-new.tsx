@@ -14,8 +14,8 @@ import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useEffect, useMemo, useState } from 'react'
-import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { ChevronDown, GitBranch, MousePointerClick, Plus, Send, Tag as TagIcon, Trash2, type LucideIcon } from 'lucide-react'
 import { tapExtrasError, type Folder, type Scenario, type Tag } from '@line-crm/shared'
@@ -42,7 +42,8 @@ import { TemplateEditFrame } from '../template-edit/frame'
 import type { TemplateEditHost } from '../template-edit/host'
 import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveErrorReveal, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -335,8 +336,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 {host ? (
                   <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={null} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
                 ) : (
-                  <div {...fields.bind(`extras-${index}`)}>
-                    <QuestionChoiceBehavior index={index} icon={choiceActionIcon(choice)} summary={choiceActionText(choice, tags, scenarios)} invalid={fields.invalid(`extras-${index}`)} onOpen={() => openAction(index)} />
+                  <Field label="押されたら" optional={false}>
+                    <ChoiceActionErrorReveal index={index} onReveal={openAction} />
+                    <div {...fields.bind(`extras-${index}`)}><EntityPickerSummary label={`選択肢 ${index + 1} の押されたら`} noun="押したときの動き" icon={choiceActionIcon(choice)} name={choiceActionText(choice, tags, scenarios)} invalid={fields.invalid(`extras-${index}`)} compact onOpen={() => openAction(index)} /></div>
                     <FieldError id={`q-extras-${index}-error`}>{fields.error(`extras-${index}`)}</FieldError>
                   </div>
                 )}
@@ -394,4 +396,11 @@ export default function QuestionNewV8({ host }: { host?: TemplateEditHost } = {}
       <QuestionNew host={host} />
     </Suspense>
   )
+}
+
+/* 閉じた「押されたら」の欄に保存エラーが返ったら、その選択肢の窓を開いて理由を見せる（B-139）。 */
+const CHOICE_ACTION_FIELDS = ['behavior', 'url', 'tel', 'mail', 'userMessage', 'user_message', 'hideUserMessage', 'hide_user_message', 'repeatReply', 'repeat_reply']
+function ChoiceActionErrorReveal({ index, onReveal }: { index: number; onReveal: (index: number) => void }) {
+  useSaveErrorReveal(CHOICE_ACTION_FIELDS.map((name) => `choices.${index}.${name}`), useCallback(() => onReveal(index), [index, onReveal]))
+  return null
 }

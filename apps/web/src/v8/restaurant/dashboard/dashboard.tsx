@@ -66,7 +66,8 @@ export function sourceBreakdown(summary: Pick<ReturnType<typeof summarizeToday>,
 
 function TodayStore() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('店舗ダッシュボード')
+  // 筋道の最後は見出しと同じ「今日のお店」（B-186 で店舗ダッシュボードと一つにした）。
+  usePageTitle('今日のお店')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()

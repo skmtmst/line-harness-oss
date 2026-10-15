@@ -162,8 +162,39 @@ function section(): HTMLElement | null {
   return container.querySelector('section[aria-label="要対応の交換"]')
 }
 
-function retryButtons(): HTMLButtonElement[] {
-  return [...(section()?.querySelectorAll('button') ?? [])] as HTMLButtonElement[]
+/* 行の右端は「…」1つ（B-253）。もう一度届けるはその中にある。 */
+function retryTriggers(): HTMLButtonElement[] {
+  return [...(section()?.querySelectorAll('button[aria-label$="の交換の操作"]') ?? [])] as HTMLButtonElement[]
+}
+
+function openRetryItem(): HTMLButtonElement | undefined {
+  return [...document.querySelectorAll('[role="menuitem"]')].find((item) => /もう一度届ける|やり直しています/.test(item.textContent ?? '')) as HTMLButtonElement | undefined
+}
+
+/** i 行目の「…」を開き、中の［もう一度届ける］を返す（開いたまま）。 */
+async function openRetry(index: number): Promise<HTMLButtonElement> {
+  await act(async () => { retryTriggers()[index].click() })
+  // 別の行の窓が開いたままだと、1回目は閉じるだけになる。そのときはもう一度押して開く。
+  if (!openRetryItem()) await act(async () => { retryTriggers()[index].click() })
+  const item = openRetryItem()
+  if (!item) throw new Error('もう一度届ける が見つかりません')
+  return item
+}
+
+async function pressRetry(index: number) {
+  const item = await openRetry(index)
+  await act(async () => { item.click() })
+}
+
+/** 各行の［もう一度届ける］が押せないか（開いて見て閉じる）。 */
+async function retryDisabledStates(): Promise<boolean[]> {
+  const states: boolean[] = []
+  for (let index = 0; index < retryTriggers().length; index += 1) {
+    const item = await openRetry(index)
+    states.push(item.disabled)
+    await act(async () => { retryTriggers()[index].click() })
+  }
+  return states
 }
 
 describe('届かなかった交換の欄(本物のReact)', () => {
@@ -177,7 +208,8 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(text).toContain('3 回')
     // 最終日時は日本時間で出す。UTCの01:02は10:02。
     expect(text).toContain('9月9日（水）10:02')
-    expect(text).toContain('もう一度届ける')
+    expect(retryTriggers()).toHaveLength(1)
+    expect((await openRetry(0)).textContent).toContain('もう一度届ける')
   })
 
   it('理由が空でも符号を出し、両方無いときだけ断りを出す', async () => {
@@ -250,20 +282,20 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     })
     await render('account-1')
 
-    const buttons = retryButtons()
-    expect(buttons).toHaveLength(2)
+    expect(retryTriggers()).toHaveLength(2)
     // 同じ行を連打し、続けて別の行も押す。応答が返る前の同時押し。
+    const first = await openRetry(0)
     await act(async () => {
-      buttons[0].click()
-      buttons[0].click()
-      buttons[1].click()
+      first.click()
+      first.click()
     })
+    await pressRetry(1)
     expect(net.retries()).toHaveLength(1)
     expect(net.retries()[0].url).toContain('/redemption-1/retry-fulfillment')
     // 押した店を本文に添える。添えないと別の店の交換に当たる。
     expect(net.retries()[0].body).toBe(JSON.stringify({ accountId: 'account-1' }))
     // 応答が返るまで、どのボタンも押せない。
-    expect(retryButtons().every((button) => button.disabled)).toBe(true)
+    expect((await retryDisabledStates()).every(Boolean)).toBe(true)
 
     await act(async () => { releaseRetry(); await Promise.resolve() })
     // 返ったら一覧を読み直す（最初の1回＋やり直し後の1回）。
@@ -279,12 +311,12 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     })
     await render('account-1')
 
-    await act(async () => { retryButtons()[0].click() })
+    await pressRetry(0)
     await act(async () => { await Promise.resolve() })
     expect(section()?.textContent ?? '').toContain('やり直せませんでした')
-    expect(retryButtons().some((button) => button.disabled)).toBe(false)
+    expect((await retryDisabledStates()).some(Boolean)).toBe(false)
 
-    await act(async () => { retryButtons()[0].click() })
+    await pressRetry(0)
     await act(async () => { await Promise.resolve() })
     expect(net.retries()).toHaveLength(2)
   })
@@ -338,11 +370,11 @@ describe('届かなかった交換の欄(本物のReact)', () => {
       onRetry: () => delayed,
     })
     await render('account-1')
-    await act(async () => { retryButtons()[0].click() })
+    await pressRetry(0)
     await render('account-2')
     const listCount = net.lists().length
     expect(section()?.textContent).toContain('Bの交換')
-    expect(retryButtons().every((button) => !button.disabled)).toBe(true)
+    expect((await retryDisabledStates()).every((disabled) => !disabled)).toBe(true)
     await act(async () => {
       finish(new Response(JSON.stringify({ success: status === 200, data: {}, error: '古い失敗' }), { status }))
       await Promise.resolve()
@@ -424,7 +456,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     await render('account-1')
     expect(section()?.textContent ?? '').toContain('500円引き')
 
-    await act(async () => { retryButtons()[0].click() })
+    await pressRetry(0)
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
