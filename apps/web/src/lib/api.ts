@@ -1149,6 +1149,7 @@ export type RichMenuScheduleInput = {
 
 /** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
 export type RichMenuPublishRun = {
+  versionNumber?: number | null
   id: string
   status: 'running' | 'succeeded' | 'failed'
   lastErrorCode: string | null

@@ -2829,6 +2829,7 @@ richMenuGroups.get(
       }
       runs.push({
         id: request.id,
+        versionNumber: request.version_number ?? null,
         status: request.status,
         lastErrorCode: request.last_error_code,
         idempotencyKey: request.idempotency_key,
