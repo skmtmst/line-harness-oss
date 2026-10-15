@@ -347,7 +347,7 @@ export default function QuickSendV8({
                 size="full"
                 value={approverId}
                 onChange={setApproverId}
-                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
+                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name, hint: ROLE_LABELS[item.role] }))]}
               /></SaveErrorField>
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>

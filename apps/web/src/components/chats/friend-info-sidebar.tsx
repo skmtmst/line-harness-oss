@@ -1081,6 +1081,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div>
             </div>
   )
+  /* 対応の節の「次回予約」「次の自動配信」の値。未取得と「予定なし」は分ける（IDEA-02）。 */
+  const upcomingRowValue = (which: 'booking' | 'delivery'): React.ReactNode => {
+    if (upcoming.kind === 'loading') return '読み込み中…'
+    const failed = upcoming.kind === 'error' || (which === 'booking' ? upcoming.data.nextBookingError : upcoming.data.nextAutoDeliveryError)
+    if (failed) return <span className="text-danger">読み込めませんでした</span>
+    if (upcoming.kind !== 'data') return '予定なし'
+    if (which === 'booking' && upcoming.data.nextBooking) {
+      const next = upcoming.data.nextBooking
+      return <a href={upcomingBookingHref(next, friendId ?? '')} title={`${next.title} ${formatDate(next.startsAt)}`} className="text-action block min-w-0 truncate hover:underline">{formatDate(next.startsAt)} {next.title}</a>
+    }
+    if (which === 'delivery' && upcoming.data.nextAutoDelivery) {
+      const next = upcoming.data.nextAutoDelivery
+      return <a href={upcomingDeliveryHref(next)} title={`${next.name} ${formatDate(next.scheduledAt)}`} className="text-action block min-w-0 truncate hover:underline">{formatDate(next.scheduledAt)} {next.name}</a>
+    }
+    return '予定なし'
+  }
   const renderTags = (friend: FriendDetail) => (
 <div data-customer-section="tags" style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${v8.tagsSection}`}>
               <div className="mb-1.5 flex items-center justify-between">
@@ -1646,6 +1662,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 */}
                 {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
                 <CustomerInfoPanel
+                  labelWidth="wide"
                   friendId={friend.id}
                   profile={{ name: friend.realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: formatAddedDate(friend.createdAt) }}
                   fields={friendFields.kind === 'data' ? friendFields.items : []}
@@ -1656,8 +1673,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   sections={[
                     { key: 'support', label: '対応', action: canEditChat ? <Button variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</Button> : null, content: <>
                       {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
-                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} />
-                        {sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-upcoming'?: boolean }>(child) && child.props['data-customer-upcoming'])}
+                        {/* 絵 eovoG：次回予約・次の自動配信も 状況・担当 と同じ行の形（見出し＋値）で続ける。 */}
+                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]} />
+                        {(upcoming.kind === 'error' || (upcoming.kind === 'data' && (upcoming.data.nextBookingError || upcoming.data.nextAutoDeliveryError))) ? (
+                          <Button variant="text" size="inline" onClick={() => setUpcomingRetry((key) => key + 1)}>再試行する</Button>
+                        ) : null}
                       </>}
                       {editingSupport ? <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} /> : null}
                     </> },

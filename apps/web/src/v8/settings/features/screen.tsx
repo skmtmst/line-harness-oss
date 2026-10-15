@@ -334,7 +334,7 @@ export default function FeatureSettingsScreen() {
     for (const node of scrolled) if (node.scrollTop > 0) node.scrollTo({ top: 0 })
   }, [conflicted])
   const conflictBand = conflicted ? (
-    <div ref={conflictRef} className={styles.conflict} role="status" data-design-node="ziYCN">
+    <div ref={conflictRef} role="status" data-design-node="ziYCN">
       <SaveConflictBand title="ほかの人が先に機能設定を保存しました" onCompare={() => setCompareOpen(true)} onReload={() => void load()} />
     </div>
   ) : null
@@ -342,6 +342,7 @@ export default function FeatureSettingsScreen() {
   return (
     <SbSettingsScreen
       boardId="ywFJT"
+      notice={conflictBand}
       title={TITLE}
       help={DESCRIPTION}
       explanation="公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。"
@@ -379,7 +380,6 @@ export default function FeatureSettingsScreen() {
         </span>
       ) : undefined}
     >
-      {conflictBand}
       {!canManage && (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}

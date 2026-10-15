@@ -2,7 +2,7 @@
 
 /*
  * ★V8 分析「使われ方」（Pencil `N8ZrUl`）。
- * 数の帯 → 注の箱 → 左に機能ごとの表（中身を見る・「…」から片づける）、右に気づいたこと。
+ * 数の帯 → 注の箱 → 左に機能ごとの表（行の右端は「…」1つ。中身を見る・片づける）、右に気づいたこと。
  * 集計期間は表の下で変えられる（絵の上には出さない）。
  * 呼ぶ口・判定・CSV は今の画面（UsageOverviewTab・app/analytics/analytics-usage.ts）と同じ。
  */
@@ -11,8 +11,8 @@ import { PackageOpen, Clock, LayoutGrid, RefreshCw, Zap } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
-import { RowActions } from '@/components/shared/row-actions'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowMenu } from '@/components/shared/row-actions'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Disclosure from '@/components/shared/disclosure'
@@ -125,7 +125,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
               <Th align="right">利用中</Th>
               <Th align="right">未使用</Th>
               <Th>最終利用</Th>
-              <Th>操作</Th>
+              <Th aria-label="操作" />
             </TableHeadRow>
             </thead>
             <tbody>
@@ -135,9 +135,8 @@ export default function UsageV8({ accountId }: { accountId: string }) {
               <Td align="right"><MetricText metric={item.inUse} /></Td>
               <Td align="right"><MetricText metric={item.unused} /></Td>
               <Td><span className={item.lastUsedAt.value === null ? styles.faint : undefined} title={item.lastUsedAt.reason ?? undefined}>{shortWhen(item.lastUsedAt.value)}</span></Td>
-              <Td data-list-action-cell>{canTidyUsage(item)
-                ? <RowActions subjectName={item.label} detail={{ href: item.href, label: '中身を見る' }} menuAppearance="box" menuItems={[{ id: 'tidy', label: '片づける', href: item.href }]} />
-                : <Button variant="secondary" href={item.href}>中身を見る</Button>}</Td>
+              {/* 行の右端は「…」1つ（B-253・絵 N8ZrUl）。中身を見る・片づけるはその中。 */}
+              <ActionCell><RowMenu label={`${item.label}の操作`} items={[{ id: 'detail', label: '中身を見る', href: item.href }, ...(canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', href: item.href }] : [])]} /></ActionCell>
             </Tr>)}
             </tbody>
           </DataTable>

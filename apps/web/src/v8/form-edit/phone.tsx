@@ -30,22 +30,30 @@ type Props = {
   title?: string
   /** 次へ・送るを画面の下に固定する（中身が長いリサーチ。絵 EsYo4「下の帯（固定）」）。 */
   fixedNext?: boolean
+  /** 進み具合の線と「1 / 1 ページ」を題の上（いちばん頭）に出す（絵 EsYo4「進み具合」）。 */
+  progressHead?: boolean
 }
 
-export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false }: Props) {
+export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false, progressHead = false }: Props) {
   const sections = layout.sections
   const section = sections[pageIndex] ?? sections[0]
   const options = { ...FORM_OPTIONS_DEFAULT, ...layout.options }
   const blocks = [...(pageIndex === 0 ? layout.header : []), ...(section?.blocks ?? [])]
   const last = pageIndex >= sections.length - 1
-  const progress = (
+  const bar = (
     <span className={styles.phoneProgress} aria-hidden="true">
       {sections.map((s, i) => <span key={s.id} data-done={i <= pageIndex || undefined} />)}
     </span>
   )
+  const progress = progressHead ? (
+    <span className={styles.phoneProgressHead}>
+      {bar}
+      <span className={styles.phonePageNo}>{`${pageIndex + 1} / ${sections.length} ページ`}</span>
+    </span>
+  ) : bar
   // 1ページ目は表紙（画像・題・説明）のあとに進み具合、ほかのページは頭に出す。
   const firstInput = blocks.findIndex((b) => b.kind === 'input')
-  const progressAt = pageIndex === 0 && firstInput > 0 ? firstInput : 0
+  const progressAt = !progressHead && pageIndex === 0 && firstInput > 0 ? firstInput : 0
   // 色を決めたフォームは、その主の色で見せる（決めていなければ LINE の緑）。
   const theme = resolveCustomerFormTheme(layout.options,accountLook ?? DEFAULT_CUSTOMER_LOOK)
   const main = theme.main

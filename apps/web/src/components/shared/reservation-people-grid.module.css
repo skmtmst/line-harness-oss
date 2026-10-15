@@ -8,6 +8,7 @@
 .name { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-row); min-width: 0; }
 .name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .name svg { flex-shrink: 0; }
+.name > span { flex-shrink: 0; font-size: var(--text-micro); }
 .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro); }
 .slot { min-width: 0; }
 .slot a { max-width: 100%; }

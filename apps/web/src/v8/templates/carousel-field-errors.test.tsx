@@ -39,9 +39,9 @@ describe('カルーセルの欄ごとの誤り（B-139）', () => {
     expect(screen.queryByRole('button', { name: 'カード1のボタン1を外す' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ボタンを足す' }))
     expect(screen.getAllByText('ボタンの文字', { exact: true }).length).toBe(2)
-    const labels = screen.getAllByText('押したら・中身', { exact: true })
+    const labels = screen.getAllByText('押したら', { exact: true })
     expect(labels.length).toBe(2)
-    for (const label of labels) expect(label.closest('[data-form-row="columns"]')?.children.length).toBe(2)
+    for (const label of labels) expect(label.closest('[data-tap-action-columns="3"]')?.children.length).toBe(3)
     fireEvent.change(screen.getByLabelText('カード1のボタン2の文字'), { target: { value: '残すボタン' } })
     const add = screen.getByRole('button', { name: 'ボタンを足す' }) as HTMLButtonElement
     fireEvent.click(add)

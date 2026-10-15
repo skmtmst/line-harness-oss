@@ -1,6 +1,6 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
-import { Lock } from 'lucide-react'
+import { ArrowUpRight, Lock } from 'lucide-react'
 import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -102,7 +102,12 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const inGroup = group === ALL_GROUP ? [...basic,...others] : group === BASIC_GROUP ? basic : others.filter(field => field.folderId === group)
   const ordered = inGroup.filter(field => field.status !== 'archived')
   const groups = [...new Set(ordered.map(field => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'))]
-  const groupName = (key: string) => key === 'basic' ? '基本' : key === 'dining' ? '飲食の情報' : `お店が作った項目（${key === 'unfiled' ? '未分類' : fieldFolders.find(folder => folder.id === key)?.name ?? '分類'}）`
+  const groupName = (key: string) => key === 'basic' ? '基本（決まった欄）' : key === 'dining' ? '飲食の情報' : key === 'unfiled' ? '未分類' : fieldFolders.find(folder => folder.id === key)?.name ?? '分類'
+  /* 読み上げ名（区切りの名前）は今までどおり。 */
+  const groupAria = (key: string) => key === 'basic' ? '基本' : key === 'dining' ? '飲食の情報' : `お店が作った項目（${groupName(key)}）`
+  /* vX3wQ：題の横の補足。決まった欄は回答フォームの答え、ほかはお店が作った項目。 */
+  const groupNote = (key: string) => key === 'basic' ? '回答フォームの答えが入ります' : key === 'dining' ? '飲食を使うアカウントの決まった欄' : 'お店が作った項目・分類ごとに出ます'
+  const firstShopGroup = groups.find(key => key !== 'basic' && key !== 'dining')
   const groupOf = (field: FriendField) => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'
 
   const folderCount = new Map<string, number>()
@@ -155,8 +160,11 @@ export default function InfoTab({ friendId, group, data, perms }: {
         </div>
       ) : (
         <>
-          {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupName(groupKey)}>
-          <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}</h3>
+          {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
+          <div className={styles.infoGroupHead}>
+            <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<span className={styles.infoGroupNote}>{groupNote(groupKey)}</span></h3>
+            {groupKey === firstShopGroup ? <Link className={styles.manageLink} href="/friend-fields">情報欄を管理<ArrowUpRight size={13} aria-hidden="true" /></Link> : null}
+          </div>
           <div className={styles.fieldGrid}>
             {ordered.filter(field => groupOf(field) === groupKey).map((field) => {
               const id = `ff-${field.id}`
@@ -169,8 +177,10 @@ export default function InfoTab({ friendId, group, data, perms }: {
                 <div key={field.id} className={styles.field} data-changed={changed || undefined}>
                   <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${label}（${FIELD_TYPE_LABELS[field.type] ?? field.type}）`}>
                     {field.isStarred ? <span aria-label="★つき">★</span> : null}
-                    {label}
+                    <span className={styles.fieldLabelText}>{label}</span>
                     {field.isPersonal ? <span className={styles.faint}>個人情報</span> : null}
+                    {/* 値の出どころ（手で入れた・回答フォーム…）は題の横に1行で（vX3wQ）。全文は title。 */}
+                    {fixed?.source ? <span className={styles.fieldSource} title={fixed.source}>{fixed.source}</span> : null}
                   </label>
                   <FieldInput
                     id={id}
@@ -179,7 +189,6 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
                     disabled={!perms.canEditField(field) || !!fixed?.derived}
                   />
-                  {fixed?.source ? <p className={styles.fieldNote}>{fixed.source}</p> : null}
                   {field.type === 'multi_select' && field.fixedKey !== 'allergy' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
                   {field.ecIsMaster ? <p className={styles.fieldNote}>EC側の値が正のため、ここからは変更できません。</p> : null}
                 </div>

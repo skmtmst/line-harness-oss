@@ -10,6 +10,8 @@
 }
 :root .heading { border: 0; padding: 0; margin-bottom: 8px; }
 :root .heading > p { font-size: 12px; font-weight: 600; line-height: normal; color: var(--color-ink-faint); }
+/* 見出しと「？」は、ほかの見出しと同じく間 6・行の真ん中（S35pO）。 */
+:root .heading > p { display: inline-flex; align-items: center; gap: 6px; }
 /* S2Vgi：「すべて」の下に置くフォルダの見出し。 */
 :root .inlineHeading { margin: 0; padding: 4px 0 0; font-size: 12px; font-weight: 600; line-height: normal; color: var(--color-ink-faint); }
 :root .rows { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0; }

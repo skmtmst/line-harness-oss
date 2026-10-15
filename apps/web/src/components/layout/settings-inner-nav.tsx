@@ -176,46 +176,74 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     .filter((item): item is MenuItem => Boolean(item))
     .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
 
-  const renderItem = (item: MenuItem) => {
+  const entries: SettingsMenuEntry[] = items.map((item) => {
     const active = item.href === '/settings'
       ? pathname === '/settings'
       : itemActive(item.href)
     // 機能設定の下の2つは絵に無いが、ここからしか行けないので消さない。機能設定とその2つを開いているときだけ出す。
     const children = item.href === '/settings' && (pathname === '/settings' || SETTINGS_CHILDREN.some((child) => itemActive(child.href))) ? SETTINGS_CHILDREN : []
-    const Icon = SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]]
-    return (
-      <li key={item.href}>
-        <Link
-          href={item.href}
-          className={`${styles.item} ${active ? styles.itemActive : ''}`}
-          aria-current={active ? 'page' : undefined}
-        >
-          {Icon ? <Icon size={16} aria-hidden="true" className={styles.icon} /> : null}
-          {item.label}
-        </Link>
-        {children.length > 0 && (
-          <ul className={styles.children}>
-            {children.map((child) => (
-              <li key={child.href}>
-                <Link
-                  href={child.href}
-                  className={`${styles.child} ${itemActive(child.href) ? styles.itemActive : ''}`}
-                >
-                  {child.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </li>
-    )
-  }
+    return {
+      href: item.href,
+      label: item.label,
+      Icon: SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]],
+      active,
+      children: children.map((child) => ({ href: child.href, label: child.label, active: itemActive(child.href) })),
+    }
+  })
 
+  return <SettingsMenu heading="設定" label="設定の中のメニュー" entries={entries} placement={inline ? 'inline' : 'outer'} />
+}
+
+export type SettingsMenuEntry = {
+  href: string
+  label: string
+  Icon?: LucideIcon
+  active: boolean
+  children?: { href: string; label: string; active: boolean }[]
+}
+
+/**
+ * 設定の中のメニューの形（見出し＋印つきの項目・いまの画面は薄い地＋太字）。
+ * 店の設定（SettingsInnerNav）と統括の設定（v8/hq/settings-nav）が同じ形を使う。
+ * placement：'inline'＝白い板の中の左の欄（幅・余白・仕切り線を持つ）、
+ * 'outer'＝まだ移っていない画面の外の欄、'folder'＝型（ListPage）のフォルダの列の中（幅・余白・線は型が持つ）。
+ */
+export function SettingsMenu({ heading, label, entries, placement = 'inline', fit = false }: {
+  heading: string
+  label: string
+  entries: SettingsMenuEntry[]
+  placement?: 'inline' | 'outer' | 'folder'
+  /** 型のフォルダの列を中身の高さで止める（data-folder-fit）。 */
+  fit?: boolean
+}) {
+  const className = placement === 'folder' ? styles.folder : `${styles.root} ${placement === 'inline' ? styles.inline : ''}`
   return (
-    <nav className={`${styles.root} ${inline ? styles.inline : ''}`} aria-label="設定の中のメニュー" data-settings-nav={inline ? 'inline' : 'outer'}>
-      <p className={styles.heading}>設定</p>
+    <nav className={className} aria-label={label} data-settings-nav={placement === 'outer' ? 'outer' : placement} data-folder-fit={fit ? '' : undefined}>
+      <p className={styles.heading}>{heading}</p>
       <ul className={styles.list}>
-        {items.map(renderItem)}
+        {entries.map(({ href, label: itemLabel, Icon, active, children = [] }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className={`${styles.item} ${active ? styles.itemActive : ''}`}
+              aria-current={active ? 'page' : undefined}
+            >
+              {Icon ? <Icon size={16} aria-hidden="true" className={styles.icon} /> : null}
+              {itemLabel}
+            </Link>
+            {children.length > 0 && (
+              <ul className={styles.children}>
+                {children.map((child) => (
+                  <li key={child.href}>
+                    <Link href={child.href} className={`${styles.child} ${child.active ? styles.itemActive : ''}`}>
+                      {child.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
       </ul>
     </nav>
   )

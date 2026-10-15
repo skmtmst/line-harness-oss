@@ -2,7 +2,7 @@
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowUpRight, Link2, Plug, Search, Unlink, UserSearch } from 'lucide-react'
+import { ArrowUpRight, Link2, Plug, Unlink, UserSearch } from 'lucide-react'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -10,6 +10,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import Drawer from '@/components/shared/drawer'
+import { DialogActions } from '@/components/shared/dialog'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import { IdentityEvidenceList, IdentityHistoryList, IdentityImpactList, IdentitySubjectCard } from '@/components/identity/identity-parts'
@@ -24,7 +25,9 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { EcTabsV8 } from './screen'
 import shared from './screen.module.css'
 import styles from './identity.module.css'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowMenu } from '@/components/shared/row-actions'
+import { useRouter } from 'next/navigation'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -82,6 +85,7 @@ export default function EcIdentityCandidatesScreen() {
   const canEdit = canManageRole(role)
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
   const [candidateId, setCandidateId] = useDetailPanelUrl('candidate')
+  const router = useRouter()
   useEffect(() => { if (candidateId && candidateId !== review.selectedId) review.select(candidateId) }, [candidateId, review.selectedId, review.select])
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
@@ -174,7 +178,7 @@ export default function EcIdentityCandidatesScreen() {
       <>
         <KpiBand presentation="band">
           <KpiCard presentation="band" icon={<Link2 size={13} aria-hidden="true" />} title="自動で結びついた" value={operationsReady ? (operations?.summary.linked ?? null) : null} unit="人" detail={operationsDetail('メールか電話番号が同じ')} loading={operationsState === 'loading'} onRetry={operationsState === 'error' ? () => { void loadOperations() } : undefined} />
-          <KpiCard presentation="band" icon={<UserSearch size={13} aria-hidden="true" />} title="候補が見つかった" value={operationsReady ? candidateCount : null} unit="人" detail={operationsReady ? `人が決める（つき合わせ ${formatNumber(operations?.summary.unmatched ?? 0)} のうち）` : operationsDetail('人が決める')} loading={operationsState === 'loading'} />
+          <KpiCard presentation="band" icon={<UserSearch size={13} aria-hidden="true" />} title="候補が見つかった" value={operationsReady ? candidateCount : null} unit="人" detailLayout="single" detail={operationsReady ? `人が決める（つき合わせ ${formatNumber(operations?.summary.unmatched ?? 0)} のうち）` : operationsDetail('人が決める')} loading={operationsState === 'loading'} />
           <KpiCard presentation="band" icon={<Unlink size={13} aria-hidden="true" />} title="結びついていない" value={operationsReady ? noneCount : null} unit="人" detail={operationsDetail('候補なし')} loading={operationsState === 'loading'} />
           <KpiCard
             presentation="band"
@@ -213,7 +217,7 @@ export default function EcIdentityCandidatesScreen() {
             <Th>LINEの候補</Th>
             <Th>似ているところ</Th>
             <Th>確からしさ</Th>
-            <Th>操作</Th>
+            <Th aria-label="操作" />
           </TableHeadRow></thead>
           <tbody>{shown.length === 0 ? (
             <Tr><Td colSpan={5}>この絞り込みに当たる候補はありません</Td></Tr>
@@ -240,16 +244,18 @@ export default function EcIdentityCandidatesScreen() {
                     <StatusBadge tone={confidenceTone(item.confidence.label)} size="compact">{confidenceText(item.confidence.label)}</StatusBadge>
                   ) : emptyValue('unknown')}
                 </Td>
-                <Td><span className={styles.ops}>
-                  {hasCandidate ? (
-                    <>
-                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-expanded={selected} onClick={() => { setCandidateId(item.id); review.select(item.id) }}>候補を見る</Button>
-                      {canEdit ? <Button type="button" data-qa-open="ELayY" onClick={() => review.openDialog(item.id)}>決める</Button> : null}
-                    </>
-                  ) : (
-                    <Button href={`/friends?q=${encodeURIComponent(item.left.label)}`}><Search className={shared.btnIcon} aria-hidden="true" />友だちを探す</Button>
-                  )}
-                </span></Td>
+                <ActionCell>
+                  {/* 行の右端は「…」1つ（B-253・絵 w1W8h）。候補を見る・決める・友だちを探すはその中。 */}
+                  <RowMenu
+                    label={`${item.left.label}の候補の操作`}
+                    items={hasCandidate ? [
+                      { id: 'view', label: '候補を見る', onSelect: () => { setCandidateId(item.id); review.select(item.id) } },
+                      ...(canEdit ? [{ id: 'decide', label: '決める', onSelect: () => review.openDialog(item.id) }] : []),
+                    ] : [
+                      { id: 'search', label: '友だちを探す', onSelect: () => router.push(`/friends?q=${encodeURIComponent(item.left.label)}`) },
+                    ]}
+                  />
+                </ActionCell>
               </Tr>
             )
           })}</tbody>
@@ -269,7 +275,7 @@ export default function EcIdentityCandidatesScreen() {
 
         {detail ? (
           <>
-          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
+          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<DialogActions padding="none"><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</DialogActions>}>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />

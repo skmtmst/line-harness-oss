@@ -1,0 +1,15 @@
+/* 予約管理「今月」R8tlbw：数の帯の下の月送り・URLの段。 */
+.bar { display: flex; flex-direction: column; gap: 10px; padding: 16px 24px 0; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.nav { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.month { font-size: 15px; font-weight: 700; line-height: normal; color: var(--color-ink); white-space: nowrap; margin-inline: 2px 4px; }
+.urls { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.copyWord { margin-left: 6px; padding-left: 8px; border-left: 1px solid var(--color-hairline); color: var(--color-ink-secondary); font-weight: 600; white-space: nowrap; }
+.caption { font-size: 12px; line-height: normal; color: var(--color-ink-secondary); }
+.chipsLabel { font-size: 11px; color: var(--color-ink-faint); white-space: nowrap; align-self: center; }
+/* 表のセル：名前・メニュー・担当は1行＋省略（title で全文）。 */
+.name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-weight: 600; }
+.cellText { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+/* 札が狭くて「状態」の選ぶ欄へ畳まれたら、頭の「よく使う」は消す（ぶら下がった一語を残さない）。 */
+:global([data-toolbar-row]) > :has(> .chipsLabel):has(+ * [data-filter-collapsed]) { display: none; }

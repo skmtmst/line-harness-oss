@@ -241,7 +241,7 @@ export default function WebhooksSheetsV8() {
         <Dialog
           open={disconnectFor !== null}
           title="Google Sheets との接続を解除しますか？"
-          description={`「${disconnectFor?.label ?? ''}」の書き出しを止め、連携設定・同期の記録・Google側の許可を消します。シートの中身は残ります。元に戻せません。`}
+          description="書き出しが止まります。シートの中身は消えません。この操作は取り消せません。"
           descriptionBand="danger"
           tone="destructive"
           confirmation
@@ -249,11 +249,14 @@ export default function WebhooksSheetsV8() {
           designNode="YZ57z"
           designWidth={500}
           designTop={280}
+          designContentPadding="0 var(--polish-space-section) var(--polish-space-card)"
           busy={busy === 'disconnect'}
           confirmLabel="接続を解除する"
           onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
-        />
+        >
+          <p>{`「${disconnectFor?.label ?? ''}」の連携設定・同期の記録・Google側の許可を消します。`}</p>
+        </Dialog>
       )}
     >
       <div className={styles.body}>

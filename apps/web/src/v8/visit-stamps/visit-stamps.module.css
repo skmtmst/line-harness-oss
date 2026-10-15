@@ -14,7 +14,7 @@
 .pair {
   display: flex;
   gap: var(--tpl-e78-row-gap);
-  align-items: stretch;
+  align-items: flex-start;
   min-width: 0;
 }
 
@@ -29,10 +29,6 @@
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
-}
-
-.cardTall {
-  min-height: var(--tpl-stamp-card-min-h);
 }
 
 .cardRules {
@@ -499,6 +495,7 @@
 .cardInstructions { margin: 0; font-size: var(--tpl-e78-sub-size); line-height: var(--tpl-e78-sub-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
 .cardExpiry { font-size: var(--tpl-e78-tiny-size); line-height: var(--tpl-e78-tiny-lh); }
 @container v8-page (max-width: 1099px) {
+  .stacking { flex-direction: column; }
   .appearance { flex-wrap: wrap; }
   .hoursRow { flex-wrap: wrap; }
   .paperRow { flex-direction: column; }
@@ -513,3 +510,4 @@
 
 /* 設定タブの①②は、タブの線から 28（上の余白 4＋24）あけて置く（fpPlW）。ほかのタブは見出しから始まるので変えない。 */
 .body > .pair:first-child { padding-top: var(--tpl-e78-row-gap); }
+.receiptCount { width: var(--tpl-e78-col-stamps); flex: 0 0 auto; }

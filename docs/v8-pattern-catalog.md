@@ -5,6 +5,8 @@
 - 役目：時刻を縦、担当を横に並べる。正の部品は `shared/reservation-board.tsx` の `timeDirection="vertical"` と `reservation-people-grid.tsx`。標準の横時間軸は変更しない。
 - 空き枠はAPIから渡った `slots` のみ。予約の詳細・版付き移動・移動失敗後の復旧は共通盤の契約を保つ。閲覧者へ作成入口・ドラッグを出さない。
 - 当日の型は `templates/booking-page.tsx` の明示的な `stats` / `aside`。白い板が1100未満なら右欄を畳み「次の予約・内訳」で開く。数・次の予約・売上は実データから読み、未取得は0にしない。
+- 右欄の区画は同じ型の `BookingSidebarSection` へ題と内容を渡す。区切り・余白・題の段を画面側に定義しない。
+- 格子の外枠は共通 `GridTable` の `presentation="calendar"`。カードの本文ではなく、時刻・担当の行/列/セルを持つ表として描く。通常の一覧の密度・カードの余白の定義は変えない。
 - 見張り：`reservation-people-grid.test.tsx`・`day-frame.test.tsx` と実ブラウザの3幅。使う板はGcyTr/O2Z8u。細かな最終調整はClaudeへ渡す。
 
 - 作成：2026-10-09（オーナー「見落としていて決まりから外れているところが、次回から外れないように、同じものとして認識されるようにしておいて」・B-143・B-168・B-172）
@@ -349,6 +351,8 @@
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - チェック・未設定情報の行：同じファイルの `DialogContentRow` に共通 `Checkbox` または名前・操作を渡す。チェック後も行の薄い線を保ち、未設定情報は `tone="muted"` の灰色の面で1行にまとめる。
+  - 公開前の宛先：`shared/dialog-recipient-list.tsx` の `DialogRecipientList` へ実際の名前・役割・共通の通知方法の札を渡す。通常一覧の固定行高を持たず、役割を読めない時は「—」。
   - 作る種類を選ぶ窓：`shared/dialog-choice-cards.tsx` の `DialogChoiceCards` へ名前・説明・行き先を渡す。3列のカードの説明は安全に折り返し、名前は1行、クリック・キーボード・別タブで行き先を開ける。選択を保存するラジオとは分ける。
   - 使用先を示す窓：`shared/dialog-usage-table.tsx` の `DialogUsageTable` へ種類・名前・行き先を渡す。フォルダの丸を出さず、名前の省略と全文確認・外部の行き先の印1つを共通部品で保つ。
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
@@ -392,6 +396,8 @@
 
 <a id="picker-field"></a>
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
+
+- 電話予約で検索した友だちの行は `shared/friend-match-row.tsx` の `FriendMatchRow`。選択の薄い帯、名前/補足、選ぶ/選び直すを1行で持ち、行の内側へ別の選択枠を重ねない。
 
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
 - 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
@@ -558,7 +564,7 @@
 <a id="sticky-bar"></a>
 ## sticky-bar 作る・編集の下の帯
 
-- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。
+- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。 件数で保存文が変わる操作は`Button.widthReserve="dynamic"`を指定し現在の全文で測り直す。既定の`states`/`idle`の幅は保つ（合格済みの窓と競合の帯を動かさない）。
 
 - **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
 - **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）
@@ -1102,3 +1108,10 @@
 - 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
 - `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
 - 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
+
+<a id="verification-list"></a>
+## verification-list 接続のチェックの行
+
+- 役目：入力した接続情報の検査結果。一般の表ではなく、検査の印・題・説明・状態を並べる。
+- 持ち主：`shared/verification-list.tsx` の `VerificationList`。箱は共通Card、状態はStatusBadge、行は文字と上下12の自然高。
+- 失敗の説明は全文を折り返して高さを増やす。その他は1行で省略し、titleで全文を残す。使用先：LINEアカウント登録の接続確認（v2KMj）。

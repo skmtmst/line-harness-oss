@@ -7,6 +7,15 @@ import { PageFrame } from './page-frame'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('作成型は下帯があると画面高さ、無いと内容高さ、明示指定を優先する', () => {
+    const { container, rerender } = render(<CreatePage title="作成" footerActions={<button>次へ</button>}>短い内容</CreatePage>)
+    const frame = () => container.querySelector('[data-page-template="create"]')!
+    expect(frame().getAttribute('data-frame-height')).toBe('viewport')
+    rerender(<CreatePage title="作成" footerActions={null}>短い内容</CreatePage>)
+    expect(frame().getAttribute('data-frame-height')).toBe('content')
+    rerender(<CreatePage title="作成" heightMode="content" footerActions={<button>保存</button>}>明示した内容高さ</CreatePage>)
+    expect(frame().getAttribute('data-frame-height')).toBe('content')
+  })
   it('一覧型は画面の任意指定によらず標準の一覧寸法と検査を持つ', () => {
     const { container, rerender } = render(<ListPage title="一覧">表</ListPage>)
     expect(container.querySelector('[data-page-template="list"]')?.getAttribute('data-list-skeleton')).toBe('templates')

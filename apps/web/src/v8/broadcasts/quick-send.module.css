@@ -165,6 +165,8 @@
 
 .approval {
   display: flex;
+  /* 選んだ人の名前が長くても欄の幅（266）を広げない（絵 P6vbxn）。 */
+  min-width: 0;
   flex: 0 0 var(--tpl-ms-qs-approval-w);
   flex-direction: column;
   gap: var(--tpl-ms-key-row-gap);

@@ -50,7 +50,6 @@ import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
@@ -542,8 +541,11 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
-        <div className={styles.imageSlot}>
-          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><ImageFrame
+        <div className={styles.postImageSlot}>
+          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><MediaSlot
+            kind="image"
+            /* 絵 T1j2Sw：画像は本文の下、幅320・4:3。 */
+            aspectRatio="4 / 3"
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}

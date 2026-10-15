@@ -57,7 +57,8 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
       const widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
       const gap = parseFloat(getComputedStyle(host).columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
-      return () => { if (active) setFit(Math.min(count, maxVisible ?? items.length)) }
+      // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 y2n1z）。
+      return () => { if (active) setFit(Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)) }
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
     update()
@@ -71,7 +72,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const rest = items.length - shown
   return <>
     <span ref={root} className={styles.line} data-tag-overflow="" onClick={(event) => event.stopPropagation()}>
-      {items.slice(0, shown).map((item, index) => <span key={index} className={styles.item}>{item}</span>)}
+      {items.slice(0, shown).map((item, index) => <span key={index} className={styles.item} data-shrink={shown === 1 && rest > 0 ? '' : undefined}>{item}</span>)}
       {rest > 0 ? <button type="button" className={styles.more} aria-label={`${label}（ほか${rest}件）`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>+{rest}</button> : null}
       <span ref={measure} className={styles.measure} data-tag-overflow-measure="" aria-hidden="true" inert>{items.map((item, index) => <span key={index} className={styles.item}>{item}</span>)}</span>
       <button ref={more} type="button" className={`${styles.more} ${styles.sampleMore}`} aria-hidden="true" tabIndex={-1} inert>+{items.length}</button>

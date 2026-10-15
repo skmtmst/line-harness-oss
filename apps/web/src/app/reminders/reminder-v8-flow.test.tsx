@@ -133,6 +133,8 @@ import RemindersPage from './page'
 import NewReminderPage from './new/page'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
 import { RegistrantsTab } from '@/v8/reminders/detail'
+// 登録者のタブは画面の説明の帯を持つので、画面と同じく説明の器の中に置く（loVfW）。
+import { PageExplanationProvider } from '@/components/shared/page-explanation'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
@@ -274,7 +276,7 @@ describe('V8 リマインダの通し：登録者を足す', () => {
       createdAt: '2026-10-03T00:00:00.000Z',
       updatedAt: '2026-10-03T00:00:00.000Z',
     }]
-    renderNode(<RegistrantsTab canManage reminderId="rm-1" />)
+    renderNode(<PageExplanationProvider pageKey="reminders:registrants"><RegistrantsTab canManage reminderId="rm-1" /></PageExplanationProvider>)
     await flush()
     await screen.findByText('試す友だち')
     await screen.findByText('1 人')
