@@ -28,7 +28,8 @@ it('同じ寸法通知をまとめて測り、幅・タグ変更後の全件と+
     await Promise.resolve()
   })
   expect(measured).toHaveBeenCalledTimes(2)
-  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか2件）' }).textContent).toBe('+2')
+  // 1つも入らない幅でも最初の札は省略して出し、残りを +N にする（+N だけにしない）。
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' }).textContent).toBe('+1')
   expect(container.querySelector('[data-tag-overflow]')?.textContent).toContain('VIP')
   available = 300
   rerender(<TagOverflow><TagPill name="VIP" /><TagPill name="会員" /><TagPill name="常連" /></TagOverflow>)
