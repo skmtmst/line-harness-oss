@@ -2,7 +2,6 @@
 .body {
   --hss-col-kind: 140px;
   --hss-col-how: 220px;
-  --hss-col-date: 140px;
   --hss-col-menu: 28px;
   --hss-row-h: 60px;
   --hss-title-lh: 27px;
@@ -103,10 +102,6 @@
   font-size: var(--text-micro);
 }
 
-.date {
-  font-size: var(--text-caption);
-  white-space: nowrap;
-}
 
 .empty {
   color: var(--color-ink-secondary);

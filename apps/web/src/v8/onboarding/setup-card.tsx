@@ -7,7 +7,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { sampleMenuFor, featureName, summarizeSetup, type SetupSummary, type TodoRow } from './model'
+import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, type SetupSummary, type TodoRow } from './model'
 import type { StyleSetupData } from './use-style-setup'
 import styles from './setup-card.module.css'
 
@@ -26,6 +26,7 @@ export function setupSummary(data: StyleSetupData | null): SetupSummary | null {
 
 /** 上の警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。 */
 export function SetupWarningBands({ data }: { data: StyleSetupData }) {
+  const preparing = usePreparingDialog()
   const seen = new Set<string>()
   const warnings = data.warnings.filter((warning) => (seen.has(warning.feature) ? false : (seen.add(warning.feature), true)))
   if (warnings.length === 0) return null
@@ -35,11 +36,12 @@ export function SetupWarningBands({ data }: { data: StyleSetupData }) {
       {warnings.map((warning) => {
         const button = tiles.find((tile) => tile.feature === warning.feature)?.label ?? featureName(warning.feature)
         return (
-          <Notice key={warning.feature} tone="warn" appearance="soft" action={<Button href={warning.href}>決まりを入れる</Button>}>
+          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button onClick={() => preparing.open(FEATURES[warning.feature]!.preparing!)}>決まりを入れる</Button> : <Button href={featureHref(warning.feature, warning.href)}>決まりを入れる</Button>}>
             {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}の決まりがまだです。お客さまには「${PREPARING_WORD}」と出ています。`}
           </Notice>
         )
       })}
+      {preparing.dialog}
     </>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { styleSetupApi, type StarterItemState, type StyleState, type StyleWarning } from '@/lib/api-style-setup'
+import { styleApi } from '@/lib/api-styles'
+import type { StarterItemState, StyleState, StyleWarning } from './model'
 import { canManageRole } from '@/lib/staff-role'
 
 export type StyleSetupData = {
@@ -23,7 +24,7 @@ export function useStyleSetup(accountId: string | null, role: string | null) {
     setData(null)
     if (!accountId || !enabled) return
     let cancelled = false
-    void Promise.all([styleSetupApi.get(accountId), styleSetupApi.warnings(accountId), styleSetupApi.starterItems(accountId)])
+    void Promise.all([styleApi.get(accountId), styleApi.warnings(accountId), styleApi.starterItems(accountId)])
       .then(([state, warnings, items]) => {
         if (cancelled || !state.success || !warnings.success || !items.success) return
         setData({ state: state.data, warnings: warnings.data.items ?? [], items: items.data.items ?? [] })

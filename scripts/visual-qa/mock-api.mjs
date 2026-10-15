@@ -2232,44 +2232,41 @@ const UID_MIGRATION_DONE = {
 const STYLE_SETUP_STATE = {
   style: 'restaurant', styleSelected: true, version: 3,
   answers: {
-    style: { mode: 'configured', value: 'restaurant' }, look: { mode: 'configured', value: 'sample' },
-    confirmation: { mode: 'configured', value: 'instant' }, payment: { mode: 'later' }, cancelDeadline: { mode: 'configured', value: 'day_before' },
-    reminder: { mode: 'configured', value: 'on' }, visitStamp: { mode: 'later' }, coupon: { mode: 'configured', value: 'first' }, seats: { mode: 'configured', value: 'sample' },
+    image: { mode: 'configured', value: 'keep' }, booking: { mode: 'configured', value: true }, approval: { mode: 'configured', value: 'automatic' },
+    payment: { mode: 'later' }, reminders: { mode: 'configured', value: true }, stamps: { mode: 'later' }, coupons: { mode: 'configured', value: true }, content: { mode: 'configured', value: true },
   },
 }
+const STYLE_QUESTION_KEYS = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content']
 const STYLE_SETUP_ITEMS = [
-  { key: 'rm', kind: 'rich_menu', name: '飲食店の見本', buttons: [{ label: '予約する', feature: 'reserve' }, { label: '予約の確認', feature: 'history' }, { label: 'クーポン', feature: 'coupon' }, { label: 'メニュー', feature: 'menu' }, { label: 'スタンプ', feature: 'visit_stamp' }, { label: 'お問い合わせ', feature: 'contact' }] },
-  { key: 'tpl-pre', kind: 'template', name: '前日のお知らせ' }, { key: 'tpl-thanks', kind: 'template', name: '来店のお礼' }, { key: 'tpl-day', kind: 'template', name: '当日のお知らせ' },
-  { key: 'tpl-review', kind: 'template', name: '口コミのお願い' }, { key: 'tpl-closed', kind: 'template', name: '臨時休業のお知らせ' },
-  { key: 'bm-lunch', kind: 'booking_menu', name: 'ランチコース' }, { key: 'bm-dinner', kind: 'booking_menu', name: 'ディナーコース' }, { key: 'bm-seat', kind: 'booking_menu', name: '席のみ' },
-  { key: 'cp-first', kind: 'coupon', name: 'はじめての方 10% オフ' },
-  { key: 'au-pre', kind: 'automation', feature: 'reminder', name: '前日のお知らせ', text: '予約の前日 18:00 に LINE で送る' },
-  { key: 'au-day', kind: 'automation', feature: 'reminder', name: '当日のお知らせ', text: '来店の 2 時間前に送る' },
-  { key: 'au-thanks', kind: 'automation', feature: 'thanks', name: '来店のお礼', text: '来店の翌日 12:00 に送る' },
-  { key: 'db', kind: 'dashboard', name: '今日のお店' },
+  { key: 'menu', kind: 'rich_menu', name: '飲食店の見本', buttons: [{ label: '予約する', feature: 'booking' }, { label: '予約の確認', feature: 'booking' }, { label: 'クーポン', feature: 'coupons' }, { label: 'メニュー', feature: 'contact' }, { label: 'スタンプ', feature: 'stamps' }, { label: 'お問い合わせ', feature: 'contact' }] },
+  { key: 'sample-reservation-confirm', kind: 'template', name: '【見本】予約の確認' }, { key: 'sample-thanks', kind: 'template', name: '【見本】来店のお礼' }, { key: 'sample-day', kind: 'template', name: '【見本】当日のご案内' },
+  { key: 'sample-review', kind: 'template', name: '【見本】口コミのお願い' }, { key: 'sample-closed', kind: 'template', name: '【見本】臨時休業のお知らせ' },
+  { key: 'booking-lunch', kind: 'booking_menu', feature: 'booking', name: 'ランチコース' }, { key: 'booking-dinner', kind: 'booking_menu', feature: 'booking', name: 'ディナーコース' }, { key: 'booking-seat', kind: 'booking_menu', feature: 'booking', name: '席のみ' },
+  { key: 'reminder', kind: 'automation', feature: 'reminders', name: '前日のお知らせ', text: '予約の前日 18:00 に LINE で送る' },
+  { key: 'reminder-day', kind: 'automation', feature: 'reminders', name: '当日のお知らせ', text: '来店の 2 時間前に送る' },
+  { key: 'dashboard', kind: 'dashboard', name: '今日のお店' },
 ]
-const STYLE_SETUP_STATES = STYLE_SETUP_ITEMS.map((item, i) => ({ target_id: `starter-${item.key}`, key: item.key, kind: item.kind, is_sample: 1, status: item.kind === 'automation' ? 'stopped' : 'active', draftRevision: null }))
-const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'visit_stamp', areaId: 'E', groupId: 'rm-sample-restaurant', href: '/visit-stamps', customerState: 'preparing' }], pending: [{ key: 'payment', href: '/booking/menus?tab=payment', mode: 'later' }, { key: 'visitStamp', href: '/visit-stamps', mode: 'later' }], manual: [] }
+/* 口の starter-items は item_key・name を返さない（API-CONTRACT-4 §10）。種類と並びだけ。 */
+const STYLE_SETUP_STATES = STYLE_SETUP_ITEMS.map((item, i) => ({ target_id: `starter-${i}`, kind: item.kind, is_sample: 1, status: item.kind === 'automation' ? 'draft' : item.kind === 'booking_menu' ? 'inactive' : 'active', draftRevision: item.kind === 'automation' ? `draft-${i}` : null }))
+const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'stamps', areaId: 'area-e', groupId: 'rm-sample-restaurant', href: '/visit-stamps', customerState: 'preparing' }], pending: [{ key: 'payment', href: '/booking/settings?tab=payment', mode: 'later' }, { key: 'stamps', href: '/visit-stamps', mode: 'later' }], manual: [] }
 const HQ_STARTER_SETS = [
-  ['restaurant', '飲食店向け', 12], ['salon', 'サロン', 8], ['consult', '面談・相談', 3], ['lesson', '教室・レッスン', 5], ['ec', 'ECサイト', 2], ['standard', '標準', 4],
-].map(([style, name, accountCount], i) => ({
-  id: `starter-set-${style}`, style, name: `${name}の初期セット`, version: 2, accountCount, autoInsert: true,
-  definition: { items: STYLE_SETUP_ITEMS.filter((item) => item.kind !== 'coupon').map((item) => item.kind === 'automation' && item.key === 'au-pre' ? { ...item, name: '前日のリマインダー' } : item) },
-  updates: { rich_menu: { at: '2026-10-14', by: '本部 佐藤' }, template: { at: '2026-10-12', by: '本部 佐藤' }, automation: { at: '2026-10-12', by: '本部 佐藤' }, booking_menu: { at: '2026-10-10', by: '本部 田中' }, dashboard: { at: '2026-10-09', by: '本部 田中' } },
-}))
+  { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, definition: { items: STYLE_SETUP_ITEMS.map((item) => item.key === 'reminder' ? { ...item, name: '前日のリマインダー' } : item) } },
+]
 const HQ_STYLE_ATTENTION = {
   asOf: '2026-10-15T08:30:00.000Z',
   items: [
-    { accountId: 'visual-qa-account', name: '然 渋谷店', style: 'restaurant', counts: { unhandledChats: 9, pendingBookings: 3, unpaid: 2, connections: 1, stoppedDeliveries: 0 } },
-    { accountId: 'visual-qa-account-2', name: '然 新宿店', style: 'restaurant', counts: { unhandledChats: 6, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
-    { accountId: 'visual-qa-account-3', name: 'Hair Salon 然 表参道', style: 'salon', counts: { unhandledChats: 4, pendingBookings: 0, unpaid: 2, connections: 0, stoppedDeliveries: 0 } },
-    { accountId: 'visual-qa-account-4', name: '然 相談窓口', style: 'consult', counts: { unhandledChats: 3, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 0 } },
-    { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', style: 'lesson', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
-  ].map((item) => ({ ...item, details: { unhandledChats: [{ id: 'c', href: '/chats' }], pendingBookings: [{ id: 'b', href: '/booking/bookings' }], unpaid: [{ id: 'p', href: '/booking/menus?tab=payment' }], connections: [{ id: 'l', href: '/line-accounts' }], stoppedDeliveries: [{ id: 'd', href: '/broadcasts' }] } })),
+    { accountId: 'visual-qa-account', name: '然 渋谷店', counts: { unhandledChats: 9, pendingBookings: 3, unpaid: 2, connections: 1, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-2', name: '然 新宿店', counts: { unhandledChats: 6, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+    { accountId: 'visual-qa-account-3', name: 'Hair Salon 然 表参道', counts: { unhandledChats: 4, pendingBookings: 0, unpaid: 2, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-4', name: '然 相談窓口', counts: { unhandledChats: 3, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+  ].map((item) => ({ ...item, details: { unhandledChats: [{ id: 'c', href: '/chats' }], pendingBookings: [{ id: 'b', href: '/booking/bookings' }], unpaid: [{ id: 'p', href: '/booking/settings?tab=payment' }], connections: [{ id: 'l', href: '/line-accounts' }], stoppedDeliveries: [{ id: 'd', href: '/broadcasts' }] } })),
 }
 function styleSetupRead(method, pathname, query) {
   if (method !== 'GET') return null
-  if (pathname === '/api/dashboard/style') return { success: true, data: { ...STYLE_SETUP_STATE, settings: {}, cards: [] } }
+  if (pathname === '/api/dashboard/style') return { success: true, data: { ...STYLE_SETUP_STATE, settings: {}, cards: [], questions: STYLE_QUESTION_KEYS.map((key) => ({ key, changeAt: '/booking/settings', canChangeLater: true, recommended: key !== 'payment', modes: ['configured', 'later', 'manual'] })), warnings: STYLE_SETUP_WARNINGS } }
+  if (pathname === '/api/dashboard/style/resources') return { success: true, data: { items: [{ id: 'rm-1', name: '秋のメニュー', kind: 'rich_menu' }, { id: 'page-1', name: '秋のメニューの画像', kind: 'image' }] } }
+  if (/^\/api\/dashboard\/style\/menus\/[^/]+$/.test(pathname)) return { success: true, data: { id: pathname.split('/').pop(), name: 'ランチコース', version: 1, meetingMode: 'in_person', location: null } }
   if (pathname === '/api/dashboard/style/warnings') return { success: true, data: STYLE_SETUP_WARNINGS }
   if (pathname === '/api/dashboard/style/starter-set') return { success: true, data: { id: `starter-set-${query.get('style') ?? 'restaurant'}`, version: 2, definition: { items: STYLE_SETUP_ITEMS } } }
   if (pathname === '/api/dashboard/style/starter-items') return { success: true, data: { items: STYLE_SETUP_STATES } }
@@ -2280,6 +2277,7 @@ function styleSetupRead(method, pathname, query) {
 function styleSetupWrite(method, pathname) {
   if (method === 'PUT' && pathname === '/api/dashboard/style') return { style: 'restaurant', version: STYLE_SETUP_STATE.version + 1, inserted: [] }
   if (method === 'POST' && pathname === '/api/dashboard/style/activate') return { complete: true, items: [] }
+  if (method === 'PUT' && /^\/api\/hq\/style-starter-sets\/[^/]+$/.test(pathname)) return { id: 'starter-set-restaurant', version: 3 }
   return null
 }
 

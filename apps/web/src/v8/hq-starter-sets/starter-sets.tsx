@@ -7,7 +7,6 @@ import FolderPanel from '@/components/shared/folder-panel'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
-import Toggle from '@/components/shared/toggle'
 import { Tabs } from '@/components/shared/tabs'
 import { hqTemplateTabsForStarterSets } from '@/v8/hq-templates/store-list'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -17,8 +16,11 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { ACCOUNT_STYLES, hqStyleSetupApi, type AccountStyle, type HqStarterSet, type StarterSetItem } from '@/lib/api-style-setup'
-import { styleLabel } from '@/v8/onboarding/model'
+import type { AccountStyle } from '@line-crm/shared'
+import { hqStyleApi, type StarterSetItem, type StyleStarterSet } from '@/lib/api-styles'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifySaved } from '@/components/shared/toast'
+import { STYLE_CHOICES, styleLabel } from '@/v8/onboarding/model'
 import styles from './starter-sets.module.css'
 
 /*
@@ -45,25 +47,22 @@ function nameOf(list: StarterSetItem[], kind: StarterSetItem['kind']): { main: s
   return { main: list.length > 1 ? `${list[0].name} ほか ${list.length}件` : list[0].name }
 }
 
-function shortDate(iso: string | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '—' : `${date.getMonth() + 1}/${String(date.getDate()).padStart(2, '0')}`
-}
-
 export default function HqStarterSetsV8() {
   usePageTitle('スタイルの初期セット')
   const role = useStaffRole()
   const canEdit = role === null || canManageRole(role)
   const preparing = usePreparingDialog()
-  const [sets, setSets] = useState<HqStarterSet[] | null>(null)
+  const [sets, setSets] = useState<StyleStarterSet[] | null>(null)
   const [error, setError] = useState('')
   const [active, setActive] = useState<AccountStyle>('restaurant')
+  const [removing, setRemoving] = useState<StarterSetItem['kind'] | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const load = useCallback(async () => {
     setError('')
     try {
-      const res = await hqStyleSetupApi.listStarterSets()
+      const res = await hqStyleApi.listStarterSets()
       if (!res.success) throw new Error('list failed')
       setSets(res.data)
     } catch (caught) {
@@ -72,10 +71,29 @@ export default function HqStarterSetsV8() {
   }, [])
   useEffect(() => { void load() }, [load])
 
-  const rows = ACCOUNT_STYLES.map((style) => ({ id: style, label: styleLabel(style), count: sets ? sets.find((set) => set.style === style)?.accountCount ?? null : null }))
+  /* 使っているアカウントの数は口が返さない（API-CONTRACT-4 §10）。数は出さない。 */
+  const rows = STYLE_CHOICES.map(({ value: style }) => ({ id: style, label: styleLabel(style), count: null }))
   const set = sets?.find((item) => item.style === active) ?? null
   const groups = useMemo(() => KIND_ROWS.map((row) => ({ ...row, items: (set?.definition.items ?? []).filter((item) => item.kind === row.kind) })).filter((row) => row.items.length > 0), [set])
   const label = styleLabel(active)
+
+  /* 統括の初期セットから種類ごと外す（版つきで保存。ぶつかったら読み直してもらう）。 */
+  const removeKind = async () => {
+    if (!set || !removing) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const res = await hqStyleApi.saveStarterSet(set.style, { expectedVersion: set.version, name: set.name, definition: { items: set.definition.items.filter((item) => item.kind !== removing) } })
+      if (!res.success) throw new Error('save failed')
+      notifySaved('初期セットから外しました')
+      setRemoving(null)
+      await load()
+    } catch (caught) {
+      setSaveError(describeApiFailure(caught, '保存', { scope: 'hq' }))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <ListPage
@@ -94,7 +112,7 @@ export default function HqStarterSetsV8() {
         {error ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度試す</Button>}>{error}</Notice> : null}
         <div className={styles.head}>
           <h3 className={styles.title}>{`${label}の初期セット`}</h3>
-          {set?.accountCount !== undefined ? <StatusBadge tone="info" dot>{`${set.accountCount} アカウントで使用中`}</StatusBadge> : null}
+          {set ? <StatusBadge tone="info" dot>統括の初期セット</StatusBadge> : <StatusBadge tone="neutral" dot>musubo の標準</StatusBadge>}
           <span className={styles.spacer} />
           {canEdit ? <>
             <Button onClick={() => preparing.open('初期セットの中身を直す')}><Pencil aria-hidden="true" className={styles.buttonIcon} />中身を直す</Button>
@@ -106,9 +124,8 @@ export default function HqStarterSetsV8() {
             <span className={styles.autoTitle}>新しいアカウントで、このスタイルを選んだときに自動で入れる</span>
             <span className={styles.autoNote}>入った物には「見本」の札が付き、店で直せます</span>
           </span>
-          {canEdit
-            ? <Toggle label="新しいアカウントで自動で入れる" checked={set?.autoInsert ?? true} onChange={() => preparing.open('自動で入れるの切り替え')} />
-            : <StatusBadge tone={set?.autoInsert === false ? 'neutral' : 'success'} dot>{set?.autoInsert === false ? '入れない' : '自動で入れる'}</StatusBadge>}
+          {/* 新しいアカウントへは必ず入る（口に切り替えが無い）。押せないスイッチは置かず、状態の札で出す。 */}
+          <StatusBadge tone="success" dot>自動で入れる</StatusBadge>
         </div>
         <div className={styles.sectionHead}>
           <h3 className={styles.sectionTitle}>入る物</h3>
@@ -118,17 +135,15 @@ export default function HqStarterSetsV8() {
           <p className={styles.empty}>{`${label}の初期セットはまだありません。［初期セットを作る］から作れます。`}</p>
         ) : (
           <div className={styles.table}>
-            <GridTable label="入る物" design={{ columns: 'var(--hss-col-kind) minmax(0, 1fr) var(--hss-col-how) var(--hss-col-date) var(--hss-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hss-row-h)', fontSize: 'var(--text-body)' }}>
+            <GridTable label="入る物" design={{ columns: 'var(--hss-col-kind) minmax(0, 1fr) var(--hss-col-how) var(--hss-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hss-row-h)', fontSize: 'var(--text-body)' }}>
               <GridHeadRow>
                 <GridCell role="columnheader">種類</GridCell>
                 <GridCell role="columnheader">名前</GridCell>
                 <GridCell role="columnheader">入り方</GridCell>
-                <GridCell role="columnheader">最後に直した</GridCell>
                 <GridCell role="columnheader">操作</GridCell>
               </GridHeadRow>
               {groups.map((group) => {
                 const name = nameOf(group.items, group.kind)
-                const update = set?.updates?.[group.kind]
                 return (
                   <GridRow key={group.kind} className={styles.row}>
                     <GridCell>{group.label}</GridCell>
@@ -137,10 +152,9 @@ export default function HqStarterSetsV8() {
                       {name.sub ? <span className={styles.sub}>{name.sub}</span> : null}
                     </GridCell>
                     <GridCell><StatusBadge tone={group.how.tone} dot>{group.how.text}</StatusBadge></GridCell>
-                    <GridCell className={styles.date}>{update ? `${shortDate(update.at)} ${update.by}` : '—'}</GridCell>
                     <GridCell>{canEdit ? <RowMenu appearance="box" size="row" label={`${group.label}の操作`} items={[
                       { id: 'edit', label: '中身を直す', onSelect: () => preparing.open(`${group.label}の中身を直す`) },
-                      { id: 'remove', label: '初期セットから外す', tone: 'danger', onSelect: () => preparing.open(`${group.label}を初期セットから外す`) },
+                      ...(set ? [{ id: 'remove', label: '初期セットから外す', tone: 'danger' as const, onSelect: () => { setSaveError(''); setRemoving(group.kind) } }] : []),
                     ]} /> : null}</GridCell>
                   </GridRow>
                 )
@@ -151,6 +165,18 @@ export default function HqStarterSetsV8() {
         {groups.some((group) => group.kind === 'automation') && <Notice tone="info" icon={<Info aria-hidden="true" />}>自動で送る物は、店が一度確かめて［動かす］を押すまで送りません。直したあとは［今のアカウントへ配る］で、上書きか新しく作るかを選んで配ります（配る前に確かめの画面が出ます）。統括の無い店には musubo の標準の初期セットが入ります。</Notice>}
       </div>
       {preparing.dialog}
+      <ConfirmDialog
+        open={removing !== null}
+        title="初期セットから外しますか？"
+        description={`これから新しく作るアカウントには「${KIND_ROWS.find((row) => row.kind === removing)?.label ?? ''}」が入らなくなります。今あるアカウントの中身は変わりません。`}
+        confirmLabel="外す"
+        destructive
+        busy={saving}
+        busyLabel="外しています…"
+        error={saveError}
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => void removeKind()}
+      />
     </ListPage>
   )
 }

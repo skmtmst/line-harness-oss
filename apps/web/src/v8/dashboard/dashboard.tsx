@@ -102,11 +102,14 @@ export default function DashboardV8() {
   /* まだスタイルを選んでいない（あとでも選んでいない）アカウントは、最初に入ったとき 1 問目を開く。 */
   useEffect(() => {
     const state = setup.data?.state
-    if (state && canManage && !state.styleSelected && !state.answers?.style) setWizardStep((current) => current ?? 0)
-  }, [setup.data, canManage])
+    if (!state || !canManage || state.styleSelected || !d.selectedAccountId) return
+    let later = false
+    try { later = window.localStorage.getItem(`lh:v8:style-setup-later:${d.selectedAccountId}`) === '1' } catch { /* 覚えが読めなければ開く */ }
+    if (!later) setWizardStep((current) => current ?? 0)
+  }, [setup.data, canManage, d.selectedAccountId])
   const openSetupStep = (step: string | number) => {
     if (typeof step === 'number') { setWizardStep(step); return }
-    const names = setup.data ? ['style', 'look'] : []
+    const names = setup.data ? ['style', 'image'] : []
     setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
   }
   const closeWizard = (changed: boolean) => {

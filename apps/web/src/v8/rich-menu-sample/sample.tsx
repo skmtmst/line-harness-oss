@@ -14,8 +14,9 @@ import HelpTip from '@/components/shared/help-tip'
 import { DetailPage, DetailColumns } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { ACCOUNT_STYLES, styleSetupApi, type AccountStyle, type StyleWarning } from '@/lib/api-style-setup'
-import { FEATURES, featureName, sampleMenuFor, styleLabel } from '@/v8/onboarding/model'
+import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared'
+import { styleApi } from '@/lib/api-styles'
+import { FEATURES, featureHref, featureName, sampleMenuFor, styleLabel, type StyleWarning } from '@/v8/onboarding/model'
 import { SampleMenuTiles } from '@/v8/onboarding/sample-menu'
 import styles from './sample.module.css'
 
@@ -47,18 +48,18 @@ export default function RichMenuSampleV8() {
   useEffect(() => {
     if (!selectedAccountId || style) return
     let cancelled = false
-    void styleSetupApi.get(selectedAccountId).then((res) => { if (!cancelled && res.success) setStyle(res.data.style) }).catch(() => { if (!cancelled) setStyle('restaurant') })
+    void styleApi.get(selectedAccountId).then((res) => { if (!cancelled && res.success) setStyle(res.data.style) }).catch(() => { if (!cancelled) setStyle('restaurant') })
     return () => { cancelled = true }
   }, [selectedAccountId, style])
 
   useEffect(() => {
     if (!selectedAccountId || !style) return
     let cancelled = false
-    void styleSetupApi.starterSet(selectedAccountId, style).then((res) => {
+    void styleApi.starterSet(selectedAccountId, style).then((res) => {
       if (cancelled || !res.success) return
       setName(res.data.definition.items.find((item) => item.kind === 'rich_menu')?.name ?? null)
     }).catch(() => { /* 名前が読めなくても見本の形で出す */ })
-    void styleSetupApi.warnings(selectedAccountId).then((res) => { if (!cancelled && res.success) setWarnings(res.data.items ?? []) }).catch(() => { /* 帯を出さない */ })
+    void styleApi.warnings(selectedAccountId).then((res) => { if (!cancelled && res.success) setWarnings(res.data.items ?? []) }).catch(() => { /* 帯を出さない */ })
     return () => { cancelled = true }
   }, [selectedAccountId, style])
 
@@ -67,7 +68,11 @@ export default function RichMenuSampleV8() {
   const firstWarned = menu.tiles.findIndex((tile) => warned.has(tile.feature))
   const shown = selected ?? (firstWarned >= 0 ? firstWarned : 0)
   const shownTile = menu.tiles[shown]
-  const hrefOf = (feature: string) => warnings.find((warning) => warning.feature === feature)?.href ?? FEATURES[feature]?.settingHref ?? '/rich-menus'
+  const hrefOf = (feature: string) => featureHref(feature, warnings.find((warning) => warning.feature === feature)?.href ?? '/rich-menus')
+  /* 設定の画面がまだ無い機能（クーポン・回数券）は、［決まりを入れる］で準備中の窓（B-314）。 */
+  const configure = (feature: string) => FEATURES[feature]?.preparing
+    ? <Button onClick={() => preparing.open(FEATURES[feature]!.preparing!)}>決まりを入れる</Button>
+    : <Button href={hrefOf(feature)}>決まりを入れる</Button>
   const title = name ?? `${styleLabel(style ?? 'restaurant')}の見本`
 
   const aside = (
@@ -106,7 +111,7 @@ export default function RichMenuSampleV8() {
     >
       <DetailColumns presentation="card" aside={aside} asideLabel="お客さまの見え方" expanded={asideOpen} onExpandedChange={setAsideOpen}>
         {[...warned].filter((feature) => menu.tiles.some((tile) => tile.feature === feature)).map((feature) => (
-          <Notice key={feature} tone="warn" appearance="soft" action={canEdit ? <Button href={hrefOf(feature)}>決まりを入れる</Button> : undefined}>
+          <Notice key={feature} tone="warn" appearance="soft" action={canEdit ? configure(feature) : undefined}>
             {`「${menu.tiles.find((tile) => tile.feature === feature)!.label}」のボタンの中身が決まっていません。お客さまが押すと「${PREPARING_WORD}です」と出ます。`}
           </Notice>
         ))}
@@ -134,7 +139,7 @@ export default function RichMenuSampleV8() {
                   <GridCell>
                     {canEdit ? <RowMenu appearance="box" size="row" label={`${tile.label}の操作`} items={[
                       { id: 'change', label: '押したときを変える', onSelect: () => preparing.open('押したときの変更') },
-                      ...(open ? [{ id: 'configure', label: '決まりを入れる', href: hrefOf(tile.feature) }] : []),
+                      ...(open ? [FEATURES[tile.feature]?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(FEATURES[tile.feature]!.preparing!) } : { id: 'configure', label: '決まりを入れる', href: hrefOf(tile.feature) }] : []),
                     ]} /> : null}
                   </GridCell>
                 </GridRow>

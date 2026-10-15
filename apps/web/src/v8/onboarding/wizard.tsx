@@ -12,12 +12,14 @@ import Toggle from '@/components/shared/toggle'
 import { notifySaved } from '@/components/shared/toast'
 import { usePreparingDialog, PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { styleSetupApi, type AccountStyle, type SetupAnswer, type StarterItemState, type StarterSetItem, type StyleState } from '@/lib/api-style-setup'
+import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
+import { styleApi, type StarterSetItem } from '@/lib/api-styles'
+import Select from '@/components/shared/select'
 import { SetupIcon } from './icons'
 import { SampleMenuPhone, SampleMenuTiles } from './sample-menu'
 import {
-  LOOK_CHOICES, STYLE_CHOICES, answerOf, choiceLabel, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
-  type Question,
+  LOOK_CHOICES, STYLE_CHOICES, answerOf, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
+  type Question, type StarterItemState, type StyleState,
 } from './model'
 import styles from './wizard.module.css'
 
@@ -38,21 +40,24 @@ type Props = {
   onClose: (changed: boolean) => void
 }
 
-type SummaryData = {
-  inserted: StarterSetItem[]
-  automations: Array<{ item: StarterSetItem; state: StarterItemState | null }>
-}
+type Pair = { item: StarterSetItem; state: StarterItemState }
+type SummaryData = { inserted: Pair[]; activation: Pair[] }
 
 const KIND_WORD: Record<string, { label: string; icon: string; href: (style: AccountStyle) => string }> = {
   rich_menu: { label: 'リッチメニュー', icon: 'grid', href: (style) => `/rich-menus/sample?style=${style}` },
   template: { label: 'テンプレート', icon: 'file', href: () => '/templates' },
   booking_menu: { label: '予約メニュー', icon: 'utensils', href: () => '/booking/menus' },
-  coupon: { label: 'クーポン', icon: 'ticket', href: () => '/friend-add-settings' },
+}
+
+/** スタイルの選択を「あとで」にした印（口に質問のキーが無いので、この端末に覚える）。 */
+export function styleLaterKey(accountId: string): string {
+  return `lh:v8:style-setup-later:${accountId}`
 }
 
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const [style, setStyle] = useState<AccountStyle>(state.style)
   const [answers, setAnswers] = useState<Record<string, SetupAnswer>>(state.answers ?? {})
+  const [choices, setChoices] = useState<Record<string, { mode: 'sample' | 'existing' | 'configured'; resourceId?: string }>>({})
   const [version, setVersion] = useState(state.version)
   const [step, setStep] = useState<WizardStep>(initialStep)
   const [dirty, setDirty] = useState(false)
@@ -61,6 +66,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const [preview, setPreview] = useState(false)
   const [summary, setSummary] = useState<SummaryData | null>(null)
   const [enabled, setEnabled] = useState<Record<string, boolean>>({})
+  const [resources, setResources] = useState<Array<{ id: string; name: string; kind: string }> | null>(null)
+  const [resource, setResource] = useState('')
   const preparing = usePreparingDialog()
 
   const steps = useMemo(() => stepNames(style), [style])
@@ -74,43 +81,40 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     if (step === 0) return style
     /* 「あとで」「手動」にした質問を開き直したときは、答えに来たのでおすすめを選んでおく。 */
     const picked = (key: string) => (answers[key]?.mode === 'configured' ? selectedValue(answers[key]) : null)
-    if (step === 1) return picked('look') ?? 'sample'
+    if (step === 1) return picked('image') ?? 'keep'
     if (question) return picked(question.key) ?? recommendedValue(question, style)
     return ''
   })()
   const [choice, setChoice] = useState<string>(current)
   useEffect(() => { setChoice(current) }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* 「同じアカウントの中にある物を使う」：同じアカウントのリッチメニュー・画像の候補（styleApi.resources）。 */
+  useEffect(() => {
+    if (choice !== 'existing' || resources) return
+    void styleApi.resources(accountId).then((res) => { if (res.success) setResources(res.data.items.filter((item) => item.kind === 'rich_menu' || item.kind === 'image')) }).catch((caught) => setError(describeApiFailure(caught, '読み込み')))
+  }, [choice, resources, accountId])
+
   const answer = (key: string, value: SetupAnswer) => {
     setAnswers((prev) => ({ ...prev, [key]: value }))
     setDirty(true)
   }
 
-  const save = async (next: Record<string, SetupAnswer>) => {
-    const res = await styleSetupApi.save(accountId, {
-      expectedVersion: version,
-      style,
-      answers: next,
-      choices: next.look?.mode === 'configured' ? { look: { mode: next.look.value === 'sample' || next.look.value === 'image' ? 'sample' : next.look.value === 'existing' ? 'existing' : 'configured' } } : undefined,
-    })
+  const save = async (next: Record<string, SetupAnswer>, nextChoices = choices) => {
+    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: next, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
     if (!res.success) throw new Error('save failed')
     setVersion(res.data.version)
     setDirty(false)
   }
 
   const loadSummary = async () => {
-    const [set, items] = await Promise.all([styleSetupApi.starterSet(accountId, style), styleSetupApi.starterItems(accountId)])
+    const [set, items] = await Promise.all([styleApi.starterSet(accountId, style), styleApi.starterItems(accountId)])
     if (!set.success || !items.success) throw new Error('summary failed')
-    const states = [...items.data.items]
-    const take = (item: StarterSetItem) => {
-      const at = states.findIndex((s) => s.kind === item.kind && (!s.key || s.key === item.key))
-      return at < 0 ? null : states.splice(at, 1)[0]
-    }
-    const automations = set.data.definition.items.filter((item) => item.kind === 'automation').map((item) => ({ item, state: take(item) }))
-    setSummary({ inserted: set.data.definition.items.filter((item) => item.kind in KIND_WORD), automations })
-    /* 質問で「送る」を選んだお知らせ（前日・当日）だけ最初からオン。ほかはオフで並べる（勝手に送らない）。 */
-    const reminderOn = (answers.reminder?.mode === 'configured' && answers.reminder.value === 'on')
-    setEnabled(Object.fromEntries(automations.filter((a) => a.state && a.state.status !== 'active').map((a) => [a.state!.target_id, reminderOn && a.item.feature === 'reminder'])))
+    const pairs = pairStarterItems(set.data.definition.items, items.data.items)
+    const activation = pairs.filter((pair) => needsActivation(pair.state))
+    setSummary({ inserted: pairs.filter((pair) => pair.item.kind in KIND_WORD), activation })
+    /* 質問で「送る」「受け付ける」にした物だけ最初からオン。ほかはオフで並べる（勝手に送らない）。 */
+    const on = (key: string) => answers[key]?.mode === 'configured' && answers[key]?.value === true
+    setEnabled(Object.fromEntries(activation.map((pair) => [pair.state.target_id, pair.state.kind === 'automation' ? on('reminders') : on('booking')])))
   }
 
   /* 最後の一覧から開いたときは、入った物を読んでから出す。 */
@@ -122,12 +126,12 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     return () => { cancelled = true }
   }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const go = async (next: WizardStep, nextAnswers = answers) => {
+  const go = async (next: WizardStep, nextAnswers = answers, nextChoices = choices) => {
     setError('')
     if (next === 'summary') {
       setBusy(true)
       try {
-        await save(nextAnswers)
+        await save(nextAnswers, nextChoices)
         setSummary(null)
         setStep('summary')
       } catch (caught) {
@@ -142,22 +146,36 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
 
   const nextOf = (i: number): WizardStep => (i + 1 >= total ? 'summary' : i + 1)
 
-  const commitAndNext = (key: string, value: SetupAnswer) => {
+  const commitAndNext = (key: string, value: SetupAnswer, nextChoices = choices) => {
     const nextAnswers = { ...answers, [key]: value }
     answer(key, value)
-    void go(nextOf(index), nextAnswers)
+    setChoices(nextChoices)
+    void go(nextOf(index), nextAnswers, nextChoices)
   }
 
-  const onNext = () => {
+  const onNext = async () => {
     if (step === 0) {
       if (choice !== style) { setStyle(choice as AccountStyle); setDirty(true) }
+      try { window.localStorage.removeItem(styleLaterKey(accountId)) } catch { /* 覚えられなくても進む */ }
       void go(1)
       return
     }
     if (step === 1) {
-      if (choice === 'existing' || choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return }
-      if (choice === 'later') { commitAndNext('look', { mode: 'later' }); return }
-      commitAndNext('look', { mode: 'configured', value: choice })
+      if (choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return }
+      if (choice === 'later') { commitAndNext('image', { mode: 'later' }); return }
+      if (choice === 'existing') {
+        const picked = resources?.find((item) => item.id === resource)
+        if (!picked) { setError('使うリッチメニューか画像を選んでください。'); return }
+        if (picked.kind === 'image') { commitAndNext('image', { mode: 'configured', resourceId: picked.id }); return }
+        /* 今あるリッチメニューをそのまま使う：初期セットのリッチメニューの代わりにする（choices）。 */
+        try {
+          const set = await styleApi.starterSet(accountId, style)
+          const menuKey = set.success ? set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key : undefined
+          commitAndNext('image', { mode: 'configured', value: 'keep' }, menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: picked.id } } : choices)
+        } catch (caught) { setError(describeApiFailure(caught, '読み込み')) }
+        return
+      }
+      commitAndNext('image', { mode: 'configured', value: choice })
       return
     }
     if (question) commitAndNext(question.key, answerOf(choice))
@@ -165,28 +183,41 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
 
   const close = async () => {
     if (busy) return
-    if (dirty && step !== 'summary') {
+    if (dirty && step !== 'summary' && step !== 0) {
       try { await save(answers) } catch { /* 閉じるのは止めない。答えは次に開いたとき聞き直す */ }
     }
     onClose(true)
   }
 
-  const later = async () => {
-    const next = { ...answers, style: { mode: 'later' } as SetupAnswer }
-    setBusy(true)
-    try { await save(next) } catch { /* 閉じるのは止めない */ }
-    setBusy(false)
+  /* スタイルを「あとで」：口に質問のキーが無いので保存せず、この端末に覚えて自動では開かない。はじめにやることに残る。 */
+  const later = () => {
+    try { window.localStorage.setItem(styleLaterKey(accountId), '1') } catch { /* 覚えられなくても閉じる */ }
     onClose(true)
   }
 
   const activate = async () => {
-    const ids = Object.entries(enabled).filter(([, on]) => on).map(([id]) => id)
+    const targets = (summary?.activation ?? []).filter((pair) => enabled[pair.state.target_id])
     setBusy(true)
     setError('')
     try {
-      const res = await styleSetupApi.activate(accountId, ids.map((id) => ({ id, kind: 'automation' as const })))
+      /* 予約メニューは今の版を読んで渡す。オートメーションは下書きの版（draftRevision）。 */
+      const items = await Promise.all(targets.map(async ({ state: target }) => {
+        if (target.kind === 'automation') return { id: target.target_id, kind: 'automation' as const, expectedDraftVersionId: target.draftRevision ?? undefined }
+        const menu = await styleApi.menu(accountId, target.target_id)
+        if (!menu.success) throw new Error('menu failed')
+        return { id: target.target_id, kind: 'booking_menu' as const, expectedVersion: menu.data.version }
+      }))
+      const res = await styleApi.activate(accountId, items)
       if (!res.success) throw new Error('activate failed')
-      notifySaved(`${ids.length}件を動かしました`)
+      const failed = res.data.items.filter((item) => !item.success)
+      if (!res.data.complete || failed.length > 0) {
+        /* 途中の失敗を成功で隠さない（API-CONTRACT-4）。動いた物は動いたまま、動かなかった物の名前を出す。 */
+        const names = failed.map((item) => targets.find((pair) => pair.state.target_id === item.id)?.item.name ?? item.id)
+        setError(`動かせなかった物があります：${names.join('・')}。中身を確かめて、もう一度押してください。`)
+        await loadSummary()
+        return
+      }
+      notifySaved(`${items.length}件を動かしました`)
       onClose(true)
     } catch (caught) {
       setError(describeApiFailure(caught, '動かす操作'))
@@ -209,7 +240,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     <DialogActions><div className={styles.footer}>
       <div className={styles.footerSide}>
         {step === 0
-          ? <Button onClick={() => void later()} disabled={busy}>あとで設定する</Button>
+          ? <Button onClick={later} disabled={busy}>あとで設定する</Button>
           : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>戻る</Button>}
       </div>
       <div className={styles.footerCenter}>
@@ -219,7 +250,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${onCount}件）`}</Button>
-          : <Button variant="primary" onClick={onNext} busy={busy} busyLabel="保存中…" widthReserve="idle"><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
+          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle"><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
       </div>
       <div className={styles.footerSide} aria-hidden="true" />
     </div></DialogActions>
@@ -257,8 +288,12 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         <div className={styles.lookRow}>
           <RadioCardGroup legend="見た目" className={styles.stack}>
             {LOOK_CHOICES.map((item) => (
-              <RadioCard key={item.value} name="setup-look" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.value === 'sample' ? `${label}${item.note}` : item.note} icon={<SetupIcon name={item.icon} />} />
+              <RadioCard key={item.value} name="setup-look" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.value === 'keep' ? `${label}${item.note}` : item.note} icon={<SetupIcon name={item.icon} />} />
             ))}
+            {choice === 'existing' ? (
+              <Select aria-label="使うリッチメニュー・画像" size="full" value={resource} onChange={setResource} disabled={resources === null}
+                options={[{ value: '', label: resources === null ? '読み込んでいます…' : resources.length ? '使うリッチメニュー・画像を選ぶ' : '使える物がありません' }, ...(resources ?? []).map((item) => ({ value: item.id, label: `${item.kind === 'image' ? '画像' : 'リッチメニュー'}：${item.name}` }))]} />
+            ) : null}
           </RadioCardGroup>
           <aside className={styles.samplePanel} aria-label="入る見本">
             <div className={styles.panelHead}><span className={styles.panelTitle}>入る見本</span><StatusBadge tone="neutral" dot>見本</StatusBadge></div>
@@ -310,13 +345,12 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           <section className={styles.card} aria-labelledby="setup-activate">
             <div className={styles.cardHead}><h3 id="setup-activate" className={styles.cardTitle}>動かす前に確かめる物</h3><span className={styles.cardMetaEnd}>止めた状態で入っています</span></div>
             <ul className={styles.rows}>
-              {summary.automations.map(({ item, state: itemState }) => (
-                <li key={item.key} className={styles.row}>
-                  <span className={styles.rowText}><span className={styles.rowTitle}>{item.name}</span><span className={styles.rowNote}>{item.text ?? ''}</span></span>
-                  <Link href="/reminders" className={styles.link}>中身を見る</Link>
-                  {itemState && itemState.status !== 'active'
-                    ? <Toggle label={`${item.name}を動かす`} checked={enabled[itemState.target_id] ?? false} onChange={(next) => setEnabled((prev) => ({ ...prev, [itemState.target_id]: next }))} disabled={busy} />
-                    : <StatusBadge tone="success" dot>動いている</StatusBadge>}
+              {summary.activation.length === 0 ? <li className={styles.row}><span className={styles.rowNote}>動かす前に確かめる物はありません。</span></li> : null}
+              {summary.activation.map(({ item, state: itemState }) => (
+                <li key={itemState.target_id} className={styles.row}>
+                  <span className={styles.rowText}><span className={styles.rowTitle}>{item.name}</span><span className={styles.rowNote}>{itemState.kind === 'booking_menu' ? '予約メニュー（止めた状態）' : item.text ?? 'LINE に自動で送る物'}</span></span>
+                  <Link href={itemState.kind === 'booking_menu' ? '/booking/menus' : '/automations'} className={styles.link}>中身を見る</Link>
+                  <Toggle label={`${item.name}を動かす`} checked={enabled[itemState.target_id] ?? false} onChange={(next) => setEnabled((prev) => ({ ...prev, [itemState.target_id]: next }))} disabled={busy} />
                 </li>
               ))}
             </ul>
@@ -381,7 +415,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
 }
 
 /** 入った物を種類ごとにまとめる（テンプレートは「A・B ほか n件」）。 */
-function groupInserted(items: StarterSetItem[]): Array<{ kind: string; note: string }> {
+function groupInserted(pairs: Pair[]): Array<{ kind: string; note: string }> {
+  const items = pairs.map((pair) => pair.item)
   const kinds = [...new Set(items.map((item) => item.kind))]
   return kinds.map((kind) => {
     const list = items.filter((item) => item.kind === kind)

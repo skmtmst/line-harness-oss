@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import type { AccountStyle } from '@/lib/api-style-setup'
+import type { AccountStyle } from '@line-crm/shared'
 import { SetupIcon } from './icons'
 import { sampleMenuFor } from './model'
 import styles from './sample-menu.module.css'

@@ -475,10 +475,10 @@ export default function Sidebar({
     let cancelled = false
     const load = async () => {
       try {
-        const { hqStyleSetupApi } = await import('@/lib/api-style-setup')
-        const res = await hqStyleSetupApi.attention()
+        const { hqStyleApi } = await import('@/lib/api-styles')
+        const res = await hqStyleApi.attention()
         if (cancelled || !res.success) return
-        setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts).reduce<number>((a, b) => a + (b ?? 0), 0), 0))
+        setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts as Record<string, number>).reduce<number>((a, b) => a + (b ?? 0), 0), 0))
       } catch {
         // 口がまだ無い・読めない：札を出さない
       }

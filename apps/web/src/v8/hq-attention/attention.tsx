@@ -17,8 +17,7 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
-import { hqStyleSetupApi, type HqAttentionItem, type HqAttentionKind } from '@/lib/api-style-setup'
-import { styleLabel } from '@/v8/onboarding/model'
+import { hqStyleApi } from '@/lib/api-styles'
 import styles from './attention.module.css'
 
 /*
@@ -29,13 +28,23 @@ import styles from './attention.module.css'
  * 口は組4の `GET /api/hq/style-attention`（作り中。撮影は見本）。
  */
 
+type HqAttentionKind = 'unhandledChats' | 'pendingBookings' | 'unpaid' | 'connections' | 'stoppedDeliveries'
+type HqAttentionItem = { accountId: string; name: string; counts: Partial<Record<string, number>>; details: Partial<Record<string, Array<{ id: string; href: string }>>> }
+
 const KINDS: ReadonlyArray<{ key: HqAttentionKind; label: string; href: string }> = [
   { key: 'unhandledChats', label: '未対応のトーク', href: '/chats?status=unread' },
   { key: 'pendingBookings', label: '承認待ちの予約', href: '/booking/bookings' },
-  { key: 'unpaid', label: '未払い', href: '/booking/menus?tab=payment' },
-  { key: 'connections', label: '接続の異常', href: '/line-accounts' },
+  { key: 'unpaid', label: '未払い', href: '/booking/bookings' },
+  { key: 'connections', label: '接続の異常', href: '/accounts' },
   { key: 'stoppedDeliveries', label: '止まった配信', href: '/broadcasts' },
 ]
+
+/** 口の行き先のうち、今の画面に無い道（予約設定・LINE アカウント）は今ある画面へ読み替える。 */
+function hrefOf(item: HqAttentionItem, kind: { key: HqAttentionKind; href: string }): string {
+  const href = item.details[kind.key]?.[0]?.href
+  if (!href || href.startsWith('/booking/settings') || href.startsWith('/line-accounts')) return kind.href
+  return href
+}
 
 const count = (item: HqAttentionItem, kind: HqAttentionKind) => item.counts[kind] ?? 0
 const total = (item: HqAttentionItem) => KINDS.reduce((sum, kind) => sum + count(item, kind.key), 0)
@@ -55,7 +64,7 @@ export default function HqAttentionV8() {
     setLoading(true)
     setError('')
     try {
-      const res = await hqStyleSetupApi.attention()
+      const res = await hqStyleApi.attention()
       if (!res.success) throw new Error('attention failed')
       setItems(res.data.items)
     } catch (caught) {
@@ -140,17 +149,16 @@ export default function HqAttentionV8() {
             <GridRow key={item.accountId}>
               <GridCell className={styles.account}>
                 <span className={styles.name} title={item.name}>{item.name}</span>
-                {item.style ? <span className={styles.style}>{styleLabel(item.style)}</span> : null}
               </GridCell>
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)
-                const href = item.details[entry.key]?.[0]?.href ?? entry.href
+                const href = hrefOf(item, entry)
                 if (value === 0) return <GridCell key={entry.key}><span className={styles.none} aria-label="なし">—</span></GridCell>
                 if (entry.key === 'connections') return <GridCell key={entry.key}><button type="button" className={styles.badgeButton} onClick={() => open(item.accountId, href)}><StatusBadge tone="danger" dot>LINE の接続</StatusBadge></button></GridCell>
                 return <GridCell key={entry.key}><button type="button" className={styles.count} onClick={() => open(item.accountId, href)} aria-label={`${item.name}の${entry.label} ${value}件を開く`}>{`${value} 件`}</button></GridCell>
               })}
               <GridCell>
-                <RowMenu appearance="box" size="row" label={`${item.name}の操作`} items={KINDS.filter((entry) => count(item, entry.key) > 0).map((entry) => ({ id: entry.key, label: `${entry.label}を開く`, onSelect: () => open(item.accountId, item.details[entry.key]?.[0]?.href ?? entry.href) }))} />
+                <RowMenu appearance="box" size="row" label={`${item.name}の操作`} items={KINDS.filter((entry) => count(item, entry.key) > 0).map((entry) => ({ id: entry.key, label: `${entry.label}を開く`, onSelect: () => open(item.accountId, hrefOf(item, entry)) }))} />
               </GridCell>
             </GridRow>
           ))}
