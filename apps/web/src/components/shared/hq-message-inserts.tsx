@@ -14,7 +14,7 @@ export const HQ_INSERT_CHIPS:readonly InsertTokenSpec[]=[
 ]
 export function HqInsertRow({onInsert,count,max=5000,disabled=false}:{onInsert:(token:string)=>void;count:number;max?:number;disabled?:boolean}) {
  const [open,setOpen]=useState(false);const anchor=useRef<HTMLSpanElement>(null)
- return <MessageInsertRow count={`${count.toLocaleString()} / ${max.toLocaleString()}`} more={
+ return <MessageInsertRow moreFirst count={`${count.toLocaleString()} / ${max.toLocaleString()}`} more={
   <>{([['店名','{{account.name}}','store'],['店の電話番号','{{var.store_phone}}','phone'],['予約ページ','{{var.reservation_url}}','link']] as const).map(([label,token,kind])=><MessageInsertButton key={token} kind={kind} disabled={disabled} label={label} onClick={()=>onInsert(token)}/>)}</>
  }>
   <MessageInsertButton kind="name" disabled={disabled} label="名前" onClick={()=>onInsert('{{name}}')}/>
