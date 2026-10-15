@@ -4264,6 +4264,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
+  // 店のアレルギーの選択肢（本物は accountAllergyOptions。まだ保存していない店は決まりの8つ・版0）。
+  if (method === 'GET' && pathname === '/api/account-settings/allergy-options') {
+    return { success: true, data: { version: 0, options: ['卵', '乳', '小麦', 'そば', '落花生', 'えび', 'かに', 'くるみ'] } }
+  }
   if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
     return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }
   }

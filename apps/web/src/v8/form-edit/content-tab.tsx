@@ -336,8 +336,8 @@ function OpenBlock(props: RowProps) {
   )
 }
 
-function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
-  return <Field label={label} htmlFor={htmlFor}>{children}</Field>
+function Labeled({ label, htmlFor, required, children }: { label: string; htmlFor?: string; required?: boolean; children: ReactNode }) {
+  return <Field label={label} htmlFor={htmlFor} required={required}>{children}</Field>
 }
 
 function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
@@ -347,7 +347,7 @@ function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock;
   const labelError = useFormEditAttempted() && !block.label.trim() ? '質問文を入れてください' : null
   return (
     <>
-      <Labeled label="質問文" htmlFor={labelId}>
+      <Labeled label="質問文" htmlFor={labelId} required>
         <SaveErrorField names={["label","block.label"]}><TextField id={labelId} value={block.label} placeholder="質問の文" invalid={Boolean(labelError)} aria-describedby={labelError ? `${labelId}-error` : undefined} onChange={(e) => set({ label: e.target.value })} /></SaveErrorField>
         <FieldError id={`${labelId}-error`}>{labelError}</FieldError>
       </Labeled>
@@ -464,10 +464,16 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
 /** 答えを保存する先（友だち情報の項目）。本名・表示名・メモへの保存は「詳しい設定」。 */
 function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const fixedKey = block.fixedField ?? (block.destinations?.realName ? undefined : fixedFieldForBlock(block))
-  if (fixedKey) return <div className={styles.saveTo}>
-    <span className={styles.fieldLabel}>答えを保存する先</span>
-    <span className={styles.cardNote}>{FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label}（決まった欄）</span>
-  </div>
+  // 決まった欄は変えられない。ほかの保存先と同じ欄の形で、読むだけで出す（絵 SwGrd）。
+  if (fixedKey) {
+    const fixedLabel = `${FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label ?? ''}（決まった欄）`
+    return <div className={styles.saveTo}>
+      <span className={styles.fieldLabel}>答えを保存する先</span>
+      <span className={styles.saveSelect}>
+        <EntitySelect aria-label="答えを保存する先" size="full" readOnly actionHidden value={fixedKey} onChange={() => {}} options={[{ value: fixedKey, label: fixedLabel }]} />
+      </span>
+    </div>
+  }
   const current = block.destinations?.friendFieldIds?.[0] ?? ''
   const options = [
     { value: '', label: '保存しない' },
@@ -517,6 +523,7 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
             placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
             meta={noMeta}
+            actionHidden="label"
           /></SaveErrorField>
         </Labeled>
         <Labeled label="担当">
