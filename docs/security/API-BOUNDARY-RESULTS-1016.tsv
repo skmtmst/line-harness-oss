@@ -851,7 +851,6 @@ POST	/api/events/admin/occurrences/:id/applicant-broadcasts/preview	401	403	403	
 POST	/api/events/admin/occurrences/:id/waitlist/promote	401	403	403	403
 POST	/api/events/admin/events/:id/slots	401	403	403	403
 PUT	/api/events/admin/events/:id/slots/:slotId	401	403	403	403
-POST	/api/events/liff/bookings/:id/change	401	403	403	403
 DELETE	/api/events/admin/events/:id/slots/:slotId	401	403	403	403
 GET	/api/events/admin/events/notifications/pending	401	403	403	403
 GET	/api/events/admin/events/:id/bookings	401	403	403	403

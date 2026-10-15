@@ -13,7 +13,7 @@
 
 初回調査ではコード・設定・既存試験を読み、追跡対象のファイル一覧、GitHubの公開状態、依存関係の警告を確認した。本番・検証環境へのログイン、Cloudflareのsecret一覧取得、DB照会、外部送信、既存の動作試験の再実行はしていない。秘密や顧客情報を抽出しない。
 
-2026-10-16の修正では、`08c94923e3` を保持し、試験前に最新取得した開発枝 `5ace6976dc519607874959df2b9f6396868e27a2` をmergeした。担当：kenta / Codex。修正・残件・オーナーの手順・故障対照は[修正記録](SECURITY-FIXES-1016.md)。本番・検証DB、secret、配備先の設定は変更していない。
+2026-10-16の修正では、`08c94923e3` を保持し、試験前に最新取得した開発枝 `5ace6976dc519607874959df2b9f6396868e27a2` をmergeした。続きでは開発枝 `765373beee065d1ef2e6f846cfc7d38f176f786c` を通常mergeした。担当：kenta / Codex。修正・残件・オーナーの手順・故障対照は[修正記録](SECURITY-FIXES-1016.md)。本番・検証DB、secret、配備先の設定は変更していない。
 
 表のパスはリポジトリのルートから。命令は原則として読むだけ。「検証で確認」は、別途用意した架空データの環境で担当者が行う次の作業。実際のお客さまへ試し送信しない。
 
@@ -25,9 +25,9 @@
 | S02 | Cookieと不正な外部操作への対策・高 | `auth.ts` のCookie属性と更新時のCSRF比較、`admin-auth-config.ts` の許可元を読む | 済：Secure・HttpOnlyのセッションCookie、CSRF比較、接続構成の検査がある | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/admin-auth-config.ts` |
 | S03 | 新しいAPIがスタッフへ無条件に開かない・高 | `permissionForApiPath` とスタッフの許可条件、網羅試験の分類を読む | 済：未分類の管理APIはスタッフを403で拒否する設計。全APIの安全の証明ではない | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/route-guard-coverage.test.ts` |
 | S04 | 統括・店・別アカウントの境界・高 | `tenant-scope.ts`、各APIの所属確認と境界試験を読む。画面の「統括／店」と内部のowner/admin/staffを同じ意味と考えない | 済：共通の所属範囲検査とAPI別の制限がある。全経路の実動作はS07 | `apps/worker/src/middleware/tenant-scope.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/calendar.security.test.ts` |
-| S05 | 閲覧のみでは変更・鍵取得ができない・高 | `auth.ts` の安全なHTTPメソッド以外の拒否、`denyReadOnly` を読む | 済：更新の一律拒否と、鍵情報などを読むこと自体の拒否がある | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/staff-api-key.security.test.ts` |
+| S05 | 閲覧のみでは変更・鍵取得ができない・高 | `auth.ts` の安全なHTTPメソッド以外の拒否、`denyReadOnly` を読む | 済：更新の一律拒否と、鍵情報などを読むこと自体の拒否がある。続きでCSV・export・downloadの拒否も追加し、機能ごとの閲覧権限からの書出しも止める | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/staff-api-key.security.test.ts` |
 | S06 | 代理ログインは範囲・理由・履歴で制限する・高 | `resolveImpersonation`、伏せ字、書き出し拒否、理由付き表示、禁止操作を読む | 済：セッションに結び付き、既定は閲覧のみ。個人情報は既定で伏せ、解約等を禁止する | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/routes/ops.ts`、`apps/worker/src/middleware/train30-impersonation.test.ts` |
-| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：管理API 1,480経路で未ログイン401とowner/admin/staffの別アカウント指定403を実行し[結果表](API-BOUNDARY-RESULTS-1016.tsv)を作成。更新の閲覧のみ拒否・代理ログインの既存試験も再実行。ただしクエリを付けない他店の資源ID単独と代理ログインの全経路までは未完。旧スコア5経路はbehaviorfixと同じ410停止をこの枝にも実装し、5文脈×5経路でD1へ到達しないことを試験 | `apps/worker/src/index.ts`、`apps/worker/src/routes/openapi.ts`、`apps/worker/src/middleware/route-guard-coverage.test.ts` |
+| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,652経路の一覧](API-ROUTE-INVENTORY-1016.tsv)と[管理1,479経路の共通境界](API-BOUNDARY-RESULTS-1016.tsv)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](API-ROUTE-REVIEW-1016.md)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
 | S08 | 2人と不要アカウントの実際の権限・高 | 各サービスのメンバー画面とmusuboのユーザー管理を2人で確認し、[権限表](TWO-FACTOR-SETUP.md#誰に何の権限があるか)へ名前・役割だけ記録 | 分からない：アカウントの実際の割り当ては取得していない | `docs/brain/Memory.md`、`apps/worker/src/routes/staff.ts` |
 | S09 | 二段階認証と回復手段・高 | [設定手順](TWO-FACTOR-SETUP.md)で各自の設定を確認。musubo側も二段階認証の設定と暗号化用secretの有無を担当者と確認 | 分からない：登録・必須化のコードはあるが、2人の設定と本番の鍵は未確認 | `apps/worker/src/routes/admin-auth.ts`、`apps/worker/src/lib/mfa-config.ts`、`apps/worker/src/routes/admin-auth-mfa-enforcement.test.ts` |
 
@@ -42,7 +42,7 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 | S12 | Googleの通知入口の有無・高 | `rg -n -i 'x-goog\|pubsub\|calendar.*watch\|google.*webhook' apps/worker/src --glob '!*.test.*'` とカレンダー経路を読む。Google Cloud・Apps Script等の外側の設定も担当者が確認する | 済：このコード内ではGoogle Calendarから直接受けるpush通知の入口は見当たらず、API呼出し方式。署名実装済みとは数えない。外側の設定はS35で確認 | `apps/worker/src/routes/calendar.ts`、`apps/worker/src/services/google-calendar.ts` |
 | S13 | Meet完了通知をGoogle通知と混同しない・高 | `/api/meet-callback` と共通の署名検証、受信済み記録を読む | 済：Meet Harness独自のHMACと前後5分の時刻を検証。Googleが付けた署名ではない | `apps/worker/src/routes/meet-callback.ts`、`apps/worker/src/services/support-relay.ts`、`docs/meet-callback-security.md` |
 | S14 | LIFFの本人確認・高 | `verifyCallerLineIdentity` のLINEへのIDトークン照会と対象チャネルの選択を読む。ブラウザが送った友だちIDだけでは本人としない | 済：LINEの検証APIへIDトークンとチャネルIDを送り、返された本人IDを使う共通処理がある | `apps/worker/src/services/liff-auth.ts`、`apps/worker/src/services/liff-auth.test.ts`、`apps/worker/src/routes/liff.ts` |
-| S15 | LIFF全入口で別人・別店・期限切れを拒否する・高 | 架空の本人Aで本人Bの予約・回答・添付を指定し拒否を確認。別チャネル・期限切れ・トークン欠落でも確認。公開閲覧の入口と本人操作を分けて一覧化する | 未：予約の他店チャネル・未検証JWTのaudを信用する経路を修正。`booking-channel.security.test.ts`で拒否を実行。本人の予約変更・待ち・フォーム等の既存試験も再実行。全LIFF入口×別人・別店・失効の表は未完成（[残る開発作業](SECURITY-FIXES-1016.md#s07s15-残る開発作業)） | `apps/worker/src/routes/liff.ts`、`apps/worker/src/routes/booking.ts`、`apps/worker/src/routes/forms.security.test.ts`、`apps/worker/src/routes/liff-oauth-scenario-gate.test.ts` |
+| S15 | LIFF全入口で別人・別店・期限切れを拒否する・高 | 架空の本人Aで本人Bの予約・回答・添付を指定し拒否を確認。別チャネル・期限切れ・トークン欠落でも確認。公開閲覧の入口と本人操作を分けて一覧化する | 未：全入口は[経路一覧](API-ROUTE-INVENTORY-1016.tsv)へ収録。前回の予約14経路に加え、イベント8経路・待ち案内2経路・ウェビナー7経路の他店チャネルを拒否。未割当の他統括利用、停止統括の素材・案内・会員/ペット9経路、LIFFと店の指定不一致も修正。全入口×別人・別店・失効の実資源を使う検査は未完（[記録](API-ROUTE-REVIEW-1016.md)） | `routes/events-channel.security.test.ts`、`routes/webinars-channel.security.test.ts`、`services/liff-auth.test.ts`、`packages/db/test/friend-account-lookup.test.ts`、`packages/db/test/webinar-public-scope.test.ts` |
 
 ## 秘密の値・個人情報
 
@@ -63,7 +63,7 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
-| S26 | 開発・試験道具を含む依存の穴・高 | `pnpm audit --json`。警告を出した版とlockfileを照合し、安全な更新または到達しない根拠を記録する | 未：fast-uri 3.1.8・ip-address 10.7.1・LIFF SDK 2.31.1へ更新しmoderateを12→9へ減らした。critical 2（tinypool）は1→2系の判断待ち、high 1（braces）は修正版なし。大きい更新をせず止めた。下記依存記録と修正記録に影響・次の手順 | `package.json`、`pnpm-lock.yaml`、この文書の「依存検査の記録」 |
+| S26 | 開発・試験道具を含む依存の穴・高 | `pnpm audit --json`。警告を出した版とlockfileを照合し、安全な更新または到達しない根拠を記録する | 未：司令塔の承認で開発専用Vitestを4.1.11へ更新し、tinypoolがなくなりCritical 2→0。全体はCritical 0 / High 1 / Moderate 5 / Low 4。bracesのHighは修正版なし。開発のNext lint経由で、深く入れ子にしたglob入力が悪用条件。現設定はglobを指定せず、その回避条件を `lint-glob-boundary.test.ts` で監視する。全検査と故障対照は修正記録へ | `package.json`、`pnpm-lock.yaml`、この文書の「依存検査の記録」 |
 | S27 | 製品用の依存の穴・中 | `pnpm audit --prod --json`。担当者がビルド後に含まれる物と利用条件を確認する | 未：修正後critical/high 0、moderate 5・low 1（修正前8・1）。製品用依存の絞り込み結果であり、本番への影響なしとは断定しない | `pnpm-lock.yaml`、`apps/worker/package.json`、`apps/web/package.json` |
 | S28 | ログイン・出力・アップロードの回数制限・高 | `rate-limit.ts` と `sensitive-rate-limit.ts` を読む | 済：一般の急増制限に加え、重要操作はD1で共有。共有側の失敗時は503で止める。一般のカウンターはWorkerごとのメモリで、再起動で消える | `apps/worker/src/middleware/rate-limit.ts`、`apps/worker/src/middleware/sensitive-rate-limit.ts`、`apps/worker/src/middleware/rate-limit-shared.test.ts` |
 | S29 | 本番で制限と負荷対策が効くか・中 | 担当者が検証用の低い予算で429・Retry-After・D1障害時の503を確認。Cloudflare側の防御と請求の監視も確認 | 分からない：本番で大量の試しアクセスはしていない。D1の必要な表、配備版、防御設定も未確認 | `apps/worker/src/middleware/sensitive-rate-limit.ts`、`apps/worker/src/middleware/rate-limit-shared.test.ts` |
@@ -100,9 +100,11 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 
 ### 修正後（2026-10-16 kenta）
 
-`pnpm audit --json`：critical 2 / high 1 / moderate 9 / low 4、`--prod`：critical/high 0 / moderate 5 / low 1（どちらも警告で終了1）。`fast-uri`は3.1.7→3.1.8、`ip-address`は10.7.0→10.7.1。監査件数に出ないLINE公式の安全上の更新案内も確認し、`@line/liff`は2.31.0→2.31.1へ更新（[公式](https://developers.line.biz/en/docs/liff/release-notes/#liff-v2-31-1)）。全lockfileの該当部品を検査する `scripts/security/patched-dependencies.test.ts` は、古い版が1つ混ざっても失敗する。修正版の根拠：[fast-uriの警告](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj)、[ip-addressの警告](https://github.com/advisories/GHSA-j6r3-76f7-8jcv)と[別の警告](https://github.com/advisories/GHSA-h3mg-xc3c-68pw)。本番に届く程度をこの件数だけでは判断しない。
+前回の修正時点（続きの更新前）：`pnpm audit --json`：critical 2 / high 1 / moderate 9 / low 4、`--prod`：critical/high 0 / moderate 5 / low 1（どちらも警告で終了1）。`fast-uri`は3.1.7→3.1.8、`ip-address`は10.7.0→10.7.1。監査件数に出ないLINE公式の安全上の更新案内も確認し、`@line/liff`は2.31.0→2.31.1へ更新（[公式](https://developers.line.biz/en/docs/liff/release-notes/#liff-v2-31-1)）。全lockfileの該当部品を検査する `scripts/security/patched-dependencies.test.ts` は、古い版が1つ混ざっても失敗する。修正版の根拠：[fast-uriの警告](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj)、[ip-addressの警告](https://github.com/advisories/GHSA-j6r3-76f7-8jcv)と[別の警告](https://github.com/advisories/GHSA-h3mg-xc3c-68pw)。本番に届く程度をこの件数だけでは判断しない。
 
-Criticalの2件は同じtinypool 1.1.1。両方の修正版は2.1.2以上で、1→2系の更新になる。既存Vitest 3.2.7の依存範囲は1系で、強制overrideは互換性の試験が必要なため実施しない。braces 3.0.3のHighは監査上の修正版なし。S26は未のまま。[影響とオーナー判断](SECURITY-FIXES-1016.md#s26-依存の更新と止めた更新)。
+続きではVitest 4.1.11へ更新し、Critical 0 / High 1 / Moderate 5 / Low 4、製品用0 / 0 / 5 / 1。両方警告による終了1。Highの到達条件と回避策は[続きの記録](SECURITY-FIXES-1016.md#修正版がないhigh-1件)。
+
+前回止めた理由（司令塔が後に更新を承認）：Criticalの2件は同じtinypool 1.1.1。両方の修正版は2.1.2以上で、1→2系の更新になる。既存Vitest 3.2.7の依存範囲は1系で、強制overrideは互換性の試験が必要なため実施しない。braces 3.0.3のHighは監査上の修正版なし。S26は未のまま。[影響とオーナー判断](SECURITY-FIXES-1016.md#s26-依存の更新と止めた更新)。
 
 ### 初回調査（修正前）
 
@@ -141,7 +143,7 @@ S07・S15・S22・S24・S28の「試験が本当の故障を見付けるか」�
 | --- | --- | --- |
 | S19 | 今回のGitleaks 8.30.1による全参照検査と故障対照は済。公開直前に承認済みの端末で同じ版と検出設定を固定して再検査。全対象remoteの枝・tagを取得して対象ref数を記録し、`gitleaks git --redact=100 --log-opts="--all" .` を実行。レポートと標準出力はGit/Slack外の権限を絞った保管先へ。GitHub SecurityのSecret scanning・push protectionの利用可否と有効範囲も確認 | 別の使い捨てrepoで架空の検出対象を過去commit→削除し、全履歴検査が終了1になることを先に確認。問題発見時は種類・場所だけ記録し旧鍵を失効。検査の終了値と全対象refの網羅を確認してから済。画像内の秘密はS38で目視。[公式の使い方](https://github.com/gitleaks/gitleaks#usage) |
 | S21 | 環境ごとに別の32バイト鍵を安全な端末で生成し、Worker secret `GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY` へ標準入力またはCloudflareの秘密設定画面で登録（通常変数・引数・履歴・ログへ置かない）。承認・控えを整え、既存平文はGoogleで失効後に暗号化対応した接続口から再登録し、旧接続と控えの扱いを確認。既存予約のconnection_id参照の付替えは別途承認済み移行手順を用意し、先に削除しない | 新規3種の暗号化と旧平文件数0を値なしの件数で確認。検証用接続で鍵欠落・改ざん時に保存/Google呼出しが止まることを確認。既存接続はこの修正後500で停止するため、secret設定と移行準備なしで配備しない。手順の詳細は修正記録 |
-| S26 | tinypoolの1→2系または対応Vitestへの更新を判断する。承認後、隔離枝で全パッケージの試験・watch・型・ビルド・CI設定を確認。bracesは修正公開の再確認か上流の修正版/互換性を確認した対策を別途採用 | Critical/Highの監査結果と、旧版を混ぜると落ちる検査を確認。現状2/1のままなので公開判断へ持ち越す。更新承認がないまま強制overrideしない |
+| S26 | 開発依存の大きい更新は司令塔が承認し、Vitest 4.1.11への更新でCriticalは0。bracesの上流修正版を確認し、公開後に更新。現行のlintではnext.rootDirを未指定のまま保ち、外部入力からパターンを作らない | 現在Critical 0 / High 1。旧Vitest・危険なtinypoolを混ぜる試験と、globの解析経路を再開すると落ちる試験で再発を防ぐ。Highは未解消として公開判断に残す |
 | S32 | マサトさんが使い捨てDBと操作役を承認。本番データを使わず架空の友だち・予約・配信状態を作り、控え/復元点を取得。件数と状態を控え、故障（予約の変更・削除）を入れ、復元して同じ確認を繰り返す。送信は無効のまま | 故障後の確認は失敗し、復元後は件数・予約・配信状態が一致。開始/終了/所要時間と担当を記録。戻せない場合は未。復元点の実値とDBの中身は非公開保管 |
 | S36 | コード反映時にDEPLOY_ENV=productionを値の種類だけで確認し、承認後に本番設定のRESTAURANT_TEST_ENABLEDをfalseへ整理。検証はstaging＋true。本番の設定や配備は今回は変更していない | 配備後に管理API・通知入口・内部sandbox入口が404、飲食店cron/予約メールも停止。架空の検証でstagingだけ動く。単に設定ファイルを直しただけでは実配備確認に数えない |
 | S37 | オーナー/マサトさんがGitHub Settings → General → Danger Zone → Change repository visibilityで非公開化を実施し、共同開発者・Actions・Pagesへの影響を確認 | `gh repo view skmtmst/line-harness-oss --json visibility` がPRIVATE。未ログインの別ブラウザでソースが読めない。Pages等の公開は別に確認。過去のコピーや漏れた鍵は回収できないためS19/S38も続ける |
