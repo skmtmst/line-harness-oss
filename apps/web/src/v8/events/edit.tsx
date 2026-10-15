@@ -162,7 +162,7 @@ function EditEntry() {
       <PaymentSideCard title="決済をつないでいない店のとき">「お支払い」の段は出さず、「先払いを受けるには お支払いをつなぐ →」の 1 行だけ出します（押せない形にしない）。</PaymentSideCard>
       <PaymentSideCard title="キャンセルと返金">開始前のキャンセルの期限までの取り消しは自動で返金します。過ぎた取り消しは返金しません（予約設定 › 予約のルール）。</PaymentSideCard>
     </div>}
-    summaryLabel="お支払いの説明"
+    layout="record-detail" summaryLabel="お支払いの説明" summaryPreview={{ label: "お支払いの説明を見る", title: "お支払いの説明" }}
     actions={<><Button href={`/events/change-review?id=${id}`}>変更の影響を確認</Button><Button href={`/events/preview?id=${id}`}>お客様表示を確認</Button><Button href={`/events/bookings?id=${id}`}>申込の一覧を見る</Button></>}
     stats={<BookingStatus key={scope} accountId={selectedAccountId} eventId={id} refreshKey={statusSeq} />}>
     <LifecycleSection key={scope} accountId={selectedAccountId} eventId={id} onChanged={() => setStatusSeq((value) => value + 1)} />
