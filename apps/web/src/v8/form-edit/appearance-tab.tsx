@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { requiredText } from '@/lib/form-requirement'
 export const formNameRequirement = requiredText('フォーム名を入力してください')
 
@@ -180,10 +181,10 @@ export function AppearanceTab(props: Props) {
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <RadioCardGroup legend="見た目の使い方" className={styles.designModes}>
-            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} icon={props.portable ? <Store size={14} /> : undefined} title={props.portable?'配った先の店のデザインに合わせる':'店の設定に合わせる'} note={props.portable?'配った先で、その店の設定を使います':`今：${accountLabel}`} />
-            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} icon={props.portable ? <Palette size={14} /> : undefined} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
+            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} icon={<Store size={14} />} title={props.portable?'配った先の店のデザインに合わせる':'店の設定に合わせる'} note={props.portable?'配った先で、その店の設定を使います':`今：${accountLabel}`} />
+            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} icon={<Palette size={14} />} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
           </RadioCardGroup>
-          {!props.portable ? <Link href="/settings/customer-look">店のデザインを変える ↗</Link> : mode === 'fixed' ? <p className={styles.cardNote}>このフォームは色を固定して配ります。配った先の店の設定より優先します。</p> : null}
+          {!props.portable ? <span><TextLink external href="/settings/customer-look">店のデザインを変える</TextLink></span> : mode === 'fixed' ? <p className={styles.cardNote}>このフォームは色を固定して配ります。配った先の店の設定より優先します。</p> : null}
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
           {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
           {mode === 'fixed' && preset === 'custom' ? <>

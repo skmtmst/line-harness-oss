@@ -141,9 +141,8 @@
 .toggleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fe-save-gap); min-height: var(--tpl-fe-toggle-h); font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
 .limitRow { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); }
 .limitInput { width: var(--tpl-fe-limit-w); }
-.subBox + .subBox { margin-top: calc(var(--tpl-fe-open-gap) - var(--tpl-fe-card-gap)); }
 .tight { display: flex; flex-direction: column; gap: var(--tpl-fe-words-gap); }
-.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius); box-shadow: var(--tpl-fe-ring); }
+.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); } /* 絵 e875x：段は枠なし・余白なしでカードの中に並べる */
 .subTitle { margin: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-sub-title-lh); color: var(--color-ink); }
 .wells { display: flex; flex-direction: column; gap: var(--tpl-fe-wells-gap); }
 .well { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); font-size: var(--tpl-fe-note-size); color: var(--color-ink-faint); }
