@@ -70,6 +70,18 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('正の道具列のsearchSlotは通し、隣の検索欄と同名の自作は検出する', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/shared/list-toolbar.tsx', 'export default function ListToolbar() { return null }')
+    const pattern = loadCatalog(DEFAULT_CATALOG).patterns.find((row: { id: string }) => row.id === 'toolbar')
+    const file = 'apps/web/src/v8/demo/search.tsx'
+    const scan = (source: string) => scanCodeFile(pattern, file, source, {}, root).filter((hit: { signal: string }) => hit.signal === 'search-alone')
+    const imports = "import Tools from '@/components/shared/list-toolbar'; import SearchField from '@/components/shared/search-field';"
+    expect(scan(imports + 'export const P=()=> <Tools searchSlot={<SaveErrorField><SearchField /></SaveErrorField>} />')).toHaveLength(0)
+    expect(scan(imports + 'export const P=()=> <><Tools /><SearchField /></>')).toHaveLength(1)
+    expect(scan("import Tools from './own-toolbar'; export const P=()=> <Tools searchSlot={<SearchField />} />")).toHaveLength(1)
+    expect(scan('function ListToolbar(){return null} export const P=()=> <ListToolbar searchSlot={<SearchField />} />')).toHaveLength(1)
+  })
   it('題の正の型へ渡す説明を実ファイルまで照合し、偽の再公開や説明内の操作は止める', () => {
     const { root } = fixture()
     put(root, 'apps/web/src/components/templates/create-page.tsx', 'export function CreatePage() { return null }')

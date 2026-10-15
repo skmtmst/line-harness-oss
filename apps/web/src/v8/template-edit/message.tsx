@@ -487,7 +487,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         title={title}
         description={description}
         band={conflict ? (
-          <SaveConflictBand designNode="NCbYn"
+          <SaveConflictBand reloadVariant="primary" designNode="NCbYn"
             title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
             compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}

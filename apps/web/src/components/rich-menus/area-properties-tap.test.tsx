@@ -30,15 +30,13 @@ function Harness({ liffId = 'L-1', allowedIntents }: { liffId?: string | null; a
 }
 const last = () => seen[seen.length - 1]
 const pick = (label: string) => {
-  fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-  fireEvent.click(within(screen.getByRole('listbox')).getByText(label))
+  fireEvent.click(within(screen.getByRole('group', { name: '押したときの動き' })).getByRole('radio', { name: label }))
 }
 
 describe('リッチメニューの押したら', () => {
   it('6つの後ろにリッチメニューだけの種類が並ぶ', () => {
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-    const names = within(screen.getByRole('listbox')).getAllByRole('option').map((option) => option.querySelector('span span')?.textContent ?? option.textContent)
+    const names = within(screen.getByRole('group', { name: '押したときの動き' })).getAllByRole('radio').map((option) => option.getAttribute('aria-label'))
     expect(names.slice(0, 6)).toEqual(['URLを開く', 'テキストを送る', '予約', '回答フォーム', '予約履歴', '来店スタンプ'])
     expect(names).toContain('テンプレートを送る')
     expect(names).toContain('電話をかける')
@@ -73,8 +71,7 @@ describe('リッチメニューの押したら', () => {
 
   it('統括のひな形は予約・予約履歴・来店スタンプを出さない（配った先の LIFF に付け替える口がまだ無い）', () => {
     render(<Harness allowedIntents={[...HQ_RICH_MENU_INTENTS]} />)
-    fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-    const text = screen.getByRole('listbox').textContent ?? ''
+    const text = screen.getByRole('group', { name: '押したときの動き' }).textContent ?? ''
     expect(text).toContain('URLを開く')
     expect(text).toContain('回答フォーム')
     expect(text).not.toContain('予約履歴')

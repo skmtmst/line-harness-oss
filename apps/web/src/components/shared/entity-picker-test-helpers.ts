@@ -31,6 +31,6 @@ export async function pickEntities(label: string, names: string[]) {
   fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${escape(label)}(?::|：)?(選ぶ|変える)?$`) }))
   const dialog = await findPickerDialog()
   for (const name of names) fireEvent.click(await within(dialog).findByRole('checkbox', { name }))
-  fireEvent.click(within(dialog).getByRole('button', { name: /^この .+にする$|^この.+にする$/ }))
+  fireEvent.click(within(dialog).getByRole('button', { name: /^選ぶ（\d+件）$/ }))
   await waitFor(() => expect(screen.queryAllByRole('dialog').includes(dialog)).toBe(false))
 }

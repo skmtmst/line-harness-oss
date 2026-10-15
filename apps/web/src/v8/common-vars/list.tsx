@@ -1,4 +1,5 @@
 'use client'
+import Disclosure from '@/components/shared/disclosure'
 
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
@@ -47,9 +48,8 @@ import BulkBar from '@/components/shared/bulk-bar'
 import { RowMenu } from '@/components/shared/row-actions';
 import { withViewTransition } from '@/components/shared/view-transition';
 import Select from '@/components/shared/select'
-import HelpTip from '@/components/shared/help-tip'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/components/shared/folder-dot';
 import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
 import { formatListTimestamp, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
@@ -57,7 +57,7 @@ import { reasonRequirement, typedKeyRequirement, blockedReason, canDelete as can
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { Field } from '@/components/shared/form-controls';
 import { displayValue, emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
@@ -1339,7 +1339,7 @@ function CommonVarsListInner() {
       <Dialog
         open={deleteTarget !== null}
         designNode="xxKtW"
-        designWidth={600}
+        designWidth={480}
         designTop={240}
         designHeaderPadding="24px 24px 0"
         /* 絵 xxKtW：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
@@ -1357,11 +1357,12 @@ function CommonVarsListInner() {
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              <span>{reasonRequirement.required ? <RequiredBadge /> : null}<SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（絵 xxKtW の帯の高さ）。 */
+              <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                 aria-required={reasonRequirement.required}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="理由（必須・記録に残ります）"
+                placeholder="理由（必須）"
                 aria-label="消した理由・止める理由（記録に残ります）"
                 title="消した理由・止める理由（記録に残ります）"
                 className={styles.footerReason}
@@ -1378,6 +1379,7 @@ function CommonVarsListInner() {
                 variant="danger"
                 onClick={() => void confirmReplacement()}
                 disabled={deleteBusy || replacementPhase !== 'ready' || !replacementImpact?.canReplace || !deleteReason.trim()}
+                title={deleteBusy ? '差し替えています' : replacementPhase !== 'ready' ? '差し替え後の影響を確認してください' : !replacementImpact?.canReplace ? '差し替えられない箇所を確認してください' : !deleteReason.trim() ? '消した理由・止める理由を入力してください' : undefined}
                 busy={deleteBusy}
                 busyLabel="差し替え中…"
               >
@@ -1390,6 +1392,7 @@ function CommonVarsListInner() {
                 variant="primary"
                 onClick={() => void confirmStopInstead()}
                 disabled={deleteBusy || !deleteReason.trim()}
+                title={deleteBusy ? '止めています' : !deleteReason.trim() ? '消した理由・止める理由を入力してください' : undefined}
                 busy={deleteBusy}
                 busyLabel="止めています…"
               >
@@ -1479,9 +1482,6 @@ function CommonVarsListInner() {
                   <div className={styles.choiceGroup} role="radiogroup" aria-label="どうしますか">
                     <p className={styles.dialogQuestion}>
                       どうしますか
-                      <HelpTip label="確認した範囲">
-                        {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                      </HelpTip>
                     </p>
                     <div
                       className={styles.choiceBox}
@@ -1509,10 +1509,10 @@ function CommonVarsListInner() {
                           onChange={(value) => void selectReplacement(value)}
                           aria-label="差し替え先"
                           options={replacementCandidates.length > 0
-                            ? replacementCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate),
-                              value: candidate.id,
-                              label: `差し替え先：${candidate.name} ${placeholderText(candidate.varKey)}`,
-                            }))
+                            ? replacementCandidates.map((candidate) => {
+                              const item = items.find((row) => row.id === candidate.id), folder = item ? folderDotOf(item) : null
+                              return { ...entityOptionMetadata(item ?? candidate), value: candidate.id, color: folder ? folderDisplayColor(folder) : undefined, label: `差し替え先：${candidate.name} ${placeholderText(candidate.varKey)}` }
+                            })
                             : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
                         /></SaveErrorField>
                         {replacementPhase === 'loading' ? (
@@ -1555,14 +1555,12 @@ function CommonVarsListInner() {
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
 
-                {deleteImpact.canDelete ? (
-                <Field label="消した理由（記録に残ります）" requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                <Field label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'} requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
                     className={styles.dialogInput}
                   /></SaveErrorField></Field>
-                ) : null}
 
                 {deleteImpact.canDelete ? (
                   <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><input
@@ -1577,9 +1575,9 @@ function CommonVarsListInner() {
                   <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
                 ) : null}
 
-                {deleteImpact.canDelete ? <p className={styles.dialogHint}>
+                <Disclosure title="確認した範囲" size="compact"><p className={styles.dialogHint}>
                   {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                </p> : null}
+                </p></Disclosure>
               </>
             ) : null}
           </div>

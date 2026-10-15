@@ -3,10 +3,11 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { GridNameCell } from './grid-table'
 import TruncatedText from './truncated-text'
+import { ListFolderContext } from './list-folder-context'
 
 afterEach(cleanup)
 it('フォルダ一覧の既定の未分類の丸と、名前の全文を保つ', () => {
-  render(<GridNameCell name={<TruncatedText value="試験の名前" />} />)
+  render(<ListFolderContext.Provider value={true}><GridNameCell name={<TruncatedText value="試験の名前" />} /></ListFolderContext.Provider>)
   expect(screen.getByRole('img', { name: 'フォルダ：未分類' })).toBeTruthy()
   expect(screen.getByRole('cell').textContent).toContain('試験の名前')
 })

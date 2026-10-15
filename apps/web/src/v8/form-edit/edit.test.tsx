@@ -128,7 +128,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.getByText('ページ1 のブロック')).toBeTruthy()
     // 開いている設定（質問文の欄）に質問の文が入っている
     expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
-    expect(screen.getByText('下書き・公開中の版と違うところがあります')).toBeTruthy()
+    expect(screen.getByText('下書き・公開中と違います')).toBeTruthy()
   })
 
   it.each(['staff', 'owner', 'admin'])('役割の読み込み後、保存・公開は権限で隠す（%s）', async (role) => {

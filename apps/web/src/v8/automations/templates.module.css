@@ -3,22 +3,13 @@
  * ここは本文（きっかけの札の段・4列のカード・注記）だけ。値は globals.css の `--tpl-wb-tm-*`。
  */
 
-/* 本文：上16・左右24・下24、段の間14（絵の「本文」）。 */
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wb-tm-body-gap);
-  padding-block: var(--polish-space-card) var(--polish-space-section);
-}
 
-/* きっかけの札の段（1行・右端に再読み込み）。 */
+/* きっかけの札の段（1行・札の続きに再読み込み。絵 c7dxp）。 */
 .tools {
   display: flex;
   align-items: center;
   gap: var(--tpl-wb-tm-tools-gap);
   min-width: 0;
-  padding-inline: var(--polish-space-section);
-  flex-wrap: wrap;
 }
 .toolsLabel {
   flex-shrink: 0;
@@ -32,10 +23,8 @@
   gap: var(--tpl-wb-tm-tools-gap);
   min-width: 0;
 }
-.spacer {
-  flex: 1;
-}
 
+/* カードの中身。面と格子は共通の型が持つ。 */
 .cardTitle {
   margin: 0;
   overflow: hidden;
@@ -71,12 +60,10 @@
   margin: 0;
   color: var(--color-ink-secondary);
 }
-.cardSpacer {
-  flex: 1;
-}
+
 /* 注記（薄い地・角丸8）。 */
 .note {
-  margin: 0 var(--polish-space-section);
+  margin: 0;
   padding: var(--tpl-wb-tm-note-pad);
   border-radius: var(--tpl-wb-tm-note-radius);
   background: var(--color-surface-pearl);

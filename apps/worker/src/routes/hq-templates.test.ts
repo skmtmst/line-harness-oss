@@ -665,3 +665,43 @@ describe('統括を店と同じ欄で使う API-18',()=>{
     expect(count('hq_template_versions')).toBe(1);
   });
 });
+
+describe('HQフォームの送らない試し',()=>{
+ test('保存したひな形を店と同じ検査で試し、回答・後処理・外部送信を作らない',async()=>{
+   const definition={...formDefinition,form:{...formDefinition.form,fields:[{name:'name',label:'お名前',type:'text',required:true}]}};
+   const created=await request('','POST',{type:'form',name:'試す',definition,requestId:crypto.randomUUID()});expect(created.status).toBe(201);
+   const id=created.body.data.template.id;
+   const external=vi.fn(()=>{throw new Error('no external send')});vi.stubGlobal('fetch',external);
+   try {
+     const empty=await request(`/${id}/test-send`,'POST',{answers:{}});expect(empty.status).toBe(200);
+     expect(empty.body.data).toMatchObject({dryRun:true,sent:0,persistsAnswers:false,answerValidation:{valid:false},testUrl:null});
+     const valid=await request(`/${id}/test-send`,'POST',{answers:{name:'テスト'}});expect(valid.body.data.answerValidation).toEqual({valid:true,error:null});
+     expect(count('form_submissions')).toBe(0);expect(count('forms')).toBe(0);expect(count('messages_log')).toBe(0);expect(external).not.toHaveBeenCalled();
+     staff.readOnly=true;expect((await request(`/${id}/test-send`,'POST',{})).status).toBe(403);
+   } finally {vi.unstubAllGlobals()}
+ });
+ test('別組織・古い版の試しは拒否する',async()=>{
+   const created=await request('','POST',{type:'form',name:'試す',definition:formDefinition,requestId:crypto.randomUUID()});const id=created.body.data.template.id;
+   expect((await request(`/${id}/test-send`,'POST',{expectedRevision:1})).status).toBe(409);
+   sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('other-owner','Other','owner','other-key','tenant-b')");staff={...staff,id:'other-owner',tenantId:'tenant-b'};
+   expect((await request(`/${id}/test-send`,'POST',{})).status).toBe(404);
+ });
+ test('トークへ戻す指定を保存・読み直し・配布で保持する',async()=>{
+   const layout=fieldsToLayout(formFields);layout.options.completionMode='chat';
+   const created=await request('','POST',{type:'form',name:'戻る',definition:{...formDefinition,form:{...formDefinition.form,layout}},requestId:crypto.randomUUID()});expect(created.status).toBe(201);
+   const id=created.body.data.template.id;
+   expect((await request(`/${id}`)).body.data.definition.form.layout.options.completionMode).toBe('chat');
+   const p=await preflight(id,['a1']);const r=await execute(id,p);expect(r.body.data.stores[0].status).toBe('succeeded');
+   const form=sql.prepare('SELECT layout FROM forms').get() as {layout:string};expect(JSON.parse(form.layout).options.completionMode).toBe('chat');
+ });
+});
+
+test.each([
+ {completionMode:'invalid'},
+ {completionMode:'chat',thanksUrl:'https://example.com'},
+ {completionMode:'url',thanksUrl:null},
+])('回答後の不正な動きは保存前に拒否する: %j',async options=>{
+ const layout=fieldsToLayout(formFields);Object.assign(layout.options,options);
+ const r=await request('','POST',{type:'form',name:'検査',definition:{...formDefinition,form:{...formDefinition.form,layout}},requestId:crypto.randomUUID()});
+ expect(r.status).toBe(400);expect(count('hq_templates')).toBe(0);
+});

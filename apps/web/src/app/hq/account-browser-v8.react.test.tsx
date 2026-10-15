@@ -5,12 +5,12 @@ import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-li
 import type { AccountWithStats } from '@/contexts/account-context'
 import AccountBrowser from '@/v8/hq/home'
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), restore: vi.fn(), stepUp: vi.fn() }))
+const mocks = vi.hoisted(() => ({ list: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), restore: vi.fn(), stepUp: vi.fn(), role: 'owner' }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: mocks.push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
-vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => mocks.role }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
@@ -24,6 +24,7 @@ vi.mock('@/lib/api', async (original) => {
 const accounts = Array.from({ length: 23 }, (_, i): AccountWithStats => ({ id: `a${i}`, name: `店舗${String(i).padStart(2, '0')}`, channelId: `channel${i}`, basicId: `@shop${i}`, isActive: true, country: null, role: i === 11 ? 'viewer' : 'owner', displayOrder: i, connection: { status: i === 11 ? 'warn' : 'ok', checkedAt: null }, stats: { friendCount: i, messagesThisMonth: i * 2, activeScenarios: 0, staffCount: 1 } }))
 beforeEach(() => {
   vi.clearAllMocks(); window.history.replaceState(null, '', '/hq'); window.dispatchEvent(new PopStateEvent('popstate'))
+  mocks.role = 'owner'
   mocks.list.mockResolvedValue({ success: true, data: accounts })
   mocks.refresh.mockResolvedValue(undefined)
   mocks.restore.mockResolvedValue({ success: true, data: {} })
@@ -41,6 +42,7 @@ describe('V8 統括のアカウントを探す', () => {
     expect(screen.getByText(/21〜23\s*件/)).toBeTruthy()
   })
   it('LINE ID検索でページを戻し、閲覧者の設定操作を出さない', async () => {
+    mocks.role = 'viewer'
     render(<AccountBrowser />); await screen.findByText('店舗22')
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
     fireEvent.change(screen.getByRole('searchbox', { name: '名前・LINE ID・フォルダで探す' }), { target: { value: '@shop11' } })

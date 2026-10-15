@@ -191,7 +191,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
         {SAFETY_NOTICE}
         {phase === 'loading' ? (
           <ListState kind="loading" />
@@ -224,8 +224,8 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
-      {SAFETY_NOTICE}
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
+        {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
 

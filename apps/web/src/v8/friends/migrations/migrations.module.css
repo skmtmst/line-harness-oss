@@ -162,6 +162,9 @@
 .lineGood { color: var(--color-accent-deep); font-weight: 700; white-space: nowrap; }
 
 .footer { position: sticky; bottom: var(--tpl-fr-stack-gap); z-index: 20; }
+/* 板を画面の高さまで伸ばしたとき（Z0jHp）、下の帯は板の下端に置き、長いときは画面の下に追従する。 */
+.body[data-fill] { flex: 1; }
+.body[data-fill] > .footer { margin-top: auto; }
 .footerBar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

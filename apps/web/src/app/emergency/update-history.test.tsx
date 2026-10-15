@@ -74,7 +74,7 @@ function updateSection(): HTMLElement {
 }
 
 function updateRows(section: HTMLElement): HTMLElement[] {
-  return within(section).queryAllByTitle(/^更新-/)
+  return within(section).queryAllByText(/^更新-/)
 }
 
 async function flush() {
@@ -169,8 +169,8 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
 
     const section = updateSection()
     // 配備済みの2行だけが出る。未配備の3件は行にしない。
-    expect(within(section).queryAllByTitle(/^配備済み-/)).toHaveLength(2)
-    expect(within(section).queryByTitle(/^更新-/)).toBeNull()
+    expect(within(section).queryAllByText(/^配備済み-/)).toHaveLength(2)
+    expect(within(section).queryByText(/^更新-/)).toBeNull()
     expect(within(section).getByText(/まだ画面に入っていない変更が3件あります/)).toBeTruthy()
   })
 
@@ -205,7 +205,7 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     fixture.failed = false
     fixture.releases = releasedLog(releaseEntries(1))
     fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度読み込む' }))
-    await waitFor(() => expect(within(dialog).getByTitle('更新-01')).toBeTruthy())
+    await waitFor(() => expect(within(dialog).getByText('更新-01')).toBeTruthy())
     expect(within(dialog).queryByText('運用履歴を読み込めませんでした')).toBeNull()
   })
 

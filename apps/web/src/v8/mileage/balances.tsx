@@ -1,7 +1,7 @@
 'use client'
 
 import { ListToolbarFrame } from '@/components/shared/list-toolbar'
-
+import HelpTip from '@/components/shared/help-tip'
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -20,6 +20,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -39,6 +40,7 @@ import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import BalanceRowMenu from './balance-row-menu'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -50,7 +52,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  *
  * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
  * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・
- * 消える予定・最終行動・操作（明細を見る・増減）」。承認待ちの板は今と同じ条件で出す。
+ * 消える予定・最終行動・操作（…から明細を見る・増減）」。承認待ちの板は今と同じ条件で出す。
  *
  * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
  * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
@@ -438,6 +440,8 @@ export default function BalancesTab() {
             }}
           />
           <PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
+          {/* 絵 CJlf4：件数の右に表の読み方の「？」。 */}
+          <HelpTip label="表の読み方">いまの残高は使えるマイルです。「保留」は確定待ちの分です。消える予定は30日以内に期限を迎える分、最終行動は最後にマイルが動いた日です。</HelpTip>
         </>}
       />
     </ListToolbarFrame>
@@ -445,7 +449,7 @@ export default function BalancesTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT} columnSizing="controls">
         <thead>
           <TableHeadRow data-table-layout="columns">
             <Th grow>友だち</Th>
@@ -454,7 +458,7 @@ export default function BalancesTab() {
             <Th align="right" className={styles.colChange}>今月の増減</Th>
             <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
             <Th collapseAt="narrow" className={styles.colLast}>最終行動</Th>
-            <Th className={styles.colOpsBalance}>操作</Th>
+            <Th align="right" className={styles.colOpsMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody>
@@ -484,13 +488,7 @@ export default function BalancesTab() {
                 <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
                 <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
                 <Td collapseAt="narrow" className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
-                <Td className={styles.colOpsBalance}>
-                  <span className={styles.rowActions}>
-                    <Button href={href}>明細を見る</Button>
-                    {/* 閲覧のみの人には増減を出さない。 */}
-                    {!readonly ? <Button href={`${href}&adjust=1`}>増減</Button> : null}
-                  </span>
-                </Td>
+                <Td align="right" className={styles.colOpsMenu}><BalanceRowMenu friendId={member.friendId} friendName={member.displayName} readonly={readonly} /></Td>
               </Tr>
             )
           })}
@@ -518,12 +516,9 @@ export default function BalancesTab() {
     table
   )
 
-  const pager = !loading && !loadError && members.length > 0 && pageCount > 1 ? (
+  const pager = !loading && !loadError && members.length > 0 ? (
     <div className={styles.pagerRow}>
-      <span className={styles.pagerCount}>
-        {`${formatMileageNumber(filteredTotal)} 人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))} 人`}
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
+      <Pagination page={currentPage} pageCount={pageCount} range={{ total: filteredTotal, first: offset + 1, last: Math.min(offset + members.length, filteredTotal), unit: '人' }} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
     </div>
   ) : null
   /* 絵 CJlf4：表 → ページ送り → 下の案内の順。 */
@@ -535,7 +530,7 @@ export default function BalancesTab() {
 
   return (
     <MileageFrame
-      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。" explanationInset="content"
       explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>

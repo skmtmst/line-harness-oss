@@ -1,4 +1,6 @@
 'use client'
+
+import { initialBusinessHours, type HoursProblem, validateBusinessHours, businessHoursSaveError, resourceSaveError } from './hours-validation'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
@@ -11,7 +13,7 @@ import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
 import { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Checkbox from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
@@ -23,8 +25,6 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-
-/* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -96,7 +96,6 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     const validationError = validateBusinessHours(draft)
     if (validationError) {
       setSaveError(validationError.message)
-      /* 落ちた区間の欄を赤くして移る（B-139）。理由の文は表の下に出す。 */
       setBadHours(validationError.at ?? null)
       const at = validationError.at
       const dayLabel = at ? DAYS.find((day) => day.weekday === at.weekday)?.label : undefined
@@ -166,7 +165,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Week">
-      <Band tone="hint">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Band>
+      <Notice tone="info">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Notice>
       {!settings.businessHoursConfigured ? (
         <Band tone="warn">まだ週全体の営業時間を保存していません。時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。</Band>
       ) : null}
@@ -207,10 +206,11 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <SaveErrorField names={["isOpen","is_open"]}><SettingCheckbox
-                    label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
+                  {/* 保存してから効く設定なのでチェック（決まり14：スイッチはその場で効く物だけ・絵 yRPxl）。 */}
+                  <SaveErrorField names={["isOpen","is_open"]}><Checkbox
+                    aria-label={`${label}を開ける`}
                     checked={isOpen}
-                    onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
+                    onCheckedChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
                   /></SaveErrorField>
                   <span className={styles.dayLabel}>{label.replace('曜日', '')}</span>
                 </div>
@@ -227,6 +227,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
+                      pickerTrigger="field"
                     /></SaveErrorField>
                     <span className={styles.intervalTilde}>〜</span>
                     <SaveErrorField names={[`intervals.${index}.end`,"end","interval.end"]}><TimeField
@@ -236,6 +237,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
+                      pickerTrigger="field"
                     /></SaveErrorField>
                     <span className={styles.sameTimeLabel}>同時</span>
                     <SaveErrorField names={[`intervals.${index}.capacity`,"capacity","interval.capacity"]}><NumberInput
@@ -244,6 +246,8 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       type="number"
                       min={1}
                       max={1000}
+                      note={false}
+                      title="1〜1000"
                       value={interval.capacity ?? 1}
                       onChange={(event) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, capacity: Number(event.target.value) } : entry))}
                       className={styles.numInput}
@@ -438,8 +442,8 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       <span className={styles.equipCap}>{resource.capacity}</span>
       <span className={styles.colMenu}>
         {canEdit ? <RowMenu
-          appearance="plain"
-          className={styles.rowMenuButton}
+          appearance="box"
+          size="row"
           label={`「${resource.name}」のそのほかの操作`}
           menuLabel={`「${resource.name}」の操作`}
           items={menuItems}
@@ -684,58 +688,4 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       {checkError ? <Notice tone="danger" className="mt-2" >{checkError}</Notice> : null}
     </section>
   )
-}
-
-function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] {
-  return DAYS.map(({ weekday }) => ({
-    weekday,
-    intervals: (settings.businessHours.find((day) => day.weekday === weekday)?.intervals ?? [])
-      .map((interval) => ({ ...interval, capacity: interval.capacity ?? 1 })),
-  }))
-}
-
-// v7 /booking/staff/shifts の BusinessHoursEditor と同じ検査。
-/** 営業時間の誤りと、その欄（曜日・何区間目・どの欄）。欄が無い誤りは場所なし（B-139）。 */
-type HoursProblem = { message: string; at?: { weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } }
-
-function validateBusinessHours(days: BusinessHoursDay[]): HoursProblem | null {
-  const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
-  for (const day of days) {
-    if (day.intervals.length > 8) return { message: '1曜日の営業時間は8区間までです。' }
-    const sorted = [...day.intervals].sort((a, b) => a.start.localeCompare(b.start))
-    const at = (interval: (typeof sorted)[number], parts: Array<'start' | 'end' | 'capacity'>) => ({ weekday: day.weekday, index: day.intervals.indexOf(interval), parts })
-    for (const interval of sorted) {
-      if (!timePattern.test(interval.start) || !timePattern.test(interval.end) || interval.start >= interval.end) {
-        return { message: '営業時間は日ごとに分けて入力してください。終了は同じ日の開始より後にし、24:00は使えません。', at: at(interval, ['start', 'end']) }
-      }
-      const capacity = Number(interval.capacity)
-      if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) {
-        return { message: '同時に受け付ける数は1〜1000件で入力してください。', at: at(interval, ['capacity']) }
-      }
-    }
-    for (let index = 1; index < sorted.length; index += 1) {
-      if (sorted[index - 1].end > sorted[index].start) {
-        return { message: '同じ曜日の営業時間は重ならないように入力してください。', at: at(sorted[index], ['start']) }
-      }
-    }
-  }
-  return null
-}
-
-function businessHoursSaveError(error: unknown): string {
-  if (error instanceof ApiError && error.status === 409) {
-    return 'ほかの担当者が先に保存しました。最新の内容を読み直してから、もう一度変更してください。'
-  }
-  if (error instanceof ApiError && error.status === 400) return error.message
-  return '営業時間を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
-}
-
-function resourceSaveError(error: unknown): string {
-  if (error instanceof ApiError && error.status === 409) {
-    return 'ほかの担当者が先にこの設備を変更しました。読み直してからもう一度お試しください。'
-  }
-  if (error instanceof ApiError && error.status === 403) {
-    return permissionDeniedMessage('store')
-  }
-  return '設備を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
 }

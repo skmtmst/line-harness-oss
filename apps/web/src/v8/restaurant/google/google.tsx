@@ -150,7 +150,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           requestUnsavedAction(() => setSelectedAccountId(nextAccountId))
         }
       }}
-      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
+      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id, disabledReason: !item.line_account_id ? 'LINE公式アカウントが結び付いていません' : undefined }))}
     /></SaveErrorField>
   ) : null
 
@@ -213,7 +213,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     <SaveErrorScope errors={saveErrors}><RestaurantPage
       boardId={boardId}
       title="Googleビジネス"
-      description="Google の口コミ・投稿・営業時間を、店舗ごとに管理します。"
+      description={boardId === 'j0Wcg' ? 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。' : 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。'}
       picker={picker}
     >
       <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />

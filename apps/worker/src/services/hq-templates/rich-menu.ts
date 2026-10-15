@@ -1,5 +1,7 @@
+import { normalizeScopedTagName } from '@line-crm/db';
+import { HqTemplateError } from './tag.js';
 import { resolveHqLiffActions } from './liff-actions.js';
-import { RICH_MENU_ACTION_TYPE_BY_INTENT, isLiffActionKind, liffActionUrl, liffActionFromUrl, type LiffAction } from '@line-crm/shared';
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, isLiffActionKind, liffActionUrl, liffActionFromUrl, type LiffAction, type HqRichMenuDefinition } from '@line-crm/shared';
 import { resolveSwitcherActions, validateRichMenuGroupForPublish, type AreaInput } from '../../lib/rich-menu-publisher.js';
 import { buildTapPostbackData } from '../../lib/rich-menu-tap.js';
 import {
@@ -13,17 +15,8 @@ import {
 export const richMenuHqTemplateAdapter = unsupportedHqTemplateAdapter('rich_menu');
 
 type RefKind = 'tag' | 'form' | 'scenario' | 'template';
-interface Area {
-  id: string; bounds: { x: number; y: number; width: number; height: number };
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-  actionData: Record<string, string>; intent?: 'url' | 'text' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'template' | 'switch'; label?: string;
-  tagIds?: string[]; formId?: string; templateId?: string; scenarioId?: string;
-}
-interface Page { id: string; name: string; imageR2Key: string; areas: Area[] }
-export interface RichMenuHqDefinition {
-  schemaVersion: 1;
-  richMenu: { id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string; displayOrder?: number; displayAudience?: 'all' | 'store'; pages: Page[] };
-}
+type Area = HqRichMenuDefinition['richMenu']['pages'][number]['areas'][number];
+export type RichMenuHqDefinition = HqRichMenuDefinition;
 export interface RichMenuReferenceResolver {
   (reference: HqTemplateReference, targetAccountId: string): Promise<string | null | { targetId: string; operation: 'reuse' | 'create'; expectedRevision?: string }>;
 }
@@ -90,9 +83,12 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
   keys(d, ['schemaVersion', 'richMenu']);
   if (d.schemaVersion !== 1) fail('INVALID_DEFINITION');
   const g = d.richMenu;
-  keys(g, ['id', 'name', 'chatBarText', 'size', 'defaultPageId', 'pages', 'displayOrder', 'displayAudience']);
+  keys(g, ['id', 'name', 'chatBarText', 'size', 'defaultPageId', 'pages', 'displayOrder', 'displayAudience', 'displayTagName', 'defaultOpen']);
   if(g.displayOrder!==undefined&&(!Number.isSafeInteger(g.displayOrder)||Number(g.displayOrder)<0))fail('INVALID_DEFINITION');
-  if(g.displayAudience!==undefined&&!['all','store'].includes(String(g.displayAudience)))fail('INVALID_DEFINITION');
+  if(g.displayAudience!==undefined&&!['all','store','tag'].includes(String(g.displayAudience)))fail('INVALID_DEFINITION');
+  if(g.defaultOpen!==undefined&&typeof g.defaultOpen!=='boolean')fail('INVALID_DEFINITION');
+  if(g.displayAudience==='tag') text(g.displayTagName,100);
+  else if(g.displayTagName!==undefined)fail('INVALID_DEFINITION');
   ident(g.id); text(g.name); text(g.chatBarText, 14); ident(g.defaultPageId);
   if (g.size !== 'large' && g.size !== 'compact') fail('INVALID_DEFINITION');
   if (!Array.isArray(g.pages) || !g.pages.length || g.pages.length > 10) fail('INVALID_DEFINITION');
@@ -159,7 +155,7 @@ export function richMenuReferences(d: RichMenuHqDefinition): HqTemplateReference
   return [...result.values()].sort((a, b) => referenceKey(a).localeCompare(referenceKey(b)));
 }
 const jsonRows = (columns: string[], from: string, where: string, order = 'id') => `(SELECT json_group_array(json_array(${columns.join(',')})) FROM (SELECT * FROM ${from} WHERE ${where} ORDER BY ${order}))`;
-const GROUP_COLUMNS = ['id', 'name', 'chat_bar_text', 'size', 'default_page_id', 'status', 'publishing_at', 'publishing_owner', 'publishing_expires_at', 'publishing_generation', 'updated_at', 'folder_id', 'targeting_condition', 'targeting_enabled', 'is_default_for_all', 'targeting_priority', 'display_order', 'created_at'];
+const GROUP_COLUMNS = ['id', 'name', 'chat_bar_text', 'size', 'default_page_id', 'status', 'publishing_at', 'publishing_owner', 'publishing_expires_at', 'publishing_generation', 'updated_at', 'folder_id', 'targeting_condition', 'targeting_enabled', 'is_default_for_all', 'targeting_priority', 'display_order', 'default_open', 'created_at'];
 const PAGE_COLUMNS = ['id', 'group_id', 'order_index', 'name', 'image_r2_key', 'line_richmenu_id', 'updated_at', 'alias_id', 'image_content_type', 'created_at'];
 const AREA_COLUMNS = ['id', 'page_id', 'action_type', 'action_data', 'intent', 'tag_ids', 'form_id', 'template_id', 'tracked_link_id', 'bounds_x', 'bounds_y', 'bounds_width', 'bounds_height', 'updated_at', 'label', 'score_change', 'created_at'];
 
@@ -175,7 +171,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = richMenuReferences(d);
   // D1 allows 100 bound parameters per statement. The atomic snapshot guard
   // needs the seven root bindings, reference bindings, and one expected snapshot.
-  if (8 + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
+  if (8 + (g.displayAudience === 'tag' ? 1 : 0) + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
   const assertContext = (c: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>) => {
     if (c.tenantId !== authority.tenantId) fail('FORBIDDEN'); ident(c.targetAccountId);
   };
@@ -216,12 +212,19 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
         bindings.push(r.targetId, accountId);
       }
     }
+    if (g.displayAudience === 'tag') {
+      parts.push(jsonRows(['id', 'name', 'status', 'version', 'updated_at'], 'tags', 'line_account_id=?'));
+      bindings.push(accountId);
+    }
     const sql = `SELECT json_array(${parts.join(',')}) AS snapshot`;
     const row = await db.prepare(sql).bind(...bindings).first<{ snapshot: string }>();
     if (!row) fail('VERSION_CONFLICT');
     const values = JSON.parse(row.snapshot) as unknown[][][];
     if (values[0].length !== 1 || values[1].length !== 1 || values[1][0][1] !== input.definitionJson) fail('SOURCE_OR_TARGET_SCOPE_MISMATCH');
-    if (values.slice(5).some((v, index) => v.length !== (matched[index].operation === 'reuse' ? 1 : 0))) fail('REFERENCE_SCOPE_MISMATCH');
+    if (values.slice(5, 5 + matched.length).some((v, index) => v.length !== (matched[index].operation === 'reuse' ? 1 : 0))) fail('REFERENCE_SCOPE_MISMATCH');
+    const audienceTags = g.displayAudience === 'tag' ? values[5 + matched.length].filter(row => normalizeScopedTagName(String(row[1])) === normalizeScopedTagName(g.displayTagName!)) : [];
+    if (g.displayAudience === 'tag' && (audienceTags.length !== 1 || audienceTags[0][2] !== 'active')) throw new HqTemplateError('DISPLAY_TAG_UNAVAILABLE', 409);
+    const audienceTagId = audienceTags[0]?.[0] as string | undefined;
     const liff = await resolveHqLiffActions(db, authority, accountId, actions);
     const media = await Promise.all(g.pages.map(async p => {
       const obj = await bucket.head(p.imageR2Key);
@@ -229,7 +232,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       return { key: p.imageR2Key, etag: obj.etag, size: obj.size, contentType: obj.httpMetadata!.contentType! };
     }));
     const token = await createHqTemplateSnapshotToken({ schemaVersion: 1, rootHash: await digest(row.snapshot), referenceHash: await digest(JSON.stringify([matched, liff.snapshot])), childHash: await digest(input.definitionJson), mediaKeyHash: await digest(JSON.stringify(media)) }, digest);
-    return { sql, bindings, raw: row.snapshot, token, matched, media, liff };
+    return { sql, bindings, raw: row.snapshot, token, matched, media, liff, audienceTagId };
   }
   return {
     type: 'rich_menu',
@@ -296,6 +299,8 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
         add('DELETE FROM rich_menu_pages WHERE group_id=?', groupId);
         add("UPDATE rich_menu_groups SET name=?, chat_bar_text=?, size=?, default_page_id=?, status='draft', is_default_for_all=0, targeting_enabled=0, targeting_condition=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND account_id=?", name, g.chatBarText, g.size, resolve(g.defaultPageId), groupId, c.targetAccountId);
       } else add('INSERT INTO rich_menu_groups (id,account_id,name,chat_bar_text,size,default_page_id,status) VALUES (?,?,?,?,?,?,\'draft\')', groupId, c.targetAccountId, name, g.chatBarText, g.size, resolve(g.defaultPageId));
+      add('UPDATE rich_menu_groups SET default_open=? WHERE id=? AND account_id=?', g.defaultOpen === true ? 1 : 0, groupId, c.targetAccountId);
+      if (g.displayAudience === 'tag') add('UPDATE rich_menu_groups SET targeting_enabled=1,targeting_condition=? WHERE id=? AND account_id=?', JSON.stringify({operator:'AND',rules:[{type:'tag_exists',value:s.audienceTagId}]}), groupId, c.targetAccountId);
       if(g.displayOrder!==undefined)add('UPDATE rich_menu_groups SET display_order=? WHERE id=? AND account_id=?',g.displayOrder,groupId,c.targetAccountId);
       // 下書きを配るだけで公開はしない。全員向けの指定も、店での公開を経て反映する。
       if(g.displayAudience==='all')add('UPDATE rich_menu_groups SET is_default_for_all=1 WHERE id=? AND account_id=?',groupId,c.targetAccountId);

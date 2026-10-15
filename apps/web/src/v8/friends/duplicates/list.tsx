@@ -6,22 +6,28 @@ import { Inbox, Download, Info, RotateCw } from 'lucide-react';
 import { formatNumber } from '@/lib/format';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { PageFrame } from '@/components/templates/page-frame';
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation';
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
-import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
+import Notice from '@/components/shared/notice'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
 import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message';
-import { FriendsSectionHead } from '../shared/head';
+import { FriendsTabs } from '../shared/head';
+import { FRIENDS_TAB_NOTES } from '../shared/nav';
 import { csvExportLine } from '../list/csv-export';
 import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data';
 import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words';
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
+import Card from '@/components/shared/card'
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
@@ -79,7 +85,7 @@ export default function DuplicatesListV8() {
     {
       key: 'deliveries', title: '重なって届いた配信',
       valueText: '—',
-      unit: '',
+      unit: '件',
       detail: '配信実績の接続を待っています',
       help: d.data
         ? `配信の実績を接続したあと、同じ人に2通届いた分をここに出します。いまの見積りは1配信あたり ¥${formatNumber(d.data.wastedPerBroadcastYen)}（¥${formatNumber(d.data.msgUnitYen)}/通）です。`
@@ -97,22 +103,21 @@ export default function DuplicatesListV8() {
   const statsCopy = d.statsFailure ? loadFailureCopy(d.statsFailure, '集計') : null
 
   return (
-    <PageFrame kind="list" boardId="hn6Y8">
-      <FriendsSectionHead
-        current="duplicates"
-        description="同じ人が別のアカウント・別の友だちとして登録されていないかを見ます"
-        action={(
+    <PageExplanationProvider pageKey="friends:duplicates"><PageFrame kind="list" boardId="hn6Y8">
+      <PageHeading
+        title="友だち"
+        help="同じ人が別のアカウント・別の友だちとして登録されていないかを見ます"
+        explanationToggle={<PageExplanationToggle />}
+        tabs={<FriendsTabs current="duplicates" line={false} action={(
           <Button type="button" variant="secondary" onClick={exportVisible} disabled={d.candidates.length === 0}>
             <Download size={14} aria-hidden="true" />
             表示中をCSVで書き出す
           </Button>
-        )}
+        )} />}
       />
       <div className={styles.body}>
-        <p className={styles.band}>
-          <Info size={16} aria-hidden="true" />
-          <span>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</span>
-        </p>
+        <PageExplanationBody inset="notice">{FRIENDS_TAB_NOTES.duplicates}</PageExplanationBody>
+        <Notice tone="info" appearance="soft" icon={<Info size={16} aria-hidden="true" />}>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</Notice>
 
         <KpiBand gridClassName="grid grid-cols-4">
           {kpis.map((kpi) => (
@@ -124,6 +129,8 @@ export default function DuplicatesListV8() {
               value={null}
               valueText={kpi.valueText}
               unit={kpi.unit}
+              /* 絵 hn6Y8：数のあとに単位（18 組）。 */
+              valueTextWithUnit={Boolean(kpi.unit)}
               detail={kpi.detail}
               help={kpi.help}
             />
@@ -146,18 +153,16 @@ export default function DuplicatesListV8() {
           <div className={styles.search}>
             <SearchField aria-label="名前・メール・電話で探す" value={d.query} onChange={d.setQuery} onClear={() => d.setQuery('')} placeholder={narrow ? '名前・電話で探す' : '名前・メール・電話で探す'} />
           </div>
-          {/* 状態は1つだけ選ぶ札（選んだ札は墨の地に白い字・印なし）。 */}
           <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
             {STATUS_FILTERS.map((filter) => (
-              <button
+              <FilterChip
                 key={filter.value || 'all'}
-                type="button"
-                aria-pressed={d.status === filter.value}
-                className={d.status === filter.value ? `${styles.chip} ${styles.chipOn}` : styles.chip}
-                onClick={() => d.setStatus(filter.value)}
+                selected={d.status === filter.value}
+                selectedIcon={false}
+                onChange={() => d.setStatus(filter.value)}
               >
                 {filter.label}
-              </button>
+              </FilterChip>
             ))}
           </div>
           <span className={styles.spacer} />
@@ -168,7 +173,7 @@ export default function DuplicatesListV8() {
           </Button>
         </div>
 
-        <section className={styles.panel} aria-labelledby="dup-candidates-title">
+        <Card variant="records" padding="roomy" aria-labelledby="dup-candidates-title">
           <h3 id="dup-candidates-title" className={styles.panelTitle}>重複の候補</h3>
           <DataTable className={styles.table}>
             <colgroup>
@@ -181,12 +186,12 @@ export default function DuplicatesListV8() {
             </colgroup>
             <thead>
               <TableHeadRow>
-                <Th className={styles.th}>候補</Th>
-                <Th className={styles.th}>確からしさ</Th>
-                <Th className={styles.th}>一致した根拠</Th>
-                <Th className={styles.th}>アカウント</Th>
-                <Th className={styles.th}>状態</Th>
-                <Th className={styles.th}><span className="sr-only">操作</span></Th>
+                <Th>候補</Th>
+                <Th>確からしさ</Th>
+                <Th>一致した根拠</Th>
+                <Th>アカウント</Th>
+                <Th>状態</Th>
+                <Th><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -216,12 +221,12 @@ export default function DuplicatesListV8() {
                 const evidence = candidate.evidenceSummary.length ? candidate.evidenceSummary.join('・') : '根拠を確認'
                 return (
                   <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
-                    <Td className={styles.td}>
+                    <Td>
                       <RowNameLink href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}
                       </RowNameLink>
                     </Td>
-                    <Td className={styles.td}>
+                    <Td>
                       <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>
                         {CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label}
                       </span>
@@ -229,16 +234,13 @@ export default function DuplicatesListV8() {
                     <Td className={styles.td}><span className={styles.cellText} title={evidence}>{evidence}</span></Td>
                     <Td className={styles.td}><span className={styles.cellText} title={accounts}>{accounts}</span></Td>
                     <Td className={styles.td}>
-                      <span
-                        className={statusTone(candidate.status) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : statusTone(candidate.status) === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_muted}`}
-                        title={`最終更新 ${slashDateTime(candidate.reviewedAt ?? candidate.detectedAt)}`}
-                      >
+                      <StatusBadge tone={statusTone(candidate.status) === 'ok' ? 'success' : statusTone(candidate.status) === 'warn' ? 'warning' : 'neutral'} title={`最終更新 ${slashDateTime(candidate.reviewedAt ?? candidate.detectedAt)}`}>
                         {STATUS_WORD[candidate.status] ?? candidate.status}
-                      </span>
+                      </StatusBadge>
                     </Td>
-                    <Td className={styles.tdAction}>
+                    <ActionCell>
                       <Button href={href} variant="secondary">比べて決める</Button>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -250,10 +252,10 @@ export default function DuplicatesListV8() {
               <Pagination page={d.page} pageCount={pageCount} onPageChange={d.setPage} disabled={d.candidatesLoading} ariaLabel="重複候補のページ" />
             </div>
           ) : null}
-        </section>
+        </Card>
 
         {d.data ? (
-          <section className={styles.panel} aria-labelledby="dup-accounts-title">
+          <Card variant="records" padding="roomy" aria-labelledby="dup-accounts-title">
             <div className={styles.panelHead}>
               <h3 id="dup-accounts-title" className={styles.panelTitle}>アカウントごとの重なり</h3>
               <p className={styles.panelSub}>どのアカウントに重複が偏っているか</p>
@@ -261,7 +263,7 @@ export default function DuplicatesListV8() {
             {d.data.perAccount.length === 0 ? (
               <p className={styles.panelSub}>アカウントが登録されていません。</p>
             ) : (
-              <DataTable className={styles.table}>
+              <DataTable>
                 <colgroup>
                   <col />
                   <col className={styles.colNum} />
@@ -270,10 +272,10 @@ export default function DuplicatesListV8() {
                 </colgroup>
                 <thead>
                   <TableHeadRow>
-                    <Th className={styles.th}>アカウント</Th>
-                    <Th className={styles.th}>友だち</Th>
-                    <Th className={styles.th}>うち重複</Th>
-                    <Th className={styles.th}>重複の割合</Th>
+                    <Th>アカウント</Th>
+                    <Th>友だち</Th>
+                    <Th>うち重複</Th>
+                    <Th>重複の割合</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody>
@@ -281,48 +283,48 @@ export default function DuplicatesListV8() {
                     const rate = Math.round(row.dupRate * 100)
                     return (
                       <Tr key={row.accountId} className={styles.rowCompact}>
-                        <Td className={styles.td}><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
-                        <Td className={styles.td}>{formatNumber(row.friends)}</Td>
-                        <Td className={styles.td}>{formatNumber(row.dups)}</Td>
-                        <Td className={styles.td}><span className={rate >= 10 ? styles.rateHigh : undefined}>{`${rate}%`}</span></Td>
+                        <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
+                        <Td>{formatNumber(row.friends)}</Td>
+                        <Td>{formatNumber(row.dups)}</Td>
+                        <Td><span className={rate >= 10 ? styles.rateHigh : undefined}>{`${rate}%`}</span></Td>
                       </Tr>
                     )
                   })}
                 </tbody>
               </DataTable>
             )}
-          </section>
+          </Card>
         ) : null}
 
         {d.data && d.data.perAccount.length >= 2 && d.data.pairwiseOverlap ? (
-          <section className={styles.panel} aria-labelledby="dup-matrix-title">
+          <Card variant="records" padding="roomy" aria-labelledby="dup-matrix-title">
             <div className={styles.panelHead}>
               <h3 id="dup-matrix-title" className={styles.panelTitle}>アカウント間 重複マトリクス</h3>
               <p className={styles.panelSub}>同じ人が両方にいる数</p>
             </div>
-            <DataTable className={styles.table}>
+            <DataTable>
               <thead>
                 <TableHeadRow>
-                  <Th className={styles.th}>行 ＼ 列</Th>
-                  {d.data.perAccount.map((col) => <Th key={col.accountId} className={styles.th} title={col.accountName}>{col.accountName}</Th>)}
+                  <Th>行 ＼ 列</Th>
+                  {d.data.perAccount.map((col) => <Th key={col.accountId} title={col.accountName}>{col.accountName}</Th>)}
                 </TableHeadRow>
               </thead>
               <tbody>
                 {d.data.perAccount.map((row) => (
                   <Tr key={row.accountId} className={styles.rowCompact}>
-                    <Td className={styles.td}><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
+                    <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
                     {d.data!.perAccount.map((col) => {
-                      if (row.accountId === col.accountId) return <Td key={col.accountId} className={styles.td}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
+                      if (row.accountId === col.accountId) return <Td key={col.accountId}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
                       const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
-                      return <Td key={col.accountId} className={styles.td}>{formatNumber(pair?.overlap ?? 0)}</Td>
+                      return <Td key={col.accountId}>{formatNumber(pair?.overlap ?? 0)}</Td>
                     })}
                   </Tr>
                 ))}
               </tbody>
             </DataTable>
-          </section>
+          </Card>
         ) : null}
       </div>
-    </PageFrame>
+    </PageFrame></PageExplanationProvider>
   )
 }

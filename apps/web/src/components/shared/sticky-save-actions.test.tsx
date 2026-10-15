@@ -29,17 +29,17 @@ it('明示した役目の印は通常/分割の帯とリンクで保ち、待機
   expect(screen.getByRole('link').querySelector('svg.lucide-arrow-right')).not.toBeNull()
 })
 
-it.each(['保存する', '登録して紹介リンクを発行する', 'つくって動かす', '有効にする', 'タグを作る'])('主操作「%s」は共通の保存印と元の文字を持つ', label => {
+it.each([['保存する', 'check'], ['登録して紹介リンクを発行する', 'save'], ['つくって動かす', 'save'], ['有効にする', 'save'], ['タグを作る', 'save'], ['保存して公開', 'save']])('主操作「%s」は役目の印と元の文字を持つ', (label, mark) => {
   render(<StickyBar actions={<><div><Button variant="primary"><span><Check size={15} aria-hidden="true" /><strong>{label}</strong></span></Button></div></>} />)
   const button = screen.getByRole('button', { name: label })
   expect(button.querySelectorAll('svg')).toHaveLength(1)
-  expect(button.querySelector('svg')?.classList.contains('lucide-save')).toBe(true)
+  expect(button.querySelector('svg')?.classList.contains(`lucide-${mark}`)).toBe(true)
   expect(button.querySelector('strong')?.textContent).toBe(label)
 })
 
 it('印なしと既存の保存印も1つにそろえる', () => {
   render(<StickyBar actions={<><Button variant="primary">保存する</Button><Button variant="primary"><Save aria-hidden="true" />変更を保存</Button></>} />)
-  for (const button of screen.getAllByRole('button')) expect(button.querySelectorAll('svg.lucide-save')).toHaveLength(1)
+  for (const button of screen.getAllByRole('button')) expect(button.querySelectorAll('svg.lucide-check')).toHaveLength(1)
 })
 
 it('次へ・副操作・リンク・左端の操作の印はその役目を保つ', () => {
@@ -78,13 +78,19 @@ it('保存中と完了の表示を保ち、完了後に共通の保存印へ戻�
   expect(button.textContent).toBe('保存しました'); expect(button.querySelectorAll('svg')).toHaveLength(1)
   expect(button.querySelector('svg.lucide-check')).not.toBeNull()
   act(() => { vi.advanceTimersByTime(1300) })
-  expect(button.textContent).toBe('保存する'); expect(button.querySelector('svg.lucide-save')).not.toBeNull()
+  expect(button.textContent).toBe('保存する'); expect(button.querySelector('svg.lucide-check')).not.toBeNull()
 })
 
 it('分割した帯も同じ印、インラインの別用途は渡された印を保つ', () => {
   const action = <Button variant="primary"><Check aria-hidden="true" />保存する</Button>
   const { rerender } = render(<StickyBar split={{ trailingWidth: '380px' }} actions={action} />)
-  expect(screen.getByRole('button').querySelector('svg.lucide-save')).not.toBeNull()
+  expect(screen.getByRole('button').querySelector('svg.lucide-check')).not.toBeNull()
   rerender(<StickyBar presentation="account-registration" actions={action} />)
   expect(screen.getByRole('button').querySelector('svg.lucide-check')).not.toBeNull()
+})
+
+it('明示した保存印と印なしの指定は、保存の既定より優先する', () => {
+  render(<StickyBar actions={<><Button variant="primary" icon={<Save aria-hidden="true" />}>変更を保存</Button><Button variant="primary" icon={null}>保存する</Button></>} />)
+  expect(screen.getByRole('button', { name: '変更を保存' }).querySelectorAll('svg.lucide-save')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: '保存する' }).querySelectorAll('svg')).toHaveLength(0)
 })

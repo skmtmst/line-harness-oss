@@ -156,12 +156,14 @@ export default function BranchEditors({
   resources,
   onUpdate,
   onRemove,
+  onlyId,
 }: {
   /* 全体の実行順の配列。分岐の見出し番号はここでの位置と一致させる（監査 R474）。 */
   steps: CommonActionStep[]
   resources: CommonActionResources
   onUpdate: (id: string, patch: BranchPatch) => void
   onRemove: (id: string) => void
+  onlyId?: string
 }) {
   const tagOptions = (selected: string) => [
     ...resources.tags,
@@ -173,7 +175,7 @@ export default function BranchEditors({
   return (
     <>
       {steps.map((step, stepIndex) => {
-        if (step.type !== 'branch') return null
+        if (step.type !== 'branch' || (onlyId && step.id !== onlyId)) return null
         const branchNumber = stepIndex + 1
         const condition = branchCondition(step)
         const { thenSteps, elseSteps } = branchSides(step)

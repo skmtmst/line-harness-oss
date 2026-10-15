@@ -1,5 +1,7 @@
 'use client'
 
+import { CONSUMER_LABELS } from './version-consumer-labels'
+
 /*
  * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
  *
@@ -10,13 +12,13 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
+import { BookOpen, GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-
 import { formatNumber } from '@/lib/format'
 import { DetailPage } from '@/components/templates'
+import { PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -34,18 +36,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
-
-/** 利用先の種類（今の画面と同じ言葉）。 */
-const CONSUMER_LABELS: Record<string, string> = {
-  scenario: 'シナリオ',
-  automation: 'オートメーション',
-  auto_reply: '自動応答',
-  broadcast: '一斉配信',
-  reminder: 'リマインダ',
-  form: '回答フォーム',
-  rich_menu: 'リッチメニュー',
-  entry_route: '流入リンク',
-}
+import { useManualHref } from '@/lib/use-manual-href'
 
 /** 処理の短い名前（版の履歴の1行：「タグ → 待つ 1日 → メッセージ「お礼」」）。 */
 const STEP_SHORT: Record<string, string> = {
@@ -96,6 +87,8 @@ function VersionsInner() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /* 画面のマニュアル（正本表の画面キー）。URL がある時だけ出す。 */
+  const manualHref = useManualHref()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
   const [summary, setSummary] = useState<CommonActionSummary | null>(null)
   const [summaryError, setSummaryError] = useState('')
@@ -231,13 +224,14 @@ function VersionsInner() {
       headingSize="regular"
       title={`${detail.name}（版と使われている場所）`}
       help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
-      stats={<KpiBand aria-label="版と利用先の集計">
+      stats={<PageContent layout="stats"><KpiBand aria-label="版と利用先の集計">
         <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
         <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={13} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
         <KpiCard presentation="band" title="古い版のまま" icon={<History size={13} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
         <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
-      </KpiBand>}
+      </KpiBand></PageContent>}
       actions={<>
+        {manualHref ? <Button external href={manualHref}><BookOpen size={15} aria-hidden="true" />マニュアル</Button> : null}
         {canEdit && draft ? (
           <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>
         ) : canEdit && published ? (
@@ -304,7 +298,7 @@ function VersionsInner() {
         {detail.bindings.length === 0 ? (
           <p className={styles.cardLead}>まだどこからも呼ばれていません。</p>
         ) : (
-          <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--polish-table-row)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
+          <Card padding="none" overflow="hidden"><DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--polish-table-row)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
               <thead>
                 <TableHeadRow data-table-layout="columns">
                   <Th grow>利用先</Th>
@@ -312,7 +306,7 @@ function VersionsInner() {
                   <Th className={styles.colNum} align="right">実行中</Th>
                   <Th className={styles.colNum} align="right">待機中</Th>
                   <Th className={styles.colState}>状態</Th>
-                  <Th className={styles.colOps}>操作</Th>
+                  <Th className={styles.colOps} showActionLabel>操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -344,10 +338,10 @@ function VersionsInner() {
                   </Tr>
                 ))}
               </tbody>
-            </DataTable>
+            </DataTable></Card>
         )}
       </section>
-      <Notice tone="info">更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</Notice>
+      <Notice tone="info" presentation="account-note" icon={null}>更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</Notice>
 
       <Dialog
         open={Boolean(pendingBinding && published)}

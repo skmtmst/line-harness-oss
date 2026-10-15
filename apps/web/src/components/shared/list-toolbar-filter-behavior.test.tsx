@@ -21,6 +21,25 @@ function choose(name: RegExp) {
   fireEvent.click(option.querySelector('button') ?? option)
 }
 describe('狭い欄の状態の選択', () => {
+  it('札を保つ指定は2条件を個別に選ぶ・外す操作を保ち、状態の欄を増やさない', () => {
+    function Preserved() {
+      const [stopped, setStopped] = useState(false), [timed, setTimed] = useState(false)
+      return <ListToolbar preserveFilterChips filters={<div role="group" aria-label="条件">
+        <FilterChip selected={stopped} onChange={setStopped}>停止中のみ</FilterChip>
+        <FilterChip selected={timed} onChange={setTimed}>時間帯あり</FilterChip>
+      </div>} />
+    }
+    render(<Preserved />)
+    expect(screen.queryByRole('button', { name: '状態' })).toBeNull()
+    const stopped = screen.getByRole('button', { name: '停止中のみ' })
+    const timed = screen.getByRole('button', { name: '時間帯あり' })
+    fireEvent.click(stopped); fireEvent.click(timed)
+    expect(stopped.getAttribute('aria-pressed')).toBe('true')
+    expect(timed.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(stopped)
+    expect(stopped.getAttribute('aria-pressed')).toBe('false')
+    expect(timed.getAttribute('aria-pressed')).toBe('true')
+  })
   it('明示された用途の欄を重ねず、用途の選択と解除を保つ', () => {
     function Named() {
       const [shape, setShape] = useState<string | null>(null)

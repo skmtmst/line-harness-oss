@@ -175,3 +175,8 @@ html:root .boxWrap, html:root .box { width: var(--choice-size); height: var(--ch
 html:root .mark { inset: 0; margin: auto; }
 html:root .card:has(.box:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 html:root .invalid { outline-color: var(--color-danger); }
+
+/* 単独の確認行（Yyw6i・v5L19Z の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
+html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }
+/* 箱は行の高さ（24）の中で下へ落ちないよう、包みの中で塊として置く（印と箱の位置をそろえる）。 */
+html:root .box { display: block; }

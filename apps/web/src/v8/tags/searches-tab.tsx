@@ -44,7 +44,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -352,7 +352,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
-            <Th className={styles.searchColName}>条件名・内容</Th><Th>状態</Th>
+            <Th className={styles.searchColName}>条件名・内容</Th><Th className={styles.searchColStatus}>状態</Th>
             <Th className={styles.searchColCount}>該当</Th>
             <Th className={styles.searchColShare}>共有</Th>
             <Th className={styles.searchColUsage}>使っている所</Th>
@@ -389,8 +389,8 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
 
                   </ContextMenu>
                 </FolderDotName></Td>
-                <Td>{!search.lineAccountId ? (
-                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
+                <Td className={styles.searchColStatus}>{!search.lineAccountId ? (
+                        <StatusBadge tone="warning" size="annotation" dot={false} title="対象アカウント未割り当て">未割り当て</StatusBadge>
                       ) : null}</Td>
                 <Td className={styles.searchColCount}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
@@ -424,10 +424,6 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         </tbody>
       </DataTable>
 
-      <ListPager>
-        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り"
-          range={{ total: filteredList.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filteredList.length) }} />
-      </ListPager>
 
     </DelayedSkeleton>
   )
@@ -479,9 +475,15 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
               { value: 'unknown', label: '該当人数：未集計' },
             ]}
           /></SaveErrorField>
-          <span className={styles.toolbarSpacer} />
-          <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
+          <ListToolbarEnd><PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} /></ListToolbarEnd>
         </>}
+        listHelpPlacement="end"
+        pagination={ready && visible.length > 0 ? (
+          <ListPager>
+            <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り"
+              range={{ total: filteredList.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filteredList.length) }} />
+          </ListPager>
+        ) : undefined}
       >
         {error ? (
           <Notice tone="danger" >{error}{retryOrder ? (

@@ -17,14 +17,10 @@
   width: var(--tpl-op-kn-select-w);
 }
 
-.select :global(*),
-.wideSelect :global(*) {
+.select :global(*) {
   max-width: 100%;
 }
 
-.wideSelect :global(button) {
-  width: 100%;
-}
 
 .spacer {
   flex: 1;

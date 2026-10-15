@@ -1,21 +1,44 @@
 'use client'
 
+import { blockIcon, ADD_CARD_ICONS, AddGrid } from './content-add-grid'
+
 import Card from '@/components/shared/card'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
+  AlarmClock,
   AlignLeft,
+  Armchair,
+  Cake,
+  Calendar,
   CalendarCheck,
-  ExternalLink,
+  ChevronDown,
+  CircleDot,
+  Gift,
   Heading,
   HelpCircle,
   Image as ImageIcon,
   MousePointerClick,
+  Hash,
+  IdCard,
+  Languages,
+  Mail,
+  MapPin,
+  Minus,
+  Paperclip,
+  Phone,
+  Pilcrow,
+  ShieldAlert,
+  SquareCheck,
+  Star,
+  Type,
+  User,
+  ExternalLink,
   Plus,
   X,
 } from 'lucide-react'
@@ -150,7 +173,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} note={props.portable ? '本人確認書類の保存日数は、配った先の各アカウントの設定で決まります' : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </Card>
 
       <RenameDialog
@@ -195,16 +218,6 @@ function RenameDialog({ value, onCancel, onSave }: { value: string | null; onCan
 /* ---------------- ブロックの行 ---------------- */
 
 type RowProps = Props & { block: FormBlock; index: number }
-
-function blockIcon(block: FormBlock): ReactNode {
-  switch (block.kind) {
-    case 'image': return <ImageIcon size={15} aria-hidden="true" />
-    case 'heading': return <Heading size={15} aria-hidden="true" />
-    case 'text': return <AlignLeft size={15} aria-hidden="true" />
-    case 'button': return <MousePointerClick size={15} aria-hidden="true" />
-    default: return block.type === 'booking' ? <CalendarCheck size={15} aria-hidden="true" /> : <HelpCircle size={15} aria-hidden="true" />
-  }
-}
 
 /** つまみ：矢印キーで上下へ、つかんで落とす先の行へ。 */
 function useRowDrag(props: RowProps) {
@@ -453,7 +466,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
       <span className={styles.saveSelect}>
         <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
-          compact
+          size="full"
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
@@ -467,12 +480,14 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
 }
 
 const DAYS_AHEAD = [7, 14, 30, 60]
+const noMeta = () => undefined
 
 function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const booking = block.booking ?? null
   const menus = refs.bookingMenus ?? []
   const staff = booking?.menuId ? (refs.bookingMenuStaff?.[booking.menuId] ?? []) : []
   const days = booking?.daysAhead ?? 14
+  const menuOptions = useMemo(() => menus.map((menu) => ({ ...menu, name: `${menu.name}・${menu.durationMinutes}分` })), [menus])
   const setBooking = (next: Partial<NonNullable<FormInputBlock['booking']>>) =>
     set({ booking: { menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
   return (
@@ -482,14 +497,12 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
           <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
-            options={menus}
+            /* 絵 ijxur：欄は「名前・かかる時間」の1つの札（横の補足は出さず、狭い列でも名前を残す）。 */
+            options={menuOptions}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
             placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
-            meta={(row) => {
-              const menu = menus.find((m) => m.id === row.id)
-              return menu ? `${menu.durationMinutes}分` : undefined
-            }}
+            meta={noMeta}
           /></SaveErrorField>
         </Labeled>
         <Labeled label="担当">
@@ -610,32 +623,5 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
   }
 }
 
-/* ---------------- ブロックを足す ---------------- */
-
 /** 統括も画像を追加できる。固有の参照は保存前に別途確認する。 */
 const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set()
-
-function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string> }) {
-  return (
-    <div className={styles.addBox}>
-      <p className={styles.addTitle}>ブロックを足す</p>
-      {ADD_GROUPS.map((group) => (
-        <div key={group.title} className={styles.addGroup}>
-          <p className={styles.addGroupTitle}>{group.title}</p>
-          <div className={styles.addCards} data-writing={group.title === '書いてもらう' || undefined}>
-            {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
-              <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
-                <span className={styles.addCardTop}>
-                  <Plus size={15} aria-hidden="true" />
-                  <span className={styles.addCardLabel}>{card.label}</span>
-                  {card.fresh ? <span className={styles.newBadge}>新</span> : null}
-                </span>
-                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}

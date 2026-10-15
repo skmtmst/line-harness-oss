@@ -1,6 +1,8 @@
+import { mapStripeSubscriptionStatus } from './hq-billing-subscription-status.js'
+export { mapStripeSubscriptionStatus } from './hq-billing-subscription-status.js'
+import { hqBillingMetrics } from '../services/hq-billing-metrics.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono } from 'hono';
-import type { Context } from 'hono';
+import { Hono, type Context } from 'hono'
 import {
   getStaffById,
   getTenantBilling,
@@ -65,22 +67,6 @@ function stripeReady(c: Context<Env>): boolean {
   return Boolean(c.env.STRIPE_SECRET_KEY);
 }
 
-export function mapStripeSubscriptionStatus(status: string): TenantPlanStatus | null {
-  switch (status) {
-    case 'active':
-    case 'trialing':
-      return 'active';
-    case 'past_due':
-    case 'unpaid':
-      return 'past_due';
-    case 'incomplete':
-      return null;
-    default:
-      // canceled / incomplete_expired / paused
-      return 'canceled';
-  }
-}
-
 function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end' | 'items'>): string | null {
   const periodEnd = subscription.current_period_end ?? subscription.items?.data?.[0]?.current_period_end;
   return periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
@@ -107,6 +93,13 @@ async function applySubscription(c: Context<Env>, tenant: TenantBilling, subscri
 }
 
 // ================================================================ summary
+
+hqBilling.get('/api/hq/billing/metrics',requireRole('owner','admin'),async c=>{
+  const actor=c.get('staff'),member=actor?await getStaffById(c.env.DB,actor.id):null;
+  if(!actor?.tenantId||!member||member.is_active!==1||member.tenant_id!==actor.tenantId||member.account_scope==='accounts'||!['owner','admin'].includes(member.role))return c.json({success:false,error:'統括の閲覧権限が必要です'},403);
+  const data=await hqBillingMetrics(c.env.DB,actor.tenantId);
+  return data?c.json({success:true,data}):c.json({success:false,error:'統括が見つかりません'},404);
+});
 
 hqBilling.get('/api/hq/billing/summary', async (c) => {
   try {

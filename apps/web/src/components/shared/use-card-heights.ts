@@ -1,7 +1,7 @@
 'use client'
 import { useLayoutEffect, useRef } from 'react'
 
-/** B-192：横の箱は自然な高さの差48以内だけそろえる。縦並びでは解除する。 */
+/** B-192：横の箱は自然な高さの差48以内だけそろえる（段に data-card-height="equal" があれば差に関係なくそろえる）。縦並びでは解除する。 */
 const groups = new WeakMap<HTMLElement, { users: number; release: () => void }>()
 export function useCardHeights() {
   const ref = useRef<HTMLElement>(null)
@@ -51,7 +51,7 @@ export function useCardHeights() {
           for (const row of rows.values()) {
             const heights = row.map(card => card.getBoundingClientRect().height)
             const max = Math.max(...heights), min = Math.min(...heights)
-            if (row.length > 1 && max - min <= 48) for (const card of row) card.style.minHeight = `${max}px`
+            if (row.length > 1 && (parent.dataset.cardHeight === 'equal' || max - min <= 48)) for (const card of row) card.style.minHeight = `${max}px`
           }
         })
       }

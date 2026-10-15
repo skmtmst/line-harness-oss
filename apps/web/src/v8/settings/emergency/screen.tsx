@@ -8,7 +8,7 @@
  * アカウント一覧の失敗を黙らせない #518）は今の画面と同じ。動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { OctagonPause, RefreshCw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { Tabs } from '@/components/shared/tabs'
@@ -86,7 +86,7 @@ export default function EmergencyScreen({
         <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
     : tab === 'control' && canManage
-      ? <Button variant="danger" type="button" onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
+      ? <Button variant="primary" type="button" icon={<OctagonPause size={16} />} onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
       : tab === 'history' ? <RowActions subjectName="履歴" menuItems={[
         { id: 'incidents', label: '止めた・戻した記録を見る', onSelect: () => setHistoryDetail('incidents') },
         { id: 'updates', label: '更新内容を見る', onSelect: () => setHistoryDetail('updates') },

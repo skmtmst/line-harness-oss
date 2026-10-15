@@ -76,7 +76,7 @@ describe('ボタンのタグ選び（B-169・R19/R20）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'タグを付ける：変える' }))
     const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'NEN会員' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'この 0件にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（0件）' }))
     expect(screen.getByTestId('tag-ids').textContent).toBe('')
   })
   it('確定まで保存値を変えず、取消しても空の行を作らない', () => {
@@ -88,7 +88,7 @@ describe('ボタンのタグ選び（B-169・R19/R20）', () => {
     expect(screen.queryByRole('button', { name: 'ギフト' })).toBeNull()
     dialog = openTags()
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'ギフト' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
     expect(screen.getByTestId('tag-ids').textContent).toBe('tag-4')
   })
 })
@@ -135,9 +135,8 @@ describe('日時を選ぶ・文字をコピーするボタン（O）', () => {
 
   it('種類の選択肢に日時・コピーが増えている', () => {
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-    const listbox = screen.getByRole('listbox')
-    expect(within(listbox).getByRole('option', { name: /日時を選ぶ/ })).toBeTruthy()
-    expect(within(listbox).getByRole('option', { name: /文字をコピーする/ })).toBeTruthy()
+    const group = screen.getByRole('group', { name: '押したときの動き' })
+    expect(within(group).getByRole('radio', { name: '日時を選ぶ' })).toBeTruthy()
+    expect(within(group).getByRole('radio', { name: '文字をコピーする' })).toBeTruthy()
   })
 })

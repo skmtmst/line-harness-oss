@@ -366,7 +366,7 @@ describe('店舗共通の予約ルール', () => {
     const windowDays = await screen.findByRole('combobox', { name: '先の予約が取れる範囲' })
     expect((windowDays as HTMLInputElement).value).toBe('60')
     fireEvent.change(windowDays, { target: { value: '90' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'お店が承認してから確定する' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'お店が承認してから確定する' }))
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'ルールを作る' }))
     })

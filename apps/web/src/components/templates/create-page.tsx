@@ -54,11 +54,11 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, busy, boardId, elementRef, standalone, heightMode = 'content', children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, busy, boardId, elementRef, standalone, heightMode, children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   const Content = contentDisabled === undefined ? 'div' : 'fieldset'
   const aside = typeof preview === 'function' ? preview(false) : preview
   const dialogPreview = typeof preview === 'function' ? preview(true) : preview
-  return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode} hasFooter={!!footerActions}>
+  return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode ?? (footerActions ? 'viewport' : 'content')} hasFooter={!!footerActions}>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
     {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}

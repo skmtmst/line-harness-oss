@@ -219,3 +219,17 @@ it.each([false,true])('B-241：ライブラリの案件取得success:false（保
  expect(host.querySelector('[data-list-state="error"]')).toBeTruthy()
  expect(host.querySelector('[data-list-state="empty"]')).toBeNull()
 })
+
+// 接続の文字列ではなく、両一覧で実際に描かれる数と作成入口を確かめる。
+it.each(['', 'tab=library'])('数・タブ・説明とフォルダなしの作成入口を型へ接続する（%s）', async query => {
+  nav.query = query
+  act(() => { root.render(<HqBannersListV8 />) })
+  await flush()
+  const frame = host.querySelector('[data-page-template="list"]')!
+  const statsRegion = frame.querySelector('[data-template-region="stats"]')!
+  expect(statsRegion.querySelector('[data-content-layout="stats"] [data-kpi-strip]')).toBeTruthy()
+  expect(statsRegion.querySelectorAll('[data-kpi-label]')).toHaveLength(4)
+  expect(frame.querySelector('[data-template-region="tabs"]')).toBeTruthy()
+  expect(frame.querySelector('[data-screen-explanation-toggle]')).toBeTruthy()
+  expect(frame.querySelector('[data-list-heading-create]')?.textContent).toContain(query ? '画像を取り込む' : 'プロジェクトを作る')
+})

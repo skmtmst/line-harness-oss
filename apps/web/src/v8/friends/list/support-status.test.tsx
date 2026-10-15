@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
+const push = vi.hoisted(() => vi.fn())
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'A', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
@@ -27,4 +28,12 @@ test('友だち行で同じ対応状態は一度、異なるマークと担当�
   expect(within(other).getAllByText('未対応')).toHaveLength(1)
   expect(within(other).getByTitle('対応マーク：折り返し')).toBeTruthy()
   expect(within(other).getByText('担当：担当なし')).toBeTruthy()
+  expect(same.querySelector('[data-list-person-cell] [data-avatar]')?.textContent).toBe('同')
+  expect(other.querySelector('[data-list-person-cell] [data-avatar]')?.textContent).toBe('別')
+  expect(same.tabIndex).toBe(0)
+  fireEvent.keyDown(same, { key: 'Enter' })
+  expect(push).toHaveBeenCalledWith(expect.stringContaining('/friends/detail?id=one'))
+  push.mockClear()
+  fireEvent.click(within(same).getByRole('checkbox'))
+  expect(push).not.toHaveBeenCalled()
 })

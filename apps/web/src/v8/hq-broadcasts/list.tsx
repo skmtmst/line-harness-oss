@@ -2,48 +2,39 @@
 
 import ListDateTime from '@/components/shared/list-date-time'
 
-import { canManageRole } from '@/lib/staff-role';
-import { RowNameLink } from '@/components/shared/table';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
-import { ListToolbarSort } from '@/components/shared/list-toolbar';
+import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
+import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state';
-import { useTenantWideAccess } from '@/lib/staff-role';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react';
-import Link from '@/components/shared/list-navigation'
-import { ArrowUpDown } from 'lucide-react';
-import type { HqBroadcastRun } from '@line-crm/shared';
+import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send, ArrowUpDown } from 'lucide-react'
+import { type HqBroadcastRun, FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared';
-import { FolderDotName } from '@/components/shared/folder-dot';
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions';
 import { describeFolderFailure } from '@/components/shared/folder-failure';
 import { notifyToast } from '@/components/shared/toast';
-import type { FolderPanelRow } from '@/components/shared/folder-panel';
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowActions } from '@/components/shared/row-actions';
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { formatNumber } from '@/lib/format';
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api';
-import { useStaffRole } from '@/lib/staff-role';
 import { failedCount, runBadge, sendTotals } from './model';
 import styles from '../broadcasts/list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
@@ -265,8 +256,9 @@ export default function HqBroadcastList() {
     }
   }
 
+  /* 店の一覧（l5V9a）と同じ2段：探す／札 … 件数・並び。1段にまとめると件数と並びが縦に割れる。 */
   const toolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
@@ -314,7 +306,7 @@ export default function HqBroadcastList() {
     )
   } else {
     content = (
-      <DataTable columnSizing="content" className={styles.table} data-design="hq-broadcasts">
+      <DataTable className={styles.table} data-design="hq-broadcasts">
         <thead>
           <TableHeadRow>
             <Th className={styles.colTitle}>タイトル・内容</Th>

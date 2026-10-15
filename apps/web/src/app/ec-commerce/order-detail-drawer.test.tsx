@@ -182,7 +182,8 @@ describe('注文の状況パネル', () => {
     // EC側への外部リンクは置くが、台帳の複製はしない
     expect(document.body.querySelector('a[href="https://ec.example/admin/order/9001"]')).not.toBeNull()
     // 「重ねない」ことを操作の隣で約束する
-    expect(text).toContain('重ねません')
+    await act(async () => { (document.querySelector('button[aria-label="もう一度行うときの説明"]') as HTMLButtonElement).click() })
+    expect(document.body.textContent).toContain('重ねません')
   })
 
   it('止まった段階と分類ラベルを出し、生メッセージは安全文言だけ出す', async () => {

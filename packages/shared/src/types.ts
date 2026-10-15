@@ -1,3 +1,5 @@
+import { type AdConversionRetryResult } from './advertising-retry-types.js'
+export { type AdConversionRetryResult } from './advertising-retry-types.js'
 import type { ApiFieldErrors } from './api-field-errors.js';
 
 // =============================================================================
@@ -2840,6 +2842,7 @@ export interface OutgoingWebhookVersionConflict {
   updatedAt: string;
 }
 export interface FormSubmissionPage {
+  period?: { from?: string; until?: string };
   items: FormSubmissionDetail[];
   total: number;
   page: number;
@@ -2853,16 +2856,6 @@ export interface FormSubmissionPage {
     dateFields: Array<{ key: string; label: string; answered: number; uniqueFriends: number; minDate: string | null; maxDate: string | null }>;
     ratingFields: Array<{ key: string; label: string; answered: number; average: number | null }>;
   };
-}
-
-/** F-22: 同じ出来事の目印を維持した広告送信のやり直し結果。 */
-export interface AdConversionRetryResult {
-  logId: string;
-  outboxId: string;
-  providerEventId: string;
-  status: 'sent' | 'failed' | 'pending';
-  /** 送信済みの結果を返した場合はtrue。 */
-  replayed: boolean;
 }
 
 export type HqBannerFolderKind = 'project' | 'image';

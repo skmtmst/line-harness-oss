@@ -263,6 +263,16 @@ describe('V8 一斉配信の詳細', () => {
 })
 
 describe('V8 一斉配信を予約したあと', () => {
+  it('送る日時・人数・取り消せる期限を、説明を開かず見出しの直下で読める', async () => {
+    await render(<Reserved {...reservedProps()} />)
+    const heading = host.querySelector('[data-template-region="heading"]')!
+    expect(heading.querySelector('p')?.textContent).toContain('1,213人へ送ります。開始の前までは確かめる・取り消すができます。')
+    expect(heading.querySelector('p')?.textContent).toContain('8月24日')
+    expect(heading.querySelector('[aria-label="8月キャンペーンのお知らせの説明"]')).toBeNull()
+    await render(<Reserved {...reservedProps({ estimate: null })} />)
+    expect(host.querySelector('[data-template-region="heading"] p')?.textContent).toContain('対象の友だちへ送ります')
+    expect(host.querySelector('[data-template-region="heading"] p')?.textContent).not.toContain('0人')
+  })
   it('「予約を取り消す…」で確かめの窓を開く。窓のボタンは 取り消す・やめる・予約のまま残す の順（BeNtj）', async () => {
     const props = reservedProps()
     await render(<Reserved {...props} />)

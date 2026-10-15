@@ -114,10 +114,11 @@ a.name:hover {
 
 /* ようすの札（点つき）。 */
 
-/* 操作：中身を見る（やり直す）と設定。メニューの目印が行を1段増やさないよう横に並べる。 */
+/* 操作：行の右端の「…」だけ（B-253）。列の幅は共通の表が中身から決める。 */
 .opsBox {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--tpl-wh-ops-gap);
 }
 

@@ -166,7 +166,7 @@ export function overviewBandCells(args: {
       icon: <ListChecks size={13} aria-hidden="true" />,
       value: outgoing === null ? null : outgoing.length,
       unit: '件',
-      detail: outgoing === null || active === null ? '読み込めませんでした' : `動いている ${active}・止めている ${outgoing.length - active}`,
+      detail: outgoing === null || active === null ? '読み込めませんでした' : `有効 ${active}・停止中 ${outgoing.length - active}`,
     },
     {
       key: 'sent',

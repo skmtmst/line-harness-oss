@@ -171,13 +171,20 @@ describe('V8 リマインダの詳細', () => {
     state.tab = 'registrants'
     await render()
     expect(host.querySelector('[data-design-node="loVfW"]')).toBeTruthy()
+    // 行の操作は「…」1つの中（B-253）。開くと取り消す・再開するが出る。
+    const rowMenu = (name: string) => document.querySelector(`button[aria-label="${name}の操作"]`) as HTMLButtonElement | null
+    expect(rowMenu('山田 太郎')).toBeTruthy()
+    await act(async () => { rowMenu('山田 太郎')!.click() })
     expect(buttons()).toContain('取り消す')
+    await act(async () => { rowMenu('山田 太郎')!.click() })
+    await act(async () => { rowMenu('鈴木 一郎')!.click() })
     expect(buttons()).toContain('再開する')
     act(() => { root.unmount() })
     root = createRoot(host)
     state.role = 'viewer'
     await render()
     expect(host.textContent).toContain('山田 太郎')
+    expect(document.querySelector('button[aria-label="山田 太郎の操作"]')).toBeNull()
     expect(buttons()).not.toContain('取り消す')
     expect(buttons()).not.toContain('再開する')
   })
