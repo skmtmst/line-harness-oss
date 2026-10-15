@@ -133,8 +133,13 @@ describe('V8 コンバージョンの一覧', () => {
     const sorts: Array<string | null> = []
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input))
-      if (url.pathname === '/api/conversions/definitions') sorts.push(url.searchParams.get('sort'))
-      return base(input, init)
+      if (url.pathname !== '/api/conversions/definitions') return base(input, init)
+      sorts.push(url.searchParams.get('sort'))
+      const response = await base(input, init)
+      const body = await response.json()
+      const query = url.searchParams.get('q') ?? ''
+      const matched = body.data.items.filter((point: { name: string }) => point.name.includes(query))
+      return json({ ...body, data: { ...body.data, items: matched, pagination: { ...body.data.pagination, total: matched.length } } })
     })
     await mount()
     fireEvent.click(screen.getByRole('button', { name: '並び' }))
@@ -143,8 +148,10 @@ describe('V8 コンバージョンの一覧', () => {
     await flush()
     await waitFor(() => expect(sorts).toContain('name_asc'))
     fireEvent.change(screen.getByLabelText('成果地点の名前で探す'), { target: { value: '資料' } })
-    await waitFor(() => expect(screen.queryByText('商品を買った')).toBeNull())
-    expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.queryByText('商品を買った')).toBeNull()
+      expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+    })
   })
 
   it('行の詳細を右パネルとURLへ残し、再表示・閉じるを同期する', async () => {
