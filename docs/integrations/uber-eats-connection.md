@@ -375,11 +375,38 @@ requesting production access.
    - 実装: `apps/worker/src/services/ubereats-token-probe.ts`、
      口は `apps/worker/src/routes/restaurant-delivery.ts`。
 
-   **次の1手（2026-10-15 時点）**：この口を配備し、Codex が合言葉を検証環境の秘密設定へ
-   登録して**1回だけ**叩く。ここは `tokenUrl` しか使わないため、§5-2 で推定値と書いた
-   認可画面のURLは踏まない。これが通ったら、推定値である
-   `sandbox-login.uber.com/oauth/v2/authorize` を実際の認可画面で確かめ、
-   そのあと 4(d) の署名の差し替えへ進む。
+   ### 6-2. 検証環境で1回実行した結果（2026-10-16 00:21 JST）
+
+   PR #1736 をマージし、Git SHA
+   `008063dac1d9fb1c8ed8969f565291b8b7cd7072` を Worker と管理画面へ配備した。
+   配備 run は `38758489168` で成功し、両方の公開SHAも一致した。
+
+   検証Workerに32バイトの乱数から作った
+   `RT_DELIVERY_UBEREATS_PROBE_SECRET` を暗号化した秘密設定として登録した。
+   値は表示・記録していない。登録で作られた Worker Version
+   `1e9c043e-7976-4545-a29a-e6b7378a0049` は100%配備中で、読み取り確認では次が揃っていた。
+
+   - 上の Git SHA
+   - `RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox`
+   - 既存の Application ID / Client Secret と、新しい probe secret の**名前**
+
+   その直後、本文を `{}` の2文字にし、現在時刻と
+   `${timestamp}.{}` の HMAC-SHA256 署名を付けて**1回だけ** POST した。
+   応答は次のとおりだった。
+
+   ```json
+   {"httpStatus":503,"success":false,"code":"probe_not_configured"}
+   ```
+
+   この符号は、署名の検査や Uber への送信より前の「probe secret を使えない」分岐で返る。
+   そのため、**Uber のトークン取得口へは到達しておらず、`scope` も未確認**。
+   停止条件に従って再送は行っていない。トークン、Client Secret、
+   probe secret の値は応答・ログ・リポジトリのどこにも残していない。
+
+   **次の1手**：100%配備中の版に秘密設定の名前がある一方、
+   登録直後の実要求だけが未設定応答になった原因を切り分ける。
+   原因を確定してから、別の明示的な再検証として次の1回を行う。
+   この失敗記録に対して盲目的に再送しない。
 
 **まだ実際の接続は1回も成功していません。** 上の試験77件（通信の層16件＋設定の読み取り6件＋
 受け口55件）はすべて作り物の応答に対するもので、接続の成功を示すものではありません。
