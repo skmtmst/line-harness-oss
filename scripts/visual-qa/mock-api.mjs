@@ -2225,7 +2225,66 @@ const UID_MIGRATION_DONE = {
   rolledBackAt: null, failureReason: null, rollbackable: true,
 }
 
+/*
+ * B-311〜B-313（はじめの質問・スタイルの初期セット・対応が要るもの）の見本。本物の口は組4（codex/kenta-api4-1015）が作り中。
+ * 絵：VHp7p の Bdfxm（7 / 11 済み・警告 1・あとで 2・止めている自動の送信 3）・oKSsG・cAaGY・J6647・Kyf8U。
+ */
+const STYLE_SETUP_STATE = {
+  style: 'restaurant', styleSelected: true, version: 3,
+  answers: {
+    style: { mode: 'configured', value: 'restaurant' }, look: { mode: 'configured', value: 'sample' },
+    confirmation: { mode: 'configured', value: 'instant' }, payment: { mode: 'later' }, cancelDeadline: { mode: 'configured', value: 'day_before' },
+    reminder: { mode: 'configured', value: 'on' }, visitStamp: { mode: 'later' }, coupon: { mode: 'configured', value: 'first' }, seats: { mode: 'configured', value: 'sample' },
+  },
+}
+const STYLE_SETUP_ITEMS = [
+  { key: 'rm', kind: 'rich_menu', name: '飲食店の見本', buttons: [{ label: '予約する', feature: 'reserve' }, { label: '予約の確認', feature: 'history' }, { label: 'クーポン', feature: 'coupon' }, { label: 'メニュー', feature: 'menu' }, { label: 'スタンプ', feature: 'visit_stamp' }, { label: 'お問い合わせ', feature: 'contact' }] },
+  { key: 'tpl-pre', kind: 'template', name: '前日のお知らせ' }, { key: 'tpl-thanks', kind: 'template', name: '来店のお礼' }, { key: 'tpl-day', kind: 'template', name: '当日のお知らせ' },
+  { key: 'tpl-review', kind: 'template', name: '口コミのお願い' }, { key: 'tpl-closed', kind: 'template', name: '臨時休業のお知らせ' },
+  { key: 'bm-lunch', kind: 'booking_menu', name: 'ランチコース' }, { key: 'bm-dinner', kind: 'booking_menu', name: 'ディナーコース' }, { key: 'bm-seat', kind: 'booking_menu', name: '席のみ' },
+  { key: 'cp-first', kind: 'coupon', name: 'はじめての方 10% オフ' },
+  { key: 'au-pre', kind: 'automation', feature: 'reminder', name: '前日のお知らせ', text: '予約の前日 18:00 に LINE で送る' },
+  { key: 'au-day', kind: 'automation', feature: 'reminder', name: '当日のお知らせ', text: '来店の 2 時間前に送る' },
+  { key: 'au-thanks', kind: 'automation', feature: 'thanks', name: '来店のお礼', text: '来店の翌日 12:00 に送る' },
+  { key: 'db', kind: 'dashboard', name: '今日のお店' },
+]
+const STYLE_SETUP_STATES = STYLE_SETUP_ITEMS.map((item, i) => ({ target_id: `starter-${item.key}`, key: item.key, kind: item.kind, is_sample: 1, status: item.kind === 'automation' ? 'stopped' : 'active', draftRevision: null }))
+const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'visit_stamp', areaId: 'E', groupId: 'rm-sample-restaurant', href: '/visit-stamps', customerState: 'preparing' }], pending: [{ key: 'payment', href: '/booking/menus?tab=payment', mode: 'later' }, { key: 'visitStamp', href: '/visit-stamps', mode: 'later' }], manual: [] }
+const HQ_STARTER_SETS = [
+  ['restaurant', '飲食店向け', 12], ['salon', 'サロン', 8], ['consult', '面談・相談', 3], ['lesson', '教室・レッスン', 5], ['ec', 'ECサイト', 2], ['standard', '標準', 4],
+].map(([style, name, accountCount], i) => ({
+  id: `starter-set-${style}`, style, name: `${name}の初期セット`, version: 2, accountCount, autoInsert: true,
+  definition: { items: STYLE_SETUP_ITEMS.filter((item) => item.kind !== 'coupon').map((item) => item.kind === 'automation' && item.key === 'au-pre' ? { ...item, name: '前日のリマインダー' } : item) },
+  updates: { rich_menu: { at: '2026-10-14', by: '本部 佐藤' }, template: { at: '2026-10-12', by: '本部 佐藤' }, automation: { at: '2026-10-12', by: '本部 佐藤' }, booking_menu: { at: '2026-10-10', by: '本部 田中' }, dashboard: { at: '2026-10-09', by: '本部 田中' } },
+}))
+const HQ_STYLE_ATTENTION = {
+  asOf: '2026-10-15T08:30:00.000Z',
+  items: [
+    { accountId: 'visual-qa-account', name: '然 渋谷店', style: 'restaurant', counts: { unhandledChats: 9, pendingBookings: 3, unpaid: 2, connections: 1, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-2', name: '然 新宿店', style: 'restaurant', counts: { unhandledChats: 6, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+    { accountId: 'visual-qa-account-3', name: 'Hair Salon 然 表参道', style: 'salon', counts: { unhandledChats: 4, pendingBookings: 0, unpaid: 2, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-4', name: '然 相談窓口', style: 'consult', counts: { unhandledChats: 3, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', style: 'lesson', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+  ].map((item) => ({ ...item, details: { unhandledChats: [{ id: 'c', href: '/chats' }], pendingBookings: [{ id: 'b', href: '/booking/bookings' }], unpaid: [{ id: 'p', href: '/booking/menus?tab=payment' }], connections: [{ id: 'l', href: '/line-accounts' }], stoppedDeliveries: [{ id: 'd', href: '/broadcasts' }] } })),
+}
+function styleSetupRead(method, pathname, query) {
+  if (method !== 'GET') return null
+  if (pathname === '/api/dashboard/style') return { success: true, data: { ...STYLE_SETUP_STATE, settings: {}, cards: [] } }
+  if (pathname === '/api/dashboard/style/warnings') return { success: true, data: STYLE_SETUP_WARNINGS }
+  if (pathname === '/api/dashboard/style/starter-set') return { success: true, data: { id: `starter-set-${query.get('style') ?? 'restaurant'}`, version: 2, definition: { items: STYLE_SETUP_ITEMS } } }
+  if (pathname === '/api/dashboard/style/starter-items') return { success: true, data: { items: STYLE_SETUP_STATES } }
+  if (pathname === '/api/hq/style-starter-sets') return { success: true, data: HQ_STARTER_SETS }
+  if (pathname === '/api/hq/style-attention') return { success: true, data: HQ_STYLE_ATTENTION }
+  return null
+}
+function styleSetupWrite(method, pathname) {
+  if (method === 'PUT' && pathname === '/api/dashboard/style') return { style: 'restaurant', version: STYLE_SETUP_STATE.version + 1, inserted: [] }
+  if (method === 'POST' && pathname === '/api/dashboard/style/activate') return { complete: true, items: [] }
+  return null
+}
+
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
+  { const style = styleSetupWrite(method, pathname); if (style) return style }
   /*
    * B-6 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
    * B-26 右の欄でその場で直す：対応状況・担当・メモの更新は、送った値を当てた会話を返す（保存はしない）。
@@ -2898,6 +2957,7 @@ function visitStampRead(pathname, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const style = styleSetupRead(method, pathname, query); if (style) return style }
   { const stamps = method === 'GET' ? visitStampRead(pathname, query) : null; if (stamps) return stamps }
   if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
   if (method === 'GET' && pathname === '/api/restaurant-test/media') return { success: true, data: RESTAURANT_MEDIA_LINKS.map(({ code, name, acceptsReservations }) => ({ code, name, acceptsReservations })) }
