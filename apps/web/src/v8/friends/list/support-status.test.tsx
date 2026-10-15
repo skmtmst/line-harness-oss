@@ -26,5 +26,5 @@ test('友だち行で同じ対応状態は一度、異なるマークと担当�
   expect(within(same).getAllByText('未対応')).toHaveLength(1)
   expect(within(other).getAllByText('未対応')).toHaveLength(1)
   expect(within(other).getByTitle('対応マーク：折り返し')).toBeTruthy()
-  expect(within(other).getByText('担当：担当なし')).toBeTruthy()
+  expect(within(other).getByText('担当：なし')).toBeTruthy()
 })

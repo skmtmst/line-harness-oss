@@ -1845,6 +1845,8 @@ function AutoReplyWizardV8Inner() {
                           key={label}
                           type="button"
                           className={styles.weekday}
+                          /* つなげた7つ（絵 Z2LIUx）。選んだ日は地の色だけで示し、共通の選択の枠は付けない。 */
+                          data-part="joined-segment"
                           aria-pressed={on}
                           onClick={() => {
                             const next = on

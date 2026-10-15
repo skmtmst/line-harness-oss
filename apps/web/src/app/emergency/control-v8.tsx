@@ -548,7 +548,7 @@ const EmergencyControlV8 = (
           valueTone={isStopped ? 'danger' : 'default'}
           detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
         <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
-        <KpiCard title="いちばん長かった停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
+        <KpiCard title="最長の停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
           detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
         <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
           detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
@@ -733,9 +733,10 @@ const EmergencyControlV8 = (
                       <td title={formatStopRange(entry.stoppedAt, entry.resolvedAt)} className={styles.cellTruncate}>
                         {formatStopRange(entry.stoppedAt, entry.resolvedAt)}
                       </td>
-                      <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId}</td>
-                      <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellTruncate}>
-                        {entry.capabilities.map(capabilityShort).join('・')}
+                      {/* 絵 OHwbU：だれがは名前だけ（役割・拠点は title）。何を は「・」の切れ目で折る（語の途中で切らない）。 */}
+                      <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId.replace(/[（(].*$/, '').trim() || entry.actorId}</td>
+                      <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellWrapWords}>
+                        {entry.capabilities.map((capability, i) => <span key={capability}>{capabilityShort(capability)}{i < entry.capabilities.length - 1 ? '・' : ''}</span>)}
                       </td>
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
                         {entry.reason}

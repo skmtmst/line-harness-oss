@@ -1757,6 +1757,7 @@ function CommonVarsListInner() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              detailLayout={kpi.fix ? 'inline-action' : undefined}
               action={kpi.fix ? { label: canWrite ? '直す' : '空のままを見る', onClick: applyEmptyFilter } : undefined}
             />
           ))}

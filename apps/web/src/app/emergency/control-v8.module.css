@@ -243,6 +243,11 @@
   white-space: nowrap;
 }
 
+.cellWrapWords > span {
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .tableNote {
   margin: var(--tpl-rest3-em-row-gap) 0 0;
   padding: var(--tpl-rest3-em-note-pad);

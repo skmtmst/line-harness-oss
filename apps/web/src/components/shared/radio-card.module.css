@@ -365,3 +365,7 @@ html:root .card[data-choice-indicator='check'] > .radio { width: 1px; height: 1p
 html:root .card[data-choice-indicator='check'] .body { padding-right: 0; }
 html:root .card[data-choice-indicator='check'] .title { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
 .check { width: var(--space-16); height: var(--space-16); flex-shrink: 0; color: var(--color-accent-deep); }
+
+/* バナー生成の出力サイズ（★BG-B 出力サイズ・絵 iMnph）：1列に並べる小さい箱。B-152 の内側16・欄の間12 ではなく、余白 8/10・箱の間 8 で描く。 */
+:root .compact[data-compact-typography='banner'] { padding: 8px 10px; gap: 3px; }
+:root .items:has(> .compact[data-compact-typography='banner']) { gap: 8px; }

@@ -28,11 +28,13 @@ import AllergyField from '@/components/shared/allergy-field'
 export const BASIC_GROUP = 'basic'
 export const ALL_GROUP = 'all'
 
-function FieldInput({ field, value, onChange, disabled, id }: {
+function FieldInput({ field, value, onChange, disabled, derived, id }: {
   field: FriendField
   value: string
   onChange: (v: string) => void
   disabled: boolean
+  /** 生年月日から計算する年齢など。灰色の読むだけの欄で見せる（vX3wQ）。 */
+  derived?: boolean
   id: string
 }) {
   // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
@@ -75,6 +77,7 @@ function FieldInput({ field, value, onChange, disabled, id }: {
   if (field.type === 'date') {
     return <SaveErrorField names={["value"]}><DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未設定" /></SaveErrorField>
   }
+  if (derived) return <TextField id={id} value={value} readOnly aria-readonly="true" data-look="derived" aria-label={`${field.name}の値`} title={value} />
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
   return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
 }
@@ -180,7 +183,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     <span className={styles.fieldLabelText}>{label}</span>
                     {field.isPersonal ? <span className={styles.faint}>個人情報</span> : null}
                     {/* 値の出どころ（手で入れた・回答フォーム…）は題の横に1行で（vX3wQ）。全文は title。 */}
-                    {fixed?.source ? <span className={styles.fieldSource} title={fixed.source}>{fixed.source}</span> : null}
+                    {fixed?.sourceShort ? <span className={styles.fieldSource} title={fixed.source ?? undefined}>{fixed.sourceShort}</span> : null}
                   </label>
                   <FieldInput
                     id={id}
@@ -188,6 +191,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     value={fixed?.derived ? fixed.value ?? '' : values[field.id] ?? ''}
                     onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
                     disabled={!perms.canEditField(field) || !!fixed?.derived}
+                    derived={!!fixed?.derived}
                   />
                   {field.type === 'multi_select' && field.fixedKey !== 'allergy' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
                   {field.ecIsMaster ? <p className={styles.fieldNote}>EC側の値が正のため、ここからは変更できません。</p> : null}
@@ -199,17 +203,23 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {hiddenPersonalCount} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
           {data.warnings.length > 0 ? <ul className={styles.warnList}>{data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : null}
 
-          <div className={styles.saveBar}>
-            <p className={styles.saveNote}>
-              {data.saveError ? <span className={styles.danger} role="alert">{data.saveError}</span>
-                : data.saveNotice ? <span className={styles.success} role="status">{data.saveNotice}</span>
-                  : <><Lock size={13} aria-hidden />保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。</>}
-            </p>
-            {perms.manage ? <Button href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>項目を作る</Button> : null}
-            {perms.saveFields ? (
-              <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
-            ) : null}
-          </div>
+          {/* 絵 vX3wQ：下の帯は［キャンセル］［保存する］を中央に。項目を作る口は「情報欄を管理」があるときはそちらに任せる。 */}
+          {perms.saveFields || data.saveError || data.saveNotice ? null : (
+            <p className={styles.saveNote}><Lock size={13} aria-hidden />保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。</p>
+          )}
+          {perms.saveFields || (perms.manage && !firstShopGroup) ? (
+            <div className={styles.saveBar}>
+              {data.saveError ? <p className={styles.saveNote}><span className={styles.danger} role="alert">{data.saveError}</span></p>
+                : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p> : null}
+              <div className={styles.saveActions}>
+                {perms.manage && !firstShopGroup ? <Button href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>項目を作る</Button> : null}
+                {perms.saveFields ? <>
+                  <Button onClick={() => setValues(Object.fromEntries(fields.map((f) => [f.id, f.value ?? ''])))} disabled={data.saving}>キャンセル</Button>
+                  <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
+                </> : null}
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </div>
