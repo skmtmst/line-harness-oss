@@ -656,7 +656,6 @@ export default function RewardsTab() {
     <MileageToolbar
       narrow={narrow}
       notices={<ToolbarNotices
-        info="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
         error={actionError}
         success={menuNotice}
       />}
@@ -909,6 +908,8 @@ export default function RewardsTab() {
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
+      /* 案内は「この画面の説明」の帯（題の右の口で開け閉めする。S35pO・B-245）。 */
+      explanation="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す
