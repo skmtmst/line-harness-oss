@@ -311,7 +311,7 @@ function CompareInner() {
             </section>
 
             <div className={styles.footer}>
-              <StickyBar outlined destructive={
+              <StickyBar destructive={
                 <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
                   <UserX size={14} aria-hidden="true" />
                   別の人だった
