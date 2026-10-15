@@ -452,6 +452,8 @@
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
+/* 表と同じ子の中に置いたページ送り（タグの4タブ）も、型のページ送りと同じ余白にする（絵 q5gbcM：左右24・上下12）。 */
+:global(:root) .listBody .content [data-list-pager] { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
 :global(:root) .listBody .paginationRow,
 :global(:root) .listBody .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-16); }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }

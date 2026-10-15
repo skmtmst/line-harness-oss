@@ -29,6 +29,9 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
   const { accountId, canEdit, host, explanation, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton } = model
   const table = <FieldsTable {...model} />
   const operationHelp = canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'
+  const typeNote = host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'
+  // いつも出す注意は「この画面の説明」の帯に入れる（絵 q5gbcM は帯1本）。行の操作は「…」の中に見えるので帯に重ねない。
+  const typeNoteAsExplanation = explanation && !host
   return (
     <>
       {host?.kpis ?? <KpiBand data-design="KPIs" className={styles.kpis}>
@@ -47,7 +50,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
 
       <ListPageBody
         skeleton
-        explanation={explanation ? operationHelp : undefined} listHelp={explanation ? undefined : operationHelp}
+        explanation={typeNoteAsExplanation ? typeNote : explanation ? operationHelp : undefined} listHelp={explanation ? undefined : operationHelp}
         folders={<>
           <FolderPanel
             createAction={createButton(true)}
@@ -66,9 +69,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
         </>}
         folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
         toolbar={<>
-          <Notice tone="info">
-            {host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'}
-          </Notice>
+          {typeNoteAsExplanation ? null : <Notice tone="info">{typeNote}</Notice>}
           <ListToolbarFrame><ListToolbarRow>
           <ListToolbarSearchSlot>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
