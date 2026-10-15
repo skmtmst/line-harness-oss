@@ -326,7 +326,7 @@ function OpenBlock(props: RowProps) {
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />
       </div>
-      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
+      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} portable={props.portable} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
       {input ? (
         <InlineSettings open={detailOpen} title={`「${blockTitleLine(block)}」の詳しい設定`} onClose={() => setDetailOpen(false)}>
           <BlockEditor block={block} index={props.index} sections={props.layout.sections} refs={refs} selected onSelect={() => {}} onChange={patch} />
@@ -340,7 +340,7 @@ function Labeled({ label, htmlFor, required, children }: { label: string; htmlFo
   return <Field label={label} htmlFor={htmlFor} required={required}>{children}</Field>
 }
 
-function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
+function InputFields({ block, refs, patch, accountId, portable = false }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null; portable?: boolean }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
   /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す（B-139）。 */
@@ -359,7 +359,7 @@ function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock;
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
       {block.fixedField === 'allergy' && accountId ? <AllergyOptionsSave accountId={accountId} block={block} set={set} /> : null}
-      {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} /> : <SaveTo block={block} refs={refs} set={set} />}
+      {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} portable={portable} /> : <SaveTo block={block} refs={refs} set={set} />}
     </>
   )
 }
@@ -502,7 +502,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
 const DAYS_AHEAD = [7, 14, 30, 60]
 const noMeta = () => undefined
 
-function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
+function BookingFields({ block, refs, set, portable = false }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void; portable?: boolean }) {
   const booking = block.booking ?? null
   const menus = refs.bookingMenus ?? []
   const staff = booking?.menuId ? (refs.bookingMenuStaff?.[booking.menuId] ?? []) : []
@@ -514,6 +514,8 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
     <>
       <div className={styles.bookingRow}>
         <Labeled label="メニュー">
+          {/* 統括のひな形（N4T9mO）：メニューは店ごとにあり、統括の口には一覧が無い（機能待ち）。読み込み中で止めず、押せない形で決まりを書く。 */}
+          {portable ? <EntityKindField kind="booking_menu" label="メニュー" options={[]} value="" onChange={() => {}} disabled disabledReason="配った先の店のメニューから選びます" placeholder="配った先の店のメニューから選びます" meta={noMeta} /> :
           <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
@@ -524,7 +526,7 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
             placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
             meta={noMeta}
             actionHidden="label"
-          /></SaveErrorField>
+          /></SaveErrorField>}
         </Labeled>
         <Labeled label="担当">
           <SaveErrorField names={["staffId","booking?.staffId","booking"]}><EntityKindField
