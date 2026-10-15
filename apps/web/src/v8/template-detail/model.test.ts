@@ -15,7 +15,7 @@ describe('テンプレートの詳細の計算', () => {
   it('使っている所は一斉配信→自動応答→シナリオ→…→旧オートメーションの順。版を決めた所と開けない所が分かる', () => {
     const rows = buildUsageRows(usage)
     expect(rows.map((r) => r.kind)).toEqual(['一斉配信', '自動応答', 'シナリオ配信', 'オートメーション'])
-    expect(rows[0]).toMatchObject({ name: '9月の案内', fixed: true, version: '版2で固定（変わらない）', status: '予約中', href: '/broadcasts/reserved?id=b1' })
+    expect(rows[0]).toMatchObject({ name: '9月の案内', fixed: true, version: '版2で固定', status: '予約中', href: '/broadcasts/reserved?id=b1' })
     expect(rows[2]).toMatchObject({ name: 'フォロー・1 通目', fixed: false, version: 'いまの版' })
     expect(rows[3].href).toBeNull()
   })

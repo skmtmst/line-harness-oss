@@ -72,7 +72,7 @@ export function templateDeleteDescription(usageCount: number): string {
 }
 
 function versionText(version: number | null | undefined): string {
-  return version === null || version === undefined ? 'いまの版' : `版${version}で固定（変わらない）`
+  return version === null || version === undefined ? 'いまの版' : `版${version}で固定`
 }
 
 export function broadcastStatusText(status: string): string {
@@ -105,7 +105,7 @@ export interface UsageRow {
   key: string
   kind: string
   name: string
-  /** 使っている版（いまの版／版Nで固定（変わらない））。 */
+  /** 使っている版（いまの版／版Nで固定）。固定は公開しても変わらない（カードの説明に書く・絵 UTbi1）。 */
   version: string
   versionNumber: number | null
   /** 版を決めている（公開しても変わらない）。 */
