@@ -184,7 +184,9 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('平均離脱時間 —')
     expect(host.textContent).not.toContain('平均 6分で離脱')
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
-    const chat = host.querySelector('a[href="/chats?friend=f-1"]')
+    const menu = host.querySelector('tr[data-row-id="f-1"] button[aria-haspopup="menu"]') as HTMLButtonElement
+    await act(async () => { menu.click() })
+    const chat = document.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
     expect(buttonText('CSVで書き出す')).toBeTruthy()
   })

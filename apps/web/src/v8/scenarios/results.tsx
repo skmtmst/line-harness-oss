@@ -10,6 +10,7 @@ import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { DetailPage } from '@/components/templates';
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Dialog from '@/components/shared/dialog'
@@ -420,10 +421,7 @@ export default function ScenarioResultsV8() {
 
       {!loading && scenario && stats ? (
         <>
-          <div className={styles.kpiBox}>
           <ScenarioResultSummary stats={stats} summary={runs?.summary} />
-          </div>
-
           <section className={styles.section} aria-labelledby="scenario-results-steps">
             <div className={styles.sectionHead}>
               <h2 id="scenario-results-steps" className={styles.sectionTitle}>通ごとの反応</h2>
@@ -437,7 +435,7 @@ export default function ScenarioResultsV8() {
             {sortedSteps.length === 0 ? (
               <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
             ) : (
-              <GridTable label="通ごとの反応" framed={false} design={{ columns: "minmax(0, 1fr)", gap: "var(--polish-space-row)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
+              <Card padding="none"><GridTable label="通ごとの反応" framed={false} design={{ columns: "minmax(0, 1fr)", gap: "var(--polish-space-row)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
                 {sortedSteps.map((step) => {
                   const run = runsByOrder.get(step.stepOrder)
                   const reached = reachedOf(step)
@@ -461,7 +459,7 @@ export default function ScenarioResultsV8() {
                     </GridCell></GridRow>
                   )
                 })}
-              </GridTable>
+              </GridTable></Card>
             )}
           </section>
 
@@ -531,7 +529,7 @@ export default function ScenarioResultsV8() {
               />
             ) : (
               <>
-                <GridTable label="参加中の友だち" framed={false} design={{ columns: "minmax(0, 1fr) var(--tpl-sc2-col-state) var(--tpl-sc2-col-now) var(--tpl-sc2-col-next) var(--tpl-sc2-col-plan) var(--table-action-width, var(--tpl-sc2-col-menu))", gap: "var(--polish-space-card)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
+                <Card padding="none"><GridTable label="参加中の友だち" framed={false} design={{ columns: "minmax(0, 1fr) var(--tpl-sc2-col-state) var(--tpl-sc2-col-now) var(--tpl-sc2-col-next) var(--tpl-sc2-col-plan) var(--table-action-width, var(--tpl-sc2-col-menu))", gap: "var(--polish-space-card)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
                   <GridHeadRow>
                     <GridCell role="columnheader">友だち</GridCell>
                     <GridCell role="columnheader">状態</GridCell>
@@ -609,7 +607,7 @@ export default function ScenarioResultsV8() {
                       </GridRow>
                     )
                   })}
-                </GridTable>
+                </GridTable></Card>
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
                   <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}

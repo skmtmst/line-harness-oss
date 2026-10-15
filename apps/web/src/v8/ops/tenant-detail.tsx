@@ -1,7 +1,7 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
 import type { FormRequirement } from '@/lib/form-requirement'
-import { ChevronLeft, LogIn } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
@@ -124,7 +124,7 @@ function DetailContent() {
   if (!detail) {
     return (
       <PageFrame kind="detail" boardId="Oub6x" standalone>
-        <OpsHead title="契約先アカウント" environment={environment} actions={<BackToList />} />
+        <OpsHead title="契約先アカウント" environment={environment} />
         <div className={parts.panel}>
           {error
             ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
@@ -149,7 +149,6 @@ function DetailContent() {
         environment={environment}
         actions={(
           <>
-            <BackToList />
             {!readOnly && tenant.status === 'active' ? <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
             <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><LogIn aria-hidden="true" />代理ログイン（閲覧のみ）</Button>
             {readOnly ? null : tenant.status === 'active'
@@ -305,14 +304,6 @@ function DetailContent() {
         />
       ) : null}
     </PageFrame>
-  )
-}
-
-function BackToList() {
-  return (
-    <Button href="/ops/tenants">
-      <ChevronLeft aria-hidden="true" />一覧へ
-    </Button>
   )
 }
 

@@ -15,6 +15,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { OpsHead } from './shell'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -97,12 +98,15 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: fullPage && dirty, busy })
   const close = () => { if (busy) return; if (fullPage && dirty) setClosing(true); else onClose() }
+  // 全画面のときは、上の帯のパンくずの最後に保存済みの題名を出す（R5ckwJ）。
+  usePageTitle(fullPage ? initial.title : null, fullPage)
   const ticketLabel = article.ticketNo == null ? '番号未取得' : `#${article.ticketNo}`
 
   return (
     <KnowledgeSurface fullPage={fullPage} editing={editing} busy={busy} onCancel={close} actions={(
       <>
-        <Button onClick={close} disabled={busy}>キャンセル</Button>
+        {/* 全画面の戻り道はパンくずと左のメニュー（R5ckwJ は頭に主ボタンだけ）。窓のときは閉じる口として残す。 */}
+        {!fullPage ? <Button onClick={close} disabled={busy}>キャンセル</Button> : null}
         {editing ? (
           <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
         ) : (
@@ -120,7 +124,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
           <div className={styles.field}>
             <span className={styles.smallLabel} id="ops-article-kind">種類</span>
             <div className={styles.wideSelect}>
-              <SaveErrorField names={["kind","form.kind"]}><Select aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} /></SaveErrorField>
+              <SaveErrorField names={["kind","form.kind"]}><Select aria-label="種類" size="full" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} /></SaveErrorField>
             </div>
           </div>
           <div className={styles.field}><Field label="質問" htmlFor="ka-question" requirement={fields.requirement('question')}><SaveErrorField names={["question","form.question"]}><TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={(e) => change('question', e.target.value)} /></SaveErrorField>

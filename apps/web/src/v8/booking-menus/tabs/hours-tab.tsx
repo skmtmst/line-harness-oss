@@ -244,6 +244,8 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       type="number"
                       min={1}
                       max={1000}
+                      note={false}
+                      title="1〜1000"
                       value={interval.capacity ?? 1}
                       onChange={(event) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, capacity: Number(event.target.value) } : entry))}
                       className={styles.numInput}

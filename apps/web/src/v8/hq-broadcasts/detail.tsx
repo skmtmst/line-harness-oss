@@ -507,7 +507,10 @@ export default function HqBroadcastDetail() {
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
         <PageHeading title={run?.title ?? '一括配信'}
         steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
-        actions={<>{badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : null}{run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}{run ? (
+        /* 店の詳細（tPm3e）と同じ形：題の右に状態の札、題の下に1行の要約（絵 M2tJM）。 */
+        titleAccessory={badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : undefined}
+        crumbs={run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : undefined}
+        actions={<>{run ? (
             <div className={detailStyles.actions}>
               {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
               <Button size="field" onClick={() => void exportCsv()} busy={exporting} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>

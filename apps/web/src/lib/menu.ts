@@ -56,7 +56,8 @@ export interface MenuSection {
 /** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
 export function isHqShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加）も統括の外側（絵 xj3zz・faGn4）。
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new'
 }
 
 export const HQ_MENU_SECTIONS: MenuSection[] = [

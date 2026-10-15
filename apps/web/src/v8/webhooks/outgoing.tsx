@@ -680,20 +680,22 @@ export default function WebhooksOutgoingV8() {
                         : item.isActive && !toggling ? <span className={styles.sub}>まだ送っていません</span> : null}
                     </Td>
                     <ActionCell className={styles.colOps}>
+                      {/* 行の右端は「…」だけ（B-253）。中身を見る・やり直すも中に入れる。見るだけの担当者にも出す。 */}
                       <div className={styles.opsBox}>
-                        {item.deliverySummary.canRetry && canManage
-                          ? <Button size="compact" href="/webhooks?tab=interactions">やり直す</Button>
-                          : <Button size="compact" href="/webhooks?tab=interactions">中身を見る</Button>}
-                        {showMenu ? (
-                          <RowMenu
-                            label={`「${item.name}」の設定`}
-                            title="設定"
-                            open={menuId === item.id}
-                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
-                            items={menuItems}
-                            note={canManage ? undefined : MANAGE_REASON}
-                          />
-                        ) : null}
+                        <RowMenu
+                          label={`「${item.name}」の操作`}
+                          title="操作"
+                          open={menuId === item.id}
+                          onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                          items={[
+                            { id: 'view', label: '送信の記録を見る', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
+                            ...(item.deliverySummary.canRetry && canManage
+                              ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } }]
+                              : []),
+                            ...(showMenu ? menuItems : []),
+                          ]}
+                          note={canManage ? undefined : MANAGE_REASON}
+                        />
                       </div>
                     </ActionCell>
                   </Tr>
@@ -718,7 +720,7 @@ export default function WebhooksOutgoingV8() {
       skeleton
       help={<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
-          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}
+          : '行の「…」から 送信の記録を見る・直す・止める・鍵を作り直す・試しに送る・失敗をやり直す・削除。'}</>}
       explanation="友だちの動きを、決めたタイミングでほかのシステムへ送ります。送るときは秘密の鍵を付けます。鍵は「…」から作り直せます。"
       boardId={narrow ? 'AsfFB' : 'ZSbFY'}
       headingSize="regular"

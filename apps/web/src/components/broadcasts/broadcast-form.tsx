@@ -634,6 +634,12 @@ export default function BroadcastForm({
    * 誤った案内が出る。
    */
   const [templateCandidatesStatus, setTemplateCandidatesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /* 選ぶ窓の「よく使う」：使った回数の多い順に上から3つ（B-165・f63Jza）。使った記録が無いものは入れない。 */
+  const frequentTemplateIds = useMemo(() => new Set(messageTemplates
+    .filter((template) => (template.usageCount ?? 0) > 0)
+    .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
+    .slice(0, 3)
+    .map((template) => template.id)), [messageTemplates])
   /**
    * テンプレート選択窓の絞り込み（IDEA-11）。
    * 「置き場」はテンプレートのフォルダで、配信そのものの置き場
