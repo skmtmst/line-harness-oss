@@ -18,6 +18,14 @@ describe('作業役Dと同じ支払い管理APIの形',()=>{
     await api.refund('p /');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/payments/p%20%2F/refund',{method:'POST',body:'{}'});
     await api.replayEvent('a','ev /');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-events/ev%20%2F/replay?account_id=a',{method:'POST',body:'{}'});
   });
+  it('設定の読取で返された版を保存に渡せる',async()=>{
+    await api.saveCourseMode('a','m','online',3);
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/restaurant-test/menus/m/payment?account_id=a',{method:'PUT',body:'{"mode":"online","expectedVersion":3}'});
+    await api.saveEventMode('a','ev',null,4);
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/events/admin/events/ev/payment?account_id=a',{method:'PUT',body:'{"mode":null,"expectedVersion":4}'});
+    await api.saveEventPrice('a','ev',0,5);
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/events/admin/events/ev/price?account_id=a',{method:'PUT',body:'{"unitPrice":0,"expectedVersion":5}'});
+  });
   it('コース・クラスの読取/保存はDの型と同じ。上書き解除のnullも送る',async()=>{
     await api.courseMode('a','m /');expect(fetchApi).toHaveBeenLastCalledWith('/api/restaurant-test/menus/m%20%2F/payment?account_id=a');
     await api.saveCourseMode('a','m','customer_choice');expect(fetchApi).toHaveBeenLastCalledWith('/api/restaurant-test/menus/m/payment?account_id=a',{method:'PUT',body:'{"mode":"customer_choice"}'});

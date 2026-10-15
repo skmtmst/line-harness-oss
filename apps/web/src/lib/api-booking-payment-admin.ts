@@ -2,7 +2,7 @@ import { ApiError, fetchApi, fetchApiBlob } from './api';
 
 /*
  * 予約のお支払い（管理画面）の口（B-305・B-315）。作業役Dの形を保持する。
- * 通知履歴・コース/クラスの保存先は追加番号の承認待ち（503/storage_not_ready）。
+ * 通知履歴・コース/クラスの設定には663〜665の適用が必要。
  * 支払いリンクは模擬のみ。sent:false を送信成功として表示しない。
  */
 
@@ -100,17 +100,17 @@ export const bookingPaymentAdminApi = {
     fetchApi<Result<{ payment: unknown }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refund`, { method: 'POST', body: '{}' }),
   /** 飲食のコース（restaurant-test のメニュー）とイベントのクラスの支払い。予約メニューは bookingApi.saveMenuPayment。 */
   courseMode: (accountId: string, menuId: string) =>
-    fetchApi<Result<{ mode: BookingPaymentMode | null }>>(`/api/restaurant-test/menus/${encodeURIComponent(menuId)}/payment?${q(accountId)}`),
-  saveCourseMode: (accountId: string, menuId: string, mode: BookingPaymentMode | null) =>
-    fetchApi<Result<{ mode: BookingPaymentMode | null }>>(`/api/restaurant-test/menus/${encodeURIComponent(menuId)}/payment?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ mode }) }),
+    fetchApi<Result<{ mode: BookingPaymentMode | null; version: number }>>(`/api/restaurant-test/menus/${encodeURIComponent(menuId)}/payment?${q(accountId)}`),
+  saveCourseMode: (accountId: string, menuId: string, mode: BookingPaymentMode | null, expectedVersion?: number) =>
+    fetchApi<Result<{ mode: BookingPaymentMode | null; version: number }>>(`/api/restaurant-test/menus/${encodeURIComponent(menuId)}/payment?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ mode, expectedVersion }) }),
   eventMode: (accountId: string, eventId: string) =>
-    fetchApi<Result<{ mode: BookingPaymentMode | null }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/payment?${q(accountId)}`),
-  saveEventMode: (accountId: string, eventId: string, mode: BookingPaymentMode | null) =>
-    fetchApi<Result<{ mode: BookingPaymentMode | null }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/payment?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ mode }) }),
+    fetchApi<Result<{ mode: BookingPaymentMode | null; version: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/payment?${q(accountId)}`),
+  saveEventMode: (accountId: string, eventId: string, mode: BookingPaymentMode | null, expectedVersion?: number) =>
+    fetchApi<Result<{ mode: BookingPaymentMode | null; version: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/payment?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ mode, expectedVersion }) }),
   eventPrice: (accountId: string, eventId: string) =>
-    fetchApi<Result<{ unitPrice: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/price?${q(accountId)}`),
-  saveEventPrice: (accountId: string, eventId: string, unitPrice: number) =>
-    fetchApi<Result<{ unitPrice: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/price?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ unitPrice }) }),
+    fetchApi<Result<{ unitPrice: number; version: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/price?${q(accountId)}`),
+  saveEventPrice: (accountId: string, eventId: string, unitPrice: number, expectedVersion?: number) =>
+    fetchApi<Result<{ unitPrice: number; version: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/price?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ unitPrice, expectedVersion }) }),
 };
 
 /** 口がまだ無い・表がまだ無い（B-314 の「現在準備中です」で出す）か。 */
