@@ -35,7 +35,7 @@ export default function BlockedDeleteDialog({
   onClose: () => void
 }) {
   return <Dialog open title={title} description={description} onCancel={onClose} busy={busy} error={error ?? undefined}
-    tone="destructive" confirmation designLayout="stacked" designWidth={480} designNode="yOyCg" footer={footer} footerAlign="center">
+    tone="destructive" confirmation designLayout="stacked" designWidth={480} designNode="yOyCg" footer={footer} footerAlign="start">
     <ol className={styles.rows}>{rows.map((row, index) => <li key={row.key} className={styles.row}>
       <span className={styles.rowText}>{`${index + 1} ${row.text}`}</span><span className={styles.spacer} aria-hidden="true" />
       {row.action ? <button type="button" className={styles.rowAction} onClick={row.action.onSelect} disabled={busy}>{row.action.label}</button> : null}

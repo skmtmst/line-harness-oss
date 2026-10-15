@@ -128,8 +128,10 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     render(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('山田 太郎')).toBeTruthy()
     // 判定入口（1行ごとの操作）は候補と一緒に見える。
-    expect(screen.getByRole('button', { name: '決める' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '候補を見る' })).toBeTruthy()
+    // 行の右端は「…」1つ（B-253）。判定入口はその中。
+    fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
+    expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '候補を見る' })).toBeTruthy()
     // 集計の数はサーバが数えた値を出す（w1W8h：絵の言葉）。
     expect(screen.getByText('人が決める（つき合わせ 5 のうち）')).toBeTruthy()
     expect(screen.getByText('¥50,000')).toBeTruthy()
@@ -140,7 +142,8 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     render(<EcIdentityCandidatesPage />)
     // 取得済みの候補と判定入口は隠さない。
     expect(await screen.findByText('山田 太郎')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '決める' })).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
+    expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
     // 集計欄はその場所で失敗を言い、やり直せる。
     expect(screen.getAllByText('読み込めませんでした').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
@@ -154,7 +157,8 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     mocks.operations.mockRejectedValue(new ApiError(403))
     render(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('山田 太郎')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '決める' })).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
+    expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
     expect(screen.getAllByText('表示する権限がありません').length).toBeGreaterThan(0)
     // 押しても直らない再試行の口は出さない。
     expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()

@@ -252,7 +252,7 @@ describe('キー操作', () => {
 
 describe('欄の高さの口（size）', () => {
   const frame = (name: string) => screen.getByRole('combobox', { name }).parentElement as HTMLElement
-  it('既定は印なし（36）、field は日付の欄と並ぶ 40、compact は細い欄の 32', () => {
+  it('既定は印なし（36）、field は日付の欄と並ぶ 36、compact は細い欄の 32', () => {
     render(
       <>
         <TimeField aria-label="既定" value="09:00" />
@@ -283,7 +283,7 @@ describe('日時の欄の時刻の部分も同じ部品', () => {
     expect(within(dialog).queryByRole('button', { name: '時' })).toBeNull()
     const time = within(dialog).getByRole('combobox', { name: '時刻' }) as HTMLInputElement
     expect(time.value).toBe('10 : 00')
-    // 日付の欄（40）と並ぶので高さは field（絵 FU2aU・BBRDb・ZU4Ae）。
+    // 日付の欄（36）と並ぶので高さは field（絵 FU2aU・BBRDb・ZU4Ae）。
     expect((time.parentElement as HTMLElement).dataset.size).toBe('field')
     fireEvent.focus(time)
     fireEvent.change(time, { target: { value: '1430' } })

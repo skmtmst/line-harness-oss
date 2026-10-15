@@ -1441,6 +1441,9 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'flow-2', store_id: null, flow_type: 'reservation_2h', title: '本日のご来店をお待ちしております', body: 'お店までの道順と、駐車場のご案内です。', timing_minutes: -120, is_enabled: 1, delivery_mode: 'preview_only' },
     { id: 'flow-3', store_id: null, flow_type: 'post_visit', title: '本日はありがとうございました', body: '次回使えるデザートのサービス券をお送りします。', timing_minutes: 180, is_enabled: 0, delivery_mode: 'preview_only' },
     { id: 'flow-4', store_id: null, flow_type: 'review_request', title: 'よろしければご感想をお聞かせください', body: 'Google の口コミに書いていただけるとうれしいです。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
+    /* 融合の板 n9vvGx の「会員証」「ワンタップ予約」（常設）。 */
+    { id: 'flow-5', store_id: null, flow_type: 'member_card', title: 'デジタル会員証', body: 'スタンプカードと来店履歴を見られます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
+    { id: 'flow-6', store_id: null, flow_type: 'one_tap_booking', title: '前回と同じ内容で予約', body: '店舗・人数・コースを前回と同じにして予約できます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
   ],
 }
 /*
@@ -2314,6 +2317,13 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /* Al4Ek（B-177 ③）：シナリオの複製。止めたコピーを作って返す（保存はしない）。通・きっかけは取得の口が同じ形を返すので足さずに済む。 */
+  if ((method === 'POST' && pathname === '/api/scenarios') || (method === 'PUT' && pathname === '/api/scenarios/scenario-copy')) {
+    return { ...FRIEND_SCENARIOS[0], id: 'scenario-copy', name: `${FRIEND_SCENARIOS[0].name} のコピー`, isActive: false }
+  }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/actions') return { ...SCENARIO_ACTIONS[0], id: `scenario-copy-action-${Date.now()}`, scenarioId: 'scenario-copy' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/triggers') return { ...SCENARIO_TRIGGERS[0], id: 'scenario-copy-trigger' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/steps') return { ...SCENARIO_STEPS[0], id: `scenario-copy-step-${Date.now()}`, scenarioId: 'scenario-copy' }
   /*
    * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
@@ -2795,11 +2805,13 @@ const VISUAL_COMPOSE_BUBBLES = [
   } } },
   { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
     columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      /* 絵の小さな写真の代わり（撮影は外へ取りに行かないので、その場の色の絵）。 */
+      thumbnailImageUrl: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="${['#c98a4b', '#8fae6b', '#d9a066'][index]}"/><rect y="120" width="300" height="80" fill="${['#a8663a', '#6f8f4f', '#b97f4a'][index]}"/></svg>`)}`,
       title, text: '秋のおすすめ商品をご案内します',
       actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
     }))),
   } },
-  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+  { id: 'visual-audio', type: 'audio', content: { fileName: 'autumn-greeting.m4a', state: {
     location: { title: '', address: '', latitude: '', longitude: '' },
     video: { originalContentUrl: '', previewImageUrl: '' },
     audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
@@ -2866,6 +2878,9 @@ const VISIT_STAMP_ENTRIES = [
 function visitStampRead(pathname, query) {
   if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD, { ...VISIT_STAMP_CARD, id: 'vs-card-gold', name: 'ゴールドカード', settings: { ...VISIT_STAMP_CARD.settings, completion: 'repeat', nextCardId: null } }] }
   if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
+  // 店頭の QR（印刷用）は発行済みの形（絵 fpPlW：QR の画像・保存・印刷・作り直す・最後に作り直した日 9/1）。
+  const storefront = /^\/api\/visit-stamps\/cards\/([^/]+)\/storefront-qr$/.exec(pathname)
+  if (storefront) return { success: true, data: { id: 'vsqr-store-1', cardId: decodeURIComponent(storefront[1]), accountId: query.get('accountId') ?? 'acc-1', kind: 'storefront', url: 'https://liff.line.me/2000000000-demo/visit-stamps/s/vsqr-store-1', issuedAt: '2026-09-01T01:00:00.000Z', expiresAt: null, serverTime: '2026-10-15T01:00:00.000Z', status: 'active', generation: 2, count: 1, amount: null } }
   if (pathname === '/api/visit-stamps/entries') {
     const page = Math.max(1, Number(query.get('page') ?? 1)), pageSize = Math.min(200, Math.max(1, Number(query.get('pageSize') ?? 50)))
     const friendId = query.get('friendId'), kind = query.get('kind')

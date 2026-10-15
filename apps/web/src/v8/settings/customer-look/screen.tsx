@@ -2,7 +2,7 @@
 import {useEffect,useRef,useState} from 'react'
 import {DEFAULT_CUSTOMER_LOOK,customerPalette,customerLookError,type CustomerLook} from '@line-crm/shared'
 import {SettingsPage} from '@/components/templates/settings-page'
-import {SettingsNavV8} from '@/components/layout/settings-nav-v8'
+import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import {usePageTitle,usePageCrumbs,useHideSettingsNav} from '@/components/shell/page-chrome'
 import {useAccount} from '@/contexts/account-context'
 import {useStaffRole,canManageRole} from '@/lib/staff-role'
@@ -56,7 +56,7 @@ export default function CustomerLookScreen() {
   catch(failure){if(request===generation.current)setError(japaneseDetailOf(failure)||'最新のデザインを読み込めませんでした')}
   finally{if(request===generation.current)setSaving(false)}
  }
- return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsNavV8/>}
+ return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsInnerNav inline/>}
   help="予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。"
   preview={status==='ready'?<CustomerLookPreview look={draft} accountName={selectedAccount?.name??'公式アカウント'}/>:undefined}
   saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}

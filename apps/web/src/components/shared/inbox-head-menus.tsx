@@ -52,6 +52,7 @@ export function HeadOperatorMenu({
       aria-label={ariaLabel}
       label="担当"
       width={OPERATOR_WIDTH}
+      actionHidden
       value={value}
       onChange={onChange}
       options={rows.map((row) => ({ ...entityOptionMetadata(row), value: row.id, label: row.name }))}

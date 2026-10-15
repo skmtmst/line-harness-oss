@@ -586,6 +586,21 @@
 /* 段の題は 15/700・行の高さ 22（共通の見出しは 23）。 */
 .flatCard h3 { line-height: var(--tpl-eds-card-title-lh); }
 
+/* 統括の④「確かめる」（BVSbe）：左に形（幅 240）、右に面ごとの動きの一覧（行の間は線）。 */
+.hqReview { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: start; }
+.hqReviewShape { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hqReviewActions { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hqReviewLabel { margin: 0; color: var(--color-ink-secondary); font-size: 12px; line-height: 17px; }
+.hqActionList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.hqActionRow { display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 6px 0; box-shadow: var(--shadow-row-line); }
+.hqActionLetter {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: 999px; background: var(--color-canvas-sunken); color: var(--color-accent-deep);
+  font-size: 12px; font-weight: 600;
+}
+.hqActionName { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.hqActionValue { flex: none; color: var(--color-ink-secondary); font-size: 12px; white-space: nowrap; }
+
 /* 板 `F4gELj`「確かめる」：左に小さな見本（幅 165）、右に面ごとの動き。 */
 .reviewRow { display: flex; align-items: flex-start; gap: var(--polish-space-card); min-width: 0; }
 .reviewThumb { flex: none; width: 165px; display: flex; flex-direction: column; gap: 8px; }

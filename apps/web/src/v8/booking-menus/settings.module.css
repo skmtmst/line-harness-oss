@@ -166,7 +166,7 @@
 
 .sideTitle {
   display: flex;
-  align-self: flex-start;
+  align-self: stretch;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -676,7 +676,7 @@
 
 .intervalLine {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--tpl-bm-6);
   min-height: var(--tpl-bm-36);
 }
@@ -1069,14 +1069,17 @@
 
 .staffName {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 var(--tpl-bk2-staff-col-name);
   flex-direction: column;
   gap: var(--tpl-bm-2);
   min-width: 0;
 }
 
 .staffRole {
+  overflow: hidden;
   color: var(--color-ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--tpl-bm-11);
 }
 
@@ -1100,9 +1103,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--tpl-bm-4);
-  width: var(--tpl-bk2-staff-col-link);
-  flex-shrink: 0;
-  min-width: 0;
+  flex: 1 1 var(--tpl-bk2-staff-col-link);
+  min-width: var(--tpl-bk2-staff-col-link);
 }
 
 .staffColStatus {
@@ -1133,10 +1135,21 @@
   line-height: var(--tpl-bm-16);
 }
 
+/* 絵 VLEaj：数の「0」は黒、下の注意文だけオレンジ。 */
 .staffRow .cellWarn {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  color: var(--color-ink);
   line-height: var(--tpl-bm-17);
+}
+
+/* 絵 VLEaj：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
+.staffRow .cellWarn .staffCellSub {
+  overflow: hidden;
+  color: var(--color-warning);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .staffCellMain {
@@ -1471,10 +1484,15 @@
 }
 
 /* メニューの分類札の帯。 */
+/* 実 LIFF と同じく1行（入りきらない札は横へ送る）。スマホの器が 310 の画面になっても2段に折らない。 */
 .phoneCats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: var(--tpl-bm-6);
+  overflow: hidden;
+  padding: 2px; /* 選んだ札の枠を切らない */
+  margin: -2px;
 }
 
 .phoneCat {
@@ -1485,6 +1503,8 @@
   color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-12);
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .phoneCatNow {
@@ -1802,3 +1822,19 @@
 }
 
 .warnBand, .warnBandNoticePlacement { margin: 0; flex-shrink: 0; }
+
+/* 畳んだ右欄の2つのボタン（VFxWU）。 */
+.narrowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bm-6);
+}
+
+/* 開ける時間の行：欄の上をそろえ、範囲の添え書き（1〜1000）は数の欄の下に垂らす。文字と×は欄の高さの中で真ん中。 */
+.intervalLine > .intervalTilde,
+.intervalLine > .sameTimeLabel,
+.intervalLine > .iconRemove {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tpl-bm-36);
+}

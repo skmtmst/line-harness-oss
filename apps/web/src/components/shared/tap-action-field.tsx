@@ -58,6 +58,10 @@ export interface TapActionSourceItem {
   note?: string
   /** 新しくは選べない（受け付けを止めた回答フォームなど）。選んであるときは名前と補足を出す。 */
   disabled?: boolean
+  /** フォルダ（回答フォーム）。undefined＝フォルダの無い種類。 */
+  folderId?: string | null
+  /** 最後に直した日時（選ぶ窓の行の補足）。 */
+  updatedAt?: string | null
 }
 
 export type TapActionSources = Partial<Record<'form' | 'booking' | 'visit_stamp', TapActionSourceItem[]>>
@@ -256,7 +260,7 @@ export function TapTargetPicker({ tapKind, noun, required, emptyLabel, items, in
   const entity: EntityKind | undefined = tapKind === 'form' ? 'form' : tapKind === 'booking' ? 'booking_menu' : undefined
   const usable = (items ?? []).filter((item) => !item.disabled || item.id === initialId)
   if (required && entity && items !== undefined) {
-    return <EntityKindDialog kind={entity} options={usable.map((item) => ({ id: item.id, name: item.name }))} initialId={initialId} onConfirm={onConfirm} onCancel={onCancel} />
+    return <EntityKindDialog kind={entity} options={usable.map((item) => ({ id: item.id, name: item.name, folderId: item.folderId, updatedAt: item.updatedAt }))} initialId={initialId} onConfirm={onConfirm} onCancel={onCancel} />
   }
   const def = entity ? ENTITY_KINDS[entity] : undefined
   const rows: EntityPickerItem[] = [
