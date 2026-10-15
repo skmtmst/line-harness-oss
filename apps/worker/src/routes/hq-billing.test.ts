@@ -536,3 +536,24 @@ describe('即時変更の日割り見積り', () => {
     expect((await call('GET', path)).status).toBe(502);
   });
 });
+
+type StoredBillingMetrics = NonNullable<Awaited<ReturnType<typeof import('../services/hq-billing-metrics.js').hqBillingMetrics>>>;
+describe('統括の請求の数の帯（保存済み請求のみ）',()=>{
+  it('今月の額・未払いと組織単位の契約を、他組織と分けて返す',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(new Date('2026-09-30T15:00:00Z'));
+    try {
+      setTenant({plan_status:'active',stripe_subscription_id:'sub-test',current_period_ends_at:'2026-11-01T00:00:00+09:00'});
+      testDb.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES ('local','Local','local','test','test',?)").run(DEFAULT_TENANT_ID);
+      testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('other','Other')");
+      for(const [id,tenant,at,amount,status] of [['old',DEFAULT_TENANT_ID,'2026-09-01 00:00:00',900,'paid'],['new',DEFAULT_TENANT_ID,'2026-09-30T15:00:00Z',29800,'open'],['foreign','other','2026-10-01 00:00:00',99999,'open']])testDb.raw.prepare("INSERT INTO billing_invoices(id,tenant_id,created_at,amount_due,status,currency,synced_at) VALUES (?,?,?,?,?,'jpy','2026-10-01 00:00:00')").run(id,tenant,at,amount,status);
+      const r=await call('GET','/api/hq/billing/metrics');expect(r.status).toBe(200);const b=await r.json() as {data:StoredBillingMetrics};
+      expect(b.data).toMatchObject({thisMonthBilledYen:29800,contractCount:1,contractUnit:'organization',activeAccountCount:1,contractAccountCount:null,trialCount:0,unpaidInvoiceCount:1,paymentFailureCount:null,nextBillingAt:'2026-11-01T00:00:00+09:00'});
+      expect(stripe.retrievePrice).not.toHaveBeenCalled();expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+    } finally {vi.useRealTimers()}
+  });
+  it('請求の未取得は0で埋めず、アカウント限定とスタッフ権限は拒否する',async()=>{
+    const r=await call('GET','/api/hq/billing/metrics');const b=await r.json() as {data:StoredBillingMetrics};expect(b.data).toMatchObject({thisMonthBilledYen:null,unpaidInvoiceCount:null,unavailable:{invoices:'NOT_SYNCED'}});
+    expect((await call('GET','/api/hq/billing/metrics',undefined,{staff:staffOf({role:'staff'})})).status).toBe(403);
+    testDb.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='staff-1'");expect((await call('GET','/api/hq/billing/metrics')).status).toBe(403);
+  });
+});
