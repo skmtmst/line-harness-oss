@@ -43,11 +43,12 @@
       "rules": ["B-260", "B-262"],
       "owner": {
         "code": {
-          "files": ["apps/web/src/components/shared/reservation-board.tsx", "apps/web/src/components/shared/reservation-people-grid.tsx", "apps/web/src/components/shared/reservation-people-grid.module.css"],
-          "components": ["ReservationBoard", "ReservationPeopleGrid"],
+          "files": ["apps/web/src/components/shared/reservation-board.tsx", "apps/web/src/components/shared/reservation-people-grid.tsx", "apps/web/src/components/shared/reservation-people-grid.module.css", "apps/web/src/components/templates/booking-page.tsx", "apps/web/src/components/templates/booking-day-layout.module.css"],
+          "components": ["ReservationBoard", "ReservationPeopleGrid", "BookingPage", "BookingSidebarSection"],
           "vars": ["--tpl-people-time-width", "--tpl-people-hour-height", "--tpl-people-block-height", "--tpl-people-block-gap"]
         },
-        "pen": ["GcyTr", "O2Z8u"]
+        "pen": [],
+        "status": "使用板はGcyTr/O2Z8u。Penの再利用する盤の部品は未指定"
       },
       "code": { "selectorHint": "data-people-day-grid", "overrideSelectors": [], "signals": [] }
     },
