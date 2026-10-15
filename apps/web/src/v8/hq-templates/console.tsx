@@ -7,7 +7,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useListReturnHref, useListNavigationHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useAccount } from '@/contexts/account-context'
-import { ArrowLeft, Check, Plus, Search, Send } from 'lucide-react'
+import { ArrowLeft, Check, Plus, Send } from 'lucide-react'
 import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -62,10 +62,11 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { DistributionPage } from '@/components/templates/distribution-page'
+import AccountDistributionPage from './account-distribution-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
+import { DistributionTable, DistributionProgress, DistributionAccountName } from '@/components/shared/distribution-table'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -1140,7 +1141,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
 
   return (
-    <DistributionPage boardId={stage === 'result' && done ? 'dEvJM' : 'meBRB'} title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle}
+    <AccountDistributionPage selecting={stage === 'accounts'} rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={accountFolders.failed}
+      boardId={stage === 'result' && done ? 'dEvJM' : 'meBRB'} title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle}
         help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。アカウントのフォルダで絞り込むこともできます。"
       stats={<KpiBand>
         <KpiCard title="配布先" value={accounts.length} unit="アカウント" detail="配ることのできるアカウント" />
@@ -1152,10 +1154,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       notices={ <>
       {folderBatch ? <p className={styles.note}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。`}</p> : null}
       {error || message ?notices : null}
+      {stage !== 'accounts' && accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
         </>}
-        toolbar={<DistributionToolbar>
-          <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["search"]}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField></Field>
-          <span className={styles.bulkPick}>
+        toolbar={<SaveErrorField names={["search"]}><ListToolbar search={{label: 'アカウントを検索', placeholder: 'アカウント名で探す', value: search, onChange: setSearch, updateMode: 'immediate'}}
+          filters={stage === 'duplicates' ? <span className={styles.bulkPick}>
             <SaveErrorField names={["bulkMode","bulk_mode"]}><Select
               aria-label="一括の配布方法"
               size="full"
@@ -1164,15 +1166,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               onChange={(next) => applyBulk(next as '' | DistributionMode)}
               options={[{ value: '', label: '一括の配布方法：選ぶ' }, { value: 'overwrite', label: '一括の配布方法：上書き' }, { value: 'alias', label: '一括の配布方法：別名で作る' }]}
             /></SaveErrorField>
-          </span>
-        <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/>
-          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
-          {accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
-        </DistributionToolbar>}
+          </span> : null}
+          trailing={stage !== 'accounts' ? <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/> : null}
+        /></SaveErrorField>}
       actions={<>
 {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>
-            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
+            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" title={!selected.length ? '配るアカウントを選んでください。' : undefined} disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
           </> : stage === 'duplicates' && preflight ? <>
             <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
             {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
@@ -1259,7 +1259,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           </DistributionProgress>
         ) : null}
         </div>
-      </DistributionPage>
+      </AccountDistributionPage>
   )
 }
 
