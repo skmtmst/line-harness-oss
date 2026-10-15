@@ -1154,7 +1154,7 @@
   --tpl-fe-row-pad: 12px; --tpl-fe-grip-w: 14px; --tpl-fe-icon-box: 28px; --tpl-fe-icon-radius: var(--polish-radius-small); --tpl-fe-more-h: 28px;
   --tpl-fe-open-pad: 16px; --tpl-fe-open-gap: 12px; --tpl-fe-open-head-gap: 8px; --tpl-fe-open-line: 1.5px; --tpl-fe-save-gap: 12px; --tpl-fe-info-pad: 10px 12px; --tpl-fe-info-lh: 19px; --tpl-fe-button-pad: 0 14px; --tpl-fe-input-pad: 0 12px; --tpl-fe-select-pad: 0 10px 0 12px;
   --tpl-fe-add-pad: var(--polish-space-card); --tpl-fe-add-card-h: 58px; --tpl-fe-add-card-gap: 4px; --tpl-fe-add-card-pad: 8px 12px;
-  --tpl-fe-limit-w: 120px; --tpl-fe-booking-cols: 31fr 31fr 20fr; --tpl-fe-wells-gap: 6px; --tpl-fe-words-gap: 8px; --tpl-fe-url-pad: 0 10px; --tpl-fe-change-gap: 6px; --tpl-fe-changes-pad: 12px 14px; --tpl-fe-notes-gap: 12px;
+  --tpl-fe-limit-w: 120px; --tpl-fe-booking-cols: 36fr 26fr 20fr; --tpl-fe-wells-gap: 6px; --tpl-fe-words-gap: 8px; --tpl-fe-url-pad: 0 10px; --tpl-fe-change-gap: 6px; --tpl-fe-changes-pad: 12px 14px; --tpl-fe-notes-gap: 12px;
   --tpl-fe-band-slot-pad: 0 24px 8px; --tpl-fe-band-gap: 12px; --tpl-fe-band-pad: 12px 16px; --tpl-fe-band-title-size: var(--polish-text-section); --tpl-fe-band-title-lh: 20px;
   /* 保存がぶつかったときの帯・比べる窓（共通 save-conflict。J1pdB・k32cn）。回答フォームの編集の値と同じ。 */
   --save-conflict-gap: var(--tpl-fe-band-gap); --save-conflict-pad: var(--tpl-fe-band-pad); --save-conflict-ring: var(--tpl-fe-ring-warning); --save-conflict-head-gap: var(--tpl-fe-head-gap);
@@ -3013,7 +3013,8 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-list-cell-side: 16px;
 }
 
-:root { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }
+/* 画像の枠：中に印・題・説明2行・上限が入る大きさ（絵 J60utH・e875x・D6fh3 の 180×160）。 */
+:root { --tpl-image-frame-w: 180px; --tpl-image-frame-h: 160px; --tpl-image-frame-ratio: 9 / 8; --tpl-slot-links-gap-below: 2px; --tpl-slot-links-pad-below: 8px; }
 :root { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
 /* 印刷の内容は body 直下へ置き、画面のスクロール枠・高さ制限から外す。 */
 @media print {

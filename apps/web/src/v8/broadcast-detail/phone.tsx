@@ -37,7 +37,7 @@ export default function BroadcastPhone({
   const photo = broadcast.messageType === 'image' && single ? { url: imageUrlOf(broadcast.messageContent) } : null
   return (
     <LinePreview title={null} accountName={accountName} caption={chip}>
-      <LinePreviewMessage accountName={accountName} avatar={initial} time={time}>
+      <LinePreviewMessage accountName={accountName} avatar={initial} time={time} bare={Boolean(photo)}>
                 {plainText ? (
                   <p className={styles.bubble}>{broadcast.messageContent}</p>
                 ) : photo ? (

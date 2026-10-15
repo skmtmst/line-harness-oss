@@ -367,7 +367,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     }
   }
 
-  const sendName = host ? '公式アカウント' : accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
+  const sendName = host ? host.accountName || '公式アカウント' : accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
   const blocked = saved ? '保存しました。一覧へ戻ってください。' : null
   const busy = saving || publishing || Boolean(host?.busy)
   const imageSet = /^https?:\/\//.test(imageUrl.trim())
