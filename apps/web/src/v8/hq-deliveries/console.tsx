@@ -11,6 +11,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import FolderPanel from '@/components/shared/folder-panel'
 import SearchField from '@/components/shared/search-field'
 import ResourceTable from '@/components/shared/resource-table'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
 import Checkbox from '@/components/shared/checkbox'
 import { Tabs } from '@/components/shared/tabs'
@@ -165,7 +166,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}}
       toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value={query} onChange={setQuery} />}>
       {notices}
-      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<Button disabled={busy || accountsFailed} onClick={async()=>{if (await edit(row)) setView('accounts')}}><Send size={15} />アカウントへ配る</Button>}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
+      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={14} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
     </ListPage></SaveErrorScope>
   }
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
