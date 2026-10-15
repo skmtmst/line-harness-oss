@@ -12,7 +12,7 @@ import { formatDate } from '@/lib/format'
 import type { BookingChannel, BookingChannelStaff, BookingChannelsData } from './lib/booking-channels'
 import ch from './channels.module.css'
 
-const TABLE_LAYOUT = { headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-row)', padding: '0 var(--polish-space-section)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' as const }
+const TABLE_LAYOUT = { headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--polish-space-section)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' as const }
 const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> = {
   line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
   manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
@@ -60,10 +60,10 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
       <CardHeader size="content" titleId="channels-calendar-heading" title="スタッフの Google カレンダー" />
       <p data-card-footer className={ch.cardDesc}>カレンダーの予定は「埋まっている時間」として扱います。LINE で入った予約は、そのスタッフのカレンダーに書き込みます。</p>
       <DataTable aria-label="スタッフの Google カレンダー" columnSizing="content" columnLayout={TABLE_LAYOUT}>
-        <thead><TableHeadRow data-table-layout="columns"><Th truncate>スタッフ</Th><Th grow collapseAt="narrow" truncate>カレンダー</Th><Th truncate>状態</Th><Th align="right" truncate>外の予定（今週）</Th><Th collapseAt="narrow" truncate>最後に読んだ</Th><Th>操作</Th></TableHeadRow></thead>
+        <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>スタッフ</Th><Th collapseAt="narrow" truncate>カレンダー</Th><Th truncate>状態</Th><Th align="right" truncate>外の予定（今週）</Th><Th collapseAt="narrow" truncate>最後に読んだ</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
         <tbody>{data.staff.map(person => <Tr key={person.staffId} data-table-layout="columns">
-          <Td title={`カレンダー：${calendars[person.staffId] || emptyValue('unknown')}・最後に読んだ：${formatReadAt(person.lastReadAt)}`}><span className={ch.nameCell}><OneLine text={person.displayName} tone="name" />{roles[person.staffId] ? <OneLine text={roles[person.staffId]} tone="sub" /> : null}</span></Td>
-          <Td grow collapseAt="narrow"><TruncatedText value={calendars[person.staffId] || emptyValue('unknown')} /></Td>
+          <Td grow title={`カレンダー：${calendars[person.staffId] || emptyValue('unknown')}・最後に読んだ：${formatReadAt(person.lastReadAt)}`}><span className={ch.nameCell}><OneLine text={person.displayName} tone="name" />{roles[person.staffId] ? <OneLine text={roles[person.staffId]} tone="sub" /> : null}</span></Td>
+          <Td collapseAt="narrow"><TruncatedText value={calendars[person.staffId] || emptyValue('unknown')} /></Td>
           <Td><StaffStatusChip status={person.status} /></Td>
           <Td align="right"><TruncatedText value={person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`} /></Td>
           <Td collapseAt="narrow"><TruncatedText value={formatReadAt(person.lastReadAt)} /></Td>
@@ -75,7 +75,7 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
       <CardHeader size="content" titleId="channels-route-heading" title="予約経路" />
       <p data-card-footer className={ch.cardDesc}>どこから入った予約も「予約管理」に集めます。入り口ごとの受け取り方と、今日の件数です。</p>
       <DataTable aria-label="予約経路" columnSizing="content" columnLayout={TABLE_LAYOUT}>
-        <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th>操作</Th></TableHeadRow></thead>
+        <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
         <tbody>{data.channels.map(channel => {
           const label = CHANNEL_LABEL[channel.key] ?? { name: channel.key, sub: '', how: '' }
           return <Tr key={channel.key} data-table-layout="columns">
