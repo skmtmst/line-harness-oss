@@ -662,7 +662,7 @@ function ProjectInner() {
                       <span className={styles.spacer} />
                       {image.deliveredAccountIds.length > 0 ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                       {canManage ? (
-                        <button type="button" className={styles.star} onClick={() => void toggleImageFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
+                        <button type="button" data-part="attention-star" className={styles.star} onClick={() => void toggleImageFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                           <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />
                         </button>
                       ) : null}
