@@ -37,3 +37,50 @@ test('audience migration preserves existing recipients with foreign keys enabled
   ).toThrow('analytics_result_source_not_found');
   db.close();
 });
+
+test('681 preserves previous selection and defaults automatic insertion on; invalid states fail', () => {
+  const db = new Database(':memory:');
+  db.exec(`CREATE TABLE account_styles(line_account_id TEXT PRIMARY KEY,selected_at TEXT,answers_json TEXT);
+    INSERT INTO account_styles VALUES('chosen','2026-10-15','{"hours":{"mode":"manual"}}'),('unselected',NULL,'{}');
+    CREATE TABLE style_starter_sets(id TEXT PRIMARY KEY,definition_json TEXT);
+    INSERT INTO style_starter_sets VALUES('set','{"items":[]}');`);
+  db.exec(
+    readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../../packages/db/migrations/681_style_setup_selection_and_auto_insert.sql',
+      ),
+      'utf8',
+    ),
+  );
+  expect(
+    db
+      .prepare(
+        'SELECT line_account_id,selection_mode,answers_json FROM account_styles ORDER BY line_account_id',
+      )
+      .all(),
+  ).toEqual([
+    {
+      line_account_id: 'chosen',
+      selection_mode: 'configured',
+      answers_json: '{"hours":{"mode":"manual"}}',
+    },
+    {
+      line_account_id: 'unselected',
+      selection_mode: 'later',
+      answers_json: '{}',
+    },
+  ]);
+  expect(
+    db
+      .prepare('SELECT auto_insert,definition_json FROM style_starter_sets')
+      .get(),
+  ).toEqual({ auto_insert: 1, definition_json: '{"items":[]}' });
+  expect(() =>
+    db.exec("UPDATE account_styles SET selection_mode='bad'"),
+  ).toThrow();
+  expect(() =>
+    db.exec('UPDATE style_starter_sets SET auto_insert=2'),
+  ).toThrow();
+  db.close();
+});

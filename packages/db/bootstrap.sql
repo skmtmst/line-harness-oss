@@ -227,7 +227,7 @@ CREATE TABLE account_styles (
  selected_at TEXT,
 settings_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(settings_json)),
  version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT
-);
+, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')));
 
 CREATE TABLE action_score_rule_sets (
   id                           TEXT PRIMARY KEY,
@@ -7706,7 +7706,7 @@ CREATE TABLE style_starter_sets (
  id TEXT PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id), style TEXT NOT NULL, name TEXT NOT NULL,
  definition_json TEXT NOT NULL CHECK(json_valid(definition_json)),
  version INTEGER NOT NULL DEFAULT 1, archived_at TEXT, updated_at TEXT NOT NULL, updated_by TEXT
-);
+, auto_insert INTEGER NOT NULL DEFAULT 1 CHECK(auto_insert IN (0,1)));
 
 CREATE TABLE style_targets(line_account_id TEXT NOT NULL REFERENCES line_accounts(id), metric TEXT NOT NULL, period TEXT NOT NULL, value REAL NOT NULL CHECK(value>=0), PRIMARY KEY(line_account_id,metric,period));
 
