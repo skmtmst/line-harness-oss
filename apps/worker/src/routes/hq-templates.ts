@@ -1,8 +1,4 @@
-import { searchHqResources } from '../services/hq-templates/resource-search.js';
-import { listDistributionTargets } from '../services/hq-templates/distribution-display.js';
-import { testHqForm, issueHqFormTestToken, revokeHqFormTestToken } from '../services/hq-templates/form-test.js';
-import { restoreArchivedTemplate, templateArchiveStatus } from '../services/hq-templates/archive.js';
-import { importHqTags } from '../services/hq-templates/tag-import.js';
+import { testHqForm } from '../services/hq-templates/form-test.js';
 import { previewRichMenu } from '../services/hq-templates/rich-menu-preview.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
@@ -125,7 +121,6 @@ hqTemplates.delete('/api/hq/templates/media', async c => {
   }
 });
 hqTemplates.post('/api/hq/templates/rich-menu-preview', inputJsonBoundary(), async c => c.json({success:true,data:await previewRichMenu(dbFor(c.env),await authority(c),await body(c),c.env.IMAGES)}));
-for(const [suffix,execute] of [['/preview',false],['',true]] as const)hqTemplates.post(`/api/hq/templates/tags/import${suffix}`,inputJsonBoundary(),async c=>c.json({success:true,data:await importHqTags(dbFor(c.env),await authority(c),await body(c),execute)}));
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/kind-counts', async c => {
@@ -134,17 +129,13 @@ hqTemplates.get('/api/hq/templates/kind-counts', async c => {
   return c.json({success:true,data:counts});
 });
 hqTemplates.get('/api/hq/templates', async c => {
-  const status = templateArchiveStatus(c.req.query('status'));
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
   const kind=c.req.query('kind');
   const attributeType=kind==='friend_field'?'friend_field':kind==='support_mark'?'mark':null;
   if(attributeType&&type&&type!==attributeType) throw new HqTemplateError('INVALID_KIND');
   if(kind&&!attributeType && (kind==='tag' ? (type && type!=='tag') : (!TEMPLATE_KINDS.includes(kind as TemplateKind) || (type && type!=='template')))) throw new HqTemplateError('INVALID_KIND');
-  const allRows=await listTemplates(dbFor(c.env),await authority(c),attributeType??(kind==='tag'?'tag':kind?'template':type as HqTemplateType | undefined),'all');
-  const matchesKind=(row:typeof allRows[number])=>!kind||kind==='tag'||!!attributeType||row.kind===kind;
-  const archiveCounts={active:allRows.filter(row=>matchesKind(row)&&!row.archived_at).length,archived:allRows.filter(row=>matchesKind(row)&&!!row.archived_at).length};
-  const rows=allRows.filter(row=>status==='all'||(status==='archived'?!!row.archived_at:!row.archived_at));
+  const rows=await listTemplates(dbFor(c.env),await authority(c),attributeType??(kind==='tag'?'tag':kind?'template':type as HqTemplateType | undefined));
   const counts=Object.fromEntries(TEMPLATE_KINDS.map(k=>[k,rows.filter(row=>row.kind===k).length])) as TemplateKindCounts;
   const selectedType=attributeType??type;
   const attributeStats=isFriendAttributeType(selectedType??'')?{
@@ -152,10 +143,10 @@ hqTemplates.get('/api/hq/templates', async c => {
     distributedAccountCount:Number((await dbFor(c.env).prepare(`SELECT COUNT(DISTINCT r.target_account_id) count FROM hq_template_distribution_results r
       JOIN hq_templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id
       JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
-      WHERE r.tenant_id=? AND (?='all' OR (?='archived' AND t.archived_at IS NOT NULL) OR (?='active' AND t.archived_at IS NULL)) AND t.friend_attribute_type=? AND r.status='succeeded'
-        AND NOT EXISTS(SELECT 1 FROM hq_template_preflight_resolutions p WHERE p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id AND p.friend_attribute_mode='skip')`).bind((await authority(c)).tenantId,status,status,status,selectedType).first<{count:number}>())?.count??0),
+      WHERE r.tenant_id=? AND t.archived_at IS NULL AND t.friend_attribute_type=? AND r.status='succeeded'
+        AND NOT EXISTS(SELECT 1 FROM hq_template_preflight_resolutions p WHERE p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id AND p.friend_attribute_mode='skip')`).bind((await authority(c)).tenantId,selectedType).first<{count:number}>())?.count??0),
   }:{};
-  return c.json({success:true,data:rows.filter(matchesKind),status,archive_counts:archiveCounts,kind_counts:counts,stats:{...attributeStats,thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
+  return c.json({success:true,data:kind&&kind!=='tag'&&!attributeType?rows.filter(row=>row.kind===kind):rows,kind_counts:counts,stats:{...attributeStats,thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
     outdatedTemplateCount:rows.filter(r=>(r.outdated_account_count??0)>0).length}});
 });
 hqTemplates.get('/api/hq/templates/attribute-kind-counts',async c=>{
@@ -172,22 +163,6 @@ hqTemplates.post('/api/hq/templates/folders', inputJsonBoundary({ name: ['string
 hqTemplates.patch('/api/hq/templates/folders/:id', inputJsonBoundary({ name: ['string'], color: ['string', 'null'] }), async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c),c.req.param('id')) }));
 hqTemplates.delete('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await deleteTemplateFolder(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision) }));
 hqTemplates.post('/api/hq/templates/:id/duplicate', inputJsonBoundary(), async c => c.json({ success:true, data:await duplicateTemplate(dbFor(c.env),await authority(c),c.req.param('id'),await body(c)) },201));
-hqTemplates.post('/api/hq/templates/:id/restore', inputJsonBoundary({expectedRevision:['number']}), async c => {
-  const data=await restoreArchivedTemplate(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision);
-  c.set('auditRecorded',true);
-  return c.json({success:true,data});
-});
-hqTemplates.get('/api/hq/templates/resources',async c=>{
- const auth=await authority(c);
- return c.json({success:true,data:await searchHqResources(dbFor(c.env),auth.tenantId,c.req.query())});
-});
-hqTemplates.get('/api/hq/templates/:id/distribution-targets',async c=>{
-  const ids=c.req.query('accountIds')?.split(',')??[];
-  if(ids.length>30||new Set(ids).size!==ids.length||ids.some(id=>!id||id.length>100)) throw new HqTemplateError('INVALID_REQUEST');
-  const auth=await authority(c),data=await listDistributionTargets(dbFor(c.env),auth.tenantId,c.req.param('id'),ids);
-  if(!data)throw new HqTemplateError('NOT_FOUND',404);
-  return c.json({success:true,data});
-});
 hqTemplates.get('/api/hq/templates/:id/versions',async c=>c.json({success:true,data:await templateVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));
 hqTemplates.get('/api/hq/templates/:id/versions/compare',async c=>c.json({success:true,data:await compareTemplateVersions(dbFor(c.env),await authority(c),c.req.param('id'),Number(c.req.query('from')),Number(c.req.query('to')))}));
 hqTemplates.post('/api/hq/templates/:id/versions/:version/restore',inputJsonBoundary(), async c=>{
@@ -214,11 +189,6 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
 hqTemplates.post('/api/hq/templates/:id/test-send',inputJsonBoundary(),async c=>c.json({success:true,data:await testHqForm(dbFor(c.env),await authority(c),c.req.param('id'),await body(c))}));
-hqTemplates.post('/api/hq/templates/:id/test-token',inputJsonBoundary(),async c=>{
-  c.header('Cache-Control','no-store');
-  return c.json({success:true,data:await issueHqFormTestToken(dbFor(c.env),await authority(c),c.req.param('id'),await body(c),c.env.WORKER_URL||new URL(c.req.url).origin)},201);
-});
-hqTemplates.delete('/api/hq/templates/:id/test-tokens/:tokenId',async c=>c.json({success:true,data:await revokeHqFormTestToken(dbFor(c.env),await authority(c),c.req.param('id'),c.req.param('tokenId'))}));
 hqTemplates.post('/api/hq/templates/:id/preflight', inputJsonBoundary(), async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');

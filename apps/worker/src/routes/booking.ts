@@ -1,4 +1,3 @@
-import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../services/booking-entitlements.js';
 import { bookingHistoryItem } from '../services/booking-history-item.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
@@ -43,7 +42,6 @@ import {
   decidePrepayOnly,
   prepayNoticeFor,
   resolveBookingPaymentConfig,
-  resolveBookingPaymentForBooking,
   listBookingAdminResources,
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
@@ -148,14 +146,11 @@ import {
   bookingAutomaticNotificationAllowed,
 } from '../services/booking-channels.js';
 
-import { assignBookingStaff } from '../services/booking-assignment.js';
-import { assignmentSettingsResponse } from './booking-assignment-settings.js';
-
 const booking = new Hono<Env>();
 booking.use('/api/booking/admin/bookings.csv', outputAuditMiddleware);
 booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
 
-booking.onError((error,c)=>{if(/entitlement_month_change|entitlement_unavailable/.test(String(error)))return c.json({error:String(error).includes('entitlement_month_change')?'entitlement_month_change':'entitlement_unavailable'},409);if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
+booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
 booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({"code":"waitlist_reconcile_failed"}));}}});
 
 
@@ -711,9 +706,7 @@ async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId
   });
   const rows = await c.env.DB.prepare('SELECT id FROM staff WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL AND is_designation_optional = 0').bind(accountId).all<{ id: string }>();
   const actualStaff = new Set(rows.results.map((staff) => staff.id));
-  const availableIds = latest.by_staff.filter((staff) => actualStaff.has(staff.staff_id)
-    && findLatestSlotForInstant(staff.slots, startsAt) !== null).map(staff => staff.staff_id);
-  return assignBookingStaff(c.env.DB, accountId, startsAt.toISOString(), timeZone, availableIds);
+  return latest.by_staff.find((staff) => actualStaff.has(staff.staff_id) && findLatestSlotForInstant(staff.slots,startsAt) !== null)?.staff_id ?? null;
 }
 
 booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
@@ -732,12 +725,8 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     starts_at: string; // UTC ISO8601
     customer_note?: string;
     party_size?: unknown;
-    entitlement_id?: string;
-    payment_method?: 'onsite' | 'online';
     waitlist_id?: string;
   }>();
-  if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);
-  if (body.payment_method !== undefined && !['onsite','online'].includes(body.payment_method)) return inputError(c,{error:'invalid_payment_method'},400,['payment_method']);
   if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
   if (!body.menu_id || !body.starts_at) {
     return inputError(c, { error: 'missing_params' }, 400, ["menu_id","starts_at"]);
@@ -761,7 +750,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
           WHERE id = ? AND line_account_id = ? AND friend_id = ?`)
           .bind(response.booking_id, accountId, friendId).first<{ menu_id: string; price_at_booking: number }>();
         if (saved && saved.price_at_booking > 0
-          && (await resolveBookingPaymentForBooking(c.env.DB, accountId, response.booking_id, saved.menu_id)).mode === 'online'
+          && (await resolveBookingPaymentConfig(c.env.DB, accountId, saved.menu_id)).mode === 'online'
           && !await getBookingPaymentByBooking(c.env.DB, accountId, response.booking_id)) {
           return c.json({ error: 'booking_payment_unavailable' }, 500);
         }
@@ -779,7 +768,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       if (saved) {
         const payment = await getBookingPaymentByBooking(c.env.DB, accountId, saved.id);
         const requiresPayment = saved.price_at_booking > 0
-          && (await resolveBookingPaymentForBooking(c.env.DB, accountId, saved.id, saved.menu_id)).mode === 'online';
+          && (await resolveBookingPaymentConfig(c.env.DB, accountId, saved.menu_id)).mode === 'online';
         if (requiresPayment && !payment) return c.json({ error: 'booking_payment_unavailable' }, 500);
         if (['expired','cancelled','rejected'].includes(saved.status)) return c.json({ error: 'booking_unavailable' }, 409);
         const prepayNotice = await prepayNoticeFor(
@@ -872,18 +861,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   // 予約のルール「お店が承認してから確定する」が automatic の店は、
   // 未承認を通さずその場で確定にする。設定が読めないときは承認ありに倒す。
   const adminSettings = await getBookingAdminSettings(c.env.DB, accountId);
-  let paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
-  if (body.entitlement_id) {
-    try { await validateEntitlementSelection(c.env.DB,accountId,friendId,body.menu_id,body.entitlement_id,startsAt.toISOString()); }
-    catch(error) { if(error instanceof EntitlementError)return c.json({error:error.code},error.status); throw error; }
-    if(body.payment_method) return inputError(c,{error:'choose_entitlement_or_payment'},400,['entitlement_id','payment_method']);
-    paymentConfig={mode:'none',provider:'none',holdMinutes:paymentConfig.holdMinutes};
-  } else if(paymentConfig.mode==='customer_choice') {
-    if(!body.payment_method)return inputError(c,{error:'payment_method_required'},400,['payment_method']);
-    paymentConfig={...paymentConfig,mode:body.payment_method,provider:body.payment_method==='online'?'stripe':'onsite'};
-  } else if(body.payment_method && body.payment_method!==paymentConfig.mode) {
-    return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
-  }
+  const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
   const requiresOnlinePayment = paymentConfig.mode === 'online' && menuRow.price > 0;
   const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment;
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
@@ -989,9 +967,6 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
       bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
       additionalStatements: [
-        ...(body.entitlement_id ? [entitlementUseStatement(c.env.DB,bookingId,body.entitlement_id,startsAt.toISOString(),await getAccountTimeZone(c.env.DB,accountId))] : []),
-        ...(!body.entitlement_id && body.payment_method ? [c.env.DB.prepare(`INSERT INTO booking_payment_choices(booking_id,line_account_id,mode,provider,hold_minutes)
-          SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)`).bind(bookingId,accountId,paymentConfig.mode,paymentConfig.provider,paymentConfig.holdMinutes,bookingId)] : []),
         ...(bookingPayment ? [bookingPaymentInsertStatement(c.env.DB, {
           id: bookingPayment.id, bookingId, lineAccountId: accountId, amount: menuRow.price,
           provider: paymentConfig.provider, holdUntil: bookingPayment.holdUntil!, now: nowIso,
@@ -1009,7 +984,6 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         key: idemKey, lineAccountId: accountId, friendId, bookingId,
       });
     } catch { /* 不明な結果はキーを残して二重作成を止める。 */ }
-    if(error instanceof Error && error.message.includes('entitlement_unavailable'))return c.json({error:'entitlement_unavailable'},409);
     throw error;
   }
   if (!insertResult.inserted) {
@@ -2285,17 +2259,6 @@ booking.post('/api/booking/admin/sync-notices/:id/done',requireRole('owner','adm
   if(notice.status==='resolved')return c.json({success:false,error:'すでに条件が解消した知らせです'},409);
   await c.env.DB.prepare("UPDATE booking_sync_notices SET status='done',updated_at=datetime('now') WHERE id=? AND line_account_id=? AND status='open'").bind(c.req.param('id'),accountId).run();
   return c.json({success:true,data:{id:c.req.param('id'),status:'done'}});
-});
-
-booking.get('/api/booking/admin/assignment-settings', async c => {
-  const id = await resolveAccountIdAdmin(c);
-  if (!id) return c.json({ success: false, error: 'missing_account_id' }, 400);
-  return assignmentSettingsResponse(c, c.env.DB, { kind: 'staff', id });
-});
-booking.put('/api/booking/admin/assignment-settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async c => {
-  const id = await resolveAccountIdAdmin(c);
-  if (!id) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ['account_id']);
-  return assignmentSettingsResponse(c, c.env.DB, { kind: 'staff', id });
 });
 
 booking.get('/api/booking/admin/settings', async (c) => {
@@ -7427,13 +7390,9 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         WHERE id = ? AND status = ?`,
     )
     .bind(next, new Date().toISOString(), id, row.status);
-  let updateResult: D1Result;
-  try { [updateResult] = await c.env.DB.batch([
+  const [updateResult] = await c.env.DB.batch([
     updateStatement, ...(next === 'confirmed' ? [confirmationWorkflowStatement(c.env.DB, id, true)] : []),
-  ]); } catch(error) {
-    if(error instanceof Error && error.message.includes('entitlement_unavailable'))return c.json({error:'entitlement_unavailable'},409);
-    throw error;
-  }
+  ]);
   if ((updateResult.meta?.changes ?? 0) === 0) {
     return c.json({ error: 'concurrent_update' }, 409);
   }
