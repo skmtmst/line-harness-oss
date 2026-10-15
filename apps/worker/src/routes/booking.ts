@@ -1,3 +1,4 @@
+import { featureReadiness, StyleError } from '../services/style-setup.js';
 import { bookingHistoryItem } from '../services/booking-history-item.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
@@ -588,6 +589,21 @@ export async function resolveFriendId(
 // ================================================================
 // LIFF endpoints (/api/liff/booking/*)
 // ================================================================
+
+booking.get('/api/liff/booking/style-readiness', async c => {
+  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+  try{return c.json({success:true,data:await featureReadiness(c.env.DB,caller.accountId,c.req.query('feature')??'')});}catch(e){if(e instanceof StyleError)return c.json({error:e.code},e.status);throw e;}
+});
+
+booking.post('/api/liff/booking/page-views', inputJsonBoundary(), async c => {
+  const caller=await resolveSelfBookingCaller(c);
+  if(!caller.ok)return c.json({error:caller.error},caller.status);
+  const body=await c.req.json<{menuId?:unknown;entryPoint?:unknown}>().catch(()=>null);
+  if(!body||(body.menuId!==undefined&&typeof body.menuId!=='string')||(body.entryPoint!==undefined&&(typeof body.entryPoint!=='string'||body.entryPoint.length>100)))return c.json({error:'invalid_page_view'},400);
+  if(body.menuId&&!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1').bind(body.menuId,caller.accountId).first())return c.json({error:'menu_not_found'},404);
+  await c.env.DB.prepare('INSERT INTO booking_page_views(id,line_account_id,menu_id,friend_id,entry_point,viewed_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),caller.accountId,body.menuId??null,caller.friendId,body.entryPoint??null,new Date().toISOString()).run();
+  return c.json({success:true},201);
+});
 
 booking.get('/api/liff/booking/menus', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);

@@ -361,7 +361,7 @@ function summarizeRows(
   menus: SalesSummaryMenu[];
   weekdays: SalesSummaryWeekday[];
 } {
-  const byMenu = new Map<string, SalesSummaryMenu & { cancelled: number; noshow: number }>();
+  const byMenu = new Map<string, SalesSummaryMenu & { cancelled: number; noshow: number; eligible: number }>();
   const byWeekday = new Map<number, SalesSummaryWeekday>();
   let bookings = 0;
   let confirmed = 0;
@@ -374,7 +374,7 @@ function summarizeRows(
     if (!menu) {
       menu = {
         menu_id: menuId, menu_name: menuName, bookings: 0,
-        confirmed: 0, revenue: 0, paidRevenue: 0, cancelRate: 0, noshowRate: 0, cancelled: 0, noshow: 0,
+        confirmed: 0, revenue: 0, paidRevenue: 0, cancelRate: 0, noshowRate: 0, cancelled: 0, noshow: 0, eligible: 0,
       };
       byMenu.set(menuId, menu);
     }
@@ -388,6 +388,7 @@ function summarizeRows(
     }
     return day;
   };
+  const heldOrCancelled = new Set(['cancelled','rejected','expired','pending_payment']);
   for (const row of rows) {
     const price = Number(row.price ?? 0);
     const menuId = row.menu_id ?? '';
@@ -395,8 +396,9 @@ function summarizeRows(
     const day = ensureDay(weekdayOf(row.starts_at));
     bookings += 1;
     menu.bookings += 1;
+    if (!heldOrCancelled.has(row.status)) menu.eligible += 1;
     day.bookings += 1;
-    if (row.status === 'confirmed') {
+    if (row.status === 'confirmed' || row.status === 'completed') {
       confirmed += 1;
       menu.confirmed += 1;
       day.confirmed += 1;
@@ -416,11 +418,12 @@ function summarizeRows(
     ensureMenu(paid.menuId, paid.menuName).paidRevenue += paid.amount;
     ensureDay(weekdayOf(paid.startsAt)).paidRevenue += paid.amount;
   }
-  const rate = (part: number) => (bookings > 0 ? part / bookings : 0);
+  const denominator = [...byMenu.values()].reduce((sum,menu)=>sum+menu.eligible,0);
+  const cancelDenominator = denominator + cancelled;
   return {
     total: {
       bookings, confirmed, revenue, paidRevenue,
-      cancelRate: rate(cancelled), noshowRate: rate(noshow),
+      cancelRate: cancelDenominator ? cancelled / cancelDenominator : null, noshowRate: denominator ? noshow / denominator : null,
       cancelled, noshow,
     },
     menus: [...byMenu.values()].map((menu) => ({
@@ -430,8 +433,8 @@ function summarizeRows(
       confirmed: menu.confirmed,
       revenue: menu.revenue,
       paidRevenue: menu.paidRevenue,
-      cancelRate: menu.bookings > 0 ? menu.cancelled / menu.bookings : 0,
-      noshowRate: menu.bookings > 0 ? menu.noshow / menu.bookings : 0,
+      cancelRate: menu.eligible + menu.cancelled > 0 ? menu.cancelled / (menu.eligible + menu.cancelled) : null,
+      noshowRate: menu.eligible > 0 ? menu.noshow / menu.eligible : null,
     })),
     weekdays: [...byWeekday.values()].sort((a, b) => a.weekday - b.weekday),
   };

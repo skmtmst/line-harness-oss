@@ -1,3 +1,4 @@
+import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
@@ -1448,6 +1449,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1662,6 +1664,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
       console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
     }
 
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
   } catch (err) {
     if (err instanceof CredentialEncryptionKeyError) {

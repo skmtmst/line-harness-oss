@@ -6,8 +6,8 @@ export interface BookingSalesMenu {
   confirmed: number;
   revenue: number;
   paidRevenue: number;
-  cancelRate: number;
-  noshowRate: number;
+  cancelRate: number | null;
+  noshowRate: number | null;
 }
 
 export interface BookingSalesWeekday {
@@ -26,8 +26,8 @@ export interface BookingSalesTotal {
   revenue: number;
   /** 期間内のオンライン入金。返金済みの支払いは除外する。 */
   paidRevenue: number;
-  cancelRate: number;
-  noshowRate: number;
+  cancelRate: number | null;
+  noshowRate: number | null;
   cancelled: number;
   noshow: number;
 }

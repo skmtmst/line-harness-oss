@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { UBER_OPERATION_SCOPES, UBER_PRODUCTION_HOSTS } from './uber-eats-hosts.js';
 import {
-  UBER_OPERATION_SCOPES,
   UberEatsError,
   activatePosIntegration,
   buildAuthorizeUrl,
@@ -25,6 +25,7 @@ const client = {
   clientId: 'test-client-id',
   clientSecret: 'test-client-secret',
   redirectUri: 'https://stg-api.example.test/api/restaurant-test/delivery/ubereats/oauth/callback',
+  hosts: UBER_PRODUCTION_HOSTS,
 };
 
 const NOW_MS = 1_760_000_000_000;
@@ -54,7 +55,12 @@ function formOf(init?: RequestInit): URLSearchParams {
 
 describe('Uber Eats の認可', () => {
   it('認可URLは店舗の連携用の権限と state を持つ', () => {
-    const url = new URL(buildAuthorizeUrl({ clientId: client.clientId, redirectUri: client.redirectUri, state: 'st-1' }));
+    const url = new URL(buildAuthorizeUrl({
+      clientId: client.clientId,
+      redirectUri: client.redirectUri,
+      state: 'st-1',
+      hosts: client.hosts,
+    }));
 
     expect(url.origin + url.pathname).toBe('https://auth.uber.com/oauth/v2/authorize');
     expect(url.searchParams.get('response_type')).toBe('code');
@@ -153,7 +159,12 @@ describe('Uber Eats の認可', () => {
 });
 
 describe('Uber Eats の店舗と連携の状態', () => {
-  const options = (fetch: FetchLike) => ({ fetch, accessToken: 'access-1', sleep: noSleep });
+  const options = (fetch: FetchLike) => ({
+    fetch,
+    accessToken: 'access-1',
+    hosts: UBER_PRODUCTION_HOSTS,
+    sleep: noSleep,
+  });
 
   it('店舗の一覧を画面で使える形に直す', async () => {
     const { fetch, calls } = fetchFrom(() =>
