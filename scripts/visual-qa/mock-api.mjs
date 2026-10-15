@@ -3052,6 +3052,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/connection') return GOOGLE_CONNECTION_DATA
+  // SNS 連携（y3GGTs）の Instagram：まだつないでいない（絵の「まだつないでいません」）。汎用の一覧を返すと読み込み中のまま止まる。
+  if (method === 'GET' && pathname === '/api/instagram/connection') return { success: true, data: { state: 'disconnected', replyEnabled: false } }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {
     return { success: true, reviews: GOOGLE_REVIEWS, page: 1, perPage: 20, total: GOOGLE_REVIEWS.length, connection: GOOGLE_CONNECTION }
   }
