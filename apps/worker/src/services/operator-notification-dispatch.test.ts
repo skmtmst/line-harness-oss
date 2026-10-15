@@ -485,3 +485,64 @@ describe('運用者通知の自動発火と登録簿', () => {
     expect(new OperatorEventError('x', 'y')).toMatchObject({ code: 'x' });
   });
 });
+
+describe('B-333 運用者通知の送る条件',()=>{
+  it('3件になるまで台帳で待ち、再送を数えず、3件後の回収で送る',async()=>{
+    const t=createTestD1();seedBase(t);
+    try {
+      await publishRule(t,{conditions:{threshold:'three'}});
+      const input={lineAccountId:'account-1',eventType:'booking_created',executionMode:'automatic' as const};
+      pushMessageWithRequestId.mockClear();pushMessageWithRequestId.mockResolvedValue({requestId:'ok'});
+      await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e1'});
+      await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e1'});
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      expect(t.raw.prepare('SELECT occurrence_count FROM notification_instances').get()).toEqual({occurrence_count:1});
+      await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e2'});
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e3'});
+      const result=await sweepOperatorNotifications(t.db,env,{now:new Date(Date.now()+120_000)});
+      expect(result.accepted).toBeGreaterThan(0);expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
+      // A grouped source must remain deduplicated after the first batch has closed.
+      t.raw.prepare("UPDATE notification_instances SET created_at='2000-01-01T00:00:00.000Z'").run();
+      await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e2'});
+      expect(t.raw.prepare('SELECT COUNT(*) count FROM notification_instances').get()).toEqual({count:1});
+      expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
+    } finally {t.raw.close();}
+  });
+  it('翌朝のまとめは初期9時まで待ち、回収で届く',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-16T11:00:00+09:00'));
+    const t=createTestD1();seedBase(t);
+    try {
+      await publishRule(t,{conditions:{schedule:'morning_digest'}});
+      pushMessageWithRequestId.mockClear();pushMessageWithRequestId.mockResolvedValue({requestId:'ok'});
+      await dispatchOperatorEvent(t.db,env,{lineAccountId:'account-1',eventType:'booking_created',sourceEventId:'digest1',executionMode:'automatic'});
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      expect(t.raw.prepare('SELECT DISTINCT next_retry_at FROM notification_deliveries').all()).toEqual([{next_retry_at:'2026-10-17T00:00:00.000Z'}]);
+      await sweepOperatorNotifications(t.db,env,{now:new Date('2026-10-17T00:00:01Z')});
+      expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
+    } finally {t.raw.close();vi.useRealTimers();}
+  });
+  it('勤務中だけの条件では勤務表にない人へ送らない',async()=>{
+    const t=createTestD1();seedBase(t);
+    try {
+      await publishRule(t,{conditions:{onlyAvailable:true}});pushMessageWithRequestId.mockClear();
+      const result=await dispatchOperatorEvent(t.db,env,{lineAccountId:'account-1',eventType:'booking_created',sourceEventId:'shift1',executionMode:'automatic'});
+      expect(result[0].excluded).toBe(4);expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      expect(t.raw.prepare("SELECT DISTINCT error_code FROM notification_deliveries").all()).toEqual([{error_code:'staff_off_shift'}]);
+    } finally {t.raw.close();}
+  });
+});
+
+it('B-333 営業時間は予約の受付枠とその時刻帯で決める',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-16T01:00:00Z'));
+  const t=createTestD1();seedBase(t);
+  try {
+    t.raw.prepare("INSERT INTO booking_settings(id,line_account_id,timezone,business_hours_configured) VALUES('hours','account-1','UTC',1)").run();
+    t.raw.prepare("INSERT INTO booking_business_hours(id,booking_settings_id,weekday,start_time,end_time) VALUES('h','hours',5,'10:00','18:00')").run();
+    await publishRule(t,{conditions:{schedule:'business_hours'}});pushMessageWithRequestId.mockClear();pushMessageWithRequestId.mockResolvedValue({requestId:'ok'});
+    await dispatchOperatorEvent(t.db,env,{lineAccountId:'account-1',eventType:'booking_created',sourceEventId:'hours1',executionMode:'automatic'});
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled(); // JSTは10時でも、受付枠のUTCは1時。
+    await sweepOperatorNotifications(t.db,env,{now:new Date('2026-10-16T10:05:00Z')});
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
+  } finally {t.raw.close();vi.useRealTimers();}
+});

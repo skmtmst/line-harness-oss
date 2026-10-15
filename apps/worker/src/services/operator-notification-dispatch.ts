@@ -78,6 +78,9 @@ export type OperatorRecipient = {
 
 export type OperatorRuleConditions = {
   teamId?: string;
+  schedule?: 'anytime'|'business_hours'|'morning_digest';
+  threshold?: 'one'|'three'|'ten';
+  onlyAvailable?: boolean;
   importance?: string;
   recipientIds?: string[];
   recipientLabel?: string;
@@ -198,8 +201,31 @@ async function ensureOperatorInstance(
     channels: string[];
   },
 ): Promise<string> {
-  const instanceId = crypto.randomUUID();
   const now = new Date().toISOString();
+  // Group membership survives completion and the grouping window: a replay is never a new occurrence.
+  const occurrence = await db.prepare(`SELECT instance_id FROM operator_notification_occurrences
+    WHERE rule_id=? AND line_account_id=? AND source_event_id=?`).bind(
+      input.ruleId, input.lineAccountId, input.sourceEventId,
+    ).first<{instance_id:string}>();
+  if (occurrence) return occurrence.instance_id;
+  const existingBatch = await db.prepare(`SELECT i.id FROM notification_instances i
+    WHERE i.line_account_id=? AND i.audience_type='operator' AND i.definition_id=?
+      AND (datetime(i.created_at)>datetime(?) OR ((? > 1 OR ? != 'anytime')
+        AND NOT EXISTS (SELECT 1 FROM notification_deliveries d WHERE d.instance_id=i.id AND d.status IN ('provider_accepted','failed','excluded'))))
+    ORDER BY i.created_at DESC LIMIT 1`).bind(input.lineAccountId,input.ruleId,
+      new Date(Date.now()-Math.max(0,input.dedupeMinutes)*60_000).toISOString(),
+      input.conditions.threshold === 'ten' ? 10 : input.conditions.threshold === 'three' ? 3 : 1,
+      input.conditions.schedule ?? 'anytime').first<{id:string}>();
+  if (existingBatch) {
+    await db.batch([
+      db.prepare(`INSERT OR IGNORE INTO operator_notification_occurrences(rule_id,line_account_id,source_event_id,instance_id)
+        VALUES (?,?,?,?)`).bind(input.ruleId,input.lineAccountId,input.sourceEventId,existingBatch.id),
+      db.prepare(`UPDATE notification_instances SET occurrence_count=occurrence_count+1,grouped_count=grouped_count+1,updated_at=?
+        WHERE id=? AND changes()=1`).bind(now,existingBatch.id),
+    ]);
+    return existingBatch.id;
+  }
+  const instanceId = crypto.randomUUID();
   const windowMs = Math.max(0, input.dedupeMinutes) * 60_000;
   const dedupeKey = windowMs > 0
     ? `${input.ruleId}:${input.sourceEventType}:${Math.floor(Date.now() / windowMs)}`
@@ -217,11 +243,18 @@ async function ensureOperatorInstance(
         (id, line_account_id, audience_type, definition_id, definition_version_id,
          source_event_type, source_event_id, source_metadata_json,
          dedupe_key, status, created_at, updated_at)
-      VALUES (?, ?, 'operator', ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+      SELECT ?, ?, 'operator', ?, ?, ?, ?, ?, ?, 'pending', ?, ?
+      WHERE NOT EXISTS(SELECT 1 FROM notification_instances i WHERE i.line_account_id=? AND i.audience_type='operator' AND i.definition_id=?
+        AND (datetime(i.created_at)>datetime(?) OR ((?>1 OR ?!='anytime') AND NOT EXISTS(
+          SELECT 1 FROM notification_deliveries d WHERE d.instance_id=i.id AND d.status IN ('provider_accepted','failed','excluded')))))
     `).bind(
       instanceId, input.lineAccountId, input.ruleId, String(input.ruleVersion),
       input.sourceEventType, input.sourceEventId, metadata, dedupeKey, now, now,
+      input.lineAccountId,input.ruleId,new Date(Date.now()-Math.max(0,input.dedupeMinutes)*60_000).toISOString(),
+      input.conditions.threshold==='ten'?10:input.conditions.threshold==='three'?3:1,input.conditions.schedule??'anytime',
     ).run();
+    if (!await db.prepare('SELECT id FROM notification_instances WHERE id=?').bind(instanceId).first()) return ensureOperatorInstance(db,input);
+    await db.prepare('INSERT OR IGNORE INTO operator_notification_occurrences(rule_id,line_account_id,source_event_id,instance_id) VALUES (?,?,?,?)').bind(input.ruleId,input.lineAccountId,input.sourceEventId,instanceId).run();
     return instanceId;
   } catch (error) {
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {
@@ -615,6 +648,40 @@ export async function dispatchOperatorEvent(
   return results;
 }
 
+export async function operatorRuleDeferredUntil(db: D1Database, accountId: string, conditions: OperatorRuleConditions, instanceId: string, now = new Date()): Promise<string|null> {
+  const instance = await db.prepare('SELECT created_at,occurrence_count FROM notification_instances WHERE id=? AND line_account_id=?').bind(instanceId,accountId).first<{created_at:string;occurrence_count:number}>();
+  const count = conditions.threshold === 'ten' ? 10 : conditions.threshold === 'three' ? 3 : 1;
+  if (Number(instance?.occurrence_count ?? 0) < count) return new Date(now.getTime()+60_000).toISOString();
+  if (conditions.schedule === 'morning_digest') {
+    const setting = await db.prepare("SELECT value FROM account_settings WHERE line_account_id=? AND key='notifications.digest_time'").bind(accountId).first<{value:string}>();
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(setting?.value ?? '') ? setting!.value : '09:00';
+    const day = new Date(new Date(instance!.created_at).getTime()+9*3600_000+86400_000).toISOString().slice(0,10);
+    const due = new Date(`${day}T${time}:00+09:00`);
+    if (due > now) return due.toISOString();
+  }
+  if (conditions.schedule === 'business_hours') {
+    const setting = await db.prepare('SELECT timezone FROM booking_settings WHERE line_account_id=?').bind(accountId).first<{timezone:string}>();
+    let weekday:number,time:string;
+    try {
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:setting?.timezone??'Asia/Tokyo',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+      const part=(kind:string)=>parts.find(value=>value.type===kind)?.value??'';
+      weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday'));
+      time=`${part('hour')}:${part('minute')}`;
+    } catch {return new Date(now.getTime()+60_000).toISOString();}
+    const open = await db.prepare(`SELECT 1 FROM booking_business_hours h JOIN booking_settings s ON s.id=h.booking_settings_id
+      WHERE s.line_account_id=? AND s.business_hours_configured=1 AND h.weekday=? AND h.start_time<=? AND h.end_time>?`).bind(accountId,weekday,time,time).first();
+    if (!open) return new Date(now.getTime()+60_000).toISOString();
+  }
+  return null;
+}
+
+async function operatorIsOnShift(db: D1Database, accountId: string, recipientId: string, now=new Date()): Promise<boolean> {
+  const local=new Date(now.getTime()+9*3600_000).toISOString();
+  return Boolean(await db.prepare(`SELECT 1 FROM staff_shifts sh JOIN staff s ON s.id=sh.staff_id
+    WHERE s.staff_member_id=? AND s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL
+      AND sh.work_date=? AND sh.start_time<=? AND sh.end_time>?`).bind(recipientId,accountId,local.slice(0,10),local.slice(11,16),local.slice(11,16)).first());
+}
+
 export async function dispatchOperatorRule(
   db: D1Database,
   env: Parameters<typeof sendOperationEmail>[0],
@@ -654,6 +721,7 @@ export async function dispatchOperatorRule(
   let pending = 0;
   let duplicate = 0;
 
+  const deferUntil = input.executionMode === 'test' ? null : await operatorRuleDeferredUntil(db,input.lineAccountId,conditions,instanceId);
   for (const recipient of recipients) {
     const preview = recipientPreview(recipient, channels);
     for (const requestedChannel of channels) {
@@ -670,6 +738,14 @@ export async function dispatchOperatorRule(
       if (!claimed) {
         duplicate += 1;
         continue;
+      }
+      if (deferUntil) {
+        await db.prepare("UPDATE notification_deliveries SET status='retry_wait',retryable=1,error_code='schedule_wait',error_message_safe='通知条件を満たすまで待っています',next_retry_at=? WHERE id=?").bind(deferUntil,claimed.id).run();
+        pending++; continue;
+      }
+      if (input.executionMode !== 'test' && conditions.onlyAvailable && !await operatorIsOnShift(db,input.lineAccountId,recipient.id)) {
+        await finishOperatorDelivery(db,{id:claimed.id,lineAccountId:input.lineAccountId,retryKey:claimed.retryKey,finish:{kind:'excluded',errorCode:'staff_off_shift',errorMessage:'勤務時間外です'}});
+        excluded++; continue;
       }
       if (channel === 'in_app') {
         /*
@@ -851,6 +927,16 @@ export async function sweepOperatorNotifications(
         typeof value === 'string' && OPERATOR_NOTIFICATION_CHANNELS.has(value)
       ))
       : [];
+    const conditions = metadata.conditions as OperatorRuleConditions ?? {};
+    const deferUntil = await operatorRuleDeferredUntil(db,row.line_account_id,conditions,row.instance_id,now);
+    if (deferUntil) {
+      await db.prepare("UPDATE notification_deliveries SET status='retry_wait',retryable=1,error_code='schedule_wait',error_message_safe='通知条件を満たすまで待っています',next_retry_at=? WHERE id=? AND updated_at=?").bind(deferUntil,row.id,leaseToken).run();
+      result.pending++; continue;
+    }
+    if (conditions.onlyAvailable && !await operatorIsOnShift(db,row.line_account_id,row.recipient_id,now)) {
+      await finishOperatorDelivery(db,{id:row.id,lineAccountId:row.line_account_id,retryKey:row.idempotency_key,finish:{kind:'excluded',errorCode:'staff_off_shift',errorMessage:'勤務時間外です'}});
+      result.excluded++; continue;
+    }
     const preview = recipientPreview(recipient, channels);
     const ruleConditionsSnapshot = metadata.conditions
       && typeof metadata.conditions === 'object'
