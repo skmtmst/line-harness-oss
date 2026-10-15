@@ -1,3 +1,4 @@
+import { consumePublicIngressReceipt } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { hasStaffAccess } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -923,6 +924,19 @@ conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), async (c) =
     if (!payload) {
       await log({ result: 'rejected', reason: 'invalid_json', signatureSha256: signatureHash });
       return inputError(c, { success: false, error: 'Invalid JSON body' }, 400, []);
+    }
+    // 時刻とnonceも本文HMACの対象。署名だけを別のイベントへ使い回せない。
+    const timestamp = payload.timestamp;
+    const nonce = payload.nonce;
+    if (typeof timestamp !== 'number' || !Number.isInteger(timestamp)
+        || Math.abs(Date.now() / 1000 - timestamp) > 300
+        || typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(nonce)) {
+      await log({ result: 'rejected', reason: 'invalid_freshness', signatureSha256: signatureHash });
+      return c.json({ success: false, error: '有効な送信時刻とnonceが必要です', code: 'INVALID_FRESHNESS' }, 401);
+    }
+    if (!await consumePublicIngressReceipt(c.env.DB, { kind: 'conversion_nonce', scopeId: pointId, key: await sha256Hex(nonce) })) {
+      await log({ result: 'rejected', reason: 'nonce_reused', signatureSha256: signatureHash });
+      return c.json({ success: false, error: '同じnonceは再利用できません', code: 'NONCE_REUSED' }, 409);
     }
     const payloadShape = maskedPayloadShape(payload);
     /*
