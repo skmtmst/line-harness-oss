@@ -126,4 +126,16 @@ describe('統括のアカウント', () => {
     expect(container.querySelector('button[aria-label$="の設定"]') !== null).toBe(viewerRole !== 'viewer')
   })
 
+
+
+  it('閲覧のみでも所属とタグを読め、権限者を含む補足の全文へ届く', async () => {
+    role.value = 'viewer'
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'main', name: '本店', color: '#0088ff' }], stats: { ...warnedAccount.stats, staffCount: 4 } }] })
+    await render()
+    const card = container.querySelector('article')!
+    expect(card.querySelector('[aria-label="フォルダ：渋谷エリア"]')).not.toBeNull()
+    expect(card.querySelector('[aria-label="タグ「本店」"]')).not.toBeNull()
+    expect(card.textContent).toContain('権限者 4 人')
+    expect([...card.querySelectorAll('button')].some(button => button.textContent === '設定')).toBe(false)
+  })
 })

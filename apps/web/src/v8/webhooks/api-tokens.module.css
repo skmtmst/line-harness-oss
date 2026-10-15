@@ -32,27 +32,6 @@
   white-space: nowrap;
 }
 
-.infoBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ms-key-info-gap);
-  padding: var(--tpl-ms-key-info-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-}
-
-.infoBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
-
-.infoBand > p {
-  margin: 0;
-  font-size: var(--text-label);
-  line-height: var(--tpl-ms-key-info-lh);
-}
-
 .table {
   display: flex;
   flex-direction: column;

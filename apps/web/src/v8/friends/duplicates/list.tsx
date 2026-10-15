@@ -1,21 +1,25 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime';
-import { Inbox, Download, Info, RotateCw } from 'lucide-react';
+import { Inbox, Download, RotateCw } from 'lucide-react';
 
 import { formatNumber } from '@/lib/format';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { PageFrame } from '@/components/templates/page-frame';
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation';
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import Notice from '@/components/shared/notice'
 import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
 import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message';
-import { FriendsSectionHead } from '../shared/head';
+import { FriendsTabs } from '../shared/head';
+import { FRIENDS_TAB_NOTES } from '../shared/nav';
 import { csvExportLine } from '../list/csv-export';
 import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data';
 import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words';
@@ -23,7 +27,6 @@ import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import StatusBadge from '@/components/shared/status-badge'
-import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
 
 /*
@@ -100,19 +103,21 @@ export default function DuplicatesListV8() {
   const statsCopy = d.statsFailure ? loadFailureCopy(d.statsFailure, '集計') : null
 
   return (
-    <PageFrame kind="list" boardId="hn6Y8">
-      <FriendsSectionHead
-        current="duplicates"
-        description="同じ人が別のアカウント・別の友だちとして登録されていないかを見ます"
-        action={(
+    <PageExplanationProvider pageKey="friends:duplicates"><PageFrame kind="list" boardId="hn6Y8">
+      <PageHeading
+        title="友だち"
+        help="同じ人が別のアカウント・別の友だちとして登録されていないかを見ます"
+        explanationToggle={<PageExplanationToggle />}
+        tabs={<FriendsTabs current="duplicates" line={false} action={(
           <Button type="button" variant="secondary" onClick={exportVisible} disabled={d.candidates.length === 0}>
             <Download size={14} aria-hidden="true" />
             表示中をCSVで書き出す
           </Button>
-        )}
+        )} />}
       />
       <div className={styles.body}>
-        <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</Notice>
+        <PageExplanationBody inset="notice">{FRIENDS_TAB_NOTES.duplicates}</PageExplanationBody>
+        <Notice tone="info" appearance="soft" icon={<Info size={16} aria-hidden="true" />}>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</Notice>
 
         <KpiBand gridClassName="grid grid-cols-4">
           {kpis.map((kpi) => (
@@ -146,18 +151,16 @@ export default function DuplicatesListV8() {
           <div className={styles.search}>
             <SearchField aria-label="名前・メール・電話で探す" value={d.query} onChange={d.setQuery} onClear={() => d.setQuery('')} placeholder={narrow ? '名前・電話で探す' : '名前・メール・電話で探す'} />
           </div>
-          {/* 状態は1つだけ選ぶ札（選んだ札は墨の地に白い字・印なし）。 */}
           <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
             {STATUS_FILTERS.map((filter) => (
-              <button
+              <FilterChip
                 key={filter.value || 'all'}
-                type="button"
-                aria-pressed={d.status === filter.value}
-                className={d.status === filter.value ? `${styles.chip} ${styles.chipOn}` : styles.chip}
-                onClick={() => d.setStatus(filter.value)}
+                selected={d.status === filter.value}
+                selectedIcon={false}
+                onChange={() => d.setStatus(filter.value)}
               >
                 {filter.label}
-              </button>
+              </FilterChip>
             ))}
           </div>
           <span className={styles.spacer} />
@@ -320,6 +323,6 @@ export default function DuplicatesListV8() {
           </Card>
         ) : null}
       </div>
-    </PageFrame>
+    </PageFrame></PageExplanationProvider>
   )
 }

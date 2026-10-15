@@ -52,3 +52,4 @@
 .colTenant {
   width: var(--tpl-op-audit-tenant-w);
 }
+.dateGroup { display: flex; align-items: center; gap: var(--tpl-op-me-gap); white-space: nowrap; }

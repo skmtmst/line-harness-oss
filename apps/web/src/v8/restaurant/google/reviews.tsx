@@ -217,6 +217,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
       {list && pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件 ・ 新着と未返信は別に管理`} />
       ) : null}
+      <Notice tone="info" appearance="soft" icon={null}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</Notice>
     </>
   )
 }

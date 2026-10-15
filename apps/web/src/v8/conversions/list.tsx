@@ -1,7 +1,7 @@
 'use client'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
 import TruncatedText from '@/components/shared/truncated-text'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -890,11 +890,10 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const wideToolbar = (
     <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>
 
-      <ListToolbar
-        search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 160, value: query, onChange: setQuery }}
-        filters={filterChips}
-        secondary={<ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd>}
-      />
+      <ListToolbarFrame layout="stacked">
+        <ListToolbarRow><ListToolbarSearchSlot width={160}>{searchBox}</ListToolbarSearchSlot>{filterChips}</ListToolbarRow>
+        <ListToolbarRow><ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd></ListToolbarRow>
+      </ListToolbarFrame>
     </div>
   )
 

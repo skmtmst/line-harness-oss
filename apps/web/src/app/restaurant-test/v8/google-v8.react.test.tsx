@@ -60,12 +60,15 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     for (const label of ['未返信', '平均の評価', '要確認', 'Google経由の予約']) {
       expect(board.textContent).toContain(label)
     }
+    expect(board.querySelectorAll('[data-kpi-icon] .lucide-inbox')).toHaveLength(4)
     expect(board.textContent).toContain('4.2')
     expect(board.textContent).toContain('佐藤 S.')
     expect(board.textContent).toContain('下書きを作る')
     expect(board.textContent).toContain('返信を見る')
-    expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
     expect(screen.getByText(/^返信文は手で書くか/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
+    const table = board.querySelector('[data-shared-part="list-table"]')!
+    expect(table.contains(screen.getByText(/^返信文は手で書くか/))).toBe(false)
   })
 
   it('状態で絞ると一覧の口へ条件が届く', async () => {

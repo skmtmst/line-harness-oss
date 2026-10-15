@@ -6,11 +6,10 @@ import { Activity, CircleDot, FileWarning, Filter, LayoutTemplate, ListChecks, R
 import { api, fetchApi, type AutomationListItem, type AutomationTemplateSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
+import { ListPage, ListPageCards, ListPageSection } from '@/components/templates/list-page'
 import Card from '@/components/shared/card'
-import { ListPageCards } from '@/components/templates/list-page'
 import TruncatedText from '@/components/shared/truncated-text'
+import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -184,7 +183,7 @@ export default function AutomationTemplatesV8() {
   } else {
     body = (
       <>
-        <div className={styles.tools}>
+        <ListPageSection><div className={styles.tools}>
           <span className={styles.toolsLabel}>きっかけ</span>
           <div role="group" aria-label="きっかけで絞り込む" className={styles.chips}>
             <FilterChip selected={trigger === ''} onChange={() => setTrigger('')} icon={<CircleDot size={13} aria-hidden="true" />}>
@@ -206,11 +205,11 @@ export default function AutomationTemplatesV8() {
             <RefreshCw size={15} aria-hidden="true" />見本を再読み込み
           </Button>
         </div>
-        {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
+        {actionError ? <Notice tone="danger">{actionError}</Notice> : null}</ListPageSection>
         {visible.length === 0 ? (
           <ListState kind="empty" title="条件に合う見本はありません" description="きっかけの札を外すと、すべて出ます。" />
         ) : (
-          <div role="list" aria-label="見本"><ListPageCards columns={4}>
+          <section role="list" aria-label="見本"><ListPageCards columns={4}>
             {visible.map((item) => {
               const triggerText = templateTriggerText(item.triggerLabel)
               return (
@@ -219,14 +218,13 @@ export default function AutomationTemplatesV8() {
                   <dl className={styles.facts}>
                     <div className={styles.fact}>
                       <dt>きっかけ</dt>
-                      <dd><TruncatedText value={triggerText} /></dd>
+                      <dd title={triggerText}><TruncatedText value={triggerText} /></dd>
                     </div>
                     <div className={styles.fact}>
                       <dt>すること</dt>
-                      <dd><TruncatedText value={item.actionLabel} /></dd>
+                      <dd title={item.actionLabel}><TruncatedText value={item.actionLabel} /></dd>
                     </div>
                   </dl>
-                  <span className={styles.cardSpacer} aria-hidden="true" />
                   {canEdit ? (
                     <Button
                       variant="secondary"
@@ -241,9 +239,9 @@ export default function AutomationTemplatesV8() {
                 </Card>
               )
             })}
-          </ListPageCards></div>
+          </ListPageCards></section>
         )}
-        <p className={styles.note}>実行まで確認できた見本だけを、ここへ表示します。見本に実データは入っていません。見本から作る下書きは、選んだアカウントだけに保存します。</p>
+        <ListPageSection><p className={styles.note}>実行まで確認できた見本だけを、ここへ表示します。見本に実データは入っていません。見本から作る下書きは、選んだアカウントだけに保存します。</p></ListPageSection>
       </>
     )
   }
@@ -263,7 +261,7 @@ export default function AutomationTemplatesV8() {
         <AutomationBand label="ルールの数の帯" cells={cells} />
       </>}
     >
-      <div className={styles.body}>{body}</div>
+      {status === 'ready' && items.length > 0 ? body : <ListPageSection>{body}</ListPageSection>}
     </ListPage></SaveErrorScope>
   )
 }

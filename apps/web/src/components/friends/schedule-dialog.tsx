@@ -134,6 +134,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
 
   return (
     <Dialog
+      footer={<DialogActions><Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button><Button type="button" variant="primary" icon={<Clock3 aria-hidden="true" />} onClick={() => void reserve()} disabled={busy} busy={busy}>{scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}</Button></DialogActions>}
       open
       designWidth={520}
       title={`${friendName}さんに予約して送る`}

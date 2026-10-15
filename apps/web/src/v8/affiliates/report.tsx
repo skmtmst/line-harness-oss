@@ -9,7 +9,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListItemHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Banknote, CalendarDays, Download, ListOrdered, ReceiptText, ShoppingBag, Trophy, Users } from 'lucide-react'
+import { Banknote, Calculator, CalendarDays, Download, ListOrdered, ShoppingBag, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -232,7 +232,7 @@ export default function ReportTab() {
       <KpiCard
         presentation="band"
         title="1件あたりの報酬"
-        icon={<ReceiptText size={14} aria-hidden="true" />}
+        icon={<Calculator size={14} aria-hidden="true" />}
         value={null}
         valueText={ready && !hasMissingReward ? formatYen(perItem) : emptyValue('unknown')}
         unit=""
