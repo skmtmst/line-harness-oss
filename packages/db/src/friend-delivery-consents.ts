@@ -1,3 +1,11 @@
+/** Alias f must refer to friends. Multiple purposes still exclude one friend once. */
+export const DELIVERY_CONSENT_ALLOWED_SQL = `NOT EXISTS (
+  SELECT 1 FROM friend_delivery_consents consent
+  JOIN friends consent_friend ON consent_friend.id=consent.friend_id
+    AND consent_friend.line_account_id=consent.line_account_id
+  WHERE consent.friend_id=f.id AND consent.state<>'granted'
+)`;
+
 export type DeliveryConsentState = 'granted' | 'unknown' | 'revoked';
 export interface FriendDeliveryConsent {
   purpose: string; state: DeliveryConsentState; reason: string; source: string;

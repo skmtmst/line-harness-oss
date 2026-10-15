@@ -114,8 +114,8 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true
     if(!connected)reasons.push('LINEに接続されていません');
     if(/\{\{\s*liff_id\s*\}\}/.test(JSON.stringify(input))&&!account?.liff_id)reasons.push('店舗のLIFF IDを確認してください');
 
-    let audienceCount:number|null=null;
-    try{audienceCount=await countHqAudience(db,t.line_account_id,await resolveHqBroadcastAudience(db,run.tenant_id,t.line_account_id,input));}
+    let audienceCount:number|null=null,consentExcluded:number|null=null;
+    try{const counts=await countHqAudience(db,t.line_account_id,await resolveHqBroadcastAudience(db,run.tenant_id,t.line_account_id,input));audienceCount=counts.count;consentExcluded=counts.consentExcluded;}
     catch(e){reasons.push(e instanceof StampError?e.message:'対象条件を確認できません');}
     if(audienceCount===0)reasons.push('友だちが0人です');
     const quota=connected?await fetchQuota(account!.channel_access_token):{limit:null,used:null};
@@ -125,7 +125,7 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true
     else if(audienceCount!==null&&audienceCount>remaining)reasons.push('今月の送信枠が足りません');
     try {const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,t.line_account_id,input,runtime ? {...runtime,copy:false} : undefined),content=mappedHqContent(materials,account?.name??t.account_name,account?.liff_id),parts=parseBroadcastMessageParts({...materials,...content});for(const p of parts)await resolveSendCommonVars(db,t.line_account_id,p.messageContent,{kind:'broadcast',id:run.id});}
     catch(e) {reasons.push(e instanceof StampError?e.message:'店舗の共通情報を確認してください');}
-    const p={accountId:t.line_account_id,accountName:account?.name??t.account_name,audienceCount,remaining,connected:connected&&remaining!==null,paused,blockedReasons:reasons,excluded:!!t.excluded,broadcastId:t.broadcast_id};
+    const p={accountId:t.line_account_id,accountName:account?.name??t.account_name,audienceCount,consentExcluded,warnings:consentExcluded? [`配信を止めている ${consentExcluded} 人には送りません。`]:[],remaining,connected:connected&&remaining!==null,paused,blockedReasons:reasons,excluded:!!t.excluded,broadcastId:t.broadcast_id};
     result.push(p);
     if(persist)await db.prepare('UPDATE hq_broadcast_targets SET preflight_json=? WHERE run_id=? AND line_account_id=?').bind(JSON.stringify(p),run.id,t.line_account_id).run();
   }

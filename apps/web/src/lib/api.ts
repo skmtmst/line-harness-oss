@@ -1930,6 +1930,7 @@ import type { BroadcastMessageOptions } from '@line-crm/shared';
 export type BroadcastPreflight = {
   audienceCount: number
   hiddenExcluded: number
+  consentExcluded?: number
   warnings: Array<{ level: 'info' | 'warning'; message: string }>
   audience?: {
     matched: number
