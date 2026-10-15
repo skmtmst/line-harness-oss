@@ -5,6 +5,7 @@
 - 役目：時刻を縦、担当を横に並べる。正の部品は `shared/reservation-board.tsx` の `timeDirection="vertical"` と `reservation-people-grid.tsx`。標準の横時間軸は変更しない。
 - 空き枠はAPIから渡った `slots` のみ。予約の詳細・版付き移動・移動失敗後の復旧は共通盤の契約を保つ。閲覧者へ作成入口・ドラッグを出さない。
 - 当日の型は `templates/booking-page.tsx` の明示的な `stats` / `aside`。白い板が1100未満なら右欄を畳み「次の予約・内訳」で開く。数・次の予約・売上は実データから読み、未取得は0にしない。
+- 右欄の区画は同じ型の `BookingSidebarSection` へ題と内容を渡す。区切り・余白・題の段を画面側に定義しない。
 - 見張り：`reservation-people-grid.test.tsx`・`day-frame.test.tsx` と実ブラウザの3幅。使う板はGcyTr/O2Z8u。細かな最終調整はClaudeへ渡す。
 
 - 作成：2026-10-09（オーナー「見落としていて決まりから外れているところが、次回から外れないように、同じものとして認識されるようにしておいて」・B-143・B-168・B-172）
