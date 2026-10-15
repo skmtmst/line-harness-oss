@@ -271,6 +271,8 @@
 :root .tail { display: none; }
 :root .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 :root .bubbleText { display: inline; }
+/* 行末の1〜3字だけが次の行へ落ちないよう、日本語は文節で折り、最後の数行の折り返しを整える（UTbi1「は。」）。 */
+:root .bubbleBody, :root .bubbleBody .bubbleText, :root .outgoingBubble { text-wrap: pretty; word-break: auto-phrase; }
 
 /* 専用の受け口を使う画面だけ。トークの下で画像の高さを保つ。 */
 .richMenu { flex-shrink: 0; }

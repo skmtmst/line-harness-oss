@@ -1,7 +1,7 @@
 'use client'
 
 /* LINEの見え方は書き出しもブラウザも現在のスマホ枠だけ。中身と操作は画面が渡す。 */
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
 import FlexPreview from '@/components/flex-preview'
@@ -109,6 +109,18 @@ export default function LinePreview({
 
 }
 
+/**
+ * 本文の URL は「/」「.」のあとで折れるようにする（「…/book」「ing」のように語の途中で折らない・UTbi1）。
+ * それでも1行に入らない長い区切りだけ、今までどおり途中で折る。
+ */
+function withUrlBreaks(text: string): ReactNode {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  if (parts.length === 1) return text
+  return parts.map((part, index) => index % 2 === 1
+    ? <Fragment key={index}>{part.split(/(?<=[/.?&=])/).map((piece, pieceIndex) => <Fragment key={pieceIndex}>{pieceIndex > 0 ? <wbr /> : null}{piece}</Fragment>)}</Fragment>
+    : part)
+}
+
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
 export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density }: {
   accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
@@ -124,7 +136,7 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
       <div className={styles.bubbleRow}>
         <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
-          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{children}</span></div>
+          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof children === 'string' ? withUrlBreaks(children) : children}</span></div>
         </div>
         <span className={styles.messageTime}>{time}</span>
       </div>
