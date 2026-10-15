@@ -83,6 +83,8 @@
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */
 }
+/* 状態の文字を2つ渡す画面（公開の状態＋下書きの保存）は行を分け、1行に詰めて途中で切らない。 */
+.status > :global([data-status-line]) { display: block; overflow: hidden; text-overflow: ellipsis; }
 
 /*
  * 操作の手前の一言（★BG-B `WDJak`「中 サイズ確認」→ `GcuH5`）。

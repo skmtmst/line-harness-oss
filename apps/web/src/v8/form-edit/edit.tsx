@@ -911,7 +911,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={<><span role="note">{statusLine}</span>{saveStatus ? <> · {saveStatus}</> : null}</>} dirty={false}
+      status={<><span role="note" data-status-line>{statusLine}</span>{saveStatus ? <span data-status-line>{saveStatus}</span> : null}</>} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
