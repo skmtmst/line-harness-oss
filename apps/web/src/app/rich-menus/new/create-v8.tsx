@@ -60,7 +60,7 @@ import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
 import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
-import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
+import { AreaIcon, CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
 import { pruneStaleAreaTags, pruneStaleAreaTemplates } from '@/components/rich-menus/action-drafts'
 import {
@@ -416,7 +416,7 @@ function MenuPreview({
 }: {
   size: 'large' | 'compact'
   imageUrl: string | null
-  areas: Array<{ x: number; y: number; w: number; h: number }> | null
+  areas: Array<{ x: number; y: number; w: number; h: number; label?: string; intent?: Area['intent'] }> | null
   pages: Array<{ id: string; name: string }>
   activePageId: string | null
 }) {
@@ -433,7 +433,8 @@ function MenuPreview({
             width: `${(a.w / dims.width) * 100}%`,
             height: `${(a.h / dims.height) * 100}%`,
           }}
-        />
+        >{/* 絵 cmRZc：スマホの見本でも面の名前と印を出し、どの面か分かるようにする（左の画像の面と同じ）。 */}
+          {a.label ? <><AreaIcon intent={a.intent} size={14} className={styles.previewMenuAreaIcon} /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
       ))}
     </div>
   ) : null
@@ -1729,7 +1730,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const previewAreas = !group
     ? template.areas
     : previewPage
-      ? previewPage.areas.map((a) => ({ x: a.boundsX, y: a.boundsY, w: a.boundsWidth, h: a.boundsHeight }))
+      ? previewPage.areas.map((a, i) => ({ x: a.boundsX, y: a.boundsY, w: a.boundsWidth, h: a.boundsHeight, label: areaDisplayName(a, i), intent: a.intent }))
       : null
 
   const previewPages = !group
