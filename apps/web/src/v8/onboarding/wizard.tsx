@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Circle, CircleCheck, CircleDot, Eye, Hourglass, Info, Play } from 'lucide-react'
+import { ArrowRight, Circle, CircleCheck, CircleDot, Hourglass, Info, Play } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -17,7 +17,8 @@ import { styleApi, type StarterSetItem } from '@/lib/api-styles'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { SetupIcon } from './icons'
-import { SampleMenuPhone, SampleMenuTiles } from './sample-menu'
+import { SampleMenuTiles } from './sample-menu'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   LOOK_CHOICES, SETTINGS_KEYS, STYLE_CHOICES, answerOf, answersForApi, changedAnswers, isBookingConfirmSample, settingsChanges, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
   type Question, type StarterItemState, type StyleState,
@@ -58,10 +59,6 @@ const BOOKING_PLACE: Record<AccountStyle, string> = {
   restaurant: '予約台帳', salon: '予約管理', consult: '予約管理', lesson: 'イベント予約', ec: '予約管理', standard: '予約管理',
 }
 
-/** スタイルの選択を「あとで」にした印（口に質問のキーが無いので、この端末に覚える）。 */
-export function styleLaterKey(accountId: string): string {
-  return `lh:v8:style-setup-later:${accountId}`
-}
 
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const [style, setStyle] = useState<AccountStyle>(state.style)
@@ -72,7 +69,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [preview, setPreview] = useState(false)
+  const router = useRouter()
   const [summary, setSummary] = useState<SummaryData | null>(null)
   const [enabled, setEnabled] = useState<Record<string, boolean>>({})
   const [resources, setResources] = useState<Array<{ id: string; name: string; kind: string }> | null>(null)
@@ -182,14 +179,16 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
 
   const onNext = async () => {
     if (step === 0) {
+      /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
+      if (choice === 'later' || choice === 'manual') { await saveStyleMode(choice); return }
       if (choice !== style) { setStyle(choice as AccountStyle); setDirty(true) }
-      try { window.localStorage.removeItem(styleLaterKey(accountId)) } catch { /* 覚えられなくても進む */ }
       void go(1)
       return
     }
     if (step === 1) {
       if (choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return }
       if (choice === 'later') { commitAndNext('image', { mode: 'later' }); return }
+      if (choice === 'manual') { commitAndNext('image', { mode: 'manual' }); return }
       if (choice === 'existing') {
         const picked = resources?.find((item) => item.id === resource)
         if (!picked) { setError('使うリッチメニューか画像を選んでください。'); return }
@@ -217,10 +216,20 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     onClose(true)
   }
 
-  /* スタイルを「あとで」：口に質問のキーが無いので保存せず、この端末に覚えて自動では開かない。はじめにやることに残る。 */
-  const later = () => {
-    try { window.localStorage.setItem(styleLaterKey(accountId), '1') } catch { /* 覚えられなくても閉じる */ }
-    onClose(true)
+  /* スタイルを「あとで」（はじめにやることに残る）・「手動」（スタイルを使わず設定の画面で決める）。 */
+  const saveStyleMode = async (mode: 'later' | 'manual') => {
+    setBusy(true)
+    setError('')
+    try {
+      const res = await styleApi.save(accountId, { expectedVersion: version, styleMode: mode })
+      if (!res.success) throw new Error('save failed')
+      onClose(true)
+      if (mode === 'manual') router.push('/settings')
+    } catch (caught) {
+      setError(describeApiFailure(caught, '保存'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const activate = async () => {
@@ -266,15 +275,11 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const onCount = Object.values(enabled).filter(Boolean).length
   const footer = (
     <DialogActions><div className={styles.footer}>
+      {/* B-338：どの問も同じ骨組み。左に［戻る］（1問目は無し）、真ん中に［次へ］。あとで・手動はカードで選ぶ。 */}
       <div className={styles.footerSide}>
-        {step === 0
-          ? <Button onClick={later} disabled={busy}>あとで設定する</Button>
-          : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>戻る</Button>}
+        {step === 0 ? null : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>戻る</Button>}
       </div>
       <div className={styles.footerCenter}>
-        {step === 0 ? <Button onClick={() => setPreview(true)}><Eye aria-hidden="true" className={styles.buttonIcon} />プレビュー</Button> : null}
-        {step === 1 ? <Button onClick={() => commitAndNext('look', { mode: 'manual' })} disabled={busy}>手動で設定する</Button> : null}
-        {question ? <Button onClick={() => commitAndNext(question.key, { mode: 'later' })} disabled={busy}>この質問を飛ばす</Button> : null}
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${onCount}件）`}</Button>
@@ -306,6 +311,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           {STYLE_CHOICES.map((item) => (
             <RadioCard key={item.value} name="setup-style" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.note} icon={<SetupIcon name={item.icon} />} />
           ))}
+          <RadioCard name="setup-style" value="later" checked={choice === 'later'} onChange={setChoice} title="あとで設定する" note="今は入れません。はじめにやることに残ります" icon={<SetupIcon name="hourglass" />} />
+          <RadioCard name="setup-style" value="manual" checked={choice === 'manual'} onChange={setChoice} title="手動で設定する" note="スタイルを使わず、設定の画面で 1 つずつ決めます" icon={<SetupIcon name="sliders" />} />
         </RadioCardGroup>
         {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
@@ -315,9 +322,13 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       <>
         <div className={styles.lookRow}>
           <RadioCardGroup legend="見た目" className={styles.stack}>
-            {LOOK_CHOICES.map((item) => (
+            {LOOK_CHOICES.filter((item) => item.value !== 'later').map((item) => (
               <RadioCard key={item.value} name="setup-look" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.value === 'keep' ? `${label}${item.note}` : item.note} icon={<SetupIcon name={item.icon} />} />
             ))}
+            <div className={styles.pair}>
+              <RadioCard name="setup-look" value="later" checked={choice === 'later'} onChange={setChoice} title="あとで設定する" note="今は入れません。はじめにやることに残ります" icon={<SetupIcon name="hourglass" />} />
+              <RadioCard name="setup-look" value="manual" checked={choice === 'manual'} onChange={setChoice} title="手動で設定する" note="リッチメニューの画面で 1 から作ります" icon={<SetupIcon name="sliders" />} />
+            </div>
             {choice === 'existing' ? (
               <Select aria-label="使うリッチメニュー・画像" size="full" value={resource} onChange={setResource} disabled={resources === null}
                 options={[{ value: '', label: resources === null ? '読み込んでいます…' : resources.length ? '使うリッチメニュー・画像を選ぶ' : '使える物がありません' }, ...(resources ?? []).map((item) => ({ value: item.id, label: `${item.kind === 'image' ? '画像' : 'リッチメニュー'}：${item.name}` }))]} />
@@ -385,7 +396,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
                 </li>
               ))}
             </ul>
-            <p className={styles.cardFoot}>オンにした物だけ、［まとめて動かす］で動き始めます。</p>
+            <p className={styles.cardFoot}>自動で送る物は全部止めて入れています。オンにした物だけ、［まとめて動かす］で動き始めます。</p>
           </section>
         </div>
         {skipped.length > 0 ? (
@@ -395,7 +406,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
               {skipped.map((q) => (
                 <li key={q.key} className={styles.skippedRow}>
                   <Hourglass aria-hidden="true" className={styles.skippedIcon} />
-                  <span className={styles.rowTitle}>{q.short}</span>
+                  <span className={styles.rowTitle}>{q.skippedTitle ?? q.short}</span>
                   <span className={styles.skippedNote}>{q.skipped ?? q.todo.note}</span>
                   {q.preparing
                     ? <button type="button" className={styles.linkButton} onClick={() => preparing.open(q.preparing!)}>今設定する</button>
@@ -432,14 +443,6 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           {body}
         </div>
       </Dialog>
-      {preview ? (
-        <Dialog open title={`${styleLabel(choice as AccountStyle)}の見本`} description="友だち追加のあとに、お客さまの LINE にこう出ます。" size="medium" onCancel={() => setPreview(false)} footer={null}>
-          <div className={styles.preview}>
-            <SampleMenuPhone style={(choice as AccountStyle) in { restaurant: 1, salon: 1, consult: 1, lesson: 1 } ? choice as AccountStyle : 'restaurant'} />
-            <p className={styles.panelNote}>{`見本の画像のまま使えます。ボタンの中身が未設定のときは「${PREPARING_WORD}」と出ます。`}</p>
-          </div>
-        </Dialog>
-      ) : null}
       {preparing.dialog}
       <ConfirmDialog
         open={confirm !== null}

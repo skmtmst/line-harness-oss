@@ -4,6 +4,7 @@
   --hss-col-how: 220px;
   --hss-col-menu: 28px;
   --hss-col-open: 104px;
+  --hss-col-date: 140px;
   --hss-row-h: 60px;
   --hss-title-lh: 27px;
   --hss-auto-pad: 14px 16px;
@@ -153,4 +154,41 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--polish-space-row);
+}
+
+.date {
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.distribute {
+  --hss-fact-w: 120px;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--polish-space-card);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: var(--hss-fact-w) minmax(0, 1fr);
+  gap: var(--polish-space-row) var(--polish-space-field);
+  padding: var(--polish-space-card);
+  border-radius: var(--polish-radius-card);
+  background: var(--color-surface-pearl);
+  font-size: var(--text-caption);
+}
+
+.facts dt {
+  color: var(--color-ink-secondary);
+}
+
+.facts dd {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.footLead {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
 }

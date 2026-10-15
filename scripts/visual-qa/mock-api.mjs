@@ -2230,7 +2230,7 @@ const UID_MIGRATION_DONE = {
  * 絵：VHp7p の Bdfxm（7 / 11 済み・警告 1・あとで 2・止めている自動の送信 3）・oKSsG・cAaGY・J6647・Kyf8U。
  */
 const STYLE_SETUP_STATE = {
-  style: 'restaurant', styleSelected: true, version: 3,
+  style: 'restaurant', styleSelected: true, styleMode: 'configured', version: 3,
   answers: {
     image: { mode: 'configured', value: 'keep' }, booking: { mode: 'configured', value: true }, approval: { mode: 'configured', value: 'automatic' },
     payment: { mode: 'later' }, reminders: { mode: 'configured', value: true }, stamps: { mode: 'later' }, coupons: { mode: 'configured', value: true }, content: { mode: 'configured', value: true },
@@ -2251,7 +2251,8 @@ const STYLE_SETUP_ITEMS = [
 const STYLE_SETUP_STATES = STYLE_SETUP_ITEMS.map((item, i) => ({ target_id: `starter-${i}`, kind: item.kind, is_sample: 1, status: item.kind === 'automation' ? 'draft' : item.kind === 'booking_menu' ? 'inactive' : 'active', draftRevision: item.kind === 'automation' ? `draft-${i}` : null }))
 const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'stamps', areaId: 'area-e', groupId: 'rm-sample-restaurant', href: '/visit-stamps', customerState: 'preparing' }], pending: [{ key: 'payment', href: '/booking/settings?tab=payment', mode: 'later' }, { key: 'stamps', href: '/visit-stamps', mode: 'later' }], manual: [] }
 const HQ_STARTER_SETS = [
-  { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, definition: { items: STYLE_SETUP_ITEMS } },
+  { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, accountCount: 12, updatedAt: '2026-10-14T03:00:00.000Z', updatedBy: 'stf-1', autoInsert: true, definition: { items: STYLE_SETUP_ITEMS } },
+  ...[['salon', 8], ['consult', 3], ['lesson', 5], ['ec', 2], ['standard', 4]].map(([style, accountCount]) => ({ id: `starter-set-${style}`, style, name: `${style}の初期セット`, version: 1, accountCount, updatedAt: '2026-10-10T03:00:00.000Z', updatedBy: 'stf-2', autoInsert: true, definition: { items: STYLE_SETUP_ITEMS.filter((item) => item.kind !== 'booking_menu') } })),
 ]
 const STYLE_TEMPLATE_SAMPLES = [
   ['sample-reservation-confirm', '予約の確認', 'common'], ['sample-reminder', '前日のリマインド', 'common'], ['sample-day', '当日の案内', 'common'], ['sample-thanks', '来店のお礼', 'common'],
@@ -2260,11 +2261,11 @@ const STYLE_TEMPLATE_SAMPLES = [
 const HQ_STYLE_ATTENTION = {
   asOf: '2026-10-15T08:30:00.000Z',
   items: [
-    { accountId: 'visual-qa-account', name: '然 渋谷店', counts: { unhandledChats: 9, pendingBookings: 3, unpaid: 2, connections: 1, stoppedDeliveries: 0 } },
-    { accountId: 'visual-qa-account-2', name: '然 新宿店', counts: { unhandledChats: 6, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
-    { accountId: 'visual-qa-account-3', name: 'Hair Salon 然 表参道', counts: { unhandledChats: 4, pendingBookings: 0, unpaid: 2, connections: 0, stoppedDeliveries: 0 } },
-    { accountId: 'visual-qa-account-4', name: '然 相談窓口', counts: { unhandledChats: 3, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 0 } },
-    { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+    { accountId: 'visual-qa-account', name: '然 渋谷店', style: 'restaurant', counts: { unhandledChats: 9, pendingBookings: 3, unpaid: 2, connections: 1, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-2', name: '然 新宿店', style: 'restaurant', counts: { unhandledChats: 6, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+    { accountId: 'visual-qa-account-3', name: 'Hair Salon 然 表参道', style: 'salon', counts: { unhandledChats: 4, pendingBookings: 0, unpaid: 2, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-4', name: '然 相談窓口', style: 'consult', counts: { unhandledChats: 3, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', style: 'lesson', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
   ].map((item) => ({ ...item, details: { unhandledChats: [{ id: 'c', href: '/chats' }], pendingBookings: [{ id: 'b', href: '/booking/bookings' }], unpaid: [{ id: 'p', href: '/booking/settings?tab=payment' }], connections: [{ id: 'l', href: '/line-accounts' }], stoppedDeliveries: [{ id: 'd', href: '/broadcasts' }] } })),
 }
 function styleSetupRead(method, pathname, query) {
@@ -2283,7 +2284,7 @@ function styleSetupRead(method, pathname, query) {
 function styleSetupWrite(method, pathname) {
   if (method === 'PUT' && pathname === '/api/dashboard/style') return { style: 'restaurant', version: STYLE_SETUP_STATE.version + 1, inserted: [] }
   if (method === 'POST' && pathname === '/api/dashboard/style/activate') return { complete: true, items: [] }
-  if (method === 'PUT' && /^\/api\/hq\/style-starter-sets\/[^/]+$/.test(pathname)) return { id: 'starter-set-restaurant', version: 3 }
+  if (method === 'PUT' && /^\/api\/hq\/style-starter-sets\/[^/]+$/.test(pathname)) return { id: 'starter-set-restaurant', version: 3, autoInsert: true }
   return null
 }
 

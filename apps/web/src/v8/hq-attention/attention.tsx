@@ -17,7 +17,9 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
+import type { AccountStyle } from '@line-crm/shared'
 import { hqStyleApi } from '@/lib/api-styles'
+import { styleLabel } from '@/v8/onboarding/model'
 import styles from './attention.module.css'
 
 /*
@@ -29,7 +31,7 @@ import styles from './attention.module.css'
  */
 
 type HqAttentionKind = 'unhandledChats' | 'pendingBookings' | 'unpaid' | 'connections' | 'stoppedDeliveries'
-type HqAttentionItem = { accountId: string; name: string; counts: Partial<Record<string, number>>; details: Partial<Record<string, Array<{ id: string; href: string }>>> }
+type HqAttentionItem = { accountId: string; name: string; style?: AccountStyle; counts: Partial<Record<string, number>>; details: Partial<Record<string, Array<{ id: string; href?: string }>>> }
 
 const KINDS: ReadonlyArray<{ key: HqAttentionKind; label: string; href: string }> = [
   { key: 'unhandledChats', label: '未対応のトーク', href: '/chats?status=unread' },
@@ -149,6 +151,7 @@ export default function HqAttentionV8() {
             <GridRow key={item.accountId}>
               <GridCell className={styles.account}>
                 <span className={styles.name} title={item.name}>{item.name}</span>
+                {item.style ? <span className={styles.style}>{styleLabel(item.style)}</span> : null}
               </GridCell>
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)

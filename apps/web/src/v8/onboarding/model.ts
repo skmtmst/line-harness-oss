@@ -61,6 +61,8 @@ export type Question = {
   todo: { title: string; note: string; action: string }
   /** 最後の一覧「入れなかった物」の説明。無ければ todo.note。 */
   skipped?: string
+  /** 最後の一覧「入れなかった物」の題。無ければ short。 */
+  skippedTitle?: string
   /** 設定の画面がまだ無いときの機能の名前。押すと準備中の窓（B-314）。 */
   preparing?: string
   /**
@@ -71,7 +73,7 @@ export type Question = {
 }
 
 /** 口が受け付ける質問のキー（組4 `questionKeys`）。保存はこのキーだけ送る。 */
-export const API_QUESTION_KEYS = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content'] as const
+export const API_QUESTION_KEYS = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content', 'cancelDeadline', 'seats', 'hours', 'partySize', 'nomination', 'assignment', 'classCapacity'] as const
 
 /** 保存する答え：口のキーだけ。予約の確定の仕方を答えた（その場で／承認）＝予約を使う、を booking に写す。 */
 export function answersForApi(answers: Record<string, SetupAnswer>): Record<string, SetupAnswer> {
@@ -112,9 +114,10 @@ const Q: Record<string, Question> = {
       { value: 'customer_choice', icon: 'split', label: 'お客さまが選ぶ', note: '先払いか、お店で払うかをお客さまが選びます' },
     ],
     where: '予約設定 › お支払い', manualHref: '/booking/menus', manualNote: 'お支払いの画面を開きます',
-    info: 'オンラインを選ぶと、最後に Stripe をつなぐ案内が出ます。つなぐまでは試験モードで、本当の請求は起きません。',
+    info: 'オンラインで払うには Stripe をつなぎます。つなぐまではお店で払うだけで動き、つないだ後も最初は試験モード（本当の請求は起きません）です。',
     todo: { title: 'Stripe をつなぐ', note: 'オンライン先払いを使うときに必要です', action: 'つなぐ' },
-    skipped: 'Stripe をつなぐまで、お店で払うだけです',
+    skipped: 'Stripe をつなぐまではお店で払うだけです。つなぐと最初は試験モードです',
+    skippedTitle: 'お支払い（オンライン）',
     preparing: 'お支払い',
   },
   reminders: {
@@ -188,7 +191,7 @@ const PENDING: Record<string, Question> = {
     ],
     recommended: { consult: 'hours_3' },
     where: '予約設定 › 予約のルール', manualHref: RULES, manualNote: '予約のルールの画面を開きます',
-    todo: { title: 'キャンセルの期限を決める', note: 'LINE からキャンセルできる期限です', action: '決める' }, pendingApi: true,
+    todo: { title: 'キャンセルの期限を決める', note: 'LINE からキャンセルできる期限です', action: '決める' },
   },
   seats: {
     key: 'seats', short: '席・卓', title: '席・卓はどう入れますか？', description: '予約を受ける席の数です。卓ごとの人数はあとで直せます。',
@@ -197,7 +200,7 @@ const PENDING: Record<string, Question> = {
       { value: 'none', icon: 'ban', label: '席を分けない', note: '時間ごとの組数だけで受け付けます' },
     ],
     where: '座席・卓管理', manualHref: '/restaurant-test/tables', manualNote: '座席・卓の画面を開きます',
-    todo: { title: '席・卓を入れる', note: '予約を受ける席の数です', action: '入れる' }, pendingApi: true,
+    todo: { title: '席・卓を入れる', note: '予約を受ける席の数です', action: '入れる' },
   },
   nomination: {
     key: 'nomination', short: '担当者の指名', title: '担当者の指名を受け付けますか？', description: 'お客さまが予約のときに担当者を選べるようにします。',
@@ -206,7 +209,7 @@ const PENDING: Record<string, Question> = {
       { value: 'none', icon: 'users', label: '指名は受け付けない', note: '空いている担当者に入ります' },
     ],
     where: '予約設定 › 担当者', manualHref: '/booking/menus?tab=staff', manualNote: '担当者の画面を開きます',
-    todo: { title: '担当者の指名を決める', note: '予約のときに担当者を選べるかどうかです', action: '決める' }, pendingApi: true,
+    todo: { title: '担当者の指名を決める', note: '予約のときに担当者を選べるかどうかです', action: '決める' },
   },
   assignment: {
     key: 'assignment', short: '担当の割り当て', title: '面談の担当はどう決めますか？', description: '予約が入ったときの担当の決め方です。',
@@ -215,7 +218,7 @@ const PENDING: Record<string, Question> = {
       { value: 'customer', icon: 'user', label: 'お客さまが選ぶ', note: '担当を選んで予約してもらいます' },
     ],
     where: '予約設定 › 担当者', manualHref: '/booking/menus?tab=staff', manualNote: '担当者の画面を開きます',
-    todo: { title: '担当の割り当てを決める', note: '予約が入ったときの担当の決め方です', action: '決める' }, pendingApi: true,
+    todo: { title: '担当の割り当てを決める', note: '予約が入ったときの担当の決め方です', action: '決める' },
   },
   classCapacity: {
     key: 'classCapacity', short: 'クラスの定員', title: '1 クラスの定員は？', description: '1 回のクラスで受け付ける人数です。',
@@ -224,7 +227,7 @@ const PENDING: Record<string, Question> = {
       { value: '20', icon: 'users', label: '20 人', note: '大人数のクラスです' },
     ],
     where: 'イベント予約', manualHref: '/events', manualNote: 'イベント予約の画面を開きます',
-    todo: { title: 'クラスの定員を決める', note: '1 回のクラスで受け付ける人数です', action: '決める' }, pendingApi: true,
+    todo: { title: 'クラスの定員を決める', note: '1 回のクラスで受け付ける人数です', action: '決める' },
   },
   hours: {
     key: 'hours', short: '営業時間', title: '予約を受け付ける時間は？', description: '予約を受け付ける曜日と時間です。休みの日はあとで足せます。',
@@ -233,7 +236,7 @@ const PENDING: Record<string, Question> = {
       { value: 'night', icon: 'clock', label: '17:00〜23:00（毎日）', note: '夜だけ受け付けます' },
     ],
     where: '予約設定 › 営業時間', manualHref: '/booking/menus?tab=hours', manualNote: '営業時間の画面を開きます',
-    todo: { title: '営業時間を入れる', note: '予約を受け付ける曜日と時間です', action: '入れる' }, pendingApi: true,
+    todo: { title: '営業時間を入れる', note: '予約を受け付ける曜日と時間です', action: '入れる' },
   },
   partySize: {
     key: 'partySize', short: '受け付ける人数', title: '1 回の予約で受け付ける人数は？', description: 'LINE から予約できる人数です。多い人数はお店へ連絡してもらいます。',
@@ -242,7 +245,7 @@ const PENDING: Record<string, Question> = {
       { value: '1-10', icon: 'users', label: '1〜10 人', note: '宴会も LINE で受け付けます' },
     ],
     where: '予約設定 › 予約のルール', manualHref: RULES, manualNote: '予約のルールの画面を開きます',
-    todo: { title: '受け付ける人数を決める', note: 'LINE から予約できる人数です', action: '決める' }, pendingApi: true,
+    todo: { title: '受け付ける人数を決める', note: 'LINE から予約できる人数です', action: '決める' },
   },
 }
 Object.assign(Q, PENDING)
@@ -432,8 +435,8 @@ export function needsActivation(state: StarterItemState): boolean {
 
 /* ── はじめにやること（Bdfxm） ─────────────────────────────────── */
 
-export type StyleState = { style: AccountStyle; styleSelected: boolean; version: number; answers: Record<string, SetupAnswer> }
-export type StyleWarning = { feature: string; areaId: string; groupId: string; href: string; customerState: 'preparing' }
+export type StyleState = { style: AccountStyle; styleSelected: boolean; styleMode?: SetupAnswer['mode']; version: number; answers: Record<string, SetupAnswer> }
+export type StyleWarning = { feature: string; areaId: string; groupId: string; href?: string; customerState: 'preparing' }
 
 export type TodoRow = {
   key: string
@@ -474,7 +477,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href) },
     })
   }
-  if (!state.styleSelected) rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })
+  if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })
   for (const question of questions) {
     const answer = answers[question.key]
     if (!answer || answer.mode === 'configured') continue

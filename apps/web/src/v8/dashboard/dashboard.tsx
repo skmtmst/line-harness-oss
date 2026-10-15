@@ -102,10 +102,10 @@ export default function DashboardV8() {
   /* まだスタイルを選んでいない（あとでも選んでいない）アカウントは、最初に入ったとき 1 問目を開く。 */
   useEffect(() => {
     const state = setup.data?.state
+    /* 「あとで」「手動」は口の styleMode に残る（別の人・別の端末でも自動では開かない）。 */
     if (!state || !canManage || state.styleSelected || !d.selectedAccountId) return
-    let later = false
-    try { later = window.localStorage.getItem(`lh:v8:style-setup-later:${d.selectedAccountId}`) === '1' } catch { /* 覚えが読めなければ開く */ }
-    if (!later) setWizardStep((current) => current ?? 0)
+    if (state.styleMode === 'later' || state.styleMode === 'manual') return
+    setWizardStep((current) => current ?? 0)
   }, [setup.data, canManage, d.selectedAccountId])
   const openSetupStep = (step: string | number) => {
     if (typeof step === 'number') { setWizardStep(step); return }
