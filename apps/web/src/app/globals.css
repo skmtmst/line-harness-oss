@@ -1151,7 +1151,7 @@
   --tpl-fe-field-gap: var(--polish-space-field); --tpl-fe-control-h: 36px; --tpl-fe-choice-h: 32px; --tpl-fe-toggle-h: 20px; --tpl-fe-chip-gap: 6px; --tpl-fe-chip-pad: 6px 12px; --tpl-fe-empty-pad: 20px;
   --tpl-fe-row-pad: 12px; --tpl-fe-grip-w: 14px; --tpl-fe-icon-box: 28px; --tpl-fe-icon-radius: var(--polish-radius-small); --tpl-fe-more-h: 28px;
   --tpl-fe-open-pad: 16px; --tpl-fe-open-gap: 12px; --tpl-fe-open-head-gap: 8px; --tpl-fe-open-line: 1.5px; --tpl-fe-save-gap: 12px; --tpl-fe-info-pad: 10px 12px; --tpl-fe-info-lh: 19px; --tpl-fe-button-pad: 0 14px; --tpl-fe-input-pad: 0 12px; --tpl-fe-select-pad: 0 10px 0 12px;
-  --tpl-fe-add-pad: var(--polish-space-card); --tpl-fe-add-card-h: 58px; --tpl-fe-add-card-gap: var(--polish-space-row); --tpl-fe-add-card-pad: var(--polish-space-card);
+  --tpl-fe-add-pad: var(--polish-space-card); --tpl-fe-add-card-h: 58px; --tpl-fe-add-card-gap: 4px; --tpl-fe-add-card-pad: 8px 12px;
   --tpl-fe-limit-w: 120px; --tpl-fe-booking-cols: 31fr 31fr 20fr; --tpl-fe-wells-gap: 6px; --tpl-fe-words-gap: 8px; --tpl-fe-url-pad: 0 10px; --tpl-fe-change-gap: 6px; --tpl-fe-changes-pad: 12px 14px; --tpl-fe-notes-gap: 12px;
   --tpl-fe-band-slot-pad: 0 24px 8px; --tpl-fe-band-gap: 12px; --tpl-fe-band-pad: 12px 16px; --tpl-fe-band-title-size: var(--polish-text-section); --tpl-fe-band-title-lh: 20px;
   /* 保存がぶつかったときの帯・比べる窓（共通 save-conflict。J1pdB・k32cn）。回答フォームの編集の値と同じ。 */

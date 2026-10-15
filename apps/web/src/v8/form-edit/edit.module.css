@@ -79,7 +79,8 @@
 .choiceRemove:disabled { opacity: 0.4; cursor: not-allowed; }
 .saveTo { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); min-width: 0; }
 .saveTo > .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); white-space: nowrap; }
-.saveSelect { display: inline-flex; min-width: 0; max-width: 100%; }
+.saveSelect { display: flex; flex: 1; min-width: 0; max-width: 100%; }
+.saveSelect > :global(*) { flex: 1; min-width: 0; }
 .saveSelect :global(*) { max-width: 100%; }
 
 .bookingRow { display: grid; grid-template-columns: var(--tpl-fe-booking-cols); gap: var(--tpl-fe-save-gap); }

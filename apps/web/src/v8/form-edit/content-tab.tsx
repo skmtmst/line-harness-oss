@@ -9,8 +9,29 @@ import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type R
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
+  AlarmClock,
   AlignLeft,
+  Armchair,
+  Cake,
+  Calendar,
   CalendarCheck,
+  ChevronDown,
+  CircleDot,
+  Gift,
+  Hash,
+  IdCard,
+  Languages,
+  Mail,
+  MapPin,
+  Minus,
+  Paperclip,
+  Phone,
+  Pilcrow,
+  ShieldAlert,
+  SquareCheck,
+  Star,
+  Type,
+  User,
   ExternalLink,
   Heading,
   HelpCircle,
@@ -202,7 +223,12 @@ function blockIcon(block: FormBlock): ReactNode {
     case 'heading': return <Heading size={15} aria-hidden="true" />
     case 'text': return <AlignLeft size={15} aria-hidden="true" />
     case 'button': return <MousePointerClick size={15} aria-hidden="true" />
-    default: return block.type === 'booking' ? <CalendarCheck size={15} aria-hidden="true" /> : <HelpCircle size={15} aria-hidden="true" />
+    default:
+      // 絵 m1cWEy：5段階は星、ファイルはクリップ、予約はカレンダー、ほかの質問は「？」。
+      if (block.type === 'booking') return <CalendarCheck size={15} aria-hidden="true" />
+      if (block.type === 'rating') return <Star size={15} aria-hidden="true" />
+      if (block.type === 'file') return <Paperclip size={15} aria-hidden="true" />
+      return <HelpCircle size={15} aria-hidden="true" />
   }
 }
 
@@ -453,7 +479,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
       <span className={styles.saveSelect}>
         <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
-          compact
+          size="full"
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
@@ -612,6 +638,16 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
 
 /* ---------------- ブロックを足す ---------------- */
 
+/** 足す札の印（絵 m1cWEy）。無い札は＋。 */
+const ADD_CARD_ICONS: Record<string, ReactNode> = Object.fromEntries(Object.entries({
+  radio: CircleDot, checkbox: SquareCheck, select: ChevronDown, rating: Star,
+  text: Minus, textarea: Pilcrow, contact: Mail, tel: Phone, address: MapPin,
+  name: User, kana: Languages, birthday: Cake, age: Hash, allergy: ShieldAlert,
+  anniversary: Gift, seat_preference: Armchair,
+  date: Calendar, time: AlarmClock, booking: CalendarCheck, file: Paperclip, identity: IdCard,
+  image: ImageIcon, heading: Heading, 'text-deco': Type, button: MousePointerClick,
+}).map(([key, Icon]) => [key, <Icon key={key} size={15} aria-hidden="true" />]))
+
 /** 統括も画像を追加できる。固有の参照は保存前に別途確認する。 */
 const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set()
 
@@ -626,7 +662,7 @@ function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) 
             {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
               <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
                 <span className={styles.addCardTop}>
-                  <Plus size={15} aria-hidden="true" />
+                  {ADD_CARD_ICONS[card.key] ?? <Plus size={15} aria-hidden="true" />}
                   <span className={styles.addCardLabel}>{card.label}</span>
                   {card.fresh ? <span className={styles.newBadge}>新</span> : null}
                 </span>

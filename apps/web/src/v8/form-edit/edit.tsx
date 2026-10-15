@@ -5,7 +5,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
-import { FlaskConical, Smartphone, Upload } from 'lucide-react';
+import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
 import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
@@ -819,7 +819,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <div className={styles.urlRow}>
               {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
               <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
-              <CopyTextButton value={answerUrl} label="コピー" aria-label="回答用URLをコピー" />
+              <CopyTextButton variant="secondary" icon={<Copy size={15} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             {canEdit ? (
