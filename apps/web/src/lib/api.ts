@@ -1149,6 +1149,7 @@ export type RichMenuScheduleInput = {
 
 /** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
 export type RichMenuPublishRun = {
+  versionNumber?: number | null
   id: string
   status: 'running' | 'succeeded' | 'failed'
   lastErrorCode: string | null
@@ -7556,9 +7557,10 @@ export const api = {
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
       ),
-    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string; from?: string; to?: string; period?: 'this_month' | 'last_month' | 'all' } = {}) => {
       const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
       if (params.query) query.set('q', params.query)
+      for (const key of ['from','to','period'] as const) if (params[key] !== undefined) query.set(key, params[key]!)
       return fetchApi<ApiResponse<FormSubmissionPage>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
       )
