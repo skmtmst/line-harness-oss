@@ -2015,6 +2015,21 @@ export async function claimReminderDeliveryRun(
     .first<ReminderDeliveryRunRow>();
   if (!row) return null;
 
+  // 登録・基準日変更・再開より前に過ぎた通は、遡って送らず記録を残す。
+  // cron の遅れや、すでに送信を試みた通の再試行とは区別する。
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET status = 'skipped', last_error_code = 'scheduled_before_enrollment',
+            last_error_message = '登録・変更時点で予定の時刻を過ぎていたため送信しませんでした',
+            completed_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'queued' AND attempt_count = 0
+        AND EXISTS (SELECT 1 FROM friend_reminders fr
+          WHERE fr.id = friend_reminder_id
+            AND julianday(reminder_delivery_runs.scheduled_at) < julianday(CASE
+              WHEN fr.updated_at GLOB '*Z' OR fr.updated_at GLOB '*[+-]??:??' THEN fr.updated_at
+              ELSE fr.updated_at || '+09:00' END))`,
+  ).bind(input.now, input.now, row.id).run();
+
   // 取消と取得の競合対策: 登録が active のままのときだけ握る (原子的)。
   // getPending (active 読み) から claim の間に取消が入っても、ここで弾く。
   // R338/R339: 予約の通知方針 OFF とルール停止もここで読み直す。

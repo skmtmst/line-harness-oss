@@ -43,8 +43,8 @@ function seedReminder(
   ).run(overrides.offsetMinutes ?? -60)
   raw.prepare(
     `INSERT INTO friend_reminders
-       (id, friend_id, reminder_id, target_date, status)
-     VALUES ('enrollment-1', 'friend-1', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active')`,
+       (id, friend_id, reminder_id, target_date, status, created_at, updated_at)
+     VALUES ('enrollment-1', 'friend-1', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z')`,
   ).run()
 }
 
@@ -841,6 +841,7 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
       reminderId: 'reminder-1',
       enrollmentId: 'enrollment-1',
       expectedLockVersion: 3,
+      now: '2026-08-28T08:00:00.000Z',
       expectedRuns: [{ reminderStepId: 'step-1', scheduledAt: '2026-08-28T09:00:00.000Z' }],
     })
     expect(resumed.state).toBe('updated')
@@ -1261,3 +1262,25 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
     ).get()).toEqual({ c: 0 })
   })
 })
+
+
+it('B-333 登録前に過ぎた通は送らず、送らなかった記録を残す', async () => {
+  const { db, raw } = createTestD1(); seedReminder(raw);
+  raw.prepare("UPDATE friend_reminders SET created_at = '2026-08-28T09:30:00Z', updated_at = '2026-08-28T09:30:00Z' WHERE id = 'enrollment-1'").run();
+  let pushes = 0;
+  const client = makeClient(async () => { pushes++; return { requestId: null }; });
+  await processReminderDeliveries(db, client, { now: new Date('2026-08-28T09:31:00Z'), pause: noPause, resolveClient: async () => client });
+  expect(pushes).toBe(0);
+  expect(raw.prepare("SELECT status, last_error_code FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'").get()).toEqual({ status: 'skipped', last_error_code: 'scheduled_before_enrollment' });
+  raw.close();
+});
+
+
+it('B-333 古いJST形式の登録日時でも未来だった通を誤って捨てない', async () => {
+  const {db,raw}=createTestD1(); seedReminder(raw);
+  raw.prepare("UPDATE friend_reminders SET updated_at='2026-08-28T17:30:00.000' WHERE id='enrollment-1'").run();
+  let pushes=0; const client=makeClient(async()=>{pushes++;return {requestId:null};});
+  await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:01:00Z'),pause:noPause,resolveClient:async()=>client});
+  expect(pushes).toBe(1);
+  raw.close();
+});
