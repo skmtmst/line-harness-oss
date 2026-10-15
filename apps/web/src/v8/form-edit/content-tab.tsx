@@ -5,7 +5,7 @@ import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
@@ -224,10 +224,11 @@ function blockIcon(block: FormBlock): ReactNode {
     case 'text': return <AlignLeft size={15} aria-hidden="true" />
     case 'button': return <MousePointerClick size={15} aria-hidden="true" />
     default:
-      // 絵 m1cWEy：5段階は星、ファイルはクリップ、予約はカレンダー、ほかの質問は「？」。
+      // 絵 m1cWEy・ijxur：5段階は星、ファイルはクリップ、自由に書くは段落の印、予約はカレンダー、ほかの質問は「？」。
       if (block.type === 'booking') return <CalendarCheck size={15} aria-hidden="true" />
       if (block.type === 'rating') return <Star size={15} aria-hidden="true" />
       if (block.type === 'file') return <Paperclip size={15} aria-hidden="true" />
+      if (block.type === 'textarea') return <Pilcrow size={15} aria-hidden="true" />
       return <HelpCircle size={15} aria-hidden="true" />
   }
 }
@@ -493,12 +494,14 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
 }
 
 const DAYS_AHEAD = [7, 14, 30, 60]
+const noMeta = () => undefined
 
 function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const booking = block.booking ?? null
   const menus = refs.bookingMenus ?? []
   const staff = booking?.menuId ? (refs.bookingMenuStaff?.[booking.menuId] ?? []) : []
   const days = booking?.daysAhead ?? 14
+  const menuOptions = useMemo(() => menus.map((menu) => ({ ...menu, name: `${menu.name}・${menu.durationMinutes}分` })), [menus])
   const setBooking = (next: Partial<NonNullable<FormInputBlock['booking']>>) =>
     set({ booking: { menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
   return (
@@ -508,14 +511,12 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
           <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
-            options={menus}
+            /* 絵 ijxur：欄は「名前・かかる時間」の1つの札（横の補足は出さず、狭い列でも名前を残す）。 */
+            options={menuOptions}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
             placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
-            meta={(row) => {
-              const menu = menus.find((m) => m.id === row.id)
-              return menu ? `${menu.durationMinutes}分` : undefined
-            }}
+            meta={noMeta}
           /></SaveErrorField>
         </Labeled>
         <Labeled label="担当">
