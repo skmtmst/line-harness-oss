@@ -88,7 +88,6 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 export default function OffersTab() {
   const saveErrors = useSaveFormErrors()
   const { readonly, narrow, setCount, accountId } = useAffiliateShell()
-  const folderState = useManagedFolders('affiliate_offer', accountId)
   const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
@@ -108,7 +107,6 @@ export default function OffersTab() {
   const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
   const [folder, setFolder] = useListUrlValue<FolderKey>('action', 'all')
   const { folders, error: folderError, reload: reloadFolders } = useManagedFolders('affiliate_offer', accountId)
-  const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
   const [sort, setSort] = useListUrlValue<'newest' | 'name' | 'reward'>('sort', 'newest')
   const [saved, setSaved] = useState('')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)

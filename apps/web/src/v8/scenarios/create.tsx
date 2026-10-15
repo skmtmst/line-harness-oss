@@ -14,6 +14,7 @@ import { notifyToast } from '@/components/shared/toast';
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';

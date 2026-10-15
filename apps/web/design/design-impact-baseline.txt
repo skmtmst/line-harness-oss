@@ -515,6 +515,7 @@ shared-button-importer v8/visit-stamps/qr.tsx
 shared-button-importer v8/restaurant/reservations/waitlist.tsx
 
 shared-button-importer v8/booking-bookings/day-list.tsx
+shared-button-importer v8/booking-bookings/month-navigation.tsx
 shared-button-importer v8/booking-bookings/visit-actions.tsx
 shared-button-importer app/emergency/control-feedback-v8.tsx
 shared-button-importer v8/settings/emergency/history-details.tsx

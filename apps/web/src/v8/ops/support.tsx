@@ -362,18 +362,12 @@ export default function OpsSupportV8() {
   return (
     <PageFrame kind="list" boardId="P0jhqO" standalone skeleton>
       <OpsHead
-        stats={<OpsSupportStats summary={summary} loading={loading && summary === null} />}
         title="お問い合わせ"
         description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         band={(
           <div className={styles.band}>
-          <KpiBand>
-            <KpiCard presentation="cell" icon={<Inbox size={13} aria-hidden="true" />} title="新規" value={summary?.byStage ? summary.byStage.new : null} unit="件" detail={summary?.kpis ? `未対応 ${summary.kpis.untouched}件` : emptyValue('unknown')} loading={!summary} />
-            <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="対応中" value={summary?.byStage ? summary.byStage.in_progress : null} unit="件" detail={summary?.kpis ? `初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}` : emptyValue('unknown')} loading={!summary} />
-            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="確認待ち" value={summary?.byStage ? summary.byStage.waiting : null} unit="件" detail="契約先の返事待ち" loading={!summary} />
-            <KpiCard presentation="cell" icon={<RotateCcw size={13} aria-hidden="true" />} title="解決" value={summary?.byStage ? summary.byStage.resolved : null} unit="件" detail={summary?.kpis ? `解決率 ${summary.kpis.resolutionRate ?? '—'}%` : emptyValue('unknown')} loading={!summary} />
-          </KpiBand>
+          <OpsSupportStats summary={summary} loading={loading && summary === null} />
           </div>
         )}
         actions={readOnly ? null : (

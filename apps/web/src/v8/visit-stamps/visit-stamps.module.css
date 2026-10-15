@@ -484,7 +484,7 @@
 .hoursRow { display: flex; align-items: center; gap: var(--tpl-e78-step-gap); }
 .hoursRow input, .receiptRow input { width: var(--tpl-stamp-hours-w); }
 .hoursRow :global([data-number-unit]), .receiptRow :global([data-number-unit]) { flex: 0 0 auto; }
-.receiptRow { display: flex; align-items: center; gap: var(--tpl-e78-step-gap); padding: var(--tpl-e78-switch-pad); padding-inline-start: calc(var(--tpl-stamp-check-w) + var(--tpl-e78-pair-gap)); }
+.receiptRow { display: flex; align-items: center; gap: var(--tpl-e78-step-gap); padding: var(--tpl-e78-switch-pad); }
 .counter { align-self: flex-end; color: var(--color-ink-faint); font-size: var(--tpl-e78-sub-size); line-height: var(--tpl-e78-sub-lh); }
 .customerCard { position: relative; width: var(--tpl-stamp-card-w); max-width: 100%; border-radius: var(--tpl-e78-radius); overflow: hidden; }
 .cardImage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

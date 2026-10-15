@@ -10,7 +10,7 @@ import { MoreAction, RowMenu } from '@/components/shared/row-actions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { DialogContentRow } from '@/components/shared/dialog-form-row'
+import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import { Grid2X2, GripHorizontal, Save } from 'lucide-react'
 import compact from './account-ordering-v8.module.css'
@@ -283,8 +283,9 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     const compactNode = (account: AccountItem, depth: number): ReactNode => {
       const parent = accounts.find((item) => item.id === account.parentLineAccountId)
       return <div key={account.id} className={depth > 0 ? compact.child : undefined}>
-        <DialogContentRow size="account" align="start"
-          data-account-id={account.id} data-depth={depth} draggable={!saving}
+        {/* 子・孫は幅をそろえ、カードの中だけを字下げする（絵 a7lUk）。 */}
+        <Card surface="inset" contentPadding={`var(--tpl-acct-hierarchy-row-pad-y) var(--tpl-acct-hierarchy-row-pad-x) var(--tpl-acct-hierarchy-row-pad-y) calc(var(--tpl-acct-hierarchy-row-pad-x) + ${depth} * var(--tpl-acct-hierarchy-indent))`} className={compact.row}
+          data-account-id={account.id} draggable={!saving}
           onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
           onDrop={(event) => dropOn(event, account.id)}>
@@ -292,7 +293,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
           <span className={compact.name} title={account.displayName || account.name}>{account.displayName || account.name}</span>
           <span className={compact.relationship}>{depth === 0 ? '最上位（親）' : `${parent?.displayName || parent?.name || '上位アカウント'}の${depth === 1 ? '子' : '孫'}`}</span>
           {moveMenu(account)}
-        </DialogContentRow>
+        </Card>
         {(childrenByParent.get(account.id) ?? []).map((child) => compactNode(child, depth + 1))}
       </div>
     }
@@ -312,9 +313,13 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
               onDrop={(event) => dropOn(event, null)}>
               {hierarchyRoots.map((account) => compactNode(account, 0))}
             </div>
-            {unassigned.length > 0 ? <div className={compact.unassignedMenus}>{unassigned.map((account) => <DialogContentRow key={account.id} tone="muted" align="start">
-                <Grid2X2 size={12} aria-hidden="true" /><Button variant="text" size="inline" textTone="ink" aria-label={`${account.displayName || account.name}の移動先を選ぶ`} onClick={() => setMoveMenuFor(account.id)} disabled={saving}>{`未設定のLINEアカウント：${account.displayName || account.name}`}</Button><ActionMenu open={moveMenuFor === account.id} ariaLabel={`${account.displayName || account.name}の移動先`} onClose={() => setMoveMenuFor(null)} items={moveMenuItems(account)} />
-              </DialogContentRow>)}</div> : null}
+            {/* 未設定は灰色の1本の帯。名前ごとの「…」から行き先を選ぶ（絵 a7lUk）。 */}
+            {unassigned.length > 0 ? <Card surface="muted" contentPadding="var(--tpl-acd-dlg-band-pad-y) var(--tpl-acd-dlg-band-pad-x)" className={compact.unassigned}>
+              <span className={compact.unassignedLabel}>▧ 未設定のLINEアカウント：</span>
+              {unassigned.map((account) => <span key={account.id} className={compact.unassignedItem}>
+                <span className={compact.unassignedName} title={account.displayName || account.name}>{account.displayName || account.name}</span>{moveMenu(account)}
+              </span>)}
+            </Card> : null}
             {!hierarchyRoots.length && !unassigned.length ? <ListState kind="empty" title="LINEアカウントがありません" /> : null}
           </>}
         </div>

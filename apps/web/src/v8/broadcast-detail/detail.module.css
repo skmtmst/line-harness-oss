@@ -721,6 +721,6 @@ a.railStep:hover .railLabel {
 .railItem[data-finished] .railMark { background: var(--color-selection-border); }
 .railItem[data-finished] .railStep { color: var(--color-ink); font-weight: 700; }
 .railItem[data-state='current'] .railMark { background: var(--color-selection-border); box-shadow: none; }
-.railItem[data-state='todo'] .railMark { background: var(--color-canvas); box-shadow: inset 0 0 0 1px var(--color-control-border); }
+.railItem[data-state='todo'] .railMark { background: var(--color-canvas); box-shadow: none; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
 .railItem[data-kind='delivery'][data-state='done'] .railStep { color: var(--color-ink); }
 .railItem[data-state='todo'] .railStep { color: var(--color-ink-secondary); }
