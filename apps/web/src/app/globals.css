@@ -1053,7 +1053,7 @@
   --tpl-stamp-card-w: 340px;
   --tpl-stamp-card-gap: var(--polish-space-row);
   --tpl-stamp-card-pad: var(--polish-space-card);
-  --tpl-stamp-hours-w: 64px;
+  --tpl-stamp-hours-w: 64px; --tpl-stamp-check-w: 18px;
   --tpl-stamp-expiry-slot-w: 140px;
   --tpl-stamp-expiry-length-w: 120px;
   --tpl-stamp-appearance-gap: 16px;
