@@ -27,6 +27,7 @@ import shared from './screen.module.css'
 import styles from './identity.module.css'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -188,9 +189,7 @@ export default function EcIdentityCandidatesScreen() {
             loading={operationsState === 'loading'}
           />
         </KpiBand>
-
-
-
+        <Notice tone="info" icon={null}>{AUTO_LINK_NOTE}</Notice>
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
             <SaveErrorField names={["sort"]}><ListToolbarSort aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} /></SaveErrorField>
@@ -300,8 +299,6 @@ export default function EcIdentityCandidatesScreen() {
       boardId="w1W8h"
       layout="narrow-nav"
       title="EC連携"
-      explanation={AUTO_LINK_NOTE}
-      explanationKey="ec-identity"
       help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={<Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={shared.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>}
     >
