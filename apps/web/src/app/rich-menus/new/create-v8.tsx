@@ -1464,7 +1464,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const previewAreas = !group
     ? template.areas
     : previewPage
-      ? previewPage.areas.map((a) => ({ x: a.boundsX, y: a.boundsY, w: a.boundsWidth, h: a.boundsHeight }))
+      ? previewPage.areas.map((a, i) => ({ x: a.boundsX, y: a.boundsY, w: a.boundsWidth, h: a.boundsHeight, label: areaDisplayName(a, i), intent: a.intent }))
       : null
 
   const previewPages = !group
@@ -2672,7 +2672,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
                 disabled={!endEnabled}
                 options={[
-                  { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
+                  { value: '', label: '前のメニュー' },
                   ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
                 ]}
               /></SaveErrorField></Field>
@@ -2896,6 +2896,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                       key: 'default',
                       label: '既定のメニュー',
                       value: `${currentDefaultMenu?.name ?? '（なし）'} → このメニュー`,
+                      wrap: true,
                     },
                   ]
                 : []),

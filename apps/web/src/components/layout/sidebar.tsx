@@ -713,7 +713,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
+      <nav ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -847,10 +847,11 @@ export default function Sidebar({
 
       {/*
         ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
-        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        オーナー・管理者にだけ出す（閲覧専用のオーナー・管理者にも出す。設定は見るだけで開ける）。
+        設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"

@@ -86,7 +86,8 @@ export default function EmergencyScreen({
         <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
     : tab === 'control' && canManage
-      ? <Button variant="primary" type="button" icon={<OctagonPause size={16} />} onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
+      // 止める操作は赤（中の［選んだものを止める］と同じ・絵 OHwbU）。
+      ? <Button variant="danger" type="button" icon={<OctagonPause size={16} />} onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
       : tab === 'history' ? <RowActions subjectName="履歴" menuItems={[
         { id: 'incidents', label: '止めた・戻した記録を見る', onSelect: () => setHistoryDetail('incidents') },
         { id: 'updates', label: '更新内容を見る', onSelect: () => setHistoryDetail('updates') },

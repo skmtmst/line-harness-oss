@@ -283,7 +283,8 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   ariaLabel?: string
   valuePrefix?: string
   compact?: boolean
-  actionHidden?: boolean
+  /** true＝「変える ›」を出さない。'label'＝文字だけ外して › は残す（狭い列で名前を残す。絵 ijxur のメニュー）。 */
+  actionHidden?: boolean | 'label'
 }) {
   const field = useFieldContext()
   const empty = !name
@@ -302,7 +303,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
       </>}
     </span>}
     {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
-    {(readOnly && empty) || (actionHidden && !empty) ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix ? actionLabel : null}<ChevronRight size={16} /></span>}
+    {(readOnly && empty) || (actionHidden === true && !empty) ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix && !actionHidden ? actionLabel : null}<ChevronRight size={16} /></span>}
   </div>
 }
 

@@ -167,8 +167,8 @@ describe('下部追従バーの並びを部品で固定する', () => {
   it('操作の手前の一言を渡した画面は、ボタンを右端に置く', () => {
     expect(BAR).toMatch(/info\?:\s*ReactNode/)
     expect(BAR).toMatch(/info \? </)
-    // 列は3つのまま。3列目が操作で、中身を右へ寄せる。
-    expect(CSS).toMatch(/\.withInfo\s*\{[^}]*grid-template-columns:\s*1fr auto 1fr/s)
+    // 列は3つのまま。左の文が残りを使い、一言と操作は中身の幅で右端に並ぶ（操作を2段に折らない・zOpMG）。
+    expect(CSS).toMatch(/\.withInfo\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto/s)
     expect(CSS).toMatch(/\.withInfo \.actions\s*\{[^}]*justify-content:\s*flex-end/s)
     // 右端に空き列を作る4列へ戻していないこと。
     expect(CSS).not.toMatch(/1fr auto auto 1fr/)

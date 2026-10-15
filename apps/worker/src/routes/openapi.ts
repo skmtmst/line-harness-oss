@@ -19,6 +19,10 @@ import { trafficPoolSavePaths } from './traffic-pools-save-openapi.js';
 import { tenantCompanyContactPaths } from './tenant-company-contact-openapi.js';
 import type { Env } from '../index.js';
 
+import { bookingEntitlementPaths } from './booking-entitlements-openapi.js';
+import { bookingAssignmentPaths } from './booking-assignment-openapi.js';
+import { bookingPaymentAdminPaths } from './booking-payment-admin-openapi.js';
+
 const openapi = new Hono<Env>();
 
 const spec = {
@@ -409,6 +413,9 @@ const spec = {
     },
   },
   paths: {
+    ...bookingAssignmentPaths,
+    ...bookingPaymentAdminPaths,
+    ...bookingEntitlementPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -7480,7 +7487,7 @@ const spec = {
                 type: 'object',
                 required: ['mode', 'provider', 'holdMinutes'],
                 properties: {
-                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online', 'customer_choice'] },
                   provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
                   holdMinutes: { type: 'integer', minimum: 5, maximum: 1440 },
                 },
@@ -7511,7 +7518,7 @@ const spec = {
                 type: 'object',
                 required: ['mode', 'provider'],
                 properties: {
-                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online', 'customer_choice'] },
                   provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
                 },
               },

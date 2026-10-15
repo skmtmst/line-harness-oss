@@ -95,6 +95,8 @@ type KindFieldBase = {
   id?: string
   /** 中身の見本を出さない（狭い所・中身の無い種類）。 */
   noPreview?: boolean
+  /** 'label'＝狭い列で「変える」の文字を外し › だけ残す。 */
+  actionHidden?: boolean | 'label'
   /** 誤りの欄へ移るときに［選ぶ］ボタンをつかむ。 */
   buttonRef?: Ref<HTMLButtonElement>
   /** 欄の下の誤り・説明の id。 */
@@ -119,7 +121,7 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
   const common = {
     label, noun: def.noun, icon: def.icon, items, folders: hasFolderInfo ? folders : undefined, foldersFailed: hasFolderInfo && failed,
     onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, disabledReason, readOnly, invalid, description, id, buttonRef, describedBy,
-    createHref: def.createHref, createLabel: def.createLabel,
+    createHref: def.createHref, createLabel: def.createLabel, actionHidden: props.actionHidden,
   }
   if (kind === 'tag') {
     return <TagPickerField id={id} buttonRef={buttonRef} describedBy={describedBy} multiple={Boolean(props.multiple)} label={label} options={options.map(row => ({ id: row.id, name: row.name ?? row.label ?? '', groupId: row.groupId }))} accountId={accountId} value={props.multiple ? props.value : props.value ? [props.value] : []} onChange={ids => props.multiple ? props.onChange(ids) : props.onChange(ids[0] ?? '')} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly} invalid={invalid} />

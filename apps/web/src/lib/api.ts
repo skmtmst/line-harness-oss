@@ -14641,7 +14641,7 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export interface BookingPaymentAdminConfig {
-  mode: 'none' | 'onsite' | 'online';
+  mode: 'none' | 'onsite' | 'online' | 'customer_choice';
   provider: string;
   holdMinutes: number;
   keyConfigured: boolean;
@@ -14711,7 +14711,7 @@ export const bookingApi = {
     ),
   savePaymentConfig: (
     accountId: string,
-    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
+    body: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
   ) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount('/api/booking/admin/payment-config', accountId),
@@ -14720,7 +14720,7 @@ export const bookingApi = {
   saveMenuPayment: (
     accountId: string,
     menuId: string,
-    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe' },
+    body: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; provider: 'none' | 'onsite' | 'stripe' },
   ) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount(`/api/booking/admin/menus/${menuId}/payment`, accountId),

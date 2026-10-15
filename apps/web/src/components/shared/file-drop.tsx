@@ -36,6 +36,7 @@ export default function FileDropzone({
   rejectTitle = 'このファイルは追加できません',
   rejectHint,
   chooseLabel = 'ファイルを選ぶ',
+  secondary,
   onFiles,
   onPaste,
   className,
@@ -63,6 +64,8 @@ export default function FileDropzone({
   rejectTitle?: string
   rejectHint?: ReactNode
   chooseLabel?: string
+  /** 欄の中に添える別の入れ方（「ライブラリから選ぶ」など）。押しても欄のファイル選びは開かない。 */
+  secondary?: ReactNode
   /** 選ばれた・落とされたファイル。形式の検査は呼び出し側で行う。 */
   onFiles: (files: File[]) => void
   /** 貼り付け（Cmd+V）も受けるときに渡す。渡さなければ貼り付けは無視される。 */
@@ -159,6 +162,9 @@ export default function FileDropzone({
             {shown === 'active' ? '離すと追加します' : title}
           </p>
           {shown === 'active' || variant === 'video' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
+          {shown === 'active' || !secondary ? null : (
+            <span className={styles.secondary} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{secondary}</span>
+          )}
           {shown === 'active' || wholeZonePicker ? null : (
             <Button
               type="button"

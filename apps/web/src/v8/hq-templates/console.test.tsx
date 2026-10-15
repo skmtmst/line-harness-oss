@@ -503,11 +503,8 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   const delivered = (id: string) => ({ runId: `run-${id}`, status: 'completed', stores: [{ accountId: 'a-1', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
   /** 配る先の欄から共通の窓を開き、アカウントを選んで確定する（dJZ7Q）。 */
   async function pickStores(dialog: HTMLElement, names: string[]) {
-    fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
-    const picker = await findPickerDialog('配るアカウントを選ぶ')
-    for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
-    fireEvent.click(within(picker).getByRole('button', { name: `選ぶ（${names.length}件）` }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
+    /* 絵 W2GYgL：配る先は窓の中のアカウントのチェックの一覧。 */
+    for (const name of names) fireEvent.click(await within(dialog).findByRole('checkbox', { name }))
   }
   async function selectFolder() {
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
@@ -526,15 +523,13 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   it('全種類のフォルダ内ひな形は全選択で始まり、片方0なら配れない', async () => {
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
-    fireEvent.click(within(dialog).getByRole('button', { name: '配るひな形：変える' }))
-    const picker = await findPickerDialog('ひな形を選ぶ')
-    expect((within(picker).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
-    expect(within(picker).getByText('本文')).toBeTruthy()
-    expect(within(picker).getByText('カルーセル')).toBeTruthy()
-    fireEvent.click(within(picker).getByRole('button', { name: 'キャンセル' }))
+    /* 絵 W2GYgL：配るテンプレートは窓の中のチェックの一覧（種類の札つき）。 */
+    expect((within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(dialog).getByText('本文')).toBeTruthy()
+    expect(within(dialog).getByText('カルーセル')).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '2 件を 0 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
     await pickStores(dialog, ['然 -NEN- 本店'])
-    await pickEntities('配るひな形', ['予約前日のご案内', '別の種類のひな形'])
+    for (const name of ['予約前日のご案内', '別の種類のひな形']) fireEvent.click(within(dialog).getByRole('checkbox', { name }))
     expect(within(dialog).getByRole('button', { name: '0 件を 1 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
     expect(calls.preflight).not.toHaveBeenCalled()
   })
@@ -597,7 +592,7 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
     const folderDialog = await screen.findByRole('dialog', { name: 'フォルダ「予約」の 1 件を配る' })
-    expect(within(folderDialog).getByRole('button', { name: 'VIPを外す' })).toBeTruthy()
+    expect(within(folderDialog).getByRole('checkbox', { name: /VIP/ })).toBeTruthy()
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
     const listName = await screen.findByRole('link', { name: 'VIP', exact: true })

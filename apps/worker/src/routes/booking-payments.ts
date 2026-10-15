@@ -6,6 +6,7 @@ import {
   getBookingPaymentConfig,
   markBookingPayment,
   resolveBookingPaymentConfig,
+  resolveBookingPaymentForBooking,
   saveBookingPaymentConfig,
   saveBookingPaymentMenuSetting,
   type BookingPaymentMode,
@@ -26,6 +27,7 @@ import {
   type PaymentProvider,
 } from '../services/payment-providers.js';
 import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../services/booking-payment-recovery.js';
+import { receivePaymentEvent } from '../services/booking-payment-events.js';
 
 /**
  * 予約の支払い（決済サービスを差し替えられる作り）。
@@ -53,7 +55,7 @@ export function registerTestPaymentProvider(provider: PaymentProvider): void {
 }
 
 function validMode(value: unknown): BookingPaymentMode | null {
-  return value === 'none' || value === 'onsite' || value === 'online' ? value : null;
+  return value === 'none' || value === 'onsite' || value === 'online' || value === 'customer_choice' ? value : null;
 }
 
 function validProvider(value: unknown): BookingPaymentProviderName | null {
@@ -106,10 +108,10 @@ bookingPayments.put(
     if (!Number.isInteger(holdMinutes) || holdMinutes < 5 || holdMinutes > 1440) {
       return inputError(c, { success: false, error: 'holdMinutes は 5〜1440 の整数で指定してください' }, 400, ["holdMinutes"]);
     }
-    if (mode === 'online' && provider !== 'stripe') {
+    if ((mode === 'online' || mode === 'customer_choice') && provider !== 'stripe') {
       return inputError(c, { success: false, error: 'online の provider は stripe を指定してください' }, 400, ["mode","provider"]);
     }
-    if (mode !== 'online' && provider === 'stripe') {
+    if (mode !== 'online' && mode !== 'customer_choice' && provider === 'stripe') {
       return inputError(c, { success: false, error: 'stripe を使うときは mode を online にしてください' }, 400, ["mode","provider"]);
     }
     const saved = await saveBookingPaymentConfig(c.env.DB, accountId, { mode, provider, holdMinutes });
@@ -138,6 +140,10 @@ bookingPayments.put(
     if (!mode || !provider) {
       return inputError(c, { success: false, error: 'mode と provider を指定してください' }, 400, ["mode","provider"]);
     }
+    if (((mode === 'online' || mode === 'customer_choice') && provider !== 'stripe')
+      || (mode !== 'online' && mode !== 'customer_choice' && provider === 'stripe')) {
+      return inputError(c, {success:false,error:'invalid_payment_provider'},400,['mode','provider']);
+    }
     await saveBookingPaymentMenuSetting(c.env.DB, accountId, menuId, { mode, provider });
     const effective = await resolveBookingPaymentConfig(c.env.DB, accountId, menuId);
     return c.json({ success: true, data: effective });
@@ -165,7 +171,7 @@ interface StartBookingRow {
  * 支払いを始める中身。担当者用とお客さま用で共用する。
  * 同じ予約の送り直しは作り直さず、今の記録を返す。
  */
-async function startBookingPayment(
+export async function startBookingPayment(
   db: D1Database,
   env: Env['Bindings'],
   booking: StartBookingRow,
@@ -180,8 +186,8 @@ async function startBookingPayment(
   const bookingMenu = await db.prepare(
     `SELECT menu_id FROM bookings WHERE id = ?`,
   ).bind(booking.id).first<{ menu_id: string }>();
-  const config = await resolveBookingPaymentConfig(
-    db, booking.line_account_id, bookingMenu?.menu_id ?? '',
+  const config = await resolveBookingPaymentForBooking(
+    db, booking.line_account_id, booking.id, bookingMenu?.menu_id ?? '',
   );
   if (config.mode !== 'online') {
     return { ok: false, error: 'この予約はオンライン支払いの対象ではありません', status: 409 };
@@ -392,32 +398,20 @@ bookingPayments.post(
     if (!provider) return c.json({ success: false, error: 'unknown provider' }, 404);
     const outcome = await provider.verifyWebhook(rawBody, signature);
     if (!outcome) return c.json({ success: false, error: 'Invalid signature' }, 401);
-    if (outcome.status !== 'paid') {
-      await markUnpaidBookingPaymentByProviderId(c.env.DB, outcome.providerPaymentId, 'failed');
-      return c.json({ success: true, status: 'failed' });
+    const result = await receivePaymentEvent(c.env.DB, providerName, outcome, rawBody);
+    if (['event_conflict','busy_or_missing'].includes(result.status) || result.result==='failed') {
+      return c.json({success:false,error:'payment_event_unavailable',code:'payment_event_unavailable'},503);
     }
-    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId, {
-      email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-    });
-    if (!applied) return c.json({ success: true, status: 'unknown_payment' });
-    return c.json({ success: true, status: applied.duplicate ? 'duplicate' : 'paid' });
+    if (outcome.status==='paid' && ['paid','duplicate'].includes(result.status)) {
+      const payment=await c.env.DB.prepare('SELECT id FROM booking_payments WHERE provider=? AND provider_payment_id=?')
+        .bind(providerName,outcome.providerPaymentId).first<{id:string}>();
+      if (payment) await reconcilePaidBookingPayment(c.env.DB,payment.id,new Date(),false,{
+        email:c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+      });
+    }
+    return c.json({ success: true, status: result.status });
   },
 );
-
-async function markUnpaidBookingPaymentByProviderId(
-  db: D1Database,
-  providerPaymentId: string,
-  status: 'failed',
-): Promise<void> {
-  const row = await db.prepare(
-    `SELECT id, line_account_id FROM booking_payments
-      WHERE provider_payment_id = ? AND status IN ('unpaid', 'pending')`,
-  ).bind(providerPaymentId).first<{ id: string; line_account_id: string }>();
-  if (!row) return;
-  await db.prepare(`UPDATE booking_payments SET status = ?, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND status IN ('unpaid', 'pending')`)
-    .bind(status, new Date().toISOString(), row.id, row.line_account_id).run();
-}
 
 /**
  * 支払い済みを予約へ反映する。二重の知らせは2回目を受け付け済みで返す。

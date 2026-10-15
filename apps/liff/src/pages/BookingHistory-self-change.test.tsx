@@ -71,7 +71,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
   it('版を返さない予約には「日時を変える」「キャンセル」を出さず、トークでの連絡を案内する', async () => {
     setup([item({ lock_version: undefined })]);
     await screen.findByText('トリミング（小型犬）');
-    expect(screen.queryByRole('button', { name: 'キャンセルする' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
     expect(screen.queryByRole('button', { name: '日時を変える' })).toBeNull();
     expect(screen.getByText('予定の変更・キャンセルは、お店に LINE でご連絡ください。')).toBeTruthy();
   });
@@ -79,7 +79,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
   it('キャンセルは確認してから版を添えて送り、一覧を読み直す', async () => {
     cancelMyBooking.mockResolvedValue({ lock_version: 5, status: 'cancelled', calendar_sync: 'not_applicable', meet_sync: 'not_applicable' });
     setup([item()]);
-    fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
     expect(await screen.findByText(/トリミング（小型犬）をキャンセルしますか/)).toBeTruthy();
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
     await vi.waitFor(() => expect(cancelMyBooking).toHaveBeenCalledWith('bk-1', 4));
@@ -89,7 +89,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
   it('期限を過ぎたキャンセルは、人の言葉で出す', async () => {
     cancelMyBooking.mockRejectedValue(Object.assign(new Error('API 403'), { status: 403, body: { error: 'self_deadline_passed' } }));
     setup([item()]);
-    fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
     expect(await screen.findByText('キャンセルの期限を過ぎています。トークでご連絡ください。')).toBeTruthy();
   });
@@ -133,7 +133,7 @@ it('確認窓を開いた後に期限を過ぎたら送信を止め、理由を�
   const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2099-10-01T00:00:00Z'));
   try {
     setup([item({ cancel_deadline_at: '2099-10-01T00:00:01Z' })]);
-    fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
     clock.mockReturnValue(Date.parse('2099-10-01T00:00:02Z'));
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
     expect(cancelMyBooking).not.toHaveBeenCalled();

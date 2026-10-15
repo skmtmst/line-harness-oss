@@ -138,7 +138,7 @@ export function SaveConflictBand({
   compareBusy = false,
   compareDisabled = false,
   reloadHref,
-  reloadVariant = 'secondary',
+  reloadVariant = 'primary',
   onCompare,
   compareHref,
   onReload,

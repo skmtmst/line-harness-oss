@@ -1,0 +1,23 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* 予約・お金の確かめの窓（h2lHCH・Y8MWGs・Md9O3・s8BwT8）。 */
+.body { display: flex; flex-direction: column; gap: var(--polish-space-card); inline-size: 100%; }
+.body > * { align-self: stretch; }
+.facts { display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--polish-space-field) var(--polish-space-card); border-radius: var(--radius-control); background: var(--polish-table-head-bg); }
+.facts dl, .confirm dl { display: flex; flex-direction: column; gap: var(--polish-space-row); margin: 0; }
+.facts dl > div, .confirm dl > div { display: grid; grid-template-columns: minmax(0, 9em) minmax(0, 1fr); gap: var(--polish-space-field); font-size: var(--text-body); }
+.facts dt, .confirm dt { color: var(--color-ink-secondary); font-size: var(--text-label); }
+.facts dd, .confirm dd { margin: 0; color: var(--color-ink); font-weight: 600; }
+.choices { display: flex; flex-direction: column; gap: var(--polish-space-row); }
+.inline { display: flex; flex-wrap: wrap; gap: var(--polish-space-card); }
+.message { margin: 0; padding: var(--polish-space-field) var(--polish-space-card); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-ink); font-size: var(--text-body); line-height: var(--text-body--line-height); white-space: pre-wrap; }
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
+.lead { color: var(--color-ink-secondary); font-size: var(--text-label); white-space: nowrap; }
+.confirm { display: flex; flex-direction: column; gap: var(--polish-space-field); }
+.overlap { display: flex; flex-direction: column; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); }
+.overlapRow { display: flex; align-items: center; gap: var(--polish-space-field); min-block-size: var(--polish-table-row); padding-inline: var(--polish-space-card); border-block-end: 1px solid var(--color-hairline); font-size: var(--text-body); }
+.overlapRow:last-child { border-block-end: 0; }
+.overlapName { display: flex; flex: 1 1 auto; flex-direction: column; min-inline-size: 0; }
+.overlapName span { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.info { margin: 0; padding: var(--polish-space-field) var(--polish-space-card); border-radius: var(--radius-control); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-body); }
+}

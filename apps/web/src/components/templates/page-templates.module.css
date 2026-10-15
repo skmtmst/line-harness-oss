@@ -430,7 +430,9 @@
 
 :global(:root) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
 :global(:root) .frame[data-template-layout='distribution'] .listBody { flex: none; }
-:global(:root) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }
+:global(:root) .frame[data-template-layout='distribution'] .listBody { margin-bottom: var(--tpl-toolbar-gap); }
+/* 下の帯は表の直後で浮かせず、白い板の下端に置く（Ft2Ey・J7HNK）。表が長いときは sticky で画面の下に追従する。 */
+:global(:root) .frame[data-template-layout='distribution'] > .footer { margin: auto 0 0; }
 .subtitle{margin:0;color:var(--color-ink-secondary);font-size:var(--text-caption);line-height:var(--tpl-rs-lh-13);}
 
 :global(:root) [data-page-template='restaurant'] .heading { min-height: 60px; }

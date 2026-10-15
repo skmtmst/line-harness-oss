@@ -742,7 +742,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         notices={notices}
         overlays={(
           <>
-          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} busy={busy} error={error}
+          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} accountFolders={accountFolders} busy={busy} error={error}
             onCancel={() => { if (!busy) { setFolderDistribution(null); setError('') } }}
             onConfirm={(rows, ids) => startFolderDistribution(folderDistribution.name, rows, ids)} /> : null}
           {stage === 'saved' ? <SavedDistributionDialog accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
@@ -1163,6 +1163,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       {error || message ?notices : null}
         </>}
         toolbar={<DistributionToolbar>
+          <strong className={styles.distSelected}>{`選んだ ${selected.length} アカウント`}</strong>
           <span className={styles.distSearch}><SaveErrorField names={["search"]}><SearchField aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={setSearch} onClear={() => setSearch('')} /></SaveErrorField></span>
           <span className={styles.bulkPick}>
             <SaveErrorField names={["bulkMode","bulk_mode"]}><Select
@@ -1174,10 +1175,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               options={[{ value: '', label: '一括の配布方法：選ぶ' }, { value: 'overwrite', label: '一括の配布方法：上書き' }, { value: 'alias', label: '一括の配布方法：別名で作る' }]}
             /></SaveErrorField>
           </span>
-        <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/>
-          {/* フォルダの「まとめて選ぶ」の箱は置かない。表の見出しの箱（表示中のアカウントをすべて選ぶ）と同じ役で、ラベルの無い緑の四角に見えた（meBRB）。 */}
-          {accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
+          {accountFolderRows.length > 1 ? null : accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
         </DistributionToolbar>}
+      /* 絵 J7HNK：アカウントのフォルダは左の列（数とまとめて選ぶ印）。狭い板では選ぶ欄に畳む。 */
+      folders={accountFolderRows.length > 1 ? <DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={Boolean(accountFolders.failed)} /> : undefined}
+      collapsedFolders={accountFolderRows.length > 1 ? <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: `フォルダ：${row.label}` }))}/> : undefined}
       actions={<>
 {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>
