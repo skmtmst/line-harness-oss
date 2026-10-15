@@ -67,9 +67,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
-  return polishFormatDate(iso, { style: 'detail', fallback: iso })
+  return `${polishFormatDate(iso, { style: 'list-day-weekday', fallback: iso })} ${polishFormatDate(iso, { style: 'time', fallback: '' })}`
 }
-
 function participationSub(applicant: EventOccurrenceApplicant): string {
   if (applicant.firstParticipation.isFirst === true) return '初参加'
   if (applicant.firstParticipation.isFirst === false) return '過去のイベント参加あり'
@@ -543,6 +542,7 @@ function Bookings({ eventId }: { eventId: string }) {
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
+              valuePrefix="開催回："
               options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
             /></SaveErrorField>
           </div>
@@ -710,7 +710,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
               <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
-                送る
+                <Send size={15} aria-hidden="true" />送る
               </Button>
             </div></Field></div>
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
