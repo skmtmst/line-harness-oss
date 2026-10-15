@@ -129,7 +129,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
           </div>
         ) : (
           <div className={styles.cardsWrap}>
-          <SaveErrorField names={["walk-in-table","id","table.id","tableId"]}><RadioCardGroup legend={`今すぐ座れる卓（${guests}名が座れる卓だけ）`} legendVisible className={styles.tableCards}>
+          <SaveErrorField names={["walk-in-table","id","table.id","tableId"]}><RadioCardGroup legend={`今すぐ座れる卓（${guests}名が座れる卓だけ）`} legendVisible columns={3}>
             {free.map((table) => (
               <RadioCard
                 key={table.id}

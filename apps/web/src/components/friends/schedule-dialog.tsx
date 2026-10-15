@@ -102,6 +102,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
     setBusy(true)
     lock.current = true
     setError('')
+    let completed = 0
     try {
       const items: Array<{ messageType?: 'image'; content: string; done: () => void }> = []
       if (image) items.push({ messageType: 'image', content: JSON.stringify({ originalContentUrl: image.url, previewImageUrl: image.url }), done: () => setImage(null) })
@@ -116,12 +117,14 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         }
         keysRef.current.clear(signature)
         item.done()
+        completed += 1
       }
       onReserved()
       onClose()
     } catch {
       // 結果が分からない失敗では鍵を残し、同じ予約の再試行を二重に作らない。
-      setError('予約できませんでした。通信状態を確認して、もう一度お試しください。')
+      // 先に予約できた分は入力から外してあるので、何件済んだかを添える（部分成功）。
+      setError(`${completed ? `${completed}件は予約済みです。残りを` : ''}予約できませんでした。通信状態を確認して、もう一度お試しください。`)
     } finally {
       lock.current = false
       setBusy(false)

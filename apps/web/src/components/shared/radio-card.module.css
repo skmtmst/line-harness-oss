@@ -26,6 +26,12 @@
   display: grid;
 }
 
+:root .items[data-choice-columns] {
+  width: 100%;
+  grid-template-columns: repeat(var(--choice-columns), minmax(0, 1fr));
+  gap: var(--polish-space-row);
+}
+
 .card {
   grid-template-columns: 20px minmax(0, 1fr);
   cursor: pointer;

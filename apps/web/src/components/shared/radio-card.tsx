@@ -1,4 +1,4 @@
-import { useId, type FormEventHandler, type KeyboardEventHandler, type Ref, type ReactNode } from 'react'
+import { useId, type CSSProperties, type FormEventHandler, type KeyboardEventHandler, type Ref, type ReactNode } from 'react'
 import styles from './radio-card.module.css'
 import { CircleCheck } from 'lucide-react'
 import { joinDescribedBy, useFieldContext } from './field-context'
@@ -36,6 +36,7 @@ export function RadioCardGroup({
   'aria-describedby': describedBy,
   onInput,
   legendVisible = false,
+  columns,
   className,
   children,
 }: {
@@ -47,13 +48,15 @@ export function RadioCardGroup({
   legend: string
   /** true にすると群名を見出しとして表示する。既定は読み上げ専用。 */
   legendVisible?: boolean
+  /** 窓内のカードを本文幅に等分する。省略時は既存の並びを保つ。 */
+  columns?: 2 | 3
   className?: string
   children: ReactNode
 }) {
   return (
     <fieldset id={id} className={styles.group} aria-invalid={invalid || undefined} aria-describedby={describedBy} onInput={onInput}>
       <legend className={legendVisible ? styles.legend : 'sr-only'}>{legend}</legend>
-      <div className={[styles.items, className].filter(Boolean).join(' ')}>{children}</div>
+      <div className={[styles.items, className].filter(Boolean).join(' ')} data-choice-columns={columns} style={columns ? { '--choice-columns': columns } as CSSProperties : undefined}>{children}</div>
     </fieldset>
   )
 }
