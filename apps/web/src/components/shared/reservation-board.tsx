@@ -45,7 +45,8 @@ export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEnt
 }
 export type ReservationBoardSlot={resourceId:string;startsAt:string;href?:string}
 /** 保存先による違いは表示型と変更契約に閉じ、すべての入口を同じ盤で描く。 */
-export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',diningContentColumns=false,monthNamePresentation,timeDirection,renderBody,renderList,selectedId}: {
+export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',diningContentColumns=false,monthNamePresentation,timeDirection,renderBody,renderList,selectedId,breaks}: {
+ breaks?:Record<string,ReadonlyArray<{weekday:number;start_time:string;end_time:string}>>;
  selectedId?:string;
  timeDirection?: 'vertical';
  renderBody?:(body:ReactNode)=>ReactNode;
@@ -98,7 +99,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
   </Tr>)}</tbody></DataTable>
  }
  const timeline=(date:string)=>{
-  if(kind==='people'&&timeDirection==='vertical')return <ReservationPeopleGrid key={date} date={date} entries={entries} resources={resources} slots={slots} canWrite={canWrite} busy={busy} onOpen={onOpen} onMove={onMove} onSlot={onSlot} onError={setError}/>
+  if(kind==='people'&&timeDirection==='vertical')return <ReservationPeopleGrid key={date} breaks={breaks} date={date} entries={entries} resources={resources} slots={slots} canWrite={canWrite} busy={busy} onOpen={onOpen} onMove={onMove} onSlot={onSlot} onError={setError}/>
   const rows=entries.filter(e=>dayKey(e.startsAt)===date)
   return <div key={date}>{renderedDays.length>1?<h3 className={styles.day}>{date}</h3>:null}
   <div className={styles.timeHead}>{hours.map(m=><span key={m}>{`${Math.floor(m/60)}:00`}</span>)}</div>

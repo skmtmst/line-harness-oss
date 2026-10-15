@@ -298,6 +298,7 @@ export default function BookingsPage() {
   const [staffFilter, setStaffFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
+  const [staffBreaks, setStaffBreaks] = useState<Record<string, Array<{ weekday: number; start_time: string; end_time: string }>>>({})
   /* 盤の「担当者」の絞り込み（GcyTr）。一覧の絞り込み（staffFilter）とは別に、盤の列だけを絞る。 */
   const [boardStaff, setBoardStaff] = useState('all')
   const [query, setQuery] = useState('')
@@ -699,6 +700,15 @@ export default function BookingsPage() {
     })()
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo, candidatesStatus, menus, staffList])
+  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 O2Z8u）。読めなければ出さないだけ。
+  useEffect(() => {
+    if (!selectedAccountId || view !== 'day' || staffList.length === 0) return
+    let alive = true
+    void Promise.all(staffList.map(staff => Promise.resolve().then(() => bookingApi.getBreaks(selectedAccountId, staff.id)).then(res => [staff.id, res.breaks] as const).catch(() => [staff.id, []] as const))).then(pairs => {
+      if (alive) setStaffBreaks(Object.fromEntries(pairs))
+    })
+    return () => { alive = false }
+  }, [selectedAccountId, view, staffList])
 
   type BookingAction = 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete'
 
@@ -979,7 +989,7 @@ export default function BookingsPage() {
             onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
-          <ReservationBoard timeDirection={view === 'day' ? 'vertical' : undefined} printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
+          <ReservationBoard breaks={view === 'day' ? staffBreaks : undefined} timeDirection={view === 'day' ? 'vertical' : undefined} printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
             toolbar={<><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?-7:-1))}>‹</Button><strong>{Number(calendarFrom.slice(5,7))}月{Number(calendarFrom.slice(8))}日{view==='week'?`〜${Number(calendarTo.slice(5,7))}月${Number(calendarTo.slice(8))}日`:null}</strong><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?7:1))}>›</Button><Button onClick={()=>setCalendarAnchor(jstDay(new Date().toISOString()))}>今日</Button></>}
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
