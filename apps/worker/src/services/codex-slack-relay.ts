@@ -1209,20 +1209,33 @@ export type HarnessErrorReport = {
 };
 
 function normalizedHarnessErrorPath(value: string | undefined): string {
-  const raw = singleLine(value || 'unknown');
+  const raw = singleLine(value || '').replace(/^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+/, '');
+  let pathname: string;
   try {
-    const url = new URL(raw);
-    return `${url.origin}${url.pathname}`;
+    pathname = new URL(raw, 'https://invalid.local').pathname;
   } catch {
-    return raw.replace(/[?#].*$/, '');
+    return '/other';
   }
+  // Copy only a fixed product area. IDs, hostnames, queries, hashes and arbitrary
+  // path segments can contain customer data even when they resemble ordinary slugs.
+  const parts = pathname.split('/').filter(Boolean);
+  const api = parts[0] === 'api';
+  const area = parts[api ? 1 : 0];
+  const areas = ['friends', 'friend-add-settings', 'booking', 'forms', 'events', 'webinars',
+    'scenarios', 'broadcasts', 'settings', 'dashboard', 'integrations', 'calendar', 'inbox',
+    'chats', 'mileage', 'action-scores', 'restaurant-test', 'staff', 'auth', 'hq', 'ops'];
+  return areas.includes(area) ? `${api ? '/api' : ''}/${area}` : '/other';
+}
+
+function harnessErrorCode(report: HarnessErrorReport): string {
+  if (report.source === 'worker' && report.message === 'unhandled_worker_error') return 'unhandled_worker_error';
+  const status = report.message.match(/\b(?:api|http)(?:\s+error)?\s*:?\s*([45]\d{2})\b/i)?.[1];
+  return status ? `HTTP ${status}` : 'runtime_error';
 }
 
 export function harnessErrorIncidentKey(report: HarnessErrorReport): string {
   const path = normalizedHarnessErrorPath(report.path);
-  const httpStatus = report.message.match(/(?:api|http)(?:\s+error)?\s*:?\s*([45]\d{2})/i)?.[1];
-  if (httpStatus) return `${report.source}:${path}:http:${httpStatus}`;
-  return `${report.source}:${path}:${singleLine(report.message).toLowerCase()}`;
+  return `${report.source === 'worker' ? 'worker' : 'admin'}:${path}:${harnessErrorCode(report)}`;
 }
 
 export async function reportHarnessErrorToSlack(
@@ -1231,9 +1244,10 @@ export async function reportHarnessErrorToSlack(
   fetcher: typeof fetch = fetch,
 ): Promise<boolean> {
   if (!config.SLACK_BOT_TOKEN || !config.SLACK_ERROR_CHANNEL_ID) return false;
-  const message = sanitizeSlackContent(singleLine(report.message)).slice(0, 500) || '不明なエラー';
-  const path = sanitizeSlackContent(singleLine(report.path || '')).slice(0, 300);
-  const stack = sanitizeSlackContent(report.stack || '').split('\n').slice(0, 8).join('\n').slice(0, 1_200);
+  // Error input is untrusted. Regex redaction cannot recognize arbitrary names or
+  // secrets: only fixed codes/areas go to Slack, including its task metadata.
+  const message = harnessErrorCode(report);
+  const path = normalizedHarnessErrorPath(report.path);
   const fingerprint = taskIdForKey(harnessErrorIncidentKey(report)).slice(5);
   const runtimeSessionId = `runtime-${fingerprint}`;
   const taskId = taskIdForKey(`session:${runtimeSessionId}`);
@@ -1242,7 +1256,6 @@ export async function reportHarnessErrorToSlack(
     `発生元：${report.source === 'worker' ? 'Worker' : '管理画面'}`,
     path ? `場所：${path}` : '',
     `内容：${message}`,
-    stack ? `スタック：\n${stack}` : '',
     `エラーID：ERR-${fingerprint}`,
     `TASK-ID：${taskId}`,
   ].filter(Boolean).join('\n');
@@ -1253,7 +1266,8 @@ export async function reportHarnessErrorToSlack(
     sessionId: runtimeSessionId,
     operator: 'codex',
     content,
-    occurredAt: report.occurredAt || new Date().toISOString(),
+    occurredAt: report.occurredAt && Number.isFinite(Date.parse(report.occurredAt))
+      ? new Date(report.occurredAt).toISOString() : new Date().toISOString(),
     explicitCategory: 'error',
   }, fetcher);
   return true;

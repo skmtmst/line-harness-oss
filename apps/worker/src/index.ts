@@ -279,6 +279,9 @@ export type Env = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
+    DEPLOY_ENV?: string;
+    /** Dedicated AES-GCM key held as a Worker secret, never a normal var. */
+    GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY?: string;
     /**
      * デリバリー受注（Uber Eats・出前館・ロケットナウ）の接続設定。
      * 送信は 'true' のときだけ行う。未設定の環境では台帳へ記録して送らない。

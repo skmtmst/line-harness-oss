@@ -22,7 +22,8 @@ const google = vi.hoisted(() => ({
   deleteEvent: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async importOriginal => ({
+  ...await importOriginal<typeof import('@line-crm/db')>(),
   ...db,
   toJstString: vi.fn((date: Date) => date.toISOString()),
 }));
@@ -34,7 +35,9 @@ vi.mock('../services/google-calendar.js', () => ({
 const { calendar } = await import('./calendar.js');
 
 type Role = 'owner' | 'admin' | 'staff';
-const env = { DB: {} as D1Database };
+const key = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)));
+const { encryptCredential } = await import('@line-crm/db');
+const env = { DB: {} as D1Database, GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY: key };
 const OWN_SCOPE = { allowedAccountIds: ['account-a'], includeUnassigned: false };
 const CONNECTION_A = {
   id: 'connection-a',
@@ -87,6 +90,7 @@ function request(path: string, init?: RequestInit, role?: Role) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.values(db).forEach(mock => mock.mockReset());
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     accounts: [{ id: 'account-a', tenant_id: 'tenant-a' }],
     allowedAccountIds: ['account-a'],
@@ -167,7 +171,7 @@ describe('Google Calendar tenant and account boundary', () => {
     expect(db.createCalendarConnection).toHaveBeenCalledWith(env.DB, expect.objectContaining({
       lineAccountId: 'account-a',
       calendarId: 'calendar-a',
-    }), OWN_SCOPE);
+    }), OWN_SCOPE, key);
     const input = db.createCalendarConnection.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(input).not.toHaveProperty('staffId');
   });
@@ -265,7 +269,7 @@ describe('Google Calendar tenant and account boundary', () => {
 
   it('does not change Google when the scoped status update loses its race', async () => {
     db.getCalendarBookingById.mockResolvedValueOnce({ ...BOOKING_A, event_id: 'event-a' });
-    db.getCalendarConnectionById.mockResolvedValueOnce({ ...CONNECTION_A, access_token: 'token-a' });
+    db.getCalendarConnectionById.mockResolvedValueOnce({ ...CONNECTION_A, access_token: await encryptCredential('token-a', key) });
     db.updateCalendarBookingStatus.mockResolvedValueOnce(false);
     const response = await request('/api/integrations/google-calendar/bookings/booking-a/status', {
       method: 'PUT',
@@ -278,7 +282,7 @@ describe('Google Calendar tenant and account boundary', () => {
   });
 
   it('cleans up the Google event when its scoped D1 link loses its race', async () => {
-    db.getCalendarConnectionById.mockResolvedValueOnce({ ...CONNECTION_A, access_token: 'token-a' });
+    db.getCalendarConnectionById.mockResolvedValueOnce({ ...CONNECTION_A, access_token: await encryptCredential('token-a', key) });
     db.updateCalendarBookingEventId.mockResolvedValueOnce(false);
     const response = await request('/api/integrations/google-calendar/book', {
       method: 'POST',
