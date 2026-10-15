@@ -1,3 +1,5 @@
+import { hasDeliveryAccess } from '@line-crm/shared';
+import { auditLog } from '../lib/audit-log.js';
 import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
@@ -305,6 +307,7 @@ function serializeForm(
 ) {
   const redactSecrets = opts?.redactSecrets === true;
   return {
+    warnings: (() => { const warning = formThemeContrastError(resolveCustomerFormTheme(parseLayout(row.layout, row.fields).options)); return warning ? [{ code: 'LOW_CONTRAST', message: warning }] : []; })(),
     id: row.id,
     name: row.name,
     description: row.description,
@@ -989,7 +992,7 @@ forms.get('/api/forms/:id', async (c) => {
 });
 
 // POST /api/forms/:id/publish — 保存済みの編集内容を不変版にして公開する。
-forms.post('/api/forms/:id/publish', inputJsonBoundary(), async (c) => {
+forms.post('/api/forms/:id/publish', requireDeliveryAccess('forms', 'publish'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
@@ -1136,19 +1139,10 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
     if (body.layout !== undefined && !normalized) {
       return inputError(c, { success: false, error: 'layout の形が正しくありません' }, 400, ["layout"]);
     }
-    // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
-    if (normalized && !('error' in normalized) && normalized.layout) {
-      const createdLayout = JSON.parse(normalized.layout) as FormLayout;
-      const createContrastError = formThemeContrastError(
-        resolveCustomerFormTheme(createdLayout.options),
-      );
-      if (createContrastError) {
-        return inputError(c, { success: false, error: createContrastError }, 422, ["layout"]);
-      }
-    }
 
     const form = await createForm(c.env.DB, {
       name: body.name,
+      isActive: hasDeliveryAccess(c.get('staff'), 'forms', 'publish'),
       description: body.description ?? null,
       fields: normalized ? normalized.fields : JSON.stringify(body.fields ?? []),
       layout: normalized ? normalized.layout : null,
@@ -1294,6 +1288,8 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
       expectedContentRevision?: unknown;
     }>();
 
+    if (body.isActive !== undefined && !hasDeliveryAccess(c.get('staff'), 'forms', 'publish')) return c.json({ success: false, error: '公開・停止には管理者権限が必要です' }, 403);
+
     /*
      * #723: 確認した編集の版を必ず受け取る。
      *
@@ -1368,14 +1364,6 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
       if ('error' in normalized) {
         return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
       }
-      // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
-      const savedLayout = JSON.parse(normalized.layout) as FormLayout;
-      const contrastError = formThemeContrastError(
-        resolveCustomerFormTheme(savedLayout.options),
-      );
-      if (contrastError) {
-        return inputError(c, { success: false, error: contrastError }, 422, ["layout"]);
-      }
       updates.layout = normalized.layout;
       updates.fields = normalized.fields;
     }
@@ -1439,6 +1427,7 @@ forms.get('/api/forms/:id/delete-impact', requireDeliveryAccess('forms'), async 
 
 /** 本文の解析より前に保管・保管解除の管理権限を確認する。 */
 const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
+  if (!hasDeliveryAccess(c.get('staff'), 'forms', 'archive')) return c.json({ success: false, error: '保管には管理者権限が必要です' }, 403);
   try {
     if (!c.req.query('account_id')?.trim()) return inputError(c, { success: false, error: 'account_id is required' }, 400, ['account_id']);
     const accountIds = await getFormAccountIds(c.env.DB, c.req.param('id')!);
@@ -1585,7 +1574,7 @@ forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({
 });
 
 // DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
-forms.delete('/api/forms/:id', async (c) => {
+forms.delete('/api/forms/:id', requireDeliveryAccess('forms', 'archive'), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('account_id')?.trim();
@@ -1656,6 +1645,39 @@ forms.delete('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'a
     if (error instanceof DeletionFailure) return c.json({ success: false, code: error.code, error: error.status === 409 ? '削除中です。少し待ってから、もう一度お試しください。' : '削除を完了できませんでした。同じ回答で、もう一度削除してください。' }, error.status);
     return c.json({ success: false, code: 'deletion_retry_required', error: '削除を完了できませんでした。同じ回答で、もう一度削除してください。' }, 503);
   }
+});
+
+// CSV は回答閲覧と分離し、明示的な書き出し権限で確認する。
+forms.post('/api/forms/:id/exports', requireDeliveryAccess('forms', 'export'), async (c) => {
+  const id = c.req.param('id');
+  const accountId = c.req.query('account_id');
+  if (!await canUseFormFromAccount(c, id, accountId)) return c.json({ success: false, error: 'Form not found' }, 404);
+  const form = await getFormById(c.env.DB, id);
+  if (!form) return c.json({ success: false, error: 'Form not found' }, 404);
+  const fields = JSON.parse(form.fields || '[]') as Array<{ id?: string; name: string; label?: string }>;
+  const cell = (value: unknown) => {
+    let text = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+    if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const rows: string[] = [['回答ID', '回答日時', ...fields.map(f => f.label ?? f.name ?? f.id ?? '')].map(cell).join(',')];
+  let page = 1;
+  let total = 0;
+  do {
+    const result = await getFormSubmissionsPage(c.env.DB, id, { page, limit: 200, lineAccountId: accountId!, search: c.req.query('q')?.trim().slice(0, 200) || undefined });
+    total = result.total;
+    for (const row of result.items) {
+      const data = JSON.parse(row.data) as Record<string, unknown>;
+      rows.push([row.id, row.created_at, ...fields.map(f => data[f.name ?? f.id ?? ''])].map(cell).join(','));
+    }
+    if (result.items.length === 0) break;
+    page++;
+  } while ((page - 1) * 200 < total);
+  auditLog(c, 'form.submission.export', { id, kind: 'form' }, { lineAccountId: accountId! });
+  return new Response('\uFEFF' + rows.join('\r\n') + '\r\n', { headers: {
+    'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="form-responses.csv"',
+    'Cache-Control': 'no-store',
+  } });
 });
 
 // GET /api/forms/:id/submissions — list submissions

@@ -15,6 +15,7 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'form.submission.export'
   | 'ad_conversion.retry'
   | 'line_account_folder.create'
   | 'line_account_folder.update'

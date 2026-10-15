@@ -203,6 +203,7 @@ export async function getScenarioById(
 }
 
 export interface CreateScenarioInput {
+  isActive?: boolean;
   name: string;
   description?: string | null;
   triggerType: ScenarioTriggerType;
@@ -225,7 +226,7 @@ export async function createScenario(
       // 「他のシナリオが動いていたら登録しない」という強い動きになる。
       // 既定は従来どおり「並行を許す」(1) にする。
       `INSERT INTO scenarios (id, name, description, trigger_type, trigger_tag_id, is_active, delivery_mode, allow_concurrent, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -233,6 +234,7 @@ export async function createScenario(
       input.description ?? null,
       input.triggerType,
       input.triggerTagId ?? null,
+      input.isActive === false ? 0 : 1,
       input.deliveryMode ?? 'relative',
       input.allowConcurrent === false ? 0 : 1,
       now,
