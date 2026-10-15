@@ -451,9 +451,9 @@ export default function HqStoreList(props: HqStoreListProps) {
                   /* タグ（DzdC3）は名前をタグの札で出す。フォルダの色は札の中の丸（名前の前の丸を二重に置かない）。 */
                   <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {itemHref ? <RowNameLink href={itemHref(row)} className={hqStyles.hqTagLink} aria-label={row.name} title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} /></RowNameLink> : canEdit ? (
-                        <button type="button" className={`${hqStyles.hqNameButton} ${hqStyles.hqTagLink}`} aria-label={row.name} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} /></button>
-                      ) : <span title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} /></span>}
+                      {itemHref ? <RowNameLink href={itemHref(row)} className={hqStyles.hqTagLink} aria-label={row.name} title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} folderName={folder?.name ?? '未分類'} /></RowNameLink> : canEdit ? (
+                        <button type="button" className={`${hqStyles.hqNameButton} ${hqStyles.hqTagLink}`} aria-label={row.name} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} folderName={folder?.name ?? '未分類'} /></button>
+                      ) : <span title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} folderName={folder?.name ?? '未分類'} /></span>}
                     </div>
                   )} nameCarriesDot />
                 ) : <NameCell name={(

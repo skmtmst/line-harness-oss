@@ -131,8 +131,10 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(name.textContent).toBe('秋の新商品')
     const pill = name.querySelector('[role="group"][aria-label="タグ「秋の新商品」"]')!
     expect(pill).not.toBeNull()
-    expect(pill.querySelector('[aria-hidden="true"]')!.getAttribute('style')).toContain('#8b5cf6')
-    expect(name.querySelector('[data-folder-dot]')).toBeNull()
+    const dot = pill.querySelector('[role="img"][aria-label="フォルダ：お問い合わせ"]')!
+    expect(dot.getAttribute('style')).toContain('#8b5cf6')
+    expect(name.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(pill.contains(dot)).toBe(true)
     await act(async () => { name.querySelector<HTMLButtonElement>('button')!.click() })
     expect(onOpen).toHaveBeenCalledWith(ROWS[0])
   })
