@@ -180,9 +180,6 @@
 .historyDate { flex: 0 0 var(--tpl-ar-cv-history-date-w); color: var(--color-ink); white-space: nowrap; }
 .historyText { min-width: 0; color: var(--color-ink); }
 .historyTextQuiet { min-width: 0; color: var(--color-ink-secondary); }
-.statusBox { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); }
-.statusBox :global(button[disabled]) { opacity: 1; color: var(--color-ink-faint); }
-.statusLabel { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
 /* スマホの中の届いた吹き出し（アイコン34・名前10・吹き出し 幅200・11.5/18・時刻9）。 */
 .talkRow { display: flex; gap: var(--tpl-label-tag-gap); }
