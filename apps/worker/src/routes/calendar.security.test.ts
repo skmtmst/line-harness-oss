@@ -29,7 +29,7 @@ vi.mock('@line-crm/db', async importOriginal => ({
 }));
 vi.mock('../services/account-access.js', () => accountAccess);
 vi.mock('../services/google-calendar.js', () => ({
-  GoogleCalendarClient: vi.fn(() => google),
+  GoogleCalendarClient: vi.fn(function () { return google; }),
 }));
 
 const { calendar } = await import('./calendar.js');

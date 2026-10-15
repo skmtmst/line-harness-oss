@@ -7,7 +7,7 @@ import { scanSingleMediaUsage, scanMediaUsage } from '../services/media-usage-sc
 import { images } from './images.js';
 import { hqTemplates } from './hq-templates.js';
 // The real pure Web authoring functions feed the real HTTP + SQLite executor.
-const webAuthoringPath = '../../../web/src/lib/hq-template-authoring.ts';
+const webAuthoringPath = new URL('../../../web/src/lib/hq-template-authoring.ts', import.meta.url).href;
 const { freshDefinition } = await import(/* @vite-ignore */ webAuthoringPath);
 
 let sql: ReturnType<typeof createTestD1>, app: Hono<Env>, staff: any;

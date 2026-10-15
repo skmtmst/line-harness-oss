@@ -51,7 +51,7 @@ const lineClientMocks = {
   getFollowerIds: vi.fn(),
 };
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+  LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
 }));
 
 // Re-import after mock so the module picks up mocked deps.

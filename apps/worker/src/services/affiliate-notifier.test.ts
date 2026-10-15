@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the LINE SDK so we can assert exactly what gets pushed without hitting
 // the network. pushMessage is a shared spy across all LineClient instances.
 const pushMessage = vi.fn().mockResolvedValue({});
-const LineClientMock = vi.fn().mockImplementation((token: string) => ({
+const LineClientMock = vi.fn().mockImplementation(function (token: string) { return ({
   __token: token,
   pushMessage,
-}));
+}); });
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: LineClientMock }));
 
 // Mock the db helpers the notifier resolves through.

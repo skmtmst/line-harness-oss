@@ -8,7 +8,7 @@ vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: async () => ({ allowedAccountIds: ['account-a'], canSeeUnassigned: false }),
 }));
 const google = vi.hoisted(() => ({ getFreeBusy: vi.fn(async () => []), createEvent: vi.fn(), deleteEvent: vi.fn() }));
-vi.mock('../services/google-calendar.js', () => ({ GoogleCalendarClient: vi.fn(() => google) }));
+vi.mock('../services/google-calendar.js', () => ({ GoogleCalendarClient: vi.fn(function () { return google; }) }));
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { calendar } from './calendar.js';
 

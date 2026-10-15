@@ -16,7 +16,7 @@ import {
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}] });
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const { processDueScheduledChatSends } = await import('./scheduled-chat-sends.js');
