@@ -24,7 +24,8 @@ import { LiffPhoneMenuStep, LiffPhoneDatetimeStep, LiffPhoneStaffStep } from './
 
 export function useBookingSettings(accountId: string | null) {
   usePageTitle('予約設定')
-  usePageCrumbs([{ label: '予約', href: '/booking/bookings' }, { label: '予約設定' }])
+  // 左メニューの項目そのものの画面なので、上の帯は「ホーム › 予約設定」だけ（絵 VLEaj・P6EdLW）。
+  usePageCrumbs(null)
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const rawTab = searchParams.get('tab')
