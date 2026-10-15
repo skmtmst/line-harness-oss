@@ -166,7 +166,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
           }
           if(template.template_type==='rich_menu'&&definition_json) {
             const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;
-            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':'配布先で店が決める'};
+            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':menu.displayAudience==='tag'?`タグが付いた人（${menu.displayTagName}）`:'配布先で店が決める'};
           }
         } catch { /* 壊れた版は未取得。 */ }
         return {message_type:null,manual_assignment_allowed:null,assignment_method:null,display_order:null,display_audience:null};
@@ -239,6 +239,7 @@ function resultReason(status: string): string | null {
 }
 function rethrowR2(error: unknown): never {
   if (!(error instanceof HqR2RuntimeError)) throw error;
+  if (error.code === 'DISPLAY_TAG_UNAVAILABLE') throw new HqTemplateError('DISPLAY_TAG_UNAVAILABLE', 409);
   if (error.code === 'LIFF_UNAVAILABLE') throw new HqTemplateError('LIFF_UNAVAILABLE', 409);
   if (error.code === 'CARD_REFERENCE_UNAVAILABLE') throw new HqTemplateError('CARD_REFERENCE_UNAVAILABLE', 409);
   if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
