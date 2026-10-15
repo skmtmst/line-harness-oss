@@ -1,3 +1,4 @@
+import { markListStats } from '../services/hq-templates/mark-list-stats.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
 import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
@@ -124,6 +125,10 @@ hqTemplates.get('/api/hq/templates/kind-counts', async c => {
   return c.json({success:true,data:counts});
 });
 hqTemplates.get('/api/hq/templates', async c => {
+  const messageCount = c.req.query('message_count');
+  const hasInterpolations = c.req.query('has_interpolations');
+  if (messageCount !== undefined && !['single', 'multiple'].includes(messageCount)
+    || hasInterpolations !== undefined && !['true', 'false'].includes(hasInterpolations)) throw new HqTemplateError('INVALID_LIST_FILTER');
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
   const kind=c.req.query('kind');
@@ -141,7 +146,10 @@ hqTemplates.get('/api/hq/templates', async c => {
       WHERE r.tenant_id=? AND t.archived_at IS NULL AND t.friend_attribute_type=? AND r.status='succeeded'
         AND NOT EXISTS(SELECT 1 FROM hq_template_preflight_resolutions p WHERE p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id AND p.friend_attribute_mode='skip')`).bind((await authority(c)).tenantId,selectedType).first<{count:number}>())?.count??0),
   }:{};
-  return c.json({success:true,data:kind&&kind!=='tag'&&!attributeType?rows.filter(row=>row.kind===kind):rows,kind_counts:counts,stats:{...attributeStats,thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
+  const markStats = selectedType === 'mark' ? await markListStats(dbFor(c.env), (await authority(c)).tenantId) : undefined;
+  const filtered = rows.filter(row => (!messageCount || (messageCount === 'single' ? row.message_count === 1 : typeof row.message_count === 'number' && row.message_count > 1))
+    && (hasInterpolations === undefined || row.has_interpolations === (hasInterpolations === 'true')));
+  return c.json({success:true,data:kind&&kind!=='tag'&&!attributeType?filtered.filter(row=>row.kind===kind):filtered,kind_counts:counts,stats:{...attributeStats,...(markStats ? { supportStatus: markStats.inbox, markChanges: markStats.markChanges, scope: markStats.scope, updatedAt: markStats.updatedAt } : {}),thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
     outdatedTemplateCount:rows.filter(r=>(r.outdated_account_count??0)>0).length}});
 });
 hqTemplates.get('/api/hq/templates/attribute-kind-counts',async c=>{
