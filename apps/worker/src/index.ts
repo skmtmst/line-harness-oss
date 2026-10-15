@@ -2180,6 +2180,8 @@ async function scheduled(
   // 配信系は1回だけ実行（内部でfriendのline_account_idから正しいlineClientを動的解決）
   // 以前はアカウントごとにループしていたが、アカウントフィルタなしのDBクエリで
   // 全アカウントの配信が各ループで重複実行されていたバグを修正
+  ctx.waitUntil(import('./routes/webhooks.js').then(({processIncomingWebhookQueue})=>processIncomingWebhookQueue(env)).catch(()=>console.error(JSON.stringify({code:'incoming_queue_failed'}))));
+
   // Phase 1: 復旧処理 (batch_offset=-1 → 0 にする軽量な UPDATE のみ) を queue 処理より
   // 先に await 完了させる。これで stalled/stuck から復旧した配信が同じ cron tick の
   // processQueuedBroadcasts に拾われ、復旧レイテンシが 1 tick 縮む。recover は inline 送信を
