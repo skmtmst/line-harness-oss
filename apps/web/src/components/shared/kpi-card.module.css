@@ -138,6 +138,9 @@
 :root .labelText {
   display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 題が行の最後のとき、マスの右の余白へ 2px だけはみ出してよい（絵と書体の幅の 1px 未満の差で
+   「結びついていない注文の金額」などが絵では入るのに「…」になるのを防ぐ。長い題は今までどおり省略）。 */
+:root .labelText:last-child { margin-right: -2px; }
 :root .labelHelp { display: inline-flex; flex: 1 1 auto; min-width: 0; flex-shrink: 1; }
 /* 帯の「？」は題の直後ではなく行の右端（絵のマスの右端どおり）。
    文が伸びて「？」を右へ押し出す（「…」の扱いは G3 のまま）。 */
