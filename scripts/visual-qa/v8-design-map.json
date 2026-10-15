@@ -1616,7 +1616,7 @@
           "タグ",
           "渋谷エリア",
           "イベント",
-          "2件にする"
+          "選ぶ（2件）"
         ],
         "viewportHeight": 1160
       }
@@ -7878,7 +7878,32 @@
           "fill:終了日時=2026-10-12T12:30",
           "fill:変える理由=会場の都合で時間を30分遅らせます",
           "変えてお知らせする"
-        ]
+        ],
+        "now": "2026-10-01T03:00:00.000Z",
+        "api": {
+          "match": "POST /api/events/admin/events/ev-1/change-review$",
+          "body": {
+            "event_id": "ev-1",
+            "impacts": [
+              {
+                "slot_id": "event-slot-1",
+                "starts_at": "2026-10-12T01:30:00.000Z",
+                "ends_at": "2026-10-12T03:30:00.000Z",
+                "capacity": 12,
+                "confirmed_seats": 10,
+                "waiting_seats": 2,
+                "pending_reminders": 10,
+                "errors": [],
+                "notices": []
+              }
+            ],
+            "event_notices": [],
+            "blocked": false,
+            "total_confirmed": 10,
+            "total_waiting": 2,
+            "total_pending_reminders": 10
+          }
+        }
       }
     },
     "qVdiX": {
