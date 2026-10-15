@@ -304,7 +304,7 @@ function VersionsInner() {
         {detail.bindings.length === 0 ? (
           <p className={styles.cardLead}>まだどこからも呼ばれていません。</p>
         ) : (
-          <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--polish-table-row)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
+          <Card padding="none" overflow="hidden"><DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--polish-table-row)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
               <thead>
                 <TableHeadRow data-table-layout="columns">
                   <Th grow>利用先</Th>
@@ -344,10 +344,10 @@ function VersionsInner() {
                   </Tr>
                 ))}
               </tbody>
-            </DataTable>
+            </DataTable></Card>
         )}
       </section>
-      <Notice tone="info">更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</Notice>
+      <Notice tone="info" presentation="account-note" icon={null}>更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</Notice>
 
       <Dialog
         open={Boolean(pendingBinding && published)}
