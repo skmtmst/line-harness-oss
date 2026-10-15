@@ -11,6 +11,7 @@ import type { BookingRequest } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
   staffMe: vi.fn(),
+  push: vi.fn(),
   listRequests: vi.fn(),
   requestsSummary: vi.fn(),
   listMenus: vi.fn(),
@@ -24,7 +25,7 @@ const fixture = vi.hoisted(() => ({
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: fixture.push }),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -116,7 +117,7 @@ function monthBounds(): { from: string; to: string } {
 }
 
 describe('監査 R90: 今月は今月の予約に絞る', () => {
-  it('今月の数の帯には項目の印があり、今日の表示は保つ', async () => {
+  it('今月と今日の数の帯には、それぞれ項目の印がある', async () => {
     render(<BookingsPage />)
     fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
     for (const [title, icon] of [['今月の予約', 'calendar'], ['確定', 'calendar-plus'], ['変更依頼', 'circle-alert'], ['キャンセル', 'calendar-x']]) {
@@ -124,7 +125,10 @@ describe('監査 R90: 今月は今月の予約に絞る', () => {
       expect(label.closest('[data-kpi-label]')?.querySelectorAll(`[data-kpi-icon] svg.lucide-${icon}`)).toHaveLength(1)
     }
     fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: /^今日/ }))
-    expect(document.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
+    for (const [title, icon] of [['今日の予約', 'calendar-days'], ['まだ空いている枠', 'calendar-plus'], ['未承認・要対応', 'circle-alert'], ['キャンセル', 'calendar-x']]) {
+      const label = await screen.findByText(title, { selector: '[data-kpi-label] > span' })
+      expect(label.closest('[data-kpi-label]')?.querySelectorAll(`[data-kpi-icon] svg.lucide-${icon}`)).toHaveLength(1)
+    }
   })
   it('今月の題から一覧とCSVの説明を開ける', async () => {
     render(<BookingsPage />)
@@ -153,6 +157,28 @@ describe('監査 R90: 今月は今月の予約に絞る', () => {
     })
     // 対象の期間と状態を画面に明示する。
     expect(screen.getByRole('status').textContent).toMatch(/今月（\d+年\d+月）の予約を/)
+  })
+  it('月を進めた一覧とCSVは同じ期間になり、今日で今月へ戻る', async () => {
+    fixture.downloadLedgerCsv.mockResolvedValue(undefined)
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '次の月' }))
+    const now = new Date(Date.now() + 9 * 3600_000)
+    const key = (offset: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString().slice(0, 7)
+    const expected = {
+      from: new Date(`${key(1)}-01T00:00:00+09:00`).toISOString(),
+      to: new Date(`${key(2)}-01T00:00:00+09:00`).toISOString(),
+    }
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(expected)))
+    fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
+    await waitFor(() => expect(fixture.downloadLedgerCsv).toHaveBeenCalledWith('account-a', expect.objectContaining(expected)))
+    expect(screen.getByRole('status').textContent).toContain('月の予約を')
+    expect(JSON.parse(sessionStorage.getItem('booking-ledger-state-v1')!).date).toBe(`${key(1)}-01`)
+    fireEvent.click(screen.getByRole('button', { name: '前の月' }))
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(monthBounds())))
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }))
+    fireEvent.click(within(document.querySelector('[data-template-region="stats"]') as HTMLElement).getByRole('button', { name: '今日' }))
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(monthBounds())))
   })
 })
 
@@ -230,3 +256,15 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
      expect(fixture.availability).not.toHaveBeenCalled()
    })
  })
+
+
+it('予約の一覧は右端のメニューからその人の会話を開く', async () => {
+  render(<BookingsPage />)
+  fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: '一覧' }))
+  const menu = await screen.findByRole('button', { name: '予約「花子」の操作' })
+  expect(screen.queryByRole('menuitem', { name: '会話を開く' })).toBeNull()
+  fireEvent.click(menu)
+  fireEvent.click(await screen.findByRole('menuitem', { name: '会話を開く' }))
+  expect(fixture.push).toHaveBeenCalledWith(expect.stringContaining('/chats?friend=f1'))
+  expect(fixture.getBooking).not.toHaveBeenCalled()
+})

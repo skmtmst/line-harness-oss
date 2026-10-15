@@ -74,6 +74,13 @@
   }
 }
 
+/* 型（ListPage）のフォルダの列の中に置くとき（統括の設定）。幅・余白・仕切り線は型が持つ。 */
+.folder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-setnav-gap);
+}
+
 /* 見出し「設定」（11px・太字・薄い字）。 */
 .heading {
   margin: 0;

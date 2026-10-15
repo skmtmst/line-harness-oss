@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CircleX, GitBranch, RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -137,7 +138,7 @@ export default function UpdateHistoryV8() {
       {rows.length === 0 ? (
         <ListState kind="empty" title="更新の記録はまだありません" />
       ) : (
-        <GridTable label="管理画面の更新" design={{ columns: 'var(--sett-history-columns)', gap: 'var(--tpl-rest3-uh-gap)', rowPadding: 'var(--tpl-rest3-uh-row-pad)', rowHeight: 'var(--tpl-rest3-uh-row-h)', headHeight: 'var(--tpl-rest3-uh-head-h)', fontSize: 'var(--tpl-rest3-em-body)', lineHeight: 'var(--tpl-rest3-em-td-lh)', headFontSize: 'var(--tpl-rest3-em-th)', headLineHeight: 'var(--tpl-rest3-em-th-lh)', headColor: 'var(--color-ink-faint)', headBackground: 'var(--color-surface-pearl)' }} className={styles.table}>
+        <Card padding="rows" overflow="hidden"><GridTable label="管理画面の更新" design={{ columns: 'var(--sett-history-columns)', gap: 'var(--tpl-rest3-uh-gap)', rowPadding: 'var(--tpl-rest3-uh-row-pad)', rowHeight: 'var(--tpl-rest3-uh-row-h)', headHeight: 'var(--tpl-rest3-uh-head-h)', fontSize: 'var(--tpl-rest3-em-body)', lineHeight: 'var(--tpl-rest3-em-td-lh)', headFontSize: 'var(--tpl-rest3-em-th)', headLineHeight: 'var(--tpl-rest3-em-th-lh)', headColor: 'var(--color-ink-faint)', headBackground: 'var(--color-surface-pearl)' }} className={styles.table}>
           <div role="rowgroup">
             <GridHeadRow>
               <GridCell role="columnheader">開始</GridCell>
@@ -162,7 +163,7 @@ export default function UpdateHistoryV8() {
               )
             })}
           </div>
-        </GridTable>
+        </GridTable></Card>
       )}
 
       <div className={styles.foot}>

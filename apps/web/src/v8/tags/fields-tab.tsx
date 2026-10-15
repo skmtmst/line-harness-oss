@@ -2,7 +2,7 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, List, Pencil, Plus, Users } from 'lucide-react';
+import { ClipboardList, List, Pencil, Plus, Send, Users } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
@@ -244,7 +244,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   const rowMenuItems = (field: FriendField): ActionMenuItem[] => {
     if (host) return canEdit ? [
       { id: 'edit', label: '編集', onSelect: () => host.onEdit(field.id) },
-      { id: 'distribute', label: '配る', onSelect: () => host.onDistribute(field.id) },
+      { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, disabled: host.busy, onSelect: () => host.onDistribute(field.id) },
       { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(field.id) },
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openFieldDetail(field.id) }]

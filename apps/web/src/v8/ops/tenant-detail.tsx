@@ -1,7 +1,7 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
 import type { FormRequirement } from '@/lib/form-requirement'
-import { ChevronLeft, LogIn } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
@@ -32,6 +32,7 @@ import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import TenantOverviewStats from './tenant-overview-stats'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -124,7 +125,7 @@ function DetailContent() {
   if (!detail) {
     return (
       <PageFrame kind="detail" boardId="Oub6x" standalone>
-        <OpsHead title="契約先アカウント" environment={environment} actions={<BackToList />} />
+        <OpsHead title="契約先アカウント" environment={environment} />
         <div className={parts.panel}>
           {error
             ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
@@ -147,9 +148,9 @@ function DetailContent() {
         title={tenant.name}
         description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at).replace(/-/g, '/')} から`}
         environment={environment}
+        stats={<TenantOverviewStats detail={detail} />}
         actions={(
           <>
-            <BackToList />
             {!readOnly && tenant.status === 'active' ? <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
             <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><LogIn aria-hidden="true" />代理ログイン（閲覧のみ）</Button>
             {readOnly ? null : tenant.status === 'active'
@@ -305,14 +306,6 @@ function DetailContent() {
         />
       ) : null}
     </PageFrame>
-  )
-}
-
-function BackToList() {
-  return (
-    <Button href="/ops/tenants">
-      <ChevronLeft aria-hidden="true" />一覧へ
-    </Button>
   )
 }
 

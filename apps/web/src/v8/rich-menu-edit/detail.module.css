@@ -9,7 +9,7 @@
 .loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
 
 .split { display: flex; flex: 1; min-width: 0; }
-.content { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-content-gap); min-width: 0; padding: var(--tpl-eds-content-pad); }
+.content { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-content-gap); min-width: 0; }
 .aside { display: flex; flex-direction: column; flex-shrink: 0; gap: var(--tpl-eds-aside-gap); width: var(--tpl-eds-aside-w); padding: var(--tpl-eds-aside-pad); border-left: 1px solid var(--color-hairline); }
 
 /* 終わった帯（薄い緑）・止まった帯（琥珀）。 */
@@ -25,13 +25,12 @@
 .notice { margin: 0; color: var(--color-ink); font-size: var(--text-caption); }
 .errorText { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 
-.card { display: flex; flex-direction: column; gap: var(--tpl-eds-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
 .cardTitles { display: flex; flex-direction: column; gap: var(--tpl-eds-title-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 
 /* 公開の進み：段（余白10/0・下に線）。名前 13・済み 12/600 緑。 */
-.stepRow { display: flex; align-items: center; gap: var(--tpl-eds-action-gap); padding: var(--tpl-eds-row-pad); box-shadow: var(--shadow-row-line); }
+.stepRow { display: flex; align-items: center; gap: var(--tpl-eds-action-gap); padding: var(--tpl-eds-step-pad); box-shadow: var(--shadow-row-line); }
 .stepOk { flex-shrink: 0; color: var(--color-accent-deep); }
 .stepNg { flex-shrink: 0; color: var(--color-status-danger); }
 .stepQuiet { flex-shrink: 0; color: var(--color-ink-faint); }
@@ -48,8 +47,6 @@
 .checkText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-back-gap); min-width: 0; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 .diffTitle { font-weight: 600; }
 .diffList { margin: 0; padding-left: var(--tpl-eds-change-pad); }
-.ghostButton { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: var(--tpl-eds-ghost-gap); height: var(--tpl-eds-ghost-h); padding: var(--tpl-eds-ghost-pad); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-chip-label-lh); white-space: nowrap; cursor: pointer; }
-.ghostButton:hover { background: var(--color-canvas); }
 .runList { display: flex; flex-direction: column; }
 .runRow { display: flex; align-items: center; gap: var(--tpl-eds-head-gap); padding: var(--tpl-eds-about-row-pad); box-shadow: var(--shadow-row-line); }
 .runText { min-width: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
@@ -57,15 +54,16 @@
 .linkButton { min-height: 0; padding: 0; border: 0; background: transparent; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
 
 /* 右の列：操作（編集する・切替のつながり は同じ幅、…は36角）と、いまの状態の箱。 */
-.sideActions { display: flex; gap: var(--tpl-eds-side-actions-gap); }
-.sideActions > :not(.moreButton) { flex: 1 1 0; min-width: 0; }
-/* 「…」は共通の RowMenu。今の見た目（墨の色・大きさ・乗せても地を変えない）を共通の印ボタンより強く当てる。 */
-.sideActions > button.moreButton { display: inline-flex; width: var(--tpl-eds-more); flex: 0 0 var(--tpl-eds-more); align-items: center; justify-content: center; height: var(--tpl-eds-more); padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
-.sideActions > button.moreButton:hover { background: var(--color-canvas); }
+.sideActions { display: flex; flex-wrap: wrap; gap: var(--tpl-eds-side-actions-gap); }
+.sideActions > a { flex: 1 1 0; min-width: 0; }
 .roBand { margin: 0; }
 .aboutBox { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); padding: var(--tpl-eds-about-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 .aboutTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }
 .aboutList { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); margin: 0; }
 .aboutRow { display: flex; align-items: center; gap: var(--tpl-eds-about-row-gap); padding: var(--tpl-eds-about-row-pad); box-shadow: var(--shadow-row-line); }
 .aboutRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); white-space: nowrap; }
+.aboutRow > dd.stateOk { color: var(--color-accent-deep); }
+.checkIcon { flex-shrink: 0; color: var(--color-accent-deep); }
 .aboutRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
+
+.aboutRow > dd.stateOk { color: var(--color-accent-deep); }

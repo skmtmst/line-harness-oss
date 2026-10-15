@@ -14,11 +14,22 @@ import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
 import { normalizeActionLabel } from './action-words'
 
-function hasDetail(node: ReactNode): boolean {
-  return React.Children.toArray(node).some(child => {
-    if (typeof child === 'string' || typeof child === 'number') return String(child).trim().length > 0
-    return React.isValidElement<{ children?: ReactNode }>(child) && hasDetail(child.props.children)
-  })
+function detailText(node: ReactNode): string {
+  return React.Children.toArray(node).map(child => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child)
+    return React.isValidElement<{ children?: ReactNode }>(child) ? detailText(child.props.children) : ''
+  }).join('')
+}
+
+/**
+ * 題の終わりの「（…）」（添え書き）は、マスに入らないときだけ行ごと隠す。本体の言葉は切らない。
+ * 「始まる見込み（試算）」が狭いマスで「始まる見込み（…」と切れていた（ARuZ4・PMLkX・Al4Ek・nMSiE・kz2B6）。
+ * 全文は title と読み上げで残る。添え書きの無い題は今までどおり。
+ */
+function titleParts(title: string) {
+  const m = /^(.+?)(（[^（）]+）)$/u.exec(title)
+  if (!m) return title
+  return <><span className={styles.labelMain}>{m[1]}</span><span className={styles.labelQualifier}>{m[2]}</span></>
 }
 
 /** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
@@ -72,8 +83,11 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
-  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
-  detailLayout?: 'qualifier'
+  /**
+   * 'qualifier'：説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。
+   * 'single'：帯の補足を1行＋省略にする（全文は title）。狭いマスで最後の1字だけ次の行に落ちる文に使う。
+   */
+  detailLayout?: 'qualifier' | 'single'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
@@ -195,6 +209,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"
@@ -216,11 +231,11 @@ export default function KpiCard({
             </span>
           )}
           {hasTip && helpDisplay === 'label' ? (
-            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{title}</span>}>
+            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{titleParts(title)}</span>}>
               {explanation}
             </HelpTip>
           ) : <span className={styles.labelText}>
-            {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
+            {title ? titleParts(title) : (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           </span>}
           {hasTip && helpDisplay === 'question' ? (
             <HelpTip label={explanationLabel} className={styles.tip}>
@@ -260,8 +275,8 @@ export default function KpiCard({
       </div>
 
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
-      <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
-        <span role="note" className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
+      <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || action) || undefined} className={styles.detail}>
+        <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}

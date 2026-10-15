@@ -37,7 +37,7 @@ import {
 export const PERIODS = [
   { key: 'today', label: '今日' },
   { key: 'last7', label: '過去7日' },
-  { key: 'last28', label: '過去28日' },
+  { key: 'last30', label: '過去30日' },
 ] as const
 
 export type PeriodKey = (typeof PERIODS)[number]['key']
@@ -65,8 +65,8 @@ export function useDashboard() {
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
 
-  /* 期間・編集中は URL に残す（`?period=&edit=1`）。v7 と同じ名前・同じ意味。 */
-  const periodParam = params.get('period')
+  /* 期間・編集中は URL に残す。旧28日のURLも、現在の30日集計で開く。 */
+  const periodParam = params.get('period') === 'last28' ? 'last30' : params.get('period')
   const editParam = params.get('edit')
   const [period, setPeriodState] = useState<PeriodKey>(() => (
     PERIODS.some((item) => item.key === periodParam) ? (periodParam as PeriodKey) : 'today'

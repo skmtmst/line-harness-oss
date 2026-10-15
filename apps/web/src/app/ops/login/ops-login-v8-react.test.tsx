@@ -40,6 +40,9 @@ describe('運営ログインのV8（D9JALJ）', () => {
     expect(host.textContent).toContain('この画面は運営メンバーだけが開けます')
     // LINEで入る口は残す（LINEで登録した運営メンバーを締め出さない）。
     expect(host.textContent).toContain('LINE でログイン')
+    const title = host.querySelector('#ops-login-title')!
+    expect(title.parentElement?.querySelector('button')).toBeNull()
+    expect(host.querySelector('form')?.parentElement?.textContent).toContain('運営メンバーの招待を受けた方は、招待メールのリンクから設定してください')
   })
 
   it('旧テーマの指定が残っていてもV8とLINEログインの口を出す', async () => {

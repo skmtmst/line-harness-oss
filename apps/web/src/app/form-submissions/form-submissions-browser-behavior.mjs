@@ -728,7 +728,7 @@ try {
     for (const right of await dialog.locator('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
       assert.ok(right <= 390, `R26: 動作の操作が画面に収まる（右端 ${Math.round(right)}px）`)
     }
-    await dialog.getByRole('button', { name: 'この 1件にする', exact: true }).click()
+    await dialog.getByRole('button', { name: '選ぶ（1件）', exact: true }).click()
     await dialog.waitFor({ state: 'detached' })
     const action = page.locator('[data-action-row]')
     assert.equal(await action.count(), 1, '対象を確定した行だけ追加する')

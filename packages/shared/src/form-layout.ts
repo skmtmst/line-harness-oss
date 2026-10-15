@@ -2,6 +2,8 @@ import type { FormChoice, FormAction } from './form-choice-types.js';
 export type { FormChoice, FormAction } from './form-choice-types.js';
 import type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
 export type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
+import { isCalendarDateString } from './form-calendar-date.js'
+export { isCalendarDateString } from './form-calendar-date.js'
 import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
 import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
@@ -360,19 +362,6 @@ export function isFormAnswerEmpty(value: unknown): boolean {
     );
   }
   return false;
-}
-
-/** YYYY-MM-DD の形で、暦に存在する日付か（2/30 や 13/40 を通さない）。 */
-export function isCalendarDateString(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getUTCFullYear() === Number(match[1]) &&
-    date.getUTCMonth() + 1 === Number(match[2]) &&
-    date.getUTCDate() === Number(match[3])
-  );
 }
 
 /** 「その他」の選択肢がある設問で、回答値が自由記入の値（どの選択肢ラベルでもない文字列）か。 */

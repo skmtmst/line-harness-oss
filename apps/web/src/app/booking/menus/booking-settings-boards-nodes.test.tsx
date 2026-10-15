@@ -60,6 +60,7 @@ describe('予約設定の板と、型が渡す権限・見本', () => {
   it('受付枠の見本を共通の窓で開き、実際のお客さま画面への入口も保つ', async () => {
     state.tab = 'hours'; state.narrow = true
     await draw()
+    expect(screen.getAllByRole('link', { name: 'お客さまに見える画面を確かめる' }).some(link => !link.closest('[role="dialog"]'))).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方を見る' }))
     const dialog = screen.getByRole('dialog', { name: 'お客さまの予約画面' })
     expect(dialog.textContent).toContain('お客さまに見える画面を確かめる')

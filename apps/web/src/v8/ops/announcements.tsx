@@ -1,7 +1,9 @@
 'use client'
+
+import { shortPublishAt, longPublishAt } from './announcement-dates'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
-import { Send } from 'lucide-react'
+import { Pencil, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
@@ -16,6 +18,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Radio from '@/components/shared/radio'
+import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -83,21 +86,6 @@ function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementCha
   if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked} 人へ届きます`)
   if (channels.includes('email')) words.push(`メールは${p.withEmail} 人に届きます`)
   return words.join('。')
-}
-
-/** 「2026-10-05T10:00」を「10/5 10:00」にする。送るボタンの文字用。 */
-function shortPublishAt(local: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim())
-  if (!match) return local.trim()
-  return `${Number(match[2])}/${Number(match[3])} ${match[4]}:${match[5]}`
-}
-
-/** 「10/5（月）10:00」の形。 */
-function longPublishAt(local: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim())
-  if (!match) return local.trim()
-  const week = '日月火水木金土'[new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getDay()]
-  return `${Number(match[2])}/${Number(match[3])}（${week}）${match[4]}:${match[5]}`
 }
 
 /** 一覧の小さい日時（9/18 10:00）。 */
@@ -448,11 +436,16 @@ export default function OpsAnnouncementsV8() {
                   <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">
-                    {readOnly || a.status === 'sending'
+                    {/* 行の右端は「…」1つ（B-253）。閲覧のみは押せる操作が無いので出さない。送信中は中身の無い「…」（使える操作はありません）。 */}
+                    {readOnly
                       ? <span className={styles.faint}>{emptyValue('unknown')}</span>
-                      : a.status === 'draft' || a.status === 'scheduled'
-                        ? <Button onClick={() => edit(a)} disabled={busy} aria-label={`「${a.subject}」を直す`}>直す</Button>
-                        : <Button onClick={() => copyAsNew(a)} disabled={busy} aria-label={`「${a.subject}」を元に新しく作る`} title="送ったものは直せないので、中身を写して新しいお知らせを作ります">直す</Button>}
+                      : <RowMenu
+                          label={`「${a.subject}」の操作`}
+                          size="row"
+                          items={a.status === 'sending' ? [] : a.status === 'draft' || a.status === 'scheduled'
+                            ? [{ id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => edit(a) }]
+                            : [{ id: 'edit', label: '編集する', description: '送ったものは変えず、中身を写して新しく作ります', icon: <Pencil size={14} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => copyAsNew(a) }]}
+                        />}
                   </span>
                 </div>
               ))}

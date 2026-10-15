@@ -151,6 +151,13 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
     expect(screen.queryByRole('link', { name: '友だち一覧で条件を作る' })).toBeNull()
     expect(screen.getByPlaceholderText('条件名で探す')).toBeTruthy()
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(panel.textContent).toContain('この条件を保存')
+    expect(panel.hidden).toBe(false)
+    await act(async () => { fireEvent.click(toggle) })
+    expect(panel.hidden).toBe(true)
+    expect(screen.getByPlaceholderText('条件名で探す')).toBeTruthy()
   })
 
   it('保存した検索の説明は題から開閉し、条件作成のリンクには検索の印を出す', async () => {

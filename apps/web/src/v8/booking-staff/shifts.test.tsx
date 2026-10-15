@@ -164,7 +164,7 @@ describe('勤務とシフト（管理者）', () => {
   test('休憩は月〜金の1行で出し、保存のときは曜日ごとに広げて今のIDを付けて送る', async () => {
     render(<StaffShiftsV8 staffId="bs-1" />)
     expect(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })).toBeTruthy()
-    const saveButtons = screen.getAllByRole('button', { name: '保存' })
+    const saveButtons = screen.getAllByRole('button', { name: '保存する' })
     fireEvent.click(saveButtons[1])
     await waitFor(() => { expect(fixture.putBreaks).toHaveBeenCalled() })
     const rows = fixture.putBreaks.mock.calls[0][3] as Array<{ id?: string; weekday: number }>
@@ -176,7 +176,7 @@ describe('勤務とシフト（管理者）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' }))
     fireEvent.click(screen.getByRole('checkbox', { name: '水' }))
     expect(screen.getByRole('button', { name: '休憩の曜日（月・火・木・金）を選ぶ' })).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: '保存' })[1])
+    fireEvent.click(screen.getAllByRole('button', { name: '保存する' })[1])
     await waitFor(() => { expect(fixture.putBreaks).toHaveBeenCalled() })
     const rows = fixture.putBreaks.mock.calls[0][3] as Array<{ weekday: number }>
     expect(rows.map((r) => r.weekday)).toEqual([1, 2, 4, 5])
@@ -186,7 +186,7 @@ describe('勤務とシフト（管理者）', () => {
     fixture.rules = [{ weekday: 1, start_time: '19:00', end_time: '10:00' }]
     render(<StaffShiftsV8 staffId="bs-1" />)
     await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
-    fireEvent.click(screen.getAllByRole('button', { name: '保存' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: '保存する' })[0])
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(fixture.putRules).not.toHaveBeenCalled()
     const end = document.querySelector('[aria-label="月曜日の終わり"]') as HTMLElement
@@ -202,7 +202,7 @@ describe('勤務とシフト（管理者）', () => {
     fixture.myStaff = [STAFF]
     render(<StaffShiftsV8 staffId="bs-1" />)
     expect(await screen.findByText(/閲覧のみです/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /休憩を足す/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /この日を足す/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /の休憩を削除/ })).toBeNull()
@@ -263,7 +263,7 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
       ? Promise.resolve(refreshedRules)
       : rulesReload.promise)
     fixture.getAvailability.mockReturnValueOnce(previewReload.promise)
-    await act(async () => { fireEvent.click(week().getByRole('button', { name: '保存' })) })
+    await act(async () => { fireEvent.click(week().getByRole('button', { name: '保存する' })) })
     await waitFor(() => expect(fixture.getRules).toHaveBeenCalledTimes(2))
     expect(fixture.putRules).toHaveBeenCalledExactlyOnceWith('account-a', 'bs-1', refreshedRules.rules)
 
@@ -280,7 +280,7 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
     // 保存通知やPUTの呼び出しでは終わりにしない。予約枠の再取得も返して、
     // 保存ボタンが戻った後に、取り直したDOMと実際の保存内容の両方を見る。
     await act(async () => { previewReload.resolve({ by_staff: [], closed_dates: [] }) })
-    await waitFor(() => expect(week().getByRole('button', { name: '保存' }).hasAttribute('disabled')).toBe(false))
+    await waitFor(() => expect(week().getByRole('button', { name: '保存する' }).hasAttribute('disabled')).toBe(false))
     expect(input('休憩の始まり').value).toBe('12 : 00')
     const end = timing === '入力後に返る' ? '12:30' : '12:45'
     expect(input('休憩の終わり').value).toBe(end.replace(':', ' : '))
@@ -288,7 +288,7 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
     expect(fixture.getBreaks).toHaveBeenCalledTimes(1)
     expect(fixture.putBreaks).not.toHaveBeenCalled()
 
-    await act(async () => { fireEvent.click(breaks().getByRole('button', { name: '保存' })) })
+    await act(async () => { fireEvent.click(breaks().getByRole('button', { name: '保存する' })) })
     expect(fixture.putBreaks).toHaveBeenCalledExactlyOnceWith('account-a', 'bs-1', 'v1',
       [1, 2, 4, 5].map((weekday) => ({ id: `bb-${weekday}`, weekday, start_time: '12:00', end_time: end })))
   },
@@ -328,7 +328,7 @@ test.each(['毎週の休憩','この日だけの休憩','休み'] as const)('SL-
   render(<StaffShiftsV8 staffId="bs-1"/>)
   await screen.findByRole('combobox',{name:'休憩の始まり'})
   await waitFor(()=>expect(fixture.getAvailability).toHaveBeenCalledTimes(1))
-  if(kind==='毎週の休憩') await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
+  if(kind==='毎週の休憩') await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存する'})[1])})
   else await addSpecialDay(kind==='休み'?'休み':'休憩')
   await waitFor(()=>expect(fixture.getAvailability).toHaveBeenCalledTimes(2))
 })
@@ -338,13 +338,13 @@ test('SL-C03: 毎週の休憩が409でも入力を残し、本人が最新を読
   await screen.findByRole('combobox',{name:'休憩の始まり'})
   setTime('休憩の始まり','12:00')
   await waitFor(()=>expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('12:00'))
-  await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
+  await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存する'})[1])})
   expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('12:00')
   expect(fixture.getBreaks).toHaveBeenCalledTimes(1)
   fixture.getBreaks.mockResolvedValue({version:'v10',breaks:[{id:'latest',weekday:1,start_time:'16:00',end_time:'17:00'}]})
   fireEvent.click(screen.getByRole('button',{name:'最新を読み込んで続ける'}))
   await waitFor(()=>expect((screen.getByRole('combobox',{name:'休憩の始まり'}) as HTMLInputElement).title).toBe('16:00'))
-  await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存'})[1])})
+  await act(async()=>{fireEvent.click(screen.getAllByRole('button',{name:'保存する'})[1])})
   expect(fixture.putBreaks.mock.calls[1][2]).toBe('v10')
 })
 test('SL-C03: 日付付き休憩も409では編集を残し、選んだ読み直しの失敗でも残す',async()=>{
@@ -364,6 +364,16 @@ test('SL-C03: 日付付き休憩も409では編集を残し、選んだ読み直
   expect(screen.getByRole('button',{name:'休憩 16:00〜17:00'})).toBeTruthy()
 })
 
+test('畳んだ予約画面を中身の名前で開き、閉じても勤務の値を保つ', async () => {
+  render(<StaffShiftsV8 staffId="bs-1" />)
+  const launcher = await screen.findByRole('button', { name: 'お客さまの予約画面を見る' })
+  const times = screen.getAllByRole('combobox').map(node => (node as HTMLInputElement).value)
+  fireEvent.click(launcher)
+  const dialog = await screen.findByRole('dialog', { name: 'お客さまの予約画面' })
+  expect(within(dialog).getByText(/予約画面のURLがまだありません/)).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  expect(screen.getAllByRole('combobox').map(node => (node as HTMLInputElement).value)).toEqual(times)
+})
 
 test('勤務の5段は共通の見出しを使い、保存の操作と入力の役目を保つ', async () => {
   render(<StaffShiftsV8 staffId="bs-1" />)
@@ -373,7 +383,7 @@ test('勤務の5段は共通の見出しを使い、保存の操作と入力の�
     expect(heading.closest('[data-design-node="t0jk8p"]')).toBeTruthy()
     expect(heading.closest('section')?.getAttribute('aria-labelledby')).toBe(heading.id)
   }
-  expect(screen.getAllByRole('button', { name: '保存', exact: true })).toHaveLength(2)
+  expect(screen.getAllByRole('button', { name: '保存する', exact: true })).toHaveLength(2)
   expect(screen.getByRole('button', { name: '月〜金 13:00〜14:00 の休憩を削除' }).getAttribute('data-design-node')).toBe('H0V8EK')
   expect(within(document.querySelector('[aria-labelledby="bks-gen"]') as HTMLElement).getAllByText('必須')).toHaveLength(2)
   const weeks = screen.getByRole('spinbutton', { name: 'まとめて作る週の数' })

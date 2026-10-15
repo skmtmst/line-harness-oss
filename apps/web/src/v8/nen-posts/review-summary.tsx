@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ArrowUpDown } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 
@@ -21,6 +22,6 @@ const PUBLICATION_RULES: readonly ReactNode[] = [
 
 export function PublicationRules({ canEdit, busy, onOrder }: { canEdit: boolean; busy: boolean; onOrder: () => void }) {
   return <CreateSummaryCard title="出すときの決めごと" rows={[]} descriptionItems={PUBLICATION_RULES}>
-    {canEdit ? <Button variant="secondary" disabled={busy} onClick={onOrder} busy={busy} busyLabel="処理中…">並び順を変える</Button> : null}
+    {canEdit ? <Button variant="secondary" disabled={busy} onClick={onOrder} busy={busy} busyLabel="処理中…"><ArrowUpDown size={14} aria-hidden="true" />並び順を変える</Button> : null}
   </CreateSummaryCard>
 }

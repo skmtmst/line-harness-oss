@@ -113,6 +113,7 @@ export default function ListToolbar({
   secondary,
   sort,
   layout = 'band',
+  preserveFilterChips = false,
 }: {
   sort?: ListToolbarSortProps
   search?: ListToolbarSearch
@@ -122,6 +123,8 @@ export default function ListToolbar({
   actions?: ReactNode
   /** 2行目・左。札・日付などの絞り込み。 */
   filters?: ReactNode
+  /** 札を選ぶ欄へ畳まず、直接押せる形を保つ。既定は従来の実寸判定。 */
+  preserveFilterChips?: boolean
   /** 2行目・右端。並び順と表示件数。 */
   trailing?: ReactNode
   /** 友だち・一斉配信の状態など、足してよい2段目。 */
@@ -152,9 +155,9 @@ export default function ListToolbar({
       </div>
       {filters || secondary || actions || trailing || sort || trailingAccessory ? (
         <div className={styles.row2} data-toolbar-row>
-          {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}{secondary}</div> : null}
+          {filters || secondary ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters, preserveFilterChips)}{secondary}</div> : null}
           {actions ? <span className={styles.actions} data-toolbar-actions>{actions}</span> : null}
-          {trailing || sort || trailingAccessory ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>)}</div> : null}
+          {trailing || sort || trailingAccessory ? <div className={styles.trailing} data-toolbar-tools data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</>, trailingAccessory)}</div> : null}
         </div>
       ) : null}
     </div>
@@ -202,14 +205,19 @@ export function ListToolbarSearchSlot({ children, width, search }: { children?: 
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
   const { trailingAccessory } = useContext(LeadingContext)
-  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(<>{trailingAccessory}{children}</>)}</span>
+  return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(children, trailingAccessory)}</span>
 }
 
 /** B-244: the shared end owns order; keep each control and its handler intact. */
-function orderedTrailingTools(nodes: ReactNode): ReactNode[] {
+function orderedTrailingTools(nodes: ReactNode, accessory?: ReactNode): ReactNode[] {
   const flatten = (items: ReactNode): ReactNode[] => Children.toArray(items).flatMap(node => isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment ? flatten(node.props.children) : [node])
   const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2 })[toolbarRole(node)]
-  return flatten(nodes).sort((a, b) => rank(a) - rank(b))
+  const tools = flatten(nodes).sort((a, b) => rank(a) - rank(b))
+  if (!accessory) return tools
+  // 一覧の操作の説明（？）は、絞り込み・並びのあと、件数の直前（OylSV・uNsEy）。
+  const at = tools.findIndex(node => rank(node) === 2)
+  const keyed = isValidElement(accessory) && accessory.key == null ? cloneElement(accessory, { key: 'list-help' }) : accessory
+  return at < 0 ? [...tools, keyed] : [...tools.slice(0, at), keyed, ...tools.slice(at)]
 }
 
 /** B-244/266: retain named tools; an overflow group keeps its explicit name. */
@@ -286,23 +294,23 @@ function contentSizedSelects(node: ReactNode): ReactNode {
   return node
 }
 
-function compactFilterGroups(node: ReactNode): ReactNode {
+function compactFilterGroups(node: ReactNode, preserveChips = false): ReactNode {
   const children = Children.toArray(node)
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
-    return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
+    return <ResponsiveFilterChips preserveChips={preserveChips}>{children}</ResponsiveFilterChips>
   return children.map(child => {
     if (isValidElement(child) && child.type === ResponsiveFilterChips) return child
     if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
       return contentSizedSelect(child)
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
-      const nested = compactFilterGroups(child.props.children)
+      const nested = compactFilterGroups(child.props.children, preserveChips)
       // Field wrappers receive one control, not a one-element children array.
       return cloneElement(child, {}, Array.isArray(nested) && nested.length === 1 ? nested[0] : nested)
     }
     return child
   })
 }
-export function ResponsiveFilterChips({ children, label = '状態' }: { children: ReactNode; label?: string }) {
+export function ResponsiveFilterChips({ children, label = '状態', preserveChips = false }: { children: ReactNode; label?: string; preserveChips?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null)
   const unfoldedWidth = useRef(0)
   const [collapsed, setCollapsed] = useState(false)
@@ -312,7 +320,7 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
     const row = choices?.closest<HTMLElement>('[data-toolbar-row]')
     const flat = row && getComputedStyle(row).display === 'contents'
     const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') && !flat ? row ?? owner : owner
-    if (!choices || !toolbar || !window.ResizeObserver) return
+    if (preserveChips || !choices || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
@@ -326,16 +334,16 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
     measure()
     void document.fonts?.ready.then(measure)
     return () => { cancelAnimationFrame(frame); observer.disconnect() }
-  }, [children])
+  }, [children, preserveChips])
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
   const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)
   const allIndex = chips.findIndex(child => /^すべて(?:$|\s|[\d（(])/.test(text(child.props.children)))
   const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : allIndex >= 0 ? String(allIndex) : 'all'
-  return <span ref={ref} className={styles.filterChoices} data-filter-collapsed={collapsed || undefined}>
+  return <span ref={ref} className={styles.filterChoices} data-filter-collapsed={!preserveChips && collapsed || undefined}>
     <span className={styles.filterWide} data-filter-chips>{children}</span>
-    <span className={styles.filterNarrow}><Select size="content" label={label} aria-label={label} value={current}
+    {!preserveChips ? <span className={styles.filterNarrow}><Select size="content" label={label} aria-label={label} value={current}
       options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
-      onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span>
+      onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span> : null}
   </span>
 }

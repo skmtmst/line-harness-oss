@@ -1,10 +1,8 @@
 'use client'
-
 import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional } from '@/components/shared/list-toolbar';
-
 import { RowNameLink } from '@/components/shared/table';
 
 
@@ -17,9 +15,10 @@ import { RovingTbody } from '@/components/shared/row-roving';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
 
+import { useBroadcastFolderSelection } from './folder-selection'
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ArrowUpDown, Eye } from 'lucide-react';
+import { ArrowUpDown, Eye, Folder as FolderIcon } from 'lucide-react';
 import type { Folder, Tag } from '@line-crm/shared';
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api';
 import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message';
@@ -33,6 +32,8 @@ import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -226,6 +227,8 @@ export default function BroadcastListV8() {
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
+  /* 行を選んでまとめてフォルダへ移す（絵 l5V9a の左の選ぶ欄）。選ぶのはこのページの行だけ。 */
+  const bulkAnchorRef = useRef<HTMLButtonElement | null>(null)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
@@ -787,9 +790,9 @@ export default function BroadcastListV8() {
         aria-haspopup="dialog"
         aria-expanded={datePopoverOpen}
         onChange={() => setDatePopoverOpen((open) => !open)}
-        icon={<CalendarDays size={14} aria-hidden="true" />}
+        selectedIcon={false}
       >
-        {dateRangeLabel(dateFrom, dateTo)}
+        {dateRangeLabel(dateFrom, dateTo)}<CalendarDays size={14} aria-hidden="true" />
       </FilterChip>
       {datePopoverOpen ? (
         <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
@@ -953,10 +956,11 @@ export default function BroadcastListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
 
+  const selection = useBroadcastFolderSelection({ accountId: selectedAccountId || null, canEdit, broadcasts: visibleBroadcasts.filter(item => !isFromHeadquarters(item)), folders, onChanged: async () => { await loadList((page - 1) * pageSize); await loadFolders() } })
   const tableHead = (
     <thead>
       <TableHeadRow>
-        <Th className={styles.colTitle}>タイトル・内容</Th>
+        <Th className={styles.colTitle}>{selection.pageCheckbox}タイトル・内容</Th>
         <Th className={styles.colStatus}>状態</Th>
         {narrow ? null : <Th className={styles.colAudience}>配信条件</Th>}
         <Th className={styles.colDate}>配信日時</Th>
@@ -972,6 +976,7 @@ export default function BroadcastListV8() {
       <tbody>
         {[0, 1, 2, 3, 4].map((n) => (
           <Tr key={n} className={styles.row}>
+            <Td className={styles.selectCell} />
             <Td><Skeleton width={200} height={16} /><Skeleton width={140} height={12} /></Td>
             <Td><Skeleton width={72} height={22} className="rounded-pill" /></Td>
             {narrow ? null : <Td><Skeleton width={120} height={12} /></Td>}
@@ -1041,7 +1046,7 @@ export default function BroadcastListV8() {
                data-row-id={broadcast.id}
             >
               <Td>
-                <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
+                <FolderDotName folder={folderDotOf(broadcast.folderId)} selection={selection.checkbox(broadcast)}>{titleLink}</FolderDotName>
               </Td>
               <Td><StatusBadge broadcast={broadcast} />{isFromHeadquarters(broadcast) ? <HqMark /> : null}</Td>
               {narrow ? null : (
@@ -1106,7 +1111,6 @@ export default function BroadcastListV8() {
       </RovingTbody>
     </DataTable>
   )
-
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
       <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
@@ -1164,7 +1168,7 @@ export default function BroadcastListV8() {
       )}
       toolbar={toolbar}
       pagination={pager}
-      overlays={<>
+      overlays={<>{selection.overlays}
         <ActionMenu
           open={createMenuOpen}
           onClose={() => setCreateMenuOpen(false)}

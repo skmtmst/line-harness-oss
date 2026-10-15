@@ -1,7 +1,11 @@
 'use client'
 
+import { DAY_MS, definitionRange } from './list-export'
+
+import { downloadCsvBlob } from './list-export'
+
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
 import TruncatedText from '@/components/shared/truncated-text'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -11,13 +15,11 @@ import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel
 
 import { useFolderMove } from '@/components/shared/use-folder-move';
 import { moveConversionToFolder } from '@/lib/move-to-folder';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation';
-import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react';
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug, Eye } from 'lucide-react'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye } from 'lucide-react';
 import { ListPage } from '@/components/templates';
 import { ListPager } from '@/components/templates/list-page';
 import SearchField from '@/components/shared/search-field'
@@ -83,7 +85,6 @@ const FOLDER_UNFILED = 'unfiled'
 type PointSort = 'cv-desc' | 'value-desc' | 'name'
 
 const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
-const DAY_MS = 24 * 60 * 60 * 1000
 
 const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
   { value: 'cv-desc', label: '件数が多い順' },
@@ -106,24 +107,6 @@ const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: Rea
   { value: 'sourceStopped', label: '起点停止', icon: <CirclePause size={13} aria-hidden="true" /> },
   { value: 'unused', label: 'どこからも使われていない', icon: <CircleOff size={13} aria-hidden="true" /> },
 ]
-
-function definitionRange(days: number): { from: string; to: string } {
-  const end = new Date()
-  const start = new Date(end.getTime() - (days - 1) * DAY_MS)
-  const format = (value: Date) => new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(value)
-  return { from: format(start), to: format(end) }
-}
-
-function downloadCsvBlob(blob: Blob, filename: string): void {
-  const href = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = href
-  anchor.download = filename
-  anchor.click()
-  URL.revokeObjectURL(href)
-}
 
 function toEditForm(item: ConversionDefinitionListItem): EditForm {
   return {
@@ -890,11 +873,16 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const wideToolbar = (
     <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>
 
-      <ListToolbar
-        search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 160, value: query, onChange: setQuery }}
-        filters={filterChips}
-        secondary={<ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd>}
-      />
+      {/* 絵 r6dJFy：1段目「探す・状態の札」、2段目の右端に「よく使う絞り込み・並び・件数」。1段に詰めると札が選ぶ欄へ畳まれる。 */}
+      <ListToolbarFrame layout="stacked">
+        <ListToolbarRow>
+          <ListToolbarSearchSlot width={160} search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', value: query, onChange: setQuery }} />
+          {filterChips}
+        </ListToolbarRow>
+        <ListToolbarRow>
+          <ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd>
+        </ListToolbarRow>
+      </ListToolbarFrame>
     </div>
   )
 
@@ -907,9 +895,10 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
 
   /* ===== 右の詳細パネルと停止の確認 ===== */
   const detailCard = panelPoint ? (
-    <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}>
-      <div className={styles.panelHead}>
-
+    <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}
+      footer={canEdit && panelPoint.status !== 'stopped' ? <Button variant="danger-outline" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button> : undefined}>
+      <div className={styles.panelLine}>
+        <StatePill point={panelPoint} />
         <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
           ...(canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
             id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
@@ -919,16 +908,25 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
         ]} />
       </div>
-      <p className={styles.panelLine}>
-        <StatePill point={panelPoint} />
-        <span title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</span>
-      </p>
-      <p className={styles.panelText}>{`今月の成果：${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
-      <p className={styles.panelText}>{`使われている場所：${usageLabel(panelPoint)}`}</p>
+      <div className={styles.panelFact}>
+        <p className={styles.panelLabel}>何が起きたら数えるか</p>
+        <p className={styles.panelText} title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</p>
+      </div>
+      <div className={styles.panelFact}>
+        <p className={styles.panelLabel}>今月の成果</p>
+        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
+      </div>
+      <div className={styles.panelFact}>
+        <p className={styles.panelLabel}>使われている場所</p>
+        <p className={styles.panelText}>{usageLabel(panelPoint)}</p>
+      </div>
       {panelPoint.measureMethod === 'webhook' ? (
-        <p className={styles.panelText}>
-          {`受け口：POST /api/conversions/ingest/${panelPoint.id}${panelPoint.ingest.disabledAt ? '（止まっています）' : panelPoint.ingest.configured ? '（動いています）' : '（まだ鍵を発行していません）'}`}
-        </p>
+        <div className={styles.panelFact}>
+          <p className={styles.panelLabel}>受け口</p>
+          <p className={styles.panelText}>
+            {`POST /api/conversions/ingest/${panelPoint.id}${panelPoint.ingest.disabledAt ? '（止まっています）' : panelPoint.ingest.configured ? '（動いています）' : '（まだ鍵を発行していません）'}`}
+          </p>
+        </div>
       ) : null}
       {issuedSecret && panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.secretBox} role="status">{`発行した鍵（この表示でだけ見られます。連携先へ渡してください）：${issuedSecret}`}</p>
@@ -943,10 +941,9 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <Button onClick={() => void publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
         ) : null}
       </div>
-      {canEdit && panelPoint.status !== 'stopped' ? (
+      {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
         <div className={styles.panelButtons}>
-          {panelPoint.state !== 'draft' ? <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button> : null}
-          <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
+          <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button>
         </div>
       ) : null}
     </DetailPanel>
@@ -957,21 +954,20 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           ? '利用先と影響を読み込んでいます。'
           : stopImpact
             ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
-            : '利用先と影響を読み込めませんでした。'} title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
+            : '利用先と影響を読み込めませんでした。'} title={`「${stopTarget.name}」を止めますか？`} designWidth={480} designTop={220} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
-          variant="primary"
+          variant={stopAction === 'delete' ? 'danger' : 'primary'}
           disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
           disabledReason={stopping ? '止めています。' : stopImpactLoading ? '利用先と影響を確認しています。' : !stopReason.trim() ? '止める理由を入力してください。' : stopAction === 'replace' && !replacementId ? '差し替え先を選んでください。' : undefined}
           onClick={() => void runStop()}
           busy={stopping || stopImpactLoading}
-          busyLabel="止めています"
+          busyLabel="止めています" widthReserve="idle"
         >
           {stopAction === 'delete' ? '削除する' : '止める'}
         </Button>
       </DialogActions>}>
 
-      <p>止めると、使っている配信・流入リンク・アフィリエイトでも、この成果地点では数えなくなります。</p>
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
           variant="row"

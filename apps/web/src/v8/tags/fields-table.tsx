@@ -1,10 +1,10 @@
 'use client'
 
 import { RowNameLink } from '@/components/shared/table';
-import { GripVertical, Send } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import ListState from '@/components/shared/list-state';
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions';
+import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu from '@/components/shared/context-menu';
 import Button from '@/components/shared/button';
 import { ListPager } from '@/components/templates/list-page';
@@ -39,7 +39,6 @@ export default function FieldsTable({ canEdit, host, items, status, error, setQu
             <Th className={styles.fieldColType}>入っている人</Th>
             <Th className={styles.fieldColType}>回答フォーム</Th>
             <Th className={styles.fieldColPlace}>出す場所</Th>
-            {host && canEdit ? <Th className={styles.colDistribute}><span className="sr-only">配る</span></Th> : null}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -100,7 +99,7 @@ export default function FieldsTable({ canEdit, host, items, status, error, setQu
                   </span>
                 </Td>
                 <Td className={styles.fieldColPlace}><span className={styles.cellText} title={host ? undefined : destinationLabel(field)}>{host ? emptyValue('unknown') : destinationLabel(field)}</span></Td>
-                {host && canEdit ? <Td className={styles.colDistribute}><RowQuickAction label="配る" ariaLabel={`${field.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(field.id)} /></Td> : null}
+                {/* 統括の［配る］は行の「…」の中（B-253：行の右端は「…」1つ）。 */}
                 <Td className={styles.colMenu}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu

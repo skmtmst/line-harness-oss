@@ -27,6 +27,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 
 let root: Root
 let host: HTMLDivElement
+let staffRole = 'owner'
 
 const token = {
   id: 'tok-1',
@@ -58,13 +59,14 @@ const json = (data: unknown, status = 200) => new Response(
 )
 
 beforeEach(() => {
+  staffRole = 'owner'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
   vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
-      return json({ success: true, data: { role: 'owner' } })
+      return json({ success: true, data: { role: staffRole } })
     }
     if (url.includes('/api/webhooks/outgoing')) return json({ success: true, data: [] })
     if (url.includes('/incoming')) return json({ success: true, data: [] })
@@ -94,21 +96,32 @@ async function renderPage() {
   await act(async () => {})
 }
 
-test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async () => {
+test('v8 では ralAc の鍵の表（札・行の右端の「…」）が出る', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ralAc"]')
   expect(board).not.toBeNull()
   expect(board?.textContent).toContain('予約システム連携')
   expect(board?.textContent).toContain('有効')
-  expect(board?.textContent).toContain('入れ替える')
+  // 行の右端は「…」1つ（B-253）。入れ替えるはその中。
+  expect(board?.querySelector('button[aria-label="「予約システム連携」の操作"]')).not.toBeNull()
   // 板 `ralAc` の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
   expect(board?.textContent).toContain('鍵を発行する')
+  expect(board?.textContent).toContain('外の仕組みに書き写してから閉じてください')
+})
+
+test('閲覧者には発行の案内を出さず、鍵の一覧は読める', async () => {
+  staffRole = 'staff'
+  await renderPage()
+  await waitFor(() => expect(host.textContent).toContain('予約システム連携'))
+  expect(screen.queryByRole('button', { name: /API 接続の鍵を発行する/ })).toBeNull()
+  expect(screen.queryByText(/鍵は発行したときに1回だけ表示されます/)).toBeNull()
 })
 
 test('旧テーマ属性でも現役の鍵タブが出て ralAc が出る', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="ralAc"]')).not.toBeNull()
+  for (const icon of ['coins', 'gift', 'wallet']) expect(host.querySelector(`[data-design-node="ralAc"] .lucide-${icon}`)).not.toBeNull()
 })
 
 test('v8 で行を右クリックすると「…」と同じ止めるが出る', async () => {
@@ -165,7 +178,8 @@ test('鍵の入れ替えの競合理由は一覧を取り直したあとも残�
   })
   await renderPage()
   const row = host.querySelector('[data-row-id="tok-1"]')!
-  fireEvent.click(within(row as HTMLElement).getByRole('button', {name:'入れ替える'}))
+  fireEvent.click(within(row as HTMLElement).getByRole('button', {name:'「予約システム連携」の操作'}))
+  fireEvent.click(await screen.findByRole('menuitem', {name:'入れ替える'}))
   const confirm = await screen.findByRole('dialog', {name:'「予約システム連携」の鍵を入れ替えますか？'})
   fireEvent.click(within(confirm).getByRole('button', {name:'入れ替える'}))
   await waitFor(() => expect(refreshed).toBe(2))

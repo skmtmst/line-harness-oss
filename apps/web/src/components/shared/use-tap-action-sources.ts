@@ -20,7 +20,11 @@ export function useTapActionSources(accountId: string | null | undefined, want: 
     const put = (patch: TapActionSources) => { if (!cancelled) setSources((current) => ({ ...current, ...patch })) }
     if (form) {
       void Promise.resolve().then(() => api.forms.list(accountId)).then((res) => {
-        if (res.success) put({ form: res.data.map((item) => ({ id: item.id, name: item.name, note: item.isActive ? undefined : '受け付けを止めています', disabled: !item.isActive })) })
+        if (res.success) put({ form: res.data.map((item) => {
+          // 一覧と同じ応答のフォルダ・更新日を渡す（選ぶ窓の左のフォルダ列と行の更新日。Pen dJZ7Q）。
+          const extra = item as { folderId?: string | null; updatedAt?: string | null }
+          return { id: item.id, name: item.name, note: item.isActive ? undefined : '受け付けを止めています', disabled: !item.isActive, folderId: extra.folderId, updatedAt: extra.updatedAt }
+        }) })
       }).catch(() => {})
     }
     if (booking) {

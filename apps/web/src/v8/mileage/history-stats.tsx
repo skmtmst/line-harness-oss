@@ -1,4 +1,4 @@
-import { CircleMinus, CirclePlus, History, Undo2 } from 'lucide-react'
+import { CircleHelp, History, Undo2 } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatNumber } from '@/lib/format'
@@ -16,9 +16,9 @@ export default function HistoryStats({ title, ready, total, grantedCount, spendC
       detail={<span title={`この条件で手で動かした分 ${manualCount == null ? '未取得' : `${formatNumber(manualCount)} 件`}・反映を待っている ${pendingCount == null ? '未取得' : `${formatNumber(pendingCount)} 件`}`}>
         {ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(spendCount)}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}
       </span>} />
-    <KpiCard presentation="band" title="付けた" icon={<CirclePlus size={14} aria-hidden="true" />}
+    <KpiCard presentation="band" title="付けた" icon={<CircleHelp size={14} aria-hidden="true" />}
       value={ready ? grantAmount : null} unit="マイル" detail="" />
-    <KpiCard presentation="band" title="使った" icon={<CircleMinus size={14} aria-hidden="true" />}
+    <KpiCard presentation="band" title="使った" icon={<CircleHelp size={14} aria-hidden="true" />}
       value={ready ? Math.abs(spendAmount) : null} unit="マイル" detail={`交換 ${formatNumber(spendCount)} 件`} />
     <KpiCard presentation="band" title="取り消し" icon={<Undo2 size={14} aria-hidden="true" />}
       value={ready ? reversalCount : null} unit="件" detail="注文の取り消しで引いた" />

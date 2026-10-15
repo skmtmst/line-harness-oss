@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RichMenuCreateV8 from '@/app/rich-menus/new/create-v8'
 import RichMenuDetailV8 from './detail'
 
-const net = vi.hoisted(() => ({ role: 'owner', get: vi.fn(), update: vi.fn(), unpublish: vi.fn(), push: vi.fn() }))
+const net = vi.hoisted(() => ({ role: 'owner', get: vi.fn(), update: vi.fn(), unpublish: vi.fn(), push: vi.fn(), reconcile: vi.fn() }))
 const account = { id: 'account-1', name: '店A' }
 const group = {
   id: 'g1', accountId: 'account-1', name: 'メニュー', chatBarText: 'メニュー',
@@ -42,7 +42,7 @@ vi.mock('@/lib/api', async importOriginal => {
       publishProgress: async () => ({ success: true, data: { steps: [], run: null, message: null } }),
       publishRuns: async () => ({ success: true, data: { runs: [] } }),
       tapStats: async () => ({ success: true, data: { byGroup: [] } }),
-      reconcile: async () => ({ success: true, data: { dryRun: true, diffs: [] } }),
+      reconcile: net.reconcile,
     },
   } }
 })
@@ -54,6 +54,7 @@ beforeEach(() => {
   net.get.mockReset().mockResolvedValue({ success: true, data: group })
   net.update.mockReset().mockImplementation(async (_id, input) => ({ success: true, data: { ...group, ...input } }))
   net.unpublish.mockReset().mockResolvedValue({ success: true, data: { warnings: [] } })
+  net.reconcile.mockReset().mockResolvedValue({ success: true, data: { dryRun: true, diffs: [] } })
   document.documentElement.dataset.theme = 'v8'
   window.history.replaceState(null, '', '/rich-menus/edit?id=g1&step=audience')
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container)
@@ -72,6 +73,17 @@ async function openUnpublish() {
 }
 
 describe('現役V8へ残す旧編集の動き', () => {
+  it('照合と読み直しの印を出し、読み直しでは確認だけを呼ぶ', async () => {
+    await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+    const retry = await screen.findByRole('button', { name: 'もう一度照らし合わせる' })
+    await waitFor(() => expect(net.reconcile).toHaveBeenCalledTimes(1))
+    expect(container.querySelector('.lucide-shield-check')).toBeTruthy()
+    expect(retry.querySelector('.lucide-refresh-cw')).toBeTruthy()
+    fireEvent.click(retry)
+    await waitFor(() => expect(net.reconcile).toHaveBeenCalledTimes(2))
+    expect(net.reconcile).toHaveBeenLastCalledWith('g1', true)
+    expect(net.unpublish).not.toHaveBeenCalled()
+  })
   it.each(['wizard', 'detail'] as const)('%sは取得の403を権限の案内にし、保存は出さず一覧へ戻れる', async page => {
     const { ApiError } = await import('@/lib/api')
     net.get.mockRejectedValue(new ApiError(403, 'API error: 403'))

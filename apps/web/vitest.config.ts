@@ -10,6 +10,9 @@ export default defineConfig({
      */
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Some web tests mount real Worker routes. Resolve their SDK dependency
+      // from source, as the Worker tests do, before dist has been built.
+      '@line-crm/line-sdk': fileURLToPath(new URL('../../packages/line-sdk/src/index.ts', import.meta.url)),
       /*
        * 実物の worker ルートを画面試験へ mount すると、packages/db が
        * Workers 専用の 'cloudflare:workers' を読みにいって解決に落ちる。

@@ -1,5 +1,7 @@
 'use client'
 
+import { statusBadge } from './post-status'
+
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
   form_title: requiredText("タイトルを入力してください。"),
@@ -50,7 +52,6 @@ import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
@@ -77,19 +78,6 @@ const FILTER_OPTIONS: Array<{ value: GooglePostFilter; label: string }> = [
 ]
 const CTA_LABELS: Record<GooglePostCtaType, string> = { book: '予約', order: '注文', shop: '購入', learn_more: '詳細', sign_up: '申し込み', call: '電話' }
 
-function statusBadge(post: GooglePost): { label: string; tone: StatusBadgeTone } {
-  switch (post.status) {
-    case 'draft': return { label: '下書き', tone: 'neutral' }
-    case 'scheduled': return { label: '予約中', tone: 'info' }
-    case 'pending_confirm': return { label: '送信確認中', tone: 'warning' }
-    case 'accepted': return { label: '審査中', tone: 'info' }
-    case 'published': return { label: '公開済み', tone: 'success' }
-    case 'rejected': return { label: 'Googleで不承認', tone: 'danger' }
-    case 'failed': return { label: '送信失敗', tone: 'danger' }
-    case 'cancelled': return { label: '取消済み', tone: 'neutral' }
-    case 'deleted': return { label: '削除済み', tone: 'neutral' }
-  }
-}
 
 function KindChip({ kind }: { kind: GooglePostKind }) {
   return <Chip tone={kind === 'event' ? 'warn' : 'neutral'}>{KIND_LABELS[kind]}</Chip>
@@ -542,8 +530,11 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
-        <div className={styles.imageSlot}>
-          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><ImageFrame
+        <div className={styles.postImageSlot}>
+          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><MediaSlot
+            kind="image"
+            /* 絵 T1j2Sw：画像は本文の下、幅320・4:3。 */
+            aspectRatio="4 / 3"
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}
@@ -559,6 +550,34 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             onRemove={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}
           /></SaveErrorField>
           {form.mediaFilename ? <span className={styles.imageName} title={form.mediaFilename}>{`${form.mediaFilename}・4:3`}</span> : null}
+        </div>
+        <div className={styles.postDetails} data-post-details>
+          <SectionHeader size="small" title="投稿の詳細" />
+          <div className={styles.fieldPair}>
+            <Field density="compact" label="ボタン（任意）" grow>
+              <SaveErrorField names={["ctaType","form.ctaType","cta_type","type","form.cta_type"]}><Select
+                aria-label="ボタンの種類"
+                size="full"
+                value={form.kind === 'offer' ? '' : form.ctaType}
+                onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
+                options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
+                disabled={!editable || form.kind === 'offer'}
+              /></SaveErrorField>
+            </Field>
+            <Field density="input" label="リンク先" htmlFor="gb-post-cta-url" grow>
+              <SaveErrorField names={["ctaUrl","form.ctaUrl","cta_url","form.cta_url"]}><TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} /></SaveErrorField>
+            </Field>
+          </div>
+          <Field density="compact" label="公開方法">
+            <Select
+              aria-label="公開方法"
+              size="full"
+              value="now"
+              onChange={() => {}}
+              options={[{ value: 'now', label: '今すぐ' }, { value: 'scheduled', label: '日時を指定（Google側の対応を確かめてから使えます）', disabled: true }]}
+              disabled={!editable}
+            />
+          </Field>
         </div>
         </div>
         {picker.open ? (
@@ -596,31 +615,6 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </Field>
           </div>
         ) : null}
-        <div className={styles.fieldPair}>
-          <Field density="compact" label="ボタン（任意）" grow>
-            <SaveErrorField names={["ctaType","form.ctaType","cta_type","type","form.cta_type"]}><Select
-              aria-label="ボタンの種類"
-              size="full"
-              value={form.kind === 'offer' ? '' : form.ctaType}
-              onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
-              options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
-              disabled={!editable || form.kind === 'offer'}
-            /></SaveErrorField>
-          </Field>
-          <Field density="input" label="リンク先" htmlFor="gb-post-cta-url" grow>
-            <SaveErrorField names={["ctaUrl","form.ctaUrl","cta_url","form.cta_url"]}><TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} /></SaveErrorField>
-          </Field>
-        </div>
-        <Field density="compact" label="公開方法">
-          <Select
-            aria-label="公開方法"
-            size="full"
-            value="now"
-            onChange={() => {}}
-            options={[{ value: 'now', label: '今すぐ' }, { value: 'scheduled', label: '日時を指定（Google側の対応を確かめてから使えます）', disabled: true }]}
-            disabled={!editable}
-          />
-        </Field>
         {igAvailable ? (
           <div className={styles.igBand} data-design-node="hsiwQ">
             <div className={styles.igToggleRow}>

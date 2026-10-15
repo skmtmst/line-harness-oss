@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -17,6 +17,7 @@ const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
+const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const narrow = vi.hoisted(() => ({ value: false }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
@@ -30,6 +31,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       broadcasts: {
         ...actual.api.broadcasts,
         list: listBroadcasts,
+        update: updateBroadcast,
         delete: deleteBroadcast,
         getInsight: async () => ({ success: false }),
         savedViews: { ...actual.api.broadcasts.savedViews, list: listViews, create: createView },
@@ -109,6 +111,7 @@ const base = {
 const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageContent: 'まだお買い物していない方へ', status: 'draft', displayStatus: 'draft', displayStatusLabel: '下書き', scheduledAt: null }
 
 beforeEach(() => {
+  updateBroadcast.mockClear()
   forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
   role.current = 'owner'
@@ -164,6 +167,29 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     } finally { narrow.value = false }
   })
 
+  it('行を選ぶと下にまとめての帯が出て、選んだ配信をまとめてフォルダへ移す（l5V9a）', async () => {
+    listFolders.mockImplementation(async () => ({ success: true, data: [{ id: 'f-1', kind: 'broadcast', name: 'キャンペーン', parentId: null, displayOrder: 0, itemCount: 0, color: '#10B981', createdAt: '', updatedAt: '' }], unfiledCount: 2 }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const pick = (label: string) => host.querySelector(`[aria-label="${label}"]`) as HTMLElement
+    expect(pick('8月キャンペーンのお知らせを選ぶ'), '行の選ぶ欄がありません').toBeTruthy()
+    act(() => { fireEvent.click(pick('8月キャンペーンのお知らせを選ぶ')) })
+    act(() => { fireEvent.click(pick('未購入者フォローを選ぶ')) })
+    await flush()
+    const move = buttonByText('フォルダへ移す')
+    expect(move, 'まとめての帯がありません').toBeTruthy()
+    act(() => { move!.click() })
+    expect(updateBroadcast).not.toHaveBeenCalled()
+    const dialog = document.querySelector('[role="dialog"]')!
+    act(() => { fireEvent.click(dialog.querySelector('input[aria-label="キャンペーン"]')!) })
+    const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダへ移す')!
+    await act(async () => { fireEvent.click(confirm) })
+    await flush()
+    expect(updateBroadcast).toHaveBeenCalledWith('bc-1', expect.objectContaining({ folderId: 'f-1' }))
+    expect(updateBroadcast).toHaveBeenCalledWith('bc-2', expect.objectContaining({ folderId: 'f-1' }))
+    await waitFor(() => expect(buttonByText('フォルダへ移す'), '移した後も帯が残っています').toBeUndefined())
+  })
+
   it('行と数の帯・札の件数が出る', async () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
@@ -203,6 +229,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull()
     const buttons = [...host.querySelectorAll('button')]
     // 押せない形で出すのではなく、置かない（2026-10-06 オーナー決定）
     expect(buttons.find((b) => b.textContent?.includes('配信を作る')), '閲覧のみに「配信を作る」が出ています').toBeUndefined()
@@ -290,6 +317,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     await flush()
     const rowOf = (title: string) => [...host.querySelectorAll('tr')].find((tr) => tr.textContent?.includes(title))
     expect(rowOf('1月の限定メニュー')?.textContent).toContain('統括から')
+    expect(rowOf('1月の限定メニュー')?.querySelector('input[type="checkbox"]')).toBeNull()
     expect(rowOf('未購入者フォロー')?.textContent).not.toContain('統括から')
     const trigger = rowOf('1月の限定メニュー')?.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
     act(() => { trigger.click() })
@@ -434,3 +462,20 @@ it('WEB-014：一斉配信には手動順・つまみ・上下移動を置かな
     expect(host.textContent).not.toContain('手動順')
     expect(host.querySelector('[draggable="true"]')).toBeNull()
   })
+it('選んだ配信だけを、確認後にその版のままフォルダへ移す', async () => {
+  listBroadcasts.mockResolvedValueOnce({ success: true, data: [{ ...base, version: 7 }, { ...rowB, version: 9 }], pagination: { total: 2, limit: 20, cursor: 0 } })
+  listFolders.mockResolvedValue({ success: true, data: [{ id: 'campaign', name: 'キャンペーン', color: null }], unfiledCount: 2 })
+  act(() => root.render(<BroadcastListV8 />))
+  await flush()
+  act(() => fireEvent.click(host.querySelector('input[aria-label="8月キャンペーンのお知らせを選ぶ"]')!))
+  const move = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダへ移す')!
+  act(() => fireEvent.click(move))
+  expect(updateBroadcast).not.toHaveBeenCalled()
+  const dialog = document.querySelector('[role="dialog"]')!
+  act(() => fireEvent.click(dialog.querySelector('input[aria-label="キャンペーン"]')!))
+  const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダへ移す')!
+  await act(async () => { fireEvent.click(confirm) })
+  await flush()
+  expect(updateBroadcast.mock.calls).toEqual([['bc-1', { folderId: 'campaign', expectedVersion: 7 }]])
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+})

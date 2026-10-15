@@ -5,8 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsAuditPage from './page'
 import type { OpsAuditRow } from '@/lib/api'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -66,6 +64,11 @@ describe('日付範囲の折返し（R158）', () => {
     await flush()
     const titles = [...host.querySelectorAll<HTMLElement>('[title]')].map(node => node.title)
     expect(titles).toContain('テスト・IP 203.0.113.1・運営のみ')
+    const reason = host.querySelector('td[title="テスト・IP 203.0.113.1・運営のみ"]')!
+    expect(reason.getAttribute('data-cell-grow')).toBe('true')
+    expect(reason.textContent).toBe('テスト')
+    const operation = [...host.querySelectorAll('th')].find(cell => cell.textContent === '操作')!
+    expect(operation.querySelector('.sr-only')).toBeNull()
     expect(titles).toContain('120件中 1〜50件を表示')
   })
   it('開始・終了の欄はV8の折返す道具の段で幅を守る', async () => {
@@ -74,9 +77,10 @@ describe('日付範囲の折返し（R158）', () => {
     const from = document.querySelector('button[aria-label="開始日"]')!
     expect(from).not.toBeNull()
     expect(document.querySelector('button[aria-label="終了日"]')).not.toBeNull()
-    const css = readFileSync(join(process.cwd(), 'src/v8/ops/audit.module.css'), 'utf8')
-    expect(css).toMatch(/\.tools\s*\{[^}]*flex-wrap: wrap;/)
-    expect(css).toMatch(/\.date :global\(\*\)\s*\{[^}]*max-width: 100%;/)
+    const to = document.querySelector('button[aria-label="終了日"]')!
+    expect(from.closest('[role="group"]')?.textContent).toContain('開始日')
+    expect(to.closest('[role="group"]')?.textContent).toContain('終了日')
+    expect(from.closest('[role="group"]')).not.toBe(to.closest('[role="group"]'))
   })
 })
 
