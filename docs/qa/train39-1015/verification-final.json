@@ -67,7 +67,7 @@
   "remainingReplay": {
     "script": "/tmp/train39-ci-serve-recheck-v2.sh",
     "output": "/tmp/train39-evidence/ci-serve-recheck-v2",
-    "status": "heavy waiting; not started",
+    "status": "not started; waiting wrapper stopped at 2026-10-15 20:37 +07 because heavy memory gate was not satisfied",
     "memoryFreePercentage": 47,
     "requiredFreePercentageWhenSwapAtLeast6GB": 50
   }
