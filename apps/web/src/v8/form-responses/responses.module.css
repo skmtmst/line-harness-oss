@@ -284,3 +284,5 @@
 
 /* 絵 v0SbYR：ご意見の段の「1件ずつ見る」は下の右端。 */
 .cardFootEnd { display: flex; justify-content: flex-end; }
+
+.periodChips { display: flex; flex-wrap: wrap; gap: var(--space-8); }
