@@ -2936,7 +2936,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
                 disabled={!endEnabled}
                 options={[
-                  { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
+                  { value: '', label: '前のメニュー' },
                   ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
                 ]}
               /></SaveErrorField></Field>
@@ -3162,6 +3162,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                       key: 'default',
                       label: '既定のメニュー',
                       value: `${currentDefaultMenu?.name ?? '（なし）'} → このメニュー`,
+                      wrap: true,
                     },
                   ]
                 : []),

@@ -244,14 +244,14 @@
   font-weight: 700;
 }
 .railButtons {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
   gap: var(--tpl-toolbar-gap);
   margin-top: var(--tpl-wh-ops-gap);
 }
+/* 絵 MKQyJ：2つを同じ幅の候補で並べ、文字より狭くはしない（等分の列に押し込むとボタン同士が重なった）。 */
 .railButtons > * {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: max-content;
 }
 .search {
   display: flex;

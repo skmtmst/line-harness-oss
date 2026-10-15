@@ -1,7 +1,7 @@
 'use client'
 import PageSizeSelect from '@/components/shared/page-size-select'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarOptional, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -649,6 +649,7 @@ export default function FriendsListV8() {
           options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
   )
 
+  const columnsButton = <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button>
   const toolbar = (
     <>
     <ListToolbarFrame layout="stacked" data-design="V8SearchPanel">
@@ -696,6 +697,7 @@ export default function FriendsListV8() {
           詳細条件
         </FilterChip>
         <span className={styles.spacer} />
+        {!readOnly && narrow ? columnsButton : null}
         {savedSearchEnabled ? (
           <Button type="button" variant="secondary" onClick={() => setSavedOpen(true)}>
             <Bookmark size={14} aria-hidden="true" />
@@ -711,20 +713,22 @@ export default function FriendsListV8() {
         </ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
-        <div role="group" aria-label="すばやく絞り込む" className={styles.chips}>
+        {/* 絵 y2n1z：1152 でも［未対応］［注目のみ］は札のまま（「状態」の選ぶ欄に畳まない）。 */}
+        <div role="group" aria-label="すばやく絞り込む" className={styles.chips}><ResponsiveFilterChips preserveChips>
           <FilterChip selected={responseFilter === 'unhandled'} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
             未対応
           </FilterChip>
           <FilterChip selected={attentionOnly} onChange={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} icon={<Star size={14} aria-hidden="true" />}>
             注目のみ
           </FilterChip>
-        </div>
+        </ResponsiveFilterChips></div>
         <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         {/* 絵 nF4ts：表示項目を編集は2段目、件数の切り替えの左。 */}
-        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
+        {/* 1152（y2n1z）は札・件数・並び・件数の切り替えを1段に収めるため、「ほかの絞り込み・操作」の中へ移す。 */}
+        {!readOnly && !narrow ? columnsButton : null}
         <ListToolbarEnd>
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
@@ -774,8 +778,9 @@ export default function FriendsListV8() {
         <colgroup>
           {selectable ? <col className={styles.colCheck} /> : null}
           <col className={styles.colStar} />
-          <col className={styles.colName} />
-          {displayColumns.map(column => <col key={column.key} />)}
+          {/* 1152（y2n1z）：顔の丸を外して名前の列を詰め、対応・シナリオの列を狭めてタグ名を全部入れる。 */}
+          <col className={narrow ? styles.colNameNarrow : styles.colName} />
+          {displayColumns.map(column => <col key={column.key} className={narrow ? column.key === 'support' ? styles.colSupportNarrow : column.key === 'scenario' ? styles.colScenarioNarrow : column.key === 'latest' ? styles.colLatestNarrow : column.key.startsWith('fixed:') || column.key.startsWith('field:') ? styles.colFieldNarrow : undefined : undefined} />)}
           <col className={styles.colMenu} />
         </colgroup>
         <thead>
@@ -838,7 +843,7 @@ export default function FriendsListV8() {
                 <Td className={styles.td}>
                   {/* 絵 nF4ts・x6QsVz：名前の前に顔の丸（写真が無ければ頭文字）。 */}
                   <div className={styles.friendCell}>
-                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
+                    {narrow ? null : <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />}
                     <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
                   </div>
                 </Td>
@@ -847,10 +852,10 @@ export default function FriendsListV8() {
                   <Td key={column.key} className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
-                        <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusBadge>
-                        {friend.supportMark ? <StatusBadge distinctFrom={status.label} dot={false} size="annotation" title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</StatusBadge> : null}
+                        <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']} title={friend.supportMark && friend.supportMark.name !== status.label ? `対応マーク：${friend.supportMark.name}` : undefined}>{status.label}</StatusBadge>
                       </span>
-                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
+                      {/* 絵 y2n1z：札は対応の状態1つ、下の行は担当だけ。対応マークは札の title で読む（札と違う言葉を並べない）。 */}
+                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? 'なし'}`}</span>
                     </div>
                   </Td>
                   )

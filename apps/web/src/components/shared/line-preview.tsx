@@ -110,15 +110,14 @@ export default function LinePreview({
 }
 
 /**
- * 本文の URL は「/」「.」のあとで折れるようにする（「…/book」「ing」のように語の途中で折らない・UTbi1）。
- * それでも1行に入らない長い区切りだけ、今までどおり途中で折る。
+ * 本文の URL は途中で折らず1行にし、入らないときは末尾を「…」にする（全文は title・UTbi1）。
  */
-function withUrlBreaks(text: string): ReactNode {
+function withUrlLines(text: string): ReactNode {
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
   if (parts.length === 1) return text
   return parts.map((part, index) => index % 2 === 1
-    ? <Fragment key={index}>{part.split(/(?<=[/.?&=])/).map((piece, pieceIndex) => <Fragment key={pieceIndex}>{pieceIndex > 0 ? <wbr /> : null}{piece}</Fragment>)}</Fragment>
-    : part)
+    ? <span key={index} className={styles.urlLine} title={part}>{part}</span>
+    : <Fragment key={index}>{part}</Fragment>)
 }
 
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
@@ -138,7 +137,7 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
       <div className={styles.bubbleRow}>
         {bare ? children : <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
-          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof children === 'string' ? withUrlBreaks(children) : children}</span></div>
+          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof children === 'string' ? withUrlLines(children) : children}</span></div>
         </div>}
         <span className={styles.messageTime}>{time}</span>
       </div>
