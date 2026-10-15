@@ -36,7 +36,7 @@ import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
-import { resolveSendInterpolationExtra } from './interpolation-context.js';
+import { resolveSendInterpolationExtra, resolveInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
@@ -172,7 +172,7 @@ export async function buildReminderStepMessage(
   sourceKind: 'reminder' | 'test_send' = 'reminder',
   // R346: 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
   // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
-  options?: { pinnedTemplateVersions?: Record<string, number> | null },
+  options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean },
 ): Promise<{
   message: Message;
   messageType: string;
@@ -214,9 +214,9 @@ export async function buildReminderStepMessage(
       await resolveBookingInterpolation(db, friend.id, deliveredAt),
     )
     : messageContent;
-  const extra = await resolveSendInterpolationExtra(
-    db, friend.id, bookingContent, { kind: sourceKind, id: step.id },
-  );
+  const extra = options?.previewOnly
+    ? await resolveInterpolationExtra(db,friend.id,bookingContent)
+    : await resolveSendInterpolationExtra(db, friend.id, bookingContent, { kind: sourceKind, id: step.id });
   const expanded = expandVariables(
     bookingContent,
     { ...friend, metadata: resolvedMeta },

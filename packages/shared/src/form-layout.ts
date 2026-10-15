@@ -276,6 +276,8 @@ export interface FormSection {
 // ---------------------------------------------------------------------------
 
 export interface FormOptions {
+  /** 回答の完了後：お礼・トークへ戻す・URL。未指定は従来のthanksUrl判定。 */
+  completionMode?: "thanks" | "chat" | "url";
   /** 送信後に飛ばす先。空なら thanksText を出す */
   thanksUrl?: string | null;
   thanksText?: string | null;
@@ -1411,7 +1413,11 @@ export function validateFormDefinition(layout: FormLayout): string | null {
     }
   }
 
+  const completionMode = layout.options.completionMode;
+  if (completionMode !== undefined && !["thanks", "chat", "url"].includes(completionMode)) return "答え終わったあとの動きを選び直してください";
   const thanksUrl = layout.options.thanksUrl?.trim() ?? "";
+  if (completionMode === "url" && !thanksUrl) return "答えたあとに開くURLを入力してください";
+  if ((completionMode === "chat" || completionMode === "thanks") && thanksUrl) return "URLを開く場合は、答え終わったあとの動きをURLにしてください";
   if (thanksUrl !== "" && !isHttpUrl(thanksUrl)) {
     return "答えたあとに開くページがURLの形ではありません";
   }

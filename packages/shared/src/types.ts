@@ -2840,6 +2840,7 @@ export interface OutgoingWebhookVersionConflict {
   updatedAt: string;
 }
 export interface FormSubmissionPage {
+  period?: { from?: string; until?: string };
   items: FormSubmissionDetail[];
   total: number;
   page: number;

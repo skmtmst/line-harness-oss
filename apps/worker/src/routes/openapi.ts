@@ -1,4 +1,5 @@
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
+import { api1AuthoringPaths } from './api1-authoring-openapi.js';
 import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
@@ -409,6 +410,7 @@ const spec = {
     },
   },
   paths: {
+    ...api1AuthoringPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -2155,6 +2157,7 @@ const spec = {
       },
     },
     '/api/hq/templates/media': {
+      get: {tags:['HQ Templates'],summary:'自組織の登録メディアを選ぶ',parameters:[{name:'kind',in:'query',schema:{type:'string',enum:['video','audio','image']}},{name:'limit',in:'query',schema:{type:'integer',minimum:1,maximum:100}},{name:'cursor',in:'query',schema:{type:'string'}}],responses:{'200':{description:'items/nextCursor。itemsはselectable/sizeKb付き。未確認の動画・音声は選択不可'},'403':{description:'統括閲覧権限なし'}}},
       post: {
         tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
         parameters: [
@@ -2185,7 +2188,8 @@ const spec = {
       get: {
         tags: ['HQ Templates'],
         summary: '統括ひな形一覧を取得',
-        parameters: [{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
+        description: 'statusはactive（既定）/archived/all。archive_countsは同じtype/kindに対するactive/archivedの件数で、選択中statusには依存しない。保管行もarchived_atとrevisionを返す。',
+        parameters: [{name:'status',in:'query',schema:{type:'string',enum:['active','archived','all'],default:'active'}},{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder','booking_menu','mileage_reward'] } }],
         responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
       },
       post: {
@@ -2195,7 +2199,7 @@ const spec = {
         requestBody: {
           required: true,
           content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
-            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
+            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag','rich_menu','template','form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder','booking_menu','mileage_reward'] },
             name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
           } } } },
         },
@@ -2217,7 +2221,7 @@ const spec = {
         responses: { '200': { description: 'Updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
       },
       delete: {
-        tags: ['HQ Templates'], summary: '統括ひな形を削除',
+        tags: ['HQ Templates'], summary: '統括ひな形を保管（店の配布済みコピーは保持）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'integer', minimum: 1 } } } } } },
         responses: { '200': { description: 'Deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
