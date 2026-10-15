@@ -4,6 +4,11 @@ import type {
   SetupAnswer,
   StyleCard,
   StyleSnapshot,
+  StyleRange,
+  StyleDisplay,
+  StyleCalendarView,
+  StyleSchedule,
+  StyleTemplateSample,
 } from '@line-crm/shared';
 import { fetchApi, bookingApi } from './api';
 import { restaurantTestApi } from './restaurant-test-api';
@@ -21,7 +26,8 @@ const write = (method: string, body: unknown) => ({
 type Result<T> = { success: true; data: T };
 export type StyleQuery = {
   style: IndustryStyle;
-  view?: 'today' | 'tomorrow' | 'future' | 'date';
+  range?: StyleRange;
+  view?: StyleRange | 'date';
   date?: string;
   from?: string;
   to?: string;
@@ -162,6 +168,10 @@ export const styleApi = {
         definition: { items: StarterSetItem[] };
       }>
     >(url(root + '/starter-set', accountId, { style })),
+  templateSamples: (accountId: string, style: AccountStyle) =>
+    fetchApi<Result<{ style: AccountStyle; items: StyleTemplateSample[] }>>(
+      url(root + '/template-samples', accountId, { style }),
+    ),
   starterItems: (accountId: string) =>
     fetchApi<
       Result<{
@@ -203,6 +213,21 @@ export const styleApi = {
     >(url(root + '/resources', accountId)),
   summary: (accountId: string, query: StyleQuery) =>
     fetchApi<Result<StyleSnapshot>>(url(root + '/summary', accountId, query)),
+  schedule: (
+    accountId: string,
+    query: Pick<
+      StyleQuery,
+      'style' | 'range' | 'date' | 'staff_id' | 'store_id' | 'menu_id'
+    > & {
+      display?: StyleDisplay;
+      calendar_view?: StyleCalendarView;
+      axis?: 'staff' | 'table';
+      sort?: 'time' | 'name';
+      guest_count?: string;
+      duration_minutes?: string;
+    },
+  ) =>
+    fetchApi<Result<StyleSchedule>>(url(root + '/schedule', accountId, query)),
   analytics: (accountId: string, query: StyleQuery) =>
     fetchApi<Result<StyleSnapshot & { analytics: Record<string, unknown> }>>(
       url(root + '/analytics', accountId, query),
@@ -478,6 +503,10 @@ export const styleApi = {
     ),
 };
 export const hqStyleApi = {
+  templateSamples: (style: AccountStyle) =>
+    fetchApi<Result<{ style: AccountStyle; items: StyleTemplateSample[] }>>(
+      '/api/hq/style-template-samples?' + new URLSearchParams({ style }),
+    ),
   listStarterSets: () =>
     fetchApi<Result<StyleStarterSet[]>>('/api/hq/style-starter-sets'),
   saveStarterSet: (

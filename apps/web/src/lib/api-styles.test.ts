@@ -11,20 +11,46 @@ vi.mock('./api', () => ({
 vi.mock('./restaurant-test-api', () => ({
   restaurantTestApi: { createClosure: vi.fn(), previewClosure: vi.fn() },
 }));
-import { styleApi } from './api-styles';
+import { styleApi, hqStyleApi } from './api-styles';
 beforeEach(() => mocks.fetchApi.mockClear());
 describe('style client scope and consent', () => {
+  it('uses the same sample catalog for accounts and HQ and sends day/week/month schedule conditions', async () => {
+    await styleApi.templateSamples('a', 'lesson');
+    await hqStyleApi.templateSamples('lesson');
+    expect(mocks.fetchApi.mock.calls[0][0]).toBe(
+      '/api/dashboard/style/template-samples?account_id=a&style=lesson',
+    );
+    expect(mocks.fetchApi.mock.calls[1][0]).toBe(
+      '/api/hq/style-template-samples?style=lesson',
+    );
+    await styleApi.schedule('a', {
+      style: 'salon',
+      range: 'month',
+      date: '2026-10-15',
+      display: 'calendar',
+      calendar_view: 'month',
+      staff_id: 's',
+    });
+    const params = new URL(
+      mocks.fetchApi.mock.calls[2][0],
+      'https://example.test',
+    ).searchParams;
+    expect(params.get('range')).toBe('month');
+    expect(params.get('calendar_view')).toBe('month');
+    expect(params.get('display')).toBe('calendar');
+    expect(params.get('staff_id')).toBe('s');
+  });
   it('encodes account and staff IDs without changing the query scope', async () => {
     await styleApi.summary('a&account_id=b', {
       style: 'consult',
-      view: 'tomorrow',
+      range: 'week',
       staff_id: 's&other=x',
     });
     const path = mocks.fetchApi.mock.calls[0][0] as unknown as string;
     const url = new URL(path, 'https://example.test');
     expect(url.searchParams.getAll('account_id')).toEqual(['a&account_id=b']);
     expect(url.searchParams.get('staff_id')).toBe('s&other=x');
-    expect(url.searchParams.get('view')).toBe('tomorrow');
+    expect(url.searchParams.get('range')).toBe('week');
   });
   it('preserves later/manual answers and sends explicit activation consent and draft identity', async () => {
     await styleApi.save('a', {
