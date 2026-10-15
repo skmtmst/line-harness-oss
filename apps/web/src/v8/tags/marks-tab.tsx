@@ -13,7 +13,7 @@ import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type Supp
 import { createResponseGate } from '@/lib/latest-request';
 import { ListPageBody } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions';
+import { RowMenu } from '@/components/shared/row-actions';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
@@ -307,7 +307,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
     if (host) return canEdit ? [
       { id: 'edit', label: '編集', onSelect: () => host.onEdit(mark.id) },
-      { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, onSelect: () => host.onDistribute(mark.id) },
+      { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, disabled: host.busy, onSelect: () => host.onDistribute(mark.id) },
       { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
@@ -388,7 +388,6 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
             <Th className={styles.markColDefault}>はじめの値</Th>
             <Th className={styles.markColAuto}>自動で変わる</Th>
             <Th className={styles.markColPlace}>出す場所</Th>
-            {host && canEdit ? <Th className={styles.colDistribute}><span className="sr-only">配る</span></Th> : null}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -451,7 +450,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
                 <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
                 <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}</span></Td>
                 <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? emptyValue('unknown') : usageLabel(mark)}</span></Td>
-                {host && canEdit ? <Td className={styles.colDistribute}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
+                {/* 統括の［配る］は行の「…」の中（B-253：行の右端は「…」1つ）。 */}
                 <Td className={styles.colMenu}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
