@@ -34,7 +34,7 @@ import { StyleAnalyticsView } from './analytics'
 import { DayList, MonthCalendar, WeekCalendar } from './calendar'
 import { RANGES, STYLE_CONFIG, TAB_KEYS, TAB_PARAM, rangeFromParam, tabFromParam, viewFromParam, type DashboardTab, type DashboardView } from './config'
 import { LessonRoster } from './lesson-roster'
-import { SideCard, rowMenuItems } from './parts'
+import { PAY_NOTE, SideCard, rowMenuItems } from './parts'
 import { restaurantToday } from './restaurant-today'
 import { ClosureDialog, ViewDrawer } from './settings-panels'
 import { StaffBoard } from './staff-board'
@@ -215,6 +215,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     open: openRow,
     visit: (r) => void markVisit(r),
     line: () => router.push('/chats'),
+    pay: () => notifyToast(PAY_NOTE),
     copy: (r) => { void navigator.clipboard?.writeText(`${window.location.origin}/booking/bookings?id=${encodeURIComponent(r.id)}`).then(() => notifyToast('予約 URL をコピーしました。')) },
     roster: (r) => setRosterId(r.id),
   })
@@ -250,7 +251,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const filters = tab === 'analytics' ? (
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={days} onChange={(v) => setParam({ days: v })} options={ANALYTICS_DAYS} />
-      <div className={styles.dateBox} data-short><DateField value={date} onChange={setDate} displayFormat="short" /></div>
+      <div className={styles.dateBox} data-short><DateField value={date} onChange={setDate} displayFormat="short" clearable={false} /></div>
       <EntitySelect compact width={112} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
       <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
@@ -260,7 +261,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   ) : (
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={range} onChange={(v) => setParam({ range: v === 'today' ? null : v })} options={RANGES} />
-      <div className={styles.dateBox}><DateField value={date} onChange={setDate} displayFormat="full" /></div>
+      <div className={styles.dateBox}><DateField value={date} onChange={setDate} displayFormat="day" clearable={false} /></div>
       <EntitySelect compact width={112} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
       <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
@@ -305,7 +306,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         : <ListState kind="empty" title="座席の図がまだありません" action={canWrite ? <Button href="/restaurant-test/tables">座席の図を作る</Button> : undefined} />
     } else if (view === 'board' && today.board) {
       main = <StaffBoard board={today.board} search={search} onSearch={setSearch} view="board" onView={(v) => setParam({ view: v === cfg.defaultView ? null : v })} canWrite={canWrite} onSlot={() => addNew()}
-        entryItems={(e) => rowMenuItems(style, { id: e.id, time: e.start, name: e.name }, canWrite, { open: () => router.push(cfg.links.bookings), visit: () => router.push(cfg.links.bookings), line: () => router.push('/chats'), copy: () => undefined, roster: (r) => setRosterId(r.id) })} />
+        entryItems={(e) => rowMenuItems(style, { id: e.id, time: e.start, name: e.name }, canWrite, { pay: () => notifyToast(PAY_NOTE), open: () => router.push(cfg.links.bookings), visit: () => router.push(cfg.links.bookings), line: () => router.push('/chats'), copy: () => undefined, roster: (r) => setRosterId(r.id) })} />
     } else {
       main = (
         <>
@@ -314,7 +315,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
             selectedId={style === 'lesson' ? (roster ? roster.rowId : null) : undefined} onSelect={style === 'lesson' ? (r) => setRosterId(r.id) : undefined} />
         </>
       )
-      if (roster) aside = <LessonRoster roster={roster} canWrite={canWrite} onClose={() => setRosterId(null)} onAttend={() => router.push('/events')} onLine={() => router.push('/broadcasts')} onCancelClass={() => router.push('/events')} />
+      if (roster) aside = <LessonRoster roster={roster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={() => notifyToast(PAY_NOTE)} onAttend={() => router.push('/events')} onLine={() => router.push('/broadcasts')} onCancelClass={() => router.push('/events')} />
     }
     body = (
       <div className={styles.columns} data-wide={!aside || undefined}>

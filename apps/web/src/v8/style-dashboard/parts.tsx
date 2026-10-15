@@ -56,11 +56,13 @@ type MenuHandlers = {
   open: (row: StyleRow) => void
   visit: (row: StyleRow) => void
   line: (row: StyleRow) => void
+  pay: (row: StyleRow) => void
   copy: (row: StyleRow) => void
   roster: (row: StyleRow) => void
 }
 
-const PAY_REASON = 'お支払い（Stripe）をつなぐと使えます。'
+/** 決済の口（Stripe・API 組3）ができるまで、押したときに出す案内。 */
+export const PAY_NOTE = 'お支払い（Stripe）をつなぐと使えます。設定の「お支払い」からつなげます。'
 
 /**
  * 行の「…」（B-309・B-305）。業種ごとに絵の並び。
@@ -69,8 +71,8 @@ const PAY_REASON = 'お支払い（Stripe）をつなぐと使えます。'
 export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: boolean, h: MenuHandlers): ActionMenuItem[] {
   const detail: ActionMenuItem = { id: 'detail', label: '詳細を開く', icon: <PanelLeftOpen size={16} />, onSelect: () => h.open(row) }
   if (!canWrite) return [detail]
-  const payLink: ActionMenuItem = { id: 'pay-link', label: '支払いのリンクを送る', icon: <CreditCard size={16} />, dividerBefore: true, disabled: true, disabledReason: PAY_REASON }
-  const refund: ActionMenuItem = { id: 'refund', label: '返金する', icon: <Undo2 size={16} />, disabled: true, disabledReason: PAY_REASON }
+  const payLink: ActionMenuItem = { id: 'pay-link', label: '支払いのリンクを送る', icon: <CreditCard size={16} />, dividerBefore: true, onSelect: () => h.pay(row) }
+  const refund: ActionMenuItem = { id: 'refund', label: '返金する', icon: <Undo2 size={16} />, onSelect: () => h.pay(row) }
   const line: ActionMenuItem = { id: 'line', label: 'LINE を送る', icon: <MessageCircle size={16} />, dividerBefore: true, onSelect: () => h.line(row) }
   const cancel: ActionMenuItem = { id: 'cancel', label: '取り消す', icon: <CircleX size={16} />, tone: 'danger', dividerBefore: true, onSelect: () => h.open(row) }
   if (style === 'restaurant') return [

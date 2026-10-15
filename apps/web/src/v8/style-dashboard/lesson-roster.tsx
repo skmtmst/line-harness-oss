@@ -11,10 +11,11 @@ import styles from './style-dashboard.module.css'
  * 教室の「名簿のパネル」（k2MBw）。一覧で回を押すと右に開く。
  * 出席の印・この回の人に LINE・支払いのリンク（Stripe をつなぐまで押せない）・休講にする。
  */
-export function LessonRoster({ roster, canWrite, onClose, onAttend, onLine, onCancelClass }: {
+export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onLine, onCancelClass }: {
   roster: StyleRoster
   canWrite: boolean
   onClose: () => void
+  onPay: () => void
   onAttend: (name: string | null) => void
   onLine: () => void
   onCancelClass: () => void
@@ -52,7 +53,7 @@ export function LessonRoster({ roster, canWrite, onClose, onAttend, onLine, onCa
       <p className={styles.cellMuted}>{roster.more}</p>
       {canWrite ? (
         <div className={styles.rosterFoot}>
-          <Button disabled disabledReason="お支払い（Stripe）をつなぐと使えます。"><CreditCard size={16} aria-hidden="true" />支払いのリンクを送る（{roster.payLinkCount}人）</Button>
+          <Button onClick={onPay}><CreditCard size={16} aria-hidden="true" />支払いのリンクを送る（{roster.payLinkCount}人）</Button>
           <span className={styles.grow} />
           <Button variant="text" textTone="danger" onClick={onCancelClass}>休講にする</Button>
         </div>

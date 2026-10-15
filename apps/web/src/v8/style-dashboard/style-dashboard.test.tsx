@@ -4,7 +4,7 @@ import { rowMenuItems } from './parts'
 import { restaurantRow } from './restaurant-today'
 import type { RestaurantReservation } from '@/lib/restaurant-test-api'
 
-const noop = { open: () => {}, visit: () => {}, line: () => {}, copy: () => {}, roster: () => {} }
+const noop = { open: () => {}, visit: () => {}, line: () => {}, pay: () => {}, copy: () => {}, roster: () => {} }
 
 describe('業種ダッシュボード（XBkC2）', () => {
   it('題は業種の名前、1枚目のタブは業種ごとの名前（B-318）', () => {
@@ -32,11 +32,13 @@ describe('業種ダッシュボード（XBkC2）', () => {
     }
   })
 
-  it('決済の操作は Stripe をつなぐまで理由つきで押せない', () => {
-    const items = rowMenuItems('restaurant', { id: 'r', time: '10:00', name: 'A' }, true, noop)
+  it('決済の操作は押せる形で置き、押すと決済の案内へ渡す（押せないボタンを置かない）', () => {
+    let paid = ''
+    const items = rowMenuItems('restaurant', { id: 'r', time: '10:00', name: 'A' }, true, { ...noop, pay: (row) => { paid = row.id } })
     const pay = items.find((i) => i.id === 'pay-link')
-    expect(pay?.disabled).toBe(true)
-    expect(pay?.disabledReason).toContain('Stripe')
+    expect(pay?.disabled).toBeFalsy()
+    pay?.onSelect?.()
+    expect(paid).toBe('r')
     expect(items.at(-1)?.tone).toBe('danger')
   })
 
