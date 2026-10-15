@@ -250,13 +250,15 @@ type MultiBodyProps = {
   initialFolder?: string
   /** ほかの窓の中に埋め込むとき。高さを決めて一覧だけを送る。 */
   embedded?: boolean
+  /** 行を2段にする（名前の下に補足と状態）。名前を補足に押されて切らない（WjFWW 送るアカウント）。 */
+  stacked?: boolean
 }
 
 /**
  * まとめて選ぶ中身（フォルダの列＋一覧）。窓の中にも、ほかの窓の中にも埋め込める。
  * フォルダの横のチェックは、そのフォルダの選べる候補をまとめて付け外しする。
  */
-export function EntityMultiSelect({ items, folders = [], foldersFailed = false, selected, onChange, query, onlySelected = false, readOnly = false, busy = false, state, listFooter, rowExtra, searchSlot, listLabel = '候補の一覧', folder: controlledFolder, onFolder, folderHeading, initialFolder, embedded = false }: MultiBodyProps) {
+export function EntityMultiSelect({ items, folders = [], foldersFailed = false, selected, onChange, query, onlySelected = false, readOnly = false, busy = false, state, listFooter, rowExtra, searchSlot, listLabel = '候補の一覧', folder: controlledFolder, onFolder, folderHeading, initialFolder, embedded = false, stacked = false }: MultiBodyProps) {
   const id = useId()
   const [ownFolder, setOwnFolder] = useState(initialFolder ?? ALL)
   const folder = controlledFolder ?? ownFolder
@@ -286,6 +288,16 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
         {state || (rows.length ? rows.map((item) => {
           const checked = set.has(item.id)
           const inputId = `${id}-${item.id}`
+          if (stacked) return <div key={item.id} className={styles.multiRow} data-stacked="" data-selected={checked || undefined} data-disabled={item.disabled || undefined}>
+            <Checkbox id={inputId} aria-label={item.name} checked={checked} disabled={readOnly || busy || item.locked || (item.disabled && !checked)} onCheckedChange={(on) => toggleMany([item.id], on)} />
+            <label className={styles.multiStack} htmlFor={inputId}>
+              <span className={styles.multiName} title={item.name}>
+                {hasFolders ? <FolderDot folder={folderOf(item, folders)} /> : null}
+                <span className={styles.multiNameText}>{item.name}</span>
+              </span>
+              {item.meta || rowExtra ? <small className={styles.multiSub}>{item.meta ? <span className={styles.multiSubText} title={item.meta}>{item.meta}</span> : null}{rowExtra ? rowExtra(item) : null}</small> : null}
+            </label>
+          </div>
           return <div key={item.id} className={styles.multiRow} data-selected={checked || undefined} data-disabled={item.disabled || undefined}>
             <Checkbox id={inputId} aria-label={item.name} checked={checked} disabled={readOnly || busy || item.locked || (item.disabled && !checked)} onCheckedChange={(on) => toggleMany([item.id], on)} />
             <label className={styles.multiName} htmlFor={inputId} title={item.name}>
@@ -330,12 +342,14 @@ type MultiProps = {
   allowEmpty?: boolean
   rowExtra?: (item: EntityPickerItem) => ReactNode
   initialFolder?: string
+  /** 行を2段にする（名前の下に補足と状態）。 */
+  stacked?: boolean
   onConfirm: (ids: string[]) => void
   onCancel: () => void
 }
 
 /** まとめて選ぶ窓。確定するまでは呼ぶ側の値を変えない。 */
-export function EntityMultiPickerDialog({ title, description, items, folders, foldersFailed, initialIds, unit = '件', state, listFooter, error, busy = false, readOnly = false, createHref, createLabel, createAction, note, searchPlaceholder = '名前で探す', allowEmpty = true, rowExtra, initialFolder, query: controlledQuery, onQueryChange, maxSelected, onConfirm, onCancel }: MultiProps) {
+export function EntityMultiPickerDialog({ title, description, items, folders, foldersFailed, initialIds, unit = '件', state, listFooter, error, busy = false, readOnly = false, createHref, createLabel, createAction, note, searchPlaceholder = '名前で探す', allowEmpty = true, rowExtra, initialFolder, stacked, query: controlledQuery, onQueryChange, maxSelected, onConfirm, onCancel }: MultiProps) {
   const [selected, setSelected] = useState(initialIds)
   const [ownQuery, setOwnQuery] = useState('')
   const query = controlledQuery ?? ownQuery
@@ -385,7 +399,7 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
     </div>
     </>}
   >
-    <EntityMultiSelect items={maxSelected && selected.length >= maxSelected ? allItems.map((item) => ({ ...item, disabled: item.disabled || !selected.includes(item.id) })) :allItems} folders={folders} foldersFailed={foldersFailed} selected={selected} onChange={setSelected} query={query} onlySelected={onlySelected} readOnly={readOnly} busy={busy || createBusy} state={state} listFooter={listFooter} rowExtra={rowExtra} initialFolder={initialFolder}
+    <EntityMultiSelect items={maxSelected && selected.length >= maxSelected ? allItems.map((item) => ({ ...item, disabled: item.disabled || !selected.includes(item.id) })) :allItems} folders={folders} foldersFailed={foldersFailed} selected={selected} onChange={setSelected} query={query} onlySelected={onlySelected} readOnly={readOnly} busy={busy || createBusy} state={state} listFooter={listFooter} rowExtra={rowExtra} initialFolder={initialFolder} stacked={stacked}
       searchSlot={<>
         <SearchField ref={searchRef} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
         {creating && createAction ? <div className={styles.createRow}>

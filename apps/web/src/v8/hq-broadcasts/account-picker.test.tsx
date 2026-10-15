@@ -50,9 +50,9 @@ describe('送るアカウントの選択窓', () => {
   it('接続の要確認と送れない理由を出しても選べ、未取得の人数を0としない', async () => {
     render(<BroadcastAccountPicker {...props} />)
     await screen.findByRole('dialog')
-    expect(screen.getByText('要確認')).toBeTruthy()
-    expect(screen.getByText('アカウントを停止しているため、今は送れません。')).toBeTruthy()
-    expect(screen.getByText('友だち —（未取得） 人')).toBeTruthy()
+    expect(screen.getByText('・接続を確かめてください')).toBeTruthy()
+    expect(screen.getByText('・今は送れません（アカウントを停止中）')).toBeTruthy()
+    expect(screen.getByText('—（未取得） 人')).toBeTruthy()
     for (const name of ['新宿店', '梅田店']) {
       const checkbox = screen.getByRole('checkbox', { name }) as HTMLInputElement
       expect(checkbox.disabled).toBe(false)

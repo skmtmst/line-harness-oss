@@ -32,6 +32,11 @@
 .multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
 .multiNameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multiExtra { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; }
+.multiRow[data-stacked] { min-height: var(--tpl-picker-stack-row-h); padding: var(--tpl-picker-stack-row-pad); }
+.multiStack { display: flex; flex-direction: column; justify-content: center; gap: var(--tpl-picker-stack-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; }
+.multiStack > .multiName { flex: none; cursor: inherit; }
+.multiSub { display: flex; align-items: center; min-width: 0; font-size: var(--text-micro, var(--text-caption)); line-height: var(--tpl-picker-stack-sub-lh); color: var(--color-ink-secondary); }
+.multiSubText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multiMeta { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
 .multiCount { display: inline-flex; align-items: center; }
 .textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
