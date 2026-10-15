@@ -194,14 +194,14 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               <Link href={`/booking/staff/shifts?staff_id=${person.id}`} className={styles.staffNameLink}>
                 {person.name}
               </Link>
-              {person.role ? <span className={styles.staffRole}>{person.role}</span> : null}
+              {person.role ? <span className={styles.staffRole} title={person.role}>{person.role}</span> : null}
             </span>
             <span className={styles.staffColMenus}>
               {offered > 0 ? (
                 <span className={styles.staffCellMain}>{offered}つ</span>
               ) : (
                 <span className={styles.cellWarn}>
-                  0<span className={styles.staffCellSub}>予約画面に出ません</span>
+                  0<span className={styles.staffCellSub} title="予約画面に出ません">予約画面に出ません</span>
                 </span>
               )}
             </span>

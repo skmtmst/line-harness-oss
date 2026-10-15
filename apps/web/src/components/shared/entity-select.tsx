@@ -61,6 +61,8 @@ type CommonProps = {
   width?: number
   /** 選択した名前が長い小さな設定欄だけ、札を小さい口で出す。 */
   compact?: boolean
+  /** 狭い頭の欄（会話の頭の担当 eovoG）：欄全体が押す口なので「変える ›」を出さず、名前の札だけにする。 */
+  actionHidden?: boolean
   /** 呼び出し元の印は欄に入れず、窓を開く操作の意味を共通にする。 */
   icon?: ReactNode
   /** 移行前のSelectと同じ呼び出し口。 */
@@ -95,7 +97,7 @@ export default function EntitySelect(props: EntitySelectProps) {
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
-    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix,
+    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, actionHidden: props.actionHidden,
   }
   return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%', flexShrink: 0 } : undefined} data-entity-picker-field>
     {name ? <input type="hidden" name={name} value={props.values ? props.values.join(',') : props.value} disabled={disabled} /> : null}

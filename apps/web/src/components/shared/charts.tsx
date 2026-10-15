@@ -50,4 +50,19 @@ export function LineChart({ points, label, unit = '', maxX, maxY, marker }: { po
  </svg></div>
 }
 
-export function HorizontalBarChart(props: Parameters<typeof FunnelChart>[0]) { return <FunnelChart {...props} numbered={false} /> }
+/**
+ * 横棒（絵 v0SbYR「集まった回答」）：名前120・細い棒（全体に占める割合）・数と割合。
+ * 行は押せない読み物なので、枠の付いた箱にしない。total を渡さなければ並べた数の合計を全体にする。
+ */
+export function HorizontalBarChart({ items, label, unit = '件', total }: { items: ChartPoint[]; label: string; unit?: string; total?: number }) {
+ const whole = Math.max(1, total ?? items.reduce((sum, item) => sum + Math.max(0, item.value ?? 0), 0))
+ return <div className={styles.hbar} role="group" aria-label={label}>{items.map(item => {
+  const share = Math.round(Math.max(0, item.value ?? 0) / whole * 100)
+  const text = `${chartNumber(item.value, unit)}（${share}%）`
+  return <div className={styles.hbarRow} key={item.key} role="group" aria-label={`${item.label} ${text}`}>
+   <span className={styles.hbarLabel} title={item.label}>{item.label}</span>
+   <span className={styles.hbarTrack} aria-hidden="true"><span style={{ width: `${share}%` }} /></span>
+   <span className={styles.hbarValue}>{text}</span>
+  </div>
+ })}</div>
+}

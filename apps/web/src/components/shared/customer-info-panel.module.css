@@ -47,3 +47,8 @@
 /* B-152/B-212: 段は16、段内は8。節の線・上下の余白を重ねない。 */
 .panel { gap: var(--space-16); }
 .section + .section { padding-top: 0; border-top: 0; }
+
+/* 絵 eovoG：節の中身が文字だけ（メモ・リッチメニュー名）のときも、行の値と同じ本文の大きさ。 */
+.content { color: var(--color-ink); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
+/* 受信箱の右の列（絵 eovoG）：見出し84。「次の自動配信」が値にくっつかない。 */
+.panel[data-label-width='wide'] { --tpl-customer-label: 84px; }
