@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connectGuardBrowser } from './browser-session.mjs'
+import { compileUiStyles } from './compile-ui-styles.mjs'
 
 const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
@@ -27,9 +28,11 @@ const compiled = await build({
   tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
   plugins: [{ name: 'fixture', setup(b) {
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
+    b.onResolve({ filter: /^@\/contexts\/account-context$/ }, () => ({ path: 'account', namespace: 'fixture' }))
     b.onResolve({ filter: /^next\/link$|^@\/components\/shared\/list-navigation$/ }, () => ({ path: 'link', namespace: 'fixture' }))
     b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'navigation'
       ? 'export const useRouter=()=>({push(){},replace(){},prefetch(){}});export const usePathname=()=>"/fixture";export const useSearchParams=()=>new URLSearchParams();'
+      : args.path === 'account' ? 'export const useOptionalAccount=()=>null;export const useAccount=()=>({selectedAccountId:null,selectedAccount:null});'
       : 'import React from "react";export default function Link(p){return React.createElement("a",p)}', resolveDir: webRoot }))
     b.onLoad({ filter: /\.module\.css$/ }, args => {
       let css = readFileSync(args.path, 'utf8')
@@ -46,7 +49,7 @@ const compiled = await build({
     b.onLoad({ filter: /\.css$/ }, args => { sheets.add(readFileSync(args.path, 'utf8')); return { contents: '', loader: 'js' } })
   } }],
 })
-const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace(/@theme\s*\{/g, ':root {')
+const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname)
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
 test('本物の作成型は短い本文でも下帯を下へ置き、格子は印・全文・鍵盤選択を保つ', async () => {
