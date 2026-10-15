@@ -17,7 +17,7 @@ import { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from '../booking-m
 import settings from '../booking-menus/settings.module.css'
 import { providerFor } from './labels'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { TestModeBadge } from '@/components/shared/payment-badges'
+import TestModeNote from '@/components/shared/test-mode-note'
 import PaymentRecords from './records'
 import PaymentEvents from './events'
 import styles from './payments.module.css'
@@ -141,7 +141,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
             <span className={styles.providerName}>
               Stripe
               {connected ? <StatusBadge tone="success" size="compact">つながっている</StatusBadge> : null}
-              {connected && testMode ? <TestModeBadge /> : null}
+              {connected && testMode ? <TestModeNote size="compact">{null}</TestModeNote> : null}
             </span>
             <span className={styles.providerMeta}>
               {connected

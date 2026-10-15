@@ -7,7 +7,7 @@ import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
 import PaymentBadge from './PaymentBadge.js';
 import type { BookingPayment } from '../lib/api.js';
-import { paymentStatusKey } from '@line-crm/shared';
+import { PAYMENT_STATUS, paymentBadge } from '@line-crm/shared';
 
 /**
  * 予約の履歴の札 (★V8・YvTJ3)。日付の四角＋メニュー名＋状態の札。
@@ -31,8 +31,8 @@ export default function HistoryCard({
   payment?: BookingPayment | null;
   disabled?: boolean;
 }) {
-  const payKey = paymentStatusKey(payment?.status);
-  const unpaid = payKey === 'unpaid';
+  const payBadge = paymentBadge(payment?.status);
+  const unpaid = payBadge === PAYMENT_STATUS.unpaid;
   const meta = STATUS_META[booking.status] ?? { label: booking.status, tone: 'neutral' as const };
   const hasActions = Boolean(onChange || onCancel || onPay);
   return (
@@ -49,7 +49,7 @@ export default function HistoryCard({
             <div className="w-full truncate text-sm leading-normal font-bold text-ink" title={booking.menu_name}>
               {booking.menu_name}
             </div>
-            {payKey ? <PaymentBadge status={payment!.status} amount={payment?.amount ?? null} /> : <Badge tone={meta.tone}>{meta.label}</Badge>}
+            {payBadge ? <PaymentBadge status={payment!.status} amount={payment?.amount ?? null} /> : <Badge tone={meta.tone}>{meta.label}</Badge>}
           </div>
         </div>
         {unpaid && payment?.hold_until ? (

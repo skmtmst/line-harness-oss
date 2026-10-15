@@ -24,9 +24,10 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { formatListTimestamp, formatYen } from '@/lib/format'
 import { ApiError } from '@/lib/api'
 import { bookingPaymentAdminApi, isNotReadyError, type PaymentRecord, type PaymentRecordsPage } from '@/lib/api-booking-payment-admin'
-import { PAYMENT_STATUS } from '@line-crm/shared'
-import { PaymentOnsiteBadge, PaymentStatusBadge, TestModeBadge } from '@/components/shared/payment-badges'
-import RefundDialog, { type RefundInput } from '@/components/shared/refund-dialog'
+import { PAYMENT_STATUS, paymentBadge } from '@/components/shared/payment-status'
+import StatusBadge from '@/components/shared/status-badge'
+import TestModeNote from '@/components/shared/test-mode-note'
+import { RefundDialog, type RefundInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 
 /** 口の案：記録に「操作した人・理由」（返金・手で直した人と理由）。今の口には無い（口が要る）。 */
@@ -67,6 +68,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<PaymentRecord | null>(null)
   const [testMode, setTestMode] = useState(false)
+  const [refunding, setRefunding] = useState(false)
+  const [refundError, setRefundError] = useState<string | null>(null)
   const preparing = usePreparingDialog()
   const generation = useRef(0)
   const [exporting, setExporting] = useState(false)
@@ -100,7 +103,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={15} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
       ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={15} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
       ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={15} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
-      ...(canEdit && record.status === 'paid' ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => setRefundTarget(record) }] : []),
+      ...(canEdit && record.status === 'paid' ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundTarget(record) } }] : []),
     ]
   }
 
@@ -135,17 +138,22 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
    */
   async function refund(input: RefundInput) {
     if (!refundTarget) return
-    if (input.partial && input.amount < refundTarget.amount) {
+    if (input.amount < refundTarget.amount) {
       setRefundTarget(null)
       preparing.open('一部の返金')
       return
     }
+    setRefunding(true)
+    setRefundError(null)
     try {
       await bookingPaymentAdminApi.refund(refundTarget.id)
     } catch (cause) {
-      throw new Error(cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません（支払い済みのものだけ返金できます）。'
+      setRefundError(cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません（支払い済みのものだけ返金できます）。'
         : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'
           : '返金できませんでした。Stripe の管理画面で状態を確かめてください。')
+      return
+    } finally {
+      setRefunding(false)
     }
     notifySaved(`${refundTarget.friendName ?? 'お客さま'}さまに ${formatYen(input.amount)} を返金しました`)
     setRefundTarget(null)
@@ -155,7 +163,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   return (
     <div className={styles.records} data-design="PaymentRecords">
       <div className={styles.recordsHead}>
-        <h2 className={styles.recordsTitle}>お支払いの記録<HelpTip label="お支払いの記録の数え方">入金は今月に支払いが済んだ合計、返金は今月に返金した合計です。期限切れの枠は、お支払いを待つ時間を過ぎて取り消した仮の予約です。</HelpTip>{testMode ? <TestModeBadge /> : null}</h2>
+        <h2 className={styles.recordsTitle}>お支払いの記録<HelpTip label="お支払いの記録の数え方">入金は今月に支払いが済んだ合計、返金は今月に返金した合計です。期限切れの枠は、お支払いを待つ時間を過ぎて取り消した仮の予約です。</HelpTip>{testMode ? <TestModeNote size="compact">{null}</TestModeNote> : null}</h2>
         {load.state === 'ready' ? <Button busy={exporting} onClick={() => void exportCsv()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button> : null}
       </div>
 
@@ -193,7 +201,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
                           <Td grow>{record.friendId ? <RowNameLink href={`/friends/detail?id=${encodeURIComponent(record.friendId)}`} title={record.friendName ?? ''}>{record.friendName ?? emptyValue('unknown')}</RowNameLink> : <TruncatedText value={record.friendName ?? emptyValue('unknown')} />}</Td>
                           <Td grow><span className={styles.cellStack}><TruncatedText value={record.bookingLabel ?? emptyValue('unknown')} />{record.bookingNote ? <span className={styles.cellSub}>{record.bookingNote}</span> : null}</span></Td>
                           <Td align="right"><TruncatedText value={formatYen(record.amount)} /></Td>
-                          <Td>{record.status === 'onsite' ? <PaymentOnsiteBadge /> : <PaymentStatusBadge status={record.status} />}</Td>
+                          <Td>{(() => { const badge = paymentBadge(record.status); return badge ? <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge> : emptyValue('unknown') })()}</Td>
                           <Td><TruncatedText value={record.method === 'online' ? 'カード' : record.method === 'onsite' ? '店頭' : record.method ?? emptyValue('unknown')} /></Td>
                           <Td><TruncatedText value={actor ?? emptyValue('unknown')} /></Td>
                           <ActionCell>{menu.length > 0 ? <RowMenu appearance="box" size="row" label={`${record.friendName ?? 'お支払い'}の操作`} open={openMenu === record.id} onOpenChange={(next) => setOpenMenu(next ? record.id : null)} items={menu} /> : null}</ActionCell>
@@ -210,9 +218,12 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         cancelLabel="閉じる" onCancel={() => setLinkPreview(null)}>
         {linkPreview?.url ? <CopyTextButton value={linkPreview.url} label="リンクをコピー" aria-label="支払いのリンクをコピー" /> : <p className={styles.minor}>リンクはまだ作られていません。</p>}
       </Dialog>
-      <RefundDialog open={refundTarget !== null} customerName={refundTarget?.friendName ?? 'お客'} bookingLabel={refundTarget?.bookingLabel ?? ''}
-        paidAmount={refundTarget?.amount ?? 0} methodLabel="カード" testMode={testMode}
-        onSubmit={refund} onClose={() => setRefundTarget(null)} />
+      <RefundDialog open={refundTarget !== null} subtitle={`${refundTarget?.friendName ?? 'お客'}さま・${refundTarget?.bookingLabel ?? ''}`}
+        paidAmount={refundTarget?.amount ?? 0} testMode={testMode} busy={refunding} error={refundError ?? undefined}
+        facts={[{ label: '支払った額', value: `${formatYen(refundTarget?.amount)}（${refundTarget?.method === 'onsite' ? '店頭' : 'カード'}）` }, { label: 'これまでの返金', value: 'なし' }]}
+        destination={refundTarget?.method === 'onsite' ? '店頭' : 'カード'}
+        messageFor={(input) => `${refundTarget?.friendName ?? 'お客'}さま　${refundTarget?.bookingLabel ?? ''}のご予約のお支払いのうち ${formatYen(input.amount)} を返金しました。カードへの反映は数日かかることがあります。`}
+        onClose={() => { if (!refunding) { setRefundTarget(null); setRefundError(null) } }} onConfirm={(input) => void refund(input)} />
       {preparing.dialog}
     </div>
   )
