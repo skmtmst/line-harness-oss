@@ -16,6 +16,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import AllergyField from '@/components/shared/allergy-field'
 
 /*
@@ -89,6 +91,11 @@ export default function InfoTab({ friendId, group, data, perms }: {
   perms: FriendDetailPermissions
 }) {
   const { fields, values, setValues, fieldsStatus, fieldFolders, fieldFoldersStatus, hiddenPersonalCount } = data
+  // 保存前の入力があれば、ほかの画面・タブへ移る前に共通の確認を出す（ほかの編集画面と同じ番兵）。
+  const dirty = fieldsStatus === 'ready' && fields.some((field) => (field.value ?? '') !== (values[field.id] ?? ''))
+  const resetValues = () => setValues(Object.fromEntries(fields.map((field) => [field.id, field.value ?? ''])))
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: data.saving, onDiscard: resetValues })
+  const leaveDialog = <UnsavedLeaveDialog open={leaveTarget !== null} subject="情報欄への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
   if (fieldsStatus === 'loading' || fieldsStatus === 'idle') {
     return <div className={styles.pane}><DetailLoading /></div>
@@ -113,7 +120,6 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const firstShopGroup = groups.find(key => key !== 'basic' && key !== 'dining')
   // 「情報欄を管理」はお店が作った分類の頭に出す。お店の分類が無いときは最初の分類の頭に出す。
   const manageGroup = firstShopGroup ?? groups[0]
-  const dirty = fields.some((field) => (field.value ?? '') !== (values[field.id] ?? ''))
   const groupOf = (field: FriendField) => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'
 
   const folderCount = new Map<string, number>()
@@ -212,7 +218,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
               {data.saveError ? <p className={styles.saveNote}><span className={styles.danger} role="alert">{data.saveError}</span></p>
                 : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p> : null}
               <div className={styles.saveActions}>
-                <Button variant="secondary" onClick={() => setValues(Object.fromEntries(fields.map((field) => [field.id, field.value ?? ''])))} disabled={data.saving || !dirty}>キャンセル</Button>
+                <Button variant="secondary" onClick={resetValues} disabled={data.saving || !dirty}>キャンセル</Button>
                 <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
               </div>
             </div>
@@ -221,6 +227,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           )}
         </>
       )}
+      {leaveDialog}
     </div>
   )
 }
