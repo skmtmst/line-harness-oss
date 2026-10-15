@@ -64,6 +64,12 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
     expect(host.textContent).toContain('認証アプリに出ている6桁を入れてください。')
   })
 
+  it('LINEで認証したときは、パスワードを確認したとは案内しない', async () => {
+    await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=line', 'v8')
+    expect(host.textContent).toContain('LINEでのログインを確かめました。')
+    expect(host.textContent).not.toContain('パスワードを確かめました。')
+  })
+
   it('認証の情報が無いときは、確認済みの案内を出さずログインのやり直しを案内する', async () => {
     await open('/login/two-factor?next=ops', 'v8')
     expect(host.textContent).toContain('ログインの情報が見つかりませんでした。')
