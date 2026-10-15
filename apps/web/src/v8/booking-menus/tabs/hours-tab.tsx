@@ -163,7 +163,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Week">
-      <Band tone="hint">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Band>
+      <Notice tone="info">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Notice>
       {!settings.businessHoursConfigured ? (
         <Band tone="warn">まだ週全体の営業時間を保存していません。時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。</Band>
       ) : null}
