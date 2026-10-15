@@ -543,7 +543,8 @@ function Bookings({ eventId }: { eventId: string }) {
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
-              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
+              valuePrefix="開催回："
+              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: formatOccurrence(slot.starts_at) }))}
             /></SaveErrorField>
           </div>
         </div>
