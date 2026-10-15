@@ -81,7 +81,9 @@ describe('札の置き場所', () => {
   })
 
   it('v8 の寸法の文は `exportSizeText` から組む（決め打ちしない）', () => {
-    expect(v8).toMatch(/text=\{exportSizeText\(presets, input\.presetKey\)\}/)
+    // 生成中は札（exportSizeText の文・p03ImY）、それ以外は帯の小さな2行に寸法だけ（presetSizeLabel・tSgl6）。
+    expect(v8).toMatch(/<ExportSizeChip text=\{exportSizeText\(presets, input\.presetKey\)\} \/>/)
+    expect(v8).toMatch(/presetSizeLabel\(preset\)/)
     for (const source of [v8]) {
       expect(source).not.toMatch(/'1040 × 1040 で書き出します'/)
     }

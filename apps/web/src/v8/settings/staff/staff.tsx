@@ -808,7 +808,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
-  const administrator = me?.role === 'admin' || me?.role === 'owner'
+  // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
+  const administrator = (me?.role === 'admin' || me?.role === 'owner') && !me?.readOnly
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
     setLoading(true)

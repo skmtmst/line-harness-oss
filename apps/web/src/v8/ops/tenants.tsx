@@ -2,7 +2,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
+import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
@@ -157,7 +157,8 @@ export default function OpsTenantsV8() {
             <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
               {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
             </FilterChip>
-            {STATUS_FILTERS.map((f) => <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>{f.label}</FilterChip>)}
+            {/* 状態の札は文字だけ（星はお気に入りの印に見える・絵 XWtYC）。 */}
+            {STATUS_FILTERS.map((f) => <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>{f.label}</FilterChip>)}
           </>}
         />}
       >

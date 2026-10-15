@@ -505,8 +505,10 @@ export default function ScenarioCreateV8() {
             icon={<CalendarClock size={16} aria-hidden="true" />}
             title="時刻で指定"
             note="購読開始から〇日後の〇時に届きます。決まった時刻の定期配信（メルマガ・朝の配信）に"
-            contentPlacement="below-indicator"
-          ><DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} /></RadioCard>
+          >
+            {/* G-5：2人がいつ受け取るかの図を各カードの中に（絵 cu3vm・dnzqC。下の見本の表は図に入ったので消した・R83uvQ）。 */}
+            <DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} />
+          </RadioCard>
           <RadioCard
             name="delivery-mode"
             value="elapsed"
@@ -516,10 +518,10 @@ export default function ScenarioCreateV8() {
             icon={<Timer size={16} aria-hidden="true" />}
             title="経過時間で指定"
             note="購読開始から〇日と〇時間後に届きます。買った直後・予約直後のフォローに"
-            contentPlacement="below-indicator"
-          ><DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} /></RadioCard>
+          >
+            <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
+          </RadioCard>
         </RadioCardGroup></SaveErrorField>
-        {/* 絵 R83uvQ（G-5）：それぞれのカードの中に A・B の時間の図解と結びの文。 */}
       </Card>
     </CreatePage></SaveErrorScope>
   )

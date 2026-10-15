@@ -156,18 +156,22 @@ describe('作る①（dnzqC）', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  test('方式カードの中の図解で2人の届く時刻を比較でき、選んだ方式の図だけ強く見せる', async () => {
+  test('はじめは「時刻で指定」を選び、図を押しても方式を替えられ、札は個別に読ませない', async () => {
     render(<ScenarioCreateV8 />)
     const absolute = screen.getByRole('radio', { name: /時刻で指定/ }) as HTMLInputElement
     expect(absolute.checked).toBe(true)
-    const diagrams = screen.getAllByRole('img', { name: /購読を始めた/ })
+    const diagrams = screen.getAllByRole('img')
     expect(diagrams).toHaveLength(2)
-    expect(diagrams[0].getAttribute('aria-label')).toContain('1通目は当日15時')
-    expect(diagrams[1].getAttribute('aria-label')).toContain('当日17時')
-    expect(diagrams[0].getAttribute('data-selected')).toBe('true')
-    fireEvent.click(screen.getByRole('radio', { name: /経過時間で指定/ }))
+    expect(diagrams[0].getAttribute('aria-label')).toContain('両方に、1通目は当日15時、2通目は翌日20時')
+    expect(diagrams[1].getAttribute('aria-label')).toContain('当日17時と翌日22時')
+    for (const diagram of diagrams) expect(diagram.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+    fireEvent.click(diagrams[1])
     expect(absolute.checked).toBe(false)
-    expect(screen.getAllByRole('img', { name: /購読を始めた/ })[1].getAttribute('data-selected')).toBe('true')
+    expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
+    expect(diagrams[0].getAttribute('data-selected')).toBe('false')
+    expect(diagrams[1].getAttribute('data-selected')).toBe('true')
+    // 下の見本の表は置かない（図に入ったため・絵 R83uvQ）。
+    expect(screen.queryByRole('table', { name: '選んだ配信方式の見本' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '配信方式の説明' }))
     expect(screen.getByText('作ったあとは変えられません')).toBeTruthy()
   })

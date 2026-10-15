@@ -1,7 +1,7 @@
 'use client'
 
 /* LINEの見え方は書き出しもブラウザも現在のスマホ枠だけ。中身と操作は画面が渡す。 */
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
 import FlexPreview from '@/components/flex-preview'
@@ -109,6 +109,18 @@ export default function LinePreview({
 
 }
 
+/**
+ * 本文の URL は「/」「.」のあとで折れるようにする（「…/book」「ing」のように語の途中で折らない・UTbi1）。
+ * それでも1行に入らない長い区切りだけ、今までどおり途中で折る。
+ */
+function withUrlBreaks(text: string): ReactNode {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  if (parts.length === 1) return text
+  return parts.map((part, index) => index % 2 === 1
+    ? <Fragment key={index}>{part.split(/(?<=[/.?&=])/).map((piece, pieceIndex) => <Fragment key={pieceIndex}>{pieceIndex > 0 ? <wbr /> : null}{piece}</Fragment>)}</Fragment>
+    : part)
+}
+
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
 export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density, bare = false }: {
   accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
@@ -126,7 +138,7 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
       <div className={styles.bubbleRow}>
         {bare ? children : <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
-          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{children}</span></div>
+          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof children === 'string' ? withUrlBreaks(children) : children}</span></div>
         </div>}
         <span className={styles.messageTime}>{time}</span>
       </div>
@@ -150,6 +162,28 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
       {actions.map(action => <button key={action.label} type="button" className={`${styles.productAction} ${action.secondary ? styles.secondaryAction : ''}`} onClick={action.onClick}>{action.label}</button>)}
     </div>
     <span className={styles.messageTime}>{time}</span>
+  </div>
+}
+
+/**
+ * カルーセル（絵 F3X1Mo）：写真・題・短い文・押す所のカードを横に並べ、はみ出した分は横へ送る。
+ * 見本なので押す所は押せない文字にする。写真が無いカードは灰の地。
+ */
+export function LinePreviewCarousel({ columns, time }: {
+  columns: Array<{ title: string; text: string; imageUrl?: string | null; actions: string[] }>; time?: string
+}) {
+  return <div className={styles.cardRow}>
+    <div className={styles.carouselTrack}>
+      {columns.map((column, index) => <div key={index} className={`${styles.productCard} ${styles.carouselCard}`}>
+        <div className={styles.productImage} role="img" aria-label={column.title || 'カードの写真'} style={column.imageUrl ? { backgroundImage: `url(${JSON.stringify(column.imageUrl)})` } : { background: 'var(--color-canvas-sunken)' }} />
+        <div className={styles.productCopy}>
+          {column.title ? <span className={styles.productTitle} title={column.title}>{column.title}</span> : null}
+          {column.text ? <span className={styles.productDescription} title={column.text}>{column.text}</span> : null}
+        </div>
+        {column.actions.map((label) => <span key={label} className={styles.productAction}>{label}</span>)}
+      </div>)}
+    </div>
+    {time ? <span className={styles.messageTime}>{time}</span> : null}
   </div>
 }
 
