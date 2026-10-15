@@ -1937,6 +1937,9 @@ scoring.get('/api/action-scores/friends', requireRole('owner', 'admin', 'staff')
 
 // ========== スコアリングルールCRUD ==========
 
+scoring.use('/api/scoring-rules', async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410));
+scoring.use('/api/scoring-rules/*', async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410));
+
 scoring.get('/api/scoring-rules', async (c) => {
   try {
     const items = await getScoringRules(c.env.DB);

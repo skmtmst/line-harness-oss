@@ -1,22 +1,29 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { registrations, hasPriorGuard, importedRouters, exportedRouters } from '../test-utils/route-guards.js';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const authState = vi.hoisted(() => ({ readOnly: false }));
+const authState = vi.hoisted(() => ({ readOnly: false, role: 'staff' as 'owner' | 'admin' | 'staff' }));
 vi.mock('@line-crm/db', async (original) => ({
   ...await original<typeof import('@line-crm/db')>(),
   getStaffByAdminSession: async () => null,
   getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
-  getStaffByApiKey: async () => ({ id: 'coverage-staff', name: 'Coverage', role: 'staff',
+  getStaffByApiKey: async (_db: unknown, token: string) => ({ id: `coverage-${token}`, name: 'Coverage', role: authState.role, tenant_id: 'coverage-tenant',
     access_level: authState.readOnly ? 'read_only' : 'full', permission_keys: '[]', tenant_status: 'active' }),
   getActiveImpersonation: async () => null,
   getPlatformAdminByStaffId: async () => null,
   getStaffById: async () => null,
+  // The matrix tests authorization, with rate limiting tested separately in
+  // rate-limit-shared.test.ts. A fake DB must not stop requests at the throttle.
+  bumpAuthThrottle: async () => 1,
+  getLineAccountScopeEntries: async () => [{ id: 'coverage-account', tenant_id: 'coverage-tenant', is_active: 1 }],
   recordAuditEvent: async () => undefined,
 }));
 import { app } from '../index.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+
+beforeEach(() => { authState.role = 'staff'; authState.readOnly = false; });
 
 
 import {
@@ -68,6 +75,38 @@ function collectUnguarded(fixtures?: Record<string, string>): Finding[] {
 }
 
 describe('更新系の権限ガードの網羅', () => {
+  it('S07 全管理APIの読取・書出し・更新で未ログインと別アカウント指定を拒否する', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    expect(routes.length).toBeGreaterThan(100);
+    let index = 10_000;
+    const matrixDb = createTestD1({ foreignKeys: false });
+    try {
+    for (const route of routes) {
+      const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+      const env = { DB: matrixDb.db };
+      const unauthenticated = await app.request(path, { method: route.method,
+        headers: { 'CF-Connecting-IP': `s07-unauth-${++index}` } }, env as never);
+      expect(unauthenticated.status, `${route.method} ${route.path}: unauthenticated`).toBe(401);
+      for (const role of ['owner', 'admin', 'staff'] as const) {
+        authState.role = role;
+        authState.readOnly = false;
+        const denied = await app.request(`${path}?accountId=foreign-account`, { method: route.method,
+          headers: { Authorization: `Bearer ${String(++index).padStart(16, '0')}`,
+            'CF-Connecting-IP': `s07-${index}` } }, env as never);
+        expect(denied.status, `${route.method} ${route.path}: ${role} outside account`).toBe(403);
+      }
+    }
+    if (process.env.SECURITY_MATRIX_REPORT) {
+      writeFileSync(process.env.SECURITY_MATRIX_REPORT,
+        'method\tpath\tunauthenticated\towner_foreign_account_query\tadmin_foreign_account_query\tstaff_foreign_account_query\n'
+        + routes.map(route => `${route.method}\t${route.path}\t401\t403\t403\t403`).join('\n') + '\n');
+    }
+    } finally { matrixDb.raw.close(); authState.role = 'staff'; }
+  }, 120_000);
+
   it('同じファイルの保護済みルートが未保護ルートを隠さない', () => {
     const source = `import { requireRole } from '../middleware/role-guard.js';
       router.post('/api/mixed/protected', requireRole('owner'), async c => c.json({ok:true}));
