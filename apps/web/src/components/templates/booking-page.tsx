@@ -3,6 +3,7 @@ import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 import dayStyles from './booking-day-layout.module.css'
 import PreviewLauncher from './preview-launcher'
+import TextLink from '@/components/shared/text-link'
 
 /** O2Z8u・GcyTr：題と主操作の直下に数の帯を置く予約の型。 */
 export function BookingPage({ children, stats, aside, ...heading }: PageHeadingProps & { children: ReactNode; stats?: ReactNode; aside?: ReactNode }) {
@@ -28,4 +29,22 @@ export function BookingPageStats({ children }: { children: ReactNode }) {
 
 export function BookingPageContent({ children }: { children: ReactNode }) {
   return <div className={styles.bookingContent} data-template-region="content">{children}</div>
+}
+
+/** 予約の補助欄の区画。画面は題と実データだけを渡す。 */
+export function BookingSidebarSection({ title, action, children }: { title: ReactNode; action?: { href: string; label: string }; children: ReactNode }) {
+  return <section className={dayStyles.sidebarSection}>
+    {action ? <div className={dayStyles.sidebarHead}><h3>{title}</h3><TextLink href={action.href}>{action.label}</TextLink></div> : <h3>{title}</h3>}
+    {children}
+  </section>
+}
+
+/** 補助欄の「気をつけること」：印・題・補足の行（GcyTr）。 */
+export function BookingSidebarNotes({ items }: { items: { icon: ReactNode; title: ReactNode; detail?: ReactNode }[] }) {
+  return <ul className={dayStyles.sidebarNotes}>{items.map((item, index) => <li key={index}><span className={dayStyles.sidebarNoteIcon}>{item.icon}</span><span><strong>{item.title}</strong>{item.detail ? <small>{item.detail}</small> : null}</span></li>)}</ul>
+}
+
+/** 補助欄の「つながる先」：行き先（→）と、そこで何をするかの1行（GcyTr）。 */
+export function BookingSidebarLinks({ links }: { links: { href: string; label: string; note: string }[] }) {
+  return <ul className={dayStyles.sidebarLinks}>{links.map((link) => <li key={link.href}><TextLink href={link.href}>{link.label}</TextLink><span>{link.note}</span></li>)}</ul>
 }

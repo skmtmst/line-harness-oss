@@ -161,11 +161,11 @@ describe('公開前の確認の窓（sDXNy）', () => {
       ['宛先', '選んだスタッフ 3 人'],
       ['LINE が届く人', '2 人（1 人は LINE 未登録）'],
     ])
-    const rows = Array.from(dialog?.querySelectorAll('li[class*=confirmRow]') ?? []).map((li) => Array.from(li.children).map((c) => c.textContent))
+    const rows = Array.from(dialog?.querySelectorAll('table[aria-label="受け取る人"] tbody tr') ?? []).map((li) => Array.from(li.children).map((c) => c.textContent))
     expect(rows).toEqual([
       ['高田 誠', '管理者', 'LINE'],
       ['山本 健', 'スタッフ', '画面だけ'],
-      ['佐藤 杏', '', 'LINE'],
+      ['佐藤 杏', '—', 'LINE'],
     ])
     expect(dialog?.textContent).toContain('LINE 未登録の人には、管理画面のお知らせだけで届きます。')
     const send = Array.from(dialog?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('公開して'))

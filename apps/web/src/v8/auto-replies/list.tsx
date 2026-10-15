@@ -1636,7 +1636,7 @@ export default function AutoRepliesListV8() {
           </DialogActions>
         }
       >
-        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
+        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message={pendingDelete?.item.isActive ? '削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。' : '削除は元に戻せません。'} />
         {deleteTargetStale && (
           <Notice tone="danger" >アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>
         )}

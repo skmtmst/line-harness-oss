@@ -12,7 +12,7 @@ import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL
 import { compareLabel, durationLabel, elapsedLabel } from '@/app/ops/support/format'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { ListToolbarRow } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
@@ -573,12 +573,10 @@ export default function OpsSupportV8() {
           designTop={202}
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
-            <div className={styles.confirmActions}>
-              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>
-              <span className={styles.spacer} />
+            <DialogActions leadingAction={<Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>}>
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>
-            </div>
+              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…"><Send aria-hidden="true" />送信する</Button>
+            </DialogActions>
           )}
         >
           <div className={parts.dialogBody}>

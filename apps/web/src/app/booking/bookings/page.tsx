@@ -1,5 +1,5 @@
 'use client'
-import ReservationBoard from '@/components/shared/reservation-board'
+import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board'
 import PeopleDayList from '@/v8/booking-bookings/day-list'
 import PeopleDayFrame from '@/v8/booking-bookings/day-frame'
 import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks'
@@ -298,6 +298,8 @@ export default function BookingsPage() {
   const [staffFilter, setStaffFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
+  /* 盤の「担当者」の絞り込み（GcyTr）。一覧の絞り込み（staffFilter）とは別に、盤の列だけを絞る。 */
+  const [boardStaff, setBoardStaff] = useState('all')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<BookingRequest[]>([])
@@ -982,7 +984,8 @@ export default function BookingsPage() {
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            resources={staffList.map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
+            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><Select aria-label="担当者で絞り込む" value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
+            resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
             renderList={view === 'day' ? () => <PeopleDayList rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
             onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);setCalendarSeq(n=>n+1);await load()}}

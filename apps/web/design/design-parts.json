@@ -3975,6 +3975,22 @@
       "reason": "B-172持ち主の追加。固定した★V8との画素照合が未完了のため、確定済みの値の契約には入れず調査中として残す。",
       "lastCheckedAt": "2026-10-10"
     },
+    "dialog-recipient-list": {
+      "name": "確認窓の宛先一覧",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/dialog-recipient-list.tsx",
+      "components": [
+        "DialogRecipientList"
+      ],
+      "pencilNodes": [
+        "sDXNy"
+      ],
+      "declarations": [],
+      "reason": "窓の宛先の名前・役割・届く方法をまとめる持ち主。画素照合と正式な合否は司令塔が行う。",
+      "lastCheckedAt": "2026-10-15"
+    },
     "screen-explanation": {
       "role": "canonical",
       "status": "active",

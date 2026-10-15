@@ -86,7 +86,8 @@ type NativeButtonProps = CommonProps &
      * かつ絵が幅を指定している並び（窓の足など）で使う。`busy` の間も
      * 平常時の幅を下回らないので、こちらでも幅は跳ねない。
      */
-    widthReserve?: 'states' | 'idle'
+    /** `dynamic` は件数などで平常時の文字が変わる操作。状態の予約を保ち、現在の全文で測り直す。 */
+    widthReserve?: 'states' | 'idle' | 'dynamic'
   }
 
 type LinkButtonProps = CommonProps &
@@ -215,10 +216,10 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       return
     }
     // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
-    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, widthReserve, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
     measuredLabelRef.current = measurementKey
-    el.style.width = ''
+    if (widthReserve === 'dynamic') el.style.width = ''
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (widthReserve === 'idle') {

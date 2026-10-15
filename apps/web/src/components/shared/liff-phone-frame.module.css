@@ -97,7 +97,7 @@
 
 .barMain {
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 700;
   line-height: var(--tpl-bks-ph-bar-title-lh);
 }

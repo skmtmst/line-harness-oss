@@ -219,7 +219,7 @@ export default function HqTemplateDetail({
 
   return (
     <div className={styles.page} data-design-node="pQ4fH">
-      <DetailPage layout="record-detail" contentPadding="0"
+      <DetailPage layout="record-detail" contentPadding="var(--tpl-eds-content-pad)"
         title={detail.template.name}
         identity={backLink}
         help={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
@@ -227,7 +227,6 @@ export default function HqTemplateDetail({
         summaryLabel="LINE の見え方"
         summaryPreview={{ label: 'LINE の見え方', title: 'LINE の見え方' }}
       >
-        <div className={styles.content}>
         {canEdit ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</ReadOnlyNotice></div>}
         {notices}
         {canEdit ? (
@@ -357,7 +356,6 @@ export default function HqTemplateDetail({
             </>
           )}
         </section>
-      </div>
       </DetailPage>
 
       <ConfirmDialog
