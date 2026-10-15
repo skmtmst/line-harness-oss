@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, Info, RefreshCw } from 'lucide-react'
+import { CalendarDays, Info, Link2, RefreshCw } from 'lucide-react'
+import Button from '@/components/shared/button'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -16,7 +18,7 @@ import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatListTimestamp, formatYen } from '@/lib/format'
 import { bookingPaymentAdminApi, isNotReadyError, type PaymentEvent } from '@/lib/api-booking-payment-admin'
-import { EVENT_KIND, EVENT_RESULT, NOT_READY } from './labels'
+import { EVENT_KIND, EVENT_RESULT } from './labels'
 import styles from './payments.module.css'
 
 /* Stripe から届いた知らせ（UteeA の右）。失敗の行は「…」から［もう一度読む］。同じ知らせは二重に数えない。 */
@@ -42,6 +44,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const generation = useRef(0)
+  const preparing = usePreparingDialog()
 
   const reload = useCallback(async () => {
     const mine = ++generation.current
@@ -62,7 +65,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
       notifySaved('知らせをもう一度読みました')
       void reload()
     } catch (cause) {
-      notifyToast(isNotReadyError(cause) ? `${NOT_READY}もう一度読む操作は、もうすぐ使えます。` : 'もう一度読めませんでした。少し待ってからお試しください。')
+      notifyToast(isNotReadyError(cause) ? 'データの準備が済むと、もう一度読めるようになります。' : 'もう一度読めませんでした。少し待ってからお試しください。')
     }
   }
 
@@ -74,7 +77,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
   }
 
   if (load.state === 'not-ready') {
-    return <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>{NOT_READY}Stripe から届いた知らせは、データの準備が済むと見られます。</Notice>
+    return <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>Stripe から届いた知らせは、データの準備が済むと見られます。</Notice>
   }
 
   return (
@@ -100,7 +103,12 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
                   return (
                     <Tr key={event.id} data-table-layout="columns">
                       <Td><TruncatedText value={formatListTimestamp(event.receivedAt)} /></Td>
-                      <Td grow><span className={styles.cellStack}><TruncatedText value={`${EVENT_KIND[event.kind]}${event.repeat ? '（2回目）' : ''}`} />{sub ? <span className={styles.cellSub}>{sub}</span> : null}</span></Td>
+                      <Td grow><span className={styles.eventKind}><span className={styles.cellStack}><TruncatedText value={`${EVENT_KIND[event.kind]}${event.repeat ? '（2回目）' : ''}`} />{sub ? <span className={styles.cellSub}>{sub}</span> : null}</span>
+                        {/* 払ったのに予約が見つからない行の手当て（UteeA・B-338）。結び付け・返金の口はまだ無い（口が要る）。 */}
+                        {canEdit && event.result === 'failed' && !event.bookingId && event.kind === 'paid' ? <span className={styles.eventFix}>
+                          <Button size="compact" onClick={() => preparing.open('予約に結び付ける')}><Link2 size={14} aria-hidden="true" />予約に結び付ける</Button>
+                          <Button size="compact" onClick={() => preparing.open('予約の無い支払いの返金')}>返金する</Button>
+                        </span> : null}</span></Td>
                       <Td>{event.bookingId ? <RowNameLink href={`/booking/bookings?booking=${encodeURIComponent(event.bookingId)}`} title={event.bookingLabel ?? ''}>{event.bookingLabel ?? emptyValue('unknown')}</RowNameLink> : emptyValue('unknown')}</Td>
                       <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                       <ActionCell>{menu.length > 0 ? <RowMenu appearance="box" size="row" label={`${formatListTimestamp(event.receivedAt)}の知らせの操作`} open={openMenu === event.id} onOpenChange={(next) => setOpenMenu(next ? event.id : null)} items={menu} /> : null}</ActionCell>
@@ -109,7 +117,8 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
                 })}</tbody>
               </DataTable></Card>
             )}
-      <p className={styles.footNote}><Info size={14} aria-hidden="true" />失敗の行は「…」から［もう一度読む］。同じ知らせが二度届いても、二重には数えません。</p>
+      {preparing.dialog}
+      <p className={styles.footNote}><Info size={14} aria-hidden="true" />失敗の行は「…」から［もう一度読む］。払ったのに予約が見つからない行は［予約に結び付ける］か［返金する］で手当てします。同じ知らせが二度届いても、二重には数えません。</p>
     </div>
   )
 }

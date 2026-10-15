@@ -1,5 +1,5 @@
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
-import type { BookingPaymentMode, PaymentEvent, PaymentRecordStatus } from '@/lib/api-booking-payment-admin'
+import type { BookingPaymentMode, PaymentEvent } from '@/lib/api-booking-payment-admin'
 
 /* お支払いの言葉と札の色（B-305・絵 T91bV・FY8HC・UteeA）。画面ごとに言い換えない。 */
 
@@ -26,14 +26,6 @@ export const MODE_TONE: Record<BookingPaymentMode, StatusBadgeTone> = {
   customer_choice: 'warning',
 }
 
-export const RECORD_STATUS: Record<PaymentRecordStatus, { label: string; tone: StatusBadgeTone }> = {
-  paid: { label: '支払い済み', tone: 'success' },
-  pending: { label: '支払い待ち', tone: 'warning' },
-  refunded: { label: '返金済み', tone: 'neutral' },
-  expired: { label: '期限切れ', tone: 'danger' },
-  onsite: { label: 'お店で払う', tone: 'info' },
-}
-
 export const EVENT_KIND: Record<PaymentEvent['kind'], string> = {
   paid: '支払いが済んだ',
   refunded: '返金した',
@@ -52,6 +44,3 @@ export function providerFor(mode: BookingPaymentMode): 'onsite' | 'stripe' | 'no
   if (mode === 'online' || mode === 'customer_choice') return 'stripe'
   return mode === 'none' ? 'none' : 'onsite'
 }
-
-/** 「現在準備中です」の文（B-314）。 */
-export const NOT_READY = '現在準備中です。'

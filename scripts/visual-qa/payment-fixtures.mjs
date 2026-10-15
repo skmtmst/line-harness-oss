@@ -20,11 +20,11 @@ export const PAYMENT_RECORDS = {
   summary: { paidAmount: 128400, paidCount: 42, refundedAmount: 8800, refundedCount: 2, expiredCount: 3, pendingCount: 2, holdMinutes: 10 },
   total: 5,
   items: [
-    { id: 'pay-1', bookingId: 'bk-1', friendId: 'friend-yamada', friendName: '山田 花子', bookingStartsAt: '2026-10-18T09:00:00.000Z', bookingLabel: '10/18 18:00 ディナー 2名', bookingNote: 'コース先払い', amount: 8800, status: 'paid', method: 'カード', createdAt: '2026-10-15T12:52:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test' },
+    { id: 'pay-1', bookingId: 'bk-1', friendId: 'friend-yamada', friendName: '山田 花子', bookingStartsAt: '2026-10-18T09:00:00.000Z', bookingLabel: '10/18 18:00 ディナー 2名', bookingNote: 'コース先払い', amount: 8800, status: 'paid', method: 'online', createdAt: '2026-10-15T12:52:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test' },
     { id: 'pay-2', bookingId: 'bk-2', friendId: 'friend-takahashi', friendName: '高橋 美咲', bookingStartsAt: '2026-10-16T03:00:00.000Z', bookingLabel: '10/16 12:00 ランチ 3名', bookingNote: null, amount: 6600, status: 'pending', method: null, createdAt: '2026-10-15T11:31:00.000Z', receiptUrl: null },
-    { id: 'pay-3', bookingId: 'bk-3', friendId: 'friend-sato', friendName: '佐藤 健', bookingStartsAt: '2026-10-16T10:00:00.000Z', bookingLabel: '10/16 19:00 ディナー 1名', bookingNote: null, amount: 4400, status: 'refunded', method: 'カード', createdAt: '2026-10-15T10:10:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test' },
+    { id: 'pay-3', bookingId: 'bk-3', friendId: 'friend-sato', friendName: '佐藤 健', bookingStartsAt: '2026-10-16T10:00:00.000Z', bookingLabel: '10/16 19:00 ディナー 1名', bookingNote: null, amount: 4400, status: 'refunded', method: 'online', createdAt: '2026-10-15T10:10:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test', actorLabel: '自動・10 分を過ぎた' },
     { id: 'pay-4', bookingId: 'bk-4', friendId: 'friend-suzuki', friendName: '鈴木 一郎', bookingStartsAt: '2026-10-16T09:30:00.000Z', bookingLabel: '10/16 18:30 ディナー 2名', bookingNote: null, amount: 8800, status: 'expired', method: null, createdAt: '2026-10-15T09:02:00.000Z', receiptUrl: null },
-    { id: 'pay-5', bookingId: 'bk-5', friendId: 'friend-ito', friendName: '伊藤 さくら', bookingStartsAt: '2026-10-14T03:30:00.000Z', bookingLabel: '10/14 12:30 ランチ 2名', bookingNote: null, amount: 3960, status: 'onsite', method: '店頭', createdAt: '2026-10-14T03:15:00.000Z', receiptUrl: null },
+    { id: 'pay-5', bookingId: 'bk-5', friendId: 'friend-ito', friendName: '伊藤 さくら', bookingStartsAt: '2026-10-14T03:30:00.000Z', bookingLabel: '10/14 12:30 ランチ 2名', bookingNote: null, amount: 3960, status: 'onsite', method: 'onsite', createdAt: '2026-10-14T03:15:00.000Z', receiptUrl: null },
   ],
 }
 
