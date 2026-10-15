@@ -198,6 +198,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"

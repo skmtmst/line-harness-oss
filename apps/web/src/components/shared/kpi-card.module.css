@@ -274,3 +274,7 @@
 /* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
 .valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .valueAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }
+
+/* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 BVuYh）。帯の指定より後に置く。 */
+:root .strip .card[data-kpi-density='compact'][data-kpi-range] { padding-inline: 12px; }
+:root .strip .card[data-kpi-density='compact'][data-kpi-range] .number { font-size: 18px; }

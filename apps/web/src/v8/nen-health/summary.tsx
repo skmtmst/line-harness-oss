@@ -91,10 +91,10 @@ export default function SummaryDrawerV8({
           <>
             <p className={styles.summaryNote}>お客さまがマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。</p>
             <KpiBand density="compact">
-              <KpiCard icon={null} title="記録" value={s.records} unit="日" detail={null} />
-              <KpiCard icon={null} title="体重" value={null} valueRange={{ from: s.weight?.first, to: s.weight?.last }} unit="kg" detail={null} />
-              <KpiCard icon={null} title="呼吸数（平均）" value={s.respiratoryRateAvg} unit="回／分" detail={null} />
-              <KpiCard icon={null} title="心拍数（平均）" value={s.heartRateAvg} unit="回／分" detail={null} />
+              <KpiCard density="compact" icon={null} title="記録" value={s.records} unit="日" detail={null} />
+              <KpiCard density="compact" icon={null} title="体重" value={null} valueRange={{ from: s.weight?.first, to: s.weight?.last }} unit="kg" detail={null} />
+              <KpiCard density="compact" icon={null} title="呼吸数（平均）" value={s.respiratoryRateAvg} unit="回／分" detail={null} />
+              <KpiCard density="compact" icon={null} title="心拍数（平均）" value={s.heartRateAvg} unit="回／分" detail={null} />
             </KpiBand>
             <section className={styles.chart} aria-label="体重の30日の推移">
               <div className={styles.chartHead}>
