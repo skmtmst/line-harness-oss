@@ -120,7 +120,7 @@ describe('w1W8h 会員のつき合わせの絵合わせ', () => {
     /* linked=1128人・候補6人・候補なし18人・¥84,300。 */
     expect(text).toContain('1,128')
     expect(text).toContain('メールか電話番号が同じ')
-    expect(text).toContain('人が決める（つき合わせ 24 のうち）')
+    expect(text).toContain('人が決める（24 件のうち）')
     expect(text).toContain('候補なし')
     expect(text).toContain('¥84,300')
     expect(text).toContain('候補 6 人の注文')
