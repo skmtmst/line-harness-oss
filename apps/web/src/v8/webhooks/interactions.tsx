@@ -2,7 +2,7 @@
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, CircleAlert, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
+import { Star, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -317,10 +317,10 @@ export default function WebhooksInteractionsV8() {
   )
   const chips = (
     <div role="group" aria-label="向きと結果で絞り込む" className={styles.chips}>
-      {chip('すべて', summary.total, direction === 'all' && status === 'all', () => { setDirection('all'); setStatus('all') }, <RefreshCw size={13} aria-hidden="true" />)}
-      {chip('送った', summary.outgoing, direction === 'outgoing' && status === 'all', () => { setDirection('outgoing'); setStatus('all') }, <ArrowUpRight size={13} aria-hidden="true" />)}
-      {chip('受け取った', summary.incoming, direction === 'incoming' && status === 'all', () => { setDirection('incoming'); setStatus('all') }, <ArrowDownLeft size={13} aria-hidden="true" />)}
-      {chip('失敗', summary.failed, status === 'failed', () => { setDirection('all'); setStatus('failed') }, <CircleAlert size={13} aria-hidden="true" />)}
+      {chip('すべて', summary.total, direction === 'all' && status === 'all', () => { setDirection('all'); setStatus('all') }, <Star size={13} aria-hidden="true" />)}
+      {chip('送った', summary.outgoing, direction === 'outgoing' && status === 'all', () => { setDirection('outgoing'); setStatus('all') }, <Star size={13} aria-hidden="true" />)}
+      {chip('受け取った', summary.incoming, direction === 'incoming' && status === 'all', () => { setDirection('incoming'); setStatus('all') }, <Star size={13} aria-hidden="true" />)}
+      {chip('失敗', summary.failed, status === 'failed', () => { setDirection('all'); setStatus('failed') }, <Star size={13} aria-hidden="true" />)}
     </div>
   )
   /* 期間は絵に無い。消さずに、道具の段の右の空いた所へ小さく置く（件数はページ送りの段へ）。 */
@@ -454,7 +454,7 @@ export default function WebhooksInteractionsV8() {
       toolbar={<>
 
         {notice ? <div className={styles.noticeRow}><Notice tone="danger" message={notice} onClose={() => setNotice('')} /></div> : null}
-        <ListToolbar
+        <ListToolbar preserveFilterChips
           search={{ placeholder: '送り先・友だちで探す', label: '送り先・友だちで探す', width: 240, value: search, onChange: (value) => { setSearch(value); setPage(1) } }}
           filters={chips}
           trailing={trailing}

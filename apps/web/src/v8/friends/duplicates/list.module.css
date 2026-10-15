@@ -45,17 +45,6 @@
 .spacer { flex: 1; min-width: 0; }
 .reviewed { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-fr-stack-gap);
-  padding: var(--tpl-fr-panel-pad);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-  min-width: 0;
-}
-
 .panelHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
 .panelTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
 .panelSub { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
