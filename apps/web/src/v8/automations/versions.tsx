@@ -316,7 +316,7 @@ function VersionsInner() {
                   <Th className={styles.colNum} align="right">実行中</Th>
                   <Th className={styles.colNum} align="right">待機中</Th>
                   <Th className={styles.colState}>状態</Th>
-                  <Th className={styles.colOps}>操作</Th>
+                  <Th className={styles.colOps} showActionLabel>操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
