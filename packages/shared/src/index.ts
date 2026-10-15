@@ -85,3 +85,4 @@ export * from './restaurant-external-links.js';
 
 export * from './jst-datetime.js';
 export * from './restaurant-followup.js';
+export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings } from './booking-assignment.js';

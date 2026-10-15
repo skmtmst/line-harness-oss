@@ -146,6 +146,9 @@ import {
   bookingAutomaticNotificationAllowed,
 } from '../services/booking-channels.js';
 
+import { assignBookingStaff } from '../services/booking-assignment.js';
+import { assignmentSettingsResponse } from './booking-assignment-settings.js';
+
 const booking = new Hono<Env>();
 booking.use('/api/booking/admin/bookings.csv', outputAuditMiddleware);
 booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
@@ -706,7 +709,9 @@ async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId
   });
   const rows = await c.env.DB.prepare('SELECT id FROM staff WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL AND is_designation_optional = 0').bind(accountId).all<{ id: string }>();
   const actualStaff = new Set(rows.results.map((staff) => staff.id));
-  return latest.by_staff.find((staff) => actualStaff.has(staff.staff_id) && findLatestSlotForInstant(staff.slots,startsAt) !== null)?.staff_id ?? null;
+  const availableIds = latest.by_staff.filter((staff) => actualStaff.has(staff.staff_id)
+    && findLatestSlotForInstant(staff.slots, startsAt) !== null).map(staff => staff.staff_id);
+  return assignBookingStaff(c.env.DB, accountId, startsAt.toISOString(), timeZone, availableIds);
 }
 
 booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
@@ -2259,6 +2264,17 @@ booking.post('/api/booking/admin/sync-notices/:id/done',requireRole('owner','adm
   if(notice.status==='resolved')return c.json({success:false,error:'すでに条件が解消した知らせです'},409);
   await c.env.DB.prepare("UPDATE booking_sync_notices SET status='done',updated_at=datetime('now') WHERE id=? AND line_account_id=? AND status='open'").bind(c.req.param('id'),accountId).run();
   return c.json({success:true,data:{id:c.req.param('id'),status:'done'}});
+});
+
+booking.get('/api/booking/admin/assignment-settings', async c => {
+  const id = await resolveAccountIdAdmin(c);
+  if (!id) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  return assignmentSettingsResponse(c, c.env.DB, { kind: 'staff', id });
+});
+booking.put('/api/booking/admin/assignment-settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async c => {
+  const id = await resolveAccountIdAdmin(c);
+  if (!id) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ['account_id']);
+  return assignmentSettingsResponse(c, c.env.DB, { kind: 'staff', id });
 });
 
 booking.get('/api/booking/admin/settings', async (c) => {
