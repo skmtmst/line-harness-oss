@@ -1,6 +1,6 @@
 'use client'
-import { useListUrlValue } from '@/components/shared/list-url-state'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -30,6 +30,7 @@ import {
   EMPTY_GENERATION_INPUT,
   activeGeneration,
   exportSizeText,
+  presetSizeLabel,
   inputFromGeneration,
   packedTextLines,
   readFileAsBase64,
@@ -251,6 +252,10 @@ function ProjectInner() {
   }, [status, generations, running, runLoop])
 
   const validation = validateGenerationInput(input, maxCount)
+  // 左に［配る］の帯が出ている間は、札を寸法だけの短い形にして左の帯へ重ねない（絵 tSgl6「1040 × 1040」）。
+  const sizePreset = presets.find((preset) => preset.key === input.presetKey)
+  const sizeChipText = selectedImages.length > 0 && sizePreset ? presetSizeLabel(sizePreset) : exportSizeText(presets, input.presetKey)
+  const untouched = input.textLines.every((line) => !line.trim()) && !input.customPrompt.trim() && input.references.length === 0
   const refusal = usageRefusal(usage, input.count)
   const blockedReason = !engineReady
     ? '画像生成の接続設定がまだありません。運営にお問い合わせください'
@@ -691,7 +696,8 @@ function ProjectInner() {
           ) : null}
         </div>
 
-        {blockedReason && input.presetKey && !running ? <p className={styles.warnText}>{blockedReason}</p> : null}
+        {/* まだ何も入れていないうちは「入れてください」を赤で出さない（押せない［生成する］で足りる・絵 tSgl6）。 */}
+        {blockedReason && input.presetKey && !running && !(blockedReason === validation && untouched) ? <p className={styles.warnText}>{blockedReason}</p> : null}
 
         {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
         {canManage ? (
@@ -706,7 +712,7 @@ function ProjectInner() {
             </> : undefined }}
             info={<span className={styles.generationInfo}>
               <span>{`今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚`}</span>
-              {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
+              {sizeChipText ? <ExportSizeChip text={sizeChipText} /> : <span>寸法 —</span>}
             </span>}
             actions={
               running ? (
