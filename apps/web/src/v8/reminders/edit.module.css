@@ -250,7 +250,7 @@
 /* ---- 手順4（T0nis）：予定の表 ---- */
 .rangeRow { display: flex; align-items: center; gap: var(--tpl-rm-row-gap-lg); }
 .rangeCount { color: var(--color-ink); font-size: var(--tpl-rm-note-size); font-weight: 600; line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
-.planTable { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
+.planTable { display: flex; flex-direction: column; }
 .planHead, .planRow { display: flex; align-items: center; gap: var(--tpl-rm-row-gap-lg); }
 .planHead {
   padding: var(--tpl-rm-plan-head-pad);
