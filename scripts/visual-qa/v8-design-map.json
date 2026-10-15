@@ -512,9 +512,13 @@
       "textsSha256": "1ab536cde8d0b2892aaaf0b723f199647b73043706e0c2bf00bbb0176193b5cc",
       "state": {
         "viewportHeight": 1000,
-        "click": [
-          "つまんで置く・卓の形・店の部品を編集"
-        ]
+        "expect": {
+          "text": [
+            "つまんで置く：",
+            "壁・入口・厨房・トイレ・窓"
+          ]
+        },
+        "captureNotes": "この列車の共通フロア編集は、配置と卓の形の道具が初めから開いている。保存しない。"
       }
     },
     "BHEl9": {
@@ -1618,7 +1622,62 @@
           "イベント",
           "選ぶ（2件）"
         ],
-        "viewportHeight": 1160
+        "viewportHeight": 1160,
+        "api": {
+          "match": "POST /api/line-accounts/connect/check$",
+          "body": {
+            "success": true,
+            "data": {
+              "steps": [
+                {
+                  "order": 1,
+                  "state": "passed",
+                  "message": "チャネルIDとシークレットでアクセストークンを発行"
+                },
+                {
+                  "order": 2,
+                  "state": "passed",
+                  "message": "公式アカウントの名前とアイコンを取得"
+                },
+                {
+                  "order": 3,
+                  "state": "passed",
+                  "message": "Webhook URLを登録して、実際に届くかテスト"
+                },
+                {
+                  "order": 4,
+                  "state": "passed",
+                  "message": "LINE Loginチャネルを確認して、LIFFアプリを作成"
+                },
+                {
+                  "order": 5,
+                  "state": "passed",
+                  "message": "認証済みアカウントかを判定"
+                }
+              ],
+              "verification": {
+                "tokenOk": true,
+                "loginOk": true,
+                "sameProvider": true,
+                "webhook": {
+                  "expectedUrl": "https://api.example/webhook",
+                  "registeredUrl": "https://api.example/webhook",
+                  "active": true,
+                  "testPassed": true
+                },
+                "followerTotal": 1284
+              },
+              "displayName": "然 NEN",
+              "pictureUrl": null,
+              "basicId": "@nen-kichijoji",
+              "followerImport": {
+                "capability": "available",
+                "phase": "not_started"
+              },
+              "remainingActions": []
+            }
+          }
+        }
       }
     },
     "H031gC": {
@@ -3085,11 +3144,177 @@
           "fill:本文={名前}さん、10月の営業日のお知らせです。10/12（月）は臨時休業いたします。",
           "日時を決める",
           "承認する人",
-          "佐藤 美咲",
+          "承認する人：佐藤 美咲（管理者）",
           "選ぶ"
         ],
         "viewportHeight": 900,
-        "waitMs": 1500
+        "waitMs": 1500,
+        "api": {
+          "match": "POST /api/broadcasts/preflight$",
+          "body": {
+            "success": true,
+            "data": {
+              "audienceCount": 1213,
+              "hiddenExcluded": 12,
+              "warnings": [
+                {
+                  "level": "info",
+                  "message": "送信開始時に対象をもう一度数えます。"
+                },
+                {
+                  "level": "warning",
+                  "message": "同じ時刻に予約中の配信が1件あります。"
+                }
+              ],
+              "audience": {
+                "matched": 1248,
+                "sendable": 1213,
+                "evaluatedAt": "2026-08-24T00:55:00.000Z",
+                "representatives": [
+                  {
+                    "friendId": "friend-1",
+                    "displayName": "Kenta Kawano",
+                    "pictureUrl": null,
+                    "summary": "予約・未対応"
+                  },
+                  {
+                    "friendId": "friend-2",
+                    "displayName": "Masato S.",
+                    "pictureUrl": null,
+                    "summary": "予約・対応中"
+                  },
+                  {
+                    "friendId": "friend-3",
+                    "displayName": "菅野 亮",
+                    "pictureUrl": null,
+                    "summary": "予約・未対応"
+                  }
+                ]
+              },
+              "exclusions": {
+                "blocked": 8,
+                "hidden": 12,
+                "missingDestination": 3,
+                "duplicate": 7,
+                "paused": 5,
+                "total": 35
+              },
+              "quota": {
+                "monthlyUsed": 1842,
+                "monthlyLimit": 5000,
+                "remaining": 3158,
+                "planned": 1213,
+                "state": "available",
+                "reason": null
+              },
+              "concurrentBroadcasts": [
+                {
+                  "id": "broadcast-concurrent",
+                  "title": "予約空き枠のご案内",
+                  "scheduledAt": "2026-08-24T01:30:00.000Z"
+                }
+              ],
+              "conditionAxes": {
+                "standard": [
+                  {
+                    "key": "name",
+                    "label": "名前"
+                  },
+                  {
+                    "key": "private_memo",
+                    "label": "個別メモ"
+                  },
+                  {
+                    "key": "status_message",
+                    "label": "ステータスメッセージ"
+                  },
+                  {
+                    "key": "registered_at",
+                    "label": "友だち登録日"
+                  },
+                  {
+                    "key": "tag",
+                    "label": "タグ"
+                  },
+                  {
+                    "key": "friend_field",
+                    "label": "友だち情報"
+                  },
+                  {
+                    "key": "scenario",
+                    "label": "シナリオ"
+                  },
+                  {
+                    "key": "event_booking",
+                    "label": "イベント予約"
+                  },
+                  {
+                    "key": "calendar_booking",
+                    "label": "カレンダー予約"
+                  },
+                  {
+                    "key": "common_var",
+                    "label": "共通情報"
+                  },
+                  {
+                    "key": "reminder",
+                    "label": "リマインダ"
+                  },
+                  {
+                    "key": "form",
+                    "label": "回答フォーム"
+                  },
+                  {
+                    "key": "last_reaction_at",
+                    "label": "最終反応日"
+                  },
+                  {
+                    "key": "other",
+                    "label": "その他"
+                  },
+                  {
+                    "key": "support_mark",
+                    "label": "対応マーク"
+                  }
+                ],
+                "broadcastOnly": [
+                  {
+                    "key": "assignee",
+                    "label": "担当者"
+                  },
+                  {
+                    "key": "inflow_route",
+                    "label": "流入経路"
+                  },
+                  {
+                    "key": "delivery_status",
+                    "label": "配信状況"
+                  },
+                  {
+                    "key": "booking_status",
+                    "label": "予約状況"
+                  },
+                  {
+                    "key": "purchase_history",
+                    "label": "購入履歴"
+                  },
+                  {
+                    "key": "block_status",
+                    "label": "ブロック状態"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "expect": {
+          "selector": [
+            "role=dialog[name=\"かんたんに送る\"]"
+          ],
+          "text": [
+            "承認を頼む"
+          ]
+        }
       }
     },
     "PFe9c": {
@@ -3697,7 +3922,52 @@
       "textsSha256": "daced320243ad40d98f81c1709da70d4f7aa085533a6d9eb3241a0ff02f92d81",
       "state": {
         "now": "2026-10-01T03:00:00.000Z",
-        "viewportHeight": 1276
+        "viewportHeight": 1276,
+        "api": {
+          "match": "POST /api/reminders/reminder-new/preview$",
+          "body": {
+            "success": true,
+            "data": {
+              "targetDate": "2026-08-25T00:00:00.000Z",
+              "items": [
+                {
+                  "stableStepId": "day-before",
+                  "stepNumber": 1,
+                  "scheduledAt": "2026-10-02T09:00:00.000Z",
+                  "label": "前日のお知らせ",
+                  "state": "scheduled"
+                },
+                {
+                  "stableStepId": "day-before",
+                  "stepNumber": 1,
+                  "scheduledAt": "2026-10-02T09:00:00.000Z",
+                  "label": "前日のお知らせ",
+                  "state": "duplicate"
+                },
+                {
+                  "stableStepId": "hour-before",
+                  "stepNumber": 2,
+                  "scheduledAt": "2026-10-03T04:00:00.000Z",
+                  "label": "1時間前のお知らせ",
+                  "state": "scheduled"
+                },
+                {
+                  "stableStepId": "day-before",
+                  "stepNumber": 1,
+                  "scheduledAt": "2026-10-03T09:00:00.000Z",
+                  "label": "前日のお知らせ",
+                  "state": "scheduled"
+                }
+              ],
+              "summary": {
+                "audience": 172,
+                "next7Days": 124,
+                "next30Days": 1194,
+                "duplicateCount": 3
+              }
+            }
+          }
+        }
       }
     },
     "T1j2Sw": {
@@ -5844,10 +6114,7 @@
       "state": {
         "expect": {
           "selector": [
-            "[role=\"dialog\"]"
-          ],
-          "text": [
-            "テンプレートを選ぶ"
+            "role=dialog[name=\"テンプレートを選ぶ\"]"
           ]
         },
         "click": [
@@ -7874,8 +8141,12 @@
       "textsSha256": "b88395f27af29ebe09d91ea02fcdabd9c62420841e457f4d8a361e630af7e309",
       "state": {
         "click": [
-          "fill:開始日時=2026-10-12T10:30",
-          "fill:終了日時=2026-10-12T12:30",
+          "開始日時",
+          "fill:時刻=10:30",
+          "閉じる",
+          "終了日時",
+          "fill:時刻=12:30",
+          "閉じる",
           "fill:変える理由=会場の都合で時間を30分遅らせます",
           "変えてお知らせする"
         ],
@@ -10180,7 +10451,6 @@
       "url": "/friends",
       "state": {
         "click": [
-          "ほかの絞り込み・操作",
           "表示項目を編集"
         ]
       },
