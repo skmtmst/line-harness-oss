@@ -19,7 +19,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { visibleAccount } from '../services/google-sheets-account.js';
 import { dbFor } from '../services/db-router.js';
 import {
   GoogleBusinessError,
@@ -117,13 +117,6 @@ const requireIntegrationManager: MiddlewareHandler<Env> = async (c, next) => {
   }
   return next();
 };
-
-/** account_id が担当者の可視範囲にあるか（restaurant の googleAccessGuard と同じ確認）。 */
-async function visibleAccount(c: Context<Env>, selected: string | null = accountId(c)): Promise<string | null> {
-  if (!selected) return null;
-  const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
-  return scope.ids.includes(selected) ? selected : null;
-}
 
 function oauthClientFor(c: Context<Env>): GoogleOAuthClient | null {
   return sheetsOauthClient(c.env, `${new URL(c.req.url).origin}${CALLBACK_PATH}`);
@@ -271,8 +264,7 @@ googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegr
   const body = await c.req.json<{ accountId?: string }>().catch(() => ({}) as { accountId?: string });
   const selected = body.accountId?.trim() || accountId(c);
   if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
-  const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
-  if (!scope.ids.includes(selected)) return fail(c, 404, 'Not found');
+  if (!await visibleAccount(c, selected)) return fail(c, 404, 'Not found');
   const existing = await integrationFor(c, selected);
   const mode = existing && existing.status !== 'pending_target' ? 'reconnect' : 'connect';
 

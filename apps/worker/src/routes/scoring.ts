@@ -2,15 +2,10 @@ import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
-  getScoringRules,
   listMileageRewardFolders,
   createMileageRewardFolder,
   reorderMileageRewardFolders,
   moveMileageRewardToFolder,
-  getScoringRuleById,
-  createScoringRule,
-  updateScoringRule,
-  deleteScoringRule,
   getFriendById,
   getFriendScore,
   getFriendScoreHistory,
@@ -1937,81 +1932,12 @@ scoring.get('/api/action-scores/friends', requireRole('owner', 'admin', 'staff')
 
 // ========== スコアリングルールCRUD ==========
 
-scoring.use('/api/scoring-rules', async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410));
-scoring.use('/api/scoring-rules/*', async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410));
-
-scoring.get('/api/scoring-rules', async (c) => {
-  try {
-    const items = await getScoringRules(c.env.DB);
-    return c.json({
-      success: true,
-      data: items.map((r) => ({
-        id: r.id,
-        name: r.name,
-        eventType: r.event_type,
-        scoreValue: r.score_value,
-        isActive: Boolean(r.is_active),
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      })),
-    });
-  } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/scoring-rules"}));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-scoring.get('/api/scoring-rules/:id', async (c) => {
-  try {
-    const item = await getScoringRuleById(c.env.DB, c.req.param('id'));
-    if (!item) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({
-      success: true,
-      data: { id: item.id, name: item.name, eventType: item.event_type, scoreValue: item.score_value, isActive: Boolean(item.is_active), createdAt: item.created_at },
-    });
-  } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/scoring-rules/:id"}));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-scoring.post('/api/scoring-rules', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"eventType":["string"],"scoreValue":["number"]}), async (c) => {
-  try {
-    const body = await c.req.json<{ name: string; eventType: string; scoreValue: number }>();
-    if (!body.name || !body.eventType || body.scoreValue === undefined) {
-      return inputError(c, { success: false, error: 'name, eventType, scoreValue are required' }, 400, ["name","eventType","scoreValue"]);
-    }
-    const item = await createScoringRule(c.env.DB, body);
-    return c.json({ success: true, data: { id: item.id, name: item.name, eventType: item.event_type, scoreValue: item.score_value } }, 201);
-  } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/scoring-rules"}));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-scoring.put('/api/scoring-rules/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
-  try {
-    const id = c.req.param('id');
-    const body = await c.req.json();
-    await updateScoringRule(c.env.DB, id, body);
-    const updated = await getScoringRuleById(c.env.DB, id);
-    if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({ success: true, data: { id: updated.id, name: updated.name, eventType: updated.event_type, scoreValue: updated.score_value, isActive: Boolean(updated.is_active) } });
-  } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"PUT /api/scoring-rules/:id"}));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-scoring.delete('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c) => {
-  try {
-    await deleteScoringRule(c.env.DB, c.req.param('id'));
-    return c.json({ success: true, data: null });
-  } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"DELETE /api/scoring-rules/:id"}));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
+const legacyScoringRetired: MiddlewareHandler<Env> = async c => c.json({ success: false, code: 'LEGACY_SCORING_RETIRED', error: 'アカウントを指定する /api/action-scores/rules を利用してください' }, 410);
+scoring.get('/api/scoring-rules', legacyScoringRetired);
+scoring.get('/api/scoring-rules/:id', legacyScoringRetired);
+scoring.post('/api/scoring-rules', legacyScoringRetired);
+scoring.put('/api/scoring-rules/:id', legacyScoringRetired);
+scoring.delete('/api/scoring-rules/:id', legacyScoringRetired);
 
 // ========== 友だちスコア ==========
 

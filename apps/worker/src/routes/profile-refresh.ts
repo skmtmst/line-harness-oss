@@ -1,6 +1,7 @@
+import { accountScopeWhere, accountScopeBindings, adminAccountScope, visibleAccountNames } from '../services/profile-refresh-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -10,40 +11,6 @@ import { resolveLineToken } from '../services/line-token.js';
 import { listLimit } from './list-pagination.js';
 
 const profileRefresh = new Hono<Env>();
-
-function accountScopeWhere(
-  scope: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
-  accountColumn: string,
-): string {
-  const where = scope.allowedAccountIds.length
-    ? `AND (${accountColumn} IN (SELECT value FROM json_each(?))${scope.canSeeUnassigned ? ` OR ${accountColumn} IS NULL` : ''})`
-    : scope.canSeeUnassigned
-      ? `AND ${accountColumn} IS NULL`
-      : 'AND 1 = 0';
-  return where;
-}
-
-function accountScopeBindings(scope: { allowedAccountIds: string[] }): unknown[] {
-  return scope.allowedAccountIds.length ? [JSON.stringify(scope.allowedAccountIds)] : [];
-}
-
-async function adminAccountScope(c: Context<Env>, accountColumn = 'f.line_account_id') {
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const where = accountScopeWhere(scope, accountColumn);
-  return { scope, where };
-}
-
-async function visibleAccountNames(
-  db: D1Database,
-  allowedAccountIds: string[],
-): Promise<Map<string, string>> {
-  if (allowedAccountIds.length === 0) return new Map();
-  const result = await db.prepare(
-    `SELECT id, name FROM line_accounts
-      WHERE id IN (SELECT value FROM json_each(?))`,
-  ).bind(JSON.stringify(allowedAccountIds)).all<{ id: string; name: string }>();
-  return new Map(result.results?.map((account) => [account.id, account.name]) ?? []);
-}
 
 /**
  * 友だち全員のプロフィール (display_name / picture_url / status_message) を
@@ -200,7 +167,7 @@ profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('own
       if (!Array.isArray(parsed) || !parsed.length || parsed.some(id => typeof id !== 'string' || !id)) {
         return c.json({ success: false, error: 'Not found' }, 404);
       }
-      accounts = parsed;
+      accounts = [...parsed, ...(broadcast.line_account_id ? [broadcast.line_account_id] : [])];
     } catch { return c.json({ success: false, error: 'Not found' }, 404); }
   }
   if (!await canAccessAllLineAccounts(db, c.get('staff'), accounts)) {

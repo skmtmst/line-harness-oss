@@ -117,8 +117,9 @@ describe('S07 unqualified resource IDs and aggregate requests stay in the staff 
     db.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,status,target_type,line_account_id,account_ids)
       VALUES ('foreign','Foreign fixture','text','fixture','sent','all','b',NULL),
       ('mixed','Mixed fixture','text','fixture','sent','multi-account-dedup','a','["a","b"]'),
+      ('foreign-anchor','Foreign owner fixture','text','fixture','sent','multi-account-dedup','b','["a"]'),
       ('own','Own fixture','text','fixture','sent','all','a',NULL);`);
-    for (const id of ['foreign','mixed']) {
+    for (const id of ['foreign','mixed','foreign-anchor']) {
       const response = await app.request(`/api/admin/broadcasts/${id}/reset-to-draft`, post({}));
       expect(response.status).toBe(404);
       expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(id)).toEqual({ status: 'sent' });

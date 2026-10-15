@@ -1,3 +1,4 @@
+import { bodyAccountIds, ACCOUNT_KEYS } from './feature-account-body.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
 import type { Env } from '../index.js';
@@ -347,29 +348,6 @@ export function routeClassification(path: string, method = 'GET'): RouteClassifi
   return FEATURE_ROUTE_MANIFEST.find((item) => prefixMatches(path, item.prefix))?.classification ?? null;
 }
 
-const ACCOUNT_KEYS = ['account_id', 'accountId', 'line_account_id', 'lineAccountId'] as const;
-
-async function bodyAccountIds(c: Context<Env>): Promise<string[]> {
-  if (!c.req.header('content-type')?.toLowerCase().includes('application/json')) return [];
-  try {
-    const body = await c.req.raw.clone().json() as Record<string, unknown>;
-    for (const key of ACCOUNT_KEYS) {
-      const value = body[key];
-      if (typeof value === 'string' && value.trim()) return [value.trim()];
-    }
-    for (const key of ['accountIds', 'lineAccountIds'] as const) {
-      const values = body[key];
-      if (Array.isArray(values)) {
-        return [...new Set(values.filter(
-          (value): value is string => typeof value === 'string' && Boolean(value.trim()),
-        ).map((value) => value.trim()))];
-      }
-    }
-  } catch {
-    // 入力契約のエラーは route handler に任せる。
-  }
-  return [];
-}
 
 /**
  * WRITE-01: URL の対象IDから所属LINEアカウントを引く対応表。

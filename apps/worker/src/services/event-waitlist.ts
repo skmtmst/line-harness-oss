@@ -1,3 +1,4 @@
+import { sha256 } from './event-waitlist-owner.js';
 import {
   activeTenantLineAccountSql,
   resolveLineCredential,
@@ -522,12 +523,6 @@ async function expireEventWaitlistOffer(
   return (expired.meta?.changes ?? 0) === 1;
 }
 
-async function sha256(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 /** 順番は管理者の並べ替えを含む、実際の繰上げ順と同じ。 */
 export async function getMyEventWaitlist(
   db: D1Database,
@@ -600,18 +595,7 @@ export async function cancelMyEventWaitlist(
   return (results[0].meta?.changes ?? 0) > 0 ? 'cancelled' : 'conflict';
 }
 
-/** Resolve only the owner needed for LINE verification; never return offer data
- * before the route has verified the token against this account's login channel.
- */
-export async function getEventWaitlistOfferAccountId(db: D1Database, token: string): Promise<string | null> {
-  if (token.length < 32 || token.length > 256) return null;
-  const row = await db.prepare(`SELECT w.line_account_id FROM event_waitlist w
-    JOIN line_accounts la ON la.id=w.line_account_id
-    WHERE w.offer_token_hash=? AND la.is_active=1 AND la.archived_at IS NULL
-      AND ${activeTenantLineAccountSql('la.id')} LIMIT 1`)
-    .bind(await sha256(token)).first<{ line_account_id: string }>();
-  return row?.line_account_id ?? null;
-}
+export { getEventWaitlistOfferAccountId } from './event-waitlist-owner.js';
 
 /** 案内の読み出しでは失効・予約化をしない。URLの所持と本人を両方照合する。 */
 export async function getEventWaitlistOffer(

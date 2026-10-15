@@ -1,6 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
-import { activeTenantLineAccountSql } from './line-accounts.js';
 
 export interface Webinar {
   id: string;
@@ -512,14 +511,7 @@ export async function getWebinarById(db: D1Database, id: string): Promise<Webina
   return db.prepare('SELECT * FROM webinars WHERE id = ?').bind(id).first<Webinar>();
 }
 
-export async function getWebinarBySlug(db: D1Database, slug: string, options: { activeAccountOnly?: boolean } = {}): Promise<Webinar | null> {
-  if (options.activeAccountOnly) {
-    return db.prepare(`SELECT w.* FROM webinars w LEFT JOIN line_accounts la ON la.id=w.account_id
-      WHERE w.slug=? AND (w.account_id IS NULL OR (la.is_active=1 AND la.archived_at IS NULL
-        AND ${activeTenantLineAccountSql('la.id')}))`).bind(slug).first<Webinar>();
-  }
-  return db.prepare('SELECT * FROM webinars WHERE slug = ?').bind(slug).first<Webinar>();
-}
+export { getWebinarBySlug } from './webinar-lookup.js';
 
 export async function createWebinar(db: D1Database, input: WebinarCreateInput): Promise<Webinar> {
   const id = crypto.randomUUID();

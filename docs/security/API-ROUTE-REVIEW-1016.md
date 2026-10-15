@@ -43,3 +43,18 @@
 各修正の門番・SQL範囲・キャッシュ境界を一時的に外し、対応する試験がAssertionErrorで終了1になることを確認する。元に戻した通常の試験が終了0になることも別に記録する。対象は手元の架空データのSQLiteのみ。LINE・Google・Slackへの実送信や実認証はしない。
 
 検査の実測値とコミットは `SECURITY-FIXES-1016.md` の続きへ記載する。依存更新を含むため、関連試験だけで全体を合格とせず、型・全試験・全ビルド・新品の作業場所でのci-localまで確認する。
+
+## 規模制限を守る分割
+
+ci-localで大きい既存ファイル13本の行数超過を検出したため、上限や例外は変えず、既存の安全対策を役割ごとに分けた。公開importとJSONは維持する。
+
+- Workerの環境型：`worker-bindings.ts`（型だけ）。
+- 公開経路：`middleware/public-api-boundary.ts`。認証のfacadeから同じ関数を再exportする。
+- 機能判定の本文アカウント抽出：`middleware/feature-account-body.ts`。
+- 本人と所属の解決：`services/webinar-caller.ts`、`nen-member-identity.ts`、`event-waitlist-owner.ts`、`google-sheets-account.ts`。
+- 配信点検のSQL範囲：`services/profile-refresh-scope.ts`。
+- エラーの固定分類：`services/event-input-error.ts`、`slack-error-summary.ts`。Slackの自由文抑止は維持する。
+- DBの所属付き取得：`packages/db/src/friend-account-identity.ts`、`webinar-lookup.ts`。元のモジュールから同じ関数を再exportする。
+- 旧スコア：到達しない旧処理を除き、同じ5経路を410だけ返すhandlerへ置き換えた。
+
+分割後に関連試験と27故障対照をやり直し、ファイル位置も含めた経路一覧を再生成する。
