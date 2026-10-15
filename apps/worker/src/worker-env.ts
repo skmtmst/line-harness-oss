@@ -80,6 +80,10 @@ export type Env = {
     ADMIN_LINE_LOGIN_CHANNEL_SECRET?: string;
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
+    /** 予約用Stripeテストの接続設定。固定callback以外は受け付けない。 */
+    BOOKING_STRIPE_TEST_SECRET_KEY?: string;
+    BOOKING_STRIPE_TEST_CLIENT_ID?: string;
+    BOOKING_STRIPE_CONNECT_REDIRECT_URI?: string;
     /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
     OPENAI_API_KEY?: string;
     /** 画像生成モデル名。未設定時は gpt-image-1。 */
