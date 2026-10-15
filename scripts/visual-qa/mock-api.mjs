@@ -4119,6 +4119,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         },
       }
     }
+    // 一斉配信の「テンプレートから選ぶ」窓（f63Jza）は選んでいるアカウントの公開版だけを候補にする。
+    // 見本の行はアカウントを持たないので、account_id で頼まれたときだけそのアカウントの行として返す。
+    const accountId = query.get('account_id')
+    if (accountId) return { success: true, data: TEMPLATES.map((item) => ({ ...item, accountId })) }
     return { success: true, data: TEMPLATES }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
