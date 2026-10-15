@@ -402,7 +402,7 @@ export default function TemplateDetailV8() {
       >
         {canMutate ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
         {template.hasDraft ? (
-          <Notice tone="warn" role="status" heading={template.publishedVersion > 0 ? '未公開の変更があります' : 'まだ公開していません'} icon={<CircleAlert aria-hidden="true" />} action={canMutate ? <>
+          <Notice tone="warn" role="status" heading={template.publishedVersion > 0 ? '未公開の変更があります' : 'まだ公開していません'} icon={<CircleAlert size={16} aria-hidden="true" />} action={canMutate ? <>
             {inUseVersion ? <Button variant="secondary" onClick={() => setCompareTarget((current) => current === 'draft' ? null : 'draft')} aria-pressed={compareTarget === 'draft'} icon={<GitCompare aria-hidden="true" />}>比べる</Button> : null}
             <Button variant="primary" onClick={() => { setPublishError(''); setPublishOpen(true) }} icon={<Upload aria-hidden="true" />}>公開する</Button>
           </> : undefined}>{publishDraftText}</Notice>
