@@ -1926,6 +1926,7 @@ export default function BroadcastForm({
   useEffect(() => { setInlineComposer(null); setTemplateSaveIndex(null); setTemplateSaveCreatedId(null); setComposerBusy(false); setTemplateSaveError(''); setTemplateApplyError('') }, [selectedAccountId])
   const inlineHost: TemplateEditHost | undefined = inlineComposer && inlineBubble ? {
     composer: { index: inlineComposer.index, accountId: selectedAccountId },
+    accountName: selectedAccount?.name ?? null,
     description: '作った中身をこの吹き出しに入れます。', folders: [], folder: '', onFolderChange: () => {}, busy: composerBusy,
     primaryLabel: 'この吹き出しに入れる',
     initialContent: inlineComposer.kind === 'carousel' && inlineBubble.content.columnsJson ? { kind: 'carousel', name: String(inlineBubble.content.templateName ?? ''), messageContent: String(inlineBubble.content.columnsJson), tapLimitMode: inlineBubble.content.tapLimitMode === 'once' ? 'once' : 'none', tapLimitText: String(inlineBubble.content.tapLimitText ?? ''), carouselActions: inlineBubble.content.carouselActions as Record<string, Record<string, unknown[]>> | undefined, templateId: String(inlineBubble.content.templateId ?? '') } : inlineComposer.kind === 'rich_message' && inlineBubble.content.assetName ? { kind: 'rich_message', name: String(inlineBubble.content.assetName), payload: inlineBubble.content, media: [] } : inlineComposer.kind === 'rich_video' && inlineBubble.content.video ? { kind: 'message', name: String(inlineBubble.content.templateName ?? ''), messageType: 'imagemap', messageContent: JSON.stringify(inlineBubble.content) } : undefined,
