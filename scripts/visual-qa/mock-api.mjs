@@ -22,6 +22,7 @@ import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { paymentGet, paymentWrite } from './payment-fixtures.mjs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 // Web と同じ QR 生成器を使う。画像の口を JSON で返すと小窓が壊れる。
@@ -6492,6 +6493,25 @@ const server = createServer((req, res) => {
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
     return
+  }
+
+  /* お金まわり（③-1）の見本：お支払い・割り当て方・回数券（payment-fixtures.mjs）。 */
+  {
+    const paymentRead = method === 'GET' ? paymentGet(url.pathname, url.searchParams, { restaurantTables: RESTAURANT_TABLES }) : undefined
+    if (paymentRead) {
+      res.writeHead(200).end(JSON.stringify(paymentRead))
+      return
+    }
+    if (method !== 'GET' && paymentWrite(method, url.pathname, {})) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        res.writeHead(200).end(JSON.stringify(paymentWrite(method, url.pathname, body)))
+      })
+      return
+    }
   }
 
   if (method === 'GET' && url.pathname === '/api/reminders' && url.searchParams.has('sort')
