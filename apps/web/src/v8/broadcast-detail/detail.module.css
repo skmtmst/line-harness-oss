@@ -174,7 +174,8 @@ a.railStep:hover .railLabel {
 
 .railItem[data-delivery-stage='current'] .railMark {
   background: var(--color-canvas);
-  box-shadow: var(--tpl-bd-mark-ring);
+  outline: var(--tpl-bd-mark-stroke) solid var(--tpl-bd-green);
+  outline-offset: calc(-1 * var(--tpl-bd-mark-stroke));
 }
 
 .railItem[data-delivery-stage='current'] .railStep {
