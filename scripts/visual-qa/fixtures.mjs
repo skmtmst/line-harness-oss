@@ -6524,10 +6524,12 @@ export const MANUAL_LINKS = {
   **LINEの友だちと結びついていない行**も1つ入れる（設計の
   「LINEの友だちと結びついていません。当日の連絡ができません」を出すため）。
 */
+/* 担当はスタッフ一覧（bs-1 佐々木・bs-3 高田・bs-2 中川）の id でも持つ。名前だけだと予約の当日盤が「担当未設定」に落とす（GcyTr）。 */
+const BOOKING_STAFF_IDS = { 佐々木: 'bs-1', 高田: 'bs-3', 中川: 'bs-2' }
 const booking = (id, friendId, name, start, end, menu, staff, price, status = 'confirmed') => ({
   id, friend_id: friendId, starts_at: start, ends_at: end, status,
   customer_note: null, internal_note: null, price_at_booking: price,
-  menu_name: menu, staff_name: staff, friend_name: name,
+  menu_name: menu, staff_id: BOOKING_STAFF_IDS[staff] ?? null, staff_name: staff, friend_name: name,
   requested_at: '2026-09-02T02:00:00.000Z', decided_at: '2026-09-02T02:05:00.000Z',
   external_event_id: null,
 })
