@@ -152,6 +152,12 @@
 /* 名前の列は顔の丸＋名前（「Kyohei Yamamoto」が切れない幅）を最低限とる（nF4ts）。 */
 .colName { width: calc(var(--tpl-fr-avatar) + var(--tpl-fr-avatar-gap) + 160px); }
 .colSupport { width: var(--tpl-fr-col-support); }
+/* 1152：名前は顔の丸なし、対応・シナリオは中身の幅まで。残りをタグ・最新の列へ回す。 */
+.colNameNarrow { width: 160px; }
+.colSupportNarrow { width: 132px; }
+.colScenarioNarrow { width: 88px; }
+.colLatestNarrow { width: 160px; }
+.colFieldNarrow { width: 112px; }
 .colScenario { width: var(--tpl-fr-col-scenario); }
 .colLatest { width: var(--tpl-fr-col-latest); }
 .colTags { width: var(--tpl-fr-col-tags); }
@@ -258,7 +264,8 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
   white-space: nowrap;
 }
 
-.tags { display: flex; align-items: center; gap: var(--tpl-fr-tag-gap); min-width: 0; overflow: hidden; }
+/* 友だちの表のタグは名前を全部読ませたい（y2n1z「LINEログイン」）。札1枚の上限だけこの表で広げる。 */
+.tags { --tpl-tag-overflow-max: min(176px, 100%); display: flex; align-items: center; gap: var(--tpl-fr-tag-gap); min-width: 0; overflow: hidden; }
 
 .tag {
   min-width: 0;

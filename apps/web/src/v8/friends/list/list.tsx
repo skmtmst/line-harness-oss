@@ -781,8 +781,9 @@ export default function FriendsListV8() {
         <colgroup>
           <col className={styles.colCheck} />
           <col className={styles.colStar} />
-          <col className={styles.colName} />
-          {displayColumns.map(column => <col key={column.key} />)}
+          {/* 1152（y2n1z）：顔の丸を外して名前の列を詰め、対応・シナリオの列を狭めてタグ名を全部入れる。 */}
+          <col className={narrow ? styles.colNameNarrow : styles.colName} />
+          {displayColumns.map(column => <col key={column.key} className={narrow ? column.key === 'support' ? styles.colSupportNarrow : column.key === 'scenario' ? styles.colScenarioNarrow : column.key === 'latest' ? styles.colLatestNarrow : column.key.startsWith('fixed:') || column.key.startsWith('field:') ? styles.colFieldNarrow : undefined : undefined} />)}
           <col className={styles.colMenu} />
         </colgroup>
         <thead>
@@ -841,7 +842,7 @@ export default function FriendsListV8() {
                 <Td className={styles.td}>
                   {/* 絵 nF4ts・x6QsVz：名前の前に顔の丸（写真が無ければ頭文字）。 */}
                   <div className={styles.friendCell}>
-                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
+                    {narrow ? null : <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />}
                     <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
                   </div>
                 </Td>
