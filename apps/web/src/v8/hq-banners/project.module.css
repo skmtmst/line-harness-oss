@@ -117,3 +117,5 @@
 .footer { margin-inline: var(--tpl-hb-footer-margin); }
 .generationInfo.warnText { color: var(--color-status-warn-deep); }
 .galleryFooter .footer { margin-inline: var(--tpl-hb-footer-margin) 0; }
+.limitText { color: var(--color-status-warn-deep); }
+.nowrap { white-space: nowrap; }

@@ -677,17 +677,15 @@ function ProjectInner() {
               <StickyBar
                 outlined
                 className={styles.footer}
-                split={{ trailingWidth: 'auto', lead: selectedImages.length > 0 ? <>
+                /* 1つの帯（zOpMG）：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。入らない文は文節で2行に折る。 */
+                destructive={selectedImages.length > 0 ? <>
                   <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
                   <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
-                  <span className={styles.spacer} />
                   <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
-                </> : (
-                  /* 絵 iMnph：選んでいないときの左は残りの枚数（左の列の幅に収まる短い形。使う枚数は［生成する（N枚）］と title）。 */
-                  usage && input.count > usage.month.remaining
-                    ? <span className={`${styles.generationInfo} ${styles.warnText}`} title={`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}>今月の上限に達しています</span>
-                    : <span className={styles.generationInfo} title={usageStatusText(usage, input.count)}>{usage ? `今月の残り ${usage.month.remaining}枚・今日 ${usage.today.remaining}枚` : usageStatusText(usage, input.count)}</span>
-                ) }}
+                </> : undefined}
+                status={selectedImages.length > 0 ? undefined : usage && input.count > usage.month.remaining
+                  ? <span className={styles.limitText}>{`今月の上限 ${usage.month.limit}枚に達しています`}<span className={styles.nowrap}>{`（必要 ${input.count}枚）`}</span></span>
+                  : usageStatusText(usage, input.count)}
                 info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
                 actions={
                   running ? (
