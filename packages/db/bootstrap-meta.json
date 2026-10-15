@@ -585,7 +585,8 @@
     "649_account_styles_and_starter_sets.sql",
     "650_booking_analytics_audiences.sql",
     "651_lesson_mode_capacity_guards.sql",
-    "652_style_outcomes_and_member_tags.sql"
+    "652_style_outcomes_and_member_tags.sql",
+    "681_style_setup_selection_and_auto_insert.sql"
   ],
-  "migrationCount": 586
+  "migrationCount": 587
 }
