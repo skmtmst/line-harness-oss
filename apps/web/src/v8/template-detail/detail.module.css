@@ -18,7 +18,7 @@
 .roBand { margin: 0; }
 
 /* 未公開の変更の帯（琥珀）：印18・文・比べる・公開する。 */
-.draftBand { display: flex; align-items: center; gap: var(--tpl-eds-band-gap); padding: var(--tpl-eds-band-pad); border-radius: var(--radius-card); background: var(--color-status-warn-soft); }
+.draftBand { display: flex; align-items: center; gap: var(--tpl-eds-band-gap); padding: var(--tpl-eds-band-pad); border-radius: var(--radius-card); background: var(--color-caution-band); }
 .draftIcon { flex-shrink: 0; color: var(--color-warning); }
 .draftText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
 .draftTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }
@@ -35,11 +35,11 @@
 .inlineLink { color: var(--color-action); text-decoration: underline; }
 
 /* 使っている所の行：種類96・名前・版120・状態80・開く。下に線。 */
-.usageRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-row-pad); box-shadow: var(--shadow-row-line); }
+.usageRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-usage-pad); box-shadow: var(--shadow-row-line); }
 .usageKind { flex: 0 0 var(--tpl-eds-kind-w); overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
 .usageName,
 .usageNameQuiet { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-name-lh); text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
-.usageName { color: var(--color-action); }
+.usageName { color: var(--color-ink); }
 .usageName:hover { text-decoration: underline; }
 .usageNameQuiet { color: var(--color-ink); }
 .usageVersion,
@@ -54,7 +54,7 @@
 .versionDraft,
 .versionInUse,
 .versionPast { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); padding: var(--tpl-eds-ver-pad); border-radius: var(--radius-control); }
-.versionDraft { background: var(--color-status-warn-soft); }
+.versionDraft { background: var(--color-caution-band); }
 .versionInUse { background: var(--color-success-bg); }
 .versionPast { outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .versionNum { flex-shrink: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-name-lh); }

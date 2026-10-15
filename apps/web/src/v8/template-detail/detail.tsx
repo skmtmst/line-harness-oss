@@ -2,7 +2,7 @@
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -435,7 +435,7 @@ export default function TemplateDetailV8() {
           <div className={styles.cardHead}>
             <div className={styles.cardTitles}>
               <h2 className={styles.cardTitle}>{template.hasDraft ? '本文（下書き）' : '本文'}</h2>
-              <p className={styles.cardNote}>{'{ } は差し込み。受け取る人ごとに変わります。'}</p>
+              <p className={styles.cardNote}>緑の札は差し込み。受け取る人ごとに変わります。</p>
             </div>
             {canMutate ? (
               <Button href={editHref} variant="secondary">
@@ -461,7 +461,7 @@ export default function TemplateDetailV8() {
               {visibleUsages.map(usageRow)}
               {usageCount > USAGE_VISIBLE && !showAllUsages ? (
                 <div className={styles.moreRow}>
-                  <button type="button" className={styles.ghostButton} onClick={() => setShowAllUsages(true)}>ほか {usageCount - USAGE_VISIBLE} か所を見る</button>
+                  <button type="button" className={styles.ghostButton} onClick={() => setShowAllUsages(true)}><ChevronDown size={16} aria-hidden="true" />ほか {usageCount - USAGE_VISIBLE} か所を見る</button>
                 </div>
               ) : null}
             </>

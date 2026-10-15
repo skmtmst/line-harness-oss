@@ -118,6 +118,8 @@
   --color-success: #087a3e;
   --color-success-bg: #16a34a1a;
   --color-warning: #94600a;
+  /* 注意の帯の地（琥珀）。状態の札の橙（status-warn-soft）とは別。絵の「未公開の変更」「影響の確認」の帯。 */
+  --color-caution-band: #fdf3e1;
   --color-warning-bg: #faf0dc;
   --color-danger: #b91c1c;
   --color-danger-bg: #fce9e7;
@@ -1003,7 +1005,7 @@
   --tpl-eds-content-pad: 24px 28px; --tpl-eds-content-gap: 16px; --tpl-eds-card-pad: var(--polish-space-section); --tpl-eds-card-gap: var(--polish-space-row);
   --tpl-eds-card-title-lh: 22px; --tpl-eds-note-lh: 17px; --tpl-eds-head-gap: 8px; --tpl-eds-title-gap: 2px;
   --tpl-eds-band-pad: 12px 16px; --tpl-eds-band-gap: 12px; --tpl-eds-band-title-lh: 19px;
-  --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-row-gap: 12px;
+  --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-usage-pad: 14px 0; --tpl-eds-row-gap: 12px;
   --tpl-eds-kind-w: 96px; --tpl-eds-ver-w: 120px; --tpl-eds-state-w: 80px; --tpl-eds-ghost-h: 36px; --tpl-eds-ghost-pad: 0 14px; --tpl-eds-ghost-gap: 6px;
   --tpl-eds-name-lh: 19px; --tpl-eds-ver-pad: 10px 12px; --tpl-eds-ver-meta-lh: 16px;
   --tpl-eds-side-actions-gap: 8px; --tpl-eds-more: 36px; --tpl-eds-about-pad: 16px; --tpl-eds-about-gap: 4px; --tpl-eds-about-row-pad: 9px 0; --tpl-eds-about-row-gap: 8px;
@@ -1814,7 +1816,7 @@
   --tpl-rs-bar-line: inset 3px 0 0 var(--color-accent-deep); --tpl-rs-bar-media: inset 3px 0 0 var(--tpl-rs-occupied-line); --tpl-rs-bar-phone: inset 3px 0 0 var(--tpl-rs-rsv-phone-line);
   --tpl-conv-messages-pad-block: 20px; --tpl-conv-messages-pad-side: 24px; --tpl-conv-messages-gap: 12px;
   --tpl-ev-question-h: 39px; --tpl-ev-phone-gap: 6px; --tpl-ev-phone-button-h: 33px; --tpl-ev-phone-button-top: 0px; --tpl-ev-check-indent: 28px;
-  --tpl-ev-card-pad: var(--polish-space-card); --tpl-ev-row-h: var(--polish-table-row); --tpl-ev-num-w: 70px; --tpl-ev-state-w: 102px; --tpl-ev-state-pad: 10px; --tpl-ev-chip-pad: 2px 8px; --tpl-ev-chip-dot: 6px; --tpl-ev-chip-gap: 5px; --tpl-ev-chip-lh: 18px; --tpl-ev-band-pad: 10px 12px; --tpl-ev-review-row-h: 38px; --tpl-ev-band-bg: #fdf3e1; --tpl-ev-band-ink: var(--color-warning); --tpl-ev-band-lh: 18px; --tpl-ev-ba-gap: 4px; --tpl-ev-bubble-pad: 6px 11px; --tpl-ev-key-w: 150px; --tpl-ev-impact-h: 298px; --tpl-ev-confirm-pull: -21px;
+  --tpl-ev-card-pad: var(--polish-space-card); --tpl-ev-row-h: var(--polish-table-row); --tpl-ev-num-w: 70px; --tpl-ev-state-w: 102px; --tpl-ev-state-pad: 10px; --tpl-ev-chip-pad: 2px 8px; --tpl-ev-chip-dot: 6px; --tpl-ev-chip-gap: 5px; --tpl-ev-chip-lh: 18px; --tpl-ev-band-pad: 10px 12px; --tpl-ev-review-row-h: 38px; --tpl-ev-band-bg: var(--color-caution-band); --tpl-ev-band-ink: var(--color-warning); --tpl-ev-band-lh: 18px; --tpl-ev-ba-gap: 4px; --tpl-ev-bubble-pad: 6px 11px; --tpl-ev-key-w: 150px; --tpl-ev-impact-h: 298px; --tpl-ev-confirm-pull: -21px;
   --tpl-ev-bk-pick-w: 220px; --tpl-ev-ls-col-when: 170px; --tpl-ev-ls-col-seats: 100px; --tpl-ev-ls-first-pad: 60px; --tpl-ev-ls-state-pad: 19px; --tpl-ev-ls-row-h: var(--polish-table-row); --tpl-ev-md-thumb-h: 120px; --tpl-ev-md-thumb-narrow-w: 80px; --tpl-ev-md-usage-top: 3px; --tpl-ev-md-grid-pad: 0 24px; --tpl-ev-md-grid-top: 18px; --tpl-ev-ls-saved-w: 152px; --tpl-ev-ls-col-pending: 88px; --tpl-ev-ls-col-state: 172px;
   --tpl-ev-fr-rail-w: 356px; --tpl-ev-fr-col-gap: 28px; --tpl-ev-fr-pull-top: 0px; --tpl-ev-fr-rail-pad: 24px; --tpl-ev-fr-alert-pad: 12px 20px; --tpl-ev-fr-bar-label-w: 118px; --tpl-ev-fr-bar-count-w: 90px; --tpl-ev-fr-bar-h: 8px; --tpl-ev-fr-quote-h: 47px; --tpl-ev-fr-head-h: var(--polish-table-head); --tpl-ev-fr-row-h: var(--polish-table-row); --tpl-ev-fr-col-when: 132px; --tpl-ev-fr-col-answer: 126px; --tpl-ev-fr-col-actions: 52px; --tpl-ev-fr-col-state: 106px; --tpl-ev-fr-pager-pad: 0 4px 0 20px; --tpl-ev-fr-detail-h: 39px; --tpl-ev-fr-quote-gap: 6px; --tpl-ev-bk-pull-top: -8px; --tpl-ev-bk-broadcast-top: 19px; --tpl-ev-bk-broadcast-gap: 34px; --tpl-ev-bk-pull-side: -4px; --tpl-ev-bk-kpi-num: 20px; --tpl-ev-bk-kpi-num-lh: 24px; --tpl-ev-bk-head-gap: 11px; --tpl-ev-bk-card-top: 14px; --tpl-ev-bk-att-pad: 8px 12px; --tpl-ev-bk-row-h: var(--polish-table-row); --tpl-ev-bk-main-row-h: var(--polish-table-row); --tpl-ev-bk-main-cols: 462px 156px 116px minmax(0, 1fr) auto; --tpl-ev-bk-wait-cols: minmax(0, 1fr) 116px 136px 136px 120px; --tpl-ev-bk-cancel-cols: minmax(0, 1fr) 116px 140px;
   --tpl-distribution-toolbar-pad: 13px;
