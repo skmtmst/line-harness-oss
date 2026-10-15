@@ -3259,6 +3259,27 @@ CREATE TABLE friend_daily_snapshots (
   PRIMARY KEY (date, line_account_id)
 );
 
+CREATE TABLE friend_delivery_consent_events (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ line_account_id TEXT NOT NULL, friend_id TEXT NOT NULL, purpose TEXT NOT NULL,
+ operation TEXT NOT NULL CHECK(operation IN ('insert','update','delete')),
+ before_json TEXT, after_json TEXT,
+ created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE friend_delivery_consents (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL CHECK(length(purpose) BETWEEN 1 AND 80),
+  state TEXT NOT NULL CHECK(state IN ('granted','unknown','revoked')),
+  reason TEXT NOT NULL CHECK(length(reason) BETWEEN 1 AND 1000),
+  source TEXT NOT NULL CHECK(length(source) BETWEEN 1 AND 100),
+  updated_by TEXT,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1),
+  PRIMARY KEY(line_account_id,friend_id,purpose)
+);
+
 CREATE TABLE friend_export_jobs (
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
@@ -6346,7 +6367,7 @@ CREATE TABLE rt_channel_close_tasks (
  channel TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('close','done','reopen')),
  reason TEXT NOT NULL CHECK(reason IN ('full','limited','table_conflict')), remaining_seats INTEGER NOT NULL,
  recipient_ids_json TEXT NOT NULL DEFAULT '[]', generation INTEGER NOT NULL DEFAULT 1,
- created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), trigger_reservation_id TEXT, trigger_source TEXT, trigger_sources_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(trigger_sources_json) AND json_type(trigger_sources_json)='array'),
  UNIQUE(slot_id,channel)
 );
 
@@ -6877,6 +6898,13 @@ CREATE TABLE rt_inventory_rule_queue (
  cause TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE rt_inventory_rule_source_events (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ store_id TEXT NOT NULL REFERENCES rt_stores(id), slot_id TEXT NOT NULL REFERENCES rt_inventory_slots(id),
+ reservation_id TEXT NOT NULL, source TEXT NOT NULL, event TEXT NOT NULL CHECK(event IN ('insert','update','delete')),
+ created_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
 CREATE TABLE rt_inventory_rules (
  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id), threshold INTEGER NOT NULL CHECK(threshold>=0),
  stop_line INTEGER NOT NULL CHECK(stop_line IN (0,1)), stop_same_day INTEGER NOT NULL CHECK(stop_same_day IN (0,1)),
@@ -7001,7 +7029,7 @@ CREATE TABLE rt_reservation_close_outbox (
 CREATE TABLE rt_reservation_close_tasks (
  id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id), reservation_id TEXT NOT NULL REFERENCES rt_reservations(id),
  channel TEXT NOT NULL, starts_at TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('close','done','reopen')),
- generation INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ generation INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), trigger_source TEXT,
  UNIQUE(reservation_id,channel,starts_at)
 );
 
@@ -7988,6 +8016,12 @@ CREATE TABLE traffic_pools (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE uid_migration_delivery_consents (
+ item_id TEXT NOT NULL REFERENCES uid_migration_items(id),
+ purpose TEXT NOT NULL, source_state TEXT, before_json TEXT, after_json TEXT,
+ PRIMARY KEY(item_id,purpose)
+);
+
 CREATE TABLE uid_migration_items (
   id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES uid_migration_runs(id) ON DELETE RESTRICT,
@@ -8563,6 +8597,8 @@ CREATE TABLE workflow_steps (
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
 
 CREATE INDEX broadcasts_hq_run ON broadcasts(hq_run_id);
+
+CREATE INDEX friend_delivery_consents_dispatch ON friend_delivery_consents(line_account_id,state,friend_id);
 
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
@@ -10730,6 +10766,8 @@ CREATE INDEX rt_external_links_reservation ON rt_reservation_external_links(rese
 
 CREATE INDEX rt_inventory_outbox_pending ON rt_inventory_notification_outbox(sent_at,lease_until);
 
+CREATE INDEX rt_inventory_rule_source_events_slot ON rt_inventory_rule_source_events(store_id,slot_id,id);
+
 CREATE INDEX rt_reserved_table ON rt_reservation_table_links(table_id,reservation_id);
 
 CREATE UNIQUE INDEX rt_visit_request ON rt_seat_visit_marks(reservation_id,request_id) WHERE request_id IS NOT NULL;
@@ -10961,6 +10999,16 @@ CREATE TRIGGER friend_add_rules_folder_name_insert AFTER INSERT ON friend_add_ru
 CREATE TRIGGER friend_add_rules_folder_name_update AFTER UPDATE OF folder_name ON friend_add_rules WHEN NEW.folder_name IS NOT OLD.folder_name BEGIN INSERT INTO folders(id,kind,account_id,name) SELECT 'friend-add-name-'||hex(NEW.line_account_id)||'-'||hex(NEW.folder_name)||'-'||lower(hex(randomblob(8))),'friend_add_rule',NEW.line_account_id,NEW.folder_name WHERE NEW.folder_name IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name); UPDATE friend_add_rules SET folder_id=(SELECT id FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name) WHERE id=NEW.id; END;
 
 CREATE TRIGGER friend_add_rules_folder_update BEFORE UPDATE OF folder_id,line_account_id ON friend_add_rules WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='friend_add_rule' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER friend_delivery_consents_audit_delete AFTER DELETE ON friend_delivery_consents BEGIN  INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation,before_json)  VALUES(OLD.line_account_id,OLD.friend_id,OLD.purpose,'delete',json_object('state',OLD.state,'reason',OLD.reason,'source',OLD.source,'updatedBy',OLD.updated_by,'updatedAt',OLD.updated_at,'version',OLD.version)); END;
+
+CREATE TRIGGER friend_delivery_consents_audit_insert AFTER INSERT ON friend_delivery_consents BEGIN  INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation,after_json)  VALUES(NEW.line_account_id,NEW.friend_id,NEW.purpose,'insert',json_object('state',NEW.state,'reason',NEW.reason,'source',NEW.source,'updatedBy',NEW.updated_by,'updatedAt',NEW.updated_at,'version',NEW.version)); END;
+
+CREATE TRIGGER friend_delivery_consents_audit_update AFTER UPDATE ON friend_delivery_consents BEGIN  INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation,before_json,after_json)  VALUES(NEW.line_account_id,NEW.friend_id,NEW.purpose,'update',json_object('state',OLD.state,'reason',OLD.reason,'source',OLD.source,'updatedBy',OLD.updated_by,'updatedAt',OLD.updated_at,'version',OLD.version),json_object('state',NEW.state,'reason',NEW.reason,'source',NEW.source,'updatedBy',NEW.updated_by,'updatedAt',NEW.updated_at,'version',NEW.version)); END;
+
+CREATE TRIGGER friend_delivery_consents_scope_insert BEFORE INSERT ON friend_delivery_consents BEGIN  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM friends WHERE id=NEW.friend_id AND line_account_id=NEW.line_account_id)  THEN RAISE(ABORT,'delivery_consent_scope') END; END;
+
+CREATE TRIGGER friend_delivery_consents_scope_update BEFORE UPDATE ON friend_delivery_consents BEGIN  SELECT CASE WHEN NEW.line_account_id<>OLD.line_account_id OR NEW.friend_id<>OLD.friend_id OR NEW.purpose<>OLD.purpose  OR NOT EXISTS(SELECT 1 FROM friends WHERE id=NEW.friend_id AND line_account_id=NEW.line_account_id)  THEN RAISE(ABORT,'delivery_consent_scope') END; END;
 
 CREATE TRIGGER friend_field_value_source_clear AFTER UPDATE OF value, updated_by, updated_at ON friend_field_values
 WHEN NEW.updated_by IS NOT 'form' AND NEW.source_type = 'form'
@@ -11253,6 +11301,10 @@ CREATE TRIGGER rt_departure_version AFTER UPDATE OF departed_at ON rt_reservatio
 
 CREATE TRIGGER rt_dining_snapshot_insert AFTER INSERT ON rt_reservations WHEN NEW.dining_snapshot_json IS NULL BEGIN UPDATE rt_reservations SET dining_snapshot_json=json_object( 'allergy',COALESCE(NEW.allergy_note,(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-allergy' LIMIT 1)), 'anniversary',(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-anniversary' LIMIT 1), 'seatPreference',(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-seat_preference' LIMIT 1), 'courseId',NEW.course_id,'courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=NEW.course_id AND store_id=NEW.store_id),'[]')),'capturedAt',NEW.created_at) WHERE id=NEW.id; END;
 
+CREATE TRIGGER rt_direct_close_source AFTER INSERT ON rt_reservation_close_tasks BEGIN  UPDATE rt_reservation_close_tasks SET trigger_source=(SELECT source FROM rt_reservations WHERE id=NEW.reservation_id AND store_id=NEW.store_id) WHERE id=NEW.id; END;
+
+CREATE TRIGGER rt_direct_close_source_generation AFTER UPDATE OF generation ON rt_reservation_close_tasks WHEN NEW.generation<>OLD.generation AND NEW.status='close' BEGIN UPDATE rt_reservation_close_tasks SET trigger_source=(SELECT source FROM rt_reservations WHERE id=NEW.reservation_id AND store_id=NEW.store_id) WHERE id=NEW.id; END;
+
 CREATE TRIGGER rt_event_receipts AFTER INSERT ON rt_reservation_events BEGIN INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) VALUES(NEW.id,'event_bus'),(NEW.id,'mileage'); INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) SELECT NEW.id,'visit_stamp_queue' WHERE NEW.event_type IN('restaurant.arrived','restaurant.arrival_undone'); END;
 
 CREATE TRIGGER rt_external_links_legacy_insert BEFORE INSERT ON rt_reservation_external_links
@@ -11334,6 +11386,12 @@ CREATE TRIGGER rt_inventory_rules_slot_insert AFTER INSERT ON rt_inventory_slots
 CREATE TRIGGER rt_inventory_rules_updated AFTER UPDATE ON rt_inventory_rules BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'rules_saved') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); UPDATE rt_inventory_slots SET reserved_count=reserved_count WHERE store_id=NEW.store_id; END;
 
 CREATE TRIGGER rt_inventory_slot_insert AFTER INSERT ON rt_inventory_slots BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0) WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_inventory_source_delete AFTER DELETE ON rt_reservations BEGIN  INSERT INTO rt_inventory_rule_source_events(store_id,slot_id,reservation_id,source,event)  SELECT i.store_id,i.id,OLD.id,OLD.source,'delete' FROM rt_inventory_slots i WHERE (i.store_id=OLD.store_id AND julianday(i.starts_at)<julianday(OLD.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(OLD.starts_at)); END;
+
+CREATE TRIGGER rt_inventory_source_insert AFTER INSERT ON rt_reservations BEGIN  INSERT INTO rt_inventory_rule_source_events(store_id,slot_id,reservation_id,source,event)  SELECT i.store_id,i.id,NEW.id,NEW.source,'insert' FROM rt_inventory_slots i WHERE (i.store_id=NEW.store_id AND julianday(i.starts_at)<julianday(NEW.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(NEW.starts_at)); END;
+
+CREATE TRIGGER rt_inventory_source_update AFTER UPDATE ON rt_reservations WHEN OLD.store_id IS NOT NEW.store_id OR OLD.source IS NOT NEW.source OR OLD.starts_at IS NOT NEW.starts_at OR OLD.ends_at IS NOT NEW.ends_at OR OLD.guest_count IS NOT NEW.guest_count OR OLD.table_id IS NOT NEW.table_id OR OLD.status IS NOT NEW.status OR OLD.hold_expires_at IS NOT NEW.hold_expires_at OR OLD.departed_at IS NOT NEW.departed_at BEGIN INSERT INTO rt_inventory_rule_source_events(store_id,slot_id,reservation_id,source,event) SELECT i.store_id,i.id,OLD.id,OLD.source,'update' FROM rt_inventory_slots i WHERE i.store_id=OLD.store_id AND julianday(i.starts_at)<julianday(OLD.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(OLD.starts_at) UNION SELECT i.store_id,i.id,NEW.id,NEW.source,'update' FROM rt_inventory_slots i WHERE i.store_id=NEW.store_id AND julianday(i.starts_at)<julianday(NEW.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(NEW.starts_at); END;
 
 CREATE TRIGGER rt_inventory_table_delete AFTER DELETE ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = OLD.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = OLD.store_id; END;
 
@@ -11871,6 +11929,10 @@ WHEN NEW.current_published_version_id IS NOT NULL
    WHERE id = NEW.current_published_version_id AND scenario_id = NEW.id
  )
 BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
+
+CREATE TRIGGER uid_migration_delivery_consents_apply AFTER UPDATE OF result ON uid_migration_items WHEN NEW.result='applied' AND OLD.result<>'applied' BEGIN SELECT CASE WHEN (SELECT user_id FROM friends WHERE id=NEW.old_friend_id) IS NOT json_extract(NEW.after_json,'$.userId') OR (SELECT user_id FROM friends WHERE id=NEW.new_friend_id) IS NOT json_extract(NEW.after_json,'$.userId') THEN RAISE(ABORT,'delivery_consent_identity_conflict') END; SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM uid_migration_runs r JOIN friends f ON f.id=NEW.old_friend_id AND f.line_account_id=r.from_account_id JOIN friends t ON t.id=NEW.new_friend_id AND t.line_account_id=r.to_account_id WHERE r.id=NEW.run_id)  THEN RAISE(ABORT,'delivery_consent_scope') END;  INSERT INTO uid_migration_delivery_consents(item_id,purpose,source_state,before_json)  SELECT NEW.id,p.purpose,s.state,CASE WHEN t.friend_id IS NULL THEN NULL ELSE json_object('state',t.state,'reason',t.reason,'source',t.source,'updatedBy',t.updated_by,'updatedAt',t.updated_at,'version',t.version) END  FROM (SELECT purpose FROM friend_delivery_consents WHERE friend_id=NEW.old_friend_id UNION SELECT purpose FROM friend_delivery_consents WHERE friend_id=NEW.new_friend_id) p  LEFT JOIN friend_delivery_consents s ON s.friend_id=NEW.old_friend_id AND s.purpose=p.purpose  LEFT JOIN friend_delivery_consents t ON t.friend_id=NEW.new_friend_id AND t.purpose=p.purpose;  INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source,updated_by,version) SELECT r.to_account_id,NEW.new_friend_id,s.purpose,  CASE WHEN s.source_state='revoked' OR json_extract(s.before_json,'$.state')='revoked' THEN 'revoked'  WHEN COALESCE(s.source_state,'unknown')='unknown' OR COALESCE(json_extract(s.before_json,'$.state'),'unknown')='unknown' THEN 'unknown' ELSE 'granted' END,  'UID移行：移行元と移行先の厳しい状態を引き継ぎ','uid_migration',r.approved_by,COALESCE((SELECT MAX(CAST(json_extract(COALESCE(e.after_json,e.before_json),'$.version') AS INTEGER)) FROM friend_delivery_consent_events e WHERE e.friend_id=NEW.new_friend_id AND e.purpose=s.purpose),0)+1 FROM uid_migration_delivery_consents s JOIN uid_migration_runs r ON r.id=NEW.run_id WHERE s.item_id=NEW.id  ON CONFLICT(line_account_id,friend_id,purpose) DO UPDATE SET state=excluded.state,reason=excluded.reason,source=excluded.source,updated_by=excluded.updated_by,updated_at=excluded.updated_at,version=friend_delivery_consents.version+1;  UPDATE uid_migration_delivery_consents SET after_json=(SELECT json_object('state',c.state,'reason',c.reason,'source',c.source,'updatedBy',c.updated_by,'updatedAt',c.updated_at,'version',c.version) FROM friend_delivery_consents c WHERE c.friend_id=NEW.new_friend_id AND c.purpose=uid_migration_delivery_consents.purpose) WHERE item_id=NEW.id;  UPDATE uid_migration_items SET before_json=json_set(before_json,'$.deliveryConsents',(SELECT json_group_array(json_object('purpose',purpose,'value',json(before_json))) FROM uid_migration_delivery_consents WHERE item_id=NEW.id)),  after_json=json_set(after_json,'$.deliveryConsentsRecorded',1,'$.deliveryConsents',(SELECT json_group_array(json_object('purpose',purpose,'value',json(after_json))) FROM uid_migration_delivery_consents WHERE item_id=NEW.id)) WHERE id=NEW.id; END;
+
+CREATE TRIGGER uid_migration_delivery_consents_restore BEFORE UPDATE OF result ON uid_migration_items WHEN NEW.result='rolled_back' AND OLD.result='applied' AND json_extract(OLD.after_json,'$.deliveryConsentsRecorded')=1 BEGIN  SELECT CASE WHEN EXISTS(SELECT 1 FROM uid_migration_delivery_consents s LEFT JOIN friend_delivery_consents c ON c.friend_id=OLD.new_friend_id AND c.purpose=s.purpose WHERE s.item_id=OLD.id AND (c.friend_id IS NULL OR c.version<>json_extract(s.after_json,'$.version') OR c.state<>json_extract(s.after_json,'$.state') OR c.reason<>json_extract(s.after_json,'$.reason') OR c.source<>json_extract(s.after_json,'$.source') OR c.updated_by IS NOT json_extract(s.after_json,'$.updatedBy') OR c.updated_at<>json_extract(s.after_json,'$.updatedAt')))  OR EXISTS(SELECT 1 FROM friend_delivery_consents c WHERE c.friend_id=OLD.new_friend_id AND NOT EXISTS(SELECT 1 FROM uid_migration_delivery_consents s WHERE s.item_id=OLD.id AND s.purpose=c.purpose))  THEN RAISE(ABORT,'delivery_consent_conflict') END;  DELETE FROM friend_delivery_consents WHERE friend_id=OLD.new_friend_id AND purpose IN (SELECT purpose FROM uid_migration_delivery_consents WHERE item_id=OLD.id AND before_json IS NULL);  UPDATE friend_delivery_consents SET  state=json_extract(s.before_json,'$.state'),reason=json_extract(s.before_json,'$.reason'),source=json_extract(s.before_json,'$.source'),updated_by=json_extract(s.before_json,'$.updatedBy'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),version=version+1  FROM uid_migration_delivery_consents s WHERE s.item_id=OLD.id AND s.purpose=friend_delivery_consents.purpose AND friend_id=OLD.new_friend_id AND s.before_json IS NOT NULL; END;
 
 CREATE TRIGGER v8_photo_publication_policy_insert AFTER INSERT ON nen_photo_publications
 BEGIN UPDATE nen_photo_publications SET reward_policy_key=COALESCE((SELECT policy_key FROM photo_reward_policies WHERE effective_from IS NULL OR julianday(effective_from,CASE WHEN substr(effective_from,11) GLOB '*[Zz+-]*' THEN '+0 hours' ELSE '-9 hours' END)<=julianday('now') ORDER BY version_number DESC LIMIT 1),'legacy-5'), reward_points=COALESCE((SELECT publication_points FROM photo_reward_policies WHERE effective_from IS NULL OR julianday(effective_from,CASE WHEN substr(effective_from,11) GLOB '*[Zz+-]*' THEN '+0 hours' ELSE '-9 hours' END)<=julianday('now') ORDER BY version_number DESC LIMIT 1),0) WHERE id=NEW.id; END;

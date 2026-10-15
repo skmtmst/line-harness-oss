@@ -578,7 +578,9 @@
     "633_restaurant_external_links.sql",
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
-    "636_restaurant_delivery_uber_connections.sql"
+    "636_restaurant_delivery_uber_connections.sql",
+    "637_friend_delivery_consents.sql",
+    "638_restaurant_close_task_sources.sql"
   ],
-  "migrationCount": 579
+  "migrationCount": 581
 }
