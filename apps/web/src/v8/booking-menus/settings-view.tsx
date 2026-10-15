@@ -23,7 +23,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   const [paymentsConnected, setPaymentsConnected] = useState(true)
   /* つなぐ前（UteeA）も右の欄を出さない。 */
   const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events' || !paymentsConnected)
-  const noPhone = tab === 'channels' || tab === 'payments'
+  /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
+  const noPhone = tab === 'channels' || tab === 'payments' || tab === 'staff'
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
