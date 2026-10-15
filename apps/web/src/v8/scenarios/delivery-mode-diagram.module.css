@@ -44,8 +44,7 @@
 }
 .person { fill: var(--color-scenario-example-person-soft); }
 .personName { fill: var(--color-scenario-example-person); font-weight: 600; }
-.startBadge { fill: var(--color-canvas); stroke: var(--color-hairline); }
-.startLabel { fill: var(--color-ink-secondary); font-size: var(--tpl-scfig-start-size); font-weight: 600; }
+.startLabel { fill: var(--color-ink); font-weight: 600; }
 .startDate { fill: var(--color-ink); font-weight: 600; }
 .track { stroke: var(--color-toggle-off); stroke-width: var(--tpl-scfig-track-stroke); }
 .elapsedLine { stroke: var(--diagram-line); stroke-width: var(--tpl-scfig-elapsed-stroke); }
@@ -53,7 +52,8 @@
 .message { fill: var(--diagram-fill); stroke: var(--diagram-line); }
 .messageTitle { font-weight: 600; }
 .messageDate { font-weight: 400; }
-.bubble { fill: var(--diagram-bubble); stroke: var(--diagram-line); }
-.bubbleText { font-weight: 500; }
+.bubble { fill: var(--diagram-bubble); }
+.bubbleText { fill: var(--diagram-ink); }
+.bubbleText { font-weight: 600; }
 .bubbleStem,
 .sameTime { stroke: var(--diagram-line); }
