@@ -8,6 +8,11 @@ const row: ReservationBoardEntry = { id: 'r1', kind: 'people', version: 7, scope
 const resources = [{ id: 'a', label: '担当A', active: true, capacity: 1 }, { id: 'b', label: '担当B', active: true, capacity: 1 }]
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
+test.each([['counter', '店頭'], ['operator', '手入力'], ['import', '取り込み']])('%sの予約には電話の印でなく実際の経路を出す', (source, label) => {
+  render(<ReservationBoard kind="people" timeDirection="vertical" dates={['2026-10-15']} entries={[{ ...row, source }]} resources={resources} onOpen={() => {}} />)
+  expect(screen.getByRole('button', { name: /花子.*カット.*詳細/ }).textContent).toContain(label)
+})
+
 test('時刻が行、担当が列で、予約の詳細とAPIが返す空き枠だけを開ける', () => {
   const open = vi.fn()
   const slot = { resourceId: 'b', startsAt: '2026-10-15T02:00:00Z', href: '/booking/bookings/new?staff=b&time=11:00' }

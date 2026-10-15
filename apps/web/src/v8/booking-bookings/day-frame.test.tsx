@@ -22,6 +22,14 @@ test.each(['requested', 'cancelled', 'rejected', 'expired', 'no_show', 'complete
   expect(result.sales).toBe(5000)
 })
 
+test.each(['counter', 'operator', 'import'] as const)('%sの予約を電話に混ぜず、その他の受付として見せる', source => {
+  const rows = [row, { ...row, id: 'phone', source: 'phone' as const }, { ...row, id: source, source }]
+  expect(dayBookingSummary(rows, '2026-10-15', { status: 'ready', slots: [] })).toMatchObject({ active: 3, line: 1, phone: 1, other: 1 })
+  const { container } = render(<PeopleDayFrame view="day" date="2026-10-15" rows={rows} ready availability={{ status: 'ready', slots: [] }} actions={null} canWrite={false} onOpen={() => {}}>盤</PeopleDayFrame>)
+  expect(container.textContent).toContain('LINE 1・電話 1・その他 1')
+  expect(container.textContent).toContain('その他の受付')
+})
+
 test('次の予約は実データから詳細を開き、狭い板の入口からも同じ内容を読める', () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-15T01:00:00Z'))
   const open = vi.fn()

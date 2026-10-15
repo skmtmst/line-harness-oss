@@ -68,10 +68,10 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
         const available = daySlots.filter(slot => slot.resourceId === resource.id && minuteOf(slot.startsAt) >= minute && minuteOf(slot.startsAt) < minute + 60)
         return <div role="cell" key={resource.id} className={styles.cell} data-resource-id={resource.id} onDragOver={event => { if (canWrite && onMove && !busy) event.preventDefault() }} onDrop={event => void drop(resource.id, minute, event)}>
           {bookings.map(row => {
-            const phone = row.source !== 'line' && row.source !== 'liff'
+            const line = ['line', 'liff'].includes(row.source), phone = ['phone', 'manual'].includes(row.source)
             const label = `${row.customerName} ${formatTime(row.startsAt)}〜${formatTime(row.endsAt)} ${row.courseName ?? '予約'}の詳細`
-            return <BookingBlock placement="cell" key={row.id} tone={phone ? 'phone' : 'line'} aria-label={label} title={label} draggable={canWrite && !!onMove && !busy} onDragStart={event => startDrag(row, event)} onDragEnd={() => { dragged.current = null }} onClick={() => onOpen(row.id)}>
-              <span className={styles.name}><strong>{row.customerName}</strong>{phone ? <Phone size={14} aria-hidden /> : <MessageCircle size={14} aria-hidden />}</span>
+            return <BookingBlock placement="cell" key={row.id} tone={phone ? 'phone' : line ? 'line' : 'confirmed'} aria-label={label} title={label} draggable={canWrite && !!onMove && !busy} onDragStart={event => startDrag(row, event)} onDragEnd={() => { dragged.current = null }} onClick={() => onOpen(row.id)}>
+              <span className={styles.name}><strong>{row.customerName}</strong>{phone ? <Phone size={14} aria-hidden /> : line ? <MessageCircle size={14} aria-hidden /> : <span>{({ counter: '店頭', operator: '手入力', import: '取り込み' } as Record<string, string>)[row.source] ?? 'その他'}</span>}</span>
               <span className={styles.meta}>{`${row.courseName ?? '予約'}・${formatTime(row.startsAt)}〜${formatTime(row.endsAt)}`}</span>
               {row.status !== 'confirmed' ? <span className={styles.meta}>{({ requested: '承認待ち', cancelled: 'キャンセル', rejected: '拒否', expired: '期限切れ', completed: '完了', no_show: '来店なし' } as Record<string, string>)[row.status] ?? row.status}</span> : null}
             </BookingBlock>

@@ -20,7 +20,8 @@ export function dayBookingSummary(rows: BookingRequest[], date: string, availabi
   const active = rows.filter(row => !['cancelled', 'rejected', 'expired'].includes(row.status))
   const line = active.filter(row => row.source ? row.source === 'liff' : Boolean(row.friend_id)).length
   const slots = availability.slots.filter(slot => slot.date === date && slot.remaining > 0 && ['available', 'limited'].includes(slot.state))
-  return { active: active.length, line, phone: active.length - line, requested: active.filter(row => row.status === 'requested').length,
+  const phone = active.filter(row => row.source === 'phone').length
+  return { active: active.length, line, phone, other: active.length - line - phone, requested: active.filter(row => row.status === 'requested').length,
     cancelled: rows.filter(row => ['cancelled', 'rejected', 'no_show'].includes(row.status)).length,
     sales: rows.filter(row => row.status === 'confirmed').reduce((sum, row) => sum + row.price_at_booking, 0),
     available: availability.status === 'ready' ? new Set(slots.map(slot => `${slot.staffId}/${slot.start}`)).size : null,
@@ -38,7 +39,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
   const day = formatDay(`${date}T00:00:00+09:00`)
   const period = date === jstDate() ? '今日' : day
   const stats = <KpiBand layout="booking">
-    <KpiCard presentation="band" icon={<CalendarDays size={16} aria-hidden />} title={`${period}の予約`} value={value(summary.active)} unit="件" detail={ready ? `LINE ${summary.line}・電話 ${summary.phone}` : '読み込んでいます'} />
+    <KpiCard presentation="band" icon={<CalendarDays size={16} aria-hidden />} title={`${period}の予約`} value={value(summary.active)} unit="件" detail={ready ? `LINE ${summary.line}・電話 ${summary.phone}${summary.other ? `・その他 ${summary.other}` : ''}` : '読み込んでいます'} />
     <KpiCard presentation="band" icon={<CalendarPlus size={16} aria-hidden />} title="まだ空いている枠" value={ready ? summary.available : null} unit="枠" detail={availability.status === 'ready' ? 'この日の残り' : availability.status === 'error' ? '読み込めませんでした' : availability.status === 'unconfigured' ? '受付枠が未設定' : '読み込んでいます'} help="空き枠から担当と開始時刻の重複を除いて数えています。メニュー違いの同じ枠は1枠です。" helpDisplay="question" />
     <KpiCard presentation="band" icon={<CircleAlert size={16} aria-hidden />} title="未承認・要対応" value={value(summary.requested)} unit="件" detail="承認待ちの予約" />
     <KpiCard presentation="band" icon={<CalendarX size={16} aria-hidden />} title="キャンセル" value={value(summary.cancelled)} unit="件" detail="この日" />
@@ -52,10 +53,12 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
         {canWrite ? <Button href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変える</Button> : null}
       </Card> : <ListState kind="empty" title={ready ? '次の予約はありません' : '予約を読み込んでいます'} />}
     </BookingSidebarSection>
-    <BookingSidebarSection title="気をつけること"><p>{!ready ? '読み込んでいます' : summary.requested ? `未承認の予約が${summary.requested}件あります。` : 'いま確認が必要な予約はありません。'}</p>{ready && summary.phone > 0 ? <p>LINE以外の予約は、連絡方法も確認してください。</p> : null}</BookingSidebarSection>
+    <BookingSidebarSection title="気をつけること"><p>{!ready ? '読み込んでいます' : summary.requested ? `未承認の予約が${summary.requested}件あります。` : 'いま確認が必要な予約はありません。'}</p>{ready && summary.phone + summary.other > 0 ? <p>LINE以外の予約は、連絡方法も確認してください。</p> : null}</BookingSidebarSection>
     <BookingSidebarSection title={`${day}の内訳`}><ReservationFacts items={[
       { label: '予約', value: ready ? `${summary.active}件` : '—' }, { label: 'うちLINEから', value: ready ? `${summary.line}件` : '—' },
-      { label: 'うち電話', value: ready ? `${summary.phone}件` : '—' }, { label: '売上見込み', value: ready ? `¥${formatNumber(summary.sales)}` : '—' },
+      { label: 'うち電話', value: ready ? `${summary.phone}件` : '—' },
+      ...(ready && summary.other > 0 ? [{ label: 'その他の受付', value: `${summary.other}件` }] : []),
+      { label: '売上見込み', value: ready ? `¥${formatNumber(summary.sales)}` : '—' },
     ]} /></BookingSidebarSection>
     <BookingSidebarSection title="つながる先"><Button variant="text" href="/booking/menus">予約設定</Button><Button variant="text" href="/reminders">リマインダ</Button><Button variant="text" href="/friends">友だち</Button><Button variant="text" href="/conversions">コンバージョン</Button></BookingSidebarSection>
   </>
