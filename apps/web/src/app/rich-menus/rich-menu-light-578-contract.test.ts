@@ -1,3 +1,4 @@
+import { isGroupResponse } from './new/create-draft'
 import { ApiError } from '@/lib/api'
 import { readFileSync } from 'node:fs'
 import { describe,expect,it } from 'vitest'
@@ -5,7 +6,6 @@ import { SIZE_LABEL } from './new/create-options'
 import { imageUploadErrorText } from './new/image-upload-error'
 
 const EDIT = readFileSync(new URL('./new/create-v8.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./new/create-draft.ts', import.meta.url), 'utf8')
 const UNPUBLISH = readFileSync(new URL('../../v8/rich-menu-edit/detail.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('../../v8/rich-menus/errors.ts', import.meta.url), 'utf8')
 const CONNECTIONS = readFileSync(new URL('../../v8/rich-menus/connections.tsx', import.meta.url), 'utf8')
@@ -24,7 +24,8 @@ const TAG_MODAL = readFileSync(
  */
 describe('#578 リッチメニューの軽整理', () => {
   it('取得結果を as で断定せず、形を確かめる', () => {
-    expect(EDIT).toContain('function isGroupResponse')
+    expect(isGroupResponse({ id: 'menu', name: '案内', pages: [] })).toBe(true)
+    for (const value of [null, {}, { id: 1, name: '案内', pages: [] }, { id: 'menu', name: '案内', pages: null }]) expect(isGroupResponse(value)).toBe(false)
     const loadEdit = EDIT.slice(EDIT.indexOf('const loadEditGroup'), EDIT.indexOf('/* ---------- 下書きの作成・保存'))
     expect(loadEdit).toContain('isGroupResponse(res.data)')
     expect(loadEdit).not.toContain('res.data as Group')

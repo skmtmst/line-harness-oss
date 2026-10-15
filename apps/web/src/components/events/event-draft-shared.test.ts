@@ -2,7 +2,8 @@ import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT,ENTRY_CUTOFF_OPTIONS } from
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe,expect,it } from 'vitest'
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readFileSync } from 'node:fs'
+import { formatJpDateTime } from '@/v8/events/edit-format'
 import {
 EVENT_CANCEL_DEADLINE_OPTIONS,
 EVENT_DEFAULT_DRAFT,
@@ -165,7 +166,7 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   })
 
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
-    expect(FORM).toMatch(/function formatJpDateTime[\s\S]*?formatDateTime\(d\)/)
+    expect(formatJpDateTime('2026-10-16T16:30:00Z')).toMatch(/10月17日（土）01:30$/)
     // 一覧側は既に JST 固定。両方が同じ固定を持つことだけを見る。
     expect(LIST_PAGE).toContain("import { jstDay, jstTime } from './shared'")
     expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('time + 9 * 3600_000')

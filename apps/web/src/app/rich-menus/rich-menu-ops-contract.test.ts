@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe,expect,it } from 'vitest'
+import { api } from '@/lib/api'
+import { areaDraftsWithSwitchTargets, mediaToFile } from './new/create-draft'
+import { describe,expect,it,vi } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
@@ -9,7 +11,6 @@ const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
-  + readFileSync(join(HERE, 'new', 'create-draft.ts'), 'utf8')
 const CREATE_FORM = readFileSync(
   join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
@@ -33,9 +34,27 @@ describe('作成画面の登録メディア選択', () => {
     // キャンセルは入力を捨てない（onClose は閉じるだけ）
     expect(NEW_PAGE).toContain('onClose={() => setMediaPickerOpen(false)}')
     // 選んだ画像のプレビューがフォーム内に残る
-    expect(NEW_PAGE).toContain('api.media.contentUrl(image.media.id, accountId)')
+    // 登録画像の取得時のアカウントは下の実行試験で確かめる。
     // 作成APIへ imageMediaId を渡す
     expect(NEW_PAGE).toContain('imageMediaId: pendingImages[0]?.media?.id')
+  })
+
+  it('登録画像を現在のアカウントで取得し、失敗した応答を画像にしない', async () => {
+    const contentUrl = vi.spyOn(api.media, 'contentUrl').mockReturnValue('/registered-image')
+    const fetchImage = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('image-data', { headers: { 'Content-Type': 'image/png' } }))
+    const media = { id: 'media-a', filename: '案内.png', mimeType: 'image/png' } as Parameters<typeof mediaToFile>[0]
+    try {
+      const file = await mediaToFile(media, 'account-a')
+      expect(contentUrl).toHaveBeenCalledWith('media-a', 'account-a')
+      expect(fetchImage).toHaveBeenCalledWith('/registered-image', { credentials: 'include' })
+      expect(file.name).toBe('案内.png')
+      expect(await file.text()).toBe('image-data')
+      fetchImage.mockResolvedValueOnce(new Response('denied', { status: 403 }))
+      await expect(mediaToFile(media, 'account-a')).rejects.toThrow('403')
+    } finally {
+      contentUrl.mockRestore()
+      fetchImage.mockRestore()
+    }
   })
 
   it('アカウントを切り替えたら前のアカウントの選択を持ち込まない', () => {
@@ -116,7 +135,8 @@ describe('作成時の既定ページ・出し分け・切替', () => {
     expect(NEW_PAGE).toContain('isDefaultForAll:')
     expect(NEW_PAGE).toContain("targetingEnabled: audience === 'targeted'")
     expect(NEW_PAGE).toContain('targetingPriority,')
-    expect(NEW_PAGE).toContain('targetPageIndex')
+    const area = { id: 'switch', actionType: 'richmenuswitch', actionData: { targetPageId: '2' } } as Parameters<typeof areaDraftsWithSwitchTargets>[0][number]
+    expect(areaDraftsWithSwitchTargets([area])[0].actionData).toEqual({ targetPageIndex: 2 })
     // 切替ボタンを新規作成で選べる
     expect(NEW_PAGE).toContain('NEW_MENU_INTENTS_WITH_SWITCH')
     // 行き先未設定の切替を黙って送らない

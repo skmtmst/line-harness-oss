@@ -681,7 +681,7 @@ export default function BookingsPage() {
     })()
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo, candidatesStatus, menus, staffList])
-  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 O2Z8u）。読めなければ出さないだけ。
+  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 O2Z8u）。読めなければ空き枠の失敗として示す。
   useEffect(() => {
     if (!selectedAccountId || view !== 'day' || staffList.length === 0) return
     let alive = true
