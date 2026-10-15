@@ -9,7 +9,7 @@ import Button from '@/components/shared/button'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
-import { ACTION_TYPES, ACTION_DEFINITIONS, type LinkedAction, type TagEditorActionLabel } from './tag-editor-v4'
+import { ACTION_TYPES, ACTION_DEFINITIONS, ACTION_DISPLAY, type LinkedAction, type TagEditorActionLabel } from './tag-editor-v4'
 import { newStepId } from '@/components/automations/common-action-editor'
 
 /** 店と統括のタグ連動。旧いラベル・定義と遅延設定を保ち、その場で再編集する。 */
@@ -41,8 +41,8 @@ export default function LinkedActionList({ value, onChange, accountId, allowedTy
   const choices: ActionChoice<LinkedAction>[] = ACTION_TYPES.filter(([label]) => label !== '友だち情報更新' && (!allowedTypes || allowedTypes.includes(label)) && (!resources?.actionTypes || resources.actionTypes.some(type => type.actionType === ACTION_DEFINITIONS[label].actionType && type.state === 'available'))).map(([label, category]) => {
     const def = ACTION_DEFINITIONS[label]
     const items = def.resource ? (resources?.[def.resource] as Array<{ id: string; name: string }> | undefined) ?? [] : []
-    return { id: label, label, make: () => { const id = newStepId(); return { id, type: category, label, timing: 'すぐに', definition: { id, type: def.actionType, params: { delayMinutes: 0, cancelIfTagRemoved: true }, onFailure: 'stop' } } },
-      picker: def.resource ? { title: `${label}の対象を選ぶ`, items,
+    return { id: label, label: ACTION_DISPLAY[label], make: () => { const id = newStepId(); return { id, type: category, label: ACTION_DISPLAY[label], timing: 'すぐに', definition: { id, type: def.actionType, params: { delayMinutes: 0, cancelIfTagRemoved: true }, onFailure: 'stop' } } },
+      picker: def.resource ? { title: `${ACTION_DISPLAY[label]}：対象を選ぶ`, items,
         apply: (action, ids) => describe(action, { ...action.definition!.params, [def.paramKey!]: ids[0] }, label) } : undefined }
   })
   return <>
