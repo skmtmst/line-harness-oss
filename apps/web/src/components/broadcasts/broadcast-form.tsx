@@ -634,6 +634,12 @@ export default function BroadcastForm({
    * 誤った案内が出る。
    */
   const [templateCandidatesStatus, setTemplateCandidatesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /* 選ぶ窓の「よく使う」：使った回数の多い順に上から3つ（B-165・f63Jza）。使った記録が無いものは入れない。 */
+  const frequentTemplateIds = useMemo(() => new Set(messageTemplates
+    .filter((template) => (template.usageCount ?? 0) > 0)
+    .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
+    .slice(0, 3)
+    .map((template) => template.id)), [messageTemplates])
   /**
    * テンプレート選択窓の絞り込み（IDEA-11）。
    * 「置き場」はテンプレートのフォルダで、配信そのものの置き場
@@ -2376,13 +2382,13 @@ export default function BroadcastForm({
           />
         </section>
         {showTemplatePicker && (
-          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
+          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" scrollBody searchPlaceholder="テンプレート名・本文で探す"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
             state={templateCandidatesStatus === 'loading' ?
                 <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
-                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
-              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
+                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind), frequent: false})),
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown'), frequent: frequentTemplateIds.has(template.id)}
               )),
             ]}
             preview=

@@ -1852,7 +1852,9 @@ const REJECTED_APPROVALS = [
   duplicateFlag: false,
 }))
 
+/* 成果承認は選んだアカウントの分だけ出す（lineAccountId で絞る）。見本は撮影のアカウントに付ける。 */
 const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
+  .map((item) => ({ lineAccountId: ACCOUNT.id, ...item }))
 
 const SHAPES = {
   '/api/public/brand': { name: '株式会社 然', iconUrl: null },
@@ -3768,7 +3770,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   // ★V8 L48eY：本移行と照合が終わった履歴（/friends/migrations?tab=uid&run=visual-uid-run-done）。
   if (pathname === '/api/friends/migrations/visual-uid-run-done') {
-    return { success: true, data: { ...UID_MIGRATION_DONE, items: [], itemTotal: 0, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
+    return { success: true, data: { ...UID_MIGRATION_DONE, items: [
+      { id: 'uid-done-1', oldUid: 'old_uid_00018', newUid: 'new_uid_00018', candidateName: '高橋 直人', evidenceType: 'operator_csv', classification: 'auto', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+      { id: 'uid-done-2', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+    ], itemTotal: 2, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
   }
   if (pathname === '/api/friends/migrations/visual-uid-run') {
     return { success: true, data: {
@@ -4117,7 +4122,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         },
       }
     }
-    return { success: true, data: TEMPLATES }
+    // 本物はアカウントの分だけ返し、各行にアカウントを持つ。送れる候補の絞り込み（accountId 一致）で落ちないようにする（f63Jza）。
+    return { success: true, data: TEMPLATES.map((item) => ({ accountId: query.get('account_id') ?? ACCOUNT.id, ...item })) }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   /* 設計 NCbYn（編集中に競合）：一覧に出ない ID。使われる場所は無く、本文に URL が1つある。 */
