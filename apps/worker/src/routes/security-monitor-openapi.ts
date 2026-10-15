@@ -11,10 +11,10 @@ const alert = { type: 'object', properties: {
   count: { type: 'integer', minimum: 0 }, threshold: { type: 'integer', minimum: 1 },
   status: { type: 'string', enum: ['open', 'acknowledged', 'resolved'] }, version: { type: 'integer' },
   firstDetectedAt: { type: 'string', format: 'date-time' }, lastDetectedAt: { type: 'string', format: 'date-time' },
-  reviewedAt: { type: 'string', format: 'date-time', nullable: true },
+  reviewedAt: { type: ['string', 'null'], format: 'date-time' },
   notification: { type: 'string', enum: ['sent', 'pending', 'unconfigured'] },
   scope: { type: 'object', description: '運営APIだけ。店APIとSlackへ出さない', properties: {
-    tenantId: { type: 'string' }, lineAccountId: { type: 'string', nullable: true },
+    tenantId: { type: 'string' }, lineAccountId: { type: ['string', 'null'] },
   } },
 } };
 function list(platform: boolean) {
@@ -28,7 +28,7 @@ function list(platform: boolean) {
           thresholds: { type: 'object', additionalProperties: { type: 'integer', minimum: 1 } },
           monitor: { type: 'object', properties: {
             status: { type: 'string', enum: ['unknown', 'failed', 'stale', 'running'] },
-            lastStartedAt: { type: 'string', nullable: true }, lastCompletedAt: { type: 'string', nullable: true }, configurationValid: { type: 'boolean' },
+            lastStartedAt: { type: ['string', 'null'] }, lastCompletedAt: { type: ['string', 'null'] }, configurationValid: { type: 'boolean' },
           } },
         } } },
       } } } },
