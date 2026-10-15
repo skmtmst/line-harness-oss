@@ -1,4 +1,5 @@
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
+import { api2FollowupPaths } from './api2-followups-openapi.js';
 import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
@@ -449,6 +450,7 @@ const spec = {
     ...audit3Paths,
     ...auditstepsPaths,
     ...api18Paths,
+    ...api2FollowupPaths,
     ...api17Paths,
     ...api9Paths,
     ...restaurantRest4Paths,

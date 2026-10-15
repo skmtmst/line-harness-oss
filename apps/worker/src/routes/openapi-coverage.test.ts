@@ -56,6 +56,9 @@ function isCoveredRoute(method: string, path: string): boolean {
     '/api/restaurant-test/followups/:storeId/stop',
     '/api/restaurant-test/reservations/:id',
     '/api/restaurant-test/reservations/:id/confirmations',
+    '/api/restaurant-test/channel-close-tasks',
+    '/api/restaurant-test/channel-close-tasks/:id/opened',
+    '/api/restaurant-test/google/reviews/:id/draft/generate',
 
   ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
@@ -131,7 +134,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 771;
+const ALLOWLIST_MAX = 770;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -142,6 +145,12 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/hq/support/summary',
+  'GET /api/manual-links/lookup',
+  'GET /api/restaurant-test/channel-close-tasks',
+  'POST /api/restaurant-test/channel-close-tasks/{id}/opened',
+  'POST /api/restaurant-test/google/reviews/{id}/draft/generate',
+  'PUT /api/booking/admin/channels/{channel}/settings',
   'GET /api/auth/api-key',
   'POST /api/auth/api-key',
   'DELETE /api/auth/api-key',
@@ -1708,9 +1717,8 @@ const ALLOWLIST = new Set<string>([
   'POST /api/identity-candidates/{id}/decide',
   'POST /api/identity-candidates/{id}/undo',
 
-  // core：ヘルプ導線設定（OpenAPI未記載・順次記載）（5件）
+  // core：ヘルプ導線設定（OpenAPI未記載・順次記載）（4件）
   'GET /api/manual-links',
-  'GET /api/manual-links/lookup',
   'POST /api/manual-links/check',
   'PUT /api/manual-links',
   'PUT /api/manual-links/{key}',
@@ -1879,7 +1887,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('暫定allowlistは777件以下（増加禁止）', async () => {
+  test('暫定allowlistは基準件数以下（増加禁止）', async () => {
     expect(
       ALLOWLIST.size <= ALLOWLIST_MAX,
       `ALLOWLISTが ${ALLOWLIST.size} 件で基準 ${ALLOWLIST_MAX} 件を超えています。` +
