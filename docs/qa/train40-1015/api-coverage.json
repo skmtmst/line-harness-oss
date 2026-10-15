@@ -30,12 +30,6 @@
       "POST /api/hq/templates/{id}/test-send"
     ]
   },
-  "pendingDenyInventory": {
-    "applied": false,
-    "questionPending": true,
-    "remainingFailedTests": 2,
-    "proposal": "staff-deny-inventory-proposal.patch"
-  },
   "existingFooterFixtureFailure": {
     "reproducedOnBaseline": true,
     "baselineLog": "/tmp/train40-evidence/footer-baseline.log",
@@ -49,5 +43,18 @@
       "failed": 0,
       "log": "/tmp/train40-evidence/fixture-post.log"
     }
+  },
+  "denyInventoryRepair": {
+    "applied": true,
+    "commit": "d4735e65db",
+    "routesAdded": 4,
+    "authorizationBasis": "Existing test comment requires intentional owner/admin-only APIs in staff-403 inventory; this inventory grants no access. User authorized fixing new integration failures.",
+    "allowlistOrCapChanged": false,
+    "accessPolicyChanged": false,
+    "relatedFiles": 2,
+    "passed": 22,
+    "failed": 0,
+    "log": "/tmp/train40-evidence/worker-deny-post.log",
+    "patch": "staff-deny-inventory-proposal.patch"
   }
 }
