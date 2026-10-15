@@ -1,7 +1,7 @@
 'use client'
 
 import { ListToolbarFrame } from '@/components/shared/list-toolbar'
-
+import HelpTip from '@/components/shared/help-tip'
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -438,7 +438,7 @@ export default function BalancesTab() {
               setPendingOnly(value === 'pending')
             }}
           />
-          <PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
+          <HelpTip label="残高一覧の操作の説明">名前で探し、残高あり・確定待ちありで絞り込めます。行を押すと明細が開きます。</HelpTip><PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
         </>}
       />
     </ListToolbarFrame>
@@ -532,7 +532,7 @@ export default function BalancesTab() {
 
   return (
     <MileageFrame
-      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。" explanationInset="content"
       explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>

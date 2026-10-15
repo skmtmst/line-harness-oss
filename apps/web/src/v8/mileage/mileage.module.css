@@ -195,7 +195,7 @@
   gap: var(--tpl-ml-approval-gap);
   padding: var(--tpl-ml-approval-pad);
   border-radius: var(--tpl-ml-approval-radius);
-  background: var(--color-status-warn-soft);
+  background: var(--color-notice-warning-bg);
 }
 .approvalTitle {
   margin: 0;

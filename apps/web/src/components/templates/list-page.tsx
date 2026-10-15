@@ -61,6 +61,8 @@ export interface ListPageBodyProps {
   toolbarRowGap?: 'card'
   /** 表の操作説明。本文に長い文を置かず、道具の段の「？」から読む。 */
   explanation?: ReactNode
+  /** 印なしの説明を本文の開始位置へそろえる板だけで指定する。 */
+  explanationInset?: 'notice' | 'content'
   listHelp?: ReactNode
   /** 明示の道具のEndへ説明を渡す。既定は道具の外側。 */
   listHelpPlacement?: 'end'
@@ -84,7 +86,7 @@ function hasListFolders({ folderNav, folders, collapsedFolders }: ListPageBodyPr
   return navs.length ? navs.some(nav => nav.rows.length > 1) : !!(folders || collapsedFolders)
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const navs = listFolderNavs(folderNav)
   const hasFolders = hasListFolders({ folderNav, folders, collapsedFolders, children })
   const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
@@ -99,7 +101,7 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
       {folders && !noFolderChoices ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
         {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation || noFolderChoices ? undefined : ''}>
-          {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset="notice">{explanation}</PageExplanationBody></div> : null}
+          {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset={explanationInset === 'notice' ? 'notice' : undefined}>{explanation}</PageExplanationBody></div> : null}
           {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices} accessory={!helpAtEnd ? help : undefined} trailingAccessory={helpAtEnd ? help : undefined}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}
           {!toolbar ? help : null}
         </div> : null}
