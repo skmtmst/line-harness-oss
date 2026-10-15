@@ -1294,8 +1294,8 @@ const FEATURES = {
 /** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
 const EC_SUBSCRIPTIONS = {
   items: [
-    { id: 'sub-1', friendId: 'friend-1', ownerName: '高橋 直人', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 8, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
-    { id: 'sub-3', friendId: 'friend-3', ownerName: '木村 亮', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: null, nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-1', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-1', ownerName: '高橋 直人', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 8, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-3', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-3', ownerName: '木村 亮', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: null, nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-4', friendId: 'friend-4', ownerName: '中村 彩', petName: 'ぷりんちゃん', contractNumber: 'SUB-12528', status: 'paused', statusLabel: '休止中です', riskReason: null, nextShippingAt: null, cycle: 'おやつ定期便（毎月）', items: '鹿肉クッキー × 2', amount: 3600, continuedCount: 4, startedAt: '2026-05-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-2', friendId: 'friend-2', ownerName: '前田 さくら', petName: 'そらくん', contractNumber: 'SUB-12503', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-09', cycle: 'おやつ定期便（毎月）', items: '鹿肉ジャーキー × 1', amount: 4200, continuedCount: 8, startedAt: '2026-01-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-5', friendId: 'friend-5', ownerName: '大西 健一', petName: 'レオくん', contractNumber: 'SUB-12532', status: 'cancelled', statusLabel: '止まりました', riskReason: null, nextShippingAt: null, cycle: 'フード定期便（毎月）', items: '鹿肉フード × 1', amount: 9800, continuedCount: 3, startedAt: '2026-05-01', cancelledAt: '2026-09-01', cancellationReason: '使いきれない', syncedAt: '2026-09-06T09:58:00+09:00' },
@@ -2135,7 +2135,9 @@ const SHAPES = {
   // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
-  '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
+  // 成果とアフィリエイト（affiliates）も絵は機能がある前提で描かれている（Eo56k ほか。2026-10-15 司令塔）。
+  // 本物の既定値（affiliates は既定オフ）は変えず、表示の出し分けだけオンで返す。
+  '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true, affiliates: true } },
   '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', accountName: '然-NEN-TEST', count: 5 }], oldestWaitMinutes: 9110 },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
@@ -3440,6 +3442,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
+  /*
+    マニュアルの正本表から1つ引く口（API 組2 の契約：screen または key、keyKind=screen/task）。
+    画面のボタンは URL がある時だけ出るので、撮る板の分だけ URL を入れる：
+    手順キー onboarding-line-guide（店舗を追加 ao15G・faGn4 のガイド）と画面キー 25-1（共通アクションの版 ziSgL のマニュアル）。
+    一覧の正本表（MANUAL_LINKS・cIdA2 の3行）には足さない。
+  */
+  if (method === 'GET' && pathname === '/api/manual-links/lookup') {
+    const key = query.get('key') ?? query.get('screen') ?? ''
+    const keyKind = query.get('keyKind') ?? 'screen'
+    const urls = { 'task:onboarding-line-guide': 'https://help.musubo.example/guides/line-account', 'screen:25-1': 'https://help.musubo.example/automations' }
+    const url = urls[`${keyKind}:${key}`] ?? null
+    return { success: true, data: { key, url, status: url ? 'ok' : 'unset', version: url ? 1 : null } }
+  }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }

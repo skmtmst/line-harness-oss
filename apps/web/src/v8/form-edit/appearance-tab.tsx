@@ -5,6 +5,7 @@ export const formNameRequirement = requiredText('フォーム名を入力して�
 
 
 import Card from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
 import { useRef, useState } from 'react'
 import { Sparkles, Link2, Store, Palette } from 'lucide-react'
 import {

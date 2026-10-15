@@ -174,7 +174,7 @@ export function SaveConflictBand({
           違いを比べる
         </Button>
       ) : null}
-      {reloadHref ? <Button variant="primary" href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant="primary" onClick={onReload}>
+      {reloadHref ? <Button href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける
       </Button>}

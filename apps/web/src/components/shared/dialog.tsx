@@ -42,6 +42,8 @@ export type DialogProps = {
   designHeaderPadding?: string
   /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。v7 では効かない。 */
   designHeaderHeight?: number
+  /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
+  headerAction?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
   /** 指定した窓だけ下の操作段の余白を変える。 */
@@ -136,6 +138,7 @@ export default function Dialog({
   designTop,
   designHeaderPadding,
   designHeaderHeight,
+  headerAction,
   designContentPadding,
   designFooterPadding,
   footerDivider = true,
@@ -310,6 +313,7 @@ export default function Dialog({
             </>
           ) : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
+        {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
           <X aria-hidden="true" size={18} />

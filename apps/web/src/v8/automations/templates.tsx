@@ -42,6 +42,8 @@ type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 札に出すきっかけの数（絵は「すべて」＋6つ。残りは「すべて」から見る）。 */
 const MAX_TRIGGER_CHIPS = 6
+/** 1行に並べる札の数（絵は「すべて」＋4つ＋「+2」。残りは「+N」で開く）。 */
+const INLINE_TRIGGER_CHIPS = 4
 
 /** きっかけの言い方（口は「友だちになったとき」。絵は「友だちになった」）。 */
 export function templateTriggerText(label: string): string {
@@ -65,7 +67,7 @@ export function templateTriggerChips(items: Pick<AutomationTemplateSummary, 'tri
 
 export default function AutomationTemplatesV8() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('見本から作る')
+  usePageTitle('オートメーション')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -129,6 +131,11 @@ export default function AutomationTemplatesV8() {
 
   const tabCounts = useAutomationTabCounts(rules ? rules.length : null)
   const chips = useMemo(() => templateTriggerChips(items), [items])
+  const [chipsOpen, setChipsOpen] = useState(false)
+  const hiddenChipCount = chipsOpen ? 0 : Math.max(0, chips.length - INLINE_TRIGGER_CHIPS)
+  const shownChips = hiddenChipCount > 0
+    ? chips.slice(0, INLINE_TRIGGER_CHIPS).concat(chips.indexOf(trigger) >= INLINE_TRIGGER_CHIPS ? [trigger] : [])
+    : chips
   const visible = useMemo(
     () => (trigger ? items.filter((item) => templateTriggerGroup(item.triggerLabel) === trigger) : items),
     [items, trigger],
@@ -190,7 +197,7 @@ export default function AutomationTemplatesV8() {
             <FilterChip selected={trigger === ''} onChange={() => setTrigger('')} icon={<CircleDot size={13} aria-hidden="true" />}>
               {`すべて ${items.length}`}
             </FilterChip>
-            {chips.map((chip) => (
+            {shownChips.map((chip) => (
               <FilterChip
                 key={chip}
                 selected={trigger === chip}
@@ -200,8 +207,12 @@ export default function AutomationTemplatesV8() {
                 {chip}
               </FilterChip>
             ))}
+            {hiddenChipCount > 0 ? (
+              <FilterChip selected={false} aria-expanded={false} onChange={() => setChipsOpen(true)} icon={<Star size={13} aria-hidden="true" />}>
+                {`+${hiddenChipCount}`}
+              </FilterChip>
+            ) : null}
           </div>
-          <span className={styles.spacer} aria-hidden="true" />
           <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">
             <RefreshCw size={15} aria-hidden="true" />見本を再読み込み
           </Button>

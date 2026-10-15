@@ -17,7 +17,6 @@ import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
 import Card, { CardHeader } from '@/components/shared/card'
 import { TextField } from '@/components/shared/text-field'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -35,6 +34,7 @@ import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
@@ -1144,7 +1144,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           <fieldset className={styles.fieldset}>
             {/* いつもの勤務時間 */}
             <Card variant="form" gap="normal" aria-labelledby="bks-week" data-design="Week"><fieldset disabled={savingRules} className={styles.fieldset}>
-              <CardHeader size="stacked" titleId="bks-week" title="いつもの勤務時間" action={canEdit ? <Button onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>保存</Button> : undefined} />
+              <CardHeader size="stacked" titleId="bks-week" title="いつもの勤務時間" action={canEdit ? <Button onClick={() => void saveRules()} disabled={savingRules} busy={savingRules} widthReserve="idle">保存する</Button> : undefined} />
               <p className={layout.cardNote}>曜日ごとの出勤時間です。空けた曜日は枠が出ません。日ごとのシフトがある日はそちらが優先されます。</p>
               {STAFF_DAYS.map((day) => {
                 const row = draft[day.weekday] ?? EMPTY_RULE_DRAFT
@@ -1174,7 +1174,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
             {/* 休憩 */}
             <Card variant="form" gap="normal" aria-labelledby="bks-breaks" data-design="Breaks"><fieldset disabled={savingBreaks} className={styles.fieldset}>
-              <CardHeader size="stacked" titleId="bks-breaks" title="休憩" action={canEdit ? <Button onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>保存</Button> : undefined} />
+              <CardHeader size="stacked" titleId="bks-breaks" title="休憩" action={canEdit ? <Button onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks} widthReserve="idle">保存する</Button> : undefined} />
               <p className={layout.cardNote}>いつもの勤務時間の中の休み時間です。休憩の時間は予約枠から除きます。</p>
               {breakGroups.length === 0 ? <p className={layout.cardNote}>休憩はありません。</p> : breakGroups.map((group) => (
                 <div key={group.key} className={styles.breakRow}>
@@ -1328,16 +1328,15 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
             {canEdit ? <Card variant="form" gap="normal" aria-labelledby="bks-gen">
               <CardHeader size="stacked" titleId="bks-gen" title="何週分かのシフトを作る" />
               <p className={layout.cardNote}>いつもの勤務時間から、日ごとのシフトをまとめて作ります。作ったあと1日ずつ直せます。</p>
-              <SettingsFormRow layout="columns" columns={2}>
+              <div className={styles.genRow}>
+                <SettingsFormRow layout="columns" columns={2}>
                 <Field required label="開始日"><span className={styles.dateBox}><SaveErrorField names={["genFrom","from_date","gen_from"]}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></SaveErrorField></span></Field>
-                <div className={layout.field}><Field required label="週の数（1〜12）" htmlFor="bks-weeks"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} /></SaveErrorField></Field></div>
-              </SettingsFormRow>
-              <div className={styles.calActions}>
-                {canEdit ? (
-                  <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">
-                    <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る
-                  </Button>
-                ) : null}
+                {/* 範囲は題に書いてあるので、欄の下の「1〜12」は重ねない。 */}
+                <div className={layout.field}><Field required label="週の数（1〜12）" htmlFor="bks-weeks"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} note={false} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} /></SaveErrorField></Field></div>
+                </SettingsFormRow>
+                <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…" widthReserve="idle">
+                  <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る
+                </Button>
               </div>
               {genError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{genError}</Notice> : null}
               {generatedCount !== null && !genError ? <p className={styles.savedNote} role="status">{generatedCount}日分作りました。</p> : null}
@@ -1373,8 +1372,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {canEdit ? (
                 <div className={styles.calActions}>
                   {calendarId ? <Button onClick={() => setConfirmDisconnect(true)} disabled={disconnecting}>外す</Button> : null}
-                  <Button variant={calendarId ? 'secondary' : 'primary'} onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…">
-                    {calendarId ? '保存' : 'つなげる'}
+                  <Button variant={calendarId ? 'secondary' : 'primary'} onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…" widthReserve="idle">
+                    {calendarId ? '保存する' : 'つなげる'}
                   </Button>
                 </div>
               ) : null}

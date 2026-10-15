@@ -335,8 +335,13 @@
   white-space: nowrap;
 }
 
+/*
+ * 一覧の行の高さは中身の行数で決まる（§6.5 の 3・B-254：2行・3行は 60）。
+ * 名前・分類の札・説明の3段は 60 に入りきらないので、60 を下限に中身の高さ＋上下 8 で伸ばす。
+ */
 .menuRow {
-  height: calc(var(--tpl-bm-84) + var(--tpl-bm-6));
+  min-height: var(--tpl-list-row-multi-h);
+  padding-block: var(--tpl-bm-8);
   box-shadow: var(--shadow-row-line);
 }
 
@@ -409,9 +414,10 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
+  /* 一覧の名前は黒の太字（§6.5 の 2・絵 owaS3）。押せることは下線で示す。 */
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-decoration: none;
@@ -694,7 +700,7 @@
 
 .intervalLine {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--tpl-bm-6);
   min-height: var(--tpl-bm-36);
 }
@@ -1856,3 +1862,19 @@
 }
 
 .warnBand, .warnBandNoticePlacement { margin: 0; flex-shrink: 0; }
+
+/* 畳んだ右欄の2つのボタン（VFxWU）。 */
+.narrowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bm-6);
+}
+
+/* 開ける時間の行：欄の上をそろえ、範囲の添え書き（1〜1000）は数の欄の下に垂らす。文字と×は欄の高さの中で真ん中。 */
+.intervalLine > .intervalTilde,
+.intervalLine > .sameTimeLabel,
+.intervalLine > .iconRemove {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tpl-bm-36);
+}

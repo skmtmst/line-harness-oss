@@ -73,7 +73,7 @@ export default function AdHistoryV8() {
   const model = useAdLogs({ page, status, query })
 
   const mediaOptions = useMemo(() => [
-    { value: 'all', label: 'すべての媒体' },
+    { value: 'all', label: 'すべて' },
     ...model.platforms.map((platform) => ({ value: platform.id, label: adPlatformLabel(platform) })),
   ], [model.platforms])
   /* 媒体は口に絞り込みが無いので、読めたページの中で絞る。 */
@@ -181,7 +181,7 @@ export default function AdHistoryV8() {
           search={{ value: query, onChange: (value) => { setQuery(value); setPage(1) }, placeholder: '成果・クリックの種類で探す' }}
           filters={<>
             <SaveErrorField names={["status"]}><Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} /></SaveErrorField>
-            <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" noun="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
+            <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" noun="媒体" valuePrefix="媒体：" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
             <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
           </>}
         />

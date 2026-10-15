@@ -7,7 +7,7 @@ import { useUrlTab } from '@/lib/use-url-tab'
  * 休業日・貸切 `UVnvR`／足す窓 `nVvXy`）。
  *
  * 板の頭 → 検証環境の帯 → タブ（時間帯ごとの在庫／予約経路の連携／休業日・貸切）→ 中身。
- * 「休業日・貸切」は絵（提案 E-10）どおり、頭が「店舗 ・ 総数」の説明と［＋臨時休業・貸切を足す］になり、検証環境の帯を出さない。
+ * 「休業日・貸切」は絵（提案 E-10）どおり、頭の「？」が「店舗 ・ 総数」の説明（題の下に行は出さない）と［＋臨時休業・貸切を足す］になり、検証環境の帯を出さない。
  * 「自動で合わせるルール」タブは口（F-24）が無いので出さない。
  * `?tab=channels`・`?tab=closures` で開く（押したタブも URL に残す）。動きは BEHAVIOR.md。
  */
@@ -112,6 +112,7 @@ export default function InventoryPage() {
       description={closures ? closuresDescription : '時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。'}
       boundary={!closures}
       headSize={closures ? 'compact' : undefined}
+      hideSubtitle={closures}
       headAfter={closures ? (ctx, storePicker) => (
         <>
           {ctx && ctx.data.stores.length > 1 ? storePicker : null}
