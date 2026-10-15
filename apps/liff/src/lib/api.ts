@@ -119,6 +119,43 @@ export interface BookingPayment {
   amount?: number | null;
   currency?: string | null;
   hold_until?: string | null;
+  /** 領収書のページ（Stripe）。返す口ができるまで無い（組1 に依頼中）。 */
+  receipt_url?: string | null;
+}
+
+/** 本人の回数券・月謝（組3 の GET /api/liff/booking/entitlements の 1 件）。 */
+export interface BookingEntitlement {
+  id: string;
+  name: string;
+  kind: 'ticket' | 'monthly';
+  menuId: string | null;
+  remaining: number | null;
+  monthlyLimit: number | null;
+  monthAllowance: number | null;
+  monthUsed: number | null;
+  monthRemaining: number | null;
+  validFrom: string | null;
+  expiresAt: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  usable: boolean;
+}
+
+/** お知らせの受け取り（組1 の 16。637 を共用）。 */
+export type NotificationPurpose = 'booking_reminders' | 'marketing';
+export interface NotificationPreferenceItem {
+  purpose: NotificationPurpose;
+  label: string;
+  state: 'granted' | 'revoked' | 'unknown';
+  enabled: boolean | null;
+  recorded: boolean;
+  version: number;
+  updatedAt: string | null;
+}
+export interface NotificationPreferences {
+  items: NotificationPreferenceItem[];
+  /** 送る側が目的ごとに止められるようになったら true。false の間は画面で切り替えさせない。 */
+  purposeSpecificEnforcement?: boolean;
 }
 
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -201,11 +238,11 @@ async function remove<T>(path:string):Promise<T>{
  const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
  const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw new Error(`API ${res.status}`);return res.json();
 }
-async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
+async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
   const res = await fetch(url.toString(), {
-    method: 'POST',
+    method,
     headers: authHeaders({ 'Content-Type': 'application/json', ...headers }),
     body: JSON.stringify(body),
   });
@@ -411,7 +448,9 @@ export const api = {
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string },
+    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string;
+      /** 組3：使う回数券・月謝。選んだときだけ送る。 */
+      entitlement_id?: string },
     idempotencyKey: string,
   ) =>
     post<CreateBookingResponse>(
@@ -430,6 +469,24 @@ export const api = {
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),
+  /** 組3：本人の回数券・月謝。menu_id・starts_at を渡すとその予約で使えるかが付く。 */
+  entitlements: (query: { menuId?: string; startsAt?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (query.menuId) qs.set('menu_id', query.menuId);
+    if (query.startsAt) qs.set('starts_at', query.startsAt);
+    const tail = qs.toString();
+    return getData<BookingEntitlement[]>(`/api/liff/booking/entitlements${tail ? `?${tail}` : ''}`);
+  },
+  /** 組1：お知らせの受け取り。店は /api/liff/config の accountId。 */
+  notificationPreferences: (lineAccountId: string) =>
+    getData<NotificationPreferences>(`/api/liff/notification-preferences?${new URLSearchParams({ lineAccountId })}`),
+  updateNotificationPreference: (lineAccountId: string, purpose: NotificationPurpose, enabled: boolean, expectedVersion: number) =>
+    post<{ success: true; data: NotificationPreferences }>(
+      `/api/liff/notification-preferences/${encodeURIComponent(purpose)}?${new URLSearchParams({ lineAccountId })}`,
+      { enabled, expectedVersion },
+      {},
+      'PUT',
+    ).then((r) => unwrapSuccessData<NotificationPreferences>(r, '/api/liff/notification-preferences')),
   /** F-6 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
   cancelMyBooking: (id: string, lockVersion: number) =>
     post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
