@@ -168,6 +168,7 @@ describe('作る①（dnzqC）', () => {
     expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
     expect(within(example).getByText('1通目 4/1 17:00')).toBeTruthy()
     expect(within(example).getByText('2通目 4/2 22:00')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '配信方式の説明' }))
     expect(screen.getByText('作ったあとは変えられません')).toBeTruthy()
   })
 

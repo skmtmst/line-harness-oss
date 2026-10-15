@@ -79,12 +79,12 @@ describe('機能設定の画面契約', () => {
       .not.toContain('ほかの管理者')
   })
 
-  it('撮影用の機能設定は同じ版と全キーを持ち、ウェビナーだけ見本のため有効にする', () => {
+  it('撮影用の機能設定は同じ版と全キーを持ち、ウェビナーと成果とアフィリエイトは見本のため有効にする', () => {
     const mock = readFileSync(resolve(process.cwd(), '../../scripts/visual-qa/mock-api.mjs'), 'utf8')
     const featureSection = mock.slice(mock.indexOf('const FEATURES = {'), mock.indexOf('/** 設計 `bfB50`'))
     for (const { featureId } of FEATURE_CATALOG) expect(featureSection).toContain(`${featureId}:`)
     for (const { featureId } of FEATURE_CATALOG.filter((item) => !item.defaultEnabled)) {
-      expect(featureSection).toContain(`${featureId}: ${featureId === 'webinars' ? 'true' : 'false'}`)
+      expect(featureSection).toContain(`${featureId}: ${featureId === 'webinars' || featureId === 'affiliates' ? 'true' : 'false'}`)
     }
     expect(mock.slice(mock.indexOf("'/api/settings/features':"))).toContain('version: 1')
   })

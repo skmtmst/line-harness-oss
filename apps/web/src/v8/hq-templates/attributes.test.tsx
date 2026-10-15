@@ -29,7 +29,7 @@ describe('統括の情報欄・対応マーク', () => {
     const toggle = screen.getByRole('button', { name: 'この画面の説明' })
     expect(toggle.closest('[data-template-region="heading"]')).toBeTruthy()
     const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
-    expect(body.textContent).toContain('並べ替えはつまんで上下')
+    expect(body.textContent).toContain('情報欄のひな形を各アカウントへ配れます。')
     expect(body.closest('[data-list-toolbar]')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
     fireEvent.click(toggle)

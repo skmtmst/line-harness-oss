@@ -28,7 +28,7 @@ describe('B-169 行うことの共通部品', () => {
     fireEvent.click(screen.getByRole('button', { name: '共通アクションから選ぶ' }))
     const dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約', exact: true }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
     expect(data()).toEqual([{ id: 'tag', text: 't1' }])
   })
   it('対象を確定するまで追加せず、取消でも入力を変えない', () => {

@@ -34,7 +34,6 @@ vi.mock('@/lib/api', async (importOriginal) => ({
     lineAccounts: { list: async () => ({ success: true, data: [] }) },
     tags: { list: async () => ({ success: true, data: [] }) },
     scenarios: { list: async () => ({ success: true, data: [] }) },
-    folders: { list: async () => ({ success: true, data: [] }) },
   },
 }))
 
@@ -84,6 +83,6 @@ describe('h7dmB 案件タブの絵合わせ', () => {
     await waitFor(() => expect(screen.queryByText('秋の紹介キャンペーン')).toBeNull())
     expect(screen.getByText('定期便の初回')).toBeTruthy()
     expect(screen.getByLabelText('フォルダ：定期便分類')).toBeTruthy()
-    expect(screen.getByLabelText('成果のときの動き')).toBeTruthy()
+    expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
   })
 })

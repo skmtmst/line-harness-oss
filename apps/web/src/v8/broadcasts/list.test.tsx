@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -13,7 +13,6 @@ vi.hoisted(() => {
 })
 
 const listBroadcasts = vi.hoisted(() => vi.fn())
-const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true })))
 const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
 const listViews = vi.hoisted(() => vi.fn())
@@ -34,7 +33,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         list: listBroadcasts,
         update: updateBroadcast,
         delete: deleteBroadcast,
-        update: updateBroadcast,
         getInsight: async () => ({ success: false }),
         savedViews: { ...actual.api.broadcasts.savedViews, list: listViews, create: createView },
       },
@@ -174,19 +172,22 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     const pick = (label: string) => host.querySelector(`[aria-label="${label}"]`) as HTMLElement
-    expect(pick('8月キャンペーンのお知らせを選択'), '行の選ぶ欄がありません').toBeTruthy()
-    act(() => { fireEvent.click(pick('8月キャンペーンのお知らせを選択')) })
-    act(() => { fireEvent.click(pick('未購入者フォローを選択')) })
+    expect(pick('8月キャンペーンのお知らせを選ぶ'), '行の選ぶ欄がありません').toBeTruthy()
+    act(() => { fireEvent.click(pick('8月キャンペーンのお知らせを選ぶ')) })
+    act(() => { fireEvent.click(pick('未購入者フォローを選ぶ')) })
     await flush()
     const move = buttonByText('フォルダへ移す')
     expect(move, 'まとめての帯がありません').toBeTruthy()
     act(() => { move!.click() })
-    const target = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('キャンペーン')) as HTMLElement
-    act(() => { target.click() })
+    expect(updateBroadcast).not.toHaveBeenCalled()
+    const dialog = document.querySelector('[role="dialog"]')!
+    act(() => { fireEvent.click(dialog.querySelector('input[aria-label="キャンペーン"]')!) })
+    const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダへ移す')!
+    await act(async () => { fireEvent.click(confirm) })
     await flush()
     expect(updateBroadcast).toHaveBeenCalledWith('bc-1', expect.objectContaining({ folderId: 'f-1' }))
     expect(updateBroadcast).toHaveBeenCalledWith('bc-2', expect.objectContaining({ folderId: 'f-1' }))
-    expect(buttonByText('フォルダへ移す'), '移した後も帯が残っています').toBeUndefined()
+    await waitFor(() => expect(buttonByText('フォルダへ移す'), '移した後も帯が残っています').toBeUndefined())
   })
 
   it('行と数の帯・札の件数が出る', async () => {

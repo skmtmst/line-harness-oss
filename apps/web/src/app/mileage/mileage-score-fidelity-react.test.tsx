@@ -177,7 +177,7 @@ describe('スコアの絵合わせ（板 `IRPw8`）', () => {
     await waitForRows()
     const explanation = container.querySelector('[data-screen-explanation]') as HTMLElement
     const toggle = container.querySelector('[data-screen-explanation-toggle]') as HTMLButtonElement
-    expect(explanation.textContent).toContain('＋ できごとを足す（30日間反応がない、も選べる）')
+    expect(explanation.textContent).toContain('下書きの変更は、公開するまで使われません。')
     await act(async () => { toggle.click() })
     expect(explanation.hidden).toBe(true)
     await act(async () => { toggle.click() })
