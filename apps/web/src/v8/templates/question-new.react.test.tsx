@@ -69,6 +69,14 @@ afterEach(() => {
 })
 
 describe('質問を作る：保存で欄に知らせる（B-139）', () => {
+  it('統括では追加処理→返信の既存の順番と、店専用の動きを出さない形を保つ', async () => {
+    await act(async () => { root.render(<QuestionNewV8 host={{ description: '配った先で使います', folders: [], folder: '', onFolderChange: vi.fn(), busy: false, onSave: vi.fn(), onCancel: vi.fn() }} />) })
+    const extra = screen.getAllByRole('button', { name: '押されたときにあわせて行うことを足す' })[0]
+    const reply = screen.getAllByLabelText('押したときの返信')[0]
+    expect(extra.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '選択肢 1 の動きを変える' })).toBeNull()
+  })
+
   it('閉じた動きの欄に保存エラーが返ると、その選択肢だけ開いて理由を出す', async () => {
     templatesApi.create.mockRejectedValue({ status: 422, fields: { 'choices.0.userMessage': '発言を短くしてください。' } })
     await act(async () => {
