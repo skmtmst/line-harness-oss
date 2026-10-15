@@ -19,6 +19,7 @@ import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
 import SidebarVersion from '@/components/layout/sidebar-version'
 import { SidebarBrand } from '@/components/layout/sidebar-identity'
 import Notice from '@/components/shared/notice'
+import { humanizeErrorText } from '@/components/shared/human-error-text'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
@@ -137,18 +138,18 @@ export default function OpsShellV8({
         })}
         {!me ? (
           <p className={styles.meNote} role="status">
-            {meError || '担当者を読み込んでいます'}
+            {humanizeErrorText(meError || '担当者を読み込んでいます')}
             {meError ? <button type="button" onClick={onRetryMe} className={styles.meRetry}>もう一度</button> : null}
           </p>
         ) : null}
       </div>
       <div className={nav.collapseHide}><SidebarVersion /></div>
-      {me ? <SidebarUserMenu name={me.name} role="運営" collapsed={collapsed && !drawer} pathname={pathname} items={[
+      <SidebarUserMenu name={me?.name || '—'} role="運営" collapsed={collapsed && !drawer} pathname={pathname} items={[
         { id: 'profile', label: 'プロフィールを編集', href: '/staff' },
         { id: 'members', label: 'メンバー管理', href: '/ops/members' },
-        { id: 'two-factor', label: me.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定', href: '/ops/two-factor' },
+        { id: 'two-factor', label: me?.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定', href: '/ops/two-factor' },
         { id: 'logout', label: 'ログアウト', tone: 'danger', dividerBefore: true, onSelect: () => void logoutAndGoToLogin('/ops/login') },
-      ]} /> : null}
+      ]} />
     </>
   )
 

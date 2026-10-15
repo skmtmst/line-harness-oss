@@ -10,6 +10,17 @@ const me = { id: 'ops-1', name: '運営担当', email: null, readOnly: false, to
 const props = { me, meError: '', onRetryMe: () => {}, pathname: '/ops/members', children: <p>中身</p> }
 afterEach(() => { cleanup(); logout.mockClear() })
 describe('運営の自分の操作とメニューを閉じる動き', () => {
+  it('担当者の取得に失敗しても再読込とログアウトを使える', async () => {
+    const retry = vi.fn()
+    render(<OpsShellV8 {...props} me={null} meError="API error: 500" onRetryMe={retry} />)
+    expect(screen.getByRole('status').textContent).toContain('サーバーで問題が起きて')
+    expect(screen.getByRole('status').textContent).not.toContain('API error')
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度', exact: true }))
+    expect(retry).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '自分のメニュー', exact: true }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'ログアウト', exact: true }))
+    await waitFor(() => expect(logout).toHaveBeenCalledWith('/ops/login'))
+  })
   it('本人の入口は左下だけに置き、上の帯と2要素認証の入口を重複させない', async () => {
     const { container } = render(<OpsShellV8 {...props} />)
     const self = screen.getByRole('button', { name: '自分のメニュー', exact: true })
