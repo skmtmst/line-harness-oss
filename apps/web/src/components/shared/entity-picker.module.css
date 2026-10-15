@@ -22,8 +22,8 @@
 .multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
 .multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
 /* S2Vgi（正の形）：行は薄い枠の箱、選んだ行は緑の地と緑の枠。 */
-.multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: inset 0 0 0 1px var(--color-hairline); }
-.multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
+.multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: var(--tpl-bd-ring-accent); }
 /* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
 .multiBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
 .multiBody .multiList > * { flex: none; }
@@ -140,6 +140,14 @@
 .tpFootLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
 .tpFootText { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; font-size: var(--text-caption); }
 .tpFootTitle { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; }
+.createRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); }
+.createRow > :first-child { flex: 1; min-width: 0; }
+.tpFootNote { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+/* S2Vgi：一覧の下の「選んだもの」の帯（薄い緑の地・左に名前・右に件数）。 */
+.pickedBand { display: flex; align-items: center; gap: var(--tpl-picker-gap); width: 100%; min-width: 0; padding: var(--tpl-inbox-tp-band-pad); background: var(--color-accent-soft); font-size: var(--text-caption); }
+.pickedLabel { flex: none; color: var(--color-accent-deep); font-weight: 600; }
+.pickedNames { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
+.pickedCount { flex: none; color: var(--color-accent-deep); font-weight: 600; }
 .tpFootSub { color: var(--color-ink-faint); font-size: var(--text-nano); white-space: nowrap; }
 .tpFootActions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); }
 

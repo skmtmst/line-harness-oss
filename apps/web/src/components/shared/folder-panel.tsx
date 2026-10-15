@@ -5,7 +5,7 @@ import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
 import HelpTip from './help-tip'
 import { folderDisplayColor } from './folder-dot'
-import { ArrowDown, ArrowUp, Ellipsis, Folder, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Ellipsis, Folder, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Star, Trash2 } from 'lucide-react'
 import { RowMenu } from './row-actions'
 import styles from './folder-panel.module.css'
 import noteStyles from './managed-folder-panel.module.css'
@@ -33,7 +33,7 @@ export interface FolderPanelRow {
   id: string
   label: string
   /** V8 共通部品 faSbC。未指定の古い呼び方は「すべて」「未分類」の名前から判定する。 */
-  kind?: 'all' | 'unfiled' | 'folder'
+  kind?: 'all' | 'unfiled' | 'folder' | 'frequent'
   /**
    * このフォルダに属する件数。`null` は「数えていない」（#631）。
    *
@@ -154,6 +154,7 @@ export default function FolderPanel({
   total,
   heading = 'フォルダ',
   showHeading = true,
+  headingAfterAll = false,
   headingHelp,
   onAddFolder,
   addFolderLabel = 'フォルダを追加する',
@@ -187,6 +188,8 @@ export default function FolderPanel({
   heading?: string
   /** 小窓で区画の見出しを外側に置くときだけ省く。 */
   showHeading?: boolean
+  /** 選ぶ窓（S2Vgi）：見出しを「よく使う」「すべて」の下、フォルダの行の上に置く。 */
+  headingAfterAll?: boolean
   headingHelp?: ReactNode
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
   onAddFolder?: () => void
@@ -211,7 +214,7 @@ export default function FolderPanel({
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} overflow-visible`}>
       {!readOnly && createAction ? <div className={styles.create}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder}`} aria-hidden="true" /> : null}
-      {showHeading ? <div className={`${styles.heading} flex items-center justify-between`}>
+      {showHeading && !headingAfterAll ? <div className={`${styles.heading} flex items-center justify-between`}>
         {hasExplanation ? <p className=" font-semibold">{heading}<HelpTip label={`${heading}の説明`}>
           {heading === 'フォルダ' ? <span>{FOLDER_DELETE_HELP}</span> : null}
           {headingHelp ? <span>{headingHelp}</span> : null}
@@ -229,9 +232,10 @@ export default function FolderPanel({
           ] } : row
           const hasActions = !readOnly && Boolean(menuRow.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
 
+          const afterAll = headingAfterAll && showHeading && kind === 'all' && rows.some((candidate) => (candidate.kind ?? 'folder') === 'folder' || candidate.kind === 'unfiled')
           return (
+            <Fragment key={row.id}>
             <div
-              key={row.id}
               className={`${styles.row} group relative flex items-center`}
               data-active={isActive || undefined}
               data-menu-open={openMenuId === row.id || undefined}
@@ -257,7 +261,7 @@ export default function FolderPanel({
               >
                 {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                     色が面で乗って名前より目立ってしまう。 */}
-                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={15} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
+                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'frequent' ? <Star size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={15} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0`}>{row.count}</span>}
               </button>
@@ -298,6 +302,8 @@ export default function FolderPanel({
                 </div>
               )}
             </div>
+            {afterAll ? <p className={styles.inlineHeading}>{heading}</p> : null}
+            </Fragment>
           )
         })}
       </nav>

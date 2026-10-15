@@ -37,5 +37,6 @@ export default function BroadcastAccountPicker({ accounts, folders, foldersFaile
   return <HqAccountPickerDialog title="送るアカウントを選ぶ" accounts={accounts} data={data} initialIds={initialIds} initialFolder={startFolder}
     meta={(account) => `友だち ${byId.get(account.id)?.friendCount == null ? '—（未取得）' : formatNumber(byId.get(account.id)!.friendCount!)} 人`}
     rowExtra={(item) => <AccountConnection account={byId.get(item.id)!} />}
+    note="除く人は次の手順で決めます"
     onConfirm={onConfirm} onCancel={onCancel} />
 }

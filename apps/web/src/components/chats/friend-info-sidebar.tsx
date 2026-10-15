@@ -772,6 +772,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (res.success && Array.isArray(res.data)) setTagFolders(res.data.map((group) => ({ id: group.id, name: group.name, color: group.color ?? null })))
     }).catch(() => {})
   }, [accountId])
+  /** 選ぶ窓の「＋タグを作る」。作るだけで、付けるのは窓の［選ぶ］のとき。 */
+  const createTagForPicker = async (name: string) => {
+    const res = await api.tags.create({ name })
+    if (!res.success) return null
+    const created = res.data
+    setTagOptions((prev) => [...prev.filter((tag) => tag.id !== created.id), created])
+    return { id: created.id, name: created.name, color: created.color, folderId: created.groupId ?? null, frequent: false }
+  }
   /** 選ぶ窓で決めたタグの組へ、足りない物を付け、外した物を外す。窓で作ったタグは候補を読み直してから付ける。 */
   const applyTagSelection = async (ids: string[]) => {
     const current = new Set((effectiveTags ?? []).map((tag) => tag.id))
@@ -1102,9 +1110,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     title="タグを選ぶ"
                     unit="件"
                     searchPlaceholder="タグの名前で探す"
-                    items={tagOptions.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ id: t.id, name: t.name, color: t.color, folderId: t.groupId ?? null, frequent: t.isStarred || undefined, meta: t.friendCount == null ? undefined : `${formatNumber(t.friendCount)} 人` }))}
+                    items={tagOptions.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ id: t.id, name: t.name, color: t.color, folderId: t.groupId ?? null, frequent: Boolean(t.isStarred), meta: t.friendCount == null ? undefined : `${formatNumber(t.friendCount)} 人` }))}
                     folders={tagFolders}
                     onOpen={loadTagFolders}
+                    headerCreate={{ label: 'タグを作る', placeholder: '新しいタグの名前', onCreate: createTagForPicker }}
                     disabled={tagSaving}
                     value={(effectiveTags ?? []).map((tag) => tag.id)}
                     onChange={(ids) => { void applyTagSelection(ids) }}
