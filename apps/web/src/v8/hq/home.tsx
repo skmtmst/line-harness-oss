@@ -219,9 +219,7 @@ export default function HqHomeV8() {
         : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`) }
+      if (!fieldFailure) setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -230,14 +228,7 @@ export default function HqHomeV8() {
 
   const login = (accountId: string) => {
     setSelectedAccountId(accountId)
-    /*
-     * 友だちの引き継ぎが途中なら、ここで続きから始める（2026-10-15 の決まり）。
-     * 新規登録の完了画面を抜けたあとに進捗を触れる場所がこのボタンしか無いので、
-     * 見た目は変えずに挙動だけ足している。口は「続きを進める」1 本で、
-     * 済んでいる・始めていないアカウントはサーバが何もせず返す。
-     * 答えは待たない：引き継ぎは cron でも進むので、ここは「次の刻みを待たずに
-     * 今すぐ動かす」ためだけのもの。失敗しても画面の遷移は止めない。
-     */
+    /* 引き継ぎが途中なら続きから動かす。見た目は変えず、答えも待たない（cron でも進む）。 */
     if (canManage) void api.lineAccounts.stepFollowerImport(accountId).catch(() => undefined)
     // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))

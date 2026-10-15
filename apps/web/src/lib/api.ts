@@ -9743,8 +9743,7 @@ export const api = {
         `/api/line-accounts/${id}/follower-import/start`,
         { method: 'POST' },
       ),
-    /** 続きを進める。済み・未開始なら何もせず返る。`profilesFetched` はこの 1 回で引いた人数。 */
-    stepFollowerImport: (id: string) =>
+    stepFollowerImport: (id: string) => // 続きを進める（済み・未開始なら何もせず返る）
       fetchApi<ApiResponse<{ state: FollowerImportState; busy: boolean; profilesFetched: number }>>(
         `/api/line-accounts/${id}/follower-import/step`,
         { method: 'POST' },

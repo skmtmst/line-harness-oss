@@ -371,6 +371,25 @@ bind変数は1文あたり8個で、D1の100個制限に対して余裕がある
 - 本線 `008063dac1` を取り込んだ後、worker全体986ファイル／11,742件と対象web8件、worker・webの型検査とビルドが合格。後続の本線 `2e2c8ca5` はUber Eats台帳と更新履歴のみの更新で、これも取り込んだ。
 - web全体はCI相当の `NEXT_PUBLIC_API_URL` を指定して2,234ファイル／13,317件が合格、**1件はローカルで未合格**。`src/lib/b244-source-rules.test.ts` が日本語を含むワークスペースの `import.meta.url.pathname` をURLデコードせず `scandir` に渡し、`ENOENT` となる既存のパス依存（今回の差分に同テスト・検査スクリプトの変更なし）。PR #1738 の英数字パスで動くCIにて全件確認する。結果が出るまではweb全体を合格扱いにしない。
 
+### 行数ゲートの修正（2026-10-16 01:22）
+
+PR #1738 の必須CI「Repository and shared checks」が `apps/web/scripts/v8-guard/code-size.mjs` で落ちていた。4ファイルが上限超過（`follower-import.ts` 660行／上限400、`line-accounts.ts` +8、`home.tsx` +9、`api.ts` +1）。この上限は下げる方向にしか動かせず（`code-size-baseline.json` への追加・引き上げは検査が弾く）、**直し方はコードを縮めるしかない**。
+
+- `follower-import.ts` を役割で3つに分けた（660行 → 192行）。`follower-import-state.ts`（176行：状態の鍵・型・`OwnershipGuard`・開始と利用可否の判定）、`follower-import-pages.ts`（327行：1ページ分のID取り込みとプロフィール取得）、`follower-import.ts`（192行：時間と件数の予算、刻みの進行、再公開）。**移した中身は読み直して丸ごう写しで、書き換えていない。**
+- `./follower-import.js` からの再公開で**公開しているインポート面を変えていない**ため、利用している5ファイルの `import` 文は無修正。
+- 残り3ファイルは説明コメントの圧縮と、挙動も見た目も変わらない行のまとめだけ（`home.tsx` 700→691、`line-accounts.ts` 2159→2151、`api.ts` 16612→16611）。リポジトリに行の長さの検査（`max-len`／`printWidth`）は無いことを確認済み。
+- 記録ファイル（`code-size-baseline.json`）は触っていない（凍結数は437のまま）。
+
+**検証（2026-10-16 01:10〜01:22 JST、すべてローカル）**
+
+- `node apps/web/scripts/v8-guard/code-size.mjs --base 2e2c8ca5b357aed5374fc96ee9c9613af59e811d` … `2593 body files, 437 frozen, **0 violations**`
+- `node --test apps/web/scripts/v8-guard/code-size.test.mjs` … 11件合格（ゲート自体の自己テスト）
+- `pnpm --filter worker test` … **986ファイル／11,742件合格**
+- `pnpm --filter web test`（CI相当の `NEXT_PUBLIC_API_URL` 指定） … 2,234ファイル／13,317件合格、**既存のパス依存1件のみ未合格**（`b244-source-rules.test.ts`。上の節と同じ原因で、復号したパスでは違反0件。CIの英数字パスでは通る）
+- `pnpm --filter web exec vitest run src/v8/hq/home.test.tsx` … 8件合格（アカウント一覧の見た目と挙動）
+- `pnpm --filter worker typecheck` / `pnpm --filter web typecheck` … 合格
+- **実APIでの検証・staging配備・所要時間の実測は未実施。** コミットもしていない。
+
 ## 4. 気づいた不具合（未修正・実装時に扱う）
 
 1. **友だち追加URLの形が他と違う**：`logic.ts:92` と `register-v8.tsx:148,933` は `https://lin.ee/{basicId}` を組み立てているが、他の箇所は `https://line.me/R/ti/p/@{basicId}`（`services/platform-announcements.ts:48`、`routes/liff.ts:1202`、`components/dashboard/qr-dialog.tsx:56`）。`lin.ee` は個別に発行されるもので basicId から導けない（`packages/db/src/line-accounts.ts:64` のコメント、`official_profile_url` 列がその用途）。→ 画面に出すURLが開けない可能性が高い
@@ -387,7 +406,9 @@ bind変数は1文あたり8個で、D1の100個制限に対して余裕がある
 - 2026-10-15 23:06：上の3件を修正し、回帰テスト5件を追加。`follower-import` 9件／worker 11,318件／web home 8件／worker・web 型検査が合格（§3 の「Codexが見つけた取り残しの修正」）。**実APIは未検証**
 - 2026-10-15 23:41：Codexの再々レビューで「状態は守れたが友だち200人が旧実行の古い値で上書きされる」を再現し、配備前にClaudeへ返却（§3 の「Codex再々レビュー」）
 - 2026-10-16 00:05：上の上書きを修正。所有権の条件を友だちへの書き込み文の中へ入れ（事前SELECTでは原子的にならないため）、交代後は1行も書けないようにした。回帰テスト1件を追加して `follower-import` 11件／worker 全件／web home 8件／型検査が合格。本物のSQLiteでも文の形と0行を確認（§3 の「友だち行の旧実行上書きの修正」）。**実APIは未検証**
-- 次の1手：Codexへ再検証・コミット・PR・CI・マージ・**staging配備**を引き継ぐ。再現スクリプト（`staleFriendWrites === 0`）での再確認を含む。最新本線 `origin/codex/development`（`e346a93acac35f1882f121f68b622b7bcdf67e69`）を取り込む。**本番は今回の対象外**。cronの自然発火は受入条件から外し、step の口で確かめる（理由は §3 の同節）
+- 2026-10-16 01:22：PR #1738 の必須CIが行数ゲートで落ちていたため、`follower-import.ts` を3ファイルへ分け（公開インポート面は不変）、残り3ファイルのコメントを圧縮して**違反0件**にした。ゲート自己テスト11件／worker 11,742件／web home 8件／型検査が合格（§3 の「行数ゲートの修正」）。**実APIとstaging配備は未実施**
+- 次の1手：CodexがPR #1738 のCIを再確認し、合格すれば**マージ・staging配備・実API確認・10,000人の所要時間の実測**を行う（基準の本線は `2e2c8ca5b357aed5374fc96ee9c9613af59e811d`）。**本番は今回の対象外**
+- 以前の1手（済み・記録用）：Codexへ再検証・コミット・PR・CI・マージ・**staging配備**を引き継ぐ。再現スクリプト（`staleFriendWrites === 0`）での再確認を含む。最新本線 `origin/codex/development`（`e346a93acac35f1882f121f68b622b7bcdf67e69`）を取り込む。**本番は今回の対象外**。cronの自然発火は受入条件から外し、step の口で確かめる（理由は §3 の同節）
 - その次：`apps/web/src/v8/account-new/` の**v06実装**（下の実装範囲）
 - v06の実装範囲：`apps/web/src/v8/account-new/register.tsx`／`logic.ts`／`register.module.css`／`BEHAVIOR.md` へ反映（①は「事前確認」、②は「アカウント接続」）。実装に含めるもの＝Step 2 のチェック3つ・Step 3 のチェック2つが全部入るまで次へを無効／Step 4 の5項目を上から順に確認する進行と行ごとの待機中・確認中（回るリング）・OK・エラー表示／確認の行は上下中央そろえ／エラー時のカード上部の赤い案内箱／5項目すべてOKのときだけフッターの次へを活性／**Step 5 の友だち追加テスト（QR表示＋追加の検知で自動的に次へ）**／ウィザードを4段にして基本情報の段を経路から外す／**友だち引き継ぎを選んだ人だけ通る引き継ぎ中の画面（進捗・残り時間・速さの更新と、終了後の自動遷移）**／**完了画面の「早速使ってみる」で接続したアカウントのダッシュボードへ遷移**。上記の不具合1は同じPRで直すか別PRにするかを判断する
 - 未確認のまま残っている1件：LINE Developers のタブ別サフィックス（`/messaging-api/` 等）。チャネル単位の `console/channel/{チャネルID}` までは確認済み
