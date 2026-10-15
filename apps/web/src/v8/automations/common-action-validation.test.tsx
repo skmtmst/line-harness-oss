@@ -72,3 +72,11 @@ it('分岐を閉じて追加し、元の順番で設定を開き、失敗時の�
   expect(saved[2].params.then).toHaveLength(1)
   expect(saved[2].params.else).toHaveLength(1)
 })
+
+it('畳んだ版と使用先を同じ名前の窓から確認できる', async () => {
+  render(<CommonActionNew />)
+  fireEvent.click(screen.getByRole('button', { name: '版とつながる先を見る' }))
+  const dialog = await screen.findByRole('dialog', { name: '版とつながる先' })
+  expect(dialog.textContent).toContain('版 1 の下書き')
+  expect(dialog.textContent).toContain('つながる先')
+})

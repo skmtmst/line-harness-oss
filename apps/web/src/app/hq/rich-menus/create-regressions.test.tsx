@@ -204,12 +204,22 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     await save()
     expect(saved().pages).toHaveLength(3)
   })
-  it('面がない編集状態では、右上に空の回数の箱を置かない', async () => {
+  it('統括の右欄は面の有無に関わらず使う参照を出し、店の回数を出さない', async () => {
     host.initial = { id: 'm-1', name: '未設定', chatBarText: 'メニュー', folderId: null, size: 'large', displayAudience: 'all', displayOrder: 0, defaultPageId: 'p-1', pages: [{ id: 'p-1', name: 'トップ', imageR2Key: null, areas: [] }] }
     window.history.replaceState(null, '', '/hq/rich-menus?step=buttons')
     render(<RichMenuCreateV8 host={host} />)
     await screen.findByText('画像の上で面を選ぶ')
     expect(screen.queryByRole('heading', { name: '押された回数（今月）' })).toBeNull()
+    expect(screen.getByRole('heading', { name: '各アカウントで使うもの' })).toBeTruthy()
+  })
+  it('面を選んだ状態でも統括の右欄に店の集計を混ぜない', async () => {
+    await start()
+    selectArea('A')
+    expect(screen.getByRole('heading', { name: '各アカウントで使うもの' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '押された回数（今月）' })).toBeNull()
+    await save()
+    expect(saved().pages[0].areas).toHaveLength(6)
+    expect(fetch).not.toHaveBeenCalled()
   })
   it('2つ目のタブにも選んだ面を出し、店のid指定が残っていても店の下書きを読まない', async () => {
     window.history.replaceState(null, '', '/hq/rich-menus?id=store-draft')

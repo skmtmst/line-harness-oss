@@ -855,7 +855,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             下書きを保存
           </Button>
           <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存したあとに、配るアカウントを選べます" busy={Boolean(hostBusy)} busyLabel="処理中…">
-            保存する
+            保存して配る
           </Button>
         </>
       )}

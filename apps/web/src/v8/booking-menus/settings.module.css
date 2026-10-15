@@ -1592,7 +1592,7 @@
   width: var(--tpl-bm-48);
   height: var(--tpl-bm-48);
   flex-shrink: 0;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--v8-liff-thumb);
   color: var(--v8-liff-thumb-ink);
   display: inline-flex;

@@ -47,8 +47,6 @@
 .checkText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-back-gap); min-width: 0; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 .diffTitle { font-weight: 600; }
 .diffList { margin: 0; padding-left: var(--tpl-eds-change-pad); }
-.ghostButton { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: var(--tpl-eds-ghost-gap); height: var(--tpl-eds-ghost-h); padding: var(--tpl-eds-ghost-pad); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-chip-label-lh); white-space: nowrap; cursor: pointer; }
-.ghostButton:hover { background: var(--color-canvas); }
 .runList { display: flex; flex-direction: column; }
 .runRow { display: flex; align-items: center; gap: var(--tpl-eds-head-gap); padding: var(--tpl-eds-about-row-pad); box-shadow: var(--shadow-row-line); }
 .runText { min-width: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
@@ -57,10 +55,7 @@
 
 /* 右の列：操作（編集する・切替のつながり は同じ幅、…は36角）と、いまの状態の箱。 */
 .sideActions { display: flex; flex-wrap: wrap; gap: var(--tpl-eds-side-actions-gap); }
-.sideActions > a { flex: 1 0 auto; }
-/* 「…」は共通の RowMenu。今の見た目（墨の色・大きさ・乗せても地を変えない）を共通の印ボタンより強く当てる。 */
-.sideActions > button.moreButton { display: inline-flex; width: var(--tpl-eds-more); flex: 0 0 var(--tpl-eds-more); align-items: center; justify-content: center; height: var(--tpl-eds-more); padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
-.sideActions > button.moreButton:hover { background: var(--color-canvas); }
+.sideActions > a { flex: 1 1 0; min-width: 0; }
 .roBand { margin: 0; }
 .aboutBox { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); padding: var(--tpl-eds-about-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 .aboutTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }

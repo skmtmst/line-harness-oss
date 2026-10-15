@@ -364,6 +364,16 @@ test('SL-C03: 日付付き休憩も409では編集を残し、選んだ読み直
   expect(screen.getByRole('button',{name:'休憩 16:00〜17:00'})).toBeTruthy()
 })
 
+test('畳んだ予約画面を中身の名前で開き、閉じても勤務の値を保つ', async () => {
+  render(<StaffShiftsV8 staffId="bs-1" />)
+  const launcher = await screen.findByRole('button', { name: 'お客さまの予約画面を見る' })
+  const times = screen.getAllByRole('combobox').map(node => (node as HTMLInputElement).value)
+  fireEvent.click(launcher)
+  const dialog = await screen.findByRole('dialog', { name: 'お客さまの予約画面' })
+  expect(within(dialog).getByText(/予約画面のURLがまだありません/)).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  expect(screen.getAllByRole('combobox').map(node => (node as HTMLInputElement).value)).toEqual(times)
+})
 
 test('勤務の5段は共通の見出しを使い、保存の操作と入力の役目を保つ', async () => {
   render(<StaffShiftsV8 staffId="bs-1" />)

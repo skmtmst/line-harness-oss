@@ -1,7 +1,6 @@
 'use client'
 
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle';
 
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
@@ -9,7 +8,6 @@ import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
 import {
   ArrowRight,
   BookOpen,
@@ -41,7 +39,6 @@ import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -54,6 +51,7 @@ import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
 import HqMenuReview from '@/components/rich-menus/hq-menu-review'
+import PublishReview from '@/v8/rich-menu-edit/publish-review'
 import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
@@ -112,6 +110,7 @@ import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
 import RichMenuSchedules from '@/v8/rich-menu-edit/schedules'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import HqMenuReferences from './hq-references'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
@@ -1933,7 +1932,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                       (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
                     title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
-                    busy={publishing || saving}
+                    busy={publishing || saving} icon={publishPlan.mode === 'now' ? <Send size={14} aria-hidden="true" /> : <CalendarClock size={14} aria-hidden="true" />}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
                     onClick={() => void handlePublishSubmit()}
                   >
@@ -1949,7 +1948,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 </Button>
                 <Button
                   type="button"
-                  variant="primary"
+                  variant="primary" icon={step === 'audience' ? <ArrowRight size={14} aria-hidden="true" /> : undefined}
                   disabled={busy}
                   busy={saving}
                   busyLabel="保存中…"
@@ -2438,7 +2437,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         {/* 出す相手 */}
         <Card variant="form" gap="normal">
           <SectionHeader title="出す相手" />
-          <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className={`grid ${host ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             <RadioCard
               name="audience"
               value="all"
@@ -2464,6 +2463,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               icon={<CircleHelp aria-hidden="true" />}
               note={host ? '条件は配った先のアカウントで決めます' : 'タグ・友だち情報などで絞る'}
             />
+            {host ? null : <RadioCard name="audience" value="none" checked={audience === 'none'} onChange={() => setAudience('none')} title="決めない" icon={<BookOpen aria-hidden="true" />} note="シナリオ・切替タブから出す" />}
           </RadioCardGroup></SaveErrorField>
 
           {host ? (
@@ -2599,6 +2599,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     }
     return (
       <>
+        <PublishReview pages={pages} size={size} imageUrl={key => `${api.richMenuGroups.imageUrl(key)}?v=${imageVersion}`} onEdit={(pageId, targetStep, areaId) => { setActivePageId(pageId); setSelectedAreaId(areaId ?? null); goToStep(targetStep) }} />
         {/* いつ公開するか */}
         <Card variant="form" gap="normal">
           <SectionHeader title="いつ公開するか" actions={!host && group ? <RichMenuSchedules key={`${accountId}:${group.id}`} groupId={group.id} canOperate={canOperate && !aggregateOnly} restoreMenus={restoreMenus} /> : undefined} />
@@ -2760,7 +2761,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       </>
     )
   }
-
   /* ======== 右の列 ======== */
   /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
   function renderLinePreview() {
@@ -2781,7 +2781,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       />
     )
   }
-
   function renderRail(inDialog = false) {
     return (
       <>
@@ -2822,7 +2821,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           />
         ) : null}
 
-        {step === 'buttons' && (!host || selectedArea) ? (
+        {step === 'buttons' ? host ? <HqMenuReferences areas={pages.flatMap(page => page.areas)} references={host.references} /> : (
           <CreateSummaryCard
             title="押された回数（今月）"
             rows={
@@ -2831,7 +2830,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     {
                       key: selectedArea.id,
                       label: `${String.fromCharCode(65 + activePage.areas.findIndex((a) => a.id === selectedArea.id))} ${areaDisplayName(selectedArea, activePage.areas.findIndex((a) => a.id === selectedArea.id))}`,
-                      value: host ? '—（配る前）' : '—（公開前）',
+                      value: '—（公開前）',
                     },
                   ]
                 : []

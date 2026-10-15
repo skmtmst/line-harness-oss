@@ -56,6 +56,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                   <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
                   <Button
                     variant="primary"
+                    icon={<Check size={15} aria-hidden="true" />}
                     onClick={() => {
                       if (!hasChanges) {
                         notifyToast('変更はありません。')
@@ -67,7 +68,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                     busy={tabEdit.saving}
 
                   >
-                    <Check size={15} aria-hidden="true" />{tabEdit.saveLabel ?? '保存する'}
+                    {tabEdit.saveLabel ?? '保存する'}
                   </Button>
                 </>
               ) : null}
