@@ -85,5 +85,5 @@ export * from './restaurant-external-links.js';
 
 export * from './jst-datetime.js';
 export * from './restaurant-followup.js';
-
 export * from './support-mark-display.js';
+export * from './report-period.js';

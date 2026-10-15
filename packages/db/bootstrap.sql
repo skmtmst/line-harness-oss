@@ -7867,7 +7867,8 @@ CREATE TABLE template_versions (
   -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
   effective_from TEXT,
   created_by_staff_id TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), message_bubbles_json TEXT
+  CHECK(message_bubbles_json IS NULL OR (json_valid(message_bubbles_json) AND json_type(message_bubbles_json)='array' AND json_array_length(message_bubbles_json) BETWEEN 1 AND 5)), hq_template_version_id TEXT,
   UNIQUE (template_id, version_number)
 );
 
@@ -7891,7 +7892,9 @@ CREATE TABLE "templates" (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), published_version INTEGER NOT NULL DEFAULT 1, published_at TEXT, draft_message_type TEXT, draft_message_content TEXT, draft_carousel_actions_json TEXT, draft_carousel_tap_limit_mode TEXT, draft_carousel_tap_limit_text TEXT, draft_question_json TEXT
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
-  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0);
+  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0, message_bubbles_json TEXT
+  CHECK(message_bubbles_json IS NULL OR (json_valid(message_bubbles_json) AND json_type(message_bubbles_json)='array' AND json_array_length(message_bubbles_json) BETWEEN 1 AND 5)), draft_message_bubbles_json TEXT
+  CHECK(draft_message_bubbles_json IS NULL OR (json_valid(draft_message_bubbles_json) AND json_type(draft_message_bubbles_json)='array' AND json_array_length(draft_message_bubbles_json) BETWEEN 1 AND 5)));
 
 CREATE TABLE tenant_data_purge_audit (
   id TEXT PRIMARY KEY,
@@ -10756,6 +10759,8 @@ CREATE INDEX scenario_source_due ON scenario_source_jobs(status,scheduled_at);
 
 CREATE INDEX scenario_source_reservation ON scenario_source_jobs(source_kind,source_id);
 
+CREATE INDEX template_versions_hq_source ON template_versions(template_id,hq_template_version_id,version_number);
+
 CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
   WHERE staff_id IS NOT NULL AND is_active = 1;
@@ -11296,6 +11301,8 @@ BEGIN SELECT RAISE(ABORT, 'external_link_store_mismatch'); END;
 CREATE TRIGGER rt_floor_new_store AFTER INSERT ON rt_stores BEGIN INSERT INTO rt_floors(id,store_id,name) VALUES('floor-'||NEW.id,NEW.id,'1階'); END;
 
 CREATE TRIGGER rt_floor_new_table AFTER INSERT ON rt_tables WHEN NEW.floor_id IS NULL BEGIN UPDATE rt_tables SET floor_id='floor-'||NEW.store_id WHERE id=NEW.id; END;
+
+CREATE TRIGGER rt_followup_anniversary_created AFTER INSERT ON rt_store_followup_templates BEGIN INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) VALUES('restaurant-followup:'||NEW.store_id||':anniversary_before',NEW.scenario_id, COALESCE((SELECT MAX(step_order)+1 FROM scenario_steps WHERE scenario_id=NEW.scenario_id),0), 'text','もうすぐ記念日ですね。ご来店をお待ちしています。',0); INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) VALUES(NEW.store_id,'anniversary_before','restaurant-followup:'||NEW.store_id||':anniversary_before',-10080,0); END;
 
 CREATE TRIGGER rt_followup_approval_apply AFTER UPDATE OF status ON rt_approval_requests WHEN json_extract(NEW.payload_json,'$.operation')='start_restaurant_followup' AND NEW.status IN('approved','returned') BEGIN UPDATE rt_store_followup_templates SET sending_status=CASE WHEN NEW.status='approved' THEN 'active' ELSE 'stopped' END WHERE approval_id=NEW.id; END;
 

@@ -1,3 +1,5 @@
+import type { SupportMark } from './support-mark-types.js';
+export type { SupportMark } from './support-mark-types.js';
 import { parseSupportMarkLocations, type SupportMarkLocation } from '@line-crm/shared';
 import { recordOperation } from './operation-audit.js';
 import { jstNow } from './utils.js';
@@ -8,34 +10,6 @@ const LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
 export interface SupportMarkScope {
   tenantId: string;
   lineAccountId: string;
-}
-
-/**
- * 対応マーク。
- *
- * 受信箱の「未対応／対応中／解決済」は chats.status が持っているが、
- * あれは3つ固定でトークにしか付かない。マークは友だちに付き、
- * 名前も色も運用側が決められる。
- */
-
-export interface SupportMark {
-  id: string;
-  name: string;
-  color: string;
-  is_default: number;
-  auto_on_inbound: number;
-  display_order: number;
-  display_locations_json: string;
-  created_at: string;
-  archived_at: string | null;
-  version: number;
-  updated_at: string;
-  created_by: string | null;
-  updated_by: string | null;
-  /** NULL は移行前からあるテナント共通マーク。 */
-  line_account_id: string | null;
-  tenant_id: string;
-  is_inherited: number;
 }
 
 export interface SupportMarkWithUsage extends SupportMark {

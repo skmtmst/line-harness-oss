@@ -579,8 +579,10 @@
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
     "636_restaurant_delivery_uber_connections.sql",
+    "666_template_message_bundles.sql",
     "667_hq_template_saved_views.sql",
-    "668_support_mark_display_locations.sql"
+    "668_support_mark_display_locations.sql",
+    "669_restaurant_anniversary_followup.sql"
   ],
-  "migrationCount": 581
+  "migrationCount": 583
 }

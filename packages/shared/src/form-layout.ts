@@ -1,3 +1,5 @@
+import type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
+export type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
 import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
 import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
@@ -137,38 +139,6 @@ export type FormAction =
   | { kind: "scenario"; op: "start" | "stop"; scenarioId: string }
   | { kind: "reminder"; reminderId: string };
 
-/**
- * 「予約を入れる」ブロックの設定。
- *
- * メニューは1つに決める（複数メニューの同時受付はしない）。
- * 担当が空なら「だれでも」（予約側の自動割り当てに任せる）。
- * 選べる期間は今日から daysAhead 日後まで。空なら14日。
- * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
- */
-export interface FormBookingConfig {
-  kind?: 'people' | 'seats';
-  storeId?: string;
-  courseId?: string | null;
-  menuId: string;
-  staffId?: string | null;
-  daysAhead?: number;
-}
-
-/**
- * 「予約を入れる」ブロックの回答の形。予約の確保は回答の送信後に
- * 予約の受け口で行い、枠の再確認と重なりの防止はそちらが担う。
- * ここでは「どの枠を選んだか」だけを持ち、形だけを検査する。
- */
-export interface FormBookingValue {
-  kind?: 'people' | 'seats';
-  storeId?: string;
-  courseId?: string | null;
-  guestCount?: number;
-  menuId: string;
-  staffId: string;
-  startsAt: string;
-}
-
 /** 入力欄のブロック。 */
 export interface FormInputBlock {
   id: string;
@@ -276,6 +246,8 @@ export interface FormSection {
 // ---------------------------------------------------------------------------
 
 export interface FormOptions {
+  /** 回答の完了後：お礼・トークへ戻す・URL。未指定は従来のthanksUrl判定。 */
+  completionMode?: "thanks" | "chat" | "url";
   /** 送信後に飛ばす先。空なら thanksText を出す */
   thanksUrl?: string | null;
   thanksText?: string | null;
@@ -1330,6 +1302,12 @@ export function validateFormDefinition(layout: FormLayout): string | null {
           return `回答データの見出し「${block.name}」が重複しています`;
         }
         seenNames.add(block.name);
+        if (block.type === "booking" && block.booking != null) {
+          if (typeof block.booking !== "object" || Array.isArray(block.booking)) return `${at}の予約設定を確認してください`;
+          for (const [key, label] of [["allowMenuSelection", "メニューを選んでもらう"], ["requireApproval", "未承認で入れる"]] as const) {
+            if (block.booking[key] !== undefined && typeof block.booking[key] !== "boolean") return `${at}の「${label}」はオン・オフで指定してください`;
+          }
+        }
         if (block.type === "file") {
           if (block.fileKinds !== undefined && (!Array.isArray(block.fileKinds) || !block.fileKinds.length || block.fileKinds.some(kind => !["image", "pdf", "identity"].includes(kind)))) return `${at}で受け取る種類を1つ以上選んでください`;
           if (block.fileKind && !["image", "pdf", "identity"].includes(block.fileKind)) return `${at}のファイルの種類を選んでください`;
@@ -1411,7 +1389,11 @@ export function validateFormDefinition(layout: FormLayout): string | null {
     }
   }
 
+  const completionMode = layout.options.completionMode;
+  if (completionMode !== undefined && !["thanks", "chat", "url"].includes(completionMode)) return "答え終わったあとの動きを選び直してください";
   const thanksUrl = layout.options.thanksUrl?.trim() ?? "";
+  if (completionMode === "url" && !thanksUrl) return "答えたあとに開くURLを入力してください";
+  if ((completionMode === "chat" || completionMode === "thanks") && thanksUrl) return "URLを開く場合は、答え終わったあとの動きをURLにしてください";
   if (thanksUrl !== "" && !isHttpUrl(thanksUrl)) {
     return "答えたあとに開くページがURLの形ではありません";
   }

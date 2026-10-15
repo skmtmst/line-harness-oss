@@ -1,3 +1,5 @@
+import type { NenPhotoPublicationList, AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+export type { NenPhotoPublicationList, AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
 import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
@@ -5483,47 +5485,6 @@ export type PhotoRewardPolicyVersion = {
   status: 'in_use' | 'reserved' | 'past'
 }
 
-/**
- * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
- * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
- * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
- */
-export type NenPhotoPublicationList = {
-  summary: {
-    publishedCount: number
-    placementCount: number
-    topPhoto: Record<string, unknown> | null
-    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
-    consentedCount: number
-    attentionCount: number
-    withdrawnCount: number
-  }
-  items: Array<Record<string, unknown>>
-  pendingWithdrawals: Array<Record<string, unknown>>
-  withdrawnItems: Array<Record<string, unknown>>
-}
-
-/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
-export type AccountHealthSummary = {
-  items: Array<{ lineAccountId: string; riskLevel: string | null }>
-  warningCount: number
-  dangerCount: number
-}
-
-export type PhotoAssetRun = {
-  id: string
-  photoId: string
-  lineAccountId: string
-  requestedVersion: number
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  requestedBy: string
-  createdAt: string
-  startedAt: string | null
-  completedAt: string | null
-  errorMessage: string | null
-  operation?: 'review' | 'public' | 'thumbnail' | 'all'
-}
-
 export type PhotoAssetStatus = {
   reviewVersion: number
   jobs: PhotoAssetRun[]
@@ -7556,9 +7517,10 @@ export const api = {
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
       ),
-    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string; from?: string; to?: string; period?: 'this_month' | 'last_month' | 'all' } = {}) => {
       const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
       if (params.query) query.set('q', params.query)
+      for (const key of ['from','to','period'] as const) if (params[key] !== undefined) query.set(key, params[key]!)
       return fetchApi<ApiResponse<FormSubmissionPage>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
       )
@@ -7627,7 +7589,10 @@ export const api = {
         name?: string
         description?: string | null
         fields?: unknown
-        /** 送ると fields もこちらから作り直される */
+        /**
+         * 送ると fields もこちらから作り直される。
+         * 予約のつまみは各ブロックのbooking.allowMenuSelection/requireApproval。
+         */
         layout?: FormLayout
         onSubmitTagId?: string | null
         onSubmitMessageType?: string | null
@@ -10211,6 +10176,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
         draftMessageContent: string | null;
         folderId: string | null;
@@ -10268,6 +10234,7 @@ export const api = {
           category: string;
           messageType: string;
           messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
           folderId: string | null;
           question: TemplateQuestion | null;
           questionStatus: 'draft' | 'published';
@@ -10297,6 +10264,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
         folderId: string | null;
@@ -10341,6 +10309,7 @@ export const api = {
         accountId: string | null;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         publishedVersion: number;
         publishedAt: string | null;
         published: boolean;
@@ -10372,13 +10341,15 @@ export const api = {
       /** 置き場。省略・null は未分類。 */
       folderId?: string | null
     }) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -10389,7 +10360,8 @@ export const api = {
         folderId?: string | null
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -10417,6 +10389,7 @@ export const api = {
         status: 'in_use' | 'reserved' | 'past';
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         carouselActions: unknown | null;
         carouselTapLimitMode: string | null;
         carouselTapLimitText: string | null;
