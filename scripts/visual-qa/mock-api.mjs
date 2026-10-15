@@ -3442,6 +3442,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
+  /*
+    マニュアルの正本表から1つ引く口（API 組2 の契約：screen または key、keyKind=screen/task）。
+    画面のボタンは URL がある時だけ出るので、撮る板の分だけ URL を入れる：
+    手順キー onboarding-line-guide（店舗を追加 ao15G・faGn4 のガイド）と画面キー 25-1（共通アクションの版 ziSgL のマニュアル）。
+    一覧の正本表（MANUAL_LINKS・cIdA2 の3行）には足さない。
+  */
+  if (method === 'GET' && pathname === '/api/manual-links/lookup') {
+    const key = query.get('key') ?? query.get('screen') ?? ''
+    const keyKind = query.get('keyKind') ?? 'screen'
+    const urls = { 'task:onboarding-line-guide': 'https://help.musubo.example/guides/line-account', 'screen:25-1': 'https://help.musubo.example/automations' }
+    const url = urls[`${keyKind}:${key}`] ?? null
+    return { success: true, data: { key, url, status: url ? 'ok' : 'unset', version: url ? 1 : null } }
+  }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }
