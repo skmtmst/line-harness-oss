@@ -28,7 +28,7 @@ function app(role: StaffRole = 'owner') {
   return instance;
 }
 
-const ENV = { RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
+const ENV = { DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
 
 function seedLiveWork(db: SqliteD1) {
   db.raw.exec(`

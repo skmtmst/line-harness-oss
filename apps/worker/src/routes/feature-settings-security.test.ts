@@ -156,7 +156,7 @@ describe('feature settings scope and versioning', () => {
           features: { scenarios: false },
           sidebarItemOrder: FULL_ITEM_ORDER,
         }),
-      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+      }, { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' });
       expect(first.status).toBe(200);
       expect(await first.json()).toMatchObject({ success: true, data: { version: 1 } });
 
@@ -164,13 +164,13 @@ describe('feature settings scope and versioning', () => {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { scenarios: true } }),
-      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+      }, { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' });
       expect(stale.status).toBe(409);
 
       const loaded = await app().request(
         '/api/settings/features?account_id=account-1',
         {},
-        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' },
+        { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' },
       );
       expect(await loaded.json()).toMatchObject({
         success: true,
@@ -224,21 +224,21 @@ describe('feature settings scope and versioning', () => {
           reason: 'テスト',
           sidebarItemOrder: { delivery: ['scenarios', 'scenarios'] },
         }),
-      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+      }, { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' });
       expect(duplicate.status).toBe(400);
 
       const invalid = await app().request('/api/settings/features?account_id=account-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { scenarios: 'off' } }),
-      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+      }, { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' });
       expect(invalid.status).toBe(400);
 
       const unknown = await app().request('/api/settings/features?account_id=account-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { not_in_feature_catalog: true } }),
-      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+      }, { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' });
       expect(unknown.status).toBe(400);
       expect(await unknown.json()).toMatchObject({
         success: false,
@@ -255,7 +255,7 @@ describe('feature settings scope and versioning', () => {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { [removed]: true } }),
-        }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+        }, { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' });
         expect(response.status).toBe(400);
         expect(await response.json()).toMatchObject({
           success: false,
@@ -283,7 +283,7 @@ describe('feature settings scope and versioning', () => {
       const loaded = await app().request(
         '/api/settings/features?account_id=account-1',
         {},
-        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' },
+        { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' },
       );
       expect(loaded.status).toBe(200);
       const body = await loaded.json() as {
@@ -325,7 +325,7 @@ describe('feature settings scope and versioning', () => {
       const bundled = await app().request(
         '/api/settings/features?account_id=account-1',
         {},
-        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' },
+        { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' },
       );
       expect(bundled.status).toBe(200);
       const bundledBody = await bundled.json() as {

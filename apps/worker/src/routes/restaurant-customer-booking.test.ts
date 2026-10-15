@@ -30,7 +30,7 @@ const start = '2027-10-01T03:00:00.000Z';
 function app() {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
-    c.env = { DB: db.db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
+    c.env = { DB: db.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
     await next();
   });
   a.route('/', restaurantCustomerBooking);
