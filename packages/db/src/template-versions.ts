@@ -257,16 +257,16 @@ export async function refreshScenarioReferences(
 ): Promise<void> {
   const result = await db
     .prepare(
-      `SELECT DISTINCT template_id FROM scenario_steps
-        WHERE scenario_id = ? AND template_id IS NOT NULL`,
+      `SELECT template_id,message_bubbles_json FROM scenario_steps
+        WHERE scenario_id = ?`,
     )
     .bind(scenarioId)
-    .all<{ template_id: string }>();
+    .all<{ template_id: string | null; message_bubbles_json: string | null }>();
   await syncTemplateReferences(
     db,
     'scenario',
     scenarioId,
-    (result.results ?? []).map((row) => row.template_id),
+    [...new Set((result.results ?? []).flatMap(row => [...(row.template_id ? [row.template_id] : []), ...extractBroadcastTemplateIds(row.message_bubbles_json)]))],
   );
 }
 

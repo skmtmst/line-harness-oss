@@ -1,3 +1,4 @@
+import type { BroadcastBubble } from './broadcast-definition.js';
 import type { ApiFieldErrors } from './api-field-errors.js';
 
 // =============================================================================
@@ -893,6 +894,8 @@ export interface ScenarioStep {
   messageType: MessageType;
   /** メッセージ内容 (テキスト or JSONシリアライズ済みFlexメッセージ等) */
   messageContent: string;
+  /** 来店フォローの複数吹き出し。保存は専用の版付きAPIを使う。 */
+  messageBubbles?: BroadcastBubble[] | null;
   /**
    * 1通ごとの配信対象 (124)。SegmentCondition。null は「購読中の全員に配信する」。
    *
