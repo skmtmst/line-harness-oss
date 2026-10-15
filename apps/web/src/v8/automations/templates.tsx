@@ -67,7 +67,7 @@ export function templateTriggerChips(items: Pick<AutomationTemplateSummary, 'tri
 
 export default function AutomationTemplatesV8() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('見本から作る')
+  usePageTitle('オートメーション')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
