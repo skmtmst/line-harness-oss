@@ -108,7 +108,7 @@
 .tileSelect { position: absolute; z-index: 1; top: var(--tpl-hb-tool-gap); left: var(--tpl-hb-tool-gap); }
 .tile[data-selected] .tileImage { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-inset); }
 .selectionCount { white-space: nowrap; font-size: var(--text-caption); font-weight: 600; color: var(--color-ink); }
-.generationInfo { display: flex; flex-direction: column; font-size: var(--text-micro); color: var(--color-ink-secondary); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
+.generationInfo { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--text-micro); color: var(--color-ink-secondary); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
 .distributionProgress { margin-top: var(--tpl-hb-tool-gap); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); color: var(--color-ink-secondary); }
 .tileImage:focus-visible, .star:focus-visible { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-outset); }
 

@@ -6,7 +6,6 @@ import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } fr
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ListPage } from '@/components/templates'
-import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -98,6 +97,7 @@ function ProjectInner() {
   const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
+  const [inputTouched, setInputTouched] = useState(false)
   const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [distributionOpen, setDistributionOpen] = useState(false)
@@ -591,8 +591,8 @@ function ProjectInner() {
   ) : undefined
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage boardId={boardId} title={project.name} help={description} actions={actions}
-      crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
+    <SaveErrorScope errors={saveErrors}><ListPage boardId={boardId} title={project.name} help={description} actions={actions}>
+      {/* ページ内の戻るリンク（プロジェクト一覧 › …）は置かない。戻るは上のパンくずだけ（決まり 2026-10-08）。 */}
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <div className={styles.split}>
@@ -675,7 +675,7 @@ function ProjectInner() {
                 presets={presets}
                 maxCount={maxCount}
                 value={input}
-                onChange={setInput}
+                onChange={(next) => { setInputTouched(true); setInput(next) }}
                 disabled={Boolean(running) || archived || !engineReady}
                 referenceImages={referenceImages}
                 onPickReference={openPicker}
@@ -691,7 +691,8 @@ function ProjectInner() {
           ) : null}
         </div>
 
-        {blockedReason && input.presetKey && !running ? <p className={styles.warnText}>{blockedReason}</p> : null}
+        {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
+        {blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}
 
         {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
         {canManage ? (
@@ -703,11 +704,11 @@ function ProjectInner() {
               <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
               <span className={styles.spacer} />
               <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
-            </> : undefined }}
-            info={<span className={styles.generationInfo}>
-              <span>{`今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚`}</span>
-              {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
-            </span>}
+            </> : (
+              /* 絵 iMnph：選んでいないときの左は残りの枚数と、この生成で使う枚数。 */
+              <span className={styles.generationInfo}>{`今月の残り ${usage?.month.remaining ?? emptyValue('unknown')}枚・今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚。この生成で${input.count}枚使います`}</span>
+            ) }}
+            info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
             actions={
               running ? (
                 <>
