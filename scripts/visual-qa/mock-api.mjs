@@ -2878,6 +2878,9 @@ const VISIT_STAMP_ENTRIES = [
 function visitStampRead(pathname, query) {
   if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD, { ...VISIT_STAMP_CARD, id: 'vs-card-gold', name: 'ゴールドカード', settings: { ...VISIT_STAMP_CARD.settings, completion: 'repeat', nextCardId: null } }] }
   if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
+  // 店頭の QR（印刷用）は発行済みの形（絵 fpPlW：QR の画像・保存・印刷・作り直す・最後に作り直した日 9/1）。
+  const storefront = /^\/api\/visit-stamps\/cards\/([^/]+)\/storefront-qr$/.exec(pathname)
+  if (storefront) return { success: true, data: { id: 'vsqr-store-1', cardId: decodeURIComponent(storefront[1]), accountId: query.get('accountId') ?? 'acc-1', kind: 'storefront', url: 'https://liff.line.me/2000000000-demo/visit-stamps/s/vsqr-store-1', issuedAt: '2026-09-01T01:00:00.000Z', expiresAt: null, serverTime: '2026-10-15T01:00:00.000Z', status: 'active', generation: 2, count: 1, amount: null } }
   if (pathname === '/api/visit-stamps/entries') {
     const page = Math.max(1, Number(query.get('page') ?? 1)), pageSize = Math.min(200, Math.max(1, Number(query.get('pageSize') ?? 50)))
     const friendId = query.get('friendId'), kind = query.get('kind')

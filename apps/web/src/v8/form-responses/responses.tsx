@@ -5,7 +5,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Download, Pencil, RotateCw, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Download, Filter, Pencil, RotateCw, User } from 'lucide-react'
 import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
@@ -38,7 +38,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import ListToolbar from '@/components/shared/list-toolbar'
+import SearchField from '@/components/shared/search-field'
 import TruncatedText from '@/components/shared/truncated-text'
 
 /*
@@ -438,7 +438,7 @@ function Responses() {
       ) : null}
       <div className={styles.railButtonsWide}>
         {canEditForm ? <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}><Pencil size={15} aria-hidden="true" />フォームを編集</Button> : null}
-        <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={exportProgress || 'CSVを準備しています'}>
+        <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={exportProgress || 'CSVを準備しています'} widthReserve="idle">
           <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       </div>
@@ -446,13 +446,7 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <Card variant="aside" aria-labelledby="fr-filter">
         <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
-        <Field label="名前・答えで探す（全件から）" labelHidden><SaveErrorField names={["query"]}><ListToolbar search={{
-            updateMode: 'immediate',
-            value: query,
-            onChange: setQuery,
-            placeholder: '名前・答えで探す（全件から）',
-            label: '名前・答えで探す（全件から）',
-          }} /></SaveErrorField></Field>
+        <Field label="名前・答えで探す（全件から）" labelHidden><SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField></Field>
       </Card>
     </div>
   )
@@ -485,7 +479,7 @@ function Responses() {
                 <Notice tone="danger" role="status"
                   heading={`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}
                   message={`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}
-                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>} />
+                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><Filter size={15} aria-hidden="true" />{`その${incompleteItems.length} 件を見る`}</Button>} />
               ) : null}
               {summaries.map((fieldSummary) => {
                 const block = blockByKey(fieldSummary.key)
@@ -505,12 +499,11 @@ function Responses() {
                     ]
                   : fieldSummary.values
                 const top = values.slice(0, 6)
-                const max = Math.max(0, ...top.map(([, count]) => count))
                 return (
                   <Card key={fieldSummary.key} variant="form" padding="roomy" aria-label={labels[fieldSummary.key] ?? fieldSummary.key}>
                     <CardHeader size="stacked" title={labels[fieldSummary.key] ?? fieldSummary.key} meta={sub} />
                     {answered > 0 ? (
-                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
+                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" total={answered} items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count}))} />
                     ) : null}
                   </Card>
                 )
@@ -518,10 +511,9 @@ function Responses() {
               {longKey ? (() => {
                 const recents = items.filter((item) => String((item.data as Record<string, unknown>)[longKey] ?? '').trim() !== '')
                 return (
-                  <Card variant="records" aria-label={labels[longKey] ?? longKey}>
-                    <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`}
-                      action={<Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button>} />
-                    <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) var(--polish-space-section)' }}><tbody>
+                  <Card variant="form" padding="roomy" aria-label={labels[longKey] ?? longKey}>
+                    <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`} />
+                    <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) 0' }}><tbody>
                       {recents.slice(0, 2).map((item) => {
                         const text = String((item.data as Record<string, unknown>)[longKey])
                         return (
@@ -532,6 +524,8 @@ function Responses() {
                         )
                       })}
                     </tbody></DataTable>
+                    {/* 絵 v0SbYR：「1件ずつ見る」は一覧の下の右端。 */}
+                    <div className={styles.cardFootEnd}><Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button></div>
                   </Card>
                 )
               })() : null}

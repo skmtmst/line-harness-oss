@@ -1,6 +1,6 @@
 'use client'
 
-import Toggle from '@/components/shared/toggle'
+import Checkbox from '@/components/shared/checkbox'
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import { notifySaved, notifyToast } from '@/components/shared/toast';
@@ -521,10 +521,10 @@ function VisitStampsScreen() {
                     {expiryBasis === 'none' ? <span className={styles.sub}>期限を設定すると選べます</span> : <SaveErrorField names={["expiryReminder","settings.expiryReminder","expiry_reminder","settings.expiry_reminder"]}><Select aria-label="期限の前に知らせる" size="full" disabled={ro} value={settings.expiryReminder ?? 'none'} onChange={v => set({ expiryReminder: v as VisitStampSettings['expiryReminder'] })} options={REMINDER_OPTIONS} /></SaveErrorField>}
                   </div>
                   <div className={styles.field}>
-                    <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。</HelpTip></span>
+                    <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。選んだカードの名前が欄に出ます（絵 fpPlW）。</HelpTip></span>
                     <SaveErrorField names={["nextCardId","settings.nextCardId","next_card_id","settings.next_card_id"]}><EntitySelect id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
                       onChange={v => set({ completion: v === 'repeat' ? 'repeat' : 'next_card', nextCardId: v === 'repeat' ? null : v })}
-                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ ...entityOptionMetadata(c), value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
+                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ ...entityOptionMetadata(c), value: c.id, label: c.name })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
                   </div>
                 </div>
                 <span className={styles.label}>特典</span>
@@ -604,7 +604,7 @@ function VisitStampsScreen() {
                 {settings.multipliers.map((m, i) => (
                   <div key={i} className={styles.switchRow}>
                     {/* 切る＝止める（消さない）。消すのは「…」から。 */}
-                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Toggle checked={m.active !== false} label={`${multiplierName(m)}を使う`} disabled={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
+                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Checkbox checked={m.active !== false} aria-label={`${multiplierName(m)}を使う`} disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
                     <span className={styles.texts}>
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています ・ ${multiplierDetail(m)}` : multiplierDetail(m)}</span>
@@ -614,7 +614,7 @@ function VisitStampsScreen() {
                   </div>
                 ))}
                 <div className={styles.switchRow}>
-                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><Toggle checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" disabled={ro} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
+                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><Checkbox checked={settings.firstVisitBonus > 0} aria-label="初回来店ボーナスを使う" disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus} 個` : 'はじめての来店で多めに押します'}</span>
@@ -622,7 +622,7 @@ function VisitStampsScreen() {
                   {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
-                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" disabled={ro} onChange={ro ? undefined : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
+                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Checkbox checked={settings.rankMultipliers.length > 0} aria-label="会員ランクの倍率を使う" disabled={ro} onCheckedChange={ro ? () => {} : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>

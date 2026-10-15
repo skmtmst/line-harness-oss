@@ -56,7 +56,7 @@ describe('Google営業時間の3方式を現在の共通部品で使う', () => 
   })
   it('カレンダーの指定日だけ休業にし、通常の営業時間を変更しない', async () => {
     await open('calendar')
-    fireEvent.click(screen.getByRole('switch', { name: 'この日は休業にする' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'この日は休業にする' }))
     fireEvent.click(screen.getByRole('button', { name: '変更案を確認' }))
     await waitFor(() => expect(go).toHaveBeenCalled())
     expect(mocks.proposeHours).toHaveBeenCalledWith('account-1', { source: 'calendar', days: [{ date: '2026-10-12', closed: true, periods: [], special: true }] })
@@ -74,9 +74,9 @@ describe('Google営業時間の3方式を現在の共通部品で使う', () => 
   it('日付を選び直しても他の日の変更を保ち、複数日を1つの変更案にまとめる', async () => {
     mocks.profile.mockResolvedValue({ ...data, profile: { ...data.profile, specialHours: [...data.profile.specialHours, { date: '2026-10-13', closed: false, periods: [{ open: '12:00', close: '17:00' }] }] } })
     await open('calendar')
-    fireEvent.click(screen.getByRole('switch', { name: 'この日は休業にする' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'この日は休業にする' }))
     fireEvent.click(within(screen.getByLabelText('登録済みの特別営業時間')).getAllByRole('button')[1])
-    fireEvent.click(screen.getByRole('switch', { name: 'この日は休業にする' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'この日は休業にする' }))
     expect(screen.getByRole('heading', { name: '変更する日（2日）' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '変更案を確認' }))
     await waitFor(() => expect(mocks.proposeHours).toHaveBeenCalledWith('account-1', { source: 'calendar', days: [
@@ -142,10 +142,10 @@ describe('Google営業時間の3方式を現在の共通部品で使う', () => 
     await open()
     expect(screen.getByRole('textbox', { name: '文章で入力' })).toHaveProperty('disabled', true)
     cleanup(); mocks.profile.mockResolvedValue({ ...data, closed: true }); await open('weekly')
-    expect(screen.getByRole('switch', { name: '月曜を定休日にする' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('checkbox', { name: '月曜を定休日にする' })).toHaveProperty('disabled', true)
     cleanup(); mocks.role = 'viewer'; mocks.profile.mockResolvedValue(data); await open('weekly')
     expect(screen.queryByRole('button', { name: '変更案を確認' })).toBeNull()
-    expect(screen.getByRole('switch', { name: '月曜を定休日にする' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('checkbox', { name: '月曜を定休日にする' })).toHaveProperty('disabled', true)
     expect(mocks.proposeHours).not.toHaveBeenCalled()
   })
 })
