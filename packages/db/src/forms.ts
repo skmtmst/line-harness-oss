@@ -1,5 +1,6 @@
 import { type FormSubmissionPeriod, submissionPeriodSql } from './form-submission-period.js'
 export { type FormSubmissionPeriod } from './form-submission-period.js'
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
@@ -802,18 +803,25 @@ export type UpdateFormResult =
  * 読んだあと書くまでのあいだに誰かが書いていれば1行も更新されない。
  * つまりこの読み直し＋書き戻しは、版の確認とセットで初めて安全になる。
  */
+export interface FormLatestEdit {staffId:string;staffName:string;savedAt:string}
+/** 同じ編集版の監査だけを使う。公開者や最新の別の版を保存者に代用しない。 */
+export async function getFormLatestEdit(db:D1Database,id:string,contentRevision:number):Promise<FormLatestEdit|null> {
+ const row=await db.prepare(`SELECT actor_principal_id staffId,json_extract(after_json,'$.staffName') staffName,created_at savedAt FROM audit_events WHERE source_kind='form_draft_save' AND source_id=? AND target_id=? AND action='form.draft_saved' AND result='success' AND json_extract(after_json,'$.contentRevision')=? LIMIT 1`).bind(JSON.stringify([id,contentRevision]),id,contentRevision).first<FormLatestEdit>();
+ return row??null;
+}
 export async function updateForm(
   db: D1Database,
   id: string,
   input: UpdateFormInput,
   expectedContentRevision: number,
+  actorId?:string,
 ): Promise<UpdateFormResult> {
   const existing = await getFormById(db, id);
   if (!existing) return { kind: 'not_found' };
 
   const now = jstNow();
 
-  const result = await db
+  const update = db
     .prepare(
       `UPDATE forms
        SET folder_id = CASE WHEN ? THEN ? ELSE folder_id END,
@@ -876,8 +884,11 @@ export async function updateForm(
       now,
       id,
       expectedContentRevision,
-    )
-    .run();
+    );
+
+  const result=actorId?(await db.batch([update,db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json,created_at)
+    SELECT ?,'form_draft_save',?,COALESCE(s.tenant_id,'${DEFAULT_TENANT_ID}'),'business',s.id,s.role,'form.draft_saved','form',?,'success',json_object('contentRevision',?,'staffName',s.name),? FROM staff_members s WHERE s.id=? AND s.is_active=1 AND changes()=1`)
+    .bind(crypto.randomUUID(),JSON.stringify([id,expectedContentRevision+1]),id,expectedContentRevision+1,now,actorId)]))[0]:await update.run();
 
   if ((result.meta?.changes ?? 0) !== 1) {
     const latest = await getFormById(db, id);

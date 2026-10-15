@@ -1,3 +1,5 @@
+import type { AutomationActionContext } from '../services/automation-engine.js';
+import { processBroadcastAfterActions } from '../services/broadcast-after-actions.js';
 import {Hono} from 'hono';import {describe,it,expect,beforeEach,afterEach,vi} from 'vitest';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';import {hqBroadcasts} from './hq-broadcasts.js';import {broadcasts} from './broadcasts.js';import {broadcastApprovals} from './broadcast-approvals.js';import type {Env} from '../index.js';
 vi.mock('../lib/step-up.js',async()=>({...await vi.importActual('../lib/step-up.js'),sensitiveStepUpSatisfied:vi.fn(async()=>true)}));
@@ -230,4 +232,26 @@ describe('統括の配信一覧・複製・追送',()=>{
    const result=await (await call('/api/hq/broadcasts/quota')).json() as QuotaResponse;expect(result.data).toMatchObject({remaining:70,used:30,limit:100});
    f.raw.exec("UPDATE operation_health_results SET observed_at='2020-01-01T00:00:00Z'");expect((await (await call('/api/hq/broadcasts/quota')).json() as QuotaResponse).data.remaining).toBeNull();
  });
+});
+
+it('店別の公開済み後処理を保存・確認・送信へ固定し、他店・取消・対象外の指定を拒む',async()=>{
+ f.raw.exec(`INSERT INTO common_actions(id,line_account_id,name,status) VALUES('action','shop','配信後','published');
+ INSERT INTO common_action_versions(id,common_action_id,version_number,status,action_config) VALUES('actions-v1','action',1,'published','[{"id":"s1","type":"start_scenario","params":{"scenarioId":"scenario1"}},{"id":"s2","type":"start_scenario","params":{"scenarioId":"scenario2"}}]');`);
+ const madeRun=await made({afterActionVersionIds:{shop:'actions-v1'}});
+ expect((await (await call(`/api/hq/broadcasts/${madeRun.id}/preflight`,'POST',{})).json() as {data:Array<{afterAction:{versionId:string;actionCount:number;versionNumber:number}}>}).data[0].afterAction).toMatchObject({versionId:'actions-v1',actionCount:2,versionNumber:1});
+ expect((await call('/api/hq/broadcasts','POST',draft('bad-scope',{afterActionVersionIds:{foreign:'actions-v1'}}))).status).toBe(400);
+ expect((await call('/api/hq/broadcasts','POST',draft('bad-version',{afterActionVersionId:'missing'}))).status).toBe(409);
+ f.raw.exec("UPDATE common_actions SET status='archived' WHERE id='action'");
+ expect((await call(`/api/hq/broadcasts/${madeRun.id}/send`,'POST',{expectedVersion:1},true)).status).toBe(409);
+ expect(f.raw.prepare('SELECT count(*) n FROM broadcasts').get()).toEqual({n:0});
+ f.raw.exec("UPDATE common_actions SET status='published' WHERE id='action'");
+ expect((await call(`/api/hq/broadcasts/${madeRun.id}/send`,'POST',{expectedVersion:1},true)).status).toBe(200);
+ expect(f.raw.prepare('SELECT after_action_version_id FROM broadcasts').get()).toEqual({after_action_version_id:'actions-v1'});
+ expect(f.raw.prepare('SELECT count(*) n FROM broadcast_after_action_runs').get()).toEqual({n:0});
+ const child=f.raw.prepare('SELECT id FROM broadcasts').get() as {id:string};
+ f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) VALUES(?,'friend','shop','sent')").run(child.id);
+ const start=vi.fn(async(_context:AutomationActionContext)=>{});
+ expect(await processBroadcastAfterActions(f.db,{broadcastId:child.id,executors:{start_scenario:start}})).toMatchObject({done:2,failed:0});
+ expect(start.mock.calls.map(([context])=>context.action.params.scenarioId)).toEqual(['scenario1','scenario2']);
+ await processBroadcastAfterActions(f.db,{broadcastId:child.id,executors:{start_scenario:start}});expect(start).toHaveBeenCalledTimes(2);
 });

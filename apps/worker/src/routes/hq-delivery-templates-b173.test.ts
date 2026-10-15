@@ -127,3 +127,22 @@ test.each(['auto_reply','friend_add_rule','reminder'] as const)('%s: 編集の�
  expect((await req(`/${id}`)).body.data.definition).toEqual({...definitions[type],references:[]});
  expect((await req(`/${id}/versions`)).body.data.map((v:any)=>v.version)).toEqual([3,2,1]);
 });
+
+test('自動応答の優先順位を保存した固定版と配った下書きに保持する',async()=>{
+ const id=await create('auto_reply',{...auto,settings:{...auto.settings,priority:42}});
+ expect((await distribute(id,await preflight(id))).body.data.status).toBe('completed');
+ const saved=fixture.raw.prepare('SELECT definition_snapshot FROM auto_reply_versions').get() as {definition_snapshot:string};
+ expect(JSON.parse(saved.definition_snapshot).priority).toBe(42);
+ for(const priority of [-10000,10000,1.5])expect((await req('','POST',{type:'auto_reply',name:'不正',requestId:crypto.randomUUID(),definition:{...auto,settings:{...auto.settings,priority}}})).status).toBe(422);
+});
+
+test('統括から店別の有効タグ・公開クーポンを名前で探し、他組織・未公開を含めない',async()=>{
+ fixture.raw.exec("INSERT INTO tags(id,name,line_account_id,status) VALUES('tag-a','会員','a1','active'),('tag-b','会員','a2','active'),('hidden','会員','a3','active'),('archived','会員旧','a1','archived');");
+ const tags=await req('/resources?kind=tag&q=会員&limit=1');
+ expect(tags.status).toBe(200);expect(tags.body.data).toMatchObject({total:2,nextCursor:'1'});
+ expect(tags.body.data.items[0]).toMatchObject({id:'tag-a',accountId:'a1'});
+ expect((await req('/resources?kind=tag&q=会員&accountIds=a2')).body.data.items).toMatchObject([{id:'tag-b'}]);
+ expect((await req('/resources?kind=coupon')).body.data.items).toEqual([]);
+ expect((await req('/resources?kind=tag&accountIds=a3')).status).toBe(403);
+ expect((await req('/resources?kind=arbitrary')).status).toBe(400);
+});

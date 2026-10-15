@@ -62,6 +62,13 @@
 }
 :root .tpBody { flex: none; }
 :root .tpBody .tpList > * { flex-shrink: 0; }
+/* 統括の「テンプレートを選ぶ」窓（EpTBB）：行は1つ選ぶ窓と同じ52、窓の高さは候補4件が見える分。 */
+:root .tpBody { height: var(--tpl-source-picker-body-h); }
+:root .tpBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
+/* 1つ選ぶ窓：送るのは候補の一覧だけ。検索欄・「N件中」・下の帯は窓の中で動かない。
+   プレビューなどで高さが足りないときは、一覧が小さくなりすぎないよう最低の高さを持ち、足りない分だけ全体を送る。 */
+:root .singleBody .tpList > .tpCards,
+:root .tpBody .tpList > .tpCards { flex: 1 1 auto; min-height: 8rem; overflow-y: auto; }
 .tpSide {
   display: grid;
   grid-template-rows: 1fr auto;

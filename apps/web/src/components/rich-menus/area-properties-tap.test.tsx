@@ -69,12 +69,12 @@ describe('リッチメニューの押したら', () => {
     expect(isAreaActionConfigured(last())).toBe(false)
   })
 
-  it('統括のひな形は予約・予約履歴・来店スタンプを出さない（配った先の LIFF に付け替える口がまだ無い）', () => {
+  it('統括のひな形は予約・予約履歴・来店スタンプも選べる（組1の保存・配布が配った先の LIFF に付け替える）', () => {
     render(<Harness allowedIntents={[...HQ_RICH_MENU_INTENTS]} />)
     const text = screen.getByRole('group', { name: '押したときの動き' }).textContent ?? ''
     expect(text).toContain('URLを開く')
     expect(text).toContain('回答フォーム')
-    expect(text).not.toContain('予約履歴')
-    expect(text).not.toContain('来店スタンプ')
+    expect(text).toContain('予約履歴')
+    expect(text).toContain('来店スタンプ')
   })
 })

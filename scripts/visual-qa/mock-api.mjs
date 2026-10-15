@@ -3671,6 +3671,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       return { accountId: account.id, accountName: account.name, receivedAt: '2026-08-21T09:10:00.000Z', targetVersion: { version, latestVersion: current, status: older ? 'older' : 'latest', label: `版${version}` } }
     }) }
   }
+  /* 配る前に「配布先が今受け取っている版」を読む（API 組1 の契約：GET /api/hq/templates/:id/distribution-targets）。同名の有無は返さない。 */
+  const distributionTargetsMatch = pathname.match(/^\/api\/hq\/templates\/([^/]+)\/distribution-targets$/)
+  if (distributionTargetsMatch && method === 'GET') {
+    const wanted = (query.get('accountIds') ?? '').split(',').filter(Boolean)
+    const latest = 2
+    const states = [{ version: null, status: 'undistributed', label: '未配布' }, { version: latest, status: 'latest', label: `版 ${latest}（最新）` }, { version: 1, status: 'older', label: '版 1' }]
+    return { success: true, data: {
+      templateId: decodeURIComponent(distributionTargetsMatch[1]), latestVersion: latest, requiresPreflight: true,
+      stores: HQ_TEMPLATE_ACCOUNTS_HTN.filter((a) => !wanted.length || wanted.includes(a.id)).map((a, i) => ({ accountId: a.id, accountName: a.name, targetVersion: { ...states[i % states.length], latestVersion: latest } })),
+    } }
+  }
   if (pathname === '/api/hq/templates/kind-counts' && method === 'GET') {
     const counts = { message: 0, carousel: 0, rich_message: 0, question: 0, coupon: 0, research: 0 }
     for (const row of HQ_TEMPLATES_HTN) if (row.template_type === 'template') counts[row.kind ?? 'message'] += 1
@@ -6936,6 +6947,34 @@ const server = createServer((req, res) => {
           return
         }
         res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
+      })
+      return
+    }
+    /* 統括リッチメニューの配る前の確認（API 組1 の契約：POST /api/hq/templates/rich-menu-preview）。保存・配布はしない。 */
+    if (method === 'POST' && url.pathname === '/api/hq/templates/rich-menu-preview') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const ids = Array.isArray(body.accountIds) ? body.accountIds : []
+        const accounts = ids.map((id) => ({ id, name: HQ_TEMPLATE_ACCOUNTS_HTN.find((a) => a.id === id)?.name ?? id }))
+        const refs = []
+        const seen = new Set()
+        for (const page of body.definition?.richMenu?.pages ?? []) for (const area of page.areas ?? []) {
+          for (const tagId of area.tagIds ?? []) if (!seen.has(`tag:${tagId}`)) { seen.add(`tag:${tagId}`); refs.push({ kind: 'tag', sourceId: tagId, name: tagId === 'visual-hq-tag-booking' ? '予約ボタン' : tagId }) }
+          if (area.formId && !seen.has(`form:${area.formId}`)) { seen.add(`form:${area.formId}`); refs.push({ kind: 'form', sourceId: area.formId, name: area.formId }) }
+          if (area.templateId && !seen.has(`template:${area.templateId}`)) { seen.add(`template:${area.templateId}`); refs.push({ kind: 'template', sourceId: area.templateId, name: area.templateId }) }
+        }
+        const sameName = accounts.slice(0, 1)
+        const data = {
+          name: body.name ?? '',
+          summary: { accountCount: accounts.length, sameNameAccountCount: sameName.length, overwriteCount: 0, createCount: accounts.length - sameName.length, missingReferences: refs.length ? 1 : 0, missingTags: 0 },
+          stores: accounts.map((a, i) => ({ accountId: a.id, accountName: a.name, sameNameMenus: i === 0 ? [{ id: 'visual-menu-same', name: body.name ?? '', status: 'published', can_overwrite: 0 }] : [], canOverwrite: false, missingReferences: [] })),
+          references: refs.map((ref, i) => ({ ...ref, availableAccountCount: Math.max(0, accounts.length - (i === 0 && ref.kind === 'tag' ? 1 : 0)), totalAccountCount: accounts.length, accounts: accounts.map((a) => ({ accountId: a.id, accountName: a.name, status: 'available', targetId: `${ref.sourceId}@${a.id}` })) })),
+          images: [], requiresPreflight: true,
+        }
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
       })
       return
     }

@@ -455,6 +455,8 @@ export async function listWebhookInteractions(
     search?: string;
     page?: number;
     limit?: number;
+    /** Internal export only. The HTTP list route never passes this option. */
+    exportAll?: boolean;
   },
 ): Promise<{
   items: WebhookInteractionListRow[];
@@ -467,8 +469,8 @@ export async function listWebhookInteractions(
     Number.isFinite(value) ? Math.floor(value as number) : fallback;
   const periodDays = Math.min(365, Math.max(1, integerOr(input.periodDays, 30)));
   const cutoff = toJstString(new Date(Date.now() - periodDays * 86_400_000));
-  const page = Math.max(1, integerOr(input.page, 1));
-  const limit = Math.min(50, Math.max(10, integerOr(input.limit, 20)));
+  const page = input.exportAll ? 1 : Math.max(1, integerOr(input.page, 1));
+  const limit = input.exportAll ? 5001 : Math.min(50, Math.max(10, integerOr(input.limit, 20)));
   // d23b R409: 結果を書く途中で止まった「処理中」を先に回収する。
   // 一覧を開いた時点で回収すれば、滞留分はここで失敗として見える。
   try {
@@ -509,7 +511,7 @@ export async function listWebhookInteractions(
               d.next_retry_at AS delivery_next_retry_at
          FROM ${joinedTables}
         WHERE ${where}
-        ORDER BY l.created_at DESC LIMIT ? OFFSET ?`,
+        ORDER BY l.created_at DESC,l.id DESC LIMIT ? OFFSET ?`,
     ).bind(...binds, limit, (page - 1) * limit).all<WebhookInteractionListRow>(),
     db.prepare(`SELECT COUNT(*) AS count FROM webhook_interaction_logs l WHERE ${where}`)
       .bind(...binds).first<{ count: number }>(),

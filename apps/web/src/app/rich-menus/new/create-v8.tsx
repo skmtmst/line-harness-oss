@@ -110,14 +110,14 @@ import {
 } from '@/app/rich-menus/edit/publish-plan-draft'
 import styles from './create-v8.module.css'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
-import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { HQ_RICH_MENU_INTENTS, hqRichMenuDefinitionFromSeed, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { previewHqRichMenu, type HqRichMenuPreview, type HqRichMenuDraft } from '@/lib/api-hq-authoring'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
 import RichMenuSchedules from '@/v8/rich-menu-edit/schedules'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import HqMenuReferences from './hq-references'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /** ①で選べる切替タブの数の上限（ページの数。LINE 側の上限より多くしない）。 */
@@ -207,6 +207,9 @@ function areaDraftsWithSwitchTargets(areas: Area[]) {
   })
 }
 
+/** 配る前の確認の参照の種類の呼び名（口は kind を英字で返す）。 */
+const HQ_REFERENCE_LABEL: Record<string, string> = { booking: '予約ページ', form: '回答フォーム', template: 'テンプレート', tag: 'タグ', scenario: 'シナリオ', stamp_card: 'スタンプカード', liff: 'LIFF' }
+
 /* ---------- 統括のひな形（host）の画面の中の下書き ---------- */
 
 /** 統括のひな形の中身を、作る画面の下書き（Group）にする。サーバーには作らない。 */
@@ -224,7 +227,7 @@ function groupFromSeed(seed: HqRichMenuSeed): Group {
     targetingPriority: seed.displayOrder,
     targetingEnabled: seed.displayAudience === 'store',
     folderId: seed.folderId,
-    defaultOpen: true,
+    defaultOpen: seed.defaultOpen ?? true,
     version: 0,
     pages: seed.pages.map((page, index) => ({
       id: page.id, orderIndex: index, name: page.name, aliasId: '', lineRichmenuId: null,
@@ -302,7 +305,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [pendingTabCount, setPendingTabCount] = useState<number | null>(null)
 
   /* 手順③ */
-  const [audience, setAudience] = useState<'all' | 'targeted' | 'none'>('all')
+  const [audience, setAudience] = useState<'all' | 'targeted' | 'none' | 'tag'>('all')
+  /* 統括のひな形だけ：「タグが付いた人」のタグ名（配った先の同じ名前の有効なタグで出す）。 */
+  const [hqTagName, setHqTagName] = useState(host?.initial?.displayTagName ?? '')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
   const [targetingPriority, setTargetingPriority] = useState(0)
   const [priorityOpen, setPriorityOpen] = useState(false)
@@ -414,6 +419,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             : null,
         folderId: folderId || null,
         defaultOpen,
+        hqTag: audience === 'tag' ? hqTagName.trim() : null,
         pages: pages.map((p, i) => ({
           id: p.id,
           name: p.name,
@@ -421,8 +427,30 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           areas: p.areas.map(projectAreaForDraft),
         })),
       }),
-    [name, chatBarText, audience, targetingPriority, targetingCondition, folderId, defaultOpen, pages],
+    [name, chatBarText, audience, targetingPriority, targetingCondition, folderId, defaultOpen, hqTagName, pages],
   )
+
+  /*
+   * 統括だけ：配る前の確認の口（組1・POST /api/hq/templates/rich-menu-preview）。保存・配布はしない。
+   * ②の右「各アカウントで使うもの」と③の右「同じ名前のメニューがある」の数を、選んだアカウントについて読む。
+   * 中身が保存できる形でないとき（画像が無いなど）は、定義なしで名前の重なりだけ読む。
+   */
+  const [hqPreview, setHqPreview] = useState<HqRichMenuPreview | null>(null)
+  const hqPreviewIds = host?.selectedIds ?? []
+  const hqPreviewKey = host && (step === 'buttons' || step === 'audience' || step === 'publish') ? `${hqPreviewIds.join(',')}|${name.trim()}|${draftSignature()}` : ''
+  useEffect(() => {
+    if (!hqPreviewKey || hqPreviewIds.length === 0 || !name.trim()) { setHqPreview(null); return }
+    let live = true
+    const timer = setTimeout(() => {
+      let definition: HqRichMenuDraft | undefined
+      try { definition = hqRichMenuDefinitionFromSeed(seedNow()) as unknown as HqRichMenuDraft } catch { definition = undefined }
+      void previewHqRichMenu({ name: name.trim(), accountIds: hqPreviewIds, ...(definition ? { definition } : {}) })
+        .then((result) => { if (live) setHqPreview(result) })
+        .catch(() => { if (live) setHqPreview(null) })
+    }, 400)
+    return () => { live = false; clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hqPreviewKey])
 
   const signatureNow = useCallback(
     () => (group ? draftSignature() : createInputSignature()),
@@ -658,14 +686,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setChatBarText(g.chatBarText)
     setFolderId(g.folderId ?? '')
     setDefaultOpen(g.defaultOpen)
-    setAudience(g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? 'targeted' : 'none')
+    setAudience(g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? (host.initial?.displayAudience === 'tag' ? 'tag' : 'targeted') : 'none')
     setTargetingCondition(parseStoredCondition(g.targetingCondition))
     setTargetingPriority(g.targetingPriority)
     /*
      * 基準署名は draftSignature と同じ投影で組み立てる（audience の写像・
      * 条件の prune が違うと、保存直後なのに未保存と出る）。
      */
-    const hydratedAudience = g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? 'targeted' : 'none'
+    const hydratedAudience = g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? (host.initial?.displayAudience === 'tag' ? 'tag' : 'targeted') : 'none'
     const hydratedCondition = parseStoredCondition(g.targetingCondition)
     setBaselineSignature(
       JSON.stringify({
@@ -680,6 +708,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             : null,
         folderId: g.folderId,
         defaultOpen: g.defaultOpen,
+        hqTag: hydratedAudience === 'tag' ? (host?.initial?.displayTagName ?? '').trim() : null,
         pages: g.pages.map((p, i) => ({
           id: p.id,
           name: p.name,
@@ -747,7 +776,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       imageR2Key: imageKeys[index] ?? null,
       areas: createAreaDrafts(template).map((area, areaIndex) => ({ ...area, id: `p${index + 1}-a${areaIndex + 1}` })),
     }))
-    return { id: host.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null, size, displayAudience: audience === 'all' ? 'all' : 'store', displayOrder: targetingPriority, defaultPageId: shapePages[0].id, pages: shapePages }
+    return { id: host.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null, size, displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store', displayTagName: audience === 'tag' ? hqTagName.trim() : '', defaultOpen, displayOrder: targetingPriority, defaultPageId: shapePages[0].id, pages: shapePages }
   }
 
   /** 手順①の内容で下書きを作る。作れたら true。 */
@@ -1611,7 +1640,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       chatBarText: chatBarText.trim(),
       folderId: folderId || null,
       size: group?.size ?? size,
-      displayAudience: audience === 'all' ? 'all' : 'store',
+      displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store',
+      displayTagName: audience === 'tag' ? hqTagName.trim() : '',
+      defaultOpen,
       displayOrder: targetingPriority,
       defaultPageId: group?.defaultPageId ?? pages[0]?.id ?? '',
       pages: pages.map((page) => ({ id: page.id, name: page.name, imageR2Key: page.imageR2Key, areas: page.areas })),
@@ -2200,7 +2231,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * ======== 統括の手順③：配る先（絵 UgZPJ）========
    * 配るアカウント（統括が渡す1行の欄）→ 各アカウントで誰に出すか。
    * 統括のひな形が持てるのは「全員（配った先の既定）」か「決めない（各アカウントで決める）」の2つ。
-   * 絵の「タグが付いた人」と「トークを開いたとき」は、ひな形の口に値が無いので出さない（機能待ち）。
+   * 「タグが付いた人」（displayTagName）と「トークを開いたとき」（defaultOpen）は組1の口（保存・配布）で持つ。
    */
   function renderHqAudience() {
     if (!host) return null
@@ -2213,7 +2244,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             help="配った先のアカウントで、このメニューを誰に出すかの初めの形です。配ったあとに各アカウントで変えられます。"
             helpLabel="各アカウントで誰に出すかの説明"
           />
-          <SaveErrorField names={["audience","displayAudience"]}><RadioCardGroup legend="各アカウントで誰に出すか" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["audience","displayAudience"]}><RadioCardGroup legend="各アカウントで誰に出すか" className="grid grid-cols-3 gap-3">
             <RadioCard
               name="audience"
               value="all"
@@ -2225,21 +2256,52 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             />
             <RadioCard
               name="audience"
+              value="tag"
+              checked={audience === 'tag'}
+              onChange={() => setAudience('tag')}
+              title="タグが付いた人"
+              icon={<Tag aria-hidden="true" />}
+              note="同じ名前のタグの人に出す"
+            />
+            <RadioCard
+              name="audience"
               value="targeted"
-              checked={audience !== 'all'}
+              checked={audience !== 'all' && audience !== 'tag'}
               onChange={() => setAudience('targeted')}
               title="決めない"
               icon={<CircleDashed aria-hidden="true" />}
               note="誰に出すかは各アカウントで"
             />
           </RadioCardGroup></SaveErrorField>
+          {audience === 'tag' ? (
+            <Field label="タグの名前" htmlFor="rm-hq-tag" help="配った先のアカウントにある、同じ名前のタグが付いた人に出します。無いアカウントには配れません。">
+              <SaveErrorField names={["displayTagName","tag"]}><TextInput id="rm-hq-tag" value={hqTagName} onChange={(e) => setHqTagName(e.target.value)} placeholder="例：会員" maxLength={100} /></SaveErrorField>
+            </Field>
+          ) : null}
           <div className={styles.infoBand}>
             <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
             <span>
               {audience === 'all'
                 ? '「全員」にすると、配った先で既定のメニューとして届きます。LINE に出て、いまの既定のメニューと入れ替わるのは、各アカウントで公開したときです。'
-                : '配った先では下書きのまま届きます。誰に出すかは、各アカウントで決めます。'}
+                : audience === 'tag'
+                  ? '配った先では、同じ名前のタグが付いた人に出します。タグが無い・同じ名前が複数あるアカウントは、配る前の確認で止まります。'
+                  : '配った先では下書きのまま届きます。誰に出すかは、各アカウントで決めます。'}
             </span>
+          </div>
+        </Card>
+        <Card variant="form" gap="normal">
+          <SectionHeader title="トークを開いたとき" />
+          <div className={styles.segRow}>
+            <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
+            <SaveErrorField names={["defaultOpen"]}><SegmentedControl
+              aria-label="トークを開いたときのメニュー"
+              options={[
+                { value: 'open', label: '開いておく' },
+                { value: 'closed', label: '閉じておく' },
+              ]}
+              value={defaultOpen ? 'open' : 'closed'}
+              onChange={(v) => setDefaultOpen(v === 'open')}
+            /></SaveErrorField>
           </div>
         </Card>
       </>
@@ -2826,7 +2888,26 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           />
         ) : null}
 
-        {step === 'buttons' ? host ? <HqMenuReferences areas={pages.flatMap(page => page.areas)} references={host.references} /> : (
+        {step === 'buttons' && host ? (
+          <CreateSummaryCard
+            title="各アカウントで使うもの"
+            rows={host.selectedCount === 0
+              ? [{ key: 'accounts', label: '配るアカウント', value: 'まだ選んでいません' }]
+              : (hqPreview && hqPreview.references.length === 0 ? [{ key: 'none', label: '配った先で探すもの', value: emptyValue('none') }] : hqPreview?.references ?? []).map((ref) => 'sourceId' in ref ? ({
+                key: `${ref.kind}:${ref.sourceId}`,
+                label: `${HQ_REFERENCE_LABEL[ref.kind] ?? '参照'}「${ref.name ?? '名前なし'}」`,
+                value: <span className={ref.availableAccountCount < ref.totalAccountCount ? styles.summaryValueWarn : undefined}>{`${ref.availableAccountCount} / ${ref.totalAccountCount}`}</span>,
+              }) : ref)}
+          >
+            <p className={styles.cardNote}>
+              {host.selectedCount === 0
+                ? '予約ページ・回答フォーム・タグ・差し込みは、配った先の各アカウントの同じ名前のものを使います。配る先は③で選びます。'
+                : `今選んでいる ${formatNumber(host.selectedCount)} アカウントのうち、同じ名前があるアカウントの数。無いアカウントは④で知らせます。`}
+            </p>
+          </CreateSummaryCard>
+        ) : null}
+
+        {step === 'buttons' && !host ? (
           <CreateSummaryCard
             title="押された回数（今月）"
             rows={
@@ -2862,6 +2943,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     ? emptyValue('none')
                     : host.friendTotal == null ? emptyValue('unknown') : `${formatNumber(host.friendTotal)} 人`,
               },
+              ...(step === 'audience' && host.selectedCount > 0 && hqPreview ? [{
+                key: 'same-name',
+                label: '同じ名前のメニューがある',
+                value: <span className={hqPreview.summary.sameNameAccountCount > 0 ? styles.summaryValueWarn : undefined}>{formatNumber(hqPreview.summary.sameNameAccountCount)}</span>,
+              }] : []),
             ]}
           />
         ) : null}

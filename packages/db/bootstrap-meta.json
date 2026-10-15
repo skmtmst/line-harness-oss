@@ -579,6 +579,8 @@
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
     "636_restaurant_delivery_uber_connections.sql",
+    "639_hq_form_test_tokens.sql",
+    "640_hq_broadcast_saved_views.sql",
     "641_booking_assignment_settings.sql",
     "642_booking_entitlements.sql",
     "643_booking_entitlement_uses.sql",
@@ -590,10 +592,11 @@
     "650_booking_analytics_audiences.sql",
     "651_lesson_mode_capacity_guards.sql",
     "652_style_outcomes_and_member_tags.sql",
+    "661_hq_catalog_templates.sql",
     "663_booking_payment_connections.sql",
     "664_booking_payment_events.sql",
     "665_booking_course_event_payment_settings.sql",
     "681_style_setup_selection_and_auto_insert.sql"
   ],
-  "migrationCount": 594
+  "migrationCount": 597
 }
