@@ -103,8 +103,6 @@ describe('Issue #637 画面名とナビ名の一致', () => {
     expect(src).toContain("usePageTitle('コンバージョン')")
     expect(src).toContain('router.replace(target)')
     expect(src).toContain('`/affiliates?${params.toString()}`')
-    const affiliates = read('v8/affiliates/affiliates.tsx')
-    expect(affiliates).toContain('usePageTitle(PAGE_TITLE)')
-    expect(affiliates).toContain("PAGE_TITLE = '成果とアフィリエイト'")
+    // 成果とアフィリエイトの画面名は entry-behavior.test.tsx で実入口を描画して確かめる。
   })
 })

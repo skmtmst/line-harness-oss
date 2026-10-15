@@ -32,7 +32,7 @@ describe('成果地点の削除確認', () => {
     expect(code(PAGE), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
     expect(code(DIALOGS), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
     expect(stopPane()).toContain('<Dialog open contentLayout="form"')
-    expect(stopPane()).toContain('title={`「${stopTarget.name}」を止めますか？`}')
+    // 窓の題と停止操作は conversion-points-v8.react.test.tsx で描画して確かめる。
   })
 
   it('停止の本体が二度押しを止め、3操作の返事を確かめ、finally で戻す', () => {
