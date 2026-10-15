@@ -3,7 +3,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import dynamic from 'next/dynamic'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
@@ -23,6 +23,9 @@ import { formatWaitRough } from '@/lib/format-duration'
 import { formatNumber, formatTime } from '@/lib/format'
 import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
 import { FirstStepsCard, useFirstSteps } from './first-steps'
+import { useSearchParams } from 'next/navigation'
+import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
+import { SetupCard, SetupWarningBands, setupSummary } from '@/v8/onboarding/setup-card'
 import { FriendTrend, trendRangeNote } from './trend'
 import { InboxSection } from './inbox'
 import { FriendAddLink } from './friend-add'
@@ -33,6 +36,9 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+/* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
+const StyleSetupWizard = dynamic(() => import('@/v8/onboarding/wizard').then((module) => module.default))
+
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
@@ -83,6 +89,31 @@ export default function DashboardV8() {
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
+  /* B-311〜B-313：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
+  const setup = useStyleSetup(d.selectedAccountId, role)
+  const setupRest = setupSummary(setup.data)
+  const params = useSearchParams()
+  const setupParam = params.get('setup')
+  const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
+  useEffect(() => {
+    if (setupParam === 'summary') setWizardStep('summary')
+    else if (setupParam !== null && /^\d+$/.test(setupParam)) setWizardStep(Number(setupParam))
+  }, [setupParam])
+  /* まだスタイルを選んでいない（あとでも選んでいない）アカウントは、最初に入ったとき 1 問目を開く。 */
+  useEffect(() => {
+    const state = setup.data?.state
+    if (state && canManage && !state.styleSelected && !state.answers?.style) setWizardStep((current) => current ?? 0)
+  }, [setup.data, canManage])
+  const openSetupStep = (step: string | number) => {
+    if (typeof step === 'number') { setWizardStep(step); return }
+    const names = setup.data ? ['style', 'look'] : []
+    setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
+  }
+  const closeWizard = (changed: boolean) => {
+    setWizardStep(null)
+    if (setupParam !== null) router.replace('/')
+    if (changed) setup.reload()
+  }
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
   const data = d.data
   const reference = d.reference
@@ -318,12 +349,14 @@ export default function DashboardV8() {
     ...d.visibleRight.map((item) => item.id),
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
-  const notice = start.summary || viewer || d.error || looseFailures.length ? (
+  const setupBands = setup.data && canManage ? <SetupWarningBands data={setup.data} /> : null
+  const notice = start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
-      {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {setupBands}
+      {setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
@@ -378,6 +411,8 @@ export default function DashboardV8() {
         {rows}
         <RecentActivity items={d.notifications} failed={d.notificationFailed} />
       </div>
+      {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
+      {wizardStep !== null && setup.data && d.selectedAccountId && canManage ? <StyleSetupWizard accountId={d.selectedAccountId} state={setup.data.state} initialStep={wizardStep} onClose={closeWizard} /> : null}
     </DashboardPage>
   )
 }

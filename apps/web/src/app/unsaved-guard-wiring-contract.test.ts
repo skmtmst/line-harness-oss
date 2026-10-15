@@ -173,6 +173,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/onboarding/wizard.tsx': 'はじめの質問の窓（B-313）。答えは途中で閉じても保存してから閉じる（失わない）。どの答えも「あとから変えられます」で、離れる確認で止める物が無い',
   'components/friend-fields/edit-tag-page-v4.tsx':
     '保管済みタグの名前と説明の訂正。元の取消は確認なしで入力を破棄するため、共通作成型も dirty=false で同じ動きを保つ。番兵の要否は削除台帳の司令塔に確認へ記録する',
   'v8/restaurant/google/google.tsx':
