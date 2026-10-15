@@ -1,4 +1,4 @@
-import { testHqForm } from '../services/hq-templates/form-test.js';
+import { testHqForm, issueHqFormTestToken, revokeHqFormTestToken } from '../services/hq-templates/form-test.js';
 import { previewRichMenu } from '../services/hq-templates/rich-menu-preview.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
@@ -189,6 +189,11 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
 hqTemplates.post('/api/hq/templates/:id/test-send',inputJsonBoundary(),async c=>c.json({success:true,data:await testHqForm(dbFor(c.env),await authority(c),c.req.param('id'),await body(c))}));
+hqTemplates.post('/api/hq/templates/:id/test-token',inputJsonBoundary(),async c=>{
+  c.header('Cache-Control','no-store');
+  return c.json({success:true,data:await issueHqFormTestToken(dbFor(c.env),await authority(c),c.req.param('id'),await body(c),c.env.WORKER_URL||new URL(c.req.url).origin)},201);
+});
+hqTemplates.delete('/api/hq/templates/:id/test-tokens/:tokenId',async c=>c.json({success:true,data:await revokeHqFormTestToken(dbFor(c.env),await authority(c),c.req.param('id'),c.req.param('tokenId'))}));
 hqTemplates.post('/api/hq/templates/:id/preflight', inputJsonBoundary(), async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
