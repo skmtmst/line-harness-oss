@@ -2865,8 +2865,8 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-picker-header-pad: 18px 20px;
   --tpl-picker-footer-pad: 12px 20px;
   --tpl-picker-list-pad: 14px;
-  --tpl-picker-row-h: var(--polish-table-row);
-  --tpl-picker-row-gap: 5px;
+  --tpl-picker-row-h: 36px;
+  --tpl-picker-row-gap: 8px;
   --tpl-picker-row-pad: 0 10px;
   --tpl-picker-gap: 8px;
   --tpl-picker-tiny-gap: 4px;
@@ -3103,8 +3103,8 @@ html:root input[type='checkbox'] { border: var(--choice-ring) solid var(--color-
 html:root input[type='checkbox']:checked { border-color: var(--color-selection-border); background: var(--color-selection-border) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m3 8 3 3 7-7'/%3E%3C/svg%3E") center/contain no-repeat; }
 html:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
-/* B-211：素の切り替えも同じ選択の色。ページ内タブはB-180の黒い下線を保つ。 */
-html:root button:not([role='tab']):is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
+/* B-211：素の切り替えも同じ選択の色。ページ内タブはB-180の黒い下線を保つ。フォルダの列の行は列の選んだ形（灰の地）を保つ。 */
+html:root button:not([role='tab']):not([data-folder-select]):is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
 
 :root { --tpl-list-state-w: 104px; }
 

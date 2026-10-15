@@ -21,12 +21,17 @@
 .embedded { flex: none; height: var(--tpl-picker-embed-h); }
 .multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
 .multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
-.multiRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); }
-.multiRow[data-selected] { background: var(--color-accent-soft); }
+/* S2Vgi（正の形）：行は薄い枠の箱、選んだ行は緑の地と緑の枠。 */
+.multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: inset 0 0 0 1px var(--color-hairline); }
+.multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
+/* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
+.multiBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
+.multiBody .multiList > * { flex: none; }
+.multiBody .multiList > .multiRows { flex: 1 1 auto; }
 .multiRow[data-disabled] { color: var(--color-ink-faint); }
-.multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
+.multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
 .multiNameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.multiExtra { flex-shrink: 0; display: inline-flex; align-items: center; }
+.multiExtra { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; }
 .multiMeta { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
 .multiCount { display: inline-flex; align-items: center; }
 .textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
@@ -133,7 +138,7 @@
   box-shadow: var(--tpl-inbox-line-top);
 }
 .tpFootLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
-.tpFootText { display: flex; min-width: 0; flex-direction: column; }
+.tpFootText { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; font-size: var(--text-caption); }
 .tpFootTitle { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; }
 .tpFootSub { color: var(--color-ink-faint); font-size: var(--text-nano); white-space: nowrap; }
 .tpFootActions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); }

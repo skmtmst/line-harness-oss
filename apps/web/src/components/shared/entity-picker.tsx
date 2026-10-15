@@ -267,7 +267,7 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
   }
   const folderRows = pickerFolderRows(items, folders, Boolean(state), groupCheck)
   const rows = items.filter((item) => inFolder(item, folder) && matches(item, query) && (!onlySelected || set.has(item.id)))
-  return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : shell.body}>
+  return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : `${shell.body} ${styles.multiBody}`}>
     {hasFolders && !narrow ? <div className={shell.folders}>
       <FolderPanel readOnly reserveCreateSpace={false} heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
     </div> : null}
