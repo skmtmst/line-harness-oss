@@ -140,11 +140,11 @@ export default function OpsAuditV8() {
           <span className={styles.spacer} />
           <span className={styles.dateLabel}>開始日</span>
           <div className={styles.date}>
-            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" /></SaveErrorField>
+            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" placeholder="指定なし" displayFormat="short" /></SaveErrorField>
           </div>
           <span className={styles.dateLabel}>終了日</span>
           <div className={styles.date}>
-            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" /></SaveErrorField>
+            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" placeholder="指定なし" displayFormat="short" /></SaveErrorField>
           </div>
         </div>
 
@@ -174,7 +174,7 @@ export default function OpsAuditV8() {
               <div key={row.id} className={parts.miniRow} role="row">
                 <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
                 <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
-                <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
+                <span className={`${parts.fixed} ${styles.colWhat}`} role="cell"><TruncatedText value={actionWord(row.action)} /></span>
                 <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? emptyValue('unknown')}</span>
                 <span className={parts.grow} role="cell" title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}>{row.reason ?? emptyValue('unknown')}</span>
               </div>
