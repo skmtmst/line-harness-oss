@@ -341,11 +341,10 @@ requesting production access.
    トークン・期限・権限・Uber の店舗ID・状態・版。更新用トークンの欄は作らない）→ **済み**。
    (b) 1回使い切り・10分で切れる `state` の置き場 → **済み**。
    (c) 認可の入口と戻り先の受け口 → **済み**。
-   (d) 受信の署名を Uber の方式へ差し替え（`verifyWebhookSignature` を
-   `routes/restaurant-delivery.ts` の受信口に `ubereats` だけ適用する。他社の
-   `x-nen-*` 方式は変えない）→ **残り。1操作ずつの原則に従い、実接続のあとで行う**。
+   (d) 受信の署名を Uber の方式へ差し替え → **済み（2026-10-16）**。詳しくは §8-4(d)。
    さらに先は、つなぐ店舗を選ぶ画面（`GET /v1/eats/stores` の一覧→選択→`POST /pos_data`）と、
-   30日で切れるトークンの取り直し。
+   30日で切れるトークンの取り直し。店舗を選ぶ画面は新規UIなので、先に新しい Pencil
+   ファイルを作って利用者の承認を得る。
 5. ~~利用者が Cloudflare の画面で秘密設定**2件**を自分で登録する~~ → **済み**。
    `nen-line-stg` の Settings → Variables and Secrets に **Encrypted** で2件登録済み
    （値はエージェントを通していません。暗号化で入れているので再配備で消えません）。
@@ -477,3 +476,41 @@ requesting production access.
 
 **Sandbox の `client_credentials` による最小の実接続は成功しました。**
 利用者のログインを伴う認可画面と、実際の注文API操作は別工程であり、今回は実行していません。
+
+### 8-4(d). 受信の署名を Uber の方式へ差し替えた（2026-10-16）
+
+Uber から届く注文の通知を「本物か」確かめる方法が、これまで自社の方式のままだった。
+公式仕様と違うので、実物の通知は**すべて 401 で落ちる**。これを Uber の方式へ合わせた。
+画面は作っていない（受け口の中だけの変更）ので、新しい Pencil の承認は要らない。
+
+**Uber の方式**（公式仕様）。
+
+- 見出しは `x-uber-signature`。
+- 署名は**本文だけ**の HMAC-SHA256（小文字16進）。自社方式のように時刻を混ぜない。
+- 鍵は同じアプリの **Client Secret**。静的なトークン用の合言葉
+  `RT_DELIVERY_UBEREATS_WEBHOOK_SECRET` は Uber では**使わない**（設定しても無視される）。
+- Uber は時刻の見出しを送らないので、**時刻のずれ（±5分）は見ない**。
+  見てしまうと本物の通知を落とすため、この確認は Uber だけ外した。
+
+**変えていないところ。**
+
+- 出前館・ロケットナウは自社の方式（`x-nen-timestamp` と `x-nen-signature`、
+  `${通算秒}.${本文}` の署名、±5分のずれ確認）をそのまま使う。
+- 送信元IPの許可確認は、鍵を読む前・署名を確かめる前のままにした。
+- 接続確認の口 `POST /internal/ubereats/sandbox-token-probe`（§6-1）は
+  Uber からの通知ではなく自社からの呼び出しなので、`x-nen-*` の方式を変えていない。
+
+**実装**。サービスごとの違いを1か所に閉じるため、受け口の外へ切り出した。
+
+- 新規: `apps/worker/src/services/delivery-webhook-auth.ts`
+  （`deliveryWebhookSigningSecret` で鍵を選び、`verifyDeliveryWebhook` で確かめる）
+- 受け口: `apps/worker/src/routes/restaurant-delivery.ts` はこの2つを呼ぶだけになった
+- 署名の計算そのものは既存の `apps/worker/src/services/uber-eats.ts`
+  （`UBER_SIGNATURE_HEADER` / `verifyWebhookSignature`）を使う
+
+**確かめた範囲**（ローカル試験）。Uber の本文だけの署名を受け取ること、時刻の見出しが
+古くても落とさないこと、鍵違い・本文改変・自社方式の見出しだけでは受け取らないこと、
+出前館・ロケットナウの受け取り方が変わっていないこと。
+
+**まだ済んでいないこと**。Uber から**実物の通知を受け取る**確認は、Uber 側の
+Sandbox テスト店舗（上の 3）が用意されてからになる。それまでは試験までの確認に留まる。
