@@ -1,7 +1,7 @@
 method	path	source	login	store_hq_scope_evidence	staff_permission	read_only	called_authorization_helpers
-GET	/admin/manifest	apps/worker/src/routes/admin-version.ts:41	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-ALL	/admin/update/*	apps/worker/src/routes/admin-update.ts:11	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/admin/version	apps/worker/src/routes/admin-version.ts:30	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/admin/manifest	apps/worker/src/routes/admin-version.ts:41	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+ALL	/admin/update/*	apps/worker/src/routes/admin-update.ts:11	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/admin/version	apps/worker/src/routes/admin-version.ts:30	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/access/roles	apps/worker/src/routes/access.ts:134	admin_session_or_api_key	getVisibleLineAccountScope,visibleScope	access.user.view	read_allowed;format=csv:403	getVisibleLineAccountScope,listAccessUsers,requirePermission,requireRole,visibleScope
 GET	/api/access/users	apps/worker/src/routes/access.ts:83	admin_session_or_api_key	getVisibleLineAccountScope,visibleScope	access.user.view	read_allowed;format=csv:403	getVisibleLineAccountScope,listAccessUsers,requirePermission,requireRole,visibleScope
 POST	/api/account-handovers	apps/worker/src/routes/account-handovers.ts:103	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole
@@ -16,12 +16,12 @@ GET	/api/account-settings/allergy-options	apps/worker/src/routes/account-setting
 PUT	/api/account-settings/allergy-options	apps/worker/src/routes/account-settings.ts:44	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole
 GET	/api/account-settings/customer-look	apps/worker/src/routes/account-settings.ts:30	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	canAccessAllLineAccounts,requireRole
 PUT	/api/account-settings/customer-look	apps/worker/src/routes/account-settings.ts:21	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole
-GET	/api/account-settings/link-base-url	apps/worker/src/routes/account-settings.ts:203	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/account-settings/link-base-url	apps/worker/src/routes/account-settings.ts:203	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 PUT	/api/account-settings/link-base-url	apps/worker/src/routes/account-settings.ts:215	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
-GET	/api/account-settings/test-recipient-login-users	apps/worker/src/routes/account-settings.ts:89	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
-GET	/api/account-settings/test-recipients	apps/worker/src/routes/account-settings.ts:56	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/account-settings/test-recipient-login-users	apps/worker/src/routes/account-settings.ts:89	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
+GET	/api/account-settings/test-recipients	apps/worker/src/routes/account-settings.ts:56	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 PUT	/api/account-settings/test-recipients	apps/worker/src/routes/account-settings.ts:155	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole
-GET	/api/account-settings/tracked-link-base-url	apps/worker/src/routes/account-settings.ts:234	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/account-settings/tracked-link-base-url	apps/worker/src/routes/account-settings.ts:234	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 PUT	/api/account-settings/tracked-link-base-url	apps/worker/src/routes/account-settings.ts:239	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 GET	/api/accounts/:id/health	apps/worker/src/routes/health.ts:63	admin_session_or_api_key	getVisibleLineAccountScope	/health	read_allowed;format=csv:403	getVisibleLineAccountScope
 POST	/api/accounts/:id/migrate	apps/worker/src/routes/health.ts:124	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,isLineAccountTenantActive,requireRole
@@ -90,7 +90,7 @@ GET	/api/affiliates/:id/archive-impact	apps/worker/src/routes/affiliates.ts:216	
 GET	/api/affiliates/:id/journeys	apps/worker/src/routes/affiliates.ts:656	admin_session_or_api_key	getAffiliateScope,getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getAffiliateScope,getVisibleLineAccountScope
 GET	/api/affiliates/:id/links	apps/worker/src/routes/affiliates.ts:677	admin_session_or_api_key	getAffiliateScope,getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getAffiliateScope,getVisibleLineAccountScope
 GET	/api/affiliates/:id/report	apps/worker/src/routes/affiliates.ts:630	admin_session_or_api_key	getAffiliateScope,getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getAffiliateScope,getVisibleLineAccountScope
-POST	/api/affiliates/click	apps/worker/src/routes/affiliates.ts:723	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+POST	/api/affiliates/click	apps/worker/src/routes/affiliates.ts:723	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/analytics/audiences/:id	apps/worker/src/routes/analytics.ts:1317	admin_session_or_api_key	getVisibleLineAccountScope	/analytics	read_allowed;format=csv:403	getVisibleLineAccountScope
 GET	/api/analytics/broadcasts	apps/worker/src/routes/analytics.ts:491	admin_session_or_api_key	getVisibleLineAccountScope	/analytics	read_allowed;format=csv:403	getVisibleLineAccountScope
 POST	/api/analytics/cross/query	apps/worker/src/routes/analytics.ts:506	admin_session_or_api_key	getVisibleLineAccountScope	/analytics	authMiddleware:403	getVisibleLineAccountScope
@@ -128,31 +128,31 @@ GET	/api/analytics/url-clicks	apps/worker/src/routes/analytics.ts:407	admin_sess
 GET	/api/analytics/usage	apps/worker/src/routes/analytics.ts:431	admin_session_or_api_key	getVisibleLineAccountScope	/analytics	read_allowed;format=csv:403	getVisibleLineAccountScope
 GET	/api/audit/events	apps/worker/src/routes/access.ts:166	admin_session_or_api_key	getVisibleLineAccountScope,visibleScope	access.audit.view	read_allowed;format=csv:403	getVisibleLineAccountScope,requirePermission,requireRole,visibleScope
 DELETE	/api/auth/api-key	apps/worker/src/routes/staff-api-key.ts:29	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	stepUpRequiredResponse
-GET	/api/auth/api-key	apps/worker/src/routes/staff-api-key.ts:22	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
+GET	/api/auth/api-key	apps/worker/src/routes/staff-api-key.ts:22	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
 POST	/api/auth/api-key	apps/worker/src/routes/staff-api-key.ts:29	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	stepUpRequiredResponse
-GET	/api/auth/line	apps/worker/src/routes/admin-auth.ts:263	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/auth/line/callback	apps/worker/src/routes/admin-auth.ts:306	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/auth/login	apps/worker/src/routes/admin-auth.ts:768	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/auth/logout	apps/worker/src/routes/admin-auth.ts:830	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/auth/ops-invite/accept	apps/worker/src/routes/ops-invite.ts:75	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/auth/ops-invite/check	apps/worker/src/routes/ops-invite.ts:59	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/auth/line	apps/worker/src/routes/admin-auth.ts:263	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/auth/line/callback	apps/worker/src/routes/admin-auth.ts:306	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/auth/login	apps/worker/src/routes/admin-auth.ts:768	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/auth/logout	apps/worker/src/routes/admin-auth.ts:830	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/auth/ops-invite/accept	apps/worker/src/routes/ops-invite.ts:75	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/auth/ops-invite/check	apps/worker/src/routes/ops-invite.ts:59	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/api/auth/password/forgot	apps/worker/src/routes/auth-email.ts:403	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyTurnstile
 POST	/api/auth/password/login	apps/worker/src/routes/auth-email.ts:322	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyPassword
-POST	/api/auth/password/reset	apps/worker/src/routes/auth-email.ts:466	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/auth/password/reset/check	apps/worker/src/routes/auth-email.ts:453	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/auth/register/check	apps/worker/src/routes/auth-email.ts:230	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+POST	/api/auth/password/reset	apps/worker/src/routes/auth-email.ts:466	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/auth/password/reset/check	apps/worker/src/routes/auth-email.ts:453	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/auth/register/check	apps/worker/src/routes/auth-email.ts:230	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/api/auth/register/complete	apps/worker/src/routes/auth-email.ts:244	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	createTrialTenant,hasTenantWithDeviceMarker
 POST	/api/auth/register/request	apps/worker/src/routes/auth-email.ts:177	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	hasTenantWithDeviceMarker,sendSignupVerifyMail,verifyTurnstile
-GET	/api/auth/session	apps/worker/src/routes/admin-auth.ts:858	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
-GET	/api/auth/sessions	apps/worker/src/routes/admin-auth.ts:930	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
-DELETE	/api/auth/sessions/:tokenHash	apps/worker/src/routes/admin-auth.ts:955	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	
-POST	/api/auth/sessions/revoke-others	apps/worker/src/routes/admin-auth.ts:982	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	
+GET	/api/auth/session	apps/worker/src/routes/admin-auth.ts:858	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
+GET	/api/auth/sessions	apps/worker/src/routes/admin-auth.ts:930	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
+DELETE	/api/auth/sessions/:tokenHash	apps/worker/src/routes/admin-auth.ts:955	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	-
+POST	/api/auth/sessions/revoke-others	apps/worker/src/routes/admin-auth.ts:982	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	-
 POST	/api/auth/step-up	apps/worker/src/routes/admin-auth.ts:657	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	verifyPassword,verifyTotp
 GET	/api/auth/two-factor/policy	apps/worker/src/routes/admin-auth.ts:87	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	auth.mfa.policy	read_allowed;format=csv:403	loginMfaRequired
 PUT	/api/auth/two-factor/policy	apps/worker/src/routes/admin-auth.ts:131	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	auth.mfa.policy	authMiddleware:403	stepUpRequiredResponse
 POST	/api/auth/two-factor/recovery	apps/worker/src/routes/admin-auth.ts:110	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	stepUpRequiredResponse
-GET	/api/auth/two-factor/self	apps/worker/src/routes/admin-auth.ts:98	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
-POST	/api/auth/two-factor/setup	apps/worker/src/routes/admin-auth.ts:512	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/auth/two-factor/self	apps/worker/src/routes/admin-auth.ts:98	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
+POST	/api/auth/two-factor/setup	apps/worker/src/routes/admin-auth.ts:512	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/api/auth/two-factor/setup/confirm	apps/worker/src/routes/admin-auth.ts:591	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyTotp
 POST	/api/auth/two-factor/verify	apps/worker/src/routes/admin-auth.ts:438	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyTotp
 GET	/api/auto-replies	apps/worker/src/routes/auto-replies.ts:1131	admin_session_or_api_key	canAccessAllLineAccounts,getVisibleLineAccountScope,hasConditionalScope	/auto-replies	read_allowed;format=csv:403	canAccessAllLineAccounts,getVisibleLineAccountScope,hasConditionalScope,requireRole
@@ -338,7 +338,7 @@ POST	/api/broadcasts/preflight	apps/worker/src/routes/broadcasts.ts:1205	admin_s
 GET	/api/broadcasts/saved-views	apps/worker/src/routes/broadcasts.ts:744	admin_session_or_api_key	canAccessAllLineAccounts	/broadcasts	read_allowed;format=csv:403	canAccessAllLineAccounts,requireRole
 POST	/api/broadcasts/saved-views	apps/worker/src/routes/broadcasts.ts:776	admin_session_or_api_key	canAccessAllLineAccounts	/broadcasts	authMiddleware:403	canAccessAllLineAccounts,requireRole
 GET	/api/broadcasts/stats	apps/worker/src/routes/broadcasts.ts:686	admin_session_or_api_key	getVisibleLineAccountScope	/broadcasts	read_allowed;format=csv:403	getVisibleLineAccountScope
-GET	/api/capabilities	apps/worker/src/routes/capabilities.ts:46	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
+GET	/api/capabilities	apps/worker/src/routes/capabilities.ts:46	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
 GET	/api/chats	apps/worker/src/routes/chats.ts:805	admin_session_or_api_key	getVisibleLineAccountScope	/chats	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole
 POST	/api/chats	apps/worker/src/routes/chats.ts:1540	admin_session_or_api_key	canAccessAllLineAccounts	/chats	authMiddleware:403	canAccessAllLineAccounts,requireRole
 GET	/api/chats/:friendId/messages	apps/worker/src/routes/chat-messages.ts:132	admin_session_or_api_key	canAccessAllLineAccounts	/chats	read_allowed;format=csv:403	canAccessAllLineAccounts
@@ -418,7 +418,7 @@ GET	/api/conversions/events/:id/attribution	apps/worker/src/routes/conversions.t
 GET	/api/conversions/events/:id/reversals	apps/worker/src/routes/conversions.ts:1460	admin_session_or_api_key	getVisibleLineAccountScope	/conversions	read_allowed;format=csv:403	getVisibleLineAccountScope,hasStaffAccess
 POST	/api/conversions/events/:id/reversals	apps/worker/src/routes/conversions.ts:1502	admin_session_or_api_key	getVisibleLineAccountScope	/conversions	authMiddleware:403	getVisibleLineAccountScope,requireRole
 GET	/api/conversions/export	apps/worker/src/routes/conversions.ts:1086	admin_session_or_api_key	canAccessAllLineAccounts,conversionDefinitionScope,getVisibleLineAccountScope	/conversions	authMiddleware:403	canAccessAllLineAccounts,conversionDefinitionScope,getVisibleLineAccountScope,hasStaffAccess
-POST	/api/conversions/ingest/:id	apps/worker/src/routes/conversions.ts:847	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+POST	/api/conversions/ingest/:id	apps/worker/src/routes/conversions.ts:847	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/conversions/points	apps/worker/src/routes/conversions.ts:1147	admin_session_or_api_key	adminAccountScope,getVisibleLineAccountScope	/conversions	read_allowed;format=csv:403	adminAccountScope,getVisibleLineAccountScope,hasStaffAccess
 POST	/api/conversions/points	apps/worker/src/routes/conversions.ts:1171	admin_session_or_api_key	canAccessAllLineAccounts	/conversions	authMiddleware:403	canAccessAllLineAccounts,requireRole
 DELETE	/api/conversions/points/:id	apps/worker/src/routes/conversions.ts:1286	admin_session_or_api_key	canAccessAllLineAccounts	/conversions	authMiddleware:403	canAccessAllLineAccounts,requireRole
@@ -450,10 +450,10 @@ PUT	/api/ec-commerce/settings/:eventType	apps/worker/src/routes/ec-commerce.ts:1
 GET	/api/ec-commerce/shipments	apps/worker/src/routes/ec-commerce.ts:1203	admin_session_or_api_key	getVisibleLineAccountScope	/ec-commerce	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole
 GET	/api/ec-commerce/subscriptions	apps/worker/src/routes/ec-commerce.ts:559	admin_session_or_api_key	canAccessAllLineAccounts	/ec-commerce	read_allowed;format=csv:403	canAccessAllLineAccounts,requireEcPermission,requireRole
 POST	/api/ec-commerce/test-send	apps/worker/src/routes/ec-commerce.ts:1059	admin_session_or_api_key	canAccessAllLineAccounts	/ec-commerce	authMiddleware:403	canAccessAllLineAccounts,requireRole
-GET	/api/entry-route-genres	apps/worker/src/routes/entry-routes.ts:113	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	read_allowed;format=csv:403	
+GET	/api/entry-route-genres	apps/worker/src/routes/entry-routes.ts:113	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	read_allowed;format=csv:403	-
 POST	/api/entry-route-genres	apps/worker/src/routes/entry-routes.ts:123	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	authMiddleware:403	requireRole
 PATCH	/api/entry-route-genres/:id	apps/worker/src/routes/entry-routes.ts:141	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	authMiddleware:403	requireRole
-GET	/api/entry-routes	apps/worker/src/routes/entry-routes.ts:162	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/inflow-links	read_allowed;format=csv:403	
+GET	/api/entry-routes	apps/worker/src/routes/entry-routes.ts:162	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/inflow-links	read_allowed;format=csv:403	-
 POST	/api/entry-routes	apps/worker/src/routes/entry-routes.ts:200	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/inflow-links	authMiddleware:403	requireEntryRouteManagement
 DELETE	/api/entry-routes/:id	apps/worker/src/routes/entry-routes.ts:328	admin_session_or_api_key	canAccessEntryRoute,canAccessEntryRouteAccount	/inflow-links	authMiddleware:403	canAccessEntryRoute,canAccessEntryRouteAccount,requireRole
 GET	/api/entry-routes/:id	apps/worker/src/routes/entry-routes.ts:186	admin_session_or_api_key	canAccessEntryRoute,canAccessEntryRouteAccount	/inflow-links	read_allowed;format=csv:403	canAccessEntryRoute,canAccessEntryRouteAccount
@@ -626,7 +626,7 @@ DELETE	/api/funnels/:id	apps/worker/src/routes/analytics.ts:1399	admin_session_o
 GET	/api/funnels/:id/result	apps/worker/src/routes/analytics.ts:1419	admin_session_or_api_key	getVisibleLineAccountScope	/analytics	read_allowed;format=csv:403	getVisibleLineAccountScope
 GET	/api/getting-started	apps/worker/src/routes/getting-started.ts:70	admin_session_or_api_key	getVisibleLineAccountScope	/getting-started	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole,withAccess
 POST	/api/getting-started/dismiss	apps/worker/src/routes/getting-started.ts:258	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/getting-started	authMiddleware:403	requireRole
-GET	/api/health	apps/worker/src/routes/health.ts:31	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/health	apps/worker/src/routes/health.ts:31	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/hq/banners/folders	apps/worker/src/routes/hq-banner-folders.ts:42	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	requireRole
 POST	/api/hq/banners/folders	apps/worker/src/routes/hq-banner-folders.ts:43	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 DELETE	/api/hq/banners/folders/:id	apps/worker/src/routes/hq-banner-folders.ts:57	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
@@ -681,12 +681,12 @@ POST	/api/hq/broadcasts/folders	apps/worker/src/routes/hq-broadcasts.ts:44	admin
 DELETE	/api/hq/broadcasts/folders/:id	apps/worker/src/routes/hq-broadcasts.ts:60	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/hq/broadcasts	authMiddleware:403	hqBroadcastAuthority,requireRole
 PATCH	/api/hq/broadcasts/folders/:id	apps/worker/src/routes/hq-broadcasts.ts:51	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/hq/broadcasts	authMiddleware:403	hqBroadcastAuthority,requireRole
 POST	/api/hq/broadcasts/folders/:id/swap-order	apps/worker/src/routes/hq-broadcasts.ts:33	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/hq/broadcasts	authMiddleware:403	hqBroadcastAuthority,requireRole
-GET	/api/hq/notices	apps/worker/src/routes/hq-notices.ts:15	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
+GET	/api/hq/notices	apps/worker/src/routes/hq-notices.ts:15	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
 POST	/api/hq/notices/:id/read	apps/worker/src/routes/hq-notices.ts:21	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	requireRole
-GET	/api/hq/notices/line-registration	apps/worker/src/routes/hq-notices.ts:28	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
-GET	/api/hq/operator-history	apps/worker/src/routes/ops.ts:611	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/hq/notices/line-registration	apps/worker/src/routes/hq-notices.ts:28	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
+GET	/api/hq/operator-history	apps/worker/src/routes/ops.ts:611	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 GET	/api/hq/support/context	apps/worker/src/routes/hq-support.ts:166	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getTenantBilling,getVisibleLineAccountScope,tenantOf
-GET	/api/hq/support/kinds	apps/worker/src/routes/hq-support.ts:202	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/hq/support/kinds	apps/worker/src/routes/hq-support.ts:202	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 GET	/api/hq/support/requests	apps/worker/src/routes/hq-support.ts:144	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	tenantOf
 POST	/api/hq/support/requests	apps/worker/src/routes/hq-support.ts:209	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,requireRole,tenantOf
 GET	/api/hq/support/requests/:id	apps/worker/src/routes/hq-support.ts:340	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	tenantOf
@@ -746,7 +746,7 @@ POST	/api/instagram/sync	apps/worker/src/routes/instagram.ts:458	admin_session_o
 GET	/api/instagram/webhook	apps/worker/src/routes/instagram.ts:579	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	requirePermission
 POST	/api/instagram/webhook	apps/worker/src/routes/instagram.ts:592	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	activeTenantLineAccountSql,requirePermission,verifyInstagramSignature
 POST	/api/integrations/ai-loop/reports	apps/worker/src/routes/ai-loop-slack-reports.ts:44	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifySupportRelay
-GET	/api/integrations/codex-monitor/status	apps/worker/src/routes/codex-slack-events.ts:324	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/integrations/codex-monitor/status	apps/worker/src/routes/codex-slack-events.ts:324	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 POST	/api/integrations/codex-slack/events	apps/worker/src/routes/codex-slack-events.ts:134	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifySupportRelay
 POST	/api/integrations/eccube/columns	apps/worker/src/routes/nen-campaigns.ts:1306	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyEccubeSignature
 POST	/api/integrations/eccube/coupon-usages	apps/worker/src/routes/nen-campaigns.ts:1389	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyEccubeSignature
@@ -765,7 +765,7 @@ GET	/api/integrations/google-sheets/oauth/callback	apps/worker/src/routes/google
 GET	/api/integrations/google-sheets/runs	apps/worker/src/routes/google-sheets.ts:230	admin_session_or_api_key	getVisibleLineAccountScope,visibleAccount	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole,visibleAccount
 POST	/api/integrations/google-sheets/sync	apps/worker/src/routes/google-sheets.ts:511	admin_session_or_api_key	getVisibleLineAccountScope,visibleAccount	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,staffTenantId,visibleAccount
 PUT	/api/integrations/google-sheets/target	apps/worker/src/routes/google-sheets.ts:474	admin_session_or_api_key	getVisibleLineAccountScope,visibleAccount	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,sheetsAccessToken,staffTenantId,visibleAccount
-POST	/api/integrations/ig-harness/engagement	apps/worker/src/routes/instagram-engagement.ts:14	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	
+POST	/api/integrations/ig-harness/engagement	apps/worker/src/routes/instagram-engagement.ts:14	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	-
 POST	/api/integrations/slack/actions	apps/worker/src/routes/codex-slack-events.ts:168	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifySlackRequest
 POST	/api/integrations/slack/events	apps/worker/src/routes/codex-slack-events.ts:209	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifySlackRequest
 GET	/api/integrations/stripe/events	apps/worker/src/routes/stripe.ts:34	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope
@@ -784,11 +784,11 @@ GET	/api/liff/affiliate/statements	apps/worker/src/routes/affiliate-self.ts:569	
 GET	/api/liff/affiliate/statements/:id/download	apps/worker/src/routes/affiliate-self.ts:591	dedicated_or_public	resolveFriendFromLineToken	dedicated_or_public	read_or_dedicated_auth	listLineAccountsWithTenantStatus
 POST	/api/liff/booking/:id/cancel	apps/worker/src/routes/booking.ts:1294	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/booking/:id/reschedule	apps/worker/src/routes/booking.ts:1250	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	reverifyLatestSlot,verifyCallerLineUserId
-GET	/api/liff/booking/availability	apps/worker/src/routes/booking.ts:606	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/liff/booking/availability	apps/worker/src/routes/booking.ts:606	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/liff/booking/last-booking	apps/worker/src/routes/booking.ts:3806	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 GET	/api/liff/booking/me	apps/worker/src/routes/booking.ts:1569	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
-GET	/api/liff/booking/menus	apps/worker/src/routes/booking.ts:564	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/liff/booking/menus/:id/staff	apps/worker/src/routes/booking.ts:584	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/liff/booking/menus	apps/worker/src/routes/booking.ts:564	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/liff/booking/menus/:id/staff	apps/worker/src/routes/booking.ts:584	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/liff/booking/payments/by-booking	apps/worker/src/routes/booking-payments.ts:299	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/booking/payments/start	apps/worker/src/routes/booking-payments.ts:273	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/booking/requests	apps/worker/src/routes/booking.ts:684	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	reverifyLatestSlot,verifyCallerLineUserId
@@ -797,7 +797,7 @@ GET	/api/liff/booking/seat-waitlist	apps/worker/src/routes/booking.ts:3739	dedic
 POST	/api/liff/booking/seat-waitlist	apps/worker/src/routes/booking.ts:3746	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 DELETE	/api/liff/booking/seat-waitlist/:id	apps/worker/src/routes/booking.ts:3768	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/booking/seat-waitlist/:id/accept	apps/worker/src/routes/booking.ts:3774	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
-GET	/api/liff/booking/settings	apps/worker/src/routes/booking.ts:641	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/liff/booking/settings	apps/worker/src/routes/booking.ts:641	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/liff/booking/waitlist	apps/worker/src/routes/booking.ts:3717	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/booking/waitlist	apps/worker/src/routes/booking.ts:3653	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 DELETE	/api/liff/booking/waitlist/:id	apps/worker/src/routes/booking.ts:3678	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
@@ -808,7 +808,7 @@ POST	/api/liff/entry-route-coupon	apps/worker/src/routes/liff.ts:1313	dedicated_
 POST	/api/liff/entry-route-coupon/use	apps/worker/src/routes/liff.ts:1339	dedicated_or_public	verifyCallerLineIdentity	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive,verifyCallerLineIdentity
 GET	/api/liff/events/:id	apps/worker/src/routes/events.ts:2709	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	computeIdentityKey,verifyCallerLineUserId
 POST	/api/liff/events/:id/bookings	apps/worker/src/routes/events.ts:2978	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	computeIdentityKey,verifyCallerLineUserId
-GET	/api/liff/events/:id/slots	apps/worker/src/routes/events.ts:2793	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/liff/events/:id/slots	apps/worker/src/routes/events.ts:2793	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/liff/events/me	apps/worker/src/routes/events.ts:2184	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 GET	/api/liff/events/me/:bookingId	apps/worker/src/routes/events.ts:2283	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/events/me/:bookingId/cancel	apps/worker/src/routes/events.ts:2320	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
@@ -846,15 +846,15 @@ POST	/api/liff/restaurant/reservations/:id/cancel	apps/worker/src/routes/restaur
 POST	/api/liff/restaurant/reservations/:id/confirm	apps/worker/src/routes/restaurant-customer-booking.ts:294	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	activeTenantLineAccountSql,identity
 POST	/api/liff/restaurant/reservations/:id/reschedule	apps/worker/src/routes/restaurant-customer-booking.ts:294	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	activeTenantLineAccountSql,identity
 POST	/api/liff/send-form-link	apps/worker/src/routes/liff.ts:2268	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive
-GET	/api/liff/visit-stamps/cards	apps/worker/src/routes/visit-stamps.ts:141	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/liff/visit-stamps/cards/:id	apps/worker/src/routes/visit-stamps.ts:146	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/liff/visit-stamps/cards/:id/paper-photos	apps/worker/src/routes/visit-stamps.ts:186	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/liff/visit-stamps/cards/:id/paper-requests	apps/worker/src/routes/visit-stamps.ts:178	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/liff/visit-stamps/cards/:id/paper-requests	apps/worker/src/routes/visit-stamps.ts:158	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/liff/visit-stamps/cards/:id/rewards	apps/worker/src/routes/visit-stamps.ts:150	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/liff/visit-stamps/paper-photos/:id	apps/worker/src/routes/visit-stamps.ts:199	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/liff/visit-stamps/qr/redeem	apps/worker/src/routes/visit-stamps.ts:131	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/liff/visit-stamps/redemptions/:id/use	apps/worker/src/routes/visit-stamps.ts:154	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/liff/visit-stamps/cards	apps/worker/src/routes/visit-stamps.ts:141	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/liff/visit-stamps/cards/:id	apps/worker/src/routes/visit-stamps.ts:146	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/liff/visit-stamps/cards/:id/paper-photos	apps/worker/src/routes/visit-stamps.ts:186	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/liff/visit-stamps/cards/:id/paper-requests	apps/worker/src/routes/visit-stamps.ts:178	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/liff/visit-stamps/cards/:id/paper-requests	apps/worker/src/routes/visit-stamps.ts:158	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/liff/visit-stamps/cards/:id/rewards	apps/worker/src/routes/visit-stamps.ts:150	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/liff/visit-stamps/paper-photos/:id	apps/worker/src/routes/visit-stamps.ts:199	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/liff/visit-stamps/qr/redeem	apps/worker/src/routes/visit-stamps.ts:131	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/liff/visit-stamps/redemptions/:id/use	apps/worker/src/routes/visit-stamps.ts:154	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/liff/webinars/:slug	apps/worker/src/routes/webinars.ts:217	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 GET	/api/liff/webinars/:slug/audience	apps/worker/src/routes/webinars.ts:479	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
 POST	/api/liff/webinars/:slug/comments	apps/worker/src/routes/webinars.ts:591	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyCallerLineUserId
@@ -930,11 +930,11 @@ POST	/api/line-webhook-events/:id/retry	apps/worker/src/routes/line-webhook-even
 POST	/api/links/wrap	apps/worker/src/routes/liff.ts:2029	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 GET	/api/list-stats	apps/worker/src/routes/dashboard.ts:529	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope
 GET	/api/login-audit	apps/worker/src/routes/friend-attributes.ts:1478	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	requireRole
-GET	/api/manual-links	apps/worker/src/routes/manual-links.ts:76	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/manual-links	apps/worker/src/routes/manual-links.ts:76	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 PUT	/api/manual-links	apps/worker/src/routes/manual-links.ts:151	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 PUT	/api/manual-links/:key	apps/worker/src/routes/manual-links.ts:152	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 POST	/api/manual-links/check	apps/worker/src/routes/manual-links.ts:161	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
-GET	/api/manual-links/lookup	apps/worker/src/routes/manual-links.ts:66	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/manual-links/lookup	apps/worker/src/routes/manual-links.ts:66	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 GET	/api/measurement-sites	apps/worker/src/routes/web-measurement.ts:182	admin_session_or_api_key	getVisibleLineAccountScope,scopedAccountId	/conversions	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole,scopedAccountId
 POST	/api/measurement-sites	apps/worker/src/routes/web-measurement.ts:215	admin_session_or_api_key	getVisibleLineAccountScope	/conversions	authMiddleware:403	getVisibleLineAccountScope,requireRole
 PATCH	/api/measurement-sites/:id	apps/worker/src/routes/web-measurement.ts:250	admin_session_or_api_key	getVisibleLineAccountScope	/conversions	authMiddleware:403	getVisibleLineAccountScope,requireRole
@@ -962,10 +962,10 @@ POST	/api/meet-callback	apps/worker/src/routes/meet-callback.ts:16	dedicated_or_
 GET	/api/meet-consultations	apps/worker/src/routes/meet-consultations.ts:15	admin_session_or_api_key	getVisibleLineAccountScope	/booking/bookings	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole
 POST	/api/meet-consultations	apps/worker/src/routes/meet-consultations.ts:47	admin_session_or_api_key	canAccessAllLineAccounts	/booking/bookings	authMiddleware:403	canAccessAllLineAccounts,requireRole
 DELETE	/api/meet-consultations/:externalEventId	apps/worker/src/routes/meet-consultations.ts:77	admin_session_or_api_key	canAccessAllLineAccounts	/booking/bookings	authMiddleware:403	canAccessAllLineAccounts,requireRole
-GET	/api/message-templates	apps/worker/src/routes/message-templates.ts:29	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	read_allowed;format=csv:403	
+GET	/api/message-templates	apps/worker/src/routes/message-templates.ts:29	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	read_allowed;format=csv:403	-
 POST	/api/message-templates	apps/worker/src/routes/message-templates.ts:53	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	authMiddleware:403	requireRole
 DELETE	/api/message-templates/:id	apps/worker/src/routes/message-templates.ts:131	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	authMiddleware:403	requireRole
-GET	/api/message-templates/:id	apps/worker/src/routes/message-templates.ts:41	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	read_allowed;format=csv:403	
+GET	/api/message-templates/:id	apps/worker/src/routes/message-templates.ts:41	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	read_allowed;format=csv:403	-
 PUT	/api/message-templates/:id	apps/worker/src/routes/message-templates.ts:91	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	/inflow-links	authMiddleware:403	requireRole
 GET	/api/mileage/adjustment-approvals	apps/worker/src/routes/scoring.ts:1190	admin_session_or_api_key	getVisibleLineAccountScope	/mileage	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole
 POST	/api/mileage/adjustment-approvals/:id/approve	apps/worker/src/routes/scoring.ts:1210	admin_session_or_api_key	getVisibleLineAccountScope	/mileage	authMiddleware:403	getVisibleLineAccountScope,requireRole
@@ -1163,15 +1163,15 @@ GET	/api/ops/tenants	apps/worker/src/routes/ops.ts:121	admin_session_or_api_key	
 GET	/api/ops/tenants/:id	apps/worker/src/routes/ops.ts:165	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	requirePlatformAdmin,tenantById
 PATCH	/api/ops/tenants/:id/feature-packs	apps/worker/src/routes/ops.ts:243	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requirePlatformAdmin,requirePlatformAdminWrite,tenantById
 PATCH	/api/ops/tenants/:id/status	apps/worker/src/routes/ops.ts:203	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requirePlatformAdmin,requirePlatformAdminWrite,tenantById
-GET	/api/postal-code/search	apps/worker/src/routes/postal-code.ts:26	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
-GET	/api/public/brand	apps/worker/src/routes/brand.ts:26	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/public/nen/adopted-photos	apps/worker/src/routes/nen-members.ts:704	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/public/nen/gallery-preview	apps/worker/src/routes/nen-members.ts:764	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/postal-code/search	apps/worker/src/routes/postal-code.ts:26	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
+GET	/api/public/brand	apps/worker/src/routes/brand.ts:26	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/public/nen/adopted-photos	apps/worker/src/routes/nen-members.ts:704	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/public/nen/gallery-preview	apps/worker/src/routes/nen-members.ts:764	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/api/public/v1/friends/:friendId/tags	apps/worker/src/routes/public-api.ts:102	dedicated_or_public	tokenHasScope	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive,requireToken,tokenHasScope
 GET	/api/public/v1/tags	apps/worker/src/routes/public-api.ts:71	dedicated_or_public	tokenHasScope	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive,requireToken,tokenHasScope
-OPTIONS	/api/public/web-conversions	apps/worker/src/routes/web-measurement.ts:45	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/public/web-conversions	apps/worker/src/routes/web-measurement.ts:54	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/qr	apps/worker/src/index.ts:761	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+OPTIONS	/api/public/web-conversions	apps/worker/src/routes/web-measurement.ts:45	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/public/web-conversions	apps/worker/src/routes/web-measurement.ts:54	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/qr	apps/worker/src/index.ts:761	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/recipes	apps/worker/src/routes/recipes.ts:281	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	canAccessAllLineAccounts,requireRole
 POST	/api/recipes	apps/worker/src/routes/recipes.ts:304	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole
 GET	/api/recipes/:id	apps/worker/src/routes/recipes.ts:348	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	canAccessAllLineAccounts,requireRole
@@ -1252,9 +1252,9 @@ GET	/api/restaurant-test/followups/:storeId/review-history	apps/worker/src/route
 POST	/api/restaurant-test/followups/:storeId/stop	apps/worker/src/routes/restaurant-test.ts:2280	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,organizationByTenantId,requireRole,requiredAccount,tenantHasFeaturePack,tenantId
 POST	/api/restaurant-test/gbp/posts	apps/worker/src/routes/restaurant-test.ts:2190	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,organizationByTenantId,requireRole,requiredAccount,tenantHasFeaturePack,tenantId
 PUT	/api/restaurant-test/gbp/reviews/:id/draft	apps/worker/src/routes/restaurant-test.ts:2211	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,organizationByTenantId,requireRole,requiredAccount,tenantHasFeaturePack,tenantId
-GET	/api/restaurant-test/google/changes	apps/worker/src/routes/restaurant-google-profile.ts:844	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
-GET	/api/restaurant-test/google/changes/:id	apps/worker/src/routes/restaurant-google-profile.ts:914	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
-POST	/api/restaurant-test/google/changes/:id/cancel	apps/worker/src/routes/restaurant-google-profile.ts:930	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	
+GET	/api/restaurant-test/google/changes	apps/worker/src/routes/restaurant-google-profile.ts:844	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
+GET	/api/restaurant-test/google/changes/:id	apps/worker/src/routes/restaurant-google-profile.ts:914	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
+POST	/api/restaurant-test/google/changes/:id/cancel	apps/worker/src/routes/restaurant-google-profile.ts:930	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	-
 POST	/api/restaurant-test/google/changes/:id/send	apps/worker/src/routes/restaurant-google-profile.ts:1039	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	accessTokenFor,requireConnectedStore,requireRole
 POST	/api/restaurant-test/google/connect/select-location	apps/worker/src/routes/restaurant-google.ts:792	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	accessTokenFor,accessTokenForConnection,getVisibleLineAccountScope,refreshAccessToken,staffTenantId,tenantHasFeaturePack
 POST	/api/restaurant-test/google/connect/start	apps/worker/src/routes/restaurant-google.ts:574	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	authMiddleware:403	getVisibleLineAccountScope,staffTenantId,tenantHasFeaturePack
@@ -1264,14 +1264,14 @@ GET	/api/restaurant-test/google/holidays	apps/worker/src/routes/restaurant-googl
 POST	/api/restaurant-test/google/hours/from-closure	apps/worker/src/routes/restaurant-google-profile.ts:1121	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	requireRole
 POST	/api/restaurant-test/google/hours/propose	apps/worker/src/routes/restaurant-google-profile.ts:590	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	accessTokenFor,requireConnectedStore,requireOpenProfile
 GET	/api/restaurant-test/google/oauth/callback	apps/worker/src/routes/restaurant-google.ts:625	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope,staffTenantId,tenantHasFeaturePack
-GET	/api/restaurant-test/google/performance	apps/worker/src/routes/restaurant-google-performance.ts:72	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
+GET	/api/restaurant-test/google/performance	apps/worker/src/routes/restaurant-google-performance.ts:72	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
 POST	/api/restaurant-test/google/performance/sync	apps/worker/src/routes/restaurant-google-performance.ts:134	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	requireConnectedStore,requireRole
 GET	/api/restaurant-test/google/photos	apps/worker/src/routes/restaurant-google-profile.ts:814	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	accessTokenFor,requireConnectedStore
-GET	/api/restaurant-test/google/posts	apps/worker/src/routes/restaurant-google-posts.ts:460	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
-POST	/api/restaurant-test/google/posts	apps/worker/src/routes/restaurant-google-posts.ts:612	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	
-GET	/api/restaurant-test/google/posts/:id	apps/worker/src/routes/restaurant-google-posts.ts:631	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	
-PUT	/api/restaurant-test/google/posts/:id	apps/worker/src/routes/restaurant-google-posts.ts:646	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	
-POST	/api/restaurant-test/google/posts/:id/cancel	apps/worker/src/routes/restaurant-google-posts.ts:668	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	
+GET	/api/restaurant-test/google/posts	apps/worker/src/routes/restaurant-google-posts.ts:460	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
+POST	/api/restaurant-test/google/posts	apps/worker/src/routes/restaurant-google-posts.ts:612	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	-
+GET	/api/restaurant-test/google/posts/:id	apps/worker/src/routes/restaurant-google-posts.ts:631	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	read_allowed;format=csv:403	-
+PUT	/api/restaurant-test/google/posts/:id	apps/worker/src/routes/restaurant-google-posts.ts:646	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	-
+POST	/api/restaurant-test/google/posts/:id/cancel	apps/worker/src/routes/restaurant-google-posts.ts:668	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	explicit_allow	authMiddleware:403	-
 POST	/api/restaurant-test/google/posts/:id/instagram/retry	apps/worker/src/routes/restaurant-google-posts.ts:775	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 POST	/api/restaurant-test/google/posts/:id/publish	apps/worker/src/routes/restaurant-google-posts.ts:680	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	accessTokenFor,requireConnectedStore,requireRole
 POST	/api/restaurant-test/google/posts/:id/remove	apps/worker/src/routes/restaurant-google-posts.ts:803	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	accessTokenFor,requireConnectedStore,requireRole
@@ -1429,24 +1429,24 @@ GET	/api/scenarios/:id/triggers	apps/worker/src/routes/scenarios.ts:2056	admin_s
 POST	/api/scenarios/:id/triggers	apps/worker/src/routes/scenarios.ts:2069	admin_session_or_api_key	canAccessAllLineAccounts	/scenarios	authMiddleware:403	canAccessAllLineAccounts
 DELETE	/api/scenarios/:id/triggers/:triggerId	apps/worker/src/routes/scenarios.ts:2130	admin_session_or_api_key	canAccessAllLineAccounts	/scenarios	authMiddleware:403	canAccessAllLineAccounts,requireDeliveryAccess
 PATCH	/api/scenarios/reorder	apps/worker/src/routes/scenarios.ts:445	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scenarios	authMiddleware:403	requireDeliveryAccess
-GET	/api/scoring-rules	apps/worker/src/routes/scoring.ts:1943	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	read_allowed;format=csv:403	
+GET	/api/scoring-rules	apps/worker/src/routes/scoring.ts:1943	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	read_allowed;format=csv:403	-
 POST	/api/scoring-rules	apps/worker/src/routes/scoring.ts:1978	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	authMiddleware:403	requireRole
 DELETE	/api/scoring-rules/:id	apps/worker/src/routes/scoring.ts:2006	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	authMiddleware:403	requireRole
-GET	/api/scoring-rules/:id	apps/worker/src/routes/scoring.ts:1964	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	read_allowed;format=csv:403	
+GET	/api/scoring-rules/:id	apps/worker/src/routes/scoring.ts:1964	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	read_allowed;format=csv:403	-
 PUT	/api/scoring-rules/:id	apps/worker/src/routes/scoring.ts:1992	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/scoring	authMiddleware:403	requireRole
-GET	/api/search-console/performance	apps/worker/src/routes/search-console.ts:12	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	
+GET	/api/search-console/performance	apps/worker/src/routes/search-console.ts:12	admin_session_or_api_key	tenantScopeMiddleware:legacy_unassigned	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	-
 POST	/api/segments/count	apps/worker/src/routes/broadcasts.ts:3369	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requirePermission
-GET	/api/settings/company	apps/worker/src/routes/company-settings.ts:24	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
+GET	/api/settings/company	apps/worker/src/routes/company-settings.ts:24	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
 PUT	/api/settings/company	apps/worker/src/routes/company-settings.ts:29	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 GET	/api/settings/features	apps/worker/src/routes/feature-settings.ts:981	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	canAccessAllLineAccounts,requireRole,restaurantEffectivelyEnabledForTenant
 PUT	/api/settings/features	apps/worker/src/routes/feature-settings.ts:1130	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole,restaurantEffectivelyEnabledForTenant
 POST	/api/settings/features/impact	apps/worker/src/routes/feature-settings.ts:1040	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole,restaurantEffectivelyEnabledForTenant
 GET	/api/settings/features/visibility	apps/worker/src/routes/feature-settings.ts:950	admin_session_or_api_key	canAccessAllLineAccounts	self	read_allowed;format=csv:403	canAccessAllLineAccounts,restaurantEffectivelyEnabledForTenant
-OPTIONS	/api/site/collect	apps/worker/src/routes/site-tracking.ts:74	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/site/collect	apps/worker/src/routes/site-tracking.ts:80	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+OPTIONS	/api/site/collect	apps/worker/src/routes/site-tracking.ts:74	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/site/collect	apps/worker/src/routes/site-tracking.ts:80	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/api/site/link	apps/worker/src/routes/site-tracking.ts:301	admin_session_or_api_key	canAccessAllLineAccounts	staff_fail_closed_or_platform_guard	authMiddleware:403	canAccessAllLineAccounts,requireRole
 GET	/api/site/pages	apps/worker/src/routes/site-tracking.ts:358	admin_session_or_api_key	getVisibleLineAccountScope,visibleAccountId	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole,visibleAccountId
-GET	/api/site/script.js	apps/worker/src/routes/site-tracking.ts:152	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/api/site/script.js	apps/worker/src/routes/site-tracking.ts:152	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/site/summary	apps/worker/src/routes/site-tracking.ts:342	admin_session_or_api_key	getVisibleLineAccountScope,visibleAccountId	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole,visibleAccountId
 GET	/api/site/tracking-key	apps/worker/src/routes/site-tracking.ts:330	admin_session_or_api_key	getVisibleLineAccountScope,visibleAccountId	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole,visibleAccountId
 GET	/api/staff	apps/worker/src/routes/staff.ts:368	admin_session_or_api_key	getStaffAccountScopeIds,getStaffAccountScopeMap,hasAllAccountScope,keysToScopeLevels	explicit_allow	read_allowed;format=csv:403	currentTenantId,getStaffAccountScopeIds,getStaffAccountScopeMap,hasAllAccountScope,keysToScopeLevels
@@ -1460,9 +1460,9 @@ POST	/api/staff/:id/resend-invite	apps/worker/src/routes/staff.ts:428	admin_sess
 DELETE	/api/staff/:id/two-factor	apps/worker/src/routes/staff.ts:1148	admin_session_or_api_key	getStaffAccountScopeIds,keysToScopeLevels	self	authMiddleware:403	currentTenantId,getStaffAccountScopeIds,isInCurrentTenant,keysToScopeLevels
 POST	/api/staff/:id/two-factor/confirm	apps/worker/src/routes/staff.ts:1094	admin_session_or_api_key	getStaffAccountScopeIds,keysToScopeLevels	self	authMiddleware:403	currentTenantId,getStaffAccountScopeIds,isInCurrentTenant,keysToScopeLevels,verifyTotp
 POST	/api/staff/:id/two-factor/setup	apps/worker/src/routes/staff.ts:1053	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	authMiddleware:403	currentTenantId,isInCurrentTenant
-POST	/api/staff/email-change/confirm	apps/worker/src/routes/staff.ts:999	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/api/staff/invitations/:token/verify	apps/worker/src/routes/staff.ts:580	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-POST	/api/staff/invitations/confirm/verify	apps/worker/src/routes/staff.ts:585	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+POST	/api/staff/email-change/confirm	apps/worker/src/routes/staff.ts:999	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/api/staff/invitations/:token/verify	apps/worker/src/routes/staff.ts:580	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+POST	/api/staff/invitations/confirm/verify	apps/worker/src/routes/staff.ts:585	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 GET	/api/staff/last-logins	apps/worker/src/routes/staff.ts:413	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	currentTenantId,requireRole
 GET	/api/staff/me	apps/worker/src/routes/staff.ts:353	admin_session_or_api_key	getStaffAccountScopeIds,keysToScopeLevels	self	read_allowed;format=csv:403	getStaffAccountScopeIds,keysToScopeLevels
 DELETE	/api/support-mark-rules/:ruleId	apps/worker/src/routes/friend-attributes.ts:738	admin_session_or_api_key	getVisibleLineAccountScope	/tags	authMiddleware:403	getVisibleLineAccountScope,requireRole,supportMarkAccess
@@ -1515,13 +1515,13 @@ POST	/api/templates/:id/publish	apps/worker/src/routes/templates.ts:797	admin_se
 POST	/api/templates/:id/revert	apps/worker/src/routes/templates.ts:932	admin_session_or_api_key	canAccessAllLineAccounts	/templates	authMiddleware:403	canAccessAllLineAccounts,requireDeliveryAccess
 GET	/api/templates/:id/usages	apps/worker/src/routes/templates.ts:485	admin_session_or_api_key	canAccessAllLineAccounts	/templates	read_allowed;format=csv:403	canAccessAllLineAccounts
 GET	/api/templates/:id/versions	apps/worker/src/routes/templates.ts:898	admin_session_or_api_key	canAccessAllLineAccounts	/templates	read_allowed;format=csv:403	canAccessAllLineAccounts
-GET	/api/templates/examples	apps/worker/src/routes/templates.ts:407	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/templates	read_allowed;format=csv:403	
+GET	/api/templates/examples	apps/worker/src/routes/templates.ts:407	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	/templates	read_allowed;format=csv:403	-
 GET	/api/tenants	apps/worker/src/routes/tenants.ts:133	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	canManageTenants
 POST	/api/tenants	apps/worker/src/routes/tenants.ts:88	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	canManageTenants
 PATCH	/api/tenants/:id/feature-packs	apps/worker/src/routes/tenants.ts:169	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	canManageTenants
 PATCH	/api/tenants/:id/status	apps/worker/src/routes/tenants.ts:150	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	canManageTenants
 GET	/api/tenants/boundary-preview	apps/worker/src/routes/tenants.ts:214	admin_session_or_api_key	getVisibleLineAccountScope	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getVisibleLineAccountScope,requireRole
-GET	/api/tenants/me	apps/worker/src/routes/tenants.ts:186	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	
+GET	/api/tenants/me	apps/worker/src/routes/tenants.ts:186	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	self	read_allowed;format=csv:403	-
 PATCH	/api/tenants/me	apps/worker/src/routes/tenants.ts:197	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	requireRole
 GET	/api/tenants/me/company-contact	apps/worker/src/routes/tenants.ts:63	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	read_allowed;format=csv:403	getTenantCompanyContact,requireRole
 PATCH	/api/tenants/me/company-contact	apps/worker/src/routes/tenants.ts:70	admin_session_or_api_key	REVIEW:see_called_helpers_or_direct_SQL	staff_fail_closed_or_platform_guard	authMiddleware:403	getTenantCompanyContact,parseTenantCompanyContact,requireRole,saveTenantCompanyContact
@@ -1628,26 +1628,26 @@ GET	/api/webinars/overview	apps/worker/src/routes/webinars.ts:969	admin_session_
 GET	/auth/callback	apps/worker/src/routes/liff.ts:704	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive
 GET	/auth/line	apps/worker/src/routes/liff.ts:386	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive
 GET	/auth/oauth	apps/worker/src/routes/liff.ts:624	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	isLineAccountTenantActive
-GET	/book	apps/worker/src/index.ts:1315	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/docs	apps/worker/src/routes/openapi.ts:9421	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/health	apps/worker/src/routes/health.ts:27	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/images/*	apps/worker/src/routes/images.ts:144	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/images/broadcast-media/:filename	apps/worker/src/routes/broadcast-message-assets.ts:486	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/images/chat-attachments/:attachmentId	apps/worker/src/routes/chat-attachments.ts:164	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/images/chat-attachments/video-preview.png	apps/worker/src/routes/chat-attachments.ts:160	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/images/imagemaps/:id/:width	apps/worker/src/routes/broadcast-message-assets.ts:475	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/book	apps/worker/src/index.ts:1315	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/docs	apps/worker/src/routes/openapi.ts:9421	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/health	apps/worker/src/routes/health.ts:27	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/images/*	apps/worker/src/routes/images.ts:144	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/images/broadcast-media/:filename	apps/worker/src/routes/broadcast-message-assets.ts:486	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/images/chat-attachments/:attachmentId	apps/worker/src/routes/chat-attachments.ts:164	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/images/chat-attachments/video-preview.png	apps/worker/src/routes/chat-attachments.ts:160	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/images/imagemaps/:id/:width	apps/worker/src/routes/broadcast-message-assets.ts:475	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/internal/ubereats/sandbox-token-probe	apps/worker/src/routes/restaurant-delivery.ts:2168	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifySupportRelay
 ALL	/line-api-data/*	apps/worker/src/routes/line-proxy.ts:672	dedicated_or_public	canAccessAllLineAccounts	dedicated_or_public	read_or_dedicated_auth	canAccessAllLineAccounts,listLineAccountsWithTenantStatus,requiredProxyPermission
 ALL	/line-api/*	apps/worker/src/routes/line-proxy.ts:671	dedicated_or_public	canAccessAllLineAccounts	dedicated_or_public	read_or_dedicated_auth	canAccessAllLineAccounts,listLineAccountsWithTenantStatus,requiredProxyPermission
-GET	/media/:id/content	apps/worker/src/routes/contents.ts:1090	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/o	apps/worker/src/index.ts:1202	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/openapi.json	apps/worker/src/routes/openapi.ts:9416	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/pool/:slug	apps/worker/src/routes/traffic-pools.ts:49	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/r/:ref	apps/worker/src/index.ts:773	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/r/:ref/help	apps/worker/src/index.ts:1040	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/robots.txt	apps/worker/src/index.ts:519	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/setup	apps/worker/src/routes/setup.ts:6	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
-GET	/t/:linkId	apps/worker/src/routes/tracked-links.ts:333	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	
+GET	/media/:id/content	apps/worker/src/routes/contents.ts:1090	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/o	apps/worker/src/index.ts:1202	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/openapi.json	apps/worker/src/routes/openapi.ts:9416	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/pool/:slug	apps/worker/src/routes/traffic-pools.ts:49	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/r/:ref	apps/worker/src/index.ts:773	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/r/:ref/help	apps/worker/src/index.ts:1040	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/robots.txt	apps/worker/src/index.ts:519	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/setup	apps/worker/src/routes/setup.ts:6	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
+GET	/t/:linkId	apps/worker/src/routes/tracked-links.ts:333	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	-
 POST	/webhook	apps/worker/src/routes/webhook.ts:174	dedicated_or_public	isFriendScopeConflict	dedicated_or_public	read_or_dedicated_auth	handleStoppedTenantEvent,isFriendScopeConflict,listLineAccountsWithTenantStatus,verifySignature
 POST	/webhooks/xserver/support-email	apps/worker/src/routes/support-inbox.ts:56	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifySupportRelay
 GET	/webinar-assets/:token/:slug/*	apps/worker/src/routes/webinars.ts:883	dedicated_or_public	REVIEW:see_called_helpers_or_direct_SQL	dedicated_or_public	read_or_dedicated_auth	verifyWebinarToken

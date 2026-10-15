@@ -138,7 +138,7 @@ describe('更新系の権限ガードの網羅', () => {
           || (isStaffSelfRouteTemplate(route.method, route.path) ? 'self'
             : isStaffExplicitAllow(route.method, route.path) ? 'explicit_allow' : 'staff_fail_closed_or_platform_guard') : 'dedicated_or_public';
         return [route.method, route.path, `${route.file}:${route.line}`, admin ? 'admin_session_or_api_key' : 'dedicated_or_public',
-          scope, permission, readonly, route.calls.filter(name => /require|verify|identity|authority|visible|scope|tenant|access/i.test(name)).join(',')].join('\t');
+          scope, permission, readonly, route.calls.filter(name => /require|verify|identity|authority|visible|scope|tenant|access/i.test(name)).join(',') || '-'].join('\t');
       });
       writeFileSync(process.env.SECURITY_INVENTORY_REPORT,
         'method\tpath\tsource\tlogin\tstore_hq_scope_evidence\tstaff_permission\tread_only\tcalled_authorization_helpers\n' + lines.join('\n') + '\n');
