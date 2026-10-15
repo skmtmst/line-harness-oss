@@ -4231,7 +4231,7 @@ CREATE TABLE media (
   public_url  TEXT,
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1));
 
 CREATE TABLE media_file_scans (
   id               TEXT PRIMARY KEY,
@@ -5892,6 +5892,14 @@ CREATE TABLE postal_import_manifest (
   input_bytes INTEGER NOT NULL,
   row_count INTEGER NOT NULL,
   imported_at TEXT NOT NULL
+);
+
+CREATE TABLE public_ingress_receipts (
+  kind TEXT NOT NULL CHECK (kind IN ('conversion_nonce', 'site_event')),
+  scope_id TEXT NOT NULL,
+  receipt_key TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  PRIMARY KEY (kind, scope_id, receipt_key)
 );
 
 CREATE TABLE "recipe_clone_items" (
@@ -7877,7 +7885,7 @@ CREATE TABLE "templates" (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), published_version INTEGER NOT NULL DEFAULT 1, published_at TEXT, draft_message_type TEXT, draft_message_content TEXT, draft_carousel_actions_json TEXT, draft_carousel_tap_limit_mode TEXT, draft_carousel_tap_limit_text TEXT, draft_question_json TEXT
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
-  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0);
+  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0, deleted_at TEXT);
 
 CREATE TABLE tenant_data_purge_audit (
   id TEXT PRIMARY KEY,
@@ -10103,6 +10111,8 @@ CREATE INDEX idx_platform_knowledge_jobs_pending ON platform_knowledge_jobs(stat
 CREATE INDEX idx_postal_codes_code
   ON postal_codes(postal_code);
 
+CREATE INDEX idx_public_ingress_receipts_received ON public_ingress_receipts(received_at);
+
 CREATE INDEX idx_recipe_clone_items_v316_run
   ON recipe_clone_items(run_id, created_at, id);
 
@@ -10519,6 +10529,8 @@ CREATE INDEX idx_template_versions_template
   ON template_versions (template_id, version_number DESC);
 
 CREATE INDEX idx_templates_category ON templates (category);
+
+CREATE INDEX idx_templates_deleted ON templates(deleted_at);
 
 CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
