@@ -3,7 +3,7 @@
  * 設定 › SNS 連携の Instagram のカード（★V8-B `YINmJ`・`DFnll`／2026-10-07 利用者承認）。
  * 守るのは BEHAVIOR.md に書いた決めごと：
  *  - 状態のことばは4つ（接続しています／未接続／認可が切れています／設定がありません）。
- *  - 未接続・認可切れは注記＋［Instagram とつなぐ］。ページを選ぶ段は出さない。
+ *  - 未接続・認可切れは注記＋［Instagram にログインして接続］。ページを選ぶ段は出さない。
  *  - 接続済みは `@ユーザー名（ビジネス）`・「写真つき投稿の同時公開」＋［接続を確かめる］［接続を解除する］。
  *  - 「設定がありません」は注記だけ。押せないボタンは置かない。
  *  - 閲覧のみにはボタンを置かない。
@@ -121,12 +121,12 @@ afterEach(() => {
 })
 
 describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
-  it('未接続では注記と［Instagram とつなぐ］を出し、ページを選ぶ段は出さない', async () => {
+  it('未接続では注記と［Instagram にログインして接続］を出し、ページを選ぶ段は出さない', async () => {
     setup('disconnected')
 
     expect(await igCard().findByText('まだつないでいません')).toBeTruthy()
-    expect(screen.getByText('プロアカウント（ビジネス）が必要です。個人のアカウントは接続できません。')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Instagram とつなぐ' })).toBeTruthy()
+    expect(screen.getByText('Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Instagram にログインして接続' })).toBeTruthy()
     // ページを選ぶ段（利用者の決めで出さない）
     expect(screen.queryByText(/ページを選/)).toBeNull()
     // 未接続では解除・確認のボタンは出ない。
@@ -152,7 +152,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     setup('expired', CONNECTED)
 
     expect((await screen.findAllByText('認可が切れています')).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Instagram とつなぐ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Instagram にログインして接続' })).toBeTruthy()
     await openIgMenu()
     expect(screen.getAllByRole('menuitem', { name: '接続を解除する' }).length).toBeGreaterThan(0)
   })
@@ -162,7 +162,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
 
     expect((await screen.findAllByText('設定がありません')).length).toBeGreaterThan(0)
     expect(screen.getByText('この環境には Instagram 接続の設定がありません。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Instagram とつなぐ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続' })).toBeNull()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
   })
 
@@ -173,7 +173,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     expect(await screen.findByText('つながっている')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /その他操作/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Instagram とつなぐ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続' })).toBeNull()
   })
 
   it('［接続を確かめる］で確かめの口を呼び、読み直す', async () => {

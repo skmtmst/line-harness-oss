@@ -110,20 +110,5 @@
 .checks li { display: flex; align-items: center; gap: var(--tpl-e1-sns-row-gap); }
 .checks svg { color: var(--color-action); flex: none; }
 
-/* 受信箱での見え方（見本）：白い板の上に見出しと表だけ */
-.sample { display: flex; flex-direction: column; gap: 16px; }
-.sampleTitle { display: flex; align-items: center; gap: var(--tpl-e1-sns-row-gap); margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; }
-.sampleTable { width: 100%; }
-.colCheck { width: 48px; }
-.colWho { width: 276px; }
-.colState { width: 166px; }
-.colRoute { width: 196px; }
-.colLast { width: 182px; }
-.who { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-row-gap); min-width: 0; }
-.face { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--tpl-e1-sns-face); height: var(--tpl-e1-sns-face); border-radius: 50%; background: var(--color-accent-soft); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 700; }
-.whoText { display: inline-flex; flex-direction: column; min-width: 0; font-size: var(--text-caption); }
-.whoText small { color: var(--color-ink-secondary); font-size: var(--text-micro, var(--text-caption)); }
-.whoText strong, .whoText span, .whoText small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 .link { display: inline-flex; align-items: center; gap: 4px; color: var(--color-action); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
 .link:hover { text-decoration: underline; }

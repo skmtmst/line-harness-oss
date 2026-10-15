@@ -12,9 +12,6 @@ import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { RowActions } from '@/components/shared/row-actions'
-import HelpTip from '@/components/shared/help-tip'
-import Checkbox from '@/components/shared/checkbox'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
@@ -52,12 +49,6 @@ const IG_BADGE: Record<InstagramConnectionStatus['state'], { label: string; tone
 }
 
 const IG_CAPABILITIES = ['DM を受信箱で読む・返す', '投稿へのコメントに返す', '投稿を予約する', 'プロフィールのリンクを LINE の友だち追加へ向ける']
-
-/* 受信箱での見え方の見本（実際のデータではない）。 */
-const SAMPLE_INBOX = [
-  { name: '@yuki_gourmet', kind: 'Instagram の DM', state: '未対応', tone: 'danger' as StatusBadgeTone, owner: '担当：なし', text: '金曜 20時に4名で入れますか？', at: '01/13 18:02', route: 'Instagram' },
-  { name: '鈴木 美咲', kind: 'LINE の友だち', state: '対応済み', tone: 'success' as StatusBadgeTone, owner: '担当：Kenta', text: '明日 19時、2名で予約できますか', at: '01/13 17:40', route: 'LINE' },
-]
 
 /** 戻り先（`/settings/sns?instagram=…`）で出す案内。Worker の折り返しが付ける。 */
 const FLASH: Record<string, { tone: 'success' | 'danger'; text: string }> = {
@@ -268,9 +259,9 @@ export default function SnsSettingsPage() {
                     <>
                       <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                         <Link2 size={15} aria-hidden />
-                        Instagram とつなぐ
+                        Instagram にログインして接続
                       </Button>
-                      <span className={styles.note}>プロアカウント（ビジネス）が必要です。個人のアカウントは接続できません。</span>
+                      <span className={styles.note}>Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。</span>
                     </>
                   )}
                 </div>
@@ -279,29 +270,6 @@ export default function SnsSettingsPage() {
           )}
         </section>
 
-        <section className={styles.sample} aria-labelledby="sns-sample-title">
-          <h2 id="sns-sample-title" className={styles.sampleTitle}>受信箱での見え方（見本）<HelpTip label="受信箱での見え方の説明">Instagram の DM をつなぐと、LINE の友だちと同じ受信箱に並びます。ここは見え方の見本で、実際のデータではありません。</HelpTip></h2>
-          <DataTable className={styles.sampleTable} columnSizing="controls" label="受信箱での見え方（見本）">
-            <thead><TableHeadRow>
-              <Th className={styles.colCheck}><span className="sr-only">選択</span></Th>
-              <Th className={styles.colWho}>相手</Th>
-              <Th className={styles.colState}>対応・担当</Th>
-              <Th grow>最新のメッセージ</Th>
-              <Th className={styles.colRoute}>経路</Th>
-              <Th className={styles.colLast}>最終接触</Th>
-            </TableHeadRow></thead>
-            <tbody>
-              {SAMPLE_INBOX.map((row) => <Tr key={row.name}>
-                <Td><Checkbox checked={false} onCheckedChange={() => {}} disabled aria-label={`${row.name}（見本）`} /></Td>
-                <Td><span className={styles.who}><span className={styles.face} aria-hidden>山</span><span className={styles.whoText}><strong>{row.name}</strong><small>{row.kind}</small></span></span></Td>
-                <Td><span className={styles.whoText}><StatusBadge tone={row.tone} size="compact">{row.state}</StatusBadge><small>{row.owner}</small></span></Td>
-                <Td><span className={styles.whoText}><span>{row.text}</span><small>{row.at}</small></span></Td>
-                <Td><StatusBadge tone="info" size="compact">{row.route}</StatusBadge></Td>
-                <Td>今日</Td>
-              </Tr>)}
-            </tbody>
-          </DataTable>
-        </section>
       </div>
 
       <ConfirmDialog
