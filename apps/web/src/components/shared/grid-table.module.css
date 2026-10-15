@@ -65,3 +65,10 @@ html:root .table .row[data-list-content-lines]:is([data-list-content-lines='2'],
 html:root .table[data-list-density-scope='general'] .row:not([data-head]) {
   height: var(--polish-table-row); min-height: var(--polish-table-row);
 }
+
+/* 時刻×担当の表もカレンダー型の枠を部品が持つ。通常の一覧は変えない。 */
+html:root .table[data-table-presentation='calendar'] {
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}

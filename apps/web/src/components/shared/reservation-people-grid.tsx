@@ -4,10 +4,10 @@ import { useRef, type DragEvent } from 'react'
 import type { ReservationBoardEntry, ReservationBoardMove, ReservationBoardResource } from '@line-crm/shared'
 import { MessageCircle, Phone } from 'lucide-react'
 import Button from './button'
-import Card from './card'
+import { GridTable } from './grid-table'
 import Avatar from './avatar'
 import { BookingBlock, BookingSlot } from './booking-controls'
-import { formatTime } from '@/lib/format'
+import { formatDay, formatTime } from '@/lib/format'
 import styles from './reservation-people-grid.module.css'
 
 type Slot = { resourceId: string; startsAt: string; href?: string }
@@ -56,17 +56,17 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
       onError('移動できませんでした。予約は元のままです。最新の予約を読み込んでください。')
     }
   }
-  return <Card frame="inset" contentPadding="0" overflow="hidden" data-people-day-grid>
-    <div className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-head>
-      <div className={styles.head}>時刻</div>
-      {staff.map(resource => <div key={resource.id} className={styles.head} title={resource.label}><Avatar name={resource.label} size={24} /><strong>{resource.label}</strong></div>)}
+  return <GridTable presentation="calendar" label={`${formatDay(`${date}T00:00:00+09:00`)}の担当別予約`} design={{ columns, gap: '0', rowPadding: '0', fontSize: 'var(--text-caption)' }} data-people-day-grid>
+    <div role="row" className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-head>
+      <div role="columnheader" className={styles.head}>時刻</div>
+      {staff.map(resource => <div role="columnheader" key={resource.id} className={styles.head} title={resource.label}><Avatar name={resource.label} size={24} /><strong>{resource.label}</strong></div>)}
     </div>
-    {hours.map(minute => <div key={minute} className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-hour={minute}>
-      <div className={styles.time}>{`${Math.floor(minute / 60)}:00`}</div>
+    {hours.map(minute => <div role="row" key={minute} className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-hour={minute}>
+      <div role="rowheader" className={styles.time}>{`${Math.floor(minute / 60)}:00`}</div>
       {staff.map(resource => {
         const bookings = rows.filter(row => row.resourceIds.includes(resource.id) && minuteOf(row.startsAt) >= minute && minuteOf(row.startsAt) < minute + 60)
         const available = daySlots.filter(slot => slot.resourceId === resource.id && minuteOf(slot.startsAt) >= minute && minuteOf(slot.startsAt) < minute + 60)
-        return <div key={resource.id} className={styles.cell} data-resource-id={resource.id} onDragOver={event => { if (canWrite && onMove && !busy) event.preventDefault() }} onDrop={event => void drop(resource.id, minute, event)}>
+        return <div role="cell" key={resource.id} className={styles.cell} data-resource-id={resource.id} onDragOver={event => { if (canWrite && onMove && !busy) event.preventDefault() }} onDrop={event => void drop(resource.id, minute, event)}>
           {bookings.map(row => {
             const phone = row.source !== 'line' && row.source !== 'liff'
             const label = `${row.customerName} ${formatTime(row.startsAt)}〜${formatTime(row.endsAt)} ${row.courseName ?? '予約'}の詳細`
@@ -81,5 +81,5 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
       })}
     </div>)}
     {rows.filter(row => !row.resourceIds.some(id => staff.some(resource => resource.id === id))).map(row => <Button key={row.id} variant="text" onClick={() => onOpen(row.id)}>{row.customerName}・担当未設定</Button>)}
-  </Card>
+  </GridTable>
 }

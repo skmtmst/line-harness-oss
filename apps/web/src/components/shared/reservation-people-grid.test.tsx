@@ -13,6 +13,9 @@ test('時刻が行、担当が列で、予約の詳細とAPIが返す空き枠�
   const slot = { resourceId: 'b', startsAt: '2026-10-15T02:00:00Z', href: '/booking/bookings/new?staff=b&time=11:00' }
   const { container } = render(<ReservationBoard kind="people" timeDirection="vertical" dates={['2026-10-15']} entries={[row]} resources={resources} slots={[slot, slot]} canWrite onOpen={open} />)
   const header = container.querySelector('[data-people-grid-head]')!
+  expect(screen.getByRole('table', { name: /担当別予約/ })).toBeTruthy()
+  expect(screen.getAllByRole('columnheader')).toHaveLength(3)
+  expect(screen.getAllByRole('rowheader')).toHaveLength(9)
   expect(header.textContent).toContain('担当A'); expect(header.textContent).toContain('担当B')
   const hour = container.querySelector('[data-people-grid-hour="540"]')!
   expect(hour.textContent).toContain('9:00')
