@@ -1,7 +1,7 @@
 import type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
 export type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
-import type { NenPhotoPublicationList, AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
-export type { NenPhotoPublicationList, AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
 import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
@@ -5385,6 +5385,26 @@ export type NenPhotoRewardActionResult = {
 }
 
 /** 掲載先1件。active=0 の外した先も removed_at つきで残る（Issue #1040）。 */
+/**
+ * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
+ * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
+ * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
+ */
+export type NenPhotoPublicationList = {
+  summary: {
+    publishedCount: number
+    placementCount: number
+    topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
+    consentedCount: number
+    attentionCount: number
+    withdrawnCount: number
+  }
+  items: Array<Record<string, unknown>>
+  pendingWithdrawals: Array<Record<string, unknown>>
+  withdrawnItems: Array<Record<string, unknown>>
+}
+
 export type NenPhotoPublicationPlacement = {
   id: string
   publication_id?: string
