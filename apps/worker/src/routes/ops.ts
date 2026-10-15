@@ -1,3 +1,4 @@
+import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { opsTenantMetrics } from '../services/ops-tenant-metrics.js';
@@ -44,25 +45,7 @@ import { parseFeaturePacks } from './tenants.js';
 export const ops = new Hono<Env>();
 
 ops.use('/api/ops/*', requirePlatformAdmin());
-
-type TenantStatus = 'active' | 'suspended' | 'archived';
 const TENANT_STATUSES = new Set<TenantStatus>(['active', 'suspended', 'archived']);
-
-type TenantListRow = {
-  id: string;
-  name: string;
-  status: TenantStatus;
-  feature_packs: string;
-  plan_key: string | null;
-  plan_status: string;
-  trial_ends_at: string | null;
-  current_period_ends_at: string | null;
-  created_at: string;
-  updated_at: string;
-  account_count: number;
-  staff_count: number;
-  last_login_at: string | null;
-};
 
 function reasonFrom(body: unknown): string | null {
   const reason = (body as { reason?: unknown } | null)?.reason;

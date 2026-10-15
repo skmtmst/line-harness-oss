@@ -1,3 +1,5 @@
+import type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
+export type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
 import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
@@ -1927,45 +1929,6 @@ export type BroadcastLedger = {
 
 export type { BroadcastMessageButton, BroadcastMessageOptions } from '@line-crm/shared';
 import type { BroadcastMessageOptions } from '@line-crm/shared';
-
-export type BroadcastPreflight = {
-  audienceCount: number
-  hiddenExcluded: number
-  consentExcluded?: number
-  warnings: Array<{ level: 'info' | 'warning'; message: string }>
-  audience?: {
-    matched: number
-    sendable: number
-    evaluatedAt: string
-    representatives: Array<{
-      friendId: string
-      displayName: string | null
-      pictureUrl: string | null
-      summary: string
-    }>
-  }
-  exclusions?: {
-    blocked: number
-    hidden: number
-    missingDestination: number
-    duplicate: number
-    paused: number | null
-    total: number
-  }
-  quota?: {
-    monthlyUsed: number | null
-    monthlyLimit: number | null
-    remaining: number | null
-    planned: number
-    state: 'available' | 'insufficient' | 'unavailable'
-    reason: string | null
-  }
-  concurrentBroadcasts?: Array<{ id: string; title: string; scheduledAt: string }>
-  conditionAxes?: {
-    standard: Array<{ key: string; label: string }>
-    broadcastOnly: Array<{ key: string; label: string }>
-  }
-}
 
 export type BroadcastSavedView = {
   id: string

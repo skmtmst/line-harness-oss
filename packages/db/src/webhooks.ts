@@ -1,3 +1,5 @@
+import type { WebhookInteractionFailureReason } from './webhook-failure-types.js';
+export type { WebhookInteractionFailureReason } from './webhook-failure-types.js';
 import type { WebhookCreateState } from '@line-crm/shared';
 import { readFolderAssignment } from './folder-assignment.js';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
@@ -124,18 +126,6 @@ export interface OutgoingWebhookRow {
 
 export type WebhookInteractionDirection = 'outgoing' | 'incoming';
 export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'retried';
-export type WebhookInteractionFailureReason =
-  | 'connection_failed'
-  | 'response_4xx'
-  | 'response_429'
-  | 'response_5xx'
-  | 'processing_failed'
-  | 'unknown'
-  /**
-   * d23b R415: こちら側の署名用の合言葉が読めず、外部へ一度も送れて
-   * いない失敗。「相手から返事がない」(connection_failed)と区別する。
-   */
-  | 'secret_unavailable';
 
 export interface WebhookInteractionRow {
   id: string;

@@ -1,3 +1,5 @@
+import { resolveMetadata } from './step-metadata.js';
+export { resolveMetadata } from './step-metadata.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement } from './outbound-idempotency.js';
@@ -163,26 +165,6 @@ export function expandVariables(
     });
   }
   return result;
-}
-
-/**
- * Resolve metadata for a friend, merging across all UUID-linked records.
- * Falls back to the friend's own metadata if no user_id.
- */
-export async function resolveMetadata(
-  db: D1Database,
-  friend: { user_id?: string | null; metadata?: string | null },
-): Promise<Record<string, unknown>> {
-  // If friend has a UUID, merge metadata from all linked records
-  if (friend.user_id) {
-    const { getMergedMetadataByUserId } = await import('@line-crm/db');
-    return getMergedMetadataByUserId(db, friend.user_id);
-  }
-  // Fallback: parse own metadata
-  if (friend.metadata) {
-    try { return JSON.parse(friend.metadata); } catch { return {}; }
-  }
-  return {};
 }
 
 const MAX_SENDS_PER_CRON = 40; // CF Free plan: 50 subrequests limit (margin for other jobs)

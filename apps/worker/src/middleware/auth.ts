@@ -1,3 +1,4 @@
+import { parseCookieHeader, bearerToken } from './auth-http.js';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
@@ -26,36 +27,6 @@ export const SESSION_REMEMBER_MAX_AGE = 7 * 24 * 60 * 60;
 export const SESSION_MAX_AGE = SESSION_REMEMBER_MAX_AGE;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-/**
- * decodeURIComponent throws on malformed percent escapes (e.g. `%`). Cookie
- * headers are client-controlled, so fall back to the raw value rather than
- * letting the exception turn a request into a 500.
- */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function parseCookieHeader(cookieHeader: string | undefined): Record<string, string> {
-  if (!cookieHeader) return {};
-  const cookies: Record<string, string> = {};
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=');
-    if (!rawName) continue;
-    cookies[rawName] = safeDecode(rawValue.join('=') || '');
-  }
-  return cookies;
-}
-
-function bearerToken(c: Context<Env>): string | null {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  return authHeader.slice('Bearer '.length);
-}
 
 /**
  * Return the hash key of the existing opaque admin session for server-side

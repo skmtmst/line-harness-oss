@@ -1,3 +1,5 @@
+import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
+export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第1段：設定（Google接続）と口コミ。
@@ -184,10 +186,6 @@ export function accountId(c: Context<Env>): string | null {
 
 export function staffTenantId(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
-}
-
-export function nowIso(): string {
-  return new Date().toISOString();
 }
 
 export function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = []) {
@@ -896,55 +894,6 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   auditLog(c, 'restaurant.google.disconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
   return c.json({ success: true, revoked, connection: publicConnection(await connectionFor(c, store.id)) });
 });
-
-// ---------- 口コミタブ ----------
-
-/** 口コミの取り込みUPSERT。手動sync（下のエンドポイント）と定期再同期の両方から使う。 */
-export async function upsertReviewsForEnv(env: Env['Bindings'], storeId: string, reviews: GoogleReview[]): Promise<void> {
-  const db = dbFor(env, storeId);
-  const now = nowIso();
-  const statements = reviews.map((review) =>
-    db
-      .prepare(
-        `INSERT INTO rt_google_reviews
-           (id, store_id, review_name, reviewer_display_name, star_rating, comment, create_time, update_time, needs_attention,
-            reply_status, reply_comment, reply_update_time, first_seen_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(store_id, review_name) DO UPDATE SET
-           reviewer_display_name = excluded.reviewer_display_name,
-           star_rating = excluded.star_rating,
-           comment = excluded.comment,
-           update_time = excluded.update_time,
-           needs_attention = excluded.needs_attention,
-           reply_comment = excluded.reply_comment,
-           reply_update_time = excluded.reply_update_time,
-           reply_status = CASE
-             WHEN excluded.reply_comment IS NOT NULL THEN 'published'
-             WHEN rt_google_reviews.reply_status IN ('replied', 'pending_confirm', 'published') THEN 'unreplied'
-             ELSE rt_google_reviews.reply_status END,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(
-        crypto.randomUUID(),
-        storeId,
-        review.name,
-        review.reviewerDisplayName,
-        review.starRating,
-        review.comment,
-        review.createTime,
-        review.updateTime,
-        review.starRating <= 3 ? 1 : 0,
-        review.reply ? 'published' : 'unreplied',
-        review.reply?.comment ?? null,
-        review.reply?.updateTime ?? null,
-        now,
-        now,
-      ),
-  );
-  for (let index = 0; index < statements.length; index += 50) {
-    await db.batch(statements.slice(index, index + 50));
-  }
-}
 
 /** 同期結果（時刻・平均評価・総件数）を接続行へ記録する。手動syncと定期再同期の両方から使う。 */
 export async function recordReviewSyncResult(

@@ -1,3 +1,5 @@
+import type { TagCsvImportRowCode } from './tag-import-row-code.js';
+export type { TagCsvImportRowCode } from './tag-import-row-code.js';
 import type { BroadcastBubble } from './broadcast-definition.js';
 import type { ApiFieldErrors } from './api-field-errors.js';
 
@@ -152,17 +154,6 @@ export type TagCsvImportRowStatus =
   | "skipped"
   | "invalid"
   | "failed";
-
-export type TagCsvImportRowCode =
-  | "name_required"
-  | "name_too_long"
-  | "invalid_character"
-  | "already_exists"
-  | "duplicate_in_file"
-  | "folder_not_found"
-  | "folder_ambiguous"
-  | "folder_changed"
-  | "create_failed";
 
 /** 事前確認・実行結果で共通して返す1行。失敗行CSVを画面で作れる情報を残す。 */
 export interface TagCsvImportRowResult {

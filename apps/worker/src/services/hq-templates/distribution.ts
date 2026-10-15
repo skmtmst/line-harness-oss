@@ -1,3 +1,4 @@
+import { canonicalDefinition } from './canonical-definition.js';
 import { isCatalogType, parseCatalogDefinition, catalogSnapshot, inspectCatalog, planCatalog } from './catalog.js';
 import { isDeliveryType, parseDeliveryDefinition, deliverySnapshot, inspectDelivery, planDelivery, validateDeliveryReferences, deliveryReferenceItems } from './delivery.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
@@ -71,23 +72,6 @@ async function replayTemplateCreation(db: D1Database, authority: HqTemplateAutho
   if (!initial) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
   // Return the original creation response, even if the live record was later edited/archived.
   return { template: { id: templateId, tenant_id: authority.tenantId, template_type: initial.template_type, name, description, current_version_id: initial.id, revision: 2, created_by: initial.created_by, created_at: initial.template_created_at, updated_at: initial.created_at, archived_at: null, folder_id: folderId }, definition: JSON.parse(initial.definition_json) as unknown };
-}
-async function canonicalDefinition(db:D1Database,type: HqTemplateType, value: unknown, authority: HqTemplateAuthority): Promise<unknown> {
-  if(isCatalogType(type)) return parseCatalogDefinition(type,value);
-  if(isDeliveryType(type)) return parseDeliveryDefinition(db,type,value);
-  try {
-    if (type === 'scenario') return parseScenarioDefinition(value);
-    if (type === 'tag') return parseTagDefinition(value);
-    if (type === 'friend_field') return parseFriendFieldDefinition(value);
-    if (type === 'mark') return parseMarkDefinition(value);
-    if (type === 'template') return parseMessageTemplateDefinition(value);
-    const input = { templateVersionId: 'validation', definitionJson: JSON.stringify(value) };
-    if (type === 'rich_menu') return parseRichMenuTemplateDefinition(input, authority.tenantId);
-    return parseFormTemplateDefinition(input);
-  } catch (error) {
-    if (error instanceof HqTemplateError) throw error;
-    throw new HqTemplateError('INVALID_DEFINITION');
-  }
 }
 export async function saveTemplate(db: D1Database, authority: HqTemplateAuthority, body: Record<string, unknown>, id?: string) {
   const requestId = id ? null : templateCreationRequestId(body.requestId);

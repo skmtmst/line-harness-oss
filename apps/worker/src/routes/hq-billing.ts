@@ -1,3 +1,5 @@
+import { mapStripeSubscriptionStatus } from './hq-subscription-status.js';
+export { mapStripeSubscriptionStatus } from './hq-subscription-status.js';
 import { hqBillingMetrics } from '../services/hq-billing-metrics.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -64,22 +66,6 @@ function adminOrigin(c: Context<Env>): string | null {
 
 function stripeReady(c: Context<Env>): boolean {
   return Boolean(c.env.STRIPE_SECRET_KEY);
-}
-
-export function mapStripeSubscriptionStatus(status: string): TenantPlanStatus | null {
-  switch (status) {
-    case 'active':
-    case 'trialing':
-      return 'active';
-    case 'past_due':
-    case 'unpaid':
-      return 'past_due';
-    case 'incomplete':
-      return null;
-    default:
-      // canceled / incomplete_expired / paused
-      return 'canceled';
-  }
 }
 
 function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end' | 'items'>): string | null {
