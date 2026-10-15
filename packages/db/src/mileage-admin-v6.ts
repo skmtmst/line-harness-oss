@@ -435,13 +435,22 @@ export async function getMileageFriendsV6(
             COALESCE(l.lifetime_earned, 0) AS lifetime_earned, COALESCE(l.spent, 0) AS spent,
             COALESCE(l.month_change, 0) AS month_change, l.last_changed_at,
             e.amount AS expiring_amount, e.lot_count, e.next_expires_at,
+            (SELECT json_object('name',ml.reason,'amount',ml.amount,'occurredAt',ml.occurred_at,'entryType',ml.entry_type,'status',ml.status)
+               FROM mileage_ledger ml LEFT JOIN friends lf ON lf.id=ml.beneficiary_friend_id
+              WHERE ml.program_id='default'
+                AND ((s.user_id IS NOT NULL AND (ml.beneficiary_user_id=s.user_id OR lf.user_id=s.user_id))
+                  OR (s.user_id IS NULL AND ml.beneficiary_friend_id=s.friend_id))
+                AND (lf.line_account_id IN (SELECT value FROM json_each(?))
+                  OR (ml.beneficiary_friend_id IS NULL AND ml.beneficiary_user_id IS NOT NULL AND EXISTS(
+                    SELECT 1 FROM friends vf WHERE vf.user_id=ml.beneficiary_user_id AND vf.line_account_id IN (SELECT value FROM json_each(?)))))
+              ORDER BY datetime(ml.occurred_at) DESC,datetime(ml.created_at) DESC,ml.id DESC LIMIT 1) AS last_action_json,
             COUNT(*) OVER() AS filtered_count
        FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key
        LEFT JOIN expiring e ON e.beneficiary_key = s.beneficiary_key
       WHERE (? = '' OR s.display_name LIKE '%' || ? || '%')
         AND (? = '' OR s.friend_id = ?)
       ORDER BY available DESC, s.display_name, s.friend_id LIMIT ? OFFSET ?`,
-  ).bind(...binds, input.search, input.search, input.friendId ?? '', input.friendId ?? '', input.limit, input.offset).all<Record<string, unknown>>();
+  ).bind(...binds, JSON.stringify(input.visibleAccountIds), JSON.stringify(input.visibleAccountIds), input.search, input.search, input.friendId ?? '', input.friendId ?? '', input.limit, input.offset).all<Record<string, unknown>>();
   /*
    * 合計は beneficiary_key（本人）単位で足す。同じ本人へ複数プロフィールが
    * 結ばれていても、ledger/expiring はキーごとに1行なので二重計上しない
@@ -509,6 +518,9 @@ export async function getMileageFriendsV6(
       lifetimeEarned: Number(row.lifetime_earned ?? 0),
       spent: Number(row.spent ?? 0),
       lastChangedAt: row.last_changed_at ?? null,
+      lastAction: row.last_action_json == null ? null : JSON.parse(String(row.last_action_json)) as {
+        name: string; amount: number; occurredAt: string; entryType: string; status: string;
+      },
       walletScope: row.user_id ? 'verified_user' : 'friend',
       lineAccount: { id: row.line_account_id, name: row.line_account_name },
     })}),

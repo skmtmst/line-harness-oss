@@ -63,6 +63,11 @@ beforeEach(() => {
 });
 
 describe('UID移行API', () => {
+  it('配信停止の引き継ぎは照合できない間、0やずれなしにしない', async () => {
+    const response=await appFor().request('/api/friends/migrations/run-1',{},env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({data:{suppressionReconciliation:{status:'unavailable',transferredCount:null,mismatchCount:null,reason:'delivery_suppression_ledger_missing'}}});
+  });
   it('dry-runは対象アカウントの権限を確認する', async () => {
     accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
     const response = await appFor().fetch(post('/api/friends/migrations', {

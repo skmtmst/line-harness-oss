@@ -265,6 +265,11 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
         itemOffset: offset,
         unresolved,
         decisionCounts,
+        // 独立した配信停止・同意台帳が無く、移行の記録にも照合値が無い。
+        suppressionReconciliation: {
+          status: 'unavailable', transferredCount: null, mismatchCount: null,
+          reason: 'delivery_suppression_ledger_missing',
+        },
       },
     });
   } catch (error) {
