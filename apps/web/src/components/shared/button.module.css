@@ -369,6 +369,6 @@
 :root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
 }
 /* B-211：共通ボタンを選ぶ札として使う画面も同じ形。 */
-html:root .button[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
+html:root .button:not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
 
 :root .button[data-full-width] { width: 100%; justify-content: center; text-align: center; }
