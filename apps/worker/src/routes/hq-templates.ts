@@ -21,11 +21,7 @@ import { dbFor } from '../services/db-router.js';
 import type { Env } from '../index.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
 import { requireRole } from '../middleware/role-guard.js';
-import {
-  templateVersions, compareTemplateVersions, restoreTemplateVersion, templateReceivedVersions,
-  HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate,
-  preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection,
-} from '../services/hq-templates/distribution.js';
+import { templateVersions, compareTemplateVersions, restoreTemplateVersion, templateReceivedVersions, HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate, preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection } from '../services/hq-templates/distribution.js';
 
 export const hqTemplates = new Hono<Env>();
 async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
@@ -145,7 +141,7 @@ hqTemplates.get('/api/hq/templates', async c => {
   const folder=c.req.query('folder_id');
   const undistributed=c.req.query('undistributed');
   if(undistributed!==undefined&&!['true','false'].includes(undistributed))throw new HqTemplateError('INVALID_LIST_FILTER');
-  const searchIds=search===undefined?null:await messageTemplateSearchIds(dbFor(c.env),await authority(c),search);
+  const searchIds=search===undefined?null:await messageTemplateSearchIds(dbFor(c.env),await authority(c),search,status);
   const messageCount = c.req.query('message_count');
   const hasInterpolations = c.req.query('has_interpolations');
   if (messageCount !== undefined && !['single', 'multiple'].includes(messageCount)

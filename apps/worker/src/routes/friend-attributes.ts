@@ -1,82 +1,14 @@
+import { serializeMark } from './friend-mark-display.js';
 import { parseSupportMarkLocations } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import {
-  restoreSupportMark,
-  ArchiveRestoreError,
-  getSupportMarksWithUsage,
-  getSupportMarkArchiveImpact,
-  getSupportMarkById,
-  createSupportMarkIdempotent,
-  SupportMarkCreateError,
-  updateSupportMark,
-  reorderSupportMarks,
-  replaceAndArchiveSupportMark,
-  archiveSupportMarkWithReplacement,
-  SupportMarkArchiveError,
-  getDefaultSupportMark,
-  setFriendSupportMark,
-  setFriendSupportMarkBulk,
-  getSavedSearches,
-  getSavedSearchById,
-  createSavedSearch,
-  reorderSavedSearches,
-  updateSavedSearchWithRevision,
-  deleteSavedSearch,
-  countSavedSearches,
-  getSavedSearchReferences,
-  getSavedSearchUsageCounts,
-  getSavedSearchReferenceUsageCounts,
-  jstNow,
-  validateSearchConditions,
-  validateSavedSegmentConditions,
-  SAVED_SEARCH_LIMIT,
-  getLoginAudit,
-  getStaffMembers,
-  LOGIN_AUDIT_ACTIONS,
-  type LoginAuditRow,
-  type LoginAuditAction,
-  getFolders,
-  getFolderItemCounts,
-  getFolderById,
-  createFolder,
-  updateFolder,
-  swapFolderOrder,
-  FolderConflictError,
-  deleteFolder,
-  isFolderKind,
-  getWebinarFolderCounts,
-  type SupportMark,
-  type SupportMarkWithUsage,
-  type SupportMarkScope,
-  type SavedSearch,
-  type SavedSearchAccess,
-  type SavedSearchConditionFormat,
-  type SavedSearchReference,
-  type Folder,
-} from '@line-crm/db';
+import { restoreSupportMark, ArchiveRestoreError, getSupportMarksWithUsage, getSupportMarkArchiveImpact, getSupportMarkById, createSupportMarkIdempotent, SupportMarkCreateError, updateSupportMark, reorderSupportMarks, replaceAndArchiveSupportMark, archiveSupportMarkWithReplacement, SupportMarkArchiveError, getDefaultSupportMark, setFriendSupportMark, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, jstNow, validateSearchConditions, validateSavedSegmentConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, getFolderById, createFolder, updateFolder, swapFolderOrder, FolderConflictError, deleteFolder, isFolderKind, getWebinarFolderCounts, type SupportMarkWithUsage, type SupportMarkScope, type SavedSearch, type SavedSearchAccess, type SavedSearchConditionFormat, type SavedSearchReference, type Folder } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import {
-  getSavedSearchMatchInsights,
-  getSavedSearchMatchPreview,
-  type SavedSearchMatchInsight,
-  type SavedSearchMatchPreview,
-} from '../services/saved-search-insights.js';
-import {
-  archiveSupportMarkAutomationRule,
-  createSupportMarkAutomationRuleIdempotent,
-  listSupportMarkAutomationRules,
-  listSupportMarkAutomationRulesForAccount,
-  SUPPORT_MARK_RULE_EVENTS,
-  SupportMarkRuleCreateError,
-  updateSupportMarkAutomationRule,
-  validateSupportMarkAutomationRuleInput,
-  type SaveSupportMarkAutomationRule,
-  type SupportMarkRuleEvent,
-} from '../services/support-mark-automation.js';
+import { getSavedSearchMatchInsights, getSavedSearchMatchPreview, type SavedSearchMatchInsight, type SavedSearchMatchPreview } from '../services/saved-search-insights.js';
+import { archiveSupportMarkAutomationRule, createSupportMarkAutomationRuleIdempotent, listSupportMarkAutomationRules, listSupportMarkAutomationRulesForAccount, SUPPORT_MARK_RULE_EVENTS, SupportMarkRuleCreateError, updateSupportMarkAutomationRule, validateSupportMarkAutomationRuleInput, type SaveSupportMarkAutomationRule, type SupportMarkRuleEvent } from '../services/support-mark-automation.js';
 import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
 
 /**
@@ -86,29 +18,6 @@ import { buildSegmentWhere, type SegmentCondition } from '../services/segment-qu
  * どれも小さく、別ファイルに散らすと登録漏れの方が起きやすい。
  */
 const friendAttributes = new Hono<Env>();
-
-
-function serializeMark(
-  row: SupportMark,
-  automationRules: Awaited<ReturnType<typeof listSupportMarkAutomationRulesForAccount>> = [],
-) {
-  return {
-    id: row.id,
-    name: row.name,
-    color: row.color,
-    isDefault: Boolean(row.is_default),
-    autoOnInbound: Boolean(row.auto_on_inbound),
-    displayOrder: row.display_order,
-    displayLocations: parseSupportMarkLocations(JSON.parse(row.display_locations_json)),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at ?? row.created_at,
-    version: Number(row.version ?? 1),
-    isInherited: Boolean(row.is_inherited),
-    archivedAt: row.archived_at,
-    automationRules,
-    displayTargets: parseSupportMarkLocations(JSON.parse(row.display_locations_json)).map(location=>location==='friends'?'friend_list':location),
-  };
-}
 
 function serializeMarkImpact(row: SupportMarkWithUsage) {
   return {

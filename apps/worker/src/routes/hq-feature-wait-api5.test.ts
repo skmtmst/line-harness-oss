@@ -62,6 +62,17 @@ describe('Upx1c: 保存した通数・差し込みで統括テンプレートを
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('組1の保管状態と組5の本文検索・通数・差し込み条件を同時に使える',async()=>{
+    const archived=await create('保管の検索 {{name}}'),active=await create('有効の検索 {{name}}');
+    sql.raw.prepare("UPDATE hq_templates SET archived_at=datetime('now') WHERE id=?").run(archived);
+    const filter='&search=検索&message_count=single&has_interpolations=true&undistributed=true&folder_id=';
+    for(const [status,ids] of [['active',[active]],['archived',[archived]],['all',[active,archived]]] as const){
+      const response=await request('?type=template&kind=message&status='+status+filter);
+      expect(response.status).toBe(200);expect(response.body.data.map(row=>row.id).sort()).toEqual([...ids].sort());
+      expect(response.body).toMatchObject({status,archive_counts:{active:1,archived:1}});
+    }
+  });
+
   it('カードは1通、依存画像を通数に足さず、壊れた版・未知の複数通を1通にしない', async () => {
     const single = definition('本文');
     const media = ['one','two'].map(id => ({ id,kind:'image',filename:`${id}.png`,mimeType:'image/png',sizeBytes:10,

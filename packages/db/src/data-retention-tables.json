@@ -4659,5 +4659,12 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "hq_template_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
   }
 }

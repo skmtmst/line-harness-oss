@@ -1,6 +1,6 @@
 import type { HqTemplateAuthority } from './contract.js';
 import { boundedText, HqTemplateError } from './tag.js';
-import { TEMPLATE_KINDS } from '@line-crm/shared';
+import { TEMPLATE_KINDS, type HqTemplateArchiveStatus } from '@line-crm/shared';
 
 export interface TemplateViewFilters {
   kind?: typeof TEMPLATE_KINDS[number];
@@ -61,15 +61,15 @@ export async function archiveTemplateView(db:D1Database,auth:HqTemplateAuthority
 }
 
 /** Search only message content fields, never filenames/media URLs. Values remain server-side. */
-export async function messageTemplateSearchIds(db:D1Database,auth:HqTemplateAuthority,search:string){
+export async function messageTemplateSearchIds(db:D1Database,auth:HqTemplateAuthority,search:string,status:HqTemplateArchiveStatus='active'){
  if(search.length>200)throw new HqTemplateError('INVALID_LIST_FILTER',422);
  const result=await db.prepare(`SELECT t.id FROM hq_templates t JOIN hq_template_versions v
    ON v.id=t.current_version_id AND v.tenant_id=t.tenant_id AND v.template_id=t.id
-   WHERE t.tenant_id=? AND t.archived_at IS NULL AND t.template_type='template'
+   WHERE t.tenant_id=? AND (?='all' OR (?='active' AND t.archived_at IS NULL) OR (?='archived' AND t.archived_at IS NOT NULL)) AND t.template_type='template'
    AND (instr(lower(t.name),lower(?))>0 OR EXISTS(
      SELECT 1 FROM json_tree(v.definition_json) j WHERE j.type='text'
      AND (j.fullkey LIKE '$.template.%' OR j.fullkey LIKE '$.card.%' OR j.fullkey LIKE '$.asset.payload.%')
      AND j.key NOT IN ('id','name','category') AND instr(lower(CAST(j.value AS TEXT)),lower(?))>0))`)
-   .bind(auth.tenantId,search,search).all<{id:string}>();
+   .bind(auth.tenantId,status,status,status,search,search).all<{id:string}>();
  return new Set(result.results.map(row=>row.id));
 }

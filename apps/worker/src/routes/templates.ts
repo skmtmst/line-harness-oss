@@ -1,33 +1,13 @@
+import { readCarouselOptions } from './template-carousel-input.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
-import {
-  getTemplatesWithUsageCount,
-  getTemplateSendCounts,
-  getTemplateFolderCounts,
-  getTemplateById,
-  getTemplateUsage,
-  createTemplate,
-  updateTemplate,
-  saveTemplateDraft,
-  publishTemplate,
-  hasTemplateDraft,
-  deleteTemplate,
-  getCarouselTapTotals,
-  getFolderById,
-  listTemplateVersions,
-  revertTemplateToVersion,
-  listBroadcastReferences,
-  listTemplateReferences,
-  getBroadcastDeleteBlockers,
-  getPinnedReminderDeleteBlockers,
-  MediaReferenceAccountError,
-} from '@line-crm/db';
+import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -72,7 +52,6 @@ async function readFolderId(
   }
   return { ok: true, folderId: id };
 }
-
 
 const QUESTION_BEHAVIORS = new Set([
   'none',
@@ -243,7 +222,6 @@ function checkImageTemplate(messageType: string | undefined, messageContent: str
     return { ok: true };
   } catch { return { ok: false, error: '画像の指定が読み取れません' }; }
 }
-
 
 templates.get('/api/templates', async (c) => {
   try {
@@ -504,42 +482,6 @@ templates.get('/api/templates/:id/usages', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
-
-/** 162: カルーセルの選択肢まわりの設定を読む。 */
-function readCarouselOptions(body: Record<string, unknown>):
-  | { ok: true; value: Record<string, unknown> }
-  | { ok: false; error: string } {
-  const value: Record<string, unknown> = {};
-  if ('carouselActions' in body) {
-    const raw = body.carouselActions;
-    if (raw === null) {
-      value.carouselActions = null;
-    } else if (typeof raw !== 'object' || Array.isArray(raw)) {
-      return { ok: false, error: 'carouselActions must be an object keyed by column index' };
-    } else {
-      value.carouselActions = raw;
-    }
-  }
-  if ('carouselTapLimitMode' in body) {
-    if (body.carouselTapLimitMode !== 'none' && body.carouselTapLimitMode !== 'once') {
-      return { ok: false, error: "carouselTapLimitMode must be 'none' or 'once'" };
-    }
-    value.carouselTapLimitMode = body.carouselTapLimitMode;
-  }
-  if ('carouselTapLimitText' in body) {
-    const raw = body.carouselTapLimitText;
-    if (raw === null || raw === '') {
-      value.carouselTapLimitText = null;
-    } else if (typeof raw !== 'string') {
-      return { ok: false, error: 'carouselTapLimitText must be a string' };
-    } else if ([...raw].length > 300) {
-      return { ok: false, error: 'carouselTapLimitText must be 300 characters or fewer' };
-    } else {
-      value.carouselTapLimitText = raw;
-    }
-  }
-  return { ok: true, value };
-}
 
 /**
  * N-146: 空でない文字列か。口を直接叩かれても、空白だけの名前や本文は
