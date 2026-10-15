@@ -190,3 +190,12 @@ describe('結合送信(N-022)', () => {
     expect(rows()).toEqual([]);
   });
 });
+
+
+test('B-333 ブロック後のまとめて送信は送信0回', async () => {
+  sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+  const response = await postCombined({ text: '送らない' }, KEY1);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: 'FRIEND_NOT_FOLLOWING' });
+  expect(pushMessage).not.toHaveBeenCalled();
+});

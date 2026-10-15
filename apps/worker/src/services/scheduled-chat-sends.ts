@@ -75,6 +75,14 @@ async function dispatchOne(
     return;
   }
 
+  if (target.friend.is_following !== 1) {
+    await markScheduledChatSendFailed(env.DB, {
+      id: row.id, leaseToken: row.lease_token!, errorCode: 'friend_not_following',
+      error: 'ブロックまたは友だち解除された相手のため送信しませんでした', retryable: false, now: nowIso,
+    });
+    return;
+  }
+
   /*
    * アカウント停止中（X-1、v6-33 §10-1）。既定アカウントのトークンへ
    * 逃がすと別名義で届いてしまうので、送らずに失敗行として残す。

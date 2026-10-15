@@ -1768,6 +1768,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
       c.env.DB,
@@ -2158,6 +2159,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
       c.env.DB,
@@ -2526,6 +2528,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
       'chats.schedule-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
     if (!await canAccessAllLineAccounts(
       c.env.DB,
       c.get('staff'),
