@@ -54,7 +54,9 @@ tags: [memory, core]
 
 ## 進行中（2026-10-15）
 
-- oneF2x HEAVY 8割役：70%以下名簿との交差35板中F4gELj/OxEMM/pvimJを75〜85%へ（正式合格前）。画面SHA94aa0a5b69、3幅9条件F1〜F10/崩れ0・操作9成功・1440左右3枚自己確認。関連211/型/build/design成功。鍵331/332、直前版比追加0、既存cFo2p1440欠測1とQ0Jrkの意図した26属性変化を記録。残り32（画面14/共通17/絵1）、細部はClaudeへ。docs/qa/one-f2x-heavy-80-1015.md、外部F2x/heavy-80-1015/round2。MID/Claude20板/共通/Pen/台帳/親EC/DB/配備/push/PRは未変更。
+- oneF2x予約8割役：製品7090938addでv5L19Z/x1OZS6の2板を75〜85%へ。前回と累計5/35、残30（画面11/共通18/絵1）。関連274/型/lintエラー0/所有新規0/長さ0/build/design成功。3板9条件中2板6条件は全F/崩れ0、qfはF6=3/2/1で共通G/Fへ・未完。操作9条件成功、1440全高左右3枚自己確認。鍵331/332・既存113板3991差は直前版と全一致/追加0、cFo1440欠測1を維持。docs/qa/one-f2x-reservations-80-1015.md・外部F2x/heavy-reservations-1015。MID/Claude20板/共通/Pen/台帳/親EC/DB/配備/push/PR未変更、コミットまで。
+
+- （前回）oneF2x HEAVY 8割役：70%以下名簿との交差35板中F4gELj/OxEMM/pvimJを75〜85%へ（正式合格前）。画面SHA94aa0a5b69、3幅9条件F1〜F10/崩れ0・操作9成功・1440左右3枚自己確認。関連211/型/build/design成功。鍵331/332、直前版比追加0、既存cFo2p1440欠測1とQ0Jrkの意図した26属性変化を記録。残り32（画面14/共通17/絵1）、細部はClaudeへ。docs/qa/one-f2x-heavy-80-1015.md、外部F2x/heavy-80-1015/round2。MID/Claude20板/共通/Pen/台帳/親EC/DB/配備/push/PRは未変更。
 
 - oneF2x J6/J7・PUNCH再開：本線d12包含、列車38最新68f580f6f9を9b707dcfacへ両側の記録保持でmerge。前回の入力/説明を1cbf86cad1、Kから継承した比較画面をd4f455a99dへ保存。関連22ファイル284件・型・lintエラー0・所有新規/一時許可0。現行browser-hostを通さなかった実寸の初回は測定前失敗として原本保持し、手順だけ修正。優先4板12条件/本番build/単板1440自己撮影はheavy待ち。完成/候補/RECIPES追加0。Pen/台帳/親EC/push/PR/DB/配備は変更なし。詳細docs/qa/one-f2x-j7-1015.md。
 
