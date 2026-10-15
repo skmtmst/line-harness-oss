@@ -7,6 +7,8 @@ export interface AssignmentCandidate {
   dailyLimit: number | null;
   priority: BookingAssignmentPriority;
   sortOrder: number;
+  /** 最後に予約を受けた時刻（未担当はnull）。 */
+  lastAssignedAt?: string | null;
   minCapacity?: number;
   maxCapacity?: number;
   /** 結合卓は、構成卓のどれかが上限に達したら選ばない。 */
@@ -35,7 +37,10 @@ export function selectAssignment<T extends AssignmentCandidate>(
   };
   if (options.method === 'balanced') keepLowest(c => c.periodCount);
   if (options.method === 'priority') keepLowest(c => c.sortOrder);
-  if (options.method !== 'random') keepLowest(c => priorityRank[c.priority]);
+  if (options.method !== 'random') {
+    keepLowest(c => priorityRank[c.priority]);
+    keepLowest(c => c.lastAssignedAt ? Date.parse(c.lastAssignedAt) : -Infinity);
+  }
   if (!pool.length) return null;
   const value = (options.random ?? Math.random)();
   if (!Number.isFinite(value) || value < 0 || value >= 1) throw new Error('invalid_assignment_random');

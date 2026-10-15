@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { assignmentStorageFixture, seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
+import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
 const access = vi.hoisted(() => ({ allow: true }));
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => access.allow),
@@ -30,6 +30,7 @@ beforeEach(() => { f = createTestD1(); seedAssignmentFixture(f); role = 'owner';
 afterEach(() => f.raw.close());
 describe('割り当て設定API', () => {
   it('未移行は初期値と従来方式を明示し、保存は503で断る', async () => {
+    f.raw.exec('DROP TABLE booking_assignment_settings');
     expect(await (await request(people)).json()).toMatchObject({ success: true, data: {
       method: 'balanced', balancePeriod: 'day', storageReady: false, effectiveMethod: 'legacy_first', version: 0,
       resources: [{ resourceId: 's1', priority: 'normal', dailyLimit: null }, { resourceId: 's2' }],
@@ -38,7 +39,6 @@ describe('割り当て設定API', () => {
     expect((await request(tables, { ...input, resources: [] })).status).toBe(503);
   });
   it('移行後は保存・再読込・古い版の拒否と新しい版の保存ができる', async () => {
-    assignmentStorageFixture(f);
     expect((await request(people, input)).status).toBe(200);
     expect(await (await request(people)).json()).toMatchObject({ data: { storageReady: true, effectiveMethod: 'balanced', version: 1,
       resources: [expect.objectContaining({ resourceId: 's1', dailyLimit: 3, priority: 'preferred' }), expect.objectContaining({resourceId:'s2'})] } });
@@ -47,24 +47,21 @@ describe('割り当て設定API', () => {
     expect(await (await request(people)).json()).toMatchObject({ data: { method: 'priority', balancePeriod: 'week', version: 2 } });
   });
   it('未作成の設定に0以外の版を渡しても新しく保存しない', async () => {
-    assignmentStorageFixture(f);
     expect((await request(people, { ...input, expectedVersion: 1 })).status).toBe(409);
     expect(await (await request(people)).json()).toMatchObject({ data: { version: 0 } });
   });
   it('同じ版の同時保存は片方だけを通す', async () => {
-    assignmentStorageFixture(f);
     const results = await Promise.all([request(people, input), request(people, { ...input, method: 'random' })]);
     expect(results.map(r => r.status).sort()).toEqual([200, 409]);
   });
   it('卓の設定は店ごとに保存し、担当者の設定と混ざらない', async () => {
-    assignmentStorageFixture(f);
     const body = { ...input, method: 'random', resources: [{ ...input.resources[0], resourceId: 't1' }] };
     expect((await request(tables, body)).status).toBe(200);
     expect(await (await request(tables)).json()).toMatchObject({ data: { method: 'random', version: 1, resources: expect.arrayContaining([{ ...body.resources[0] }]) } });
     expect(await (await request(people)).json()).toMatchObject({ data: { method: 'balanced', version: 0 } });
   });
   it.each([people, tables])('閲覧のみ・編集キーなしは保存できず、編集キーを持つスタッフは保存できる: %s', async path => {
-    assignmentStorageFixture(f); role = 'staff';
+    role = 'staff';
     const body = { ...input, resources: [] };
     expect((await request(path)).status).toBe(200);
     expect((await request(path, body)).status).toBe(403);
@@ -74,7 +71,7 @@ describe('割り当て設定API', () => {
     expect((await request(path, body)).status).toBe(200);
   });
   it('担当外アカウントと別店舗は読めず、別担当者・卓の設定は保存できない', async () => {
-    assignmentStorageFixture(f); access.allow = false;
+    access.allow = false;
     expect((await request(people)).status).toBe(403);
     expect((await request(tables)).status).toBe(403);
     access.allow = true;
@@ -90,13 +87,11 @@ describe('割り当て設定API', () => {
     { resources: [{ ...input.resources[0], sortOrder: 0.5 }] },
     { resources: [input.resources[0], input.resources[0]] },
   ])('不正な設定は欄のエラーで返す: %j', async patch => {
-    assignmentStorageFixture(f);
     const result = await request(people, { ...input, ...patch });
     expect(result.status).toBe(400);
     expect(await result.json()).toMatchObject({ code: 'invalid_assignment_settings', fields: expect.any(Object) });
   });
   it('DBの障害を未移行の初期値にすり替えない', async () => {
-    assignmentStorageFixture(f);
     f.raw.exec('ALTER TABLE booking_assignment_settings RENAME COLUMN resources_json TO broken');
     expect((await request(people)).status).toBe(503);
   });

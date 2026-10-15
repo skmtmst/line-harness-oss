@@ -578,7 +578,11 @@
     "633_restaurant_external_links.sql",
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
-    "636_restaurant_delivery_uber_connections.sql"
+    "636_restaurant_delivery_uber_connections.sql",
+    "641_booking_assignment_settings.sql",
+    "642_booking_entitlements.sql",
+    "643_booking_entitlement_uses.sql",
+    "644_booking_customer_payment_choice.sql"
   ],
-  "migrationCount": 579
+  "migrationCount": 583
 }

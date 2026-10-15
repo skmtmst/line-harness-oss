@@ -638,6 +638,48 @@
       "column": "tenant_id"
     }
   },
+  "booking_assignment_settings": {
+    "category": "global"
+  },
+  "booking_entitlements": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_entitlement_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_entitlement_month_limits": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "entitlement_id",
+      "parent": "booking_entitlements",
+      "parentColumn": "id"
+    }
+  },
+  "booking_entitlement_uses": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "entitlement_id",
+      "parent": "booking_entitlements",
+      "parentColumn": "id"
+    }
+  },
+  "booking_payment_choices": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "booking_audit_logs": {
     "category": "retain",
     "scope": {

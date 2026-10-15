@@ -132,7 +132,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 771;
+const ALLOWLIST_MAX = 770;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -143,6 +143,12 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'POST /api/liff/booking/requests',
+  'GET /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements/{id}/operations',
+  'GET /api/booking/admin/entitlements/{id}/history',
+  'GET /api/liff/booking/entitlements',
   'GET /api/booking/admin/assignment-settings',
   'PUT /api/booking/admin/assignment-settings',
   'GET /api/restaurant-test/assignment-settings',
@@ -1053,7 +1059,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/liff/affiliate/links',
   'POST /api/liff/affiliate/offers/{id}/enroll',
   'POST /api/liff/affiliate/register',
-  'POST /api/liff/booking/requests',
   'POST /api/liff/events/me/{bookingId}/cancel',
   'POST /api/liff/events/{id}/bookings',
   'POST /api/liff/friend-add-intent',

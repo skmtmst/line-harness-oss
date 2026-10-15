@@ -22,7 +22,11 @@ export async function promoteSeatWaitlist(db: D1Database, slot: SeatWaitlistSlot
   const settingsStore = d1AssignmentSettingsStore(db);
   const settings = await settingsStore.read({ kind: 'table', id: slot.storeId });
   if (settings.storageReady) {
+    // 空いた卓を起点とする既存の案内条件を守る。別の卓の状態変化では案内しない。
+    const released=await db.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1').bind(slot.tableId,slot.storeId).first();
+    if(!released)return {promoted:false,reason:'no_fitting_table'};
     const available = await openSeatTables(db,slot.storeId,next.starts_at,ends,next.guest_count);
+    if(!available.some(t=>t.id===slot.tableId||t.tableIds?.includes(slot.tableId)))return {promoted:false,reason:'no_fitting_table'};
     const selected = await assignRestaurantTable(db,slot.storeId,next.starts_at,next.guest_count,available,
       { store: { ...settingsStore, read: async () => settings } });
     if (!selected) return { promoted: false, reason: 'no_fitting_table' };

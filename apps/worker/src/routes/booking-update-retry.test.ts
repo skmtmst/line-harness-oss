@@ -13,7 +13,6 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../index.js';
-import { assignmentStorageFixture } from '../test-utils/assignment-fixture.js';
 import { d1AssignmentSettingsStore } from '../services/booking-assignment-settings.js';
 
 const availabilityMocks = vi.hoisted(() => ({
@@ -354,7 +353,6 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
   });
 
   test('新方式は同じ枠の連続予約を交互に割り当て、優先順と上限もHTTP作成へ反映する', async () => {
-    assignmentStorageFixture({ db, raw: sqlite });
     sqlite.prepare('UPDATE menus SET concurrent_capacity=10 WHERE id=?').run('m1');
     sqlite.prepare('INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)').run('auto','acc1','booking_auto_assign','true');
     const settings = { method: 'balanced' as const, balancePeriod: 'day' as const, expectedVersion: 0,

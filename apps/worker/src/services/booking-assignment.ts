@@ -17,31 +17,31 @@ export function assignmentWindows(startsAt: string, timezone: string, period: 'd
   };
 }
 
-type Counts = { id: string; periodCount: number; dailyCount: number };
+type Counts = { id: string; periodCount: number; dailyCount: number; lastAssignedAt: string | null };
 type SelectionOptions = { store?: AssignmentSettingsStore; random?: () => number; excludeReservationId?: string };
 
 async function assignmentCandidates(db: D1Database, scope: AssignmentScope, startsAt: string, timezone: string, ids: string[], options: SelectionOptions) {
   const settings = await (options.store ?? d1AssignmentSettingsStore(db)).read(scope);
   const rules = new Map(settings.resources.map(r => [r.resourceId, r]));
   if (!settings.storageReady) return { method: 'legacy_first' as const, candidates: ids.map(id => ({
-    id, ...defaultAssignmentResource(id), dailyCount: 0, periodCount: 0,
+    id, ...defaultAssignmentResource(id), dailyCount: 0, periodCount: 0, lastAssignedAt: null,
   })) };
   const w = assignmentWindows(startsAt, timezone, settings.balancePeriod);
-  const countSql = `COUNT(*) AS periodCount,SUM(CASE WHEN julianday(r.starts_at)>=julianday(?) AND julianday(r.starts_at)<julianday(?) THEN 1 ELSE 0 END) AS dailyCount`;
+  const countSql = `SUM(CASE WHEN julianday(r.starts_at)>=julianday(?) AND julianday(r.starts_at)<julianday(?) THEN 1 ELSE 0 END) AS periodCount,strftime('%Y-%m-%dT%H:%M:%fZ',MAX(julianday(r.requested_at))) AS lastAssignedAt,SUM(CASE WHEN julianday(r.starts_at)>=julianday(?) AND julianday(r.starts_at)<julianday(?) THEN 1 ELSE 0 END) AS dailyCount`;
   const rows = scope.kind === 'staff'
     ? await db.prepare(`SELECT r.staff_id AS id,${countSql} FROM bookings r WHERE r.line_account_id=?
         AND r.status IN ('requested','confirmed','completed') AND r.id<>?
-        AND julianday(r.starts_at)>=julianday(?) AND julianday(r.starts_at)<julianday(?) GROUP BY r.staff_id`)
-      .bind(w.dayFrom, w.dayTo, scope.id, options.excludeReservationId ?? '', w.from, w.to).all<Counts>()
-    : await db.prepare(`SELECT l.table_id AS id,${countSql} FROM rt_reservations r
+        GROUP BY r.staff_id`)
+      .bind(w.from, w.to, w.dayFrom, w.dayTo, scope.id, options.excludeReservationId ?? '').all<Counts>()
+    : await db.prepare(`SELECT l.table_id AS id,${countSql.replace('r.requested_at', 'r.created_at')} FROM rt_reservations r
         JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=? AND r.id<>?
         AND r.status IN ('pending','confirmed','seated','visited')
         AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now'))
-        AND julianday(r.starts_at)>=julianday(?) AND julianday(r.starts_at)<julianday(?) GROUP BY l.table_id`)
-      .bind(w.dayFrom, w.dayTo, scope.id, options.excludeReservationId ?? '', w.from, w.to).all<Counts>();
+        GROUP BY l.table_id`)
+      .bind(w.from, w.to, w.dayFrom, w.dayTo, scope.id, options.excludeReservationId ?? '').all<Counts>();
   const counts = new Map(rows.results.map(r => [r.id, r]));
   return { method: settings.method, candidates: ids.map(id => ({ id, ...(rules.get(id) ?? defaultAssignmentResource(id)),
-    dailyCount: counts.get(id)?.dailyCount ?? 0, periodCount: counts.get(id)?.periodCount ?? 0 })) };
+    dailyCount: counts.get(id)?.dailyCount ?? 0, periodCount: counts.get(id)?.periodCount ?? 0, lastAssignedAt: counts.get(id)?.lastAssignedAt ?? null })) };
 }
 
 /** 空き枠に存在する本当の担当者IDだけを受け取る。 */
@@ -71,6 +71,7 @@ export async function assignRestaurantTable(db: D1Database, storeId: string, sta
     const members = (t.tableIds ?? [t.id]).map(id => byId.get(id)!);
     const weakest = members.reduce((a, b) => rank[a.priority] >= rank[b.priority] ? a : b);
     return { ...t, priority: weakest.priority, sortOrder: Math.max(...members.map(m => m.sortOrder)),
+      lastAssignedAt: members.map(m => m.lastAssignedAt).filter((t): t is string => !!t).sort((a,b) => Date.parse(b)-Date.parse(a))[0] ?? null,
       periodCount: members.reduce((sum, m) => sum + m.periodCount, 0), dailyCount: 0, dailyLimit: null, members } satisfies AssignmentCandidate;
   });
   return selectAssignment(choices, { method, guestCount, random: options.random });

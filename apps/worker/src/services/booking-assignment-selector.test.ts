@@ -9,6 +9,13 @@ describe('担当者と卓の共通の選択', () => {
     expect(selectAssignment(pool, { method: 'balanced', random: () => 0.99 })?.id).toBe('b');
     expect(selectAssignment([candidate('a'), candidate('b')], { method: 'balanced', random: () => 0.99 })?.id).toBe('b');
   });
+  it('同件数・同優先度は最後に受けた予約が古い順、未担当を先にする', () => {
+    const a = candidate('a', { lastAssignedAt: '2026-01-02T00:00:00Z' });
+    const b = candidate('b', { lastAssignedAt: '2026-01-01T00:00:00Z' });
+    expect(selectAssignment([a,b], {method:'balanced',random:()=>0})?.id).toBe('b');
+    expect(selectAssignment([a,b,candidate('new')], {method:'balanced'})?.id).toBe('new');
+    expect(selectAssignment([a,{...b,priority:'low'}], {method:'balanced'})?.id).toBe('a');
+  });
   it('優先順は指定した順番、同じ順位なら優先度を使う', () => {
     expect(selectAssignment([candidate('a', { sortOrder: 3 }), candidate('b', { periodCount: 20, sortOrder: 1 })], { method: 'priority' })?.id).toBe('b');
     expect(selectAssignment([candidate('a'), candidate('b', { priority: 'preferred' })], { method: 'priority' })?.id).toBe('b');

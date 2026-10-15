@@ -1,15 +1,5 @@
 import type { SqliteD1 } from './d1-sqlite.js';
 
-/** 承認前の保存先を試験DBだけに用意する。製品のmigrationではない。 */
-export function assignmentStorageFixture(db: SqliteD1) {
-  db.raw.exec(`CREATE TABLE booking_assignment_settings(
-    scope_kind TEXT NOT NULL CHECK(scope_kind IN ('staff','table')),
-    scope_id TEXT NOT NULL,method TEXT NOT NULL CHECK(method IN ('balanced','priority','random')),
-    balance_period TEXT NOT NULL CHECK(balance_period IN ('day','week')),
-    resources_json TEXT NOT NULL CHECK(json_valid(resources_json)),version INTEGER NOT NULL CHECK(version>0),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(scope_kind,scope_id));`);
-}
-
 export function seedAssignmentFixture(db: SqliteD1) {
   db.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES
     ('a','試験店','a','test','test'),('b','別店','b','test','test');
