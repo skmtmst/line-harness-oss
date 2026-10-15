@@ -4,6 +4,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save } from 'lucide-react'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ReorderDialog } from './reorder-dialog'
@@ -419,10 +420,9 @@ export default function FeatureSettingsScreen() {
             <SearchField aria-label="機能の名前で探す" placeholder="機能の名前で探す" value={query} onChange={setQuery} className={styles.search} />
             <span className={styles.spacer} />
             {canManage && (
-              <Button variant="secondary" onClick={() => setReorderOpen(true)} disabled={saving}>
+              <IconButton aria-label="並びを変える" title="並びを変える" onClick={() => setReorderOpen(true)} disabled={saving}>
                 <ArrowUpDown className={styles.btnIcon} aria-hidden="true" />
-                並びを変える
-              </Button>
+              </IconButton>
             )}
           </div>
 
