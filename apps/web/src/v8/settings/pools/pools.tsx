@@ -344,7 +344,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
           const name = acc?.name ?? m.lineAccountId
           const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
-            <li key={m.id}><Card layout="horizontal" surface="inset" padding="compact" gap="var(--polish-space-row)">
+            <li key={m.id}><Card frame="inset" layout="horizontal" surface="inset" corner="control" padding="compact" gap="var(--polish-space-row)">
               <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
@@ -365,6 +365,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
             type="button"
             variant="text"
             size="inline"
+            textTone="accent"
             aria-haspopup="menu"
             aria-expanded={addOpen}
             onClick={() => setAddOpen(!addOpen)}

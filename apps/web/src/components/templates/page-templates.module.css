@@ -492,6 +492,7 @@
 :global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 
 :global(:root) .pageContent { display: flex; flex-direction: column; gap: var(--polish-space-card); padding: var(--polish-space-card) var(--polish-space-section) 0; min-width: 0; }
+:global(:root) .pageContent[data-content-layout='stats'] { padding-block: 0; }
 :global(:root) .pageContent[data-content-layout='columns'] { flex-direction: row; align-items: flex-start; }
 :global(:root) .createColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-preview-width); min-height: 0; align-items: stretch; }
 :global(:root) .createColumns > aside { contain: size; min-height: 0; overflow-y: auto; }

@@ -195,7 +195,7 @@
   gap: var(--tpl-ml-approval-gap);
   padding: var(--tpl-ml-approval-pad);
   border-radius: var(--tpl-ml-approval-radius);
-  background: var(--color-status-warn-soft);
+  background: var(--color-notice-warning-bg);
 }
 .approvalTitle {
   margin: 0;
@@ -286,10 +286,6 @@
   line-height: var(--tpl-row-name-lh);
   font-variant-numeric: tabular-nums;
 }
-.scoreNum[data-score-delta='positive'],
-.miniTable [data-score-delta='positive'] { color: var(--color-accent-deep); }
-.scoreNum[data-score-delta='negative'],
-.miniTable [data-score-delta='negative'] { color: var(--color-danger); }
 
 /* できごとの決めごとの道具（開け閉めの中）。 */
 .rulesTools {

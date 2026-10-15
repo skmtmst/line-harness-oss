@@ -32,7 +32,6 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import Notice from '@/components/shared/notice'
 import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
-
 /** 購読ごとの状態と未取得の反応を分け、再送や予定の操作は元の記録へ結び付ける。 */
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }

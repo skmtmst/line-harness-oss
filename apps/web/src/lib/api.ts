@@ -4573,7 +4573,7 @@ export type DashboardMetric<T> = {
   state: 'available' | 'empty' | 'unavailable' | 'estimated' | 'partial' | 'stale'
   reason: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
   asOf: string | null
-  period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
+  period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
 }
 
 export type DashboardFriendTrendPoint = {
@@ -4589,7 +4589,7 @@ export type DashboardFriendTrendPoint = {
 
 /** ダッシュボードが1回で読む数（設計 `V6 1-1 ダッシュボード`）。 */
 export type DashboardOverview = {
-  period: 'today' | 'last7' | 'last28'
+  period: 'today' | 'last7' | 'last28' | 'last30'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
   generatedAt: string
   /** 取得に成功した元データのうち最も古い時刻。 */
@@ -4652,7 +4652,7 @@ export type DashboardOverview = {
       asOf: string | null
       freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
       reason?: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
-      period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
+      period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >
   /** V6指標。段階配備中の旧Workerでは未返却。 */
@@ -11040,14 +11040,14 @@ export const api = {
       fetchApi<ApiResponse<{ items: DashboardActivityItem[] }>>(
         `/api/dashboard/activity?account_id=${encodeURIComponent(accountId)}&limit=${encodeURIComponent(String(limit))}`,
       ),
-    overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
+    overview: (params: { period?: 'today' | 'last7' | 'last28' | 'last30'; accountId: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
       query.set('account_id', params.accountId)
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/overview${suffix}`)
     },
-    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' }) => {
+    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' | 'last30' }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
       const suffix = query.size ? `?${query}` : ''

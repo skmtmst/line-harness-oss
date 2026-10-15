@@ -67,9 +67,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
-  return polishFormatDate(iso, { style: 'detail', fallback: iso })
+  return `${polishFormatDate(iso, { style: 'list-day-weekday', fallback: iso })} ${polishFormatDate(iso, { style: 'time', fallback: '' })}`
 }
-
 function participationSub(applicant: EventOccurrenceApplicant): string {
   if (applicant.firstParticipation.isFirst === true) return '初参加'
   if (applicant.firstParticipation.isFirst === false) return '過去のイベント参加あり'

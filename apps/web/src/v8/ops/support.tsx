@@ -18,6 +18,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
+import OpsSupportStats from './support-stats'
 import { PageFrame } from '@/components/templates/page-frame'
 import { useOpsReadOnly } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -348,15 +349,14 @@ export default function OpsSupportV8() {
     setSelectedId(res.data.id)
     await refreshAll()
   }
-
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
   const pick = (id: string) => { deepLink.current = null; if (aiAbort.current) aiAbort.current.cancelled = true; setSelectedId(id) }
 
-
   return (
     <PageFrame kind="list" boardId="P0jhqO" standalone skeleton>
       <OpsHead
+        stats={<OpsSupportStats summary={summary} loading={loading && summary === null} />}
         title="お問い合わせ"
         description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
@@ -561,7 +561,7 @@ export default function OpsSupportV8() {
               <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>
               <span className={styles.spacer} />
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>
+              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…"><Send aria-hidden="true" />送信する</Button>
             </div>
           )}
         >

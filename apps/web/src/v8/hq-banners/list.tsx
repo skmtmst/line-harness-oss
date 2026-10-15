@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ListPage } from '@/components/templates'
 import { ListPageCards } from '@/components/templates/list-page'
+import { PageContent } from '@/components/templates/page-frame'
 import Card, { CardContent, CardHeader } from '@/components/shared/card'
 import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -48,7 +49,6 @@ import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { ListToolbarRow, ListToolbarSort } from '@/components/shared/list-toolbar'
-
 /*
  * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
  * 窓：`W7Z57` プロジェクトを作る・`AnwtH` 画像を取り込む・画像の詳細（`rI5uh` と同じ窓）。
@@ -352,7 +352,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => setView('all'), createAction: createProject }}
-      stats={head.stats}
+      stats={<PageContent layout="stats">{head.stats}</PageContent>}
       tabs={head.tabs}
       explanation={head.explanation}
       contentInset
@@ -685,7 +685,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => selectView('all'), createAction: uploadImage }}
-      stats={head.stats}
+      stats={<PageContent layout="stats">{head.stats}</PageContent>}
       tabs={head.tabs}
       explanation={head.explanation}
       contentInset

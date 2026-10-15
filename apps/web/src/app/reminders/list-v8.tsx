@@ -1157,7 +1157,7 @@ export default function RemindersListV8() {
       )}
 
       {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
-      {!friendId ? <KpiBand data-design="KPIs">
+      {!friendId ? <KpiBand border="dividers" data-design="KPIs">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
         ))}

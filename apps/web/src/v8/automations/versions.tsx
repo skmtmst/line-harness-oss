@@ -14,9 +14,9 @@ import { GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-
 import { formatNumber } from '@/lib/format'
 import { DetailPage } from '@/components/templates'
+import { PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -231,12 +231,12 @@ function VersionsInner() {
       headingSize="regular"
       title={`${detail.name}（版と使われている場所）`}
       help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
-      stats={<KpiBand aria-label="版と利用先の集計">
+      stats={<PageContent layout="stats"><KpiBand aria-label="版と利用先の集計">
         <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
         <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={13} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
         <KpiCard presentation="band" title="古い版のまま" icon={<History size={13} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
         <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
-      </KpiBand>}
+      </KpiBand></PageContent>}
       actions={<>
         {canEdit && draft ? (
           <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>

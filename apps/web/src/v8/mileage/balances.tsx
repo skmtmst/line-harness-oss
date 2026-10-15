@@ -1,7 +1,7 @@
 'use client'
 
 import { ListToolbarFrame } from '@/components/shared/list-toolbar'
-
+import HelpTip from '@/components/shared/help-tip'
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -20,6 +20,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -438,7 +439,7 @@ export default function BalancesTab() {
               setPendingOnly(value === 'pending')
             }}
           />
-          <PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
+          <HelpTip label="残高一覧の操作の説明">名前で探し、残高あり・確定待ちありで絞り込めます。行を押すと明細が開きます。</HelpTip><PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
         </>}
       />
     </ListToolbarFrame>
@@ -455,7 +456,7 @@ export default function BalancesTab() {
             <Th align="right" className={styles.colChange}>今月の増減</Th>
             <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
             <Th collapseAt="narrow" className={styles.colLast}>最終行動</Th>
-            <Th align="right"><span className="sr-only">操作</span></Th>
+            <Th align="right" className={styles.colOpsMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody>
@@ -485,7 +486,7 @@ export default function BalancesTab() {
                 <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
                 <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
                 <Td collapseAt="narrow" className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
-                <Td align="right"><BalanceRowMenu friendId={member.friendId} friendName={member.displayName} readonly={readonly} /></Td>
+                <Td align="right" className={styles.colOpsMenu}><BalanceRowMenu friendId={member.friendId} friendName={member.displayName} readonly={readonly} /></Td>
               </Tr>
             )
           })}
@@ -513,12 +514,9 @@ export default function BalancesTab() {
     table
   )
 
-  const pager = !loading && !loadError && members.length > 0 && pageCount > 1 ? (
+  const pager = !loading && !loadError && members.length > 0 ? (
     <div className={styles.pagerRow}>
-      <span className={styles.pagerCount}>
-        {`${formatMileageNumber(filteredTotal)} 人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))} 人`}
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
+      <Pagination page={currentPage} pageCount={pageCount} range={{ total: filteredTotal, first: offset + 1, last: Math.min(offset + members.length, filteredTotal), unit: '人' }} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
     </div>
   ) : null
   /* 絵 CJlf4：表 → ページ送り → 下の案内の順。 */
@@ -530,7 +528,7 @@ export default function BalancesTab() {
 
   return (
     <MileageFrame
-      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。" explanationInset="content"
       explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>

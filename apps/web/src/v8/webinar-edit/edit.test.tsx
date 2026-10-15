@@ -200,6 +200,9 @@ describe('V8 ウェビナーの編集', () => {
     expect(metric?.querySelector('[data-kpi-number]')?.textContent).toBe('9')
     expect(metric?.textContent).toContain('9人')
     expect(metric?.textContent).not.toContain('9件')
+    const help = metric?.querySelector('[data-kpi-label] button') as HTMLButtonElement
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {

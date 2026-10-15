@@ -34,7 +34,7 @@
 - 作成の2列：`templates/create-page.tsx` の `CreateColumns`。見え方は入力の高さに収め、長い見本はその欄で送る。380幅と1100未満の畳み方は型が持つ。保存・プレビューの内容は画面が渡す。
 - 手順ごとの補足列：`templates/create-step-columns.tsx` の `CreateStepColumns`。白い板1100未満では右欄を同じ内容の確認窓へ畳む。入力値・補足の役目名は画面から渡す。
 - 作成の完了見出し：`templates/create-parts.tsx` の `CreateCompletionHeading`。丸い成功印・中央の題・結果本文を表示する。状態の札と区別し、数と次の操作は画面から渡す。
-- 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。
+- 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。本文の外に置く数の帯は `PageContent layout="stats"`（左右24、上下の追加なし）へ。既に本文の内側にある帯を二重に包まない。
 - 履歴の表：既存の `shared/table.tsx` の `DataTable.grid`。列・端の余白と本文／見出しの文字の大きさを共通の口へ渡す。画面で表の子を上書きしない。
 
 ## 使い方（必ず守る）
@@ -143,7 +143,7 @@
 ## kpi-band 数の帯
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
-- **補足**：L5差し戻しU6/V3では全文を自然に折り返し、行き先を次の行に置く。説明と括弧の補足を分ける形（wjfLe）は KpiCard の `detailLayout="qualifier"` を使う。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
+- **補足**：既定は1行＋省略、全文は同じ補足の `title` へ残す（10-14 i8F12差し戻し）。行き先は次の行。旧 `detailLayout="qualifier"` 指定でも同じ1行表示。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
   - 読む変数：`--color-hairline`
 - **持ち主（Pen）**：`Pp3nS`「数のマス」

@@ -9,7 +9,7 @@ import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, L
 export function OpsListPage({ stats, ...props }: ListPageProps) {
   return <ListPage {...props} stats={<>
     <PageContent><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
-    {stats}
+    {stats ? <PageContent layout="stats">{stats}</PageContent> : null}
   </>} />
 }
 

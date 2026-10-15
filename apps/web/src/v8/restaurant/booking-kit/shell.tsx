@@ -14,7 +14,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import KpiBand from '@/components/shared/kpi-band'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
@@ -81,7 +81,8 @@ export function BoundaryBanner() {
 
 /** 数の並び。compact は予約台帳の今日（小さい帯・数字20）。 */
 export function StatRow({ children, compact = false, fusion = false }: { children: ReactNode; compact?: boolean; fusion?: boolean }) {
-  return <KpiBand data-restaurant-fusion={fusion||undefined} density={compact ? 'compact' : undefined}>{children}</KpiBand>
+  const band = <KpiBand data-restaurant-fusion={fusion||undefined} density={compact ? 'compact' : undefined}>{children}</KpiBand>
+  return fusion ? <PageContent layout="stats">{band}</PageContent> : band
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */
