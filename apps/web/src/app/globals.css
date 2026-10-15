@@ -983,7 +983,7 @@
   /* ecc：設定内の列幅。狭い板でも右端を越えない。 */
   --tpl-ecc-record-columns: minmax(0, 170fr) minmax(0, 150fr) minmax(0, 222fr) minmax(0, 170fr) minmax(82px, 90fr) 36px;
   --tpl-ecc-sub-columns: minmax(0, 282fr) minmax(0, 100fr) minmax(0, 100fr) minmax(0, 90fr) minmax(100px, 110fr) 160px;
-  --tpl-ecc-identity-columns: minmax(0, 196fr) minmax(0, 180fr) minmax(0, 200fr) minmax(70px, 90fr) 190px;
+  --tpl-ecc-identity-columns: minmax(0, 196fr) minmax(0, 180fr) minmax(0, 200fr) minmax(70px, 90fr) 36px;
   --tpl-ecc-sub-search: 340px;
   --tpl-st2-id-band-lh: 18px; --tpl-st2-id-band-pad: 10px 12px; --tpl-st2-id-col-friend: 180px; --tpl-st2-id-col-evidence: 200px; --tpl-st2-id-col-confidence: 90px; --tpl-st2-id-col-ops: 190px; --tpl-st2-id-row-pad: 9px 14px; --tpl-st2-id-ops-gap: 6px;
   --tpl-st2-pc-side-w: 340px; --tpl-st2-pc-card-pad: var(--polish-space-card); --tpl-st2-pc-title-lh: 20px; --tpl-st2-pc-label-lh: 20px; --tpl-st2-pc-account-gap: 8px; --tpl-st2-pc-account-pad: 10px 12px; --tpl-st2-pc-fact-pad: var(--polish-space-row) 0;
