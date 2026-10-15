@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  UBER_OAUTH_CALLBACK_PATH,
   deliveryWebhookIpAllowlist,
   isDeliveryWebhookIpAllowed,
+} from './delivery-webhook-ip.js';
+import { UBER_PRODUCTION_HOSTS, UBER_SANDBOX_HOSTS } from './uber-eats-hosts.js';
+import {
+  UBER_OAUTH_CALLBACK_PATH,
   uberOAuthClient,
   uberWebhookSecret,
   type DeliveryEnv,
@@ -25,7 +28,19 @@ describe('Uber Eats のログイン連携の設定', () => {
       clientId: 'test-client-id',
       clientSecret: 'test-client-secret',
       redirectUri: `https://stg-api.example.test${UBER_OAUTH_CALLBACK_PATH}`,
+      hosts: UBER_PRODUCTION_HOSTS,
     });
+  });
+
+  it('接続先は配備の設定で選ぶ。sandbox のときだけ TEST APP 側へ向ける', () => {
+    expect(uberOAuthClient({ ...base, RT_DELIVERY_UBEREATS_ENVIRONMENT: 'sandbox' })?.hosts)
+      .toEqual(UBER_SANDBOX_HOSTS);
+    expect(uberOAuthClient({ ...base, RT_DELIVERY_UBEREATS_ENVIRONMENT: 'production' })?.hosts)
+      .toEqual(UBER_PRODUCTION_HOSTS);
+  });
+
+  it('接続先の書き間違いは本番へ落とさず、連携の口を開けない', () => {
+    expect(uberOAuthClient({ ...base, RT_DELIVERY_UBEREATS_ENVIRONMENT: 'stg' })).toBeNull();
   });
 
   it('土台の末尾の斜線は重ねない', () => {

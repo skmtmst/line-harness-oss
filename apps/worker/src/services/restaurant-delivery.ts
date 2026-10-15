@@ -18,7 +18,9 @@ import {
   EXTERNAL_DELIVERY_MAX_ATTEMPTS,
   externalDeliveryRetryAt,
 } from './external-delivery-retry.js';
+import type { DeliveryWebhookEnv } from './delivery-webhook-ip.js';
 import type { UberOAuthClient } from './uber-eats.js';
+import { uberHosts, type UberHostEnv } from './uber-eats-hosts.js';
 
 export const DELIVERY_SERVICES = ['ubereats', 'demaecan', 'rocketnow'] as const;
 export type DeliveryService = (typeof DELIVERY_SERVICES)[number];
@@ -253,17 +255,14 @@ const ACTION_PATHS: Record<DeliveryAction, string> = {
   intake_resume: '/intake/resume',
 };
 
-export interface DeliveryEnv {
+export interface DeliveryEnv extends DeliveryWebhookEnv, UberHostEnv {
   RT_DELIVERY_SEND_ENABLED?: string;
   RT_DELIVERY_UBEREATS_API_BASE_URL?: string;
   RT_DELIVERY_UBEREATS_API_TOKEN?: string;
-  RT_DELIVERY_UBEREATS_WEBHOOK_SECRET?: string;
   RT_DELIVERY_DEMAECAN_API_BASE_URL?: string;
   RT_DELIVERY_DEMAECAN_API_TOKEN?: string;
-  RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET?: string;
   RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
   RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
-  RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
   /**
    * Uber Eats のログイン連携（お店の人が設定画面から自分でつなぐ経路）。
    * ここに入るのは Uber の開発者画面で発行された値で、画面には出さない。
@@ -274,16 +273,6 @@ export interface DeliveryEnv {
   RT_DELIVERY_UBEREATS_REDIRECT_URI?: string;
   /** 戻り先URLの土台。配備の設定で環境ごとに決まる。 */
   WORKER_PUBLIC_URL?: string;
-  /**
-   * 通知を受け取る送信元IPの許可リスト（出前館QA#7）。
-   * カンマ区切りで、1件ずつのIPか IPv4 の CIDR（例 203.0.113.0/24）を書く。
-   * サービスごとの指定が無いときは共通の値を使う。どちらも空なら制限しない
-   * （いまの動きを変えない。相手のIPが分かってから入れる運用にする）。
-   */
-  RT_DELIVERY_WEBHOOK_IP_ALLOWLIST?: string;
-  RT_DELIVERY_UBEREATS_WEBHOOK_IP_ALLOWLIST?: string;
-  RT_DELIVERY_DEMAECAN_WEBHOOK_IP_ALLOWLIST?: string;
-  RT_DELIVERY_ROCKETNOW_WEBHOOK_IP_ALLOWLIST?: string;
 }
 
 /** 認可画面からの戻り先の道。Uber のアプリ登録と同じ文字列にする。 */
@@ -303,7 +292,10 @@ export function uberOAuthClient(env: DeliveryEnv): UberOAuthClient | null {
   const base = env.WORKER_PUBLIC_URL?.trim().replace(/\/+$/, '');
   const redirectUri = override || (base ? `${base}${UBER_OAUTH_CALLBACK_PATH}` : '');
   if (!redirectUri.startsWith('https://')) return null;
-  return { clientId, clientSecret, redirectUri };
+  // 設定の書き間違いは本番へ落とさず「未設定」にする（uber-eats-hosts.ts）。
+  const hosts = uberHosts(env);
+  if (!hosts) return null;
+  return { clientId, clientSecret, redirectUri, hosts };
 }
 
 /**
@@ -317,83 +309,6 @@ export function uberWebhookSecret(env: DeliveryEnv): string | null {
 /** 'true' のときだけ各サービスへ送る。既定は送らない（読み取りと記録だけ）。 */
 export function deliverySendEnabled(env: DeliveryEnv): boolean {
   return env.RT_DELIVERY_SEND_ENABLED?.trim().toLowerCase() === 'true';
-}
-
-export function deliveryWebhookSecret(env: DeliveryEnv, service: DeliveryService): string | null {
-  const raw =
-    service === 'ubereats'
-      ? env.RT_DELIVERY_UBEREATS_WEBHOOK_SECRET
-      : service === 'demaecan'
-        ? env.RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET
-        : env.RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET;
-  const secret = raw?.trim() ?? '';
-  // 短い鍵は事故のもとなので使わない（ec-integrations.ts と同じ 32 文字以上）。
-  return secret.length >= 32 ? secret : null;
-}
-
-/**
- * 通知を受け取っていい送信元IPの一覧（出前館QA#7）。
- * サービスごとの指定が先。無ければ共通。どちらも空なら null＝制限しない。
- */
-export function deliveryWebhookIpAllowlist(
-  env: DeliveryEnv,
-  service: DeliveryService,
-): string[] | null {
-  const perService =
-    service === 'ubereats'
-      ? env.RT_DELIVERY_UBEREATS_WEBHOOK_IP_ALLOWLIST
-      : service === 'demaecan'
-        ? env.RT_DELIVERY_DEMAECAN_WEBHOOK_IP_ALLOWLIST
-        : env.RT_DELIVERY_ROCKETNOW_WEBHOOK_IP_ALLOWLIST;
-  const raw = (perService?.trim() || env.RT_DELIVERY_WEBHOOK_IP_ALLOWLIST?.trim()) ?? '';
-  if (!raw) return null;
-  const entries = raw
-    .split(',')
-    .map((entry) => entry.trim().toLowerCase())
-    .filter((entry) => entry.length > 0);
-  // 書き間違いで空だけが並んだときは「制限なし」ではなく「誰も通さない」にはしない。
-  // 設定の意図が読めないため、制限なしと同じ扱いに戻す（受信が全部止まる事故を避ける）。
-  return entries.length > 0 ? entries : null;
-}
-
-function ipv4ToNumber(ip: string): number | null {
-  const parts = ip.split('.');
-  if (parts.length !== 4) return null;
-  let value = 0;
-  for (const part of parts) {
-    // 「01」のような0埋めや空欄は受け取らない。別のIPと取り違える元になる。
-    if (!/^(0|[1-9][0-9]{0,2})$/.test(part)) return null;
-    const octet = Number(part);
-    if (octet > 255) return null;
-    value = value * 256 + octet;
-  }
-  return value;
-}
-
-/**
- * 送信元IPが許可リストに入っているか。
- * 1件ずつのIP（IPv4・IPv6）は文字列の一致、IPv4 の CIDR は範囲で見る。
- * IPv6 の範囲指定は扱わない（入っていればその行だけ無視する）。
- */
-export function isDeliveryWebhookIpAllowed(ip: string, allowlist: string[] | null): boolean {
-  if (allowlist === null) return true;
-  const target = ip.trim().toLowerCase();
-  if (!target) return false;
-  const targetNumber = ipv4ToNumber(target);
-  for (const entry of allowlist) {
-    if (entry === target) return true;
-    const slash = entry.indexOf('/');
-    if (slash === -1) continue;
-    const network = ipv4ToNumber(entry.slice(0, slash));
-    const bits = Number(entry.slice(slash + 1));
-    if (network === null || targetNumber === null) continue;
-    if (!Number.isInteger(bits) || bits < 0 || bits > 32) continue;
-    // /0 は全許可。シフト演算では 32 ビット幅を超えて意図しない値になるため分ける。
-    if (bits === 0) return true;
-    const mask = (0xffffffff << (32 - bits)) >>> 0;
-    if (((targetNumber >>> 0) & mask) === ((network >>> 0) & mask)) return true;
-  }
-  return false;
 }
 
 function apiConfigFor(

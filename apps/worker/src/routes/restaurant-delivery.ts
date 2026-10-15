@@ -30,23 +30,33 @@ import { dbFor } from '../services/db-router.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import { randomToken } from '../services/google-business.js';
 import {
-  UBER_PROVISIONING_SCOPES,
   UberEatsError,
   buildAuthorizeUrl as buildUberAuthorizeUrl,
   exchangeAuthorizationCode as exchangeUberAuthorizationCode,
 } from '../services/uber-eats.js';
+import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
+import {
+  deliveryWebhookIpAllowlist,
+  deliveryWebhookSecret,
+  isDeliveryWebhookIpAllowed,
+  webhookSourceIp,
+} from '../services/delivery-webhook-ip.js';
+import {
+  MAX_WEBHOOK_BODY_BYTES,
+  WEBHOOK_SKEW_SECONDS,
+  parseWebhookPayload,
+  utf8Length,
+  type WebhookOrder,
+} from '../services/delivery-webhook-payload.js';
 import {
   UBER_OAUTH_CALLBACK_PATH,
   uberOAuthClient,
   DELIVERY_SERVICES,
   DELIVERY_SERVICE_LABELS,
   canTransitionOrder,
-  deliveryWebhookIpAllowlist,
-  deliveryWebhookSecret,
   dispatchToDeliveryService,
-  isDeliveryWebhookIpAllowed,
   isDeliveryService,
   isIntakeStopPreset,
   intakeStopUntil,
@@ -1560,135 +1570,6 @@ restaurantDelivery.post(
 
 // ---------- 受信（各サービスの公式窓口からの通知） ----------
 
-const MAX_WEBHOOK_BODY_BYTES = 128 * 1024;
-/** 署名の時刻ずれの許容。他の受信口（EC連携・成果受信）と同じ5分。 */
-const WEBHOOK_SKEW_SECONDS = 5 * 60;
-
-function utf8Length(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
-}
-
-/** 文字列の必須項目。長さ上限を超えた値は受け取らない（画面の崩れとDB肥大を防ぐ）。 */
-function textField(value: unknown, max: number): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > max) return null;
-  return trimmed;
-}
-
-function optionalText(value: unknown, max: number): string | null {
-  if (value === undefined || value === null) return null;
-  return textField(value, max);
-}
-
-function countField(value: unknown, max: number): number | null {
-  if (!Number.isSafeInteger(value)) return null;
-  const num = Number(value);
-  if (num < 0 || num > max) return null;
-  return num;
-}
-
-/** エポック秒。範囲外・形式違いは null にして、呼び出し側で既定値へ落とす。 */
-function epochField(value: unknown, now: number): number | null {
-  if (!Number.isSafeInteger(value)) return null;
-  const num = Number(value);
-  // 過去30日〜未来7日の外は受け取らない（誤った単位・ミリ秒混入を弾く）。
-  if (num < now - 30 * 86400 || num > now + 7 * 86400) return null;
-  return num;
-}
-
-interface WebhookItem {
-  name: string;
-  note: string | null;
-  quantity: number;
-  amount: number;
-}
-
-interface WebhookOrder {
-  externalOrderId: string;
-  orderNumber: string;
-  totalAmount: number;
-  pickupMethod: string | null;
-  wantedAt: number | null;
-  customerNote: string | null;
-  receivedAt: number;
-  items: WebhookItem[];
-}
-
-interface WebhookPayload {
-  eventId: string;
-  eventType: string;
-  storeId: string;
-  order: WebhookOrder | null;
-  cancel: { externalOrderId: string; canceledBy: 'customer' | 'service' } | null;
-}
-
-/**
- * 3サービス共通の受信形式。
- * サービスごとの項目名の違いは各サービスの窓口設定側で共通名へ寄せる。
- * ここで受け取るのは検証済みの項目だけで、サービスから届いた自由文の
- * エラー文や説明文は取り込まない。
- */
-function parseWebhookPayload(
-  raw: unknown,
-  now: number,
-): { ok: true; payload: WebhookPayload } | { ok: false; error: string } {
-  if (!raw || typeof raw !== 'object') return { ok: false, error: 'Invalid payload' };
-  const body = raw as Record<string, unknown>;
-  const eventId = textField(body.event_id, 128);
-  const eventType = textField(body.event_type, 64);
-  const storeId = textField(body.store_id, 128);
-  if (!eventId || !eventType || !storeId) return { ok: false, error: 'Invalid payload' };
-
-  let order: WebhookOrder | null = null;
-  if (body.order && typeof body.order === 'object') {
-    const source = body.order as Record<string, unknown>;
-    const externalOrderId = textField(source.external_order_id, 128);
-    const orderNumber = textField(source.order_number, 64);
-    const totalAmount = countField(source.total_amount, 10_000_000);
-    if (!externalOrderId || !orderNumber || totalAmount === null) {
-      return { ok: false, error: 'Invalid order' };
-    }
-    const items: WebhookItem[] = [];
-    if (Array.isArray(source.items)) {
-      if (source.items.length > 100) return { ok: false, error: 'Invalid order' };
-      for (const entry of source.items) {
-        if (!entry || typeof entry !== 'object') return { ok: false, error: 'Invalid order' };
-        const item = entry as Record<string, unknown>;
-        const name = textField(item.name, 200);
-        const quantity = countField(item.quantity, 999);
-        const amount = countField(item.amount, 10_000_000);
-        if (!name || quantity === null || quantity === 0 || amount === null) {
-          return { ok: false, error: 'Invalid order' };
-        }
-        items.push({ name, note: optionalText(item.note, 200), quantity, amount });
-      }
-    }
-    order = {
-      externalOrderId,
-      orderNumber,
-      totalAmount,
-      pickupMethod: optionalText(source.pickup_method, 100),
-      wantedAt: epochField(source.wanted_at, now),
-      customerNote: optionalText(source.customer_note, 500),
-      receivedAt: epochField(source.received_at, now) ?? now,
-      items,
-    };
-  }
-
-  let cancel: WebhookPayload['cancel'] = null;
-  if (body.cancel && typeof body.cancel === 'object') {
-    const source = body.cancel as Record<string, unknown>;
-    const externalOrderId = textField(source.external_order_id, 128);
-    if (!externalOrderId) return { ok: false, error: 'Invalid cancel' };
-    // 発生元は店舗以外の2つだけ。店舗のキャンセルは画面（D-3）から記録する。
-    const canceledBy = source.canceled_by === 'customer' ? 'customer' : 'service';
-    cancel = { externalOrderId, canceledBy };
-  }
-
-  return { ok: true, payload: { eventId, eventType, storeId, order, cancel } };
-}
-
 /** 署名検証を通った通知の宛先店舗。担当者の認証は通らないため、ここで店舗を確定する。 */
 async function webhookStore(c: Context<Env>, storeId: string): Promise<StoreContext | null> {
   const row = await dbFor(c.env, storeId)
@@ -1823,11 +1704,11 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
   // 送信元IPの確認は本文を読む前に行う。許可外からの通知は本文も台帳も残さない。
   const allowlist = deliveryWebhookIpAllowlist(c.env, service);
   if (allowlist !== null) {
-    const sourceIp =
-      c.req.header('cf-connecting-ip') ||
-      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-      c.req.header('x-real-ip') ||
-      '';
+    const sourceIp = webhookSourceIp({
+      cfConnectingIp: c.req.header('cf-connecting-ip'),
+      forwardedFor: c.req.header('x-forwarded-for'),
+      realIp: c.req.header('x-real-ip'),
+    });
     if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
       // 符号だけを記録する。相手のIPは記録に残すと問い合わせの材料になるので残す。
       console.error(
@@ -2115,6 +1996,7 @@ restaurantDelivery.post(
         clientId: client.clientId,
         redirectUri: client.redirectUri,
         state,
+        hosts: client.hosts,
         // 店舗の認可で求めるのは店舗一覧と連携の有効化だけ。運用の権限は混ぜられない。
         scopes: UBER_PROVISIONING_SCOPES,
       }),
