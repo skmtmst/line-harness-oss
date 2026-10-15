@@ -171,7 +171,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} note={props.portable ? '本人確認書類の保存日数は、配った先の各アカウントの設定で決まります' : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </Card>
 
       <RenameDialog
@@ -651,10 +651,12 @@ const ADD_CARD_ICONS: Record<string, ReactNode> = Object.fromEntries(Object.entr
 /** 統括も画像を追加できる。固有の参照は保存前に別途確認する。 */
 const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set()
 
-function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string> }) {
+function AddGrid({ onAdd, hide, note }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string>; note?: string }) {
   return (
     <div className={styles.addBox}>
       <p className={styles.addTitle}>ブロックを足す</p>
+      {/* 統括（u5MM7）：保存日数は配った先ごとに決まることを先に書く。 */}
+      {note ? <p className={styles.addNote}>{note}</p> : null}
       {ADD_GROUPS.map((group) => (
         <div key={group.title} className={styles.addGroup}>
           <p className={styles.addGroupTitle}>{group.title}</p>
