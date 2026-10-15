@@ -28,7 +28,7 @@ export default function FolderDistributionDialog({ name, templates, templateFold
   const [selected, setSelected] = useState<string[]>([])
   const [accountFilter, setAccountFilter] = useState(ALL_ACCOUNTS)
   const [accountSearch, setAccountSearch] = useState('')
-  return <Dialog open designNode="JSirC" designWidth={560} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
+  return <Dialog open designNode="JSirC" designWidth={720} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
     description="フォルダの中のひな形をまとめて、選んだアカウントへ配ります。"
     busy={busy} error={error} onCancel={onCancel}
     designHeaderPadding="24px 24px 8px" designContentPadding="8px 24px 20px"
@@ -53,7 +53,7 @@ export default function FolderDistributionDialog({ name, templates, templateFold
       </section>
       <section className={styles.section} aria-label="配る先">
         <div className={styles.heading}><strong>配る先</strong><span>{`${selected.length} アカウントを選択`}</span></div>
-        <DistributionAccountPicker compact showCount={false} accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
+        <DistributionAccountPicker compact selectAll showCount={false} accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
           filter={accountFilter} onFilter={setAccountFilter} search={accountSearch} onSearch={setAccountSearch} busy={busy} />
       </section>
       <p className={styles.note}>同じ名前のひな形があるアカウントは、配布方法（上書き・新しく作る）を次の確認で選べます。</p>
