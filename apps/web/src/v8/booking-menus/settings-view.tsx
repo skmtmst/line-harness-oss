@@ -20,7 +20,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
-              {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+              {previewUrl ? <Button href={previewUrl} fullWidth><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             </div>
             <p className={styles.sideTitle}>お客さまの予約画面</p>
             {phone}

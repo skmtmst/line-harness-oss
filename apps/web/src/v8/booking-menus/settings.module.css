@@ -148,6 +148,7 @@
 .sideActions {
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   gap: var(--tpl-bm-10);
 }
 
@@ -164,6 +165,7 @@
 
 .sideTitle {
   display: flex;
+  align-self: stretch;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -1187,7 +1189,15 @@
 .staffRow .cellWarn {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   line-height: var(--tpl-bm-17);
+}
+
+/* 絵 VLEaj：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
+.staffRow .cellWarn .staffCellSub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .staffCellMain {

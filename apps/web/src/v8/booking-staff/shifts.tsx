@@ -209,7 +209,10 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
     <div className={layout.shell} data-design-node={node}>
       {head ?? <Head self={self} />}
       <div className={styles.stateBody}>
-        <ListState kind={title.includes('読み込み') ? 'loading' : icon ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={actions} />
+        {/* 絵 wvGke：案内は白いカードの中（空の表示は自分で枠を持たないので、カードで包む）。 */}
+        {title.includes('読み込み') || title.includes('できませんでした')
+          ? <ListState kind={title.includes('読み込み') ? 'loading' : 'error'} title={title} description={desc} icon={icon} action={actions} />
+          : <Card><ListState kind="empty" title={title} description={desc} icon={icon} action={actions} /></Card>}
       </div>
     </div>
   )
