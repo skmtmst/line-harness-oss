@@ -79,7 +79,8 @@
 .choiceRemove:disabled { opacity: 0.4; cursor: not-allowed; }
 .saveTo { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); min-width: 0; }
 .saveTo > .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); white-space: nowrap; }
-.saveSelect { display: inline-flex; min-width: 0; max-width: 100%; }
+.saveSelect { display: flex; flex: 1; min-width: 0; max-width: 100%; }
+.saveSelect > :global(*) { flex: 1; min-width: 0; }
 .saveSelect :global(*) { max-width: 100%; }
 
 .bookingRow { display: grid; grid-template-columns: var(--tpl-fe-booking-cols); gap: var(--tpl-fe-save-gap); }
@@ -101,6 +102,7 @@
 .addTitle { margin: 0; font-size: var(--tpl-fe-note-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); }
 .addGroup { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 .addGroupTitle { margin: 0; font-size: var(--tpl-fe-small-size); font-weight: 700; line-height: var(--tpl-fe-small-lh); color: var(--color-ink-secondary); }
+.addNote { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-secondary); }
 .addCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--polish-space-row); }
 .designModes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--tpl-fe-chip-gap); }
 .addCards[data-writing] { grid-template-columns: repeat(20, minmax(0, 1fr)); }
@@ -141,9 +143,8 @@
 .toggleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fe-save-gap); min-height: var(--tpl-fe-toggle-h); font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
 .limitRow { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); }
 .limitInput { width: var(--tpl-fe-limit-w); }
-.subBox + .subBox { margin-top: calc(var(--tpl-fe-open-gap) - var(--tpl-fe-card-gap)); }
 .tight { display: flex; flex-direction: column; gap: var(--tpl-fe-words-gap); }
-.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius); box-shadow: var(--tpl-fe-ring); }
+.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); } /* 絵 e875x：段は枠なし・余白なしでカードの中に並べる */
 .subTitle { margin: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-sub-title-lh); color: var(--color-ink); }
 .wells { display: flex; flex-direction: column; gap: var(--tpl-fe-wells-gap); }
 .well { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); font-size: var(--tpl-fe-note-size); color: var(--color-ink-faint); }
@@ -237,6 +238,8 @@
 .phoneButton { flex: none; height: var(--tpl-fe-phone-next-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-r); box-shadow: none; outline: 1px solid var(--fe-phone-main, var(--color-accent)); outline-offset: -1px; color: var(--fe-phone-main, var(--color-accent)); font-size: var(--tpl-fe-body-size); font-weight: 700; }
 .phoneProgress { flex: none; display: flex; gap: var(--tpl-fe-phone-progress-gap); }
 .phoneProgress > span { flex: 1; height: var(--tpl-fe-phone-progress-h); border-radius: var(--tpl-fe-phone-progress-r); background: var(--tpl-fe-phone-track); }
+.phoneProgressHead { flex: none; display: flex; flex-direction: column; gap: var(--tpl-fe-phone-progress-head-gap); }
+.phonePageNo { font-size: var(--tpl-fe-tiny-size); line-height: var(--tpl-fe-tiny-lh); color: var(--tpl-fe-phone-sub); white-space: nowrap; }
 .phoneProgress > span[data-done] { background: var(--fe-phone-main, var(--color-accent)); }
 .phoneQ[data-kind='booking'] { gap: var(--tpl-fe-open-gap); }
 .phoneQ { flex: none; display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }

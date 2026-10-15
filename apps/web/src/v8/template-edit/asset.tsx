@@ -408,7 +408,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     options: { submitLabel: '答えを送る' },
   }
   const phone = kind === 'research' ? (
-    <FormPhone layout={researchLayout} pageIndex={0} accountName={sendName} bookingMenus={[]} caption={null} title={name || 'リサーチ'} fixedNext />
+    <FormPhone layout={researchLayout} pageIndex={0} accountName={sendName} bookingMenus={[]} caption={null} title={name || 'リサーチ'} fixedNext progressHead />
   ) : (
     <LinePreview title={null} note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
       <div className={styles.assetRow}>

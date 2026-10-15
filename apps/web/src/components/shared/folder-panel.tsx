@@ -253,6 +253,7 @@ export default function FolderPanel({
                 aria-pressed={readOnly ? isActive : undefined}
                 aria-current={activeId === row.id ? 'true' : undefined}
                 data-folder-select
+                data-part="folder-row"
                 className={`${styles.select} flex min-w-0 flex-1 items-center gap-2 text-left transition-colors ${
  activeId === row.id
  ? ' '
