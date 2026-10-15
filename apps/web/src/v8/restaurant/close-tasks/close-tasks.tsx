@@ -13,6 +13,7 @@ import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
+import { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -39,7 +40,7 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 type Tab = 'open' | 'done'
 
 /* 絵 YMVFD：表の下に件数とページ送り。1ページの行数。 */
-const PAGE_SIZE = 20
+
 
 /* 手を動かす順：未対応 → 残りあり → もう開けてよい → 閉じた（同じ状態の中は時刻順）。 */
 const STATE_ORDER: Record<CloseGroup['state'], number> = { open: 0, partly: 1, reopen: 2, done: 3 }

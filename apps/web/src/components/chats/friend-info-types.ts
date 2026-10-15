@@ -24,3 +24,30 @@ export interface FriendDetail {
     createdAt: string
   }>
 }
+
+
+export interface ChatStatusInfo {
+  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved' | null
+  notes: string | null
+}
+
+export interface Props {
+  friendId: string | null
+  /** 親 (ChatDetail) が持っている chat 側の情報 — status / notes */
+  chatStatus?: ChatStatusInfo
+  /** 担当者名 (ChatDetail で operatorId → name 変換済を渡す想定) */
+  operatorName?: string | null
+  /** A-2 その場で直すための会話 ID。無いときは表示のみ（従来どおり）。 */
+  lastContactAt?: string | null
+  chatId?: string | null
+  /** 同時編集の見分け札（chats.revision）。無いときは送らない。 */
+  revision?: number
+  /** 担当の選択肢。無いときは担当の変更欄を出さない。 */
+  operators?: Array<{ id: string; name: string }>
+  /** 現在の担当 ID。無いときは未割り当て扱い。 */
+  operatorId?: string | null
+  /** 開いているLINEアカウントの ID。前払いのみの印に使う。無いときは印を出さない。 */
+  accountId?: string | null
+  /** 保存が通ったあとに親へ知らせる（一覧の読み直しなど）。 */
+  onChatChanged?: () => void
+}

@@ -1,4 +1,6 @@
 'use client'
+
+import { operationFailureText } from './health-error'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
@@ -43,11 +45,6 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 type ReleaseSummary = { version: string; released: string | null }
 
 const HISTORY_FETCH_LIMIT = 200
-
-function operationFailureText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message && !/^API error: \d+$/.test(error.message)) return error.message
-  return fallback
-}
 
 type ControlMessage = { tone: 'success' | 'warning' | 'danger'; text: string }
 

@@ -1,5 +1,8 @@
 'use client'
 
+import { choiceActionText, choiceActionIcon } from './question-choice-summary'
+export { choiceActionText } from './question-choice-summary'
+
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
@@ -12,9 +15,8 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ChevronDown, GitBranch, MousePointerClick, Plus, Send, Tag as TagIcon, Trash2, type LucideIcon } from 'lucide-react'
 import { tapExtrasError, type Folder, type Scenario, type Tag } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
@@ -33,14 +35,13 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
 import type { TemplateEditHost } from '../template-edit/host'
 import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
-import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
@@ -74,32 +75,6 @@ function isEditableQuestion(value: unknown): value is ScenarioQuestion {
 }
 
 const snapshotOf = (value: { name: string; category: string; folderId: string | null; question: ScenarioQuestion }) => JSON.stringify(value)
-
-/** 「押されたら」に出す1行（絵：「タグ「継続」を付ける」「シナリオ「解約フォロー」を始める」）。 */
-export function choiceActionText(choice: QuestionChoice, tags: Array<Pick<Tag, 'id' | 'name'>>, scenarios: Array<Pick<Scenario, 'id' | 'name'>>): string {
-  const parts: string[] = []
-  const tagNames = (choice.addTagIds ?? []).map((id) => tags.find((tag) => tag.id === id)?.name ?? 'タグ')
-  if (tagNames.length) parts.push(`タグ「${tagNames[0]}」を付ける${tagNames.length > 1 ? ` ほか${tagNames.length - 1}` : ''}`)
-  if (choice.removeTagIds?.length) parts.push(`タグを${choice.removeTagIds.length}つ外す`)
-  if (choice.field?.fieldId) parts.push('友だち情報に書く')
-  if (choice.scenario?.op === 'start') {
-    const name = scenarios.find((item) => item.id === choice.scenario?.scenarioId)?.name
-    parts.push(name ? `シナリオ「${name}」を始める` : 'シナリオを始める')
-  }
-  if (choice.scenario?.op === 'stop') parts.push('シナリオを止める')
-  const behavior: Partial<Record<QuestionChoice['behavior'], string>> = {
-    url: 'URLを開く', tel: '電話をかける', add_friend: '友だち追加へ', mail: 'メールを送る', form: '回答フォームを開く',
-  }
-  if (behavior[choice.behavior]) parts.push(behavior[choice.behavior] as string)
-  return parts.length ? parts.join('・') : '何もしない'
-}
-
-/** 「押されたら」の欄の印：タグ＝札、シナリオ＝分かれ道、そのほか＝押す。 */
-function choiceActionIcon(choice: QuestionChoice): LucideIcon {
-  if (choice.addTagIds?.length || choice.removeTagIds?.length) return TagIcon
-  if (choice.scenario?.op) return GitBranch
-  return MousePointerClick
-}
 
 function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const saveErrors = useSaveFormErrors()

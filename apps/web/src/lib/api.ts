@@ -1,16 +1,9 @@
+import { type RichMenuPublishRun } from './api-rich-menu-publish-types'
+export { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 import { SESSION_LOST_EVENT } from './session-events'
-import type { ApiFieldErrors } from '@line-crm/shared'
+import { type ApiFieldErrors, type QuestionAnswerRecovery, type ResumeQuestionAnswerRequest, type ResumeQuestionAnswerResponse, type AutomationTabCounts, type MediaTabCounts, type ConversionApprovalCounts, type BookingMenuReorderRequest, type BookingMenuReorderResponse, type MileageHistoryTypeFilter, type MileageHistoryKind, type MileageFriendHistorySummary, type ReminderRunReadOptions, type ReminderScheduleMetrics, type WebhookCreateState, type EcIdentityDuplicateSignal, type CustomerNotificationFailureCounts, type BannerGenerationCreateOptions, type RichMenuGroupListOptions, CHAT_FILE_TYPES, type TenantCompanyContactInfo, type SaveTenantCompanyContact, type ChatAttachment, type ChatAttachmentUploadSession, type ChatSendInput, type ChatScheduleInput, type BookingSyncRules, type BookingSyncRulesInput, type BookingSyncNotice, type BookingConflictsResponse, type BookingReassignInput, type BookingCustomerNotification, type LineMessageType, type BookingWaitlistSlotSummary, type SeatWaitlistSlotSummary, type CustomerSeatWaitlist, type ReminderDraftSettings, type ReminderDraftVersion, type ReminderPreviewResult, type ReminderPublishResult, type ReminderTestRecipientStatus, type ReminderStopConditions, type ReminderValidationResult, type AutoReplyRunsResponse, type AutoReplyConflict, type AutoReplyDraftInput, type AutoReplyDraftVersion, type AutoReplyDryRunResult, type AutoReplyPublishResult, type AutoReplyValidationResult, type Friend, type FriendUpcomingItem, type FriendSummary, type DashboardActivityItem, type FormSubmissionDetail, type FormSubmissionPage, type FriendAddEventKind, type FriendAddEventAttributionStatus, type FriendAddEventRoutingStatus, type Tag, type TagGroup, type TagCsvImportInputRow, type TagCsvImportPreview, type TagCsvImportResult, type FriendField, type FriendFieldListSummary, type FriendFieldType, type SupportMark, type Folder, type SavedSearch, type SavedSearchConditions, type SavedSegmentPreset, type SavedSegmentConditions, type MediaItem, type MediaDeleteImpact, type MediaReplacementImpact, type MediaReplacementResult, type CommonVar, type CommonVarChangeImpact, type CommonVarDeleteImpact, type CommonVarSchedule, type Scenario, type ScenarioStep, type ApiResponse, type PaginatedResponse, type User, type LineAccount, type ConversionPoint, type ConversionMeasureMethod, type Affiliate, type Automation, type AutomationLog, type Chat, type Reminder, type ReminderStep, type ReminderTriggerType, type ScoringRule, type IncomingWebhook, type IncomingWebhookCreated, type OutgoingWebhook, type OutgoingWebhookCreated, type WebhookInteraction, type WebhookInteractionDirection, type WebhookInteractionList, type NotificationRule, type Notification, type NotificationCenterData, type AccountHealthLog, type AccountMigration, type StaffMember, type Broadcast, type BroadcastTargetType, type EntryRoute, type EntryRouteGenre, type CreateEntryRouteInput, type EntryRouteFunnel, type TrafficPool, type PoolAccount, type FormLayout, type MergedPersonDetail, type UpdateMergedPersonRequest, type UpdateMergedPersonDeliveryPrioritiesRequest, type FriendBulkSelection, type FriendBulkOperation, type FriendBulkPreview, type FriendBulkRunSummary, type FriendBulkRunDetail, type IdentityCandidateDetail, type IdentityCandidateImpactMetric, type IdentityCandidateKind, type IdentityCandidateList, type IdentityCandidateStatus, type DetectIdentityCandidatesResult, type DecideIdentityCandidateRequest, type UndoIdentityCandidateRequest, type RichMenuAreaIntent, type GoogleSheetsConnectionStatus, type GoogleSheetsConnection, type GoogleSheetsSyncRun, type BroadcastMessageOptions, type BroadcastBubble } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
-import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
-import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
-import { CHAT_FILE_TYPES } from '@line-crm/shared';
-import type { TenantCompanyContactInfo, SaveTenantCompanyContact } from '@line-crm/shared';
-import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
-import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
-import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
-import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
@@ -27,111 +20,6 @@ import type {
 } from './hq-banners'
 import type { HqSupportContext, HqSupportDetail, HqSupportKind, HqSupportMessage, HqSupportRequest } from './hq-support'
 import type { BillingInterval, BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
-import type {
-  ReminderDraftSettings,
-  ReminderDraftVersion,
-  ReminderPreviewResult,
-  ReminderPublishResult,
-  ReminderTestRecipientStatus,
-  ReminderStopConditions,
-  ReminderValidationResult,
-  AutoReplyRunsResponse,
-  AutoReplyConflict,
-  AutoReplyDraftInput,
-  AutoReplyDraftVersion,
-  AutoReplyDryRunResult,
-  AutoReplyPublishResult,
-  AutoReplyValidationResult,
-  Friend,
-  FriendUpcomingItem,
-  FriendSummary,
-  DashboardActivityItem,
-  FormSubmissionDetail,
-  FormSubmissionPage,
-  FriendAddEventKind,
-  FriendAddEventAttributionStatus,
-  FriendAddEventRoutingStatus,
-  Tag,
-  TagGroup,
-  TagCsvImportInputRow,
-  TagCsvImportPreview,
-  TagCsvImportResult,
-  FriendField,
-  FriendFieldListSummary,
-  FriendFieldType,
-  SupportMark,
-  Folder,
-  SavedSearch,
-  SavedSearchConditions,
-  SavedSegmentPreset,
-  SavedSegmentConditions,
-  MediaItem,
-  MediaDeleteImpact,
-  MediaReplacementImpact,
-  MediaReplacementResult,
-  CommonVar,
-  CommonVarChangeImpact,
-  CommonVarDeleteImpact,
-  CommonVarSchedule,
-  Scenario,
-  ScenarioStep,
-  ApiResponse,
-  PaginatedResponse,
-  User,
-  LineAccount,
-  ConversionPoint,
-  ConversionMeasureMethod,
-  Affiliate,
-  Automation,
-  AutomationLog,
-  Chat,
-  Reminder,
-  ReminderStep,
-  ReminderTriggerType,
-  ScoringRule,
-  IncomingWebhook,
-  IncomingWebhookCreated,
-  OutgoingWebhook,
-  OutgoingWebhookCreated,
-  WebhookInteraction,
-  WebhookInteractionDirection,
-  WebhookInteractionList,
-  NotificationRule,
-  Notification,
-  NotificationCenterData,
-  AccountHealthLog,
-  AccountMigration,
-  StaffMember,
-  Broadcast,
-  BroadcastTargetType,
-  EntryRoute,
-  EntryRouteGenre,
-  CreateEntryRouteInput,
-  EntryRouteFunnel,
-  TrafficPool,
-  PoolAccount,
-  FormLayout,
-  MergedPersonDetail,
-  UpdateMergedPersonRequest,
-  UpdateMergedPersonDeliveryPrioritiesRequest,
-  FriendBulkSelection,
-  FriendBulkOperation,
-  FriendBulkPreview,
-  FriendBulkRunSummary,
-  FriendBulkRunDetail,
-  IdentityCandidateDetail,
-  IdentityCandidateImpactMetric,
-  IdentityCandidateKind,
-  IdentityCandidateList,
-  IdentityCandidateStatus,
-  DetectIdentityCandidatesResult,
-  DecideIdentityCandidateRequest,
-  UndoIdentityCandidateRequest,
-  RichMenuAreaIntent,
-  GoogleSheetsConnectionStatus,
-  GoogleSheetsConnection,
-  GoogleSheetsSyncRun,
-} from '@line-crm/shared'
 
 export type { RichMenuAreaIntent } from '@line-crm/shared'
 
@@ -1147,32 +1035,6 @@ export type RichMenuScheduleInput = {
   restoreGroupId?: string | null
 }
 
-/** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
-export type RichMenuPublishRun = {
-  versionNumber?: number | null
-  id: string
-  status: 'running' | 'succeeded' | 'failed'
-  lastErrorCode: string | null
-  idempotencyKey: string
-  requestedByStaffId: string
-  createdAt: string
-  updatedAt: string
-  version: {
-    name: string | null
-    chatBarText: string | null
-    pageCount: number | null
-    /** その版が「誰に出る版」だったか。読めないスナップショットでは null。 */
-    isDefaultForAll: boolean | null
-    targetingEnabled: boolean | null
-  }
-  pages: Array<{
-    pageId: string
-    orderIndex: number
-    newRichMenuId: string
-    oldRichMenuId: string | null
-  }>
-}
-
 /**
  * 公開履歴の応答。`published` はいま対象へ出ている版（最後に成功したrun）、
  * `draftDiffersFromPublished` は編集中の下書きが公開版と違うか。
@@ -1926,7 +1788,6 @@ export type BroadcastLedger = {
 };
 
 export type { BroadcastMessageButton, BroadcastMessageOptions } from '@line-crm/shared';
-import type { BroadcastMessageOptions } from '@line-crm/shared';
 
 export type BroadcastPreflight = {
   audienceCount: number
@@ -1979,7 +1840,6 @@ export type BroadcastSavedView = {
 }
 
 export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
-import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
   publishedPayload?: Record<string, unknown>;

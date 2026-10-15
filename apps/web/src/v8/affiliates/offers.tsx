@@ -1,7 +1,7 @@
 'use client'
 
-import { useListUrlJsonValue } from '@/components/shared/list-url-state'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
+import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, CircleDot, Coins, Download, FilePen, Plus, Trophy, Briefcase } from 'lucide-react'
@@ -69,7 +69,7 @@ type LoadState = 'loading' | 'ready' | 'error'
 /* 成果が出たときの動きで分けた見え方（保存しない）。「よく使う絞り込み」から選ぶ。 */
 const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer) => boolean }> = [
   { key: 'all', label: '動き：すべて', match: () => true },
-  { key: 'tag', label: 'タグを付ける', match: (o) => Boolean(o.tagId) },
+  { key: 'tag', label: TAG_ADD_ACTION_LABEL, match: (o) => Boolean(o.tagId) },
   { key: 'scenario', label: 'シナリオを始める', match: (o) => !o.tagId && Boolean(o.scenarioId) },
   { key: 'miles', label: 'マイルを渡す', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
   { key: 'none', label: '動きが未設定', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles === 0 },
@@ -79,7 +79,7 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
   { value: 'open-reward', label: '公開中・報酬が高い順', filters: ['open'], sort: 'reward' },
   { value: 'draft', label: '下書きだけ', filters: ['draft'], sort: 'newest' },
-  { value: 'tag', label: 'タグを付ける案件', filters: [], sort: 'newest', folder: 'tag' },
+  { value: 'tag', label: `${TAG_ADD_ACTION_LABEL}案件`, filters: [], sort: 'newest', folder: 'tag' },
   { value: 'scenario', label: 'シナリオを始める案件', filters: [], sort: 'newest', folder: 'scenario' },
   { value: 'miles', label: 'マイルを渡す案件', filters: [], sort: 'newest', folder: 'miles' },
   { value: 'name', label: '案件名の順', filters: [], sort: 'name' },

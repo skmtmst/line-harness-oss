@@ -1,5 +1,11 @@
 'use client'
 
+import { KIND_TABS, KIND_LABEL, WORDS, type TagQuickFilter, TAG_QUICK_FILTERS } from './store-list-options'
+export { KIND_TABS } from './store-list-options'
+
+import { type HqStoreListProps } from './store-list-types'
+export { type HqStoreListProps } from './store-list-types'
+
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import ListDateTime from '@/components/shared/list-date-time'
 import StatusBadge from '@/components/shared/status-badge'
@@ -8,14 +14,13 @@ import TagPill from '@/components/shared/tag-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Archive, Bookmark, Check, Link2, CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
-import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
+import { type HqTemplateFolder, type HqTemplateListStats, type TemplateKind, FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { describeFolderFailure } from '@/components/shared/folder-failure'
 import { notifyToast } from '@/components/shared/toast'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -42,39 +47,6 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
-/*
- * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
- * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、タグ DzdC3、リッチメニュー noVq4。
- *
- * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
- * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
- *   - 表の「使っている所」の代わりに「配布先」（N アカウント・まだ配っていない）
- *   - 全種類の行の右端「…」の左に［配る］（共通部品 RowQuickAction。「…」の中にも同じ項目。オーナー 2026-10-08）
- *   - 数の帯は配ったアカウントの数
- * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
- */
-
-/** 店のテンプレートと同じ6種類（上のタブ）。 */
-export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
-  { kind: 'message', label: 'メッセージ', icon: MessageSquare },
-  { kind: 'carousel', label: 'カルーセル', icon: GalleryHorizontalEnd },
-  { kind: 'rich_message', label: 'リッチメッセージ', icon: ImageIcon },
-  { kind: 'rich_video', label: 'リッチビデオ', icon: ImageIcon },
-  { kind: 'question', label: '質問', icon: HelpCircle },
-  { kind: 'coupon', label: 'クーポン', icon: Ticket },
-  { kind: 'research', label: 'リサーチ', icon: ClipboardList },
-]
-const KIND_LABEL: Record<TemplateKind, string> = Object.fromEntries(KIND_TABS.map((tab) => [tab.kind, tab.label])) as Record<TemplateKind, string>
-
-/** 種類ごとの言葉（店の同じ機能の一覧と同じ）。 */
-const WORDS: Record<TemplateType, { title: string; item: string; create: string; search: string; description: string; column: string }> = {
-  template: { title: 'テンプレート', item: 'テンプレート', create: 'テンプレートを作る', search: '名前・本文・差し込みで探す', column: 'テンプレート', description: 'メッセージのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、配った先へ新しい版として届きます。' },
-  form: { title: '回答フォーム', item: 'フォーム', create: 'フォームを作る', search: 'フォーム名・質問文', column: 'フォーム（質問の数）', description: '回答フォームのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、新しい版として届きます。' },
-  tag: { title: 'タグ', item: 'タグ', create: 'タグを作る', search: 'タグ名・用途で探す', column: 'タグ', description: 'タグ（タグ・入力してもらう項目・対応の印）のひな形を作り、各 LINE アカウントへ配ります。配った先で同じ名前・色で使えます。' },
-  rich_menu: { title: 'リッチメニュー', item: 'メニュー', create: 'メニューを作る', search: 'メニュー名・ボタン名', column: 'メニュー（大きさ・ボタン）', description: 'リッチメニューのひな形を作り、各 LINE アカウントへ配ります。配った先では、そのアカウントの条件で出し分けます。' },
-  scenario: { title: 'シナリオ', item: 'シナリオ', create: 'シナリオを作る', search: 'シナリオ名で探す', column: 'シナリオ', description: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。' },
-}
-
 const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** M月D日（店の一覧と同じ。時刻は title）。 */
@@ -99,47 +71,6 @@ function sumOrNull(values: Array<number | null | undefined>): number | null {
 export function sentLabel(count: number | null | undefined): string {
   return count == null ? emptyValue('unknown') : `${formatNumber(count)}通`
 }
-
-export interface HqStoreListProps {
-  type: TemplateType
-  rows: HqTemplate[]
-  ready: boolean
-  busy: boolean
-  canEdit: boolean
-  /** 配る先になるアカウントの数（数の帯の「全 N アカウントのうち」）。 */
-  accountTotal: number
-  /** 一覧の集計（API-18：今月送った数・新しい版を未配布のひな形の数）。取れなければ null。 */
-  stats?: HqTemplateListStats | null
-  /** 6種類のタブ（テンプレートだけ）。 */
-  kind?: TemplateKind
-  kindCounts?: Partial<Record<TemplateKind, number>> | null
-  onKindChange?: (kind: TemplateKind) => void
-  folders: HqTemplateFolder[]
-  folderLoadFailed: boolean
-  folderFilter: string
-  onFolderFilter: (id: string) => void
-  onAddFolder: (name: string, color: string | null) => Promise<void>
-  onRenameFolder: (folder: HqTemplateFolder, name: string, color: string | null) => Promise<void>
-  onDeleteFolder: (folder: HqTemplateFolder) => Promise<void>
-  /** ほかの人が先に直した・消した（409・404）ときにフォルダの一覧を読み直す。 */
-  onReloadFolders?: () => Promise<void>
-  onCreate: () => void
-  onEdit: (row: HqTemplate) => void
-  /** 名前を押したとき（詳細 pQ4fH）。無ければ編集を開く。 */
-  onOpen?: (row: HqTemplate) => void
-  itemHref?: (row: HqTemplate) => string
-  onDistributeFolder?: (id: string, name: string) => void
-  /** 全種類を数える。種類タブや検索でフォルダの配布範囲を狭めない。 */
-  folderContents?: HqTemplate[] | null
-  onDistribute: (row: HqTemplate) => void
-  onDuplicate: (row: HqTemplate) => void
-  onRemove: (row: HqTemplate) => void
-  notices?: ReactNode
-  overlays?: ReactNode
-}
-
-type TagQuickFilter = 'outdated' | 'cleanup'
-const TAG_QUICK_FILTERS: readonly (readonly [TagQuickFilter, string])[] = [['outdated', '新しい版を未配布'], ['cleanup', '整理の候補（未使用・名前が重なっている）']]
 
 export default function HqStoreList(props: HqStoreListProps) {
   const saveErrors = useSaveFormErrors()
@@ -347,7 +278,6 @@ export default function HqStoreList(props: HqStoreListProps) {
   ]
 
   /* タグ（DzdC3）の名前の札。フォルダの色は札の中の丸。 */
-  const tagPill = (row: HqTemplate, folder: HqTemplateFolder | null) => <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} />
 
   const toolbar = (
     <div className={type === 'tag' ? `${storeStyles.wideTools} ${attributeStyles.tagTools}` : storeStyles.wideTools}>
@@ -384,10 +314,9 @@ export default function HqStoreList(props: HqStoreListProps) {
                 variant="secondary"
                 aria-haspopup="menu"
                 aria-expanded={tagQuickOpen}
-                aria-label={tagQuick.length ? `よく使う絞り込み（${tagQuick.length} 件選択中）` : 'よく使う絞り込み'}
+                aria-label={tagQuick.length ? `よく使う絞り込み（${tagQuick.length}件で絞り込み中）` : 'よく使う絞り込み'}
                 title="よく使う絞り込み"
-                data-active={tagQuick.length > 0 || undefined}
-                className={hqStyles.quickButton}
+                filterActive={tagQuick.length > 0}
                 onClick={() => setTagQuickOpen((open) => !open)}
               >
                 <Bookmark size={15} aria-hidden="true" />
@@ -522,9 +451,9 @@ export default function HqStoreList(props: HqStoreListProps) {
                   /* タグ（DzdC3）は名前をタグの札で出す。フォルダの色は札の中の丸（名前の前の丸を二重に置かない）。 */
                   <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {itemHref ? <RowNameLink href={itemHref(row)} className={hqStyles.hqTagLink} aria-label={row.name} title={row.name}>{tagPill(row, folder)}</RowNameLink> : canEdit ? (
-                        <button type="button" className={`${hqStyles.hqNameButton} ${hqStyles.hqTagLink}`} aria-label={row.name} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{tagPill(row, folder)}</button>
-                      ) : <span title={row.name}>{tagPill(row, folder)}</span>}
+                      {itemHref ? <RowNameLink href={itemHref(row)} className={hqStyles.hqTagLink} aria-label={row.name} title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} /></RowNameLink> : canEdit ? (
+                        <button type="button" className={`${hqStyles.hqNameButton} ${hqStyles.hqTagLink}`} aria-label={row.name} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} /></button>
+                      ) : <span title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} /></span>}
                     </div>
                   )} nameCarriesDot />
                 ) : <NameCell name={(

@@ -1,5 +1,7 @@
 'use client'
 
+import type { MenusTabProps } from './menus-tab-types'
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
@@ -29,15 +31,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
-export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: {
-  accountId: string
-  menus: BookingMenu[]
-  status: LoadStatus
-  error: string | null
-  menuCount: number | undefined
-  canEdit: boolean
-  onReload: () => void
-}) {
+export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: MenusTabProps) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [query, setQuery] = useListUrlValue('q', '')

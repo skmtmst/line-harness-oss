@@ -144,7 +144,7 @@ a.railStep:hover .railLabel {
 }
 
 /* 送るまでの段の字は絵の幅（12px の字＋1）に合わせ、段の間を 108・96 にそろえる。 */
-.railItem[data-kind='delivery'] .railLabel {
+.railItem.railDelivery .railLabel {
   padding-inline-end: 1px;
 }
 
@@ -160,24 +160,24 @@ a.railStep:hover .railLabel {
   color: var(--color-canvas);
 }
 
-.railItem[data-state='done'] .railMark {
+.railItem[data-delivery-stage='done'] .railMark {
   background: var(--tpl-bd-green);
 }
 
-.railItem[data-state='done'] .railStep {
+.railItem[data-delivery-stage='done'] .railStep {
   color: var(--color-action);
 }
 
-.railItem[data-kind='delivery'][data-state='done'] .railStep {
+.railItem.railDelivery[data-delivery-stage='done'] .railStep {
   color: var(--color-ink-secondary);
 }
 
-.railItem[data-state='current'] .railMark {
+.railItem[data-delivery-stage='current'] .railMark {
   background: var(--color-canvas);
   box-shadow: var(--tpl-bd-mark-ring);
 }
 
-.railItem[data-state='current'] .railStep {
+.railItem[data-delivery-stage='current'] .railStep {
   color: var(--color-ink);
   font-weight: 700;
 }
@@ -720,7 +720,7 @@ a.railStep:hover .railLabel {
 .railLine[data-done] { background: var(--color-accent-deep); }
 .railItem[data-finished] .railMark { background: var(--color-selection-border); }
 .railItem[data-finished] .railStep { color: var(--color-ink); font-weight: 700; }
-.railItem[data-state='current'] .railMark { background: var(--color-selection-border); box-shadow: none; }
-.railItem[data-state='todo'] .railMark { background: var(--color-canvas); box-shadow: none; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
-.railItem[data-kind='delivery'][data-state='done'] .railStep { color: var(--color-ink); }
-.railItem[data-state='todo'] .railStep { color: var(--color-ink-secondary); }
+.railItem[data-delivery-stage='current'] .railMark { background: var(--color-selection-border); box-shadow: none; }
+.railItem[data-delivery-stage='todo'] .railMark { background: var(--color-canvas); box-shadow: none; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
+.railItem.railDelivery[data-delivery-stage='done'] .railStep { color: var(--color-ink); }
+.railItem[data-delivery-stage='todo'] .railStep { color: var(--color-ink-secondary); }

@@ -8,13 +8,11 @@ const b244Requirements = {
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, User, UserPlus, UserRound, Workflow } from 'lucide-react';
-import Link from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -42,16 +40,15 @@ import FriendPickerField from '@/components/shared/friend-picker-field';
 import SegmentedControl from '@/components/shared/segmented'
 import { TextArea, TextField } from '@/components/shared/text-field';
 import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
 import { SettingCheckbox } from '@/components/shared/checkbox';
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import type { SegmentCondition } from '@/lib/segment-condition';
-import { pruneCondition } from '@/lib/segment-condition';
-import { ApiError, api, describeSaveFailure } from '@/lib/api';
-import type { FriendAddRule, FriendAddRuleAction, FriendAddRuleDefinition, FriendAddRuleKind, FriendAddRuleOptions, FriendAddRuleStatus } from '@/lib/api';
+import { type SegmentCondition, pruneCondition } from '@/lib/segment-condition'
+import { ApiError, api, describeSaveFailure, type FriendAddRule, type FriendAddRuleAction, type FriendAddRuleDefinition, type FriendAddRuleKind, type FriendAddRuleOptions, type FriendAddRuleStatus } from '@/lib/api'
 import { formatNumber } from '@/lib/format';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -703,7 +700,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
          帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
       notice={conflict ? (
-        <SaveConflictBand
+        <SaveConflictBand reloadVariant="primary"
           title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
           designNode="h5rm8t"
           compareBusy={compareBusy}
@@ -1034,13 +1031,13 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
     <>
       <Card variant="form" gap="normal" className={styles.card} aria-label="どの流入リンクから来た人に送るか" data-friend-add-routes>
         <CardHeader size="stacked" title={<>どの流入リンクから来た人に送るか</>} meta={<>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</>} />
-        <SearchField
+        <ListToolbar searchSlot={<SearchField
           value={query}
           placeholder="流入リンクの名前で探す"
           aria-label="流入リンクの名前で探す"
           onChange={setQuery}
           onClear={() => setQuery('')}
-        />
+        />} />
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)

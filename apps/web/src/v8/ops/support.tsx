@@ -1,5 +1,7 @@
 'use client'
 
+import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import { Building2, Check, Clock, Hourglass, Inbox, LogIn, Paperclip, Plus, RefreshCw, RotateCcw, Send, Sparkles } from 'lucide-react'
@@ -61,18 +63,6 @@ function stageLabel(stage: OpsSupportStage, fallback: string): string {
   if (stage === 'resolved') return '解決'
   return fallback
 }
-
-const PRIORITY_FILTER = [
-  { value: '', label: '優先度' },
-  { value: 'high', label: '高' },
-  { value: 'medium', label: '中' },
-  { value: 'low', label: '低' },
-]
-const SORT_OPTIONS = [
-  { value: 'priority', label: '並び：優先度' },
-  { value: 'newest', label: '並び：新しい順' },
-  { value: 'oldest', label: '並び：古い順' },
-]
 const PRIORITY_OPTIONS = [
   { value: 'high', label: '高' },
   { value: 'medium', label: '中' },

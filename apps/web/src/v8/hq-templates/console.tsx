@@ -1,5 +1,8 @@
 'use client'
 
+import { formStatusLine, formDistributedLine } from './form-status-line'
+export { formStatusLine, formDistributedLine } from './form-status-line'
+
 import type { DefinitionEditorProps, ConsoleProps } from './console-types'
 export type { DefinitionEditorProps } from './console-types'
 
@@ -27,7 +30,7 @@ import { Th } from '@/components/shared/table'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
-import { hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition, type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType } from '@/lib/hq-templates-api'
+import { hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition, type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType, type RichMenuDefinition, type TagDefinition } from '@/lib/hq-templates-api'
 import { choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems, uploadedKeysIn, type TemplateMedia } from './definition'
 import MessageForm from './message-form'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -46,7 +49,6 @@ import Card from '@/components/shared/card'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
-import type { RichMenuDefinition, TagDefinition } from '@/lib/hq-templates-api'
 import HqAccountPicker from './account-picker'
 import FolderDistributionDialog from './folder-distribution-dialog'
 import DistributionResultDialog from './distribution-result-dialog'
@@ -1268,28 +1270,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         </div>
       </AccountDistributionPage>
   )
-}
-
-/**
- * 回答フォームの題の下の1行（u5MM7）。いまの版がまだ配った先に届いていなければ、配った版との違いを出す（API-18 の版の履歴）。
- */
-export function formStatusLine(row: HqTemplateListItem | undefined, versions?: readonly HqTemplateVersionDisplay[] | null): string {
-  if (!row) return '下書き・まだ配っていません（保存してから配ると、選んだアカウントへ届きます）'
-  if ((row.distributed_account_count ?? 0) === 0) return '下書き・まだ配っていません（保存してから配ると、選んだアカウントへ届きます）'
-  const current = versions?.find((version) => version.is_current)
-  const inUse = inUseVersionOf(versions ?? null)
-  if (current && inUse && current.version !== inUse.version) return `下書き・配った版${inUse.version}と違うところがあります（保存してから配ると、配った先へ新しい版として届きます）`
-  return '下書き（保存してから配ると、配った先へ新しい版として届きます）'
-}
-
-/** 右の列「配った先」の文（u5MM7）。名前は API-14 の最大3件と、ほかの数。 */
-export function formDistributedLine(row: HqTemplateListItem | undefined): string {
-  const count = row?.distributed_account_count ?? 0
-  if (!row || count === 0) return 'まだどのアカウントにも配っていません。保存してから配ると、各アカウントでは回答フォームとして使えます。'
-  const names = (row.distributed_account_names ?? []).map((name) => name.replace(/^然\s*-NEN-\s*/, ''))
-  const more = row.distributed_account_more ?? 0
-  const list = names.length ? `（${names.join('・')}${more > 0 ? `・ほか${more}` : ''}）` : ''
-  return `配った先：${count} アカウント${list}。各アカウントでは回答フォームとして使えます。`
 }
 
 function accountName(accounts: HqAccount[], id: string): string {

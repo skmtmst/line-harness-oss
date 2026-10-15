@@ -5,8 +5,7 @@ import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/
 import { useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowLeft,
   ArrowRight,
@@ -42,7 +41,7 @@ import Notice from '@/components/shared/notice'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import { ApprovalRequestFields } from '@/components/broadcasts/broadcast-approval'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
@@ -58,7 +57,6 @@ import {
 } from './display'
 import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -555,7 +553,7 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval }: { broadcast
         const finished = displayStatus === 'sent' && index === currentIndex
         const state = index < currentIndex || finished ? 'done' : index === currentIndex ? 'current' : 'todo'
         return (
-          <li key={step.key} className={styles.railItem} data-state={state} data-finished={finished || undefined} data-kind="delivery">
+          <li key={step.key} className={`${styles.railItem} ${styles.railDelivery}`} data-delivery-stage={state} data-finished={finished || undefined} data-kind="delivery">
             {index > 0 ? <span className={styles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
             <span className={styles.railStep}>
               <span className={styles.railMark} aria-hidden="true">{state === 'done' && !finished ? <Check size={11} strokeWidth={3} /> : null}</span>

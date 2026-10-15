@@ -1,8 +1,11 @@
 'use client'
 
-import type { FriendDetail } from './friend-info-types'
+import { STATUS_WORD, STATUS_OPTIONS } from './friend-info-status'
 
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { type ChatStatusInfo, type Props, type FriendDetail } from './friend-info-types'
+
+
+import { isOwnerOrAdmin, canEditFeature } from '@/lib/staff-capability'
 import { formAnswerText } from '@/lib/form-answer'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
@@ -32,53 +35,10 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
-import { canEditFeature } from '@/lib/staff-capability'
 import { X } from 'lucide-react'
 import { formatDateTime, formatRelative, formatNumber } from '@/lib/format'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
-
-interface ChatStatusInfo {
-  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved' | null
-  notes: string | null
-}
-
-interface Props {
-  friendId: string | null
-  /** 親 (ChatDetail) が持っている chat 側の情報 — status / notes */
-  chatStatus?: ChatStatusInfo
-  /** 担当者名 (ChatDetail で operatorId → name 変換済を渡す想定) */
-  operatorName?: string | null
-  /** A-2 その場で直すための会話 ID。無いときは表示のみ（従来どおり）。 */
-  lastContactAt?: string | null
-  chatId?: string | null
-  /** 同時編集の見分け札（chats.revision）。無いときは送らない。 */
-  revision?: number
-  /** 担当の選択肢。無いときは担当の変更欄を出さない。 */
-  operators?: Array<{ id: string; name: string }>
-  /** 現在の担当 ID。無いときは未割り当て扱い。 */
-  operatorId?: string | null
-  /** 開いているLINEアカウントの ID。前払いのみの印に使う。無いときは印を出さない。 */
-  accountId?: string | null
-  /** 保存が通ったあとに親へ知らせる（一覧の読み直しなど）。 */
-  onChatChanged?: () => void
-}
-
-/** B-26 知らせの文に使う対応状況の名前（受信箱の状態の切り替えと同じ言葉）。 */
-const STATUS_WORD: Record<NonNullable<ChatStatusInfo['status']>, string> = {
-  unread: '未対応',
-  in_progress: '対応中',
-  on_hold: '保留',
-  resolved: '対応済み',
-}
-
-const STATUS_OPTIONS: Array<{ value: NonNullable<ChatStatusInfo['status']>; label: string }> = [
-  { value: 'unread', label: '未対応' },
-  { value: 'in_progress', label: '対応中' },
-  { value: 'on_hold', label: '保留' },
-  { value: 'resolved', label: '対応済み' },
-]
 
 const DETAIL_SECTIONS = [
   { key: 'profile', label: 'プロフィール' },

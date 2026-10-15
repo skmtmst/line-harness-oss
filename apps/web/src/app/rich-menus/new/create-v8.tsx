@@ -1,5 +1,11 @@
 'use client'
 
+import { MetricValue, CheckIcon, MenuPreview } from './create-preview'
+
+import { type PendingImage, type Page, type Group, type CheckState, type PrepublishState } from './create-types'
+
+import { STEP_KEYS, type StepKey, STEP_LABEL, NEXT_LABEL, HQ_STEP_LABEL, HQ_NEXT_LABEL, V8_LAYOUT_KEYS, V8_LAYOUT_LABEL, SIZE_OPTIONS, TAB_COUNT_OPTIONS, SIZE_LABEL } from './create-options'
+
 import ListState from '@/components/shared/list-state'
 
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -62,14 +68,10 @@ import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
-import { pruneStaleAreaTags, pruneStaleAreaTemplates } from '@/components/rich-menus/action-drafts'
+import { pruneStaleAreaTags, pruneStaleAreaTemplates, createAreaDrafts, isAreaActionConfigured } from '@/components/rich-menus/action-drafts'
 import {
   NEW_MENU_INTENTS_WITH_SWITCH,
 } from '@/components/rich-menus/rich-menu-create-form'
-import {
-  createAreaDrafts,
-  isAreaActionConfigured,
-} from '@/components/rich-menus/action-drafts'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -119,154 +121,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import HqMenuReferences from './hq-references'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
-/*
- * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
- *
- * Pencil の正本：
- *   ① 形と画像 `JeINq` / ② ボタンの動き `Z0uO6` / ③ 誰に出すか `OxEMM` / ④ 公開 `F4gELj`
- *
- * 立て付け：
- * - 「次へ：ボタンの動き」で下書き（rich_menu_groups）を作る。手順②以降は
- *   保存済みページに対して画像アップロード・公開前確認がそのまま使える。
- * - 形（大きさ・面の分けかた・タブ数）は作成 API だけが受け付ける。
- *   下書きができたあと手順①へ戻ると、それらは読み取り専用になる。
- * - 公開・予約・実機確認・照合の運用ロジックは編集画面（edit/）と同じ
- *   部品・関数を使い回し、別実装にしない。
- */
-
-/* ---------- 手順 ---------- */
-
-const STEP_KEYS = ['shape', 'buttons', 'audience', 'publish'] as const
-type StepKey = (typeof STEP_KEYS)[number]
-
-const STEP_LABEL: Record<StepKey, string> = {
-  shape: '形と画像',
-  buttons: 'ボタンの動き',
-  audience: '誰に出すか',
-  publish: '公開',
-}
-
-const NEXT_LABEL: Record<Exclude<StepKey, 'publish'>, string> = {
-  shape: '次へ：ボタンの動き',
-  buttons: '次へ：誰に出すか',
-  audience: '次へ：公開',
-}
-
-/** 統括のひな形（host）の手順の名前（絵 UgZPJ・BVSbe・ME78d）。複数のアカウントへ配る画面なので③④が店と違う。 */
-const HQ_STEP_LABEL: Record<StepKey, string> = {
-  shape: '形と画像',
-  buttons: 'ボタンの動き',
-  audience: '配る先',
-  publish: '確かめて配る',
-}
-
-const HQ_NEXT_LABEL: Record<Exclude<StepKey, 'publish'>, string> = {
-  shape: '次へ：ボタンの動き',
-  buttons: '次へ：配る先',
-  audience: '次へ：確かめて配る',
-}
-
-/* ---------- 面の見本（作る①「面の分け方」。Pencil では大きい側が7つ） ---------- */
-
-const V8_LAYOUT_KEYS: Record<'large' | 'compact', string[]> = {
-  large: [
-    'large-full',
-    'large-1x2-v',
-    'large-1x2-h',
-    'large-1plus2',
-    'large-2x2',
-    'large-2plus1',
-    'large-2x3',
-  ],
-  compact: ['compact-full', 'compact-2x1', 'compact-3x1', 'compact-4x1'],
-}
-
-/** Pencil の札に合わせた短い名前。 */
-const V8_LAYOUT_LABEL: Record<string, string> = {
-  'large-full': '1面',
-  'large-1x2-v': '上下2面',
-  'large-1x2-h': '左右2面',
-  'large-1plus2': '上1・下2',
-  'large-2x2': '4面',
-  'large-2plus1': '上2・下1',
-  'large-2x3': '6面',
-  'compact-full': '1面',
-  'compact-2x1': '左右2面',
-  'compact-3x1': '横3面',
-  'compact-4x1': '横4面',
-}
-
-const SIZE_OPTIONS: Array<{
-  value: 'large' | 'compact'
-  label: string
-  dims: string
-  hint: string
-  /* 板 `JeINq`：絵の印は形の印（大＝縦長・小＝横長）。札の印にしない。 */
-  icon: typeof RectangleVertical
-}> = [
-  {
-    value: 'large',
-    label: '大きい',
-    dims: `${RICH_MENU_DIMENSIONS.large.width}×${RICH_MENU_DIMENSIONS.large.height}`,
-    hint: '画面をしっかり使う。ボタン6つまで',
-    icon: RectangleVertical,
-  },
-  {
-    value: 'compact',
-    label: '小さい',
-    dims: `${RICH_MENU_DIMENSIONS.compact.width}×${RICH_MENU_DIMENSIONS.compact.height}`,
-    hint: 'トークが隠れにくい。横に並べる',
-    icon: RectangleHorizontal,
-  },
-]
-
-const TAB_COUNT_OPTIONS = [
-  { value: '0', label: 'なし' },
-  { value: '1', label: '2つ' },
-  { value: '2', label: '3つ' },
-]
-
 /** ①で選べる切替タブの数の上限（ページの数。LINE 側の上限より多くしない）。 */
 const MAX_TAB_PAGES = Math.min(RICH_MENU_MAX_PAGES, TAB_COUNT_OPTIONS.length)
-
-/** 作る前に①で選んだ画像（タブごとに1枚）。ファイルか登録メディアのどちらか。 */
-type PendingImage = {
-  file: File | null
-  url: string | null
-  dims: { w: number; h: number } | null
-  media: MediaItem | null
-}
-
-/* ---------- 型 ---------- */
-
-type Page = {
-  id: string
-  orderIndex: number
-  name: string
-  aliasId: string
-  lineRichmenuId: string | null
-  imageR2Key: string | null
-  imageContentType: string | null
-  areas: Area[]
-}
-
-type Group = {
-  id: string
-  accountId: string
-  name: string
-  chatBarText: string
-  size: 'large' | 'compact'
-  defaultPageId: string | null
-  isDefaultForAll: boolean
-  status: 'draft' | 'published'
-  targetingCondition: string | null
-  targetingPriority: number
-  targetingEnabled: boolean
-  folderId: string | null
-  defaultOpen: boolean
-  version: number
-  pages: Page[]
-}
 
 /** 古い口や途中の応答を、そのまま編集用の型に断定しない。 */
 function isGroupResponse(value: unknown): value is Group {
@@ -274,14 +130,6 @@ function isGroupResponse(value: unknown): value is Group {
   return 'id' in value && typeof value.id === 'string'
     && 'name' in value && typeof value.name === 'string'
     && 'pages' in value && Array.isArray(value.pages)
-}
-
-type CheckState = 'ok' | 'ng' | 'yet'
-type PrepublishState = {
-  self: { state: 'ok' | 'ng'; message: string | null }
-  line: { state: CheckState; message: string | null }
-  device: { state: 'ok' | 'yet'; at: string | null }
-  pages: { state: 'ok' | 'ng'; count: number; max: number }
 }
 
 /* ---------- 補助（edit/page.tsx と同じ写し。page.tsx は部品を export できないため） ---------- */
@@ -336,11 +184,6 @@ function projectAreaForDraft(a: Area) {
   }
 }
 
-const SIZE_LABEL: Record<'large' | 'compact', string> = {
-  large: `${RICH_MENU_DIMENSIONS.large.width}×${RICH_MENU_DIMENSIONS.large.height}`,
-  compact: `${RICH_MENU_DIMENSIONS.compact.width}×${RICH_MENU_DIMENSIONS.compact.height}`,
-}
-
 /** 画像エラーのサーバ原文（英語）を日本語に写す。 */
 function imageUploadErrorText(err: unknown): string {
   const fallback = '画像を読み込めませんでした。もう一度お試しください。'
@@ -385,91 +228,6 @@ function areaDraftsWithSwitchTargets(areas: Area[]) {
       actionData: Number.isInteger(index) ? { ...rest, targetPageIndex: index } : rest,
     }
   })
-}
-
-/* ---------- 小部品 ---------- */
-
-function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | undefined }) {
-  if (!metric) return <>—</>
-  if (metric.state !== 'available' || metric.value === null) {
-    return <>数えられません</>
-  }
-  return <>{formatNumber(metric.value)}人</>
-}
-
-function CheckIcon({ state }: { state: CheckState }) {
-  if (state === 'ok') return <CircleCheck className={`${styles.checkIcon} ${styles.checkIconOk}`} aria-hidden />
-  if (state === 'ng') return <CircleAlert className={`${styles.checkIcon} ${styles.checkIconNg}`} aria-hidden />
-  return <Circle className={`${styles.checkIcon} ${styles.checkIconYet}`} aria-hidden />
-}
-
-/**
- * LINEでの見え方の中身（スマホの下・入力の帯の位置に出すリッチメニュー）。画像があれば実画像に面の線を重ね、
- * 無ければ面の線（点線）だけ出し「画像を選ぶと、ここに出ます」（仕様書・公式照合より）。
- * 下の帯（トーク画面の下の文言 ∨）は LinePreview が1本だけ描く（gobhu）。
- */
-function MenuPreview({
-  size,
-  imageUrl,
-  areas,
-  pages,
-  activePageId,
-}: {
-  size: 'large' | 'compact'
-  imageUrl: string | null
-  areas: Array<{ x: number; y: number; w: number; h: number }> | null
-  pages: Array<{ id: string; name: string }>
-  activePageId: string | null
-}) {
-  const dims = RICH_MENU_DIMENSIONS[size]
-  const areaBoxes = areas && areas.length > 0 ? (
-    <div className={styles.previewMenuAreas} aria-hidden="true">
-      {areas.map((a, i) => (
-        <span
-          key={i}
-          className={styles.previewMenuAreaBox}
-          style={{
-            left: `${(a.x / dims.width) * 100}%`,
-            top: `${(a.y / dims.height) * 100}%`,
-            width: `${(a.w / dims.width) * 100}%`,
-            height: `${(a.h / dims.height) * 100}%`,
-          }}
-        />
-      ))}
-    </div>
-  ) : null
-  return (
-    <div>
-      {pages.length > 1 ? (
-        <div className={styles.previewMenuTabs} aria-hidden="true">
-          {pages.map((p) => (
-            <span key={p.id} className={p.id === activePageId ? `${styles.previewMenuTab} ${styles.previewMenuTabOn}` : styles.previewMenuTab}>
-              {p.name}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {imageUrl ? (
-        <div className={styles.previewMenuImage}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
-          <img src={imageUrl} alt="メニューの画像" />
-          {areaBoxes}
-        </div>
-      ) : (
-        <div
-          className={styles.previewMenuEmpty}
-          data-rich-menu-size={size}
-          style={{ aspectRatio: `${dims.width} / ${dims.height}` }}
-        >
-          {areaBoxes}
-          <span className={styles.previewMenuEmptyText}>
-            画像を選ぶと、ここに出ます
-            {areas && areas.length > 0 ? `（${areas.length}面）` : ''}
-          </span>
-        </div>
-      )}
-    </div>
-  )
 }
 
 /* ---------- 統括のひな形（host）の画面の中の下書き ---------- */
@@ -1902,7 +1660,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conditionHelp ? <p>{conditionHelp}</p> : null}</>} notice={conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
-            <SaveConflictBand
+            <SaveConflictBand reloadVariant="primary"
               title="ほかの人がこのメニューを更新しました"
               description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。"
               designNode="r8dGXT"

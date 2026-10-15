@@ -1075,7 +1075,7 @@ function EditCommonVarV8Inner() {
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
             {/* 誰が・いつ保存したかの文と、入力を残す動きは同じ。 */}
             <div className={styles.conflictSlot}>
-              <SaveConflictBand
+              <SaveConflictBand reloadVariant="primary"
                 title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
                 description={`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.actorName ?? '別の担当者'}さんの変更が消えます。`}
                 designNode="piWhz"

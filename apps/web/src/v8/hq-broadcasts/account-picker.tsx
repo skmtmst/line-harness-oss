@@ -16,7 +16,7 @@ function AccountConnection({ account }: { account: BroadcastAccount }) {
     : account.connection?.status === 'ok' ? 'つながっています'
     : account.connection?.status === 'warn' ? '接続を確かめてください' : '接続は未確認'
   const tone = account.isActive === false || account.channelAccessTokenConfigured === false ? 'danger' : account.connection?.status === 'warn' ? 'warning' : undefined
-  return <span className={styles.connection} data-tone={tone} title={tone === 'warning' ? '送れるかは最終確認で確かめます。' : undefined}>{`・${text}`}</span>
+  return <span className={styles.connection} data-connection-tone={tone} title={tone === 'warning' ? '送れるかは最終確認で確かめます。' : undefined}>{`・${text}`}</span>
 }
 
 /** 送るアカウントを選ぶ窓（共通の配るアカウントの窓・dJZ7Q）。確定するまでは配信の宛先を変えない。 */

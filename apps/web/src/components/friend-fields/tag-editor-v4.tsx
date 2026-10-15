@@ -1,5 +1,6 @@
 'use client'
 
+import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
@@ -60,7 +61,7 @@ export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
 export const ACTION_DISPLAY: Record<TagEditorActionLabel, string> = {
   'テキスト送信': 'テキストを送る',
   'テンプレート送信': 'テンプレートを送る',
-  'タグ追加': 'タグを付ける',
+  'タグ追加': TAG_ADD_ACTION_LABEL,
   'タグ解除': 'タグを外す',
   '友だち情報更新': '友だち情報を変える',
   '対応マーク変更': '対応マークを変える',

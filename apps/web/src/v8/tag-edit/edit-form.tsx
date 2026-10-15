@@ -183,7 +183,7 @@ export function TagEditForm({
     <div className={styles.conflictSlot}>
       <SaveConflictBand
         title={`ほかの人がタグ「${tag.name}」を先に保存しました`}
-        designNode="xn95q"
+        reloadVariant="primary" designNode="xn95q"
         compareBusy={compareBusy}
         onCompare={onCompare}
         onReload={onReloadLatest}

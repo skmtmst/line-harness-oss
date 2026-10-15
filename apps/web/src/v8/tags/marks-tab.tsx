@@ -2,13 +2,11 @@
 
 import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Archive, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react';
+import { Archive, CircleDot, Flag, GripVertical, History, Info, Loader, Send, AlertCircle } from 'lucide-react'
 
-import { RowNameLink } from '@/components/shared/table';
+import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertCircle } from 'lucide-react';
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api';
 import { createResponseGate } from '@/lib/latest-request';
 import { ListPageBody } from '@/components/templates';
@@ -28,7 +26,6 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { STATE_TEXT } from '@/components/shared/not-connected';
 import { notifyToast } from '@/components/shared/toast';
