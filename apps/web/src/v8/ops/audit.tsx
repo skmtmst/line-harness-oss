@@ -21,6 +21,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import Card from '@/components/shared/card'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -143,13 +144,13 @@ export default function OpsAuditV8() {
           <div className={styles.dateGroup}>
             <span className={styles.dateLabel}>開始日</span>
             <div className={styles.date}>
-            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" /></SaveErrorField>
+            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} displayFormat="short" placeholder="指定なし" aria-label="開始日" /></SaveErrorField>
             </div>
           </div>
           <div className={styles.dateGroup}>
             <span className={styles.dateLabel}>終了日</span>
             <div className={styles.date}>
-            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" /></SaveErrorField>
+            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} displayFormat="short" placeholder="指定なし" aria-label="終了日" /></SaveErrorField>
             </div>
           </div>
         </div>
@@ -168,9 +169,9 @@ export default function OpsAuditV8() {
             <ListState permissionScope="hq" kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
           </div>
         ) : (
-          <DataTable label="監査ログ">
+          <Card padding="rows" overflow="hidden"><DataTable label="監査ログ">
             <colgroup><col className={styles.colAt} /><col className={styles.colWho} /><col className={styles.colWhat} /><col className={styles.colTenant} /><col /></colgroup>
-            <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th>操作</Th><Th>契約先</Th><Th>理由</Th></TableHeadRow></thead>
+            <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th>理由</Th></TableHeadRow></thead>
             <tbody>{rows.map((row) => (
               <Tr key={row.id}>
                 <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
@@ -180,9 +181,9 @@ export default function OpsAuditV8() {
                 <Td title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
               </Tr>
             ))}</tbody>
-          </DataTable>
+          </DataTable></Card>
         )}
-        {rows.length > 0 ? (
+        {rows.length > 0 && pageCount > 1 ? (
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>

@@ -1344,11 +1344,12 @@ function LineNotificationsPage() {
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" description="札や検索を外すと、すべて出ます" action={<Button variant="secondary" onClick={() => setFilter('all')}>条件を外す</Button>} />
-        : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) max-content', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
+        : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) max-content', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
           <thead>
             <TableHeadRow>
               <Th>種類・きっかけ</Th>
-              <Th>いつ・だれに</Th>
+              <Th>いつ送るか</Th>
+              <Th>だれに</Th>
               <Th>この30日</Th>
               <Th>状態</Th>
               <Th>出す</Th>
@@ -1362,7 +1363,8 @@ function LineNotificationsPage() {
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
                 <Td>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</Td>
-                <Td><div><TruncatedText value={timingLabel(setting)} /></div><div><TruncatedText value={audienceLabel(setting)} /></div></Td>
+                <Td><TruncatedText value={timingLabel(setting)} /></Td>
+                <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
