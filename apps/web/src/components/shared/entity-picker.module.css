@@ -199,3 +199,5 @@ html:root .tpCard[data-selected] { background: var(--color-choice-selected); out
 html:root .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
 html:root .cardRadio:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+:root .tpList > :first-child:not(.tpCards) { margin-bottom: var(--space-8); }

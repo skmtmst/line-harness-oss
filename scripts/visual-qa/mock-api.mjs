@@ -2453,6 +2453,9 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
     return AUTO_REPLY_PUBLISH_RESULT
   }
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/pages\/[^/]+\/image$/.test(pathname)) {
+    return { imageR2Key: 'rich-menus/visual-qa.png', imageContentType: 'image/png', size: 'large' }
+  }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
       matched: { value: 1020, state: 'available', reason: null },
@@ -5901,7 +5904,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/rich-menu-groups\/[^/]+\/schedules$/.test(pathname)) return { success: true, data: [] }
   const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
   if (richMenuGroup) {
-    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]] ?? (richMenuGroup[1] === 'rmg-new' && RICH_MENU_GROUP_DETAILS['rmg-1'] ? { ...RICH_MENU_GROUP_DETAILS['rmg-1'], id: 'rmg-new', name: 'テスト' } : undefined)
     return group
       ? { success: true, data: group }
       : { success: false, error: 'リッチメニューが見つかりません' }
