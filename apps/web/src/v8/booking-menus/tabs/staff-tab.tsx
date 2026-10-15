@@ -1,6 +1,5 @@
 'use client'
 
-import TruncatedText from '@/components/shared/truncated-text'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
