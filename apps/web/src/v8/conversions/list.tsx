@@ -913,7 +913,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   /* ===== 右の詳細パネルと停止の確認 ===== */
   const detailCard = panelPoint ? (
     <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}
-      footer={canEdit && panelPoint.status !== 'stopped' ? <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button> : undefined}>
+      footer={canEdit && panelPoint.status !== 'stopped' ? <Button variant="danger-outline" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button> : undefined}>
       <div className={styles.panelLine}>
         <StatePill point={panelPoint} />
         <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
@@ -974,7 +974,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             : '利用先と影響を読み込めませんでした。'} title={`「${stopTarget.name}」を止めますか？`} designWidth={480} designTop={220} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
-          variant="primary"
+          variant={stopAction === 'delete' ? 'danger' : 'primary'}
           disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
           disabledReason={stopping ? '止めています。' : stopImpactLoading ? '利用先と影響を確認しています。' : !stopReason.trim() ? '止める理由を入力してください。' : stopAction === 'replace' && !replacementId ? '差し替え先を選んでください。' : undefined}
           onClick={() => void runStop()}
