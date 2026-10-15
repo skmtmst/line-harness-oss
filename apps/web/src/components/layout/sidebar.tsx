@@ -537,6 +537,27 @@ export default function Sidebar({
   }, [selectedAccountId, photosBadgeVisible])
 
   useEffect(() => { setIsOpen(false) }, [pathname])
+  /* メニューが縦に送られるとき、いま開いている項目が下の設定・本人カードに隠れないよう、メニューの中だけを送る。 */
+  /* 広い幅の列とスマホの引き出しの両方に同じメニューがあるので、それぞれ送る。 */
+  const navs = useRef(new Set<HTMLElement>())
+  const navRef = (node: HTMLElement | null) => { if (node) navs.current.add(node) }
+  useEffect(() => {
+    const reveal = () => {
+      for (const nav of navs.current) {
+        if (!nav.isConnected) { navs.current.delete(nav); continue }
+        const current = nav.querySelector<HTMLElement>('[aria-current="page"]')
+        if (!current || nav.clientHeight === 0) continue
+        const top = current.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop
+        const bottom = top + current.getBoundingClientRect().height
+        if (top < nav.scrollTop) nav.scrollTop = top
+        else if (bottom > nav.scrollTop + nav.clientHeight) nav.scrollTop = bottom - nav.clientHeight
+      }
+    }
+    reveal()
+    // 項目・件数は後から読み込まれて高さが変わる。開いた直後の短い間だけ見直す（人がたたんだ・送った後は動かさない）。
+    const timers = [150, 500, 1200].map((ms) => window.setTimeout(reveal, ms))
+    return () => { for (const timer of timers) window.clearTimeout(timer) }
+  }, [pathname])
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -715,7 +736,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+      <nav ref={navRef} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -792,6 +813,7 @@ export default function Sidebar({
                   prefetch={false}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
+                  aria-current={active ? 'page' : undefined}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
