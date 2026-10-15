@@ -2,7 +2,7 @@
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarClock, CalendarDays, FileText, Landmark, Lock, ReceiptText, TriangleAlert, Users, Wallet } from 'lucide-react'
+import { Banknote, Calendar, CalendarCheck, FileText, Landmark, Lock, TriangleAlert, Users, Wallet } from 'lucide-react'
 import {
   api,
   type AffiliateAccountSettlementPreview,
@@ -238,7 +238,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="今回 払う額"
-        icon={<Wallet size={14} aria-hidden="true" />}
+        icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
         valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}
         unit=""
@@ -247,7 +247,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="次の締め"
-        icon={<CalendarDays size={14} aria-hidden="true" />}
+        icon={<Calendar size={14} aria-hidden="true" />}
         value={null}
         valueText={ready && preview ? formatMonthDay(preview.periodTo) : emptyValue('unknown')}
         unit=""
@@ -256,7 +256,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="次の支払日"
-        icon={<CalendarClock size={14} aria-hidden="true" />}
+        icon={<CalendarCheck size={14} aria-hidden="true" />}
         value={null}
         valueText="—"
         unit=""
@@ -265,7 +265,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="今年 払った合計"
-        icon={<ReceiptText size={14} aria-hidden="true" />}
+        icon={<Wallet size={14} aria-hidden="true" />}
         value={null}
         valueText="—"
         unit=""
@@ -332,7 +332,7 @@ export default function PaymentTab() {
       <div className={styles.fullRow}>
         <div className={styles.noticeStack}>
           {ready && missingBanks.length > 0 ? (
-            <Notice tone="warn">
+            <Notice tone="info" icon={<TriangleAlert size={16} aria-hidden="true" />}>
               {`振込先が登録されていない人が ${formatNumber(missingBanks.length)} 人います（${missingBanks.slice(0, 3).map((item) => item.affiliateName).join('・')}${missingBanks.length > 3 ? ` ほか${formatNumber(missingBanks.length - 3)} 人` : ''}）。締める前に、本人に登録をお願いしてください。`}
             </Notice>
           ) : null}

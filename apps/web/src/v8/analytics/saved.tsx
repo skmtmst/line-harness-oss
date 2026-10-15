@@ -261,8 +261,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             {snapshotLoading ? <p data-card-footer className={styles.caption}>結果を読み込んでいます</p>
               : !selected ? <p data-card-footer className={styles.caption}>一覧から分析を選んでください</p>
               : snapshots.length === 0 ? <p data-card-footer className={styles.caption}>保存された結果はありません</p>
-              : <DataTable aria-label="結果の履歴" columnSizing="content" columnLayout={{ ...TABLE_LAYOUT, rowHeight: 'var(--polish-table-row)' }}>
-                <thead><TableHeadRow>
+              : <DataTable aria-label="結果の履歴" columnSizing="controls" columnLayout={{ ...TABLE_LAYOUT, rowHeight: 'var(--polish-table-row)' }}>
+                <thead><TableHeadRow data-table-layout="columns">
                   <Th grow truncate>対象期間</Th>
                   <Th collapseAt="narrow" truncate>データ締切</Th>
                   <Th truncate>状態</Th>
@@ -282,11 +282,11 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <p data-card-footer className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
           </Card>
         }>
-          <DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
+          <DataTable aria-label="保存した分析" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>
               {visibleItems.length === 0 ? <Tr><Td colSpan={5}>条件に合う保存済み分析はありません。<Button onClick={() => setQuery('')}>キャンセル</Button></Td></Tr> : visibleItems.map(item => <Tr key={item.id} data-table-layout="columns" selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)}>
-                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} selected={selectedId === item.id} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
+                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
                 <Td><TruncatedText value={kindLabel(item.kind)} /></Td><Td><TruncatedText value={item.createdByName} /></Td><Td><TruncatedText value={shortDateTime(item.updatedAt)} /></Td>
                 <Td title={item.latestSnapshot ? `${formatAnalyticsDate(item.latestSnapshot.periodFrom)}〜${formatAnalyticsDate(item.latestSnapshot.periodTo)}・${SAVED_STATE_LABELS[item.latestSnapshot.state]}` : undefined}>{latestPill(item)}</Td>
               </Tr>)}
@@ -303,8 +303,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       </div>
       {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)
-        : <DataTable aria-label="定期レポート" columnSizing="content" columnLayout={TABLE_LAYOUT}>
-          <thead><TableHeadRow>
+        : <DataTable aria-label="定期レポート" columnSizing="controls" columnLayout={TABLE_LAYOUT}>
+          <thead><TableHeadRow data-table-layout="columns">
             <Th grow truncate>レポート名</Th>
             <Th truncate>間隔</Th>
             <Th truncate>次に届く予定</Th>
