@@ -48,7 +48,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
     <section className={styles.section}>
       <h3>次の予約</h3>
       {next ? <Card frame="inset" padding="compact" layout="vertical" gap="tight">
-        <CardHeader title={next.friend_name ?? '名前の登録なし'} meta={next.menu_name} action={<Avatar name={next.friend_name} size={32} />} />
+        <CardHeader size="panel" title={next.friend_name ?? '名前の登録なし'} meta={next.menu_name} action={<Avatar name={next.friend_name} size={32} />} />
         <CardContent><ReservationFacts items={[{ label: '日付', value: day }, { label: '時刻', value: `${formatTime(next.starts_at)}〜${formatTime(next.ends_at)}` }, { label: '担当', value: next.staff_name }]} /></CardContent>
         <Button variant="primary" onClick={() => onOpen(next.id)}>詳細を見る</Button>
         {canWrite ? <Button href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変える</Button> : null}
