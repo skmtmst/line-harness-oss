@@ -124,6 +124,27 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   /* クラスのお支払い（B-305 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
   const eventPayment = useMenuPayment('event', accountId, eventId)
+  /* 下の帯の左端に［削除する］（絵 XFRyO）。権限と断りの文は一覧の削除と同じ。 */
+  const canDelete = role === 'owner' || role === 'admin'
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  async function removeEvent() {
+    if (!eventId || deleteBusy) return
+    setDeleteBusy(true); setDeleteError('')
+    try {
+      await eventsApi.deleteEvent(accountId, eventId)
+      setDeleteOpen(false)
+      notifyToast('イベントを削除しました')
+      router.push('/events')
+    } catch (cause) {
+      setDeleteError(cause instanceof ApiError && (cause.code === 'event_has_active_bookings' || cause.status === 409)
+        ? '申込中・確定済みの予約、またはキャンセル待ちの人がいるため削除できません。先に申込者への対応を終えてください。'
+        : '削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
   const dirty = eventPayment.dirty || JSON.stringify(draft) !== JSON.stringify(savedDraft)
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating })
 
@@ -361,11 +382,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       label: item.label, current: tab === item.key, disabled: item.key !== 'overview' && !eventId,
       onClick: () => { if (item.key === 'overview' || eventId) setTab(item.key) },
     }))} />
-    {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId} /> : null}
-    {tab === 'overview' && eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} /> : null}
+    {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId}
+      afterBasics={eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} /> : null} /> : null}
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
-    {tab !== 'slots' ? <StickyBar status={tab === 'overview'
+    {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'
       ? eventId ? '変更を「概要を保存する」で確定します' : '保存するとイベントが作成され、予約枠タブに進みます'
       : '「公開する」ON で友だちに予約 URL を案内できます'} actions={<>
         {tab === 'overview' && eventId ? <Button onClick={() => save('slots')} disabled={saving}>保存して次へ →</Button> : null}
@@ -373,6 +394,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((item) => item.key === tab)?.saveLabel ?? '保存する'}
         </Button>
       </>} /> : null}
+ <ConfirmDialog open={deleteOpen} title={`「${draft.name || 'このイベント'}」を削除しますか？`} description="削除すると元に戻せません。申込中・確定済みの予約やキャンセル待ちがあるときは削除できません。"
+      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()} />
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </></SaveErrorScope>
 }
@@ -386,11 +409,14 @@ function OverviewTab({
   update,
   accounts,
   currentAccountId,
+  afterBasics,
 }: {
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   accounts: Array<{ id: string; name: string; country: string | null; isActive: boolean }>
   currentAccountId: string
+  /** 絵 XFRyO：「基本」のすぐ下に置く段（お支払い）。 */
+  afterBasics?: React.ReactNode
 }) {
   const descLen = (draft.description ?? '').length
   /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
@@ -409,7 +435,7 @@ function OverviewTab({
   const activeAccounts = accounts.filter((a) => a.isActive)
   return (
     <>
-      <FormSection id="ev-form-overview" title="概要">
+      <FormSection id="ev-form-overview" title="基本">
       <Field label="イベント名" required error={nameError}>
         <SaveErrorField names={["name"]}><TextInput
           type="text"
@@ -462,6 +488,7 @@ function OverviewTab({
           詳細を中央揃えで表示
         </Checkbox>
       </FormSection>
+      {afterBasics}
       <FormSection id="ev-form-questions" title="申し込みのときに聞くこと" description="予約フォームに質問を追加できます。回答は申込の一覧で確認できます。">
         <EventQuestionsEditor
           questions={draft.questions ?? []}
