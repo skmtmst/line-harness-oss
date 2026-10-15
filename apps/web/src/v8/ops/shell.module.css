@@ -1,49 +1,5 @@
 /* 運営コンソールの V8 外枠（左メニューの頭・板の頭・注意の帯）。値は globals.css の --tpl-op-*。 */
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-op-brand-gap);
-  padding: var(--tpl-op-brand-pad);
-}
-
-.brandMark {
-  display: flex;
-  width: var(--tpl-op-brand-mark);
-  height: var(--tpl-op-brand-mark);
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-control);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
-  font-size: var(--tpl-op-brand-mark-text);
-  font-weight: 700;
-  line-height: var(--tpl-op-brand-mark-lh);
-}
-
-.brandText {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.brandName {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: var(--tpl-op-brand-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.brandSub {
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-op-brand-lh);
-}
-
 .meNote {
   padding: var(--tpl-op-me-pad);
   color: var(--color-ink-secondary);
@@ -181,26 +137,5 @@
 }
 
 .caution {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-op-caution-gap);
   margin: 0 0 var(--tpl-op-section-gap);
-  border-radius: var(--tpl-op-caution-radius);
-  background: var(--color-status-warn-soft);
-  padding: var(--tpl-op-caution-pad);
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-op-caution-lh);
-}
-
-.caution svg {
-  width: var(--tpl-op-caution-icon);
-  height: var(--tpl-op-caution-icon);
-  flex-shrink: 0;
-}
-
-.envTag {
-  margin-left: auto;
-  font-weight: 500;
 }

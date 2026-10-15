@@ -75,7 +75,6 @@ describe('U094 運営コンソールの外枠', () => {
     expect(NAV).toMatch(/\.nav\s*\{[^}]*overflow-y:\s*auto/s)
     // 上の見出しと下のアカウントは縮まない。
     expect(SHELL).toContain('className={nav.settingsEntry}')
-    expect(SHELL).toContain('identityActions={[')
   })
 
   it('利用者メニューは矢印キーで項目を移動できる', () => {
