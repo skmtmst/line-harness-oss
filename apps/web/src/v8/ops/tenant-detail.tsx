@@ -149,6 +149,14 @@ function DetailContent() {
         title={tenant.name}
         description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at).replace(/-/g, '/')} から`}
         environment={environment}
+        band={(
+      <KpiBand>
+        <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="月額" value={null} unit="" valueText={emptyValue('unknown')} detail={planLabel(tenant.plan_key)} />
+        <KpiCard presentation="cell" icon={<Store size={13} aria-hidden="true" />} title="アカウント" value={accounts.filter((a) => !a.archived_at).length} unit="件" detail={accounts.some((a) => a.archived_at || !a.is_active) ? `停止・アーカイブ ${accounts.filter((a) => a.archived_at || !a.is_active).length} 件` : 'すべて動いている'} />
+        <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="友だち" value={accounts.filter((a) => !a.archived_at).reduce((sum, a) => sum + a.friend_count, 0)} unit="人" detail="動いている店舗の合計" />
+        <KpiCard presentation="cell" icon={<Inbox size={13} aria-hidden="true" />} title="お問い合わせ" value={null} unit="" valueText={emptyValue('unknown')} detail="件数はまだ取得できません" />
+      </KpiBand>
+        )}
         actions={(
           <>
             {!readOnly && tenant.status === 'active' ? <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
@@ -159,12 +167,6 @@ function DetailContent() {
           </>
         )}
       />
-      <KpiBand>
-        <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="月額" value={null} unit="" valueText={emptyValue('unknown')} detail={planLabel(tenant.plan_key)} />
-        <KpiCard presentation="cell" icon={<Store size={13} aria-hidden="true" />} title="アカウント" value={accounts.filter((a) => !a.archived_at).length} unit="件" detail={accounts.some((a) => a.archived_at || !a.is_active) ? `停止・アーカイブ ${accounts.filter((a) => a.archived_at || !a.is_active).length} 件` : 'すべて動いている'} />
-        <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="友だち" value={accounts.filter((a) => !a.archived_at).reduce((sum, a) => sum + a.friend_count, 0)} unit="人" detail="動いている店舗の合計" />
-        <KpiCard presentation="cell" icon={<Inbox size={13} aria-hidden="true" />} title="お問い合わせ" value={null} unit="" valueText={emptyValue('unknown')} detail="件数はまだ取得できません" />
-      </KpiBand>
       <div className={parts.stack}>
         {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
